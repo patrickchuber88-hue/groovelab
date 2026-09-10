@@ -75,9 +75,11 @@ export function isSlotCancelledByAbsence(
   const untilDate = new Date(rawUntil);
   if (isNaN(untilDate.getTime()) || untilDate.getFullYear() <= 1971) return false;
 
-  // Slot-Startzeitpunkt ermitteln
+  // Slot-Startzeitpunkt ermitteln (Lokale Zeit)
   const cleanTime = (slotStartTimeStr || '00:00').substring(0, 5);
-  const slotDateTime = new Date(`${slotDateStr}T${cleanTime.length === 5 ? `${cleanTime}:00` : cleanTime}`);
+  const [slotH, slotM] = cleanTime.split(':').map(Number);
+  const [sYear, sMonth, sDay] = slotDateStr.substring(0, 10).split('-').map(Number);
+  const slotDateTime = new Date(sYear, (sMonth || 1) - 1, sDay || 1, slotH || 0, slotM || 0, 0, 0);
   if (isNaN(slotDateTime.getTime())) return false;
 
   // Abwesenheits-Startzeitpunkt ermitteln (volljuristischer Zeitstempel)
@@ -87,13 +89,13 @@ export function isSlotCancelledByAbsence(
     if (rawStart.includes('T')) {
       startDateTime = new Date(rawStart);
     } else {
-      // Reines YYYY-MM-DD Datum: Startet um 00:00 Uhr
-      startDateTime = new Date(`${rawStart}T00:00:00`);
+      const [stYear, stMonth, stDay] = rawStart.substring(0, 10).split('-').map(Number);
+      startDateTime = new Date(stYear, (stMonth || 1) - 1, stDay || 1, 0, 0, 0, 0);
     }
   } else {
-    // Ohne sick_start gilt das Datum von sick_until ab 00:00 Uhr
     const untilDateOnly = rawUntil.substring(0, 10);
-    startDateTime = new Date(`${untilDateOnly}T00:00:00`);
+    const [uYear, uMonth, uDay] = untilDateOnly.split('-').map(Number);
+    startDateTime = new Date(uYear, (uMonth || 1) - 1, uDay || 1, 0, 0, 0, 0);
   }
 
   // End-Zeitpunkt: Falls sick_until nur ein Datum ist, bis 23:59:59.999
@@ -102,7 +104,8 @@ export function isSlotCancelledByAbsence(
     endDateTime = new Date(rawUntil);
   } else {
     const untilDateOnly = rawUntil.substring(0, 10);
-    endDateTime = new Date(`${untilDateOnly}T23:59:59.999`);
+    const [uYear, uMonth, uDay] = untilDateOnly.split('-').map(Number);
+    endDateTime = new Date(uYear, (uMonth || 1) - 1, uDay || 1, 23, 59, 59, 999);
   }
 
   return slotDateTime.getTime() >= startDateTime.getTime() && slotDateTime.getTime() <= endDateTime.getTime();

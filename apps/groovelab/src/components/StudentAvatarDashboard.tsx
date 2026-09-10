@@ -813,12 +813,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     return () => clearInterval(timer);
   }, [parentGateCooldownSeconds]);
 
-  // Master Wall-Clock 1s Heartbeat for exact countdowns & lock synchronicity
+  // Master Wall-Clock 15s Heartbeat for lock synchronicity without VDOM thrashing
   const [wallClockNow, setWallClockNow] = useState<Date>(() => new Date());
   useEffect(() => {
     const timer = setInterval(() => {
       setWallClockNow(new Date());
-    }, 1000);
+    }, 15000);
     return () => clearInterval(timer);
   }, []);
 
@@ -6560,7 +6560,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           is_campus_active: true,
           progress_percent: skill.progress_percent || 0,
           status: skill.status || (skill.progress_percent === 100 ? 'MASTERED' : 'IN_PROGRESS'),
-          is_current_homework: Boolean(skill.is_current_homework)
+          is_current_homework: Boolean(skill.is_current_homework),
+          homework_notes: skill.homework_notes || skill.teacher_notes || ''
         });
       }
     });
@@ -6578,7 +6579,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       if (existing) {
         if (item.is_current_homework) existing.is_current_homework = true;
         if (item.status === 'MASTERED') existing.status = 'MASTERED';
-        if (item.homework_notes) existing.homework_notes = item.homework_notes;
+        if (item.homework_notes || item.teacher_notes) existing.homework_notes = item.homework_notes || item.teacher_notes;
         if (item.progress_percent !== undefined) existing.progress_percent = item.progress_percent;
       } else {
         const catalogSong = (songs || []).find(s => 
@@ -6611,7 +6612,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           progress_percent: item.progress_percent || (item.status === 'MASTERED' ? 100 : 0),
           status: item.status,
           is_current_homework: Boolean(item.is_current_homework),
-          homework_notes: item.homework_notes
+          homework_notes: item.homework_notes || item.teacher_notes || ''
         });
       }
     });
@@ -6807,7 +6808,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       if (skillsRes.status === 'fulfilled' && (skillsRes.value as any)?.data) {
         loadedSkills = ((skillsRes.value as any).data || []).filter((skill: any) => {
           if (!skill.songs) return false;
-          return skill.songs.is_campus_active === true;
+          return skill.songs.is_campus_active === true || skill.is_current_homework === true || Boolean(skill.homework_notes);
         });
         setActiveSongSkills(loadedSkills);
       }
@@ -6822,6 +6823,53 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         });
         loadedProgress = Array.from(uniqueItemsMap.values());
         setProgressItems(loadedProgress);
+
+        // 🛡️ Auto-heal localProgress for cold/online cache: merge database Lehrwerke into localProgress
+        setLocalProgress((prevLocal: any[]) => {
+          const combined = (prevLocal || []).map((a: any) => ({ ...a, pageStates: { ...(a.pageStates || {}) } }));
+          loadedProgress.forEach((item: any) => {
+            if (item.topic_name && item.topic_name.includes(' - Seite ')) {
+              const parts = item.topic_name.split(' - Seite ');
+              const bookTitle = parts[0].trim();
+              const pageNum = parseInt(parts[1], 10);
+              const book = loadedLehrwerke.find((g: any) => (g.title || '').trim().toLowerCase() === bookTitle.toLowerCase());
+              const bId = book?.id || `custom-${bookTitle.toLowerCase()}`;
+              let assignment = combined.find((a: any) => 
+                (String(a.studentId) === String(targetId) || !a.studentId) &&
+                (String(a.lehrwerkId) === String(bId) || ((a.bookTitle || a.lehrwerkTitle || '').trim().toLowerCase() === bookTitle.toLowerCase()))
+              );
+              if (!assignment) {
+                assignment = {
+                  studentId: targetId,
+                  lehrwerkId: bId,
+                  bookTitle: book?.title || bookTitle,
+                  lehrwerkTitle: book?.title || bookTitle,
+                  totalPages: book?.totalPages || book?.total_pages || 50,
+                  assignedAt: item.created_at || item.updated_at || new Date().toISOString(),
+                  pageStates: {}
+                };
+                combined.push(assignment);
+              }
+              if (!isNaN(pageNum) && assignment.pageStates) {
+                if (!assignment.pageStates[pageNum] || item.is_current_homework) {
+                  let status: 'locked' | 'homework' | 'mastered' | 'purple' = 'locked';
+                  if (item.status === 'MASTERED') status = 'mastered';
+                  else if (item.status === 'THEORY_DONE') status = 'purple';
+                  else if (item.is_current_homework) status = 'homework';
+
+                  assignment.pageStates[pageNum] = {
+                    ...(assignment.pageStates[pageNum] || {}),
+                    status: assignment.pageStates[pageNum]?.status || status,
+                    isCurrentHomework: Boolean(item.is_current_homework),
+                    notes: item.teacher_notes || assignment.pageStates[pageNum]?.notes || '',
+                    homework_notes: item.homework_notes || item.teacher_notes || assignment.pageStates[pageNum]?.homework_notes || ''
+                  };
+                }
+              }
+            }
+          });
+          return combined;
+        });
       }
 
       // Persist cache snapshot for instant 0ms loads
@@ -6906,6 +6954,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           osc.start(now + i * 0.11);
           osc.stop(now + i * 0.11 + 0.7);
         });
+        setTimeout(() => {
+          if (audioCtx.state !== 'closed') {
+            audioCtx.close().catch(() => {});
+          }
+        }, 1200);
       } catch (e) {}
     };
 
@@ -8224,7 +8277,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [isDetoxActive, isFaceDown, detoxSecondsLeft, detoxCompleted]);
+  }, [isDetoxActive, isFaceDown, detoxCompleted]);
 
   const triggerWarning = () => {
     // Haptic Vibrate Warning
@@ -10801,6 +10854,185 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
 
 
+  // 🛡️ AUTHORITATIVE PARENT GATE KEY HANDLER (Supports Virtual Keypad & Physical Mac Keyboard 0-9 / Backspace / Escape / C)
+  const handleParentGateKeyInput = useCallback(async (key: string) => {
+    if (parentGateCooldownSeconds > 0 || isVerifyingParentGate) return;
+
+    if (key === 'Escape') {
+      setShowParentGateModal(false);
+      setPendingParentTarget(null);
+      setParentSetupPin('');
+      setParentSetupConfirm('');
+      setParentSetupStep('enter');
+      setParentGatePinInput('');
+      setParentGateError('');
+      setParentSetupError('');
+      return;
+    }
+
+    setParentGateError('');
+    setParentSetupError('');
+
+    const hasConfiguredParentPin = Boolean(studentUser?.has_parent_pin === true);
+
+    if (hasConfiguredParentPin) {
+      if (key === 'C' || key === 'Escape') {
+        setParentGatePinInput('');
+      } else if (key === 'back' || key === 'Backspace') {
+        setParentGatePinInput(prev => prev.slice(0, -1));
+      } else if (/^[0-9]$/.test(key)) {
+        setParentGatePinInput(prev => {
+          if (prev.length >= 6) return prev;
+          const nextVal = prev + key;
+          if (nextVal.length === 6) {
+            // Trigger verify with nextVal
+            setTimeout(() => {
+              handleVerifyParentPinAttempt(nextVal, () => {
+                setShowParentGateModal(false);
+                if (pendingParentTarget) {
+                  setSettingsSubTab(pendingParentTarget);
+                  setActiveStudentSettingsModal(pendingParentTarget);
+                }
+              });
+            }, 0);
+          }
+          return nextVal;
+        });
+      }
+    } else {
+      // First-time PIN setup
+      if (parentSetupStep === 'enter') {
+        if (key === 'C' || key === 'Escape') {
+          setParentSetupPin('');
+        } else if (key === 'back' || key === 'Backspace') {
+          setParentSetupPin(prev => prev.slice(0, -1));
+        } else if (/^[0-9]$/.test(key)) {
+          setParentSetupPin(prev => {
+            if (prev.length >= 6) return prev;
+            const nextVal = prev + key;
+            if (nextVal.length === 6) {
+              if (/^(\d)\1+$/.test(nextVal) || nextVal === '123456' || nextVal === '654321') {
+                setParentSetupError('Bitte wähle eine sicherere PIN (nicht 123456 oder 000000).');
+                return '';
+              }
+              setParentSetupStep('confirm');
+            }
+            return nextVal;
+          });
+        }
+      } else {
+        // Confirmation step
+        if (key === 'C' || key === 'Escape') {
+          setParentSetupConfirm('');
+        } else if (key === 'back' || key === 'Backspace') {
+          setParentSetupConfirm(prev => prev.slice(0, -1));
+        } else if (/^[0-9]$/.test(key)) {
+          setParentSetupConfirm(prev => {
+            if (prev.length >= 6) return prev;
+            const nextVal = prev + key;
+            if (nextVal.length === 6) {
+              if (nextVal !== parentSetupPin) {
+                setParentSetupError('Die PINs stimmen nicht überein.');
+                setParentSetupPin('');
+                setParentSetupStep('enter');
+                return '';
+              }
+
+              const recKey = generateParentRecoveryKey();
+              (async () => {
+                try {
+                  let rpcSuccess = false;
+                  try {
+                    const { data: rpcRes, error: rpcErr } = await supabase.rpc('set_parent_pin_with_recovery_key', {
+                      p_student_id: studentId,
+                      p_new_pin: nextVal,
+                      p_recovery_key: recKey
+                    });
+                    if (!rpcErr && rpcRes === true) rpcSuccess = true;
+                  } catch (e) {}
+
+                  if (!rpcSuccess) {
+                    const { data: fbRes, error: fbErr } = await supabase.rpc('set_parent_pin', {
+                      p_student_id: studentId,
+                      p_new_pin: nextVal
+                    });
+                    if (fbErr || fbRes !== true) {
+                      throw new Error(fbErr?.message || 'Serverfehler beim Speichern der Eltern-PIN.');
+                    }
+                  }
+                  
+                  if (studentUser) {
+                    (studentUser as any).has_parent_pin = true;
+                  }
+
+                  sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 180 * 1000));
+                  sessionStorage.setItem(`groovelab_parent_unlocked_${studentId}`, 'true');
+                  sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
+                  window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: true }));
+
+                  setShowParentGateModal(false);
+                  setParentSetupPin('');
+                  setParentSetupConfirm('');
+                  setParentSetupStep('enter');
+                  if (pendingParentTarget) {
+                    setSettingsSubTab(pendingParentTarget);
+                    setActiveStudentSettingsModal(pendingParentTarget);
+                  }
+
+                  // Trigger Schicht 1: One-Time Emergency Kit Modal!
+                  setNewGeneratedRecoveryKey(recKey);
+                  setHasCopiedRecoveryKey(false);
+                  setShowEmergencyKitModal(true);
+                } catch (e: any) {
+                  setParentSetupError('Fehler beim Speichern: ' + e.message);
+                  setParentSetupConfirm('');
+                }
+              })();
+            }
+            return nextVal;
+          });
+        }
+      }
+    }
+  }, [
+    parentGateCooldownSeconds,
+    isVerifyingParentGate,
+    studentUser,
+    parentSetupStep,
+    parentSetupPin,
+    studentId,
+    pendingParentTarget,
+    handleVerifyParentPinAttempt
+  ]);
+
+  // Physical Mac Keyboard Listener when Parent Gate Modal is active (0-9, Backspace, Escape, C)
+  useEffect(() => {
+    if (!showParentGateModal) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept if user is typing in another input element
+      const activeTag = document.activeElement?.tagName?.toLowerCase();
+      if (activeTag === 'input' || activeTag === 'textarea') return;
+
+      if (/^[0-9]$/.test(e.key)) {
+        e.preventDefault();
+        handleParentGateKeyInput(e.key);
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        handleParentGateKeyInput('back');
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        handleParentGateKeyInput('Escape');
+      } else if (e.key === 'c' || e.key === 'C') {
+        e.preventDefault();
+        handleParentGateKeyInput('C');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showParentGateModal, handleParentGateKeyInput]);
+
   // 🛡️ REUSABLE MODALS: Parent Gate Master PIN & Recovery Key
   const renderParentGateModal = () => {
     if (!showParentGateModal) return null;
@@ -10812,6 +11044,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         inset: 0,
         background: 'rgba(15, 23, 42, 0.75)',
         backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        transform: 'translateZ(0)',
+        isolation: 'isolate',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -10972,118 +11207,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   key={key}
                   type="button"
                   disabled={isDisabled}
-                  onClick={async () => {
-                    if (parentGateCooldownSeconds > 0) return;
-                    setParentGateError('');
-                    setParentSetupError('');
-
-                    if (hasConfiguredParentPin) {
-                      if (key === 'C') {
-                        setParentGatePinInput('');
-                      } else if (key === 'back') {
-                        setParentGatePinInput(prev => prev.slice(0, -1));
-                      } else if (parentGatePinInput.length < 6) {
-                        const nextVal = parentGatePinInput + key;
-                        setParentGatePinInput(nextVal);
-                        if (nextVal.length === 6) {
-                          handleVerifyParentPinAttempt(nextVal, () => {
-                            setShowParentGateModal(false);
-                            if (pendingParentTarget) {
-                              setSettingsSubTab(pendingParentTarget);
-                              setActiveStudentSettingsModal(pendingParentTarget);
-                            }
-                          });
-                        }
-                      }
-                    } else {
-                      // First-time PIN setup
-                      if (parentSetupStep === 'enter') {
-                        if (key === 'C') {
-                          setParentSetupPin('');
-                        } else if (key === 'back') {
-                          setParentSetupPin(prev => prev.slice(0, -1));
-                        } else if (parentSetupPin.length < 6) {
-                          const nextVal = parentSetupPin + key;
-                          setParentSetupPin(nextVal);
-                          if (nextVal.length === 6) {
-                            if (/^(\d)\1+$/.test(nextVal) || nextVal === '123456' || nextVal === '654321') {
-                              setParentSetupError('Bitte wähle eine sicherere PIN (nicht 123456 oder 000000).');
-                              setParentSetupPin('');
-                              return;
-                            }
-                            setParentSetupStep('confirm');
-                          }
-                        }
-                      } else {
-                        if (key === 'C') {
-                          setParentSetupConfirm('');
-                        } else if (key === 'back') {
-                          setParentSetupConfirm(prev => prev.slice(0, -1));
-                        } else if (parentSetupConfirm.length < 6) {
-                          const nextVal = parentSetupConfirm + key;
-                          setParentSetupConfirm(nextVal);
-                          if (nextVal.length === 6) {
-                            if (nextVal !== parentSetupPin) {
-                              setParentSetupError('Die PINs stimmen nicht überein.');
-                              setParentSetupConfirm('');
-                              setParentSetupPin('');
-                              setParentSetupStep('enter');
-                              return;
-                            }
-
-                            const recKey = generateParentRecoveryKey();
-                            try {
-                              let rpcSuccess = false;
-                              try {
-                                const { data: rpcRes, error: rpcErr } = await supabase.rpc('set_parent_pin_with_recovery_key', {
-                                  p_student_id: studentId,
-                                  p_new_pin: nextVal,
-                                  p_recovery_key: recKey
-                                });
-                                if (!rpcErr && rpcRes === true) rpcSuccess = true;
-                              } catch (e) {}
-
-                              if (!rpcSuccess) {
-                                const { data: fbRes, error: fbErr } = await supabase.rpc('set_parent_pin', {
-                                  p_student_id: studentId,
-                                  p_new_pin: nextVal
-                                });
-                                if (fbErr || fbRes !== true) {
-                                  throw new Error(fbErr?.message || 'Serverfehler beim Speichern der Eltern-PIN.');
-                                }
-                              }
-                              
-                              if (studentUser) {
-                                (studentUser as any).has_parent_pin = true;
-                              }
-
-                              sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 180 * 1000));
-                              sessionStorage.setItem(`groovelab_parent_unlocked_${studentId}`, 'true');
-                              sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
-                              window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: true }));
-
-                              setShowParentGateModal(false);
-                              setParentSetupPin('');
-                              setParentSetupConfirm('');
-                              setParentSetupStep('enter');
-                              if (pendingParentTarget) {
-                                setSettingsSubTab(pendingParentTarget);
-                                setActiveStudentSettingsModal(pendingParentTarget);
-                              }
-
-                              // Trigger Schicht 1: One-Time Emergency Kit Modal!
-                              setNewGeneratedRecoveryKey(recKey);
-                              setHasCopiedRecoveryKey(false);
-                              setShowEmergencyKitModal(true);
-                            } catch (e: any) {
-                              setParentSetupError('Fehler beim Speichern: ' + e.message);
-                              setParentSetupConfirm('');
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }}
+                  onClick={() => handleParentGateKeyInput(key)}
                   style={{
                     padding: '14px 0',
                     borderRadius: '16px',
@@ -11182,6 +11306,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           zIndex: 100003,
           background: 'rgba(15, 23, 42, 0.75)',
           backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
+          transform: 'translateZ(0)',
+          isolation: 'isolate',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -11527,8 +11654,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       quote: '„Im Schlaf wächst dein musikalisches Gehör. Träum süß von neuen Melodien!“'
     };
 
-    return createPortal(
-      <div style={{
+    return (
+      <>
+        {createPortal(
+          <div style={{
         position: 'fixed',
         inset: 0,
         zIndex: 99999,
@@ -11694,14 +11823,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             <span>Eltern-PIN eingeben (Entsperren)</span>
           </button>
         </div>
-
-        {/* Directly render parent gate & recovery modals on top of the portal with z-index 100002! */}
-        {renderParentGateModal()}
-        {renderRecoveryKeyModal()}
       </div>,
       document.body
-    );
-  }
+    )}
+    {renderParentGateModal()}
+    {renderRecoveryKeyModal()}
+  </>
+);
+}
 
   // WENN IS_APP_USER = TRUE (Selector Screen if no avatar chosen yet in GrooveLab)
   if (showSelector && currentPlatform === 'groovelab') {
@@ -13068,6 +13197,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       )}
 
       <TourComponent />
+
+      {/* 🛡️ ROOT-LEVEL PARENT GATE & RECOVERY MODALS */}
+      {renderParentGateModal()}
+      {renderRecoveryKeyModal()}
     </div>
   );
 }

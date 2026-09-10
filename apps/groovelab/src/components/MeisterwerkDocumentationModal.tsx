@@ -622,6 +622,36 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       return timeB - timeA;
     });
   }, [assignedLehrwerke, progressItems, globalLehrwerke, student.id]);
+
+  // 🔄 Prop-Sync: When parent loads data asynchronously (cold cache / online server), sync incoming props into modal state
+  React.useEffect(() => {
+    if (initialProgressItems && initialProgressItems.length > 0) {
+      setProgressItems(initialProgressItems);
+    }
+  }, [initialProgressItems]);
+
+  React.useEffect(() => {
+    if (initialLehrwerke && initialLehrwerke.length > 0) {
+      setGlobalLehrwerke(initialLehrwerke);
+    }
+  }, [initialLehrwerke]);
+
+  React.useEffect(() => {
+    if (initialLocalProgress && Array.isArray(initialLocalProgress)) {
+      const studentAssigned = initialLocalProgress.filter((item: any) => String(item.studentId) === String(student.id));
+      if (studentAssigned.length > 0) {
+        setAssignedLehrwerke(studentAssigned);
+      }
+    }
+  }, [initialLocalProgress, student.id]);
+
+  React.useEffect(() => {
+    if (initialSongs && initialSongs.length > 0) {
+      setSongs(initialSongs);
+      setActiveSongSkills(initialSongs);
+    }
+  }, [initialSongs]);
+
   const [activeLehrwerkId, setActiveLehrwerkId] = useState<string | null>(null);
   const [activePageNumber, setActivePageNumber] = useState<number | null>(null);
   const [activeSubView, setActiveSubView] = useState<'hub' | 'lehrwerk' | 'song' | 'history'>('hub');
@@ -3776,10 +3806,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       const isStudentViewingOwn = readOnly || !isTeacherTools || String(student.id) === String(activeTId);
       const filteredSkills = (skillsData || []).filter((skill: any) => {
         if (!skill.songs) return false;
-        // 1. Must be active on Campus
-        if (skill.songs.is_campus_active !== true) return false;
-        // 2. Only in explicit teacher-tools session (editing), check teacherId if supplied
-        if (!isStudentViewingOwn && teacherId && skill.songs.teacher_id && skill.songs.teacher_id !== teacherId) return false;
+        const hasHomework = skill.is_current_homework || Boolean(skill.homework_notes);
+        if (!hasHomework) {
+          // 1. Must be active on Campus if not assigned as homework
+          if (skill.songs.is_campus_active !== true && !isStudentViewingOwn) return false;
+          // 2. Only in explicit teacher-tools session (editing), check teacherId if supplied
+          if (!isStudentViewingOwn && teacherId && skill.songs.teacher_id && skill.songs.teacher_id !== teacherId) return false;
+        }
         return true;
       });
 
@@ -8612,7 +8645,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         const localNote = localStorage.getItem(`song_note_${student.id}_${id}`) ||
                           (skill.song_id ? localStorage.getItem(`song_note_${student.id}_${skill.song_id}`) : '') ||
                           (songObj.id ? localStorage.getItem(`song_note_${student.id}_${songObj.id}`) : '') ||
-                          skill.homework_notes;
+                          skill.homework_notes ||
+                          skill.teacher_notes ||
+                          '';
 
         songsMap.set(normKey, {
           ...skill,
@@ -8642,7 +8677,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       const isHw = (localHw === 'true') || (localHw !== 'false' && Boolean(item.is_current_homework));
       const localNote = localStorage.getItem(`song_note_${student.id}_${item.id}`) ||
                         (item.song_id ? localStorage.getItem(`song_note_${student.id}_${item.song_id}`) : '') ||
-                        item.homework_notes;
+                        item.homework_notes ||
+                        item.teacher_notes ||
+                        '';
 
       if (existing) {
         if (isHw) existing.is_current_homework = true;
@@ -8693,7 +8730,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       const isAssigned = (progressItems || []).some((item: any) => isSongMatch(item, s));
       if (isAssigned) {
         const localHw = localStorage.getItem(`song_hw_${student.id}_${s.id}`) === 'true' || Boolean(s.is_current_homework);
-        const localNote = localStorage.getItem(`song_note_${student.id}_${s.id}`) || s.homework_notes || '';
+        const localNote = localStorage.getItem(`song_note_${student.id}_${s.id}`) || s.homework_notes || s.teacher_notes || '';
         songsMap.set(normKey, {
           ...s,
           id: s.id || normKey,
@@ -10189,7 +10226,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               activeTagPickerRowIndex={activeTagPickerRowIndex}
               activeTtsKey={activeTtsKey}
               adjustTextareaHeight={adjustTextareaHeight}
-              assignedLehrwerke={assignedLehrwerke}
+              assignedLehrwerke={sortedAssignedLehrwerke}
               audioDuration={audioDuration}
               audioLabel={audioLabel}
               awardSticker={awardSticker}
@@ -10449,7 +10486,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           isMobileOrSim={isMobileOrSim}
           useNotebookLayout={useNotebookLayout}
           student={student}
-          assignedLehrwerke={assignedLehrwerke}
+          assignedLehrwerke={sortedAssignedLehrwerke}
           globalLehrwerke={globalLehrwerke}
           activeSongSkills={resolvedActiveSongs}
           setActiveSongSkills={setActiveSongSkills}

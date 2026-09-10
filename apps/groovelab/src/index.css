@@ -1067,6 +1067,13 @@ body {
   40%, 60% { transform: translate3d(4px, -50%, 0) translateX(-50%); }
 }
 
+/* 🛡️ Parental Gate & PIN Dots Error Shake Animation */
+@keyframes pinShakeAnim {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+
 .flashing-dot {
   animation: flash 1.5s infinite;
 }
@@ -2219,7 +2226,7 @@ select option {
 /* ── GPU Hardware Acceleration for Smooth 60 FPS Glassmorphism ── */
 .glass-accelerated, .liquid-glass, .glass-card, .glass-modal {
   transform: translateZ(0);
-  will-change: transform, backdrop-filter;
+  will-change: transform;
 }
 
 /* ── BFSG / WCAG 2.2 AA Universal Apple Focus Ring Accessibility ── */

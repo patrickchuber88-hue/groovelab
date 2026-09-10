@@ -309,7 +309,9 @@ BEGIN
             v_time_str := SUBSTRING(COALESCE(v_occ.start_time, '00:00'), 1, 5);
 
             UPDATE public.schedule_occurrences
-            SET status = 'cancelled'
+            SET status = 'cancelled',
+                canceled_by_role = 'teacher',
+                teacher_acknowledged = TRUE
             WHERE id = v_occ.id;
 
             -- Insert crisis notification if needed
@@ -441,14 +443,14 @@ BEGIN
         END IF;
     END LOOP;
 
-    -- Restore occurrences
+    -- Restore occurrences (strictly future only: datetime > v_now)
     FOR v_occ IN
         SELECT o.id, o.student_id, o.date, o.start_time, u.first_name, u.last_name
         FROM public.schedule_occurrences o
         LEFT JOIN public.users_raw u ON u.id = o.student_id
         WHERE o.teacher_id = p_teacher_id 
           AND o.status = 'cancelled'
-          AND o.date >= DATE(v_now)
+          AND (o.date || ' ' || COALESCE(o.start_time, '00:00:00'))::timestamptz > v_now
     LOOP
         UPDATE public.schedule_occurrences 
         SET status = 'rescheduled_confirmed'

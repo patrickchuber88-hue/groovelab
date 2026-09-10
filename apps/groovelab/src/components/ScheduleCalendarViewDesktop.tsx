@@ -2891,46 +2891,48 @@ export function ScheduleCalendarViewDesktop({
       
       const schoolYearEndStr = getSchoolYearEndStr(getSimulatedNow());
 
-      // 1. Fetch DB occurrences for visible week
+      // 1. Fetch DB occurrences for visible week (excluding student cancellations to protect them)
       let weekOccs: any[] = [];
       if (weekEndStr >= todayStr) {
         const [wByDate, wByOrig] = await Promise.all([
           supabase.from('schedule_occurrences')
-            .select('id, student_id, date, start_time, status, original_date, original_start_time')
+            .select('id, student_id, date, start_time, status, canceled_by_role, original_date, original_start_time')
             .eq('teacher_id', userId)
             .gte('date', weekStartStr)
             .lte('date', weekEndStr),
           supabase.from('schedule_occurrences')
-            .select('id, student_id, date, start_time, status, original_date, original_start_time')
+            .select('id, student_id, date, start_time, status, canceled_by_role, original_date, original_start_time')
             .eq('teacher_id', userId)
             .gte('original_date', weekStartStr)
             .lte('original_date', weekEndStr)
         ]);
         const merged = [...(wByDate.data || []), ...(wByOrig.data || [])];
-        weekOccs = Array.from(new Map(merged.map(o => [o.id, o])).values());
+        weekOccs = Array.from(new Map(merged.map(o => [o.id, o])).values())
+          .filter(o => o.status !== 'canceled_by_student' && o.canceled_by_role !== 'student');
       }
 
       // 2. Fetch for rest of school year (>= todayStr && <= schoolYearEndStr)
       const [syByDate, syByOrig] = await Promise.all([
         supabase.from('schedule_occurrences')
-          .select('id, student_id, date, start_time, status, original_date, original_start_time')
+          .select('id, student_id, date, start_time, status, canceled_by_role, original_date, original_start_time')
           .eq('teacher_id', userId)
           .gte('date', todayStr)
           .lte('date', schoolYearEndStr),
         supabase.from('schedule_occurrences')
-          .select('id, student_id, date, start_time, status, original_date, original_start_time')
+          .select('id, student_id, date, start_time, status, canceled_by_role, original_date, original_start_time')
           .eq('teacher_id', userId)
           .gte('original_date', todayStr)
           .lte('original_date', schoolYearEndStr)
       ]);
       const syMerged = [...(syByDate.data || []), ...(syByOrig.data || [])];
       const syUnique = Array.from(new Map(syMerged.map(o => [o.id, o])).values())
-        .filter(o => !o.date || o.date >= todayStr);
+        .filter(o => (!o.date || o.date >= todayStr) && o.status !== 'canceled_by_student' && o.canceled_by_role !== 'student');
 
       // 3. Inspect visible occurrences for deviations from designer master template, swaps, or pending state
       const localDeviations: any[] = [];
       (occurrences || []).forEach((occ: any) => {
         if (!occ.student_id || occ.student_id === 'vacant') return;
+        if (occ.status === 'canceled_by_student' || occ.canceled_by_role === 'student') return; // Student cancellations are kept untouched!
         const occDate = occ.date;
         if (occDate < weekStartStr || occDate > weekEndStr) return;
 
@@ -2943,7 +2945,7 @@ export function ScheduleCalendarViewDesktop({
           occ.notes?.includes('Getauscht mit') ||
           (swapLinks && swapLinks.some((link: any) => link.id1 === occ.id || link.id2 === occ.id))
         );
-        const isStatusAltered = Boolean(occ.status && ['cancelled', 'canceled_by_student', 'teacher_sick', 'open_reschedule', 'pending_reschedule', 'rescheduled_confirmed'].includes(occ.status));
+        const isStatusAltered = Boolean(occ.status && ['cancelled', 'teacher_sick', 'open_reschedule', 'pending_reschedule', 'rescheduled_confirmed'].includes(occ.status));
         const isDateMoved = Boolean(occ.original_date && occ.original_date !== occ.date);
         const isTimeMoved = Boolean(occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occ.start_time.substring(0, 5));
         const isAtMaster = checkIsOccurrenceAtMasterSlot(occ);
@@ -2982,13 +2984,15 @@ export function ScheduleCalendarViewDesktop({
     try {
       const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 
-      // Filter only occurrences that were actually altered or cancelled
+      // Filter only occurrences that were actually altered or cancelled by teacher
       const alteredOccurrences = occurrences.filter(occ => 
         occ.student_id && 
         occ.student_id !== 'vacant' && 
         !String(occ.id).startsWith('mock-') && 
+        occ.status !== 'canceled_by_student' &&
+        occ.canceled_by_role !== 'student' &&
         (
-          ['cancelled', 'canceled_by_student', 'teacher_sick', 'canceled_by_teacher_sick', 'open_reschedule', 'pending_reschedule'].includes(occ.status) ||
+          ['cancelled', 'teacher_sick', 'canceled_by_teacher_sick', 'open_reschedule', 'pending_reschedule'].includes(occ.status) ||
           (occ.original_date && (occ.original_date !== occ.date || occ.original_start_time !== occ.start_time)) ||
           occ.rescheduled
         )
@@ -3098,12 +3102,12 @@ export function ScheduleCalendarViewDesktop({
       // 2. Fetch occurrences to delete
       const [resByDate, resByOrigDate] = await Promise.all([
         supabase.from('schedule_occurrences')
-          .select('id, date, start_time, student_id, status, original_date, original_start_time, student:users!schedule_occurrences_student_id_fkey(first_name, last_name)')
+          .select('id, date, start_time, student_id, status, canceled_by_role, original_date, original_start_time, student:users!schedule_occurrences_student_id_fkey(first_name, last_name)')
           .eq('teacher_id', userId)
           .gte('date', startDateStr)
           .lte('date', endDateStr),
         supabase.from('schedule_occurrences')
-          .select('id, date, start_time, student_id, status, original_date, original_start_time, student:users!schedule_occurrences_student_id_fkey(first_name, last_name)')
+          .select('id, date, start_time, student_id, status, canceled_by_role, original_date, original_start_time, student:users!schedule_occurrences_student_id_fkey(first_name, last_name)')
           .eq('teacher_id', userId)
           .gte('original_date', startDateStr)
           .lte('original_date', endDateStr)
@@ -3115,7 +3119,10 @@ export function ScheduleCalendarViewDesktop({
       ];
 
       // History protection: only delete records within the target reset range
+      // AND KEEP student cancellations (canceled_by_student / student) strictly untouched!
       const validOccurrencesToDelete = occurrencesToDelete.filter(occ => {
+        const isStudentCancel = occ.status === 'canceled_by_student' || occ.canceled_by_role === 'student';
+        if (isStudentCancel) return false;
         const occDate = occ.date || occ.original_date;
         return occDate && occDate >= startDateStr && occDate <= endDateStr;
       });
@@ -4834,116 +4841,6 @@ export function ScheduleCalendarViewDesktop({
                   <option value={30}>30 Min</option>
                 </select>
               </div>
-
-              {/* Offene Ersatztermine Navigation Capsule */}
-              {allOpenReschedules && allOpenReschedules.length > 0 && (
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  background: '#fef3c7',
-                  border: '1px solid #fcd34d',
-                  borderRadius: '10px',
-                  padding: '2px 8px',
-                  height: '32px',
-                  boxSizing: 'border-box',
-                  boxShadow: '0 1px 4px rgba(245, 158, 11, 0.12)'
-                }}>
-                  <button
-                    type="button"
-                    aria-label={`${allOpenReschedules.length} offene Ersatztermine bearbeiten`}
-                    onClick={() => {
-                      const targetOcc = allOpenReschedules[currentRescheduleIndex];
-                      if (targetOcc) {
-                        const occDate = new Date(targetOcc.date);
-                        if (!isNaN(occDate.getTime())) {
-                          setCurrentDate(occDate);
-                        }
-                        setEditOccState({
-                          id: targetOcc.id,
-                          date: targetOcc.date,
-                          start_time: targetOcc.start_time,
-                          room_id: targetOcc.schedules?.room_id || (targetOcc as any).room_id || null,
-                          duration: targetOcc.duration
-                        });
-                      }
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      background: 'transparent',
-                      border: 'none',
-                      color: '#b45309',
-                      cursor: 'pointer',
-                      padding: 0
-                    }}
-                    title="Klicken, um diesen Ersatztermin zu bearbeiten"
-                  >
-                    <RefreshCw size={13} style={{ flexShrink: 0 }} />
-                    <span style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.02em', whiteSpace: 'nowrap' }}>
-                      {allOpenReschedules.length} {allOpenReschedules.length === 1 ? 'offener Ersatztermin' : 'offene Ersatztermine'}
-                    </span>
-                    {allOpenReschedules[currentRescheduleIndex]?.student && (
-                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#92400e', background: 'rgba(255,255,255,0.7)', padding: '1px 5px', borderRadius: '4px', marginLeft: '2px' }}>
-                        ({allOpenReschedules[currentRescheduleIndex].student.first_name})
-                      </span>
-                    )}
-                  </button>
-
-                  {allOpenReschedules.length > 1 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginLeft: '4px', borderLeft: '1px solid rgba(180, 83, 9, 0.2)', paddingLeft: '6px' }}>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setCurrentRescheduleIndex(prev => (prev > 0 ? prev - 1 : allOpenReschedules.length - 1));
-                        }}
-                        style={{
-                          background: '#ffffff',
-                          border: '1px solid #fcd34d',
-                          borderRadius: '5px',
-                          padding: '1px 3px',
-                          color: '#b45309',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                        title="Vorheriger Ersatztermin"
-                        aria-label="Vorheriger Ersatztermin"
-                      >
-                        <ChevronLeft size={13} />
-                      </button>
-                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#92400e', padding: '0 3px', fontFamily: 'monospace' }}>
-                        {currentRescheduleIndex + 1}/{allOpenReschedules.length}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setCurrentRescheduleIndex(prev => (prev < allOpenReschedules.length - 1 ? prev + 1 : 0));
-                        }}
-                        style={{
-                          background: '#ffffff',
-                          border: '1px solid #fcd34d',
-                          borderRadius: '5px',
-                          padding: '1px 3px',
-                          color: '#b45309',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                        title="Nächster Ersatztermin"
-                        aria-label="Nächster Ersatztermin"
-                      >
-                        <ChevronRight size={13} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           )}
 
@@ -5736,17 +5633,6 @@ export function ScheduleCalendarViewDesktop({
                       }}>
                         {dayDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}
                       </div>
-                      {(() => {
-                        const dayRooms = Array.from(new Set(dayOccurrences.map(o => o.room_override_name || o.schedules?.room?.name || (o.template_room_id ? rooms.find(r => r.id === o.template_room_id)?.name : null) || (o.room_id ? rooms.find(r => r.id === o.room_id)?.name : null)).filter(Boolean)));
-                        if (dayRooms.length === 1) {
-                          return (
-                            <div style={{ fontSize: '0.66rem', fontWeight: 700, color: '#475569', background: 'rgba(0,0,0,0.05)', padding: '2px 8px', borderRadius: '6px', marginTop: '4px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                              <span>📍 {dayRooms[0]}</span>
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
                     </>
                   );
                 })()}
@@ -6860,20 +6746,18 @@ export function ScheduleCalendarViewDesktop({
                               <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', justifyContent: 'space-between', padding: '1px 0', gap: '2px' }}>
                                 {/* Row 1: Header (Time + Room Pill left, Status Badge & Close right) */}
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '4px' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0, flexShrink: 0 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     <span style={{ 
-                                      fontSize: '0.65rem', 
-                                      fontWeight: 800, 
-                                      color: '#1d1d1f', 
+                                      fontSize: '0.75rem', 
+                                      fontWeight: 850, 
+                                      color: '#0f172a', 
                                       background: '#ffffff', 
-                                      boxShadow: '0 1px 2px rgba(0,0,0,0.06), 0 0 0 0.5px rgba(0,0,0,0.04)',
-                                      border: '1px solid rgba(0,0,0,0.08)',
-                                      padding: '1px 4px', 
-                                      borderRadius: '4px',
-                                      whiteSpace: 'nowrap',
+                                      boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                                      border: 'none',
+                                      padding: '2px 6px', 
+                                      borderRadius: '6px',
                                       display: 'inline-flex',
                                       alignItems: 'center',
-                                      gap: '2px',
                                       flexShrink: 0
                                     }}>
                                       <input
@@ -6893,55 +6777,59 @@ export function ScheduleCalendarViewDesktop({
                                         style={{
                                           background: 'transparent',
                                           border: 'none',
-                                          fontSize: '0.65rem',
-                                          fontWeight: 800,
-                                          color: '#1d1d1f',
+                                          fontSize: '0.75rem',
+                                          fontWeight: 850,
+                                          color: '#0f172a',
                                           outline: 'none',
                                           padding: 0,
                                           cursor: 'pointer',
-                                          fontFamily: 'inherit',
-                                          width: '38px'
+                                          fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                          width: '50px'
                                         }}
                                         title="Startzeit manuell anpassen"
                                       />
-                                      {(() => {
-                                        const defaultRoomId = occ.template_room_id || (occ as any).original_room_id || occ.schedules?.room_id;
-                                        const defaultRoomName = occ.schedules?.room?.name || (occ as any).original_room_name || (occ.template_room_id ? rooms.find(r => r.id === occ.template_room_id)?.name : null);
-                                        
-                                        const currentRoomId = occ.room_override_id || occ.room_id || occ.schedules?.room_id;
-                                        const currentRoomName = occ.room_override_name || (currentRoomId ? rooms.find(r => String(r.id) === String(currentRoomId))?.name : '') || occ.schedules?.room?.name || '';
-                                        
-                                        const isRoomChanged = Boolean(
-                                          occ.room_override_id || 
-                                          (occ as any).roomOverrideId || 
-                                          occ.room_override_name || 
-                                          (occ as any).roomOverrideName || 
-                                          (occ as any).is_room_changed || 
-                                          (occ as any).isRoomChanged || 
-                                          (occ as any).is_room_booking || 
-                                          (occ as any).isRoomBooking || 
-                                          (defaultRoomId && currentRoomId && String(defaultRoomId) !== String(currentRoomId)) ||
-                                          (defaultRoomName && currentRoomName && defaultRoomName !== currentRoomName)
-                                        );
-
-                                        if (!isRoomChanged || !currentRoomName) return null;
-
-                                        return (
-                                          <span style={{ 
-                                            fontWeight: 800, 
-                                            color: '#7c3aed',
-                                            background: '#f3e8ff',
-                                            border: '1px solid #ddd6fe',
-                                            padding: '0.5px 4px',
-                                            borderRadius: '4px',
-                                            fontSize: '0.62rem', 
-                                            whiteSpace: 'nowrap' 
-                                          }} title={`Raum geändert zu ${currentRoomName}`}>
-                                            📍 {currentRoomName}
-                                          </span>
-                                        );
-                                      })()}
                                     </span>
+                                    {(() => {
+                                      const defaultRoomId = occ.template_room_id || (occ as any).original_room_id || occ.schedules?.room_id;
+                                      const defaultRoomName = occ.schedules?.room?.name || (occ as any).original_room_name || (occ.template_room_id ? rooms.find(r => r.id === occ.template_room_id)?.name : null);
+                                      
+                                      const currentRoomId = occ.room_override_id || occ.room_id || occ.schedules?.room_id || occ.template_room_id;
+                                      const currentRoomName = occ.room_override_name || (currentRoomId ? rooms.find(r => String(r.id) === String(currentRoomId))?.name : '') || occ.schedules?.room?.name || '';
+                                      if (!currentRoomName) return null;
+
+                                      const isRoomChanged = Boolean(
+                                        occ.room_override_id || 
+                                        (occ as any).roomOverrideId || 
+                                        occ.room_override_name || 
+                                        (occ as any).roomOverrideName || 
+                                        (occ as any).is_room_changed || 
+                                        (occ as any).isRoomChanged || 
+                                        (occ as any).is_room_booking || 
+                                        (occ as any).isRoomBooking || 
+                                        (defaultRoomId && currentRoomId && String(defaultRoomId) !== String(currentRoomId)) ||
+                                        (defaultRoomName && currentRoomName && defaultRoomName !== currentRoomName)
+                                      );
+
+                                      return (
+                                        <span style={{ 
+                                          fontWeight: 800, 
+                                          color: isRoomChanged ? '#7c3aed' : '#475569',
+                                          background: isRoomChanged ? '#f3e8ff' : 'rgba(255, 255, 255, 0.85)',
+                                          border: isRoomChanged ? '1px solid #ddd6fe' : '1px solid rgba(0,0,0,0.06)',
+                                          boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                                          padding: '2px 6px',
+                                          borderRadius: '6px',
+                                          fontSize: '0.68rem', 
+                                          whiteSpace: 'nowrap',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '2px',
+                                          fontFamily: "'Plus Jakarta Sans', sans-serif"
+                                        }} title={isRoomChanged ? `Raum geändert zu ${currentRoomName}` : `Raum: ${currentRoomName}`}>
+                                          📍 {currentRoomName}
+                                        </span>
+                                      );
+                                    })()}
                                   </div>
 
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
@@ -7181,16 +7069,16 @@ export function ScheduleCalendarViewDesktop({
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                                     <span style={{ 
                                       fontSize: '0.7rem', 
-                                      fontWeight: 800, 
-                                      color: '#1d1d1f', 
+                                      fontWeight: 850, 
+                                      color: '#0f172a', 
                                       background: '#ffffff', 
-                                      boxShadow: '0 1px 2px rgba(0,0,0,0.06), 0 0 0 0.5px rgba(0,0,0,0.04)',
-                                      border: '1px solid rgba(0,0,0,0.08)',
+                                      boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                                      border: 'none',
                                       padding: '1.5px 5px', 
-                                      borderRadius: '5px',
+                                      borderRadius: '6px',
                                       display: 'inline-flex',
                                       alignItems: 'center',
-                                      gap: '2px'
+                                      flexShrink: 0
                                     }}>
                                       <input
                                         type="time"
@@ -7211,55 +7099,58 @@ export function ScheduleCalendarViewDesktop({
                                           background: 'transparent',
                                           border: 'none',
                                           fontSize: '0.7rem',
-                                          fontWeight: 800,
-                                          color: '#1d1d1f',
+                                          fontWeight: 850,
+                                          color: '#0f172a',
                                           outline: 'none',
                                           padding: 0,
                                           cursor: 'pointer',
-                                          fontFamily: 'inherit',
+                                          fontFamily: "'Plus Jakarta Sans', sans-serif",
                                           width: '46px'
                                         }}
                                         title="Startzeit manuell anpassen"
                                       />
-                                      {(() => {
-                                        const defaultRoomId = occ.template_room_id || (occ as any).original_room_id || occ.schedules?.room_id;
-                                        const defaultRoomName = occ.schedules?.room?.name || (occ as any).original_room_name || (occ.template_room_id ? rooms.find(r => r.id === occ.template_room_id)?.name : null);
-                                        
-                                        const currentRoomId = occ.room_override_id || occ.room_id || occ.schedules?.room_id;
-                                        const currentRoomName = occ.room_override_name || (currentRoomId ? rooms.find(r => String(r.id) === String(currentRoomId))?.name : '') || occ.schedules?.room?.name || '';
-                                        
-                                        const isRoomChanged = Boolean(
-                                          occ.room_override_id || 
-                                          (occ as any).roomOverrideId || 
-                                          occ.room_override_name || 
-                                          (occ as any).roomOverrideName || 
-                                          (occ as any).is_room_changed || 
-                                          (occ as any).isRoomChanged || 
-                                          (occ as any).is_room_booking || 
-                                          (occ as any).isRoomBooking || 
-                                          (defaultRoomId && currentRoomId && String(defaultRoomId) !== String(currentRoomId)) ||
-                                          (defaultRoomName && currentRoomName && defaultRoomName !== currentRoomName)
-                                        );
-
-                                        if (!isRoomChanged || !currentRoomName) return null;
-
-                                        return (
-                                          <span style={{ 
-                                            marginLeft: '3px', 
-                                            fontWeight: 800, 
-                                            color: '#7c3aed',
-                                            background: '#f3e8ff',
-                                            border: '1px solid #ddd6fe',
-                                            padding: '0.5px 4px',
-                                            borderRadius: '4px',
-                                            fontSize: '0.65rem', 
-                                            whiteSpace: 'nowrap' 
-                                          }} title={`Raum geändert zu ${currentRoomName}`}>
-                                            📍 {currentRoomName}
-                                          </span>
-                                        );
-                                      })()}
                                     </span>
+                                    {(() => {
+                                      const defaultRoomId = occ.template_room_id || (occ as any).original_room_id || occ.schedules?.room_id;
+                                      const defaultRoomName = occ.schedules?.room?.name || (occ as any).original_room_name || (occ.template_room_id ? rooms.find(r => r.id === occ.template_room_id)?.name : null);
+                                      
+                                      const currentRoomId = occ.room_override_id || occ.room_id || occ.schedules?.room_id || occ.template_room_id;
+                                      const currentRoomName = occ.room_override_name || (currentRoomId ? rooms.find(r => String(r.id) === String(currentRoomId))?.name : '') || occ.schedules?.room?.name || '';
+                                      if (!currentRoomName) return null;
+
+                                      const isRoomChanged = Boolean(
+                                        occ.room_override_id || 
+                                        (occ as any).roomOverrideId || 
+                                        occ.room_override_name || 
+                                        (occ as any).roomOverrideName || 
+                                        (occ as any).is_room_changed || 
+                                        (occ as any).isRoomChanged || 
+                                        (occ as any).is_room_booking || 
+                                        (occ as any).isRoomBooking || 
+                                        (defaultRoomId && currentRoomId && String(defaultRoomId) !== String(currentRoomId)) ||
+                                        (defaultRoomName && currentRoomName && defaultRoomName !== currentRoomName)
+                                      );
+
+                                      return (
+                                        <span style={{ 
+                                          fontWeight: 800, 
+                                          color: isRoomChanged ? '#7c3aed' : '#475569',
+                                          background: isRoomChanged ? '#f3e8ff' : 'rgba(255, 255, 255, 0.85)',
+                                          border: isRoomChanged ? '1px solid #ddd6fe' : '1px solid rgba(0,0,0,0.06)',
+                                          boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                                          padding: '1.5px 5px',
+                                          borderRadius: '6px',
+                                          fontSize: '0.65rem', 
+                                          whiteSpace: 'nowrap',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '2px',
+                                          fontFamily: "'Plus Jakarta Sans', sans-serif"
+                                        }} title={isRoomChanged ? `Raum geändert zu ${currentRoomName}` : `Raum: ${currentRoomName}`}>
+                                          📍 {currentRoomName}
+                                        </span>
+                                      );
+                                    })()}
                                   </div>
 
                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', flexWrap: 'wrap', maxWidth: '65%', flexShrink: 0 }}>
@@ -7470,16 +7361,16 @@ return (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                   <span style={{ 
                                     fontSize: '0.75rem', 
-                                    fontWeight: 800, 
-                                    color: '#1d1d1f', 
+                                    fontWeight: 850, 
+                                    color: '#0f172a', 
                                     background: '#ffffff', 
-                                    boxShadow: '0 1px 2px rgba(0,0,0,0.06), 0 0 0 0.5px rgba(0,0,0,0.04)',
-                                    border: '1px solid rgba(0,0,0,0.08)',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                                    border: 'none',
                                     padding: '2px 6px', 
-                                    borderRadius: '5px',
+                                    borderRadius: '6px',
                                     display: 'inline-flex',
                                     alignItems: 'center',
-                                    gap: '2px'
+                                    flexShrink: 0
                                   }}>
                                     <input
                                       type="time"
@@ -7499,55 +7390,58 @@ return (
                                         background: 'transparent',
                                         border: 'none',
                                         fontSize: '0.75rem',
-                                        fontWeight: 800,
-                                        color: '#1d1d1f',
+                                        fontWeight: 850,
+                                        color: '#0f172a',
                                         outline: 'none',
                                         padding: 0,
                                         cursor: 'pointer',
-                                        fontFamily: 'inherit',
+                                        fontFamily: "'Plus Jakarta Sans', sans-serif",
                                         width: '50px'
                                       }}
                                       title="Startzeit manuell anpassen"
                                     />
-                                    {(() => {
-                                      const defaultRoomId = occ.template_room_id || (occ as any).original_room_id || occ.schedules?.room_id;
-                                      const defaultRoomName = occ.schedules?.room?.name || (occ as any).original_room_name || (occ.template_room_id ? rooms.find(r => r.id === occ.template_room_id)?.name : null);
-                                      
-                                      const currentRoomId = occ.room_override_id || occ.room_id || occ.schedules?.room_id;
-                                      const currentRoomName = occ.room_override_name || (currentRoomId ? rooms.find(r => String(r.id) === String(currentRoomId))?.name : '') || occ.schedules?.room?.name || '';
-                                      
-                                      const isRoomChanged = Boolean(
-                                        occ.room_override_id || 
-                                        (occ as any).roomOverrideId || 
-                                        occ.room_override_name || 
-                                        (occ as any).roomOverrideName || 
-                                        (occ as any).is_room_changed || 
-                                        (occ as any).isRoomChanged || 
-                                        (occ as any).is_room_booking || 
-                                        (occ as any).isRoomBooking || 
-                                        (defaultRoomId && currentRoomId && String(defaultRoomId) !== String(currentRoomId)) ||
-                                        (defaultRoomName && currentRoomName && defaultRoomName !== currentRoomName)
-                                      );
-
-                                      if (!isRoomChanged || !currentRoomName) return null;
-
-                                      return (
-                                        <span style={{ 
-                                          marginLeft: '4px', 
-                                          fontWeight: 800, 
-                                          color: '#7c3aed',
-                                          background: '#f3e8ff',
-                                          border: '1px solid #ddd6fe',
-                                          padding: '1px 5px',
-                                          borderRadius: '4px',
-                                          fontSize: '0.68rem', 
-                                          whiteSpace: 'nowrap' 
-                                        }} title={`Raum geändert zu ${currentRoomName}`}>
-                                          📍 {currentRoomName}
-                                        </span>
-                                      );
-                                    })()}
                                   </span>
+                                  {(() => {
+                                    const defaultRoomId = occ.template_room_id || (occ as any).original_room_id || occ.schedules?.room_id;
+                                    const defaultRoomName = occ.schedules?.room?.name || (occ as any).original_room_name || (occ.template_room_id ? rooms.find(r => r.id === occ.template_room_id)?.name : null);
+                                    
+                                    const currentRoomId = occ.room_override_id || occ.room_id || occ.schedules?.room_id || occ.template_room_id;
+                                    const currentRoomName = occ.room_override_name || (currentRoomId ? rooms.find(r => String(r.id) === String(currentRoomId))?.name : '') || occ.schedules?.room?.name || '';
+                                    if (!currentRoomName) return null;
+
+                                    const isRoomChanged = Boolean(
+                                      occ.room_override_id || 
+                                      (occ as any).roomOverrideId || 
+                                      occ.room_override_name || 
+                                      (occ as any).roomOverrideName || 
+                                      (occ as any).is_room_changed || 
+                                      (occ as any).isRoomChanged || 
+                                      (occ as any).is_room_booking || 
+                                      (occ as any).isRoomBooking || 
+                                      (defaultRoomId && currentRoomId && String(defaultRoomId) !== String(currentRoomId)) ||
+                                      (defaultRoomName && currentRoomName && defaultRoomName !== currentRoomName)
+                                    );
+
+                                    return (
+                                      <span style={{ 
+                                        fontWeight: 800, 
+                                        color: isRoomChanged ? '#7c3aed' : '#475569',
+                                        background: isRoomChanged ? '#f3e8ff' : 'rgba(255, 255, 255, 0.85)',
+                                        border: isRoomChanged ? '1px solid #ddd6fe' : '1px solid rgba(0,0,0,0.06)',
+                                        boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                                        padding: '2px 6px',
+                                        borderRadius: '6px',
+                                        fontSize: '0.68rem', 
+                                        whiteSpace: 'nowrap',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '2px',
+                                        fontFamily: "'Plus Jakarta Sans', sans-serif"
+                                      }} title={isRoomChanged ? `Raum geändert zu ${currentRoomName}` : `Raum: ${currentRoomName}`}>
+                                        📍 {currentRoomName}
+                                      </span>
+                                    );
+                                  })()}
                                   {isSwap && (
                                     <button 
                                       type="button"

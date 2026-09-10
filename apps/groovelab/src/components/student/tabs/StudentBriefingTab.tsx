@@ -1180,6 +1180,52 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       }
                     });
 
+                    // 1b. Also incorporate Lehrwerke pages from progressItems (database rows)
+                    (progressItems || []).forEach((item: any) => {
+                      if (!item.topic_name || item.topic_name.startsWith('Hausaufgabe KW ')) return;
+                      if (item.topic_name.includes(' - Seite ')) {
+                        const parts = item.topic_name.split(' - Seite ');
+                        const bookTitle = cleanTitle(parts[0].trim());
+                        const pageNum = parseInt(parts[1], 10);
+                        const book = lehrwerke.find((g: any) => (g.title || '').trim().toLowerCase() === bookTitle.toLowerCase());
+                        if (book && !isNaN(pageNum)) {
+                          let cleanNote = item.homework_notes || item.teacher_notes || '';
+                          if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
+                            try {
+                              const parsed = JSON.parse(cleanNote);
+                              if (Array.isArray(parsed)) {
+                                cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                              }
+                            } catch {}
+                          }
+                          cleanNote = String(cleanNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+                          const formattedNote = cleanNote ? `Seite ${pageNum}: ${cleanNote}` : '';
+
+                          const existingBook = activeJuniorBooks.find(b => (b.title || '').trim().toLowerCase() === book.title.trim().toLowerCase());
+                          if (existingBook) {
+                            if (!existingBook.pages.includes(pageNum)) {
+                              existingBook.pages.push(pageNum);
+                              existingBook.pages.sort((a, b) => a - b);
+                              existingBook.formattedPages = existingBook.pages.length === 1 
+                                ? `S. ${existingBook.pages[0]}` 
+                                : `S. ${existingBook.pages[0]}–${existingBook.pages[existingBook.pages.length - 1]}`;
+                            }
+                            if (formattedNote && !existingBook.notes?.includes(formattedNote)) {
+                              existingBook.notes = [...(existingBook.notes || []), formattedNote];
+                            }
+                          } else {
+                            activeJuniorBooks.push({
+                              title: book.title,
+                              pages: [pageNum],
+                              formattedPages: `S. ${pageNum}`,
+                              notes: formattedNote ? [formattedNote] : [],
+                              book
+                            });
+                          }
+                        }
+                      }
+                    });
+
                     // 2. Songs & progress items
                     const activeJuniorSongs: any[] = [];
                     (progressItems || []).forEach(item => {
@@ -1191,7 +1237,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       if (isSongHw) {
                         const cleanT = cleanTitle(item.topic_name.replace(/\s*\([^)]*\)\s*$/, ''));
                         if (!activeJuniorSongs.some(existing => cleanTitle(existing.topic_name.replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
-                          let cleanNote = item.homework_notes || '';
+                          let cleanNote = item.homework_notes || item.teacher_notes || '';
                           if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
                             try {
                               const parsed = JSON.parse(cleanNote);

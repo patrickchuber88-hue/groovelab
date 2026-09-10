@@ -136,6 +136,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
           {(showAllChangedAppointments ? visibleChangedAppointments : visibleChangedAppointments.slice(0, 3)).map((b: any) => {
               const dateObj = new Date(b.date);
               const isCancelled = ['cancelled', 'canceled_by_student', 'teacher_sick', 'canceled_by_teacher_sick'].includes(b.status);
+              const isCancelledByStudent = b.status === 'canceled_by_student' || b.canceled_by_role === 'student';
               const isReactivated = Boolean(b.status === 'scheduled' && b.original_date && b.original_date === b.date);
               const isRescheduled = ['pending_reschedule', 'rescheduled_confirmed', 'rescheduled', 'open_reschedule', 'changed', 'pending', 'draft'].includes(b.status) || 
                 Boolean(b.original_date && b.original_date !== b.date) ||
@@ -184,13 +185,8 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                 commentButtonBg = '#ffffff';
                 commentButtonColor = '#ef4444';
 
-                if (isConfirmed) {
-                  cardBg = '#fee2e2';
-                  cardBorder = '1.5px solid #ef4444';
-                } else {
-                  cardBg = 'repeating-linear-gradient(-45deg, #fef2f2 0px, #fef2f2 8px, #ffffff 8px, #ffffff 16px)';
-                  cardBorder = '1.5px dashed #ef4444';
-                }
+                cardBg = 'repeating-linear-gradient(-45deg, #fef2f2 0px, #fef2f2 8px, #ffffff 8px, #ffffff 16px)';
+                cardBorder = '1px solid #fca5a5';
               } else if (isRoomChanged) {
                 dateHeaderBg = '#7c3aed';
                 textColor = '#6b21a8';
@@ -342,24 +338,30 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                       </div>
 
                       <span 
-                        title={isCancelled ? 'Ausfall' : (isReactivated ? 'Reaktiviert' : (isConfirmed ? 'Bestätigt' : 'Unbestätigt'))}
+                        title={isCancelled ? 'Dieser Unterrichtstermin entfällt' : (isReactivated ? 'Reaktiviert' : (isConfirmed ? 'Bestätigt' : 'Unbestätigt'))}
                         style={{ 
-                          fontSize: '9px', 
+                          fontSize: '10px', 
                           fontWeight: 800, 
                           background: iconBg, 
                           color: iconColor, 
-                          border: iconBorder,
-                          padding: '2px 6px', 
+                          border: iconBorder, 
+                          padding: '2.5px 7px', 
                           borderRadius: '6px', 
                           lineHeight: 1,
                           display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '3px',
-                          flexShrink: 0
+                          gap: '4px',
+                          flexShrink: 0,
+                          fontFamily: "'Plus Jakarta Sans', sans-serif"
                         }}
                       >
-                        {iconComponent}
+                        {isCancelled ? (
+                          <>
+                            <X size={10} strokeWidth={3} />
+                            <span>Entfällt</span>
+                          </>
+                        ) : iconComponent}
                       </span>
                     </div>
 
@@ -369,82 +371,99 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
                     </div>
                   </div>
 
-                  {(isCancelled || isReactivated) && !b.teacher_acknowledged && b.teacherAcknowledged !== true && (
-                    <button
-                      type="button"
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        try {
-                          const occId = b.id || b.occurrence_id || b.ids?.[0];
-                          if (occId) {
-                            await supabase
-                              .from('schedule_occurrences')
-                              .update({ teacher_acknowledged: true })
-                              .eq('id', occId);
+                  {/* Rechte Aktionsspalte (36×36px Squircle Buttons, kein Textüberdecken) */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    {isCancelledByStudent && !b.teacher_acknowledged && b.teacherAcknowledged !== true && (
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            const occId = b.id || b.occurrence_id || b.ids?.[0];
+                            if (occId) {
+                              await supabase
+                                .from('schedule_occurrences')
+                                .update({ teacher_acknowledged: true })
+                                .eq('id', occId);
+                            }
+                            setMyChangedAppointments((prev: any[]) => prev.map((a: any) => (a.id === b.id || a.id === occId) ? { ...a, teacher_acknowledged: true, teacherAcknowledged: true } : a));
+                          } catch(err) {
+                            console.error(err);
                           }
-                          setMyChangedAppointments((prev: any[]) => prev.map((a: any) => (a.id === b.id || a.id === occId) ? { ...a, teacher_acknowledged: true, teacherAcknowledged: true } : a));
-                        } catch(err) {
-                          console.error(err);
-                        }
-                      }}
-                      title={isReactivated ? "Reaktivierung quittieren" : "Terminabsage quittieren"}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        padding: '6px 12px',
-                        minHeight: '36px',
-                        borderRadius: '10px',
-                        background: isReactivated ? '#dcfce7' : '#fee2e2',
-                        color: isReactivated ? '#166534' : '#dc2626',
-                        border: isReactivated ? '1px solid #86efac' : '1px solid #fca5a5',
-                        fontSize: '0.80rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap',
-                        flexShrink: 0
-                      }}
-                    >
-                      <Check size={12} strokeWidth={3} />
-                      <span>Quittieren</span>
-                    </button>
-                  )}
+                        }}
+                        title="Terminabsage des Schülers als gesehen markieren"
+                        aria-label="Terminabsage des Schülers als gesehen markieren"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '10px',
+                          background: '#fee2e2',
+                          color: '#dc2626',
+                          border: '1px solid #fca5a5',
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                          transition: 'all 0.15s ease',
+                          boxShadow: '0 1px 2px rgba(220, 38, 38, 0.06)'
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.background = '#fecaca';
+                          e.currentTarget.style.transform = 'scale(1.05)';
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.background = '#fee2e2';
+                          e.currentTarget.style.transform = 'scale(1)';
+                        }}
+                      >
+                        <Check size={16} strokeWidth={2.8} />
+                      </button>
+                    )}
 
-                  {b.isSchedule && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveChatOcc({
-                          ...b,
-                          id: b.id || b.ids?.[0],
-                          date: b.date,
-                          start_time: b.startTime || b.start_time,
-                          student_id: b.student_id || b.studentId || b.id,
-                          student: {
-                            first_name: displayStudentName || b.studentName || 'Schüler'
-                          }
-                        });
-                      }}
-                      title="Termingekoppelte Shoutbox öffnen"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: commentButtonBg,
-                        color: commentButtonColor,
-                        width: '36px',
-                        height: '36px',
-                        borderRadius: '10px',
-                        border: '1px solid rgba(0,0,0,0.06)',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        flexShrink: 0,
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
-                      }}
-                    >
-                      <MessageSquare size={16} />
-                    </button>
-                  )}
+                    {b.isSchedule && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveChatOcc({
+                            ...b,
+                            id: b.id || b.ids?.[0],
+                            date: b.date,
+                            start_time: b.startTime || b.start_time,
+                            student_id: b.student_id || b.studentId || b.id,
+                            student: {
+                              first_name: displayStudentName || b.studentName || 'Schüler'
+                            }
+                          });
+                        }}
+                        title="Termingekoppelte Shoutbox öffnen"
+                        aria-label="Termingekoppelte Shoutbox öffnen"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: commentButtonBg,
+                          color: commentButtonColor,
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '10px',
+                          border: '1px solid rgba(0,0,0,0.06)',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          flexShrink: 0,
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.transform = 'scale(1.05)';
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.transform = 'scale(1)';
+                        }}
+                      >
+                        <MessageSquare size={16} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}

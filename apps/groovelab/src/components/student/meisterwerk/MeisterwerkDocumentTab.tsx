@@ -5313,7 +5313,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         const hasTransferredWeek = Boolean(
                           localStorage.getItem(`week_transferred_${student.id}_${viewingWeekIso}`) === 'true' ||
                           (progressItems || []).some((item: any) => 
-                            item.topic_name === `Hausaufgabe KW ${viewingWeekNum}` && 
+                            (item.topic_name === `Hausaufgabe KW ${viewingWeekNum}` || item.topic_name === `Hausaufgabe KW ${parseInt(viewingWeekNum, 10)}`) && 
                             item.homework_notes && 
                             item.homework_notes !== '[]' && 
                             item.homework_notes !== '""'
@@ -5401,8 +5401,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               }
                               if (!isNaN(pageNum) && !groupedLehrwerke[bookTitle].pages.includes(pageNum)) {
                                 groupedLehrwerke[bookTitle].pages.push(pageNum);
-                                if (item.homework_notes) {
-                                  const cleanNote = getCleanPageNotes(item.homework_notes);
+                                if (item.homework_notes || item.teacher_notes) {
+                                  const cleanNote = getCleanPageNotes(item.homework_notes || item.teacher_notes);
                                   if (cleanNote && !groupedLehrwerke[bookTitle].notes.includes(`Seite ${pageNum}: ${cleanNote}`)) {
                                     groupedLehrwerke[bookTitle].notes.push(`Seite ${pageNum}: ${cleanNote}`);
                                   }
@@ -5414,7 +5414,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               if (cleanTopic && !otherHWs.some(existing => getCanonicalSongKey(existing) === canKey || getNormalizedSongTitle(existing) === cleanTopic)) {
                                 const cachedNote = localStorage.getItem(`song_note_${student.id}_${item.id}`) ||
                                                    localStorage.getItem(`song_note_${student.id}_${item.song_id}`) ||
-                                                   item.homework_notes || '';
+                                                   item.homework_notes ||
+                                                   item.teacher_notes ||
+                                                   '';
                                 otherHWs.push({
                                   ...item,
                                   homework_notes: cachedNote
@@ -5441,7 +5443,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
                                 const cachedNote = localStorage.getItem(`song_note_${student.id}_${skill.id}`) ||
                                                    localStorage.getItem(`song_note_${student.id}_${skill.song_id}`) ||
-                                                   skill.homework_notes || '';
+                                                   skill.homework_notes ||
+                                                   skill.teacher_notes ||
+                                                   '';
                                 otherHWs.push({
                                   id: skill.id,
                                   topic_name: fullTitle,
@@ -5585,6 +5589,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           // === HISTORICAL OR FUTURE WEEK ARCHIVED SNAPSHOT ===
                           histWeekItem = (progressItems || []).find((item: any) => {
                             return item.topic_name === `Hausaufgabe KW ${viewingWeekNum}` ||
+                                   item.topic_name === `Hausaufgabe KW ${parseInt(viewingWeekNum, 10)}` ||
                                    (item.created_at && getISOWeek(item.created_at) === viewingWeekIso) ||
                                    (item.updated_at && getISOWeek(item.updated_at) === viewingWeekIso && item.topic_name.startsWith('Hausaufgabe KW '));
                           });

@@ -2045,7 +2045,45 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         const p1 = stored1 ? JSON.parse(stored1) : [];
         const p2 = stored2 ? JSON.parse(stored2) : [];
         const combined = [...(Array.isArray(p1) ? p1 : []), ...(Array.isArray(p2) ? p2 : [])];
-        if (combined.length > 0) setLocalProgress(combined);
+        
+        // 🛡️ Auto-heal localProgress from Supabase progress_matrix for cold cache / mobile QR scans
+        const combinedFromDb = [...combined];
+        deduplicatedMatrixItems.forEach((item: any) => {
+          if (item.topic_name && item.topic_name.includes(' - Seite ')) {
+            const parts = item.topic_name.split(' - Seite ');
+            const bookTitle = parts[0].trim();
+            const pageNum = parseInt(parts[1], 10);
+            const book = (lehrwerkeRes?.data || []).find((g: any) => (g.title || '').trim().toLowerCase() === bookTitle.toLowerCase());
+            const targetBookId = book?.id || `custom-${bookTitle.toLowerCase()}`;
+            let assignment = combinedFromDb.find((a: any) => 
+              (String(a.lehrwerkId || a.lehrwerk_id) === String(targetBookId) || ((a.bookTitle || a.lehrwerkTitle || '').trim().toLowerCase() === bookTitle.toLowerCase())) &&
+              (!profile.id || String(a.studentId || a.student_id) === String(profile.id))
+            );
+            if (!assignment) {
+              assignment = {
+                studentId: profile.id,
+                lehrwerkId: targetBookId,
+                bookTitle: book?.title || bookTitle,
+                totalPages: book?.totalPages || book?.total_pages || 50,
+                assignedAt: item.created_at || item.updated_at || new Date().toISOString(),
+                pageStates: {}
+              };
+              combinedFromDb.push(assignment);
+            }
+            if (!isNaN(pageNum) && assignment.pageStates) {
+              if (!assignment.pageStates[pageNum] || item.is_current_homework) {
+                assignment.pageStates[pageNum] = {
+                  ...(assignment.pageStates[pageNum] || {}),
+                  status: item.status === 'MASTERED' ? 'mastered' : (item.status === 'THEORY_DONE' ? 'purple' : (item.is_current_homework ? 'homework' : 'locked')),
+                  isCurrentHomework: Boolean(item.is_current_homework),
+                  notes: item.teacher_notes || assignment.pageStates[pageNum]?.notes || '',
+                  homework_notes: item.homework_notes || item.teacher_notes || assignment.pageStates[pageNum]?.homework_notes || ''
+                };
+              }
+            }
+          }
+        });
+        setLocalProgress(combinedFromDb);
       } catch {}
 
       setPracticeLoggedToday(metrics.hasCompletedTargetToday);
@@ -5347,8 +5385,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             (!studentId || String(a.studentId || a.student_id) === String(studentId))
           );
           const pageState = assignment?.pageStates?.[pageNum];
-          return pageState?.status === 'homework' || pageState?.isCurrentHomework || pageState?.is_current_homework;
+          if (pageState?.status === 'homework' || pageState?.isCurrentHomework || pageState?.is_current_homework) {
+            return true;
+          }
         }
+        return Boolean(item.is_current_homework);
       }
       const localHw = studentId ? (
         localStorage.getItem(`song_hw_${studentId}_${item.id}`) ??
@@ -5371,8 +5412,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             (!studentId || String(a.studentId || a.student_id) === String(studentId))
           );
           const pageState = assignment?.pageStates?.[pageNum];
-          return pageState?.status === 'purple';
+          if (pageState?.status === 'purple') return true;
         }
+        return item.status === 'THEORY_DONE';
       }
       return item.status === 'THEORY_DONE' && 
              item.updated_at && 
@@ -5415,7 +5457,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           (String(a.lehrwerkId) === String(book.id) || String(a.lehrwerk_id) === String(book.id)) && 
           (!studentId || String(a.studentId || a.student_id) === String(studentId))
         );
-        if (!isBookAssigned && lehrwerke.length > 0) return;
+        if (!isBookAssigned && !item.is_current_homework && lehrwerke.length > 0) return;
 
         const pageNum = parseInt(parts[1], 10);
         if (!groupedLehrwerke[bookTitle]) {
@@ -5441,9 +5483,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           if (studentId) {
             cachedNote = localStorage.getItem(`song_note_${studentId}_${item.id}`) ||
                          (item.song_id ? localStorage.getItem(`song_note_${studentId}_${item.song_id}`) : '') ||
-                         item.homework_notes || '';
+                         item.homework_notes ||
+                         item.teacher_notes ||
+                         '';
           } else {
-            cachedNote = item.homework_notes || '';
+            cachedNote = item.homework_notes || item.teacher_notes || '';
           }
           otherHWs.push({
             ...item,
@@ -5458,7 +5502,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     if (studentId) {
       (activeSongSkills || []).forEach(skill => {
         if (skill.user_id && String(skill.user_id) !== String(studentId)) return;
-        if (skill.songs && skill.songs.is_campus_active === false) return;
+        const hasHomework = skill.is_current_homework || Boolean(skill.homework_notes);
+        if (skill.songs && skill.songs.is_campus_active === false && !hasHomework) return;
 
         const skillId = skill.id;
         const songId = skill.song_id || skill.songs?.id;
@@ -5480,7 +5525,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
           const cachedNote = localStorage.getItem(`song_note_${studentId}_${skillId}`) ||
                              (songId ? localStorage.getItem(`song_note_${studentId}_${songId}`) : '') ||
-                             skill.homework_notes || '';
+                             skill.homework_notes ||
+                             skill.teacher_notes ||
+                             '';
           otherHWs.push({
             id: skill.id,
             song_id: songId,
@@ -5862,13 +5909,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               (!studentId || String(a.studentId || a.student_id) === String(studentId))
             ) : null;
 
-            const pagesWithNotes = assignedBook ? item.pages.filter((p: number) => {
-              const pState = assignedBook.pageStates?.[p];
-              if (pState && cleanPageNotesText(pState.homeworkNotes || pState.homework_notes) !== '') return true;
+            const pagesWithNotes = item.pages.filter((p: number) => {
+              const pState = assignedBook?.pageStates?.[p];
+              if (pState && cleanPageNotesText(pState.homeworkNotes || pState.homework_notes || pState.notes) !== '') return true;
               const dbItem = allActive.find(x => x.topic_name === `${item.title} - Seite ${p}`);
-              if (dbItem && cleanPageNotesText(dbItem.homework_notes) !== '') return true;
+              if (dbItem && cleanPageNotesText(dbItem.homework_notes || dbItem.teacher_notes) !== '') return true;
               return false;
-            }) : [];
+            });
 
             return (
               <div key={`lw-${idx}`} style={{
@@ -5931,11 +5978,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 {/* Specific Page Notes (Frameless Editorial Flow) */}
                 {!compressed && pagesWithNotes.map((p: number) => {
                   const pState = assignedBook?.pageStates?.[p];
-                  let noteText = cleanPageNotesText(pState?.homeworkNotes || pState?.homework_notes);
+                  let noteText = cleanPageNotesText(pState?.homeworkNotes || pState?.homework_notes || pState?.notes);
                   if (!noteText) {
                     const dbItem = allActive.find(x => x.topic_name === `${item.title} - Seite ${p}`);
-                    if (dbItem?.homework_notes) {
-                      noteText = cleanPageNotesText(dbItem.homework_notes);
+                    if (dbItem?.homework_notes || dbItem?.teacher_notes) {
+                      noteText = cleanPageNotesText(dbItem.homework_notes || dbItem.teacher_notes);
                     }
                   }
 

@@ -717,10 +717,14 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                       const songTitleOnly = skill.songs?.title || skill.title || skill.song_title || 'Song';
                       const fullSongTitle = songArtist ? `${songArtist} - ${songTitleOnly}` : songTitleOnly;
                       const isHw = localStorage.getItem(`song_hw_${student?.id}_${skill.id}`) === 'true' ||
-                                   localStorage.getItem(`song_hw_${student?.id}_${skill.song_id}`) === 'true';
+                                   localStorage.getItem(`song_hw_${student?.id}_${skill.song_id}`) === 'true' ||
+                                   Boolean(skill.is_current_homework);
 
                       const cachedNote = localStorage.getItem(`song_note_${student?.id}_${skill.id}`) ||
-                                         localStorage.getItem(`song_note_${student?.id}_${skill.song_id}`) || '';
+                                         localStorage.getItem(`song_note_${student?.id}_${skill.song_id}`) ||
+                                         skill.homework_notes ||
+                                         skill.teacher_notes ||
+                                         '';
                       if (cachedNote) {
                         extractAudios(cachedNote, isHw, fullSongTitle);
                       }
@@ -739,7 +743,9 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                             const songTag = matchingSkill
                               ? (matchingSkill.songs?.title ? `${matchingSkill.songs?.artist ? matchingSkill.songs.artist + ' - ' : ''}${matchingSkill.songs.title}` : matchingSkill.title)
                               : (matchingItem?.topic_name ? matchingItem.topic_name.replace(/\s*\([^)]*\)\s*$/, '').trim() : undefined);
-                            const isHw = localStorage.getItem(`song_hw_${student.id}_${suffix}`) === 'true';
+                            const isHw = (localStorage.getItem(`song_hw_${student.id}_${suffix}`) === 'true') ||
+                                         Boolean(matchingSkill?.is_current_homework) ||
+                                         Boolean(matchingItem?.is_current_homework);
                             extractAudios(val, isHw, songTag);
                           }
                         }
@@ -747,8 +753,17 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                     }
                   } catch {}
 
-                  // 5. Scan Lehrwerke book page notes (campus_lehrwerke_progress_${student.id})
+                  // 5. Scan Lehrwerke book page notes (from progressItems & localStorage)
                   try {
+                    (progressItems || []).forEach((item: any) => {
+                      if (item.topic_name && item.topic_name.includes(' - Seite ')) {
+                        const pNotes = item.homework_notes || item.teacher_notes;
+                        if (pNotes && typeof pNotes === 'string' && pNotes.includes('AUDIO:')) {
+                          extractAudios(pNotes, Boolean(item.is_current_homework), item.topic_name.replace(/\s*\([^)]*\)\s*$/, '').trim());
+                        }
+                      }
+                    });
+
                     const lehrwerkeKey = `campus_lehrwerke_progress_${student?.id}`;
                     const storedLw = (student?.id && localStorage.getItem(lehrwerkeKey)) || localStorage.getItem('student_lehrwerke_progress');
                     if (storedLw) {

@@ -265,9 +265,11 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
       } catch (e) {}
 
       // 6. Lehrwerke
+      let loadedLwData: any[] = [];
       try {
         const { data: lwData } = await supabase.from('lehrwerke').select('*').order('title');
-        setGlobalLehrwerke(lwData || []);
+        loadedLwData = lwData || [];
+        setGlobalLehrwerke(loadedLwData);
       } catch (e) {}
 
       // 7. Assigned progress from localStorage
@@ -279,7 +281,7 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
         }
       } catch (e) {}
 
-      // 8. Homework progress
+      // 8. Homework progress & Auto-healing for assignedLehrwerke
       try {
         const { data: pmData } = await supabase
           .from('progress_matrix')
@@ -287,6 +289,47 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
           .eq('student_id', student.id)
           .order('created_at', { ascending: false });
         setCampusHomeworkItems(pmData || []);
+
+        // 🛡️ Auto-healing: Merge any Lehrwerk found in progress_matrix into assignedLehrwerke
+        setAssignedLehrwerke(prev => {
+          const combined = (prev || []).map((a: any) => ({ ...a, pageStates: { ...(a.pageStates || {}) } }));
+          (pmData || []).forEach((item: any) => {
+            if (item.topic_name && item.topic_name.includes(' - Seite ')) {
+              const parts = item.topic_name.split(' - Seite ');
+              const bookTitle = parts[0].trim();
+              const pageNum = parseInt(parts[1], 10);
+              const book = loadedLwData.find((g: any) => (g.title || '').trim().toLowerCase() === bookTitle.toLowerCase());
+              const targetId = book?.id || `custom-${bookTitle.toLowerCase()}`;
+              let assignment = combined.find((a: any) => 
+                String(a.lehrwerkId) === String(targetId) || ((a.bookTitle || a.lehrwerkTitle || '').trim().toLowerCase() === bookTitle.toLowerCase())
+              );
+              if (!assignment) {
+                assignment = {
+                  studentId: student.id,
+                  lehrwerkId: targetId,
+                  bookTitle: book?.title || bookTitle,
+                  lehrwerkTitle: book?.title || bookTitle,
+                  totalPages: book?.totalPages || book?.total_pages || 50,
+                  assignedAt: item.created_at || item.updated_at || new Date().toISOString(),
+                  pageStates: {}
+                };
+                combined.push(assignment);
+              }
+              if (!isNaN(pageNum) && assignment.pageStates) {
+                if (!assignment.pageStates[pageNum] || item.is_current_homework) {
+                  assignment.pageStates[pageNum] = {
+                    ...(assignment.pageStates[pageNum] || {}),
+                    status: item.status === 'MASTERED' ? 'mastered' : (item.status === 'THEORY_DONE' ? 'purple' : (item.is_current_homework ? 'homework' : 'locked')),
+                    isCurrentHomework: Boolean(item.is_current_homework),
+                    notes: item.teacher_notes || assignment.pageStates[pageNum]?.notes || '',
+                    homework_notes: item.homework_notes || item.teacher_notes || assignment.pageStates[pageNum]?.homework_notes || ''
+                  };
+                }
+              }
+            }
+          });
+          return combined;
+        });
       } catch (e) {}
     };
 

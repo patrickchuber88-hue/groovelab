@@ -11,7 +11,7 @@ import { AvatarImage, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, resol
 import { MUSIC_QUOTES, getQuotesForAudience, getDailyQuote } from '@groovelab/shared';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb, Download, Sliders, Mic, Disc, Radio, Timer, ArrowRight, Headphones, FileText, DoorOpen, HelpCircle, RotateCcw, Phone, Coffee } from 'lucide-react';
+import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronsUpDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb, Download, Sliders, Mic, Disc, Radio, Timer, ArrowRight, Headphones, FileText, DoorOpen, HelpCircle, RotateCcw, Phone, Coffee } from 'lucide-react';
 import { notesService, UserNote } from '../services/notesService';
 import { formatCleanNoteContent } from './notes/notesConstants';
 import { checkIsAudioTresorActive, checkIsAudioTresorReadOnly } from '../domain/stickersAndTresor';
@@ -1723,7 +1723,7 @@ export function TeacherDashboard({
         // Parallel mutations
         await Promise.all([
           scheduleIdsToCancel.size > 0 ? supabase.from('schedules').update({ status: 'canceled_by_teacher_sick' }).in('id', Array.from(scheduleIdsToCancel)) : Promise.resolve(),
-          occurrenceIdsToCancel.size > 0 ? supabase.from('schedule_occurrences').update({ status: 'cancelled' }).in('id', Array.from(occurrenceIdsToCancel)) : Promise.resolve(),
+          occurrenceIdsToCancel.size > 0 ? supabase.from('schedule_occurrences').update({ status: 'cancelled', canceled_by_role: 'teacher', teacher_acknowledged: true }).in('id', Array.from(occurrenceIdsToCancel)) : Promise.resolve(),
           notificationsToInsert.length > 0 ? supabase.from('crisis_notifications').insert(notificationsToInsert) : Promise.resolve(),
           shoutboxMessagesToInsert.length > 0 ? supabase.from('campus_direct_messages').insert(shoutboxMessagesToInsert) : Promise.resolve(),
           datesToDeleteNotifs.length > 0 ? supabase.from('crisis_notifications').delete().eq('teacher_id', userId).in('slot_start_datetime', datesToDeleteNotifs) : Promise.resolve(),
@@ -1761,6 +1761,9 @@ export function TeacherDashboard({
 
       // Optimistic instant state update
       setTeacher((prev: any) => prev ? { ...prev, sick_until: absenceUntilVal, sick_start: absenceStartVal } : prev);
+
+      // Close the form modal immediately so the teacher is not trapped in it
+      setShowAbsenceModal(false);
 
       // Open notification modal showing affected students
       setAbsenceNotifModal({
@@ -2023,12 +2026,12 @@ export function TeacherDashboard({
       }
 
       setTicker(t => t + 1);
-      alert('Abwesenheit beendet! Du stehst wieder als regulär verfügbar im System.');
+      setShowAbsenceEndedModal(true);
     } catch (err) {
       console.error('Fehler bei Verfügbarkeitsmeldung:', err);
       // Fallback: force local clear so teacher is never trapped in absence mode
       setTeacher((prev: any) => prev ? { ...prev, sick_until: null, sick_start: null } : prev);
-      alert('Abwesenheit beendet.');
+      setShowAbsenceEndedModal(true);
     } finally {
       setSubmittingAbsence(false);
     }
@@ -3182,15 +3185,17 @@ export function TeacherDashboard({
   const [bypassAbsenceView, setBypassAbsenceView] = useState(false);
   const [absenceSuccessShown, setAbsenceSuccessShown] = useState(false);
   const [absenceNotifModal, setAbsenceNotifModal] = useState<{ notifs: any[]; absenceUntilDateStr?: string } | null>(null);
+  const [showAbsenceEndedModal, setShowAbsenceEndedModal] = useState(false);
 
   const [openAnnouncementDetailModal, setOpenAnnouncementDetailModal] = useState<any>(null);
   const [dismissedAnnouncementBannerIds, setDismissedAnnouncementBannerIds] = useState<string[]>([]);
 
   useEffect(() => {
-    if (!showAbsenceModal && !absenceNotifModal && !openAnnouncementDetailModal && !showAbsenceOverviewModal) return;
+    if (!showAbsenceModal && !absenceNotifModal && !openAnnouncementDetailModal && !showAbsenceOverviewModal && !showAbsenceEndedModal) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (openAnnouncementDetailModal) setOpenAnnouncementDetailModal(null);
+        if (showAbsenceEndedModal) setShowAbsenceEndedModal(false);
+        else if (openAnnouncementDetailModal) setOpenAnnouncementDetailModal(null);
         else if (absenceNotifModal) setAbsenceNotifModal(null);
         else if (showAbsenceModal) setShowAbsenceModal(false);
         else if (showAbsenceOverviewModal) setShowAbsenceOverviewModal(false);
@@ -3198,7 +3203,7 @@ export function TeacherDashboard({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showAbsenceModal, absenceNotifModal, openAnnouncementDetailModal, showAbsenceOverviewModal]);
+  }, [showAbsenceModal, absenceNotifModal, openAnnouncementDetailModal, showAbsenceOverviewModal, showAbsenceEndedModal]);
 
   const [crisisNotifications, setCrisisNotifications] = useState<any[]>([]);
   const [isCrisisWidgetExpanded, setIsCrisisWidgetExpanded] = useState(false);
@@ -3206,18 +3211,61 @@ export function TeacherDashboard({
   // Volljuristische Ausfall- und Kenntnisnahme-Erfassung (§ 130 BGB) für den gesamten Abwesenheitszeitraum
   const activeAbsenceCancellations = useMemo(() => {
     if (!isTeacherCurrentlyAbsent(teacher)) return [];
-    const absenceStart = teacher.sick_start ? new Date(teacher.sick_start) : new Date();
-    absenceStart.setHours(0, 0, 0, 0);
-    const absenceEnd = new Date(teacher.sick_until);
-    absenceEnd.setHours(23, 59, 59, 999);
 
-    const fromCrisis = (crisisNotifications || []).filter((n: any) => {
-      if (n.is_reinstated) return false;
+    let startDateTime: Date;
+    if (teacher.sick_start) {
+      const rawStart = String(teacher.sick_start).trim();
+      if (rawStart.includes('T') && !rawStart.endsWith('00:00:00.000Z') && !rawStart.endsWith('00:00:00')) {
+        startDateTime = new Date(rawStart);
+      } else {
+        const [stYear, stMonth, stDay] = rawStart.substring(0, 10).split('-').map(Number);
+        // Falls sick_start ohne genaue Uhrzeit vorliegt (z. B. nur Datum):
+        // Bei Abmeldungen am heutigen Tag ist der Zeitpunkt der Aktualisierung / Jetzt die Grenze.
+        const today = new Date();
+        const isTodayStart = today.getFullYear() === stYear && today.getMonth() === (stMonth - 1) && today.getDate() === stDay;
+        if (isTodayStart) {
+          startDateTime = teacher.updated_at ? new Date(teacher.updated_at) : today;
+        } else {
+          startDateTime = new Date(stYear, (stMonth || 1) - 1, stDay || 1, 0, 0, 0, 0);
+        }
+      }
+    } else {
+      const rawUntil = String(teacher.sick_until).trim();
+      const [uYear, uMonth, uDay] = rawUntil.substring(0, 10).split('-').map(Number);
+      const today = new Date();
+      if (today.getFullYear() === uYear && today.getMonth() === (uMonth - 1) && today.getDate() === uDay) {
+        startDateTime = teacher.updated_at ? new Date(teacher.updated_at) : today;
+      } else {
+        startDateTime = new Date(uYear, (uMonth || 1) - 1, uDay || 1, 0, 0, 0, 0);
+      }
+    }
+
+    const rawUntilStr = String(teacher.sick_until).trim();
+    let endDateTime: Date;
+    if (rawUntilStr.includes('T') && !rawUntilStr.endsWith('00:00:00.000Z') && !rawUntilStr.endsWith('00:00:00')) {
+      endDateTime = new Date(rawUntilStr);
+    } else {
+      const [uYear, uMonth, uDay] = rawUntilStr.substring(0, 10).split('-').map(Number);
+      endDateTime = new Date(uYear, (uMonth || 1) - 1, uDay || 1, 23, 59, 59, 999);
+    }
+
+    const resultMap = new Map<string, any>();
+
+    // 1. Primärquelle: Krisen-Benachrichtigungen mit volljuristischem Status (§ 130 BGB)
+    (crisisNotifications || []).forEach((n: any) => {
+      if (n.is_reinstated) return;
       const slotDate = new Date(n.slot_start_datetime);
-      return slotDate >= absenceStart && slotDate <= absenceEnd;
-    }).map((n: any) => {
+      if (isNaN(slotDate.getTime())) return;
+
+      // Strikt zeitpunktbezogene Filterung: Keine Stunden vor dem Abmelde-Zeitpunkt berücksichtigen
+      if (slotDate.getTime() < startDateTime.getTime() || slotDate.getTime() > endDateTime.getTime()) return;
+
       const student = n.student || allStudents.find(s => s.id === n.student_id);
-      return {
+      const dateKey = slotDate.toISOString().substring(0, 10);
+      const timeKey = `${String(slotDate.getHours()).padStart(2, '0')}:${String(slotDate.getMinutes()).padStart(2, '0')}`;
+      const uniqueKey = `${dateKey}_${timeKey}_${n.student_id}`;
+
+      resultMap.set(uniqueKey, {
         id: n.id,
         slot_start_datetime: n.slot_start_datetime,
         student_id: n.student_id,
@@ -3226,35 +3274,124 @@ export function TeacherDashboard({
         student,
         studentName: student ? `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim() : (n.student_name || 'Schüler'),
         instrument: student?.instrument || n.instrument || 'Unterricht'
-      };
+      });
     });
 
-    if (fromCrisis.length > 0) return fromCrisis;
-
+    // 2. Sekundärquelle: Lokale Briefing-Timeline für aktuelle Ausfälle
     if (briefingData?.timeline) {
       const todayStr = new Date().toLocaleDateString('sv-SE');
-      return briefingData.timeline
-        .filter((s: any) => 
-          s.status === 'canceled_by_teacher_sick' || 
+      briefingData.timeline.forEach((s: any) => {
+        const isCancelled = s.status === 'canceled_by_teacher_sick' || 
           s.status === 'teacher_sick' || 
-          s.status === 'cancelled'
-        )
-        .map((s: any) => {
-          const student = s.student || allStudents.find((st: any) => st.id === s.student_id);
-          const timeSlot = s.start_time || s.time_slot || '14:00';
-          return {
+          s.status === 'cancelled';
+        if (!isCancelled) return;
+
+        const timeSlot = s.start_time || s.time_slot || '14:00';
+        const [slotH, slotM] = timeSlot.substring(0, 5).split(':').map(Number);
+        const [sYear, sMonth, sDay] = todayStr.split('-').map(Number);
+        const slotDateTime = new Date(sYear, sMonth - 1, sDay, slotH || 0, slotM || 0, 0, 0);
+
+        if (slotDateTime.getTime() < startDateTime.getTime() || slotDateTime.getTime() > endDateTime.getTime()) return;
+
+        const student = s.student || allStudents.find((st: any) => st.id === s.student_id);
+        const timeKey = `${String(slotH || 0).padStart(2, '0')}:${String(slotM || 0).padStart(2, '0')}`;
+        const uniqueKey = `${todayStr}_${timeKey}_${s.student_id || student?.id}`;
+
+        if (!resultMap.has(uniqueKey)) {
+          resultMap.set(uniqueKey, {
             id: s.id || `timeline-${s.schedule_id || 'slot'}`,
             slot_start_datetime: `${todayStr}T${timeSlot.length === 5 ? `${timeSlot}:00` : timeSlot}`,
             student_id: s.student_id || student?.id,
-            status: s.student_acknowledged ? 'READ' : 'UNREAD',
+            status: s.student_acknowledged === true ? 'READ' : 'UNREAD',
             student,
             studentName: student ? `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim() : (s.title || 'Schüler'),
             instrument: s.instrument || student?.instrument || 'Unterricht'
-          };
-        });
+          });
+        }
+      });
     }
-    return [];
-  }, [teacher?.sick_until, teacher?.sick_start, crisisNotifications, briefingData?.timeline, allStudents, showRealNames]);
+
+    return Array.from(resultMap.values()).sort((a, b) => {
+      return new Date(a.slot_start_datetime).getTime() - new Date(b.slot_start_datetime).getTime();
+    });
+  }, [teacher?.sick_until, teacher?.sick_start, teacher?.updated_at, crisisNotifications, briefingData?.timeline, allStudents, showRealNames]);
+
+  // Tageweise Gruppierung für das Akkordeon-System der Ausfälle
+  const groupedAbsenceCancellations = useMemo(() => {
+    const groups: Record<string, {
+      dateStr: string;
+      formattedDate: string;
+      dayOfWeek: string;
+      dayNum: string;
+      items: typeof activeAbsenceCancellations;
+      readCount: number;
+      unreadCount: number;
+    }> = {};
+
+    const todayStr = new Date().toLocaleDateString('sv-SE');
+
+    activeAbsenceCancellations.forEach((item: any) => {
+      const dt = new Date(item.slot_start_datetime);
+      const dateKey = !isNaN(dt.getTime())
+        ? `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
+        : item.slot_start_datetime.substring(0, 10);
+
+      if (!groups[dateKey]) {
+        const isToday = dateKey === todayStr;
+        const weekdayLong = dt.toLocaleDateString('de-DE', { weekday: 'long' });
+        const shortDateStr = dt.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const formattedDate = isToday 
+          ? `Heute, ${dt.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}.`
+          : `${weekdayLong}, ${shortDateStr}`;
+
+        groups[dateKey] = {
+          dateStr: dateKey,
+          formattedDate,
+          dayOfWeek: dt.toLocaleDateString('de-DE', { weekday: 'short' }),
+          dayNum: String(dt.getDate()).padStart(2, '0'),
+          items: [],
+          readCount: 0,
+          unreadCount: 0
+        };
+      }
+
+      groups[dateKey].items.push(item);
+      if (item.status === 'READ') {
+        groups[dateKey].readCount += 1;
+      } else {
+        groups[dateKey].unreadCount += 1;
+      }
+    });
+
+    return Object.keys(groups).sort().map(key => groups[key]);
+  }, [activeAbsenceCancellations]);
+
+  // State für eingeklappte Tages-Akkordeons (standardmäßig alle ausgeklappt)
+  const [collapsedAbsenceDates, setCollapsedAbsenceDates] = useState<Record<string, boolean>>({});
+
+  const toggleAbsenceDateCollapse = (dateKey: string) => {
+    setCollapsedAbsenceDates(prev => ({
+      ...prev,
+      [dateKey]: !prev[dateKey]
+    }));
+  };
+
+  const areAllAbsenceDatesCollapsed = useMemo(() => {
+    if (groupedAbsenceCancellations.length === 0) return false;
+    return groupedAbsenceCancellations.every(g => !!collapsedAbsenceDates[g.dateStr]);
+  }, [groupedAbsenceCancellations, collapsedAbsenceDates]);
+
+  const toggleAllAbsenceDates = () => {
+    if (areAllAbsenceDatesCollapsed) {
+      setCollapsedAbsenceDates({});
+    } else {
+      const allCollapsed: Record<string, boolean> = {};
+      groupedAbsenceCancellations.forEach(g => {
+        allCollapsed[g.dateStr] = true;
+      });
+      setCollapsedAbsenceDates(allCollapsed);
+    }
+  };
 
   const totalAbsenceCancellationsCount = activeAbsenceCancellations.length || cancellationsCount;
   const readCancellationsCount = activeAbsenceCancellations.filter((c: any) => c.status === 'READ').length;
@@ -3623,8 +3760,9 @@ export function TeacherDashboard({
             studentName: studentDisplayName,
             student_acknowledged: occ.student_acknowledged,
             studentAcknowledged: occ.studentAcknowledged,
-            teacher_acknowledged: occ.teacher_acknowledged,
-            teacherAcknowledged: occ.teacherAcknowledged,
+            canceled_by_role: occ.canceled_by_role || ((occ.status === 'canceled_by_teacher_sick' || isTeacherCurrentlyAbsent(teacher)) ? 'teacher' : undefined),
+            teacher_acknowledged: (occ.status === 'canceled_by_teacher_sick' || occ.canceled_by_role === 'teacher' || isTeacherCurrentlyAbsent(teacher)) ? true : occ.teacher_acknowledged,
+            teacherAcknowledged: (occ.status === 'canceled_by_teacher_sick' || occ.canceled_by_role === 'teacher' || isTeacherCurrentlyAbsent(teacher)) ? true : occ.teacherAcknowledged,
             is_rescheduled: occ.is_rescheduled || occ.isRescheduled,
             is_moved: occ.is_moved || occ.isMoved,
             is_room_booking: Boolean(occ.is_room_booking || occ.isRoomBooking || occ.room_override_id || occ.roomOverrideId || occ.is_room_changed || occ.isRoomChanged),
@@ -4968,7 +5106,7 @@ export function TeacherDashboard({
                roomId: slot.roomId || slot.rooms?.id || null,
                room: resolvedRoom,
                instrument: resolvedInstrument,
-               student_acknowledged: true,
+               student_acknowledged: slot.student_acknowledged ?? (slot.status?.includes('cancel') || slot.status?.includes('sick') ? false : true),
                original_date: null,
                student: student ? {
                  id: student.id,
@@ -5026,20 +5164,21 @@ export function TeacherDashboard({
                                      occ.schedules?.rooms?.name || occ.roomName || occ.room_name || existingItem?.room || 'Raum 4';
                  const resolvedInstrument = resolveStudentInstrument(occ.schedules?.instrument || occ.instrument || existingItem?.instrument, student?.instrument, teacherProfile?.instrument);
 
+                 const occStatus = occ.status || 'scheduled';
                  const mappedItem = {
                    id: occ.id,
                    scheduleId: occ.schedule_id || occ.id,
                    date: todayStr,
                    timeSlot: formattedTime,
                    duration: occ.schedules?.duration || existingItem?.duration || 30,
-                   status: occ.status || 'scheduled',
+                   status: occStatus,
                    isGroup: Boolean(existingItem?.isGroup),
                    groupStudents: existingItem?.groupStudents || [],
                    students: existingItem?.students || (existingItem?.isGroup && student ? [student] : []),
                    roomId: occ.room_id || occ.schedules?.room_id || existingItem?.roomId || null,
                    room: resolvedRoom,
                    instrument: resolvedInstrument,
-                   student_acknowledged: occ.student_acknowledged ?? true,
+                   student_acknowledged: occ.student_acknowledged ?? (occStatus?.includes('cancel') || occStatus?.includes('sick') ? false : true),
                    original_date: (occ.original_date || null) as null,
                    student: student ? {
                      id: student.id,
@@ -7238,186 +7377,311 @@ useEffect(() => {
     const isAbsent = isTeacherCurrentlyAbsent(teacher);
     const absenceUntilFormatted = isAbsent ? formatAbsenceEndDate(teacher?.sick_until) : '';
 
+    if (!isAbsent) {
+      return (
+        <div 
+          className="absence-card-container hover-scale"
+          role="button"
+          tabIndex={0}
+          aria-label="Abwesenheit erfassen"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              const today = new Date().toLocaleDateString('sv-SE');
+              setAbsenceStartDate(today);
+              setAbsenceUntilDate(today);
+              setQuickAbsencePreset('today');
+              setShowAbsenceModal(true);
+            }
+          }}
+          onClick={() => {
+            const today = new Date().toLocaleDateString('sv-SE');
+            setAbsenceStartDate(today);
+            setAbsenceUntilDate(today);
+            setQuickAbsencePreset('today');
+            setShowAbsenceModal(true);
+          }}
+          style={{ 
+            padding: '12px 16px', 
+            borderRadius: '22px',
+            background: 'linear-gradient(135deg, #ffffff 0%, #fff5f5 100%)',
+            boxShadow: '0 4px 16px -2px rgba(239, 68, 68, 0.08)',
+            border: '1.5px solid #fecaca',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            width: '100%',
+            boxSizing: 'border-box',
+            cursor: 'pointer',
+            transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+            <div style={{
+              width: '38px',
+              height: '38px',
+              borderRadius: '12px',
+              background: 'rgba(239, 68, 68, 0.1)',
+              color: '#dc2626',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              <Activity size={18} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+              <h3 style={{ 
+                fontSize: '0.88rem', 
+                fontWeight: 900, 
+                margin: 0,
+                color: '#7f1d1d',
+                letterSpacing: '-0.01em',
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+              }}>
+                Ausfall / Abwesenheit melden
+              </h3>
+              <p style={{ 
+                margin: '1px 0 0 0', 
+                fontSize: '0.73rem', 
+                color: '#94a3b8', 
+                fontWeight: 600,
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+              }}>
+                Termine absagen & Verwaltung informieren
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              const today = new Date().toLocaleDateString('sv-SE');
+              setAbsenceStartDate(today);
+              setAbsenceUntilDate(today);
+              setQuickAbsencePreset('today');
+              setShowAbsenceModal(true);
+            }}
+            style={{
+              height: '36px',
+              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+              color: '#ffffff',
+              border: 'none',
+              padding: '0 16px',
+              borderRadius: '100px',
+              fontWeight: 800,
+              fontSize: '0.76rem',
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              boxShadow: '0 3px 12px rgba(239, 68, 68, 0.28)',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <CalendarX size={14} strokeWidth={2.4} />
+            <span>Abwesenheit melden</span>
+          </button>
+        </div>
+      );
+    }
+
+    // Wenn isAbsent = true: 2-Zeilen Apple HIG Control Card (Null Überlappung)
     return (
       <div 
-        className="absence-card-container hover-scale"
-        role={isAbsent ? undefined : "button"}
-        tabIndex={isAbsent ? undefined : 0}
-        aria-label={isAbsent ? undefined : "Abwesenheit erfassen"}
-        onKeyDown={(e) => {
-          if (!isAbsent && (e.key === 'Enter' || e.key === ' ')) {
-            e.preventDefault();
-            const today = new Date().toLocaleDateString('sv-SE');
-            setAbsenceStartDate(today);
-            setAbsenceUntilDate(today);
-            setQuickAbsencePreset('today');
-            setShowAbsenceModal(true);
-          }
-        }}
-        onClick={() => {
-          if (!isAbsent) {
-            const today = new Date().toLocaleDateString('sv-SE');
-            setAbsenceStartDate(today);
-            setAbsenceUntilDate(today);
-            setQuickAbsencePreset('today');
-            setShowAbsenceModal(true);
-          }
-        }}
+        className="absence-card-container"
         style={{ 
-          padding: '14px 18px', 
-          borderRadius: '20px',
-          background: isAbsent 
-            ? 'linear-gradient(135deg, #fef2f2 0%, #fff1f2 100%)' 
-            : 'linear-gradient(135deg, #ffffff 0%, #fff5f5 100%)',
-          boxShadow: isAbsent 
-            ? '0 6px 20px -4px rgba(239, 68, 68, 0.18)' 
-            : '0 4px 16px -2px rgba(239, 68, 68, 0.08)',
-          border: isAbsent ? '1.5px solid #fca5a5' : '1.5px solid #fecaca',
+          padding: '16px', 
+          borderRadius: '24px',
+          background: 'linear-gradient(135deg, #fff5f5 0%, #ffffff 100%)',
+          boxShadow: '0 4px 18px -2px rgba(239, 68, 68, 0.12), 0 1px 3px rgba(0, 0, 0, 0.04)',
+          border: '1.5px solid #fca5a5',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          flexDirection: 'column',
           gap: '12px',
           width: '100%',
           boxSizing: 'border-box',
-          cursor: isAbsent ? 'default' : 'pointer',
           transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
-          <div style={{
-            width: '40px',
-            height: '40px',
-            borderRadius: '12px',
-            background: isAbsent ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'rgba(239, 68, 68, 0.1)',
-            color: isAbsent ? '#ffffff' : '#dc2626',
+        {/* Zeile 1: Status & Schnellzugriff auf Ausfall-Übersicht (§ 130 BGB) */}
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="Ausfall-Status und Kenntnisnahmen einsehen"
+          onClick={() => setShowAbsenceOverviewModal(true)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setShowAbsenceOverviewModal(true);
+            }
+          }}
+          style={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-            boxShadow: isAbsent ? '0 4px 12px rgba(239, 68, 68, 0.3)' : 'none'
-          }}>
-            {isAbsent ? <AlertTriangle size={20} /> : <Activity size={20} />}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h3 style={{ 
-                fontSize: '0.95rem', fontWeight: 800, margin: 0,
-                color: isAbsent ? '#991b1b' : '#7f1d1d',
-                letterSpacing: '-0.01em',
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-              }}>
-                {isAbsent ? 'Abwesenheit aktiv' : 'Ausfall / Abwesenheit melden'}
-              </h3>
-              {isAbsent && (
+            justifyContent: 'space-between',
+            gap: '10px',
+            cursor: 'pointer',
+            padding: '4px',
+            borderRadius: '14px',
+            transition: 'background 0.15s ease'
+          }}
+          className="hover-scale"
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              boxShadow: '0 3px 10px rgba(239, 68, 68, 0.25)'
+            }}>
+              <AlertTriangle size={20} strokeWidth={2.4} />
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <h3 style={{ 
+                  fontSize: '0.90rem', 
+                  fontWeight: 900, 
+                  margin: 0,
+                  color: '#991b1b',
+                  letterSpacing: '-0.01em',
+                  fontFamily: "'Plus Jakarta Sans', sans-serif",
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                }}>
+                  Abwesenheit aktiv
+                </h3>
                 <span style={{ 
                   background: '#fee2e2', 
                   color: '#b91c1c', 
-                  fontSize: '0.68rem', 
-                  fontWeight: 800, 
-                  padding: '2px 8px', 
+                  fontSize: '0.62rem', 
+                  fontWeight: 900, 
+                  padding: '1.5px 7px', 
                   borderRadius: '100px', 
-                  border: '1px solid #fca5a5'
+                  border: '1px solid #fca5a5',
+                  letterSpacing: '0.02em',
+                  textTransform: 'uppercase'
                 }}>
                   Aktiv
                 </span>
-              )}
+              </div>
+              <p style={{ 
+                margin: '2px 0 0 0', 
+                fontSize: '0.74rem', 
+                color: '#b91c1c', 
+                fontWeight: 600,
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+              }}>
+                Bis {absenceUntilFormatted} • {totalAbsenceCancellationsCount} {totalAbsenceCancellationsCount === 1 ? 'Ausfall' : 'Ausfälle'}
+              </p>
             </div>
-            <p style={{ 
-              margin: '2px 0 0 0', 
-              fontSize: '0.75rem', 
-              color: isAbsent ? '#b91c1c' : '#94a3b8', 
-              fontWeight: 500,
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-            }}>
-              {isAbsent 
-                ? `Abwesend bis ${absenceUntilFormatted} (${totalAbsenceCancellationsCount} Ausfälle)` 
-                : 'Termine absagen & Verwaltung informieren'}
-            </p>
+          </div>
+
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '3px',
+            color: '#b91c1c',
+            fontSize: '0.72rem',
+            fontWeight: 800,
+            flexShrink: 0
+          }}>
+            <span>Ausfälle</span>
+            <ChevronRight size={14} />
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-          {isAbsent ? (
-            <>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowAbsenceModal(true);
-                }}
-                style={{
-                  background: '#ffffff',
-                  color: '#b91c1c',
-                  border: '1.5px solid #fca5a5',
-                  padding: '7px 11px',
-                  borderRadius: '12px',
-                  fontWeight: 800,
-                  fontSize: '0.72rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
-                }}
-              >
-                <Calendar size={12} />
-                <span>Anpassen</span>
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleEndAbsence();
-                }}
-                disabled={submittingAbsence}
-                style={{
-                  background: 'linear-gradient(135deg, #34a853 0%, #2e8b57 100%)',
-                  color: '#ffffff',
-                  border: 'none',
-                  padding: '7px 12px',
-                  borderRadius: '12px',
-                  fontWeight: 800,
-                  fontSize: '0.72rem',
-                  cursor: submittingAbsence ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  boxShadow: '0 3px 10px rgba(52, 168, 83, 0.3)'
-                }}
-              >
-                <Check size={13} strokeWidth={3} />
-                <span>Wieder verfügbar</span>
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                const today = new Date().toLocaleDateString('sv-SE');
-                setAbsenceStartDate(today);
-                setAbsenceUntilDate(today);
-                setQuickAbsencePreset('today');
-                setShowAbsenceModal(true);
-              }}
-              style={{
-                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                color: '#ffffff',
-                border: 'none',
-                padding: '8px 16px',
-                borderRadius: '14px',
-                fontWeight: 800,
-                fontSize: '0.78rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                boxShadow: '0 3px 12px rgba(239, 68, 68, 0.28)'
-              }}
-            >
-              <span>Ausfall melden</span>
-              <ArrowRight size={13} strokeWidth={2.5} />
-            </button>
-          )}
+        {/* Zeile 2: Symmetrisches 50/50 Apple Control Grid (Garantierte Überlappungsfreiheit) */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '10px',
+          width: '100%'
+        }}>
+          {/* Button 1: Anpassen (Weiß mit feiner roter Outline) */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowAbsenceModal(true);
+            }}
+            style={{
+              height: '38px',
+              background: '#ffffff',
+              color: '#991b1b',
+              border: '1.5px solid #fca5a5',
+              borderRadius: '14px',
+              fontWeight: 800,
+              fontSize: '0.76rem',
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              boxShadow: '0 1px 4px rgba(0, 0, 0, 0.04)',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseOver={e => {
+              e.currentTarget.style.background = '#fff5f5';
+              e.currentTarget.style.borderColor = '#f87171';
+            }}
+            onMouseOut={e => {
+              e.currentTarget.style.background = '#ffffff';
+              e.currentTarget.style.borderColor = '#fca5a5';
+            }}
+          >
+            <Calendar size={14} strokeWidth={2.4} color="#dc2626" />
+            <span>Anpassen</span>
+          </button>
+
+          {/* Button 2: Wieder verfügbar (Campus-Grün mit weißem Text) */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleEndAbsence();
+            }}
+            disabled={submittingAbsence}
+            style={{
+              height: '38px',
+              background: 'linear-gradient(135deg, #34a853 0%, #2e8b57 100%)',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '14px',
+              fontWeight: 800,
+              fontSize: '0.76rem',
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+              cursor: submittingAbsence ? 'not-allowed' : 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              boxShadow: '0 3px 12px rgba(52, 168, 83, 0.32)',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseOver={e => {
+              if (!submittingAbsence) e.currentTarget.style.transform = 'scale(1.02)';
+            }}
+            onMouseOut={e => {
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+          >
+            <Check size={15} strokeWidth={3} color="#ffffff" />
+            <span>{submittingAbsence ? 'Wird beendet...' : 'Wieder verfügbar'}</span>
+          </button>
         </div>
       </div>
     );
@@ -11631,21 +11895,25 @@ useEffect(() => {
                   width: '42px',
                   height: '42px',
                   borderRadius: '14px',
-                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  background: isTeacherCurrentlyAbsent(teacher)
+                    ? 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)'
+                    : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
                   color: '#ffffff',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 4px 14px rgba(239, 68, 68, 0.3)'
+                  boxShadow: isTeacherCurrentlyAbsent(teacher)
+                    ? '0 4px 14px rgba(14, 165, 233, 0.3)'
+                    : '0 4px 14px rgba(239, 68, 68, 0.3)'
                 }}>
-                  <AlertTriangle size={22} />
+                  {isTeacherCurrentlyAbsent(teacher) ? <Calendar size={22} /> : <AlertTriangle size={22} />}
                 </div>
                 <div>
                   <h2 id="absence-modal-title" style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                    {isTeacherCurrentlyAbsent(teacher) ? 'Abwesenheit anpassen' : 'Abwesenheit / Ausfall melden'}
+                    {isTeacherCurrentlyAbsent(teacher) ? 'Abwesenheit verwalten' : 'Abwesenheit / Ausfall melden'}
                   </h2>
                   <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }}>
-                    Sagt Termine ab & alarmiert das Sekretariat zur Schülerbetreuung
+                    {isTeacherCurrentlyAbsent(teacher) ? 'Verfügbarkeit wiederherstellen oder Zeitraum korrigieren' : 'Sagt Termine ab & alarmiert das Sekretariat zur Schülerbetreuung'}
                   </p>
                 </div>
               </div>
@@ -11673,20 +11941,43 @@ useEffect(() => {
             <div style={{ padding: '20px 24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '18px', flex: 1 }}>
               
               {/* Notice Banner */}
-              <div style={{
-                background: '#fff5f5',
-                border: '1.5px solid #fecaca',
-                borderRadius: '16px',
-                padding: '12px 16px',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '10px'
-              }}>
-                <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>ℹ️</span>
-                <span style={{ fontSize: '0.78rem', color: '#991b1b', lineHeight: 1.45, fontWeight: 550 }}>
-                  Alle betroffenen Stundenplandaten im Zeitraum werden storniert. Das Sekretariat erhält ein Ticket zur Betreuung der Schüler.
-                </span>
-              </div>
+              {isTeacherCurrentlyAbsent(teacher) ? (
+                <div style={{
+                  background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                  border: '1.5px solid #86efac',
+                  borderRadius: '16px',
+                  padding: '14px 16px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '12px',
+                  boxShadow: '0 2px 8px rgba(34, 197, 94, 0.08)'
+                }}>
+                  <span style={{ fontSize: '1.25rem', lineHeight: 1 }}>🟢</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <strong style={{ fontSize: '0.84rem', color: '#166534', display: 'block', fontWeight: 800 }}>
+                      Aktuell als abwesend gemeldet
+                    </strong>
+                    <span style={{ fontSize: '0.76rem', color: '#15803d', lineHeight: 1.45, fontWeight: 600 }}>
+                      Bis einschließlich {teacher.sick_until ? new Date(teacher.sick_until.substring(0, 10) + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'auf Weiteres'}. Du kannst dich jederzeit vorzeitig wieder verfügbar melden.
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div style={{
+                  background: '#fff5f5',
+                  border: '1.5px solid #fecaca',
+                  borderRadius: '16px',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px'
+                }}>
+                  <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>ℹ️</span>
+                  <span style={{ fontSize: '0.78rem', color: '#991b1b', lineHeight: 1.45, fontWeight: 550 }}>
+                    Alle betroffenen Stundenplandaten im Zeitraum werden storniert. Das Sekretariat erhält ein Ticket zur Betreuung der Schüler.
+                  </span>
+                </div>
+              )}
 
               {/* 1-Tap Quick-Selection Chips */}
               <div>
@@ -11944,77 +12235,127 @@ useEffect(() => {
               flexDirection: 'column',
               gap: '10px'
             }}>
-              <button
-                onClick={handleReportAbsence}
-                disabled={submittingAbsence}
-                style={{
-                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                  color: '#ffffff',
-                  border: 'none',
-                  padding: '14px',
-                  borderRadius: '16px',
-                  fontWeight: 900,
-                  fontSize: '0.92rem',
-                  cursor: submittingAbsence ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  boxShadow: '0 4px 18px rgba(239, 68, 68, 0.35)',
-                  opacity: submittingAbsence ? 0.7 : 1,
-                  letterSpacing: '-0.01em',
-                  transition: 'all 0.15s'
-                }}
-                className="hover-scale"
-              >
-                <CalendarX size={18} />
-                <span>{submittingAbsence ? 'Wird übermittelt...' : (isTeacherCurrentlyAbsent(teacher) ? 'Abwesenheit anpassen' : 'Terminabsage jetzt einreichen')}</span>
-              </button>
+              {isTeacherCurrentlyAbsent(teacher) ? (
+                <>
+                  {/* 1. Hauptaktion: Sofort wieder verfügbar melden (Groß & Campus-Grün) */}
+                  <button
+                    onClick={() => {
+                      handleEndAbsence();
+                      setShowAbsenceModal(false);
+                    }}
+                    disabled={submittingAbsence}
+                    style={{
+                      background: 'linear-gradient(135deg, #34a853 0%, #2e8b57 100%)',
+                      color: '#ffffff',
+                      border: 'none',
+                      padding: '14px',
+                      borderRadius: '16px',
+                      fontWeight: 900,
+                      fontSize: '0.94rem',
+                      cursor: submittingAbsence ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      boxShadow: '0 4px 18px rgba(52, 168, 83, 0.35)',
+                      letterSpacing: '-0.01em',
+                      transition: 'all 0.15s'
+                    }}
+                    className="hover-scale"
+                  >
+                    <Check size={18} strokeWidth={3} />
+                    <span>{submittingAbsence ? 'Wird aktualisiert...' : 'Wieder verfügbar melden'}</span>
+                  </button>
 
-              {isTeacherCurrentlyAbsent(teacher) && (
-                <button
-                  onClick={() => {
-                    handleEndAbsence();
-                    setShowAbsenceModal(false);
-                  }}
-                  disabled={submittingAbsence}
-                  style={{
-                    background: 'linear-gradient(135deg, #34a853 0%, #2e8b57 100%)',
-                    color: '#ffffff',
-                    border: 'none',
-                    padding: '12px',
-                    borderRadius: '14px',
-                    fontWeight: 800,
-                    fontSize: '0.85rem',
-                    cursor: submittingAbsence ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    boxShadow: '0 4px 14px rgba(52, 168, 83, 0.3)'
-                  }}
-                  className="hover-scale"
-                >
-                  <Check size={16} strokeWidth={3} />
-                  <span>Wieder verfügbar melden</span>
-                </button>
+                  {/* 2. Sekundäraktion: Geänderten Zeitraum speichern */}
+                  <button
+                    onClick={handleReportAbsence}
+                    disabled={submittingAbsence}
+                    style={{
+                      background: '#f8fafc',
+                      color: '#334155',
+                      border: '1.5px solid #cbd5e1',
+                      padding: '11px',
+                      borderRadius: '14px',
+                      fontWeight: 800,
+                      fontSize: '0.84rem',
+                      cursor: submittingAbsence ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      transition: 'all 0.15s'
+                    }}
+                    className="hover-scale"
+                  >
+                    <CalendarX size={15} color="#64748b" />
+                    <span>{submittingAbsence ? 'Wird übermittelt...' : 'Neuen Zeitraum speichern'}</span>
+                  </button>
+
+                  {/* 3. Schließen */}
+                  <button
+                    type="button"
+                    onClick={() => setShowAbsenceModal(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#64748b',
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      padding: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Schließen
+                  </button>
+                </>
+              ) : (
+                <>
+                  {/* Regulärer Erst-Absage Flow */}
+                  <button
+                    onClick={handleReportAbsence}
+                    disabled={submittingAbsence}
+                    style={{
+                      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                      color: '#ffffff',
+                      border: 'none',
+                      padding: '14px',
+                      borderRadius: '16px',
+                      fontWeight: 900,
+                      fontSize: '0.92rem',
+                      cursor: submittingAbsence ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      boxShadow: '0 4px 18px rgba(239, 68, 68, 0.35)',
+                      opacity: submittingAbsence ? 0.7 : 1,
+                      letterSpacing: '-0.01em',
+                      transition: 'all 0.15s'
+                    }}
+                    className="hover-scale"
+                  >
+                    <CalendarX size={18} />
+                    <span>{submittingAbsence ? 'Wird übermittelt...' : 'Terminabsage jetzt einreichen'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowAbsenceModal(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#64748b',
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      padding: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Abbrechen
+                  </button>
+                </>
               )}
-
-              <button
-                type="button"
-                onClick={() => setShowAbsenceModal(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#64748b',
-                  fontSize: '0.82rem',
-                  fontWeight: 700,
-                  padding: '4px',
-                  cursor: 'pointer'
-                }}
-              >
-                Abbrechen
-              </button>
             </div>
           </div>
         </div>
@@ -12194,6 +12535,120 @@ useEffect(() => {
         </div>
       )}
 
+      {/* ── ABWESENHEIT BEENDET ERFOLGS-MODAL (CAMPUS-GRÜN) ── */}
+      {showAbsenceEndedModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 10000,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px'
+          }}
+          onClick={() => setShowAbsenceEndedModal(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="absence-ended-title"
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: '#ffffff',
+              borderRadius: '28px',
+              padding: '32px 28px',
+              width: '100%',
+              maxWidth: '420px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              textAlign: 'center',
+              gap: '20px',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.2)'
+            }}
+          >
+            {/* Green Apple Squircle Icon Badge */}
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '20px',
+              background: '#e6f4ea',
+              border: '1.5px solid #bbf7d0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 8px 24px rgba(52, 168, 83, 0.18)'
+            }}>
+              <CheckCircle size={32} color="#34a853" strokeWidth={2.5} />
+            </div>
+
+            {/* Content */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <h3
+                id="absence-ended-title"
+                style={{
+                  margin: 0,
+                  fontSize: '1.25rem',
+                  fontWeight: 900,
+                  color: '#0f172a',
+                  fontFamily: "'Plus Jakarta Sans', sans-serif",
+                  letterSpacing: '-0.02em'
+                }}
+              >
+                Abwesenheit beendet!
+              </h3>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: '0.92rem',
+                  color: '#64748b',
+                  fontWeight: 600,
+                  lineHeight: 1.45,
+                  fontFamily: "'Plus Jakarta Sans', sans-serif"
+                }}
+              >
+                Du stehst wieder als regulär verfügbar im System.
+              </p>
+            </div>
+
+            {/* Campus-Grüner OK Button */}
+            <button
+              type="button"
+              onClick={() => setShowAbsenceEndedModal(false)}
+              autoFocus
+              style={{
+                background: '#34a853',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '16px',
+                padding: '14px 24px',
+                width: '100%',
+                fontSize: '1rem',
+                fontWeight: 900,
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                cursor: 'pointer',
+                boxShadow: '0 4px 16px rgba(52, 168, 83, 0.35)',
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = '#2e974a';
+                e.currentTarget.style.transform = 'scale(1.02)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = '#34a853';
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── 🏛️ AUSFALL-STATUS & KENNTNISNAHMEN (§ 130 BGB) REVISIONS-MODAL ── */}
       {showAbsenceOverviewModal && (
         <div
@@ -12355,16 +12810,16 @@ useEffect(() => {
               </div>
             </div>
 
-            {/* List of Affected Lessons */}
+            {/* List of Affected Lessons - Tageweise gegliedert */}
             <div style={{
               flex: 1,
               overflowY: 'auto',
               padding: '20px 28px',
               display: 'flex',
               flexDirection: 'column',
-              gap: '12px'
+              gap: '14px'
             }}>
-              {activeAbsenceCancellations.length === 0 ? (
+              {groupedAbsenceCancellations.length === 0 ? (
                 <div style={{
                   padding: '40px 20px',
                   textAlign: 'center',
@@ -12381,135 +12836,294 @@ useEffect(() => {
                   </p>
                 </div>
               ) : (
-                activeAbsenceCancellations.map((item: any, idx: number) => {
-                  const dt = new Date(item.slot_start_datetime);
-                  const dateStr = dt.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
-                  const timeStr = dt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-                  const isRead = item.status === 'READ';
-
-                  return (
-                    <div
-                      key={item.id || idx}
+                <>
+                  {/* Global Accordion Control Bar */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '2px 4px'
+                  }}>
+                    <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Ausfälle nach Unterrichtstagen ({groupedAbsenceCancellations.length} {groupedAbsenceCancellations.length === 1 ? 'Tag' : 'Tage'})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={toggleAllAbsenceDates}
                       style={{
-                        padding: '14px 18px',
-                        borderRadius: '18px',
-                        background: isRead ? '#ffffff' : 'repeating-linear-gradient(-45deg, #fef2f2 0px, #fef2f2 8px, #ffffff 8px, #ffffff 16px)',
-                        border: isRead ? '1.5px solid #e2e8f0' : '1.5px solid #fca5a5',
+                        background: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '10px',
+                        padding: '5px 12px',
+                        fontSize: '0.74rem',
+                        fontWeight: 800,
+                        color: '#334155',
+                        cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '14px',
-                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)'
+                        gap: '6px',
+                        transition: 'all 0.15s'
                       }}
                     >
-                      {/* Left: Date & Student Info */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0 }}>
-                        <div style={{
-                          width: '48px',
-                          height: '48px',
-                          borderRadius: '14px',
-                          background: isRead ? '#f1f5f9' : '#fee2e2',
-                          border: isRead ? '1px solid #e2e8f0' : '1.5px solid #fca5a5',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0
-                        }}>
-                          <span style={{ fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', color: isRead ? '#64748b' : '#dc2626' }}>
-                            {dt.toLocaleDateString('de-DE', { weekday: 'short' })}
-                          </span>
-                          <span style={{ fontSize: '15px', fontWeight: 900, color: isRead ? '#0f172a' : '#991b1b', lineHeight: 1 }}>
-                            {String(dt.getDate()).padStart(2, '0')}
-                          </span>
-                        </div>
+                      <ChevronsUpDown size={13} />
+                      <span>{areAllAbsenceDatesCollapsed ? 'Alle ausklappen' : 'Alle einklappen'}</span>
+                    </button>
+                  </div>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                          <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {item.studentName}
-                          </span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px', fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
-                            <span>{item.instrument}</span>
-                            <span>•</span>
-                            <span>{timeStr} Uhr</span>
-                            <span>•</span>
-                            <span>{dateStr}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Right: Legal Read Receipt & Action */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-                        {isRead ? (
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            background: '#f0fdf4',
-                            border: '1px solid #86efac',
-                            padding: '6px 12px',
-                            borderRadius: '10px',
-                            color: '#166534',
-                            fontSize: '0.72rem',
-                            fontWeight: 800
-                          }}>
-                            <CheckCheck size={14} color="#16a34a" />
-                            <span>Kenntnisnahme bestätigt</span>
-                          </div>
-                        ) : (
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            background: '#fffbeb',
-                            border: '1px solid #fde047',
-                            padding: '6px 12px',
-                            borderRadius: '10px',
-                            color: '#854d0e',
-                            fontSize: '0.72rem',
-                            fontWeight: 800
-                          }} title="Zugang nach § 130 BGB noch nicht bestätigt">
-                            <Clock size={13} color="#ca8a04" />
-                            <span>Zugestellt (Ungelesen)</span>
-                          </div>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowAbsenceOverviewModal(false);
-                            handleEmergencyShoutbox({
-                              id: item.id,
-                              student_id: item.student_id,
-                              date: item.slot_start_datetime.substring(0, 10),
-                              startTime: timeStr,
-                              student: item.student,
-                              studentName: item.studentName
-                            });
+                  {/* Day Accordions */}
+                  {groupedAbsenceCancellations.map((group) => {
+                    const isCollapsed = !!collapsedAbsenceDates[group.dateStr];
+                    return (
+                      <div
+                        key={group.dateStr}
+                        style={{
+                          borderRadius: '20px',
+                          border: '1.5px solid #e2e8f0',
+                          background: '#ffffff',
+                          overflow: 'hidden',
+                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
+                          transition: 'border-color 0.2s'
+                        }}
+                      >
+                        {/* Accordion Day Header */}
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => toggleAbsenceDateCollapse(group.dateStr)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              toggleAbsenceDateCollapse(group.dateStr);
+                            }
                           }}
+                          aria-expanded={!isCollapsed}
+                          aria-label={`Tag ${group.formattedDate} ${isCollapsed ? 'ausklappen' : 'einklappen'}`}
                           style={{
-                            background: '#f8fafc',
-                            border: '1px solid #cbd5e1',
-                            color: '#334155',
-                            padding: '7px 12px',
-                            borderRadius: '10px',
-                            fontSize: '0.74rem',
-                            fontWeight: 800,
-                            cursor: 'pointer',
+                            padding: '14px 18px',
+                            background: isCollapsed ? '#ffffff' : 'linear-gradient(135deg, #fff5f5 0%, #ffffff 100%)',
+                            borderBottom: isCollapsed ? 'none' : '1px solid #f1f5f9',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '5px',
+                            justifyContent: 'space-between',
+                            gap: '12px',
+                            cursor: 'pointer',
+                            userSelect: 'none',
                             transition: 'all 0.15s'
                           }}
-                          title="Shoutbox mit Schüler öffnen"
                         >
-                          <MessageSquare size={13} />
-                          <span>Nachricht</span>
-                        </button>
+                          {/* Left: Day Badge & Label */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                            <div style={{
+                              width: '42px',
+                              height: '42px',
+                              borderRadius: '12px',
+                              background: '#fee2e2',
+                              border: '1.5px solid #fca5a5',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              <span style={{ fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', color: '#dc2626' }}>
+                                {group.dayOfWeek}
+                              </span>
+                              <span style={{ fontSize: '14px', fontWeight: 900, color: '#991b1b', lineHeight: 1 }}>
+                                {group.dayNum}
+                              </span>
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                              <span style={{ fontSize: '0.94rem', fontWeight: 850, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                {group.formattedDate}
+                              </span>
+                              <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
+                                {group.items.length} {group.items.length === 1 ? 'Unterrichtseinheit' : 'Unterrichtseinheiten'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Right: KPI Pill + Chevron Toggle */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                            <div style={{
+                              padding: '5px 11px',
+                              borderRadius: '100px',
+                              fontSize: '0.72rem',
+                              fontWeight: 800,
+                              background: group.unreadCount > 0 ? '#fef3c7' : '#dcfce7',
+                              color: group.unreadCount > 0 ? '#92400e' : '#166534',
+                              border: group.unreadCount > 0 ? '1px solid #fde047' : '1px solid #86efac',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '5px'
+                            }}>
+                              {group.unreadCount > 0 ? (
+                                <>
+                                  <Clock size={12} color="#ca8a04" />
+                                  <span>{group.unreadCount} unbestätigt</span>
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCheck size={13} color="#16a34a" />
+                                  <span>Alle bestätigt ✓</span>
+                                </>
+                              )}
+                            </div>
+
+                            <div style={{
+                              width: '30px',
+                              height: '30px',
+                              borderRadius: '8px',
+                              background: '#f8fafc',
+                              border: '1px solid #e2e8f0',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#64748b'
+                            }}>
+                              {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Collapsible Student Cards */}
+                        {!isCollapsed && (
+                          <div style={{
+                            padding: '12px 14px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '10px',
+                            background: '#f8fafc'
+                          }}>
+                            {group.items.map((item: any, idx: number) => {
+                              const dt = new Date(item.slot_start_datetime);
+                              const timeStr = !isNaN(dt.getTime())
+                                ? dt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+                                : '14:00';
+                              const isRead = item.status === 'READ';
+
+                              return (
+                                <div
+                                  key={item.id || idx}
+                                  style={{
+                                    padding: '12px 16px',
+                                    borderRadius: '16px',
+                                    background: isRead ? '#ffffff' : 'repeating-linear-gradient(-45deg, #fef2f2 0px, #fef2f2 8px, #ffffff 8px, #ffffff 16px)',
+                                    border: isRead ? '1.5px solid #e2e8f0' : '1.5px solid #fca5a5',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    gap: '12px',
+                                    boxShadow: '0 1px 4px rgba(0, 0, 0, 0.02)'
+                                  }}
+                                >
+                                  {/* Left: Student Info */}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                                    <div style={{
+                                      width: '38px',
+                                      height: '38px',
+                                      borderRadius: '11px',
+                                      background: isRead ? '#f1f5f9' : '#fee2e2',
+                                      border: isRead ? '1px solid #e2e8f0' : '1.5px solid #fca5a5',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      color: isRead ? '#64748b' : '#dc2626',
+                                      flexShrink: 0
+                                    }}>
+                                      <User size={18} />
+                                    </div>
+
+                                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                      <span style={{ fontSize: '0.90rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {item.studentName}
+                                      </span>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px', fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
+                                        <span>{item.instrument}</span>
+                                        <span>•</span>
+                                        <span style={{ fontWeight: 750, color: '#0f172a' }}>{timeStr} Uhr</span>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Right: Status Pill & Action */}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                    {isRead ? (
+                                      <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '5px',
+                                        background: '#f0fdf4',
+                                        border: '1px solid #86efac',
+                                        padding: '5px 10px',
+                                        borderRadius: '9px',
+                                        color: '#166534',
+                                        fontSize: '0.70rem',
+                                        fontWeight: 800
+                                      }}>
+                                        <CheckCheck size={13} color="#16a34a" />
+                                        <span>Bestätigt</span>
+                                      </div>
+                                    ) : (
+                                      <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        background: '#fffbeb',
+                                        border: '1px solid #fde047',
+                                        padding: '5px 10px',
+                                        borderRadius: '9px',
+                                        color: '#854d0e',
+                                        fontSize: '0.70rem',
+                                        fontWeight: 800
+                                      }} title="Zugang nach § 130 BGB noch nicht bestätigt">
+                                        <Clock size={12} color="#ca8a04" />
+                                        <span>Ungelesen</span>
+                                      </div>
+                                    )}
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setShowAbsenceOverviewModal(false);
+                                        handleEmergencyShoutbox({
+                                          id: item.id,
+                                          student_id: item.student_id,
+                                          date: item.slot_start_datetime.substring(0, 10),
+                                          startTime: timeStr,
+                                          student: item.student,
+                                          studentName: item.studentName
+                                        });
+                                      }}
+                                      style={{
+                                        background: '#ffffff',
+                                        border: '1px solid #cbd5e1',
+                                        color: '#334155',
+                                        padding: '6px 10px',
+                                        borderRadius: '9px',
+                                        fontSize: '0.72rem',
+                                        fontWeight: 800,
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        transition: 'all 0.15s'
+                                      }}
+                                      title="Shoutbox mit Schüler öffnen"
+                                    >
+                                      <MessageSquare size={12} />
+                                      <span>Nachricht</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  );
-                })
+                    );
+                  })}
+                </>
               )}
             </div>
 

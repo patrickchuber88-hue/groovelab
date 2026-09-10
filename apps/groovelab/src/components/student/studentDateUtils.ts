@@ -28,7 +28,7 @@ export const getDaysBetweenLocal = (dateStr1: string, dateStr2: string) => {
 export const getISOWeekRaw = (dateInput?: string | Date, lessonDay: number = 1): string => {
   let date: Date;
   if (!dateInput) {
-    date = new Date();
+    date = getSimulatedNow();
   } else if (dateInput instanceof Date) {
     date = dateInput;
   } else {
@@ -44,7 +44,7 @@ export const getISOWeekRaw = (dateInput?: string | Date, lessonDay: number = 1):
   }
   
   if (isNaN(date.getTime())) {
-    date = new Date();
+    date = getSimulatedNow();
   }
 
   // Adjust the date back to the most recent lesson day
@@ -74,7 +74,7 @@ export const getItemWeek = (item: { topic_name: string; updated_at?: string }): 
     const parts = item.topic_name.split('Hausaufgabe KW ');
     const kwNum = parts[1]?.trim();
     if (kwNum) {
-      const year = item.updated_at ? new Date(item.updated_at).getFullYear() : new Date().getFullYear();
+      const year = item.updated_at ? new Date(item.updated_at).getFullYear() : getSimulatedNow().getFullYear();
       return `${year}-W${kwNum.padStart(2, '0')}`;
     }
   }

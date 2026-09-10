@@ -40,6 +40,10 @@ export function useParentSessionLock({
 
   const lastActivityRef = useRef<number>(Date.now());
   const timerIntervalRef = useRef<any>(null);
+  const onLockRef = useRef<(() => void) | undefined>(onLock);
+  useEffect(() => {
+    onLockRef.current = onLock;
+  }, [onLock]);
 
   // Hard physical hardware & media teardown
   const stopHardwareMediaStreams = useCallback(() => {
@@ -93,11 +97,11 @@ export function useParentSessionLock({
     setIsWarning(false);
     setRemainingSeconds(timeoutSeconds);
 
-    // 5. Invoke caller callback
-    if (onLock) {
-      onLock();
+    // 5. Invoke caller callback via stable ref
+    if (onLockRef.current) {
+      onLockRef.current();
     }
-  }, [studentId, stopHardwareMediaStreams, onLock, timeoutSeconds]);
+  }, [studentId, stopHardwareMediaStreams, timeoutSeconds]);
 
   // Extend session by another full timeout interval
   const extendSession = useCallback(() => {
