@@ -22,16 +22,23 @@ import {
   Gauge, 
   CircleDot, 
   Check, 
-  Sliders,
-  Layers,
-  Compass,
-  ChevronRight,
-  Bluetooth,
-  TrendingUp,
-  Lightbulb,
-  CheckCircle2,
-  Lock
+  Sliders, 
+  Layers, 
+  Compass, 
+  ChevronRight, 
+  Bluetooth, 
+  TrendingUp, 
+  Lightbulb, 
+  CheckCircle2, 
+  Lock 
 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { 
+  getAudioDeviceFingerprint, 
+  getDeviceLatency, 
+  saveDeviceLatency 
+} from '../../utils/audioDeviceCalibration';
+import { GrooveLeaderboardWidget } from './GrooveLeaderboardWidget';
 
 export interface GrooveTrainerProps {
   student?: any;
@@ -45,18 +52,23 @@ export interface GrooveTrainerProps {
 }
 
 type RhythmLevel = 'viertel' | 'achtel' | 'synkopen' | 'shuffle';
-type TrainingMode = 'call_response' | 'continuous' | 'disappearing_beat' | 'tempo_sprint';
+type TrainingMode = 'call_response' | 'continuous' | 'disappearing_beat';
 type SoundKitType = 'acoustic' | 'body_percussion' | 'urban_808' | 'latin';
 
 interface LevelConfig {
   id: RhythmLevel;
-  title: string;
-  subtitle: string;
+  titleJunior: string;
+  titlePro: string;
+  subtitleJunior: string;
+  subtitlePro: string;
   defaultBpm: number;
   subdivisions: number;
-  syllables: string[];
+  syllablesJunior: string[];
+  syllablesPro: string[];
   targetPattern: boolean[];
-  badge: string;
+  badgeJunior: string;
+  badgePro: string;
+  multiplier: number;
 }
 
 interface HitRecord {
@@ -70,43 +82,63 @@ interface HitRecord {
 const RHYTHM_LEVELS: LevelConfig[] = [
   {
     id: 'viertel',
-    title: '1. Bären-Puls',
-    subtitle: 'Der Grund-Puls: Finde den Herzschlag der Musik',
+    titleJunior: '1. Bären-Puls',
+    titlePro: '1. Viertel-Puls (Downbeats)',
+    subtitleJunior: 'Der Grund-Puls: Finde den Herzschlag der Musik',
+    subtitlePro: 'Metrischer 4/4 Grundpuls und Mikrotiming',
     defaultBpm: 80,
     subdivisions: 4,
-    syllables: ['BUMM', 'BUMM', 'BUMM', 'BUMM'],
+    syllablesJunior: ['BUMM', 'BUMM', 'BUMM', 'BUMM'],
+    syllablesPro: ['1', '2', '3', '4'],
     targetPattern: [true, true, true, true],
-    badge: 'Herzschlag'
+    badgeJunior: 'Herzschlag',
+    badgePro: '1/4 Beat',
+    multiplier: 1.0
   },
   {
     id: 'achtel',
-    title: '2. Häschen-Groove',
-    subtitle: 'Hüpfen im Takt: Hä-schen, Hä-schen',
+    titleJunior: '2. Häschen-Groove',
+    titlePro: '2. Achtel-Grid (8th-Notes)',
+    subtitleJunior: 'Hüpfen im Takt: Hä-schen, Hä-schen',
+    subtitlePro: 'Lineares 8tel-Subdivisions-Gitter',
     defaultBpm: 90,
     subdivisions: 8,
-    syllables: ['HÄ', 'schen', 'HÄ', 'schen', 'HÄ', 'schen', 'HÄ', 'schen'],
+    syllablesJunior: ['HÄ', 'schen', 'HÄ', 'schen', 'HÄ', 'schen', 'HÄ', 'schen'],
+    syllablesPro: ['1', '+', '2', '+', '3', '+', '4', '+'],
     targetPattern: [true, true, true, true, true, true, true, true],
-    badge: 'Laufschritt'
+    badgeJunior: 'Laufschritt',
+    badgePro: '1/8 Grid',
+    multiplier: 1.2
   },
   {
     id: 'synkopen',
-    title: '3. Off-Beat & Pause',
-    subtitle: 'Spiele genau zwischen den Schlägen',
+    titleJunior: '3. Känguru & Off-Beat',
+    titlePro: '3. Off-Beat Synkopen',
+    subtitleJunior: 'Spiele genau zwischen den Schlägen',
+    subtitlePro: 'Upbeat-Akzente und synkopierte Pausen',
     defaultBpm: 95,
     subdivisions: 8,
-    syllables: ['·', 'UND', '·', 'UND', '·', 'UND', '·', 'UND'],
+    syllablesJunior: ['·', 'UND', '·', 'UND', '·', 'UND', '·', 'UND'],
+    syllablesPro: ['·', '+', '·', '+', '·', '+', '·', '+'],
     targetPattern: [false, true, false, true, false, true, false, true],
-    badge: 'Reggae-Kick'
+    badgeJunior: 'Reggae-Kick',
+    badgePro: 'Upbeats',
+    multiplier: 1.4
   },
   {
     id: 'shuffle',
-    title: '4. Galopp & Swing',
-    subtitle: 'Das rollende Pferde-Galopp-Gefühl',
+    titleJunior: '4. Pferde-Galopp & Swing',
+    titlePro: '4. Shuffle & Swing-Triolen',
+    subtitleJunior: 'Das rollende Pferde-Galopp-Gefühl',
+    subtitlePro: 'Ternäre Triolen-Phrasierung & Swing-Feel',
     defaultBpm: 75,
     subdivisions: 12,
-    syllables: ['HOPP', '·', 'e', 'HOPP', '·', 'e', 'HOPP', '·', 'e', 'HOPP', '·', 'e'],
+    syllablesJunior: ['HOPP', '·', 'e', 'HOPP', '·', 'e', 'HOPP', '·', 'e', 'HOPP', '·', 'e'],
+    syllablesPro: ['1', '·', 'a', '2', '·', 'a', '3', '·', 'a', '4', '·', 'a'],
     targetPattern: [true, false, true, true, false, true, true, false, true, true, false, true],
-    badge: 'Galopp'
+    badgeJunior: 'Galopp',
+    badgePro: '12/8 Swing',
+    multiplier: 1.5
   }
 ];
 
@@ -316,8 +348,20 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
   // Hit History Record for Post-Session Scatter Density Plot
   const [sessionHits, setSessionHits] = useState<HitRecord[]>([]);
 
+  const [isCountingIn, setIsCountingIn] = useState<boolean>(false);
+  const [countInBeat, setCountInBeat] = useState<number>(0);
+  const countInTimerRef = useRef<any>(null);
+  const [latestFinishedScore, setLatestFinishedScore] = useState<{ level: RhythmLevel; accuracy: number; streak: number; bpm: number } | null>(null);
+  const [mobileActivePane, setMobileActivePane] = useState<'trainer' | 'leaderboard'>('trainer');
+
   const activeLevelConfig = RHYTHM_LEVELS.find(l => l.id === selectedLevel) || RHYTHM_LEVELS[0];
   const currentTheme = LEVEL_THEMES[selectedLevel] || LEVEL_THEMES.viertel;
+
+  const isJunior = uiLevel === 'junior';
+  const activeTitle = isJunior ? activeLevelConfig.titleJunior : activeLevelConfig.titlePro;
+  const activeSubtitle = isJunior ? activeLevelConfig.subtitleJunior : activeLevelConfig.subtitlePro;
+  const activeSyllables = isJunior ? activeLevelConfig.syllablesJunior : activeLevelConfig.syllablesPro;
+  const activeBadge = isJunior ? activeLevelConfig.badgeJunior : activeLevelConfig.badgePro;
 
   const getAudioContext = useCallback(() => {
     if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
@@ -330,30 +374,32 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
     return audioCtxRef.current;
   }, []);
 
-  // Hardware Latency Auto-Detection & Loopstation Source Sync
+  // Hardware Latency Auto-Detection & Loopstation/Platform Sync
   useEffect(() => {
-    try {
-      const ctx = getAudioContext();
-      const detectedOutLatency = (ctx as any).outputLatency || (ctx as any).baseLatency || 0;
-      
-      const trainerStored = localStorage.getItem('campus_timing_latency_offset');
-      const loopstationStored = localStorage.getItem('groovelab_latency_offset');
+    let isMounted = true;
+    const initHardwareLatency = async () => {
+      try {
+        const ctx = getAudioContext();
+        const detectedOutLatency = (ctx as any).outputLatency || (ctx as any).baseLatency || 0;
+        if (detectedOutLatency > 0.05 && isMounted) {
+          setIsBluetoothDetected(true);
+        }
 
-      if (detectedOutLatency > 0.05) {
-        setIsBluetoothDetected(true);
-        if (!trainerStored) {
+        const { hash } = await getAudioDeviceFingerprint(ctx?.sampleRate || 44100);
+        const savedDeviceOffset = getDeviceLatency(hash);
+
+        if (savedDeviceOffset !== null && isMounted) {
+          setLatencyOffsetMs(savedDeviceOffset);
+          setCalibrationSource('loopstation');
+        } else if (detectedOutLatency > 0.05 && isMounted) {
           const recOffset = Math.min(220, Math.round(detectedOutLatency * 1000) + 15);
           setLatencyOffsetMs(recOffset);
           setCalibrationSource('bluetooth');
         }
-      } else if (trainerStored) {
-        setCalibrationSource('trainer');
-      } else if (loopstationStored) {
-        setCalibrationSource('loopstation');
-      } else {
-        setCalibrationSource('default');
-      }
-    } catch (_) {}
+      } catch (_) {}
+    };
+    initHardwareLatency();
+    return () => { isMounted = false; };
   }, [getAudioContext]);
 
   // Multi-Kit Sound Synthesizer
@@ -618,16 +664,57 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
   const handleFinishSession = useCallback(() => {
     isRunningRef.current = false;
     setIsPlaying(false);
+    setIsCountingIn(false);
     setSessionCompleted(true);
     completionCooldownRef.current = Date.now() + 1200; // 🛡️ 1.2s Cooldown-Schutz vor Reflex-Taps
     
     const accuracy = totalHits > 0 ? Math.round(scoreSum / totalHits) : 0;
-    const earnedRound = accuracy >= 90 ? 50 : (accuracy >= 75 ? 35 : (accuracy >= 50 ? 20 : 5));
-    setAwardedRoundXp(earnedRound);
-    setSessionAccumulatedXp(prev => prev + earnedRound);
-    // Guarantee minimum 30 seconds practice credit per finished 16-bar round
-    sessionActiveSecondsRef.current = Math.max(sessionActiveSecondsRef.current, 30);
-  }, [scoreSum, totalHits]);
+    
+    // 1. Stufen-Basis nach Genauigkeit
+    let baseRoundXp = accuracy >= 90 ? 50 : (accuracy >= 75 ? 35 : (accuracy >= 50 ? 20 : 5));
+
+    // 2. Makelloser Pocket-Streak Bonus (+10 XP bei hoher Trefferserie)
+    const streakBonus = (bestStreak >= 10 && totalHits >= 10) ? 10 : 0;
+
+    // 3. Gestaffelter Schwierigkeits-Multiplikator
+    const multiplier = activeLevelConfig.multiplier || 1.0;
+    const rawEarned = Math.round((baseRoundXp + streakBonus) * multiplier);
+
+    // 4. Fresh Energy Soft-Cap (max 200 XP/Tag voll, danach degressiv 20% Ausdauer-XP)
+    let finalEarned = rawEarned;
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const studentKey = student?.id ? student.id : 'anon';
+        const dailyKey = `campus_gt_daily_xp_${studentKey}_${todayStr}`;
+        const currentDaily = Number(localStorage.getItem(dailyKey) || 0);
+
+        if (currentDaily >= 200) {
+          finalEarned = Math.max(5, Math.round(rawEarned * 0.20));
+        } else if (currentDaily + rawEarned > 200) {
+          const fullPart = 200 - currentDaily;
+          const degressedPart = Math.round((rawEarned - fullPart) * 0.20);
+          finalEarned = fullPart + Math.max(2, degressedPart);
+        }
+        localStorage.setItem(dailyKey, String(currentDaily + finalEarned));
+      } catch (_) {}
+    }
+
+    setAwardedRoundXp(finalEarned);
+    setSessionAccumulatedXp(prev => prev + finalEarned);
+
+    // 5. Sekundengenaue Übezeit (mindestens die tatsächliche Songlänge in Sekunden)
+    const expectedSongDurationSec = Math.round((16 * 4 * 60) / bpm);
+    sessionActiveSecondsRef.current = Math.max(sessionActiveSecondsRef.current, expectedSongDurationSec);
+
+    // 6. Leaderboard PR Synchronisation
+    setLatestFinishedScore({
+      level: selectedLevel,
+      accuracy,
+      streak: bestStreak,
+      bpm
+    });
+  }, [activeLevelConfig.multiplier, bestStreak, bpm, scoreSum, selectedLevel, student?.id, totalHits]);
 
   // Centralized Atomic Session Commit: Syncs XP and Practice Time to DB and Parent Callbacks
   const commitSessionData = useCallback(() => {
@@ -645,6 +732,28 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
       const updated = current + xpToCommit;
       localStorage.setItem(key, String(updated));
       setStudentBaseXp(prev => prev + xpToCommit);
+
+      // Persist practice minutes to Supabase
+      const minutesToAdd = Math.max(1, Math.round(secondsToCommit / 60));
+      (async () => {
+        try {
+          const { data } = await supabase
+            .from('students')
+            .select('practice_minutes_today')
+            .eq('id', student.id)
+            .single();
+          const currentMins = data?.practice_minutes_today || 0;
+          await supabase
+            .from('students')
+            .update({
+              practice_minutes_today: currentMins + minutesToAdd,
+              last_practice_date: new Date().toISOString()
+            })
+            .eq('id', student.id);
+        } catch (err) {
+          console.warn('[GrooveTrainer] Practice minutes sync note:', err);
+        }
+      })();
     }
 
     if (onRewardXp) {
@@ -688,7 +797,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
       const stepIdx = currentStepRef.current;
       const barIdx = barCountRef.current;
 
-      let isCall = true;
+      let isCall = false;
       let shouldMuteLeadDrums = false;
       let shouldMuteAllAudio = false;
 
@@ -698,10 +807,6 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
       } else if (trainingMode === 'disappearing_beat') {
         const barInCycle = barIdx % 4;
         shouldMuteAllAudio = barInCycle === 2 || barInCycle === 3;
-      } else if (trainingMode === 'tempo_sprint') {
-        if (stepIdx === 0 && barIdx > 0 && barIdx % 4 === 0) {
-          setBpm(prev => Math.min(160, prev + 2));
-        }
       }
 
       if (!shouldMuteAllAudio) {
@@ -781,33 +886,74 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
     return () => clearInterval(interval);
   }, [isPlaying, scheduleAudioEvents]);
 
-  const handleTogglePlay = () => {
+  const startActualPlayback = useCallback((anchorTime?: number) => {
     const ctx = getAudioContext();
-    if (!isPlaying) {
-      isRunningRef.current = true;
-      const startAnchor = ctx.currentTime + 0.08;
-      playbackStartTimeRef.current = startAnchor;
-      nextBeatTimeRef.current = startAnchor;
-      currentStepRef.current = 0;
-      barCountRef.current = 0;
-      setPocketStreak(0);
-      setTotalHits(0);
-      setScoreSum(0);
-      setPerfectHits(0);
-      setSessionHits([]);
-      setSessionCompleted(false);
-      setTimingOffsetMs(null);
-      setLastRating(null);
-      setIsPlaying(true);
-    } else {
+    if (!ctx) return;
+    isRunningRef.current = true;
+    const startAnchor = anchorTime || (ctx.currentTime + 0.08);
+    playbackStartTimeRef.current = startAnchor;
+    nextBeatTimeRef.current = startAnchor;
+    currentStepRef.current = 0;
+    barCountRef.current = 0;
+    setPocketStreak(0);
+    setTotalHits(0);
+    setScoreSum(0);
+    setPerfectHits(0);
+    setSessionHits([]);
+    setSessionCompleted(false);
+    setTimingOffsetMs(null);
+    setLastRating(null);
+    setIsCountingIn(false);
+    setIsPlaying(true);
+  }, [getAudioContext]);
+
+  const startCountIn = useCallback(() => {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    isRunningRef.current = true;
+    setIsCountingIn(true);
+    setCountInBeat(1);
+    setSessionCompleted(false);
+    setTimingOffsetMs(null);
+    setLastRating(null);
+
+    const secPerBeat = 60 / bpm;
+    const startTime = ctx.currentTime + 0.05;
+
+    // Schedule 4 count-in clicks
+    for (let b = 0; b < 4; b++) {
+      const beatTime = startTime + b * secPerBeat;
+      playDrumSound('click', beatTime, b === 0);
+      setTimeout(() => {
+        if (!isRunningRef.current) return;
+        setCountInBeat(b + 1);
+      }, Math.max(0, (beatTime - ctx.currentTime) * 1000));
+    }
+
+    countInTimerRef.current = setTimeout(() => {
+      if (!isRunningRef.current) return;
+      startActualPlayback(startTime + 4 * secPerBeat);
+    }, 4 * secPerBeat * 1000);
+  }, [bpm, getAudioContext, playDrumSound, startActualPlayback]);
+
+  const handleTogglePlay = useCallback(() => {
+    if (isPlaying || isCountingIn) {
       isRunningRef.current = false;
+      if (countInTimerRef.current) {
+        clearTimeout(countInTimerRef.current);
+        countInTimerRef.current = null;
+      }
+      setIsCountingIn(false);
       setIsPlaying(false);
       setCurrentStep(0);
       setAnticipatingStep(null);
       setTimingOffsetMs(null);
       setLastRating(null);
+    } else {
+      startCountIn();
     }
-  };
+  }, [isCountingIn, isPlaying, startCountIn]);
 
   /**
    * High-Precision Musician Quantization Tap Handler
@@ -1286,6 +1432,28 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
               </button>
               <button
                 type="button"
+                onClick={() => setTrainingMode('continuous')}
+                style={{
+                  flex: 1,
+                  border: 'none',
+                  background: trainingMode === 'continuous' ? '#fffbeb' : 'transparent',
+                  color: trainingMode === 'continuous' ? '#92400e' : '#64748b',
+                  borderRadius: '7px',
+                  padding: '5px 6px',
+                  fontSize: '0.68rem',
+                  fontWeight: trainingMode === 'continuous' ? 950 : 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px'
+                }}
+              >
+                <Activity size={11} color={trainingMode === 'continuous' ? '#d97706' : '#64748b'} />
+                <span>Dauer-Groove</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setTrainingMode('disappearing_beat')}
                 style={{
                   flex: 1,
@@ -1304,29 +1472,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
                 }}
               >
                 <Clock size={11} color={trainingMode === 'disappearing_beat' ? '#d97706' : '#64748b'} />
-                <span>Tunnel</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setTrainingMode('tempo_sprint')}
-                style={{
-                  flex: 1,
-                  border: 'none',
-                  background: trainingMode === 'tempo_sprint' ? '#fffbeb' : 'transparent',
-                  color: trainingMode === 'tempo_sprint' ? '#92400e' : '#64748b',
-                  borderRadius: '7px',
-                  padding: '5px 6px',
-                  fontSize: '0.68rem',
-                  fontWeight: trainingMode === 'tempo_sprint' ? 950 : 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '4px'
-                }}
-              >
-                <FastForward size={11} color={trainingMode === 'tempo_sprint' ? '#d97706' : '#64748b'} />
-                <span>Sprint (+2)</span>
+                <span>Geister-Beat</span>
               </button>
             </div>
           </div>
@@ -1473,7 +1619,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
                 fontWeight: 850,
                 color: isSel ? '#d97706' : '#94a3b8'
               }}>
-                {lvl.badge}
+                {isJunior ? lvl.badgeJunior : lvl.badgePro}
               </div>
             </button>
           );
@@ -1543,9 +1689,9 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
         }}>
           
           {/* Signal-Pill & Streak */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: '34px', gap: '8px' }}>
             <span style={{
-              background: isCallPhase ? '#fef3c7' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+              background: isCallPhase ? '#fef3c7' : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
               color: isCallPhase ? '#92400e' : '#ffffff',
               border: isCallPhase ? '1.5px solid #fde68a' : 'none',
               fontSize: isNotebook ? '0.84rem' : '0.78rem',
@@ -1555,16 +1701,17 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '7px',
-              boxShadow: isCallPhase ? '0 2px 8px rgba(217, 119, 6, 0.15)' : '0 2px 10px rgba(217, 119, 6, 0.28)'
+              boxShadow: isCallPhase ? '0 2px 8px rgba(217, 119, 6, 0.15)' : '0 2px 10px rgba(22, 163, 74, 0.30)',
+              transition: 'all 0.15s ease'
             }}>
               {trainingMode === 'call_response' 
                 ? (isCallPhase 
-                  ? <><Headphones size={14} color="#92400e" strokeWidth={2.5} /> HÖR GUT ZU!</> 
-                  : <><Target size={14} color="#ffffff" strokeWidth={2.4} /> DU BIST DRAN!</>)
-                : (trainingMode === 'tempo_sprint'
-                  ? <><FastForward size={14} color="#ffffff" /> Sprint ({bpm} BPM)</>
+                  ? <><Headphones size={14} color="#92400e" strokeWidth={2.5} /> HÖR GUT ZU! (Noch {2 - (currentBar % 4)} {2 - (currentBar % 4) === 1 ? 'Takt' : 'Takte'})</> 
+                  : <><Target size={14} color="#ffffff" strokeWidth={2.4} /> JETZT DU! (Spiele im Beat)</>)
+                : (trainingMode === 'continuous'
+                  ? <><Activity size={14} color="#ffffff" /> Dauer-Groove (16 Takte Flow)</>
                   : (isDisappeared 
-                    ? <><Clock size={14} color="#64748b" /> Beat im Tunnel – Zähle!</> 
+                    ? <><Clock size={14} color="#64748b" /> Geister-Beat – Zähle innerlich!</> 
                     : <><Activity size={14} color="#ffffff" /> Der Beat groovt</>))}
             </span>
 
@@ -1600,14 +1747,34 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
             </div>
           </div>
 
+          {/* Call-Phase visueller Takt-Fortschrittsbalken */}
+          {trainingMode === 'call_response' && isCallPhase && isPlaying && (
+            <div style={{
+              width: '100%',
+              height: '4px',
+              background: '#fef3c7',
+              borderRadius: '100px',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                width: `${Math.min(100, Math.max(5, (((currentBar % 4) * activeLevelConfig.subdivisions + currentStep + 1) / (2 * activeLevelConfig.subdivisions)) * 100))}%`,
+                height: '100%',
+                background: 'linear-gradient(90deg, #f59e0b 0%, #16a34a 100%)',
+                transition: 'width 0.08s linear'
+              }} />
+            </div>
+          )}
+
           {/* Konzentrische Beat-Trigger-Pads */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: `repeat(${activeLevelConfig.syllables.length}, 1fr)`,
+            gridTemplateColumns: `repeat(${activeSyllables.length}, 1fr)`,
             gap: isNotebook ? '10px' : '6px',
-            padding: '2px 0'
+            padding: '2px 0',
+            minHeight: isNotebook ? '106px' : '92px',
+            alignItems: 'center'
           }}>
-            {activeLevelConfig.syllables.map((syl, sIdx) => {
+            {activeSyllables.map((syl, sIdx) => {
               const isCurrent = isPlaying && currentStep === sIdx;
               const isAnticipating = isPlaying && anticipatingStep === sIdx;
               const isTarget = activeLevelConfig.targetPattern[sIdx];
@@ -1623,13 +1790,17 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
                   }}
                 >
                   <span style={{
-                    fontSize: activeLevelConfig.syllables.length > 8 
+                    fontSize: activeSyllables.length > 8 
                       ? (isNotebook ? '0.78rem' : '0.70rem') 
                       : (isNotebook ? '0.94rem' : '0.84rem'),
                     fontWeight: 950,
                     color: isCurrent ? '#d97706' : (isTarget ? '#0f172a' : '#94a3b8'),
                     letterSpacing: '0.01em',
-                    transition: 'all 0.08s ease'
+                    transition: 'all 0.08s ease',
+                    height: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
                   }}>
                     {syl}
                   </span>
@@ -1712,7 +1883,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
       {/* 🌟 FOKUS-ZONE 3: DAS HERO 3D MPC DRUM-PAD (ALL-IN-ONE TRIGGER) */}
       <button
         type="button"
-        aria-label={!isPlaying ? "Groove-Trainer starten" : "Im Rhythmus tippen"}
+        aria-label={!isPlaying && !isCountingIn ? "Groove-Trainer starten" : (isCountingIn ? "Einzähler läuft" : "Im Rhythmus tippen")}
         onPointerDown={(e) => {
           e.preventDefault();
           handleUserTap();
@@ -1725,14 +1896,21 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
         }}
         style={{
           width: '100%',
-          minHeight: isNotebook ? '124px' : '108px',
+          height: isNotebook ? '124px' : '112px',
+          minHeight: isNotebook ? '124px' : '112px',
+          maxHeight: isNotebook ? '124px' : '112px',
+          boxSizing: 'border-box',
           borderRadius: isNotebook ? '28px' : '24px',
           border: 'none',
-          background: !isPlaying 
+          background: !isPlaying && !isCountingIn
             ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 60%, #b45309 100%)'
-            : (isPadPressed 
-              ? '#b45309' 
-              : 'linear-gradient(180deg, #f59e0b 0%, #d97706 100%)'),
+            : (isCountingIn 
+              ? 'linear-gradient(135deg, #d97706 0%, #b45309 100%)' 
+              : (isCallPhase && trainingMode === 'call_response'
+                ? 'linear-gradient(135deg, #d97706 0%, #b45309 100%)'
+                : (isPadPressed 
+                  ? '#14532d' 
+                  : 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)'))),
           color: '#ffffff',
           display: 'flex',
           flexDirection: 'column',
@@ -1741,20 +1919,45 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
           gap: isNotebook ? '6px' : '4px',
           cursor: 'pointer',
           boxShadow: isPadPressed 
-            ? '0 2px 0 #78350f, inset 0 3px 8px rgba(0, 0, 0, 0.25)' 
+            ? '0 2px 0 #0f172a, inset 0 3px 8px rgba(0, 0, 0, 0.25)' 
             : (isNotebook 
               ? '0 6px 0 #92400e, 0 18px 36px -6px rgba(217, 119, 6, 0.38), inset 0 1.5px 0 rgba(255, 255, 255, 0.45)'
               : '0 6px 0 #92400e, 0 16px 32px -6px rgba(217, 119, 6, 0.42), inset 0 1.5px 0 rgba(255, 255, 255, 0.42)'),
           userSelect: 'none',
           WebkitUserSelect: 'none',
           touchAction: 'manipulation',
-          transform: isPadPressed ? 'translateY(4px)' : 'translateY(0)',
-          transition: 'all 0.07s cubic-bezier(0.16, 1, 0.3, 1)',
+          transform: isPadPressed ? 'translateY(3px)' : 'translateY(0)',
+          transition: 'transform 0.05s ease, background 0.15s ease',
           outline: 'none'
         }}
         className="hover-scale-mini"
       >
-        {!isPlaying ? (
+        {isCountingIn ? (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: isNotebook ? '12px' : '9px' }}>
+              <Activity size={isNotebook ? 28 : 24} color="#ffffff" className="animate-pulse" />
+              <span style={{
+                fontSize: isNotebook ? '1.42rem' : '1.24rem',
+                fontWeight: 950,
+                letterSpacing: '-0.01em',
+                color: '#ffffff'
+              }}>
+                BEREIT MACHEN... {countInBeat > 0 ? countInBeat : '1'}
+              </span>
+            </div>
+            <div style={{
+              height: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: isNotebook ? '0.84rem' : '0.76rem',
+              color: 'rgba(255, 255, 255, 0.94)',
+              fontWeight: 800
+            }}>
+              Vorzähler läuft • Lausche auf den Puls 1 · 2 · 3 · 4
+            </div>
+          </>
+        ) : !isPlaying ? (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: isNotebook ? '12px' : '9px' }}>
               <Play size={isNotebook ? 28 : 24} fill="#ffffff" color="#ffffff" strokeWidth={2.4} />
@@ -1771,6 +1974,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
+              height: '24px',
               fontSize: isNotebook ? '0.84rem' : '0.76rem',
               color: 'rgba(255, 255, 255, 0.94)',
               fontWeight: 750
@@ -1799,40 +2003,50 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
                 letterSpacing: '-0.01em',
                 color: '#ffffff'
               }}>
-                HIER IM TAKT TROMMELN
+                {trainingMode === 'call_response' && isCallPhase ? 'NUR ZUHÖREN...' : 'HIER IM TAKT TROMMELN'}
               </span>
             </div>
 
-            {/* Live-Feedback direkt im Hero-Pad */}
-            <div style={{ minHeight: isNotebook ? '24px' : '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {/* Live-Feedback direkt im Hero-Pad (Fixed Height Slot gegen Layout-Shift) */}
+            <div style={{
+              height: '24px',
+              minHeight: '24px',
+              maxHeight: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis'
+            }}>
               {lastRating === 'pocket' && (
                 <span style={{ fontSize: isNotebook ? '0.90rem' : '0.82rem', fontWeight: 950, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <Sparkles size={16} color="#ffffff" /> PERFEKT IM POCKET! {isProMode && timingOffsetMs !== null && `(${timingOffsetMs > 0 ? `+${timingOffsetMs}` : timingOffsetMs}ms)`}
+                  <Sparkles size={16} color="#ffffff" /> GENAU! VOLL IM POCKET! ✨
                 </span>
               )}
               {lastRating === 'good' && (
                 <span style={{ fontSize: isNotebook ? '0.90rem' : '0.82rem', fontWeight: 950, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <Check size={16} color="#ffffff" /> SUPER IM GROOVE! {isProMode && timingOffsetMs !== null && `(${timingOffsetMs > 0 ? `+${timingOffsetMs}` : timingOffsetMs}ms)`}
+                  <Check size={16} color="#ffffff" /> GUT IM PULS! 👍
                 </span>
               )}
               {lastRating === 'rush' && (
                 <span style={{ fontSize: isNotebook ? '0.86rem' : '0.78rem', fontWeight: 900, color: '#fee2e2', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <Clock size={15} color="#fee2e2" /> Etwas zu eilig – bleib ruhig!
+                  <Clock size={15} color="#fee2e2" /> ETWAS FRÜH ⏩ Nicht hetzen!
                 </span>
               )}
               {lastRating === 'drag' && (
                 <span style={{ fontSize: isNotebook ? '0.86rem' : '0.78rem', fontWeight: 900, color: '#fef3c7', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <Clock size={15} color="#fef3c7" /> Lass dir Zeit, ganz entspannt!
+                  <Clock size={15} color="#fef3c7" /> ETWAS SPÄT ⏪ Ganz entspannt mit dem Beat!
                 </span>
               )}
               {lastRating === 'miss' && (
-                <span style={{ fontSize: isNotebook ? '0.86rem' : '0.78rem', fontWeight: 900, color: '#fee2e2', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <RotateCcw size={15} color="#fee2e2" /> Neuer Versuch – hör auf den Beat!
+                <span style={{ fontSize: isNotebook ? '0.86rem' : '0.78rem', fontWeight: 900, color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <RotateCcw size={15} color="#f1f5f9" /> DANEBEN 💨 Lausche auf den Beat!
                 </span>
               )}
               {!lastRating && (
                 <span style={{ fontSize: isNotebook ? '0.82rem' : '0.74rem', color: 'rgba(255, 255, 255, 0.88)', fontWeight: 750 }}>
-                  Tippe im Rhythmus der Beats
+                  {trainingMode === 'call_response' && isCallPhase ? 'Präge dir den Rhythmus ein' : 'Tippe im Rhythmus der Beats'}
                 </span>
               )}
             </div>
@@ -2337,13 +2551,126 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
     </div>
   );
 
-  if (isNotebook) {
-    return (
-      <div style={{ width: '100%', maxWidth: '860px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {studioCard}
+  return (
+    <div style={{ width: '100%', maxWidth: '1240px', margin: '0 auto' }}>
+      {/* Mobile / Tablet Portrait Segmented Tab Switch */}
+      <div 
+        className="groove-mobile-pane-switch"
+        style={{
+          display: 'none',
+          marginBottom: '16px',
+          background: '#ffffff',
+          padding: '4px',
+          borderRadius: '16px',
+          border: '1.5px solid #fed7aa',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setMobileActivePane('trainer')}
+          style={{
+            flex: 1,
+            border: 'none',
+            background: mobileActivePane === 'trainer' ? '#f59e0b' : 'transparent',
+            color: mobileActivePane === 'trainer' ? '#ffffff' : '#64748b',
+            borderRadius: '12px',
+            padding: '10px 14px',
+            fontSize: '0.88rem',
+            fontWeight: 950,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          <Target size={16} />
+          <span>Rhythmus-Trainer</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileActivePane('leaderboard')}
+          style={{
+            flex: 1,
+            border: 'none',
+            background: mobileActivePane === 'leaderboard' ? '#f59e0b' : 'transparent',
+            color: mobileActivePane === 'leaderboard' ? '#ffffff' : '#64748b',
+            borderRadius: '12px',
+            padding: '10px 14px',
+            fontSize: '0.88rem',
+            fontWeight: 950,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          <Trophy size={16} />
+          <span>Bestenliste</span>
+        </button>
       </div>
-    );
-  }
 
-  return studioCard;
+      {/* 2-Spalten Doppelseite (Aufgeschlagenes Aufgabenheft) */}
+      <div className="groove-dual-book-grid">
+        <div className={`groove-pane-trainer ${mobileActivePane !== 'trainer' ? 'hide-mobile' : ''}`}>
+          {studioCard}
+        </div>
+
+        <div className={`groove-pane-leaderboard ${mobileActivePane !== 'leaderboard' ? 'hide-mobile' : ''}`}>
+          <GrooveLeaderboardWidget
+            selectedLevel={selectedLevel}
+            onSelectLevel={(lvl) => {
+              if (!isPlaying && !isCountingIn) {
+                setSelectedLevel(lvl);
+              }
+            }}
+            student={student}
+            onPlayLevel={(lvl) => {
+              if (!isPlaying && !isCountingIn) {
+                setSelectedLevel(lvl);
+                setMobileActivePane('trainer');
+                setTimeout(() => handleTogglePlay(), 60);
+              }
+            }}
+            latestScore={latestFinishedScore}
+            useNotebookLayout={isNotebook}
+          />
+        </div>
+      </div>
+
+      <style>{`
+        .groove-dual-book-grid {
+          display: grid;
+          grid-template-columns: minmax(460px, 1.16fr) minmax(360px, 0.84fr);
+          gap: 24px;
+          align-items: stretch;
+          width: 100%;
+        }
+        @media (max-width: 1023px) {
+          .groove-dual-book-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+          }
+          .groove-mobile-pane-switch {
+            display: flex !important;
+          }
+          .groove-pane-trainer.hide-mobile,
+          .groove-pane-leaderboard.hide-mobile {
+            display: none !important;
+          }
+        }
+        @media (min-width: 1024px) {
+          .groove-pane-trainer,
+          .groove-pane-leaderboard {
+            display: block !important;
+          }
+        }
+      `}</style>
+    </div>
+  );
 };

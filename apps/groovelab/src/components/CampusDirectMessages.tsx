@@ -1292,18 +1292,26 @@ export function CampusDirectMessages({
       const isPast = date < todayStr;
       const effectiveTime = (startTime && startTime !== '18:00') ? startTime.slice(0, 5) : defaultStartTime;
 
+      const occIds: string[] = [];
+      if (occObj?.id) occIds.push(String(occObj.id));
+      if (occObj?.schedule_id && (occObj?.date || date)) {
+        occIds.push(`virtual-${occObj.schedule_id}-${occObj.date || date}`);
+      }
+
       if (!dateSlotMap.has(date)) {
         dateSlotMap.set(date, {
           occ: occObj || { date, start_time: effectiveTime, is_virtual: true },
-          ids: occObj?.id ? [String(occObj.id)] : [],
+          ids: occIds,
           start_time: effectiveTime,
           isPast
         });
       } else {
         const existing = dateSlotMap.get(date)!;
-        if (occObj?.id && !existing.ids.includes(String(occObj.id))) {
-          existing.ids.push(String(occObj.id));
-        }
+        occIds.forEach(id => {
+          if (!existing.ids.includes(id)) {
+            existing.ids.push(id);
+          }
+        });
         if (startTime && (!existing.start_time || existing.start_time === '18:00')) {
           existing.start_time = effectiveTime;
         }
@@ -1361,7 +1369,7 @@ export function CampusDirectMessages({
       const isShiftOrChanged = 
         (occ.status && occ.status !== 'scheduled' && occ.status !== 'confirmed') ||
         occ.rescheduled_from ||
-        occ.original_date ||
+        (occ.original_date && occ.original_date !== occ.date) ||
         (occ.notes && (occ.notes.includes('->') || occ.notes.includes('verschoben')));
 
       return {
@@ -1376,7 +1384,7 @@ export function CampusDirectMessages({
         messages: occMessages,
         occurrence: occ
       };
-    }).filter(t => t.messages.length > 0 || t.isShiftOrChanged);
+    }).filter(t => t.messages.length > 0);
 
     const upcoming = allTabs.filter(t => !t.isPast).sort((a, b) => {
       const dateA = `${a.date}T${a.start_time}`;
@@ -1414,6 +1422,19 @@ export function CampusDirectMessages({
     if (!selectedRecipient) return;
     setActiveSubTab('all');
   }, [selectedRecipient?.id]);
+
+  // 4b. Graceful fallback if selected subtab no longer exists (e.g. empty tab was filtered out)
+  useEffect(() => {
+    if (activeSubTab === 'all' || activeSubTab === 'general') return;
+    const exists = allOccurrenceTabs.some(tab => 
+      tab.id === activeSubTab || 
+      (tab.allIds && tab.allIds.includes(activeSubTab)) ||
+      tab.date === activeSubTab
+    );
+    if (!exists) {
+      setActiveSubTab('all');
+    }
+  }, [activeSubTab, allOccurrenceTabs]);
 
   // 5. Messages displayed in the chat area for currently active sub-tab (Unified Timeline)
   const displayedMessages = useMemo(() => {

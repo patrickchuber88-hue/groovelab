@@ -1136,7 +1136,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                     (localProgress || []).forEach((assignment: any) => {
                       if (String(assignment.studentId) !== String(studentId) || !assignment.pageStates) return;
                       const book = lehrwerke.find(g => String(g.id) === String(assignment.lehrwerkId));
-                      if (!book) return;
+                      const bookTitle = book?.title || assignment.bookTitle || assignment.lehrwerkTitle;
+                      if (!bookTitle) return;
                       const pages: number[] = [];
                       const notes: string[] = [];
                       Object.entries(assignment.pageStates).forEach(([pNumStr, pState]: [string, any]) => {
@@ -1148,7 +1149,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             try {
                               const parsed = JSON.parse(cleanNote);
                               if (Array.isArray(parsed)) {
-                                cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
                               }
                             } catch {}
                           }
@@ -1161,7 +1162,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       if (pages.length > 0) {
                         pages.sort((a, b) => a - b);
                         const formattedPages = pages.length === 1 ? `S. ${pages[0]}` : `S. ${pages[0]}–${pages[pages.length - 1]}`;
-                        const existingBook = activeJuniorBooks.find(b => b.title === book.title);
+                        const existingBook = activeJuniorBooks.find(b => b.title.toLowerCase() === bookTitle.toLowerCase());
                         if (existingBook) {
                           existingBook.book = existingBook.book || book;
                           pages.forEach(p => {
@@ -1175,7 +1176,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             existingBook.notes = Array.from(new Set([...(existingBook.notes || []), ...notes]));
                           }
                         } else {
-                          activeJuniorBooks.push({ title: book.title, pages, formattedPages, notes, book });
+                          activeJuniorBooks.push({ title: bookTitle, pages, formattedPages, notes, book });
                         }
                       }
                     });
@@ -1188,20 +1189,21 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         const bookTitle = cleanTitle(parts[0].trim());
                         const pageNum = parseInt(parts[1], 10);
                         const book = lehrwerke.find((g: any) => (g.title || '').trim().toLowerCase() === bookTitle.toLowerCase());
-                        if (book && !isNaN(pageNum)) {
+                        const resolvedTitle = book?.title || bookTitle;
+                        if (!isNaN(pageNum)) {
                           let cleanNote = item.homework_notes || item.teacher_notes || '';
                           if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
                             try {
                               const parsed = JSON.parse(cleanNote);
                               if (Array.isArray(parsed)) {
-                                cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
                               }
                             } catch {}
                           }
                           cleanNote = String(cleanNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
                           const formattedNote = cleanNote ? `Seite ${pageNum}: ${cleanNote}` : '';
 
-                          const existingBook = activeJuniorBooks.find(b => (b.title || '').trim().toLowerCase() === book.title.trim().toLowerCase());
+                          const existingBook = activeJuniorBooks.find(b => (b.title || '').trim().toLowerCase() === resolvedTitle.trim().toLowerCase());
                           if (existingBook) {
                             if (!existingBook.pages.includes(pageNum)) {
                               existingBook.pages.push(pageNum);
@@ -1215,7 +1217,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             }
                           } else {
                             activeJuniorBooks.push({
-                              title: book.title,
+                              title: resolvedTitle,
                               pages: [pageNum],
                               formattedPages: `S. ${pageNum}`,
                               notes: formattedNote ? [formattedNote] : [],
@@ -1296,6 +1298,79 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         }
                       }
                     });
+
+                    // 2b. 📦 Snapshot Hydration: Falls activeJuniorBooks oder activeJuniorSongs leer sind, aus jüngstem SNAPSHOT hydrieren
+                    if (activeJuniorBooks.length === 0 || activeJuniorSongs.length === 0) {
+                      const allSnapshotCandidates = (progressItems || []).filter((item: any) => item.topic_name?.startsWith('Hausaufgabe KW '));
+                      allSnapshotCandidates.sort((a: any, b: any) => {
+                        const wA = getItemWeek(a);
+                        const wB = getItemWeek(b);
+                        if (wA !== wB) return (wB || '').localeCompare(wA || '');
+                        const tA = new Date(a.updated_at || a.created_at || 0).getTime();
+                        const tB = new Date(b.updated_at || b.created_at || 0).getTime();
+                        return tB - tA;
+                      });
+
+                      for (const snapItem of allSnapshotCandidates) {
+                        if (!snapItem.homework_notes) continue;
+                        let parsedSnapNotes: any = null;
+                        try {
+                          parsedSnapNotes = typeof snapItem.homework_notes === 'string' ? JSON.parse(snapItem.homework_notes) : snapItem.homework_notes;
+                        } catch {}
+                        if (!Array.isArray(parsedSnapNotes)) continue;
+
+                        if (activeJuniorBooks.length === 0) {
+                          const snapLwEntry = parsedSnapNotes.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_LEHRWERKE:'));
+                          if (snapLwEntry) {
+                            try {
+                              const rawJson = snapLwEntry.substring('SNAPSHOT_LEHRWERKE:'.length);
+                              const parsedLw = JSON.parse(rawJson);
+                              if (Array.isArray(parsedLw) && parsedLw.length > 0) {
+                                parsedLw.forEach((lw: any) => {
+                                  const title = cleanTitle(lw.title || '');
+                                  const pages = Array.isArray(lw.pages) ? [...lw.pages].sort((a: number, b: number) => a - b) : [];
+                                  if (title && pages.length > 0 && !activeJuniorBooks.some(b => b.title.toLowerCase() === title.toLowerCase())) {
+                                    activeJuniorBooks.push({
+                                      title,
+                                      pages,
+                                      formattedPages: pages.length === 1 ? `S. ${pages[0]}` : `S. ${pages[0]}–${pages[pages.length - 1]}`,
+                                      notes: Array.isArray(lw.notes) ? lw.notes : []
+                                    });
+                                  }
+                                });
+                              }
+                            } catch (e) {
+                              console.warn('Error hydrating SNAPSHOT_LEHRWERKE in Junior:', e);
+                            }
+                          }
+                        }
+
+                        if (activeJuniorSongs.length === 0) {
+                          const snapSongEntry = parsedSnapNotes.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_SONGS:'));
+                          if (snapSongEntry) {
+                            try {
+                              const rawJson = snapSongEntry.substring('SNAPSHOT_SONGS:'.length);
+                              const parsedSongs = JSON.parse(rawJson);
+                              if (Array.isArray(parsedSongs) && parsedSongs.length > 0) {
+                                parsedSongs.forEach((song: any) => {
+                                  const tName = cleanTitle(song.topic_name || song.title || '');
+                                  if (tName && !activeJuniorSongs.some(s => cleanTitle(s.topic_name || s.title || '').toLowerCase() === tName.toLowerCase())) {
+                                    activeJuniorSongs.push({
+                                      ...song,
+                                      topic_name: tName
+                                    });
+                                  }
+                                });
+                              }
+                            } catch (e) {
+                              console.warn('Error hydrating SNAPSHOT_SONGS in Junior:', e);
+                            }
+                          }
+                        }
+
+                        if (activeJuniorBooks.length > 0 && activeJuniorSongs.length > 0) break;
+                      }
+                    }
 
                     // 3. Notes & Audio
                     const currentWeekNotes: string[] = [];
@@ -1400,7 +1475,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         try {
                           const p = JSON.parse(clean);
                           if (Array.isArray(p)) {
-                            clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:') && !x.startsWith('STUDENT_QUESTION:')).join(' ');
+                            clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('SNAPSHOT_') && !x.startsWith('FEEDBACK:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:') && !x.startsWith('STUDENT_QUESTION:')).join(' ');
                           } else if (typeof p === 'string') {
                             clean = p;
                           }
@@ -1415,7 +1490,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         .trim();
                     };
 
-                    let generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
+                    let isPastNoteCarriedOver = false;
+                    let generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
                     if (!generalNoteRaw && (activeJuniorBooks.length > 0 || activeJuniorSongs.length > 0)) {
                       const pastHwSnapshots = (progressItems || []).filter((item: any) => {
                         if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
@@ -1435,17 +1511,50 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         try {
                           const parsed = typeof latestPast.homework_notes === 'string' ? JSON.parse(latestPast.homework_notes) : latestPast.homework_notes;
                           if (Array.isArray(parsed)) {
-                            const pastNote = parsed.find((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
-                            if (pastNote) generalNoteRaw = pastNote;
+                            const pastNote = parsed.find((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
+                            if (pastNote) {
+                              generalNoteRaw = pastNote;
+                              isPastNoteCarriedOver = true;
+                            }
                           } else if (typeof parsed === 'string') {
                             generalNoteRaw = parsed;
+                            isPastNoteCarriedOver = true;
                           }
                         } catch {}
                       }
                     }
                     const generalNote = generalNoteRaw ? cleanGeneralNote(generalNoteRaw) : '';
 
-                    const studentQuestionRaw = currentWeekNotes.find(n => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
+                    const isAudioCarriedOver = audioTracks.some(t => t.isCarriedOver);
+                    const isCarriedOverPlan = isAudioCarriedOver || isPastNoteCarriedOver;
+
+                    let studentQuestionRaw = currentWeekNotes.find(n => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
+                    if (!studentQuestionRaw) {
+                      const pastHwSnapshots = (progressItems || []).filter((item: any) => {
+                        if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
+                        const itWeekIso = getItemWeek(item);
+                        return itWeekIso && itWeekIso < currentWeekStr;
+                      });
+                      pastHwSnapshots.sort((a: any, b: any) => {
+                        const wA = getItemWeek(a);
+                        const wB = getItemWeek(b);
+                        if (wA !== wB) return wB.localeCompare(wA);
+                        const tA = new Date(a.updated_at || a.created_at || 0).getTime();
+                        const tB = new Date(b.updated_at || b.created_at || 0).getTime();
+                        return tB - tA;
+                      });
+                      const latestPast = pastHwSnapshots[0];
+                      if (latestPast && latestPast.homework_notes) {
+                        try {
+                          const parsed = typeof latestPast.homework_notes === 'string' ? JSON.parse(latestPast.homework_notes) : latestPast.homework_notes;
+                          if (Array.isArray(parsed)) {
+                            const pastQ = parsed.find((n: string) => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
+                            if (pastQ) studentQuestionRaw = pastQ;
+                          }
+                        } catch {}
+                      }
+                    }
+
                     let studentQuestionText = '';
                     if (studentQuestionRaw) {
                       if (studentQuestionRaw.startsWith('STUDENT_QUESTION:')) {
@@ -1639,8 +1748,29 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                              <div style={{ fontSize: isMusicStandMode ? '0.92rem' : '0.84rem', fontWeight: 950, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                Hausaufgaben
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+                                <div style={{ fontSize: isMusicStandMode ? '0.92rem' : '0.84rem', fontWeight: 950, color: '#34a853', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                  Hausaufgaben
+                                </div>
+                                {isCarriedOverPlan && (
+                                  <div style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '5px',
+                                    background: '#f8fafc',
+                                    border: '1px solid #cbd5e1',
+                                    color: '#475569',
+                                    borderRadius: '100px',
+                                    padding: '2px 10px',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 850,
+                                    letterSpacing: '0.01em',
+                                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)'
+                                  }}>
+                                    <RotateCcw size={10} color="#0284c7" strokeWidth={2.5} />
+                                    <span>Fortlaufender Übeplan • Übertrag aus der Vorwoche</span>
+                                  </div>
+                                )}
                               </div>
                               
                               {/* Lehrwerke (harmonisiert wie im Teen-Widget) */}
@@ -1774,6 +1904,21 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   <HelpCircle size={14} style={{ color: '#2563eb', flexShrink: 0 }} />
                                   <strong style={{ color: '#2563eb', fontWeight: 850, flexShrink: 0 }}>Deine Frage für die Stunde:</strong>
                                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{studentQuestionText}</span>
+                                </div>
+                              )}
+
+                              {/* Audio-Karussell direkt in der Heldenkarte (Volle Parität mit Desktop-Schülervorschau) */}
+                              {audioTracks.length > 0 && (
+                                <div style={{ paddingTop: '4px' }}>
+                                  <AudioTrackCarousel
+                                    tracks={audioTracks}
+                                    readOnly={true}
+                                    isTeacher={false}
+                                    activeTopicContext="Hausaufgabe"
+                                    defaultExpanded={true}
+                                    isCarriedOver={isAudioCarriedOver}
+                                    hideCarriedOverBadge={true}
+                                  />
                                 </div>
                               )}
 
@@ -4250,6 +4395,46 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         }
                       });
 
+                      // 🌉 Smart Audio Bridge: Bridge active practice tracks from latest past lesson if current week has none
+                      if (audioTracks.length === 0) {
+                        const pastHwSnapshots = (progressItems || []).filter((item: any) => {
+                          if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
+                          const itWeekIso = getItemWeek(item);
+                          return itWeekIso && itWeekIso < currentWeekStr;
+                        });
+                        pastHwSnapshots.sort((a: any, b: any) => {
+                          const wA = getItemWeek(a);
+                          const wB = getItemWeek(b);
+                          if (wA !== wB) return (wB || '').localeCompare(wA || '');
+                          const tA = new Date(a.updated_at || a.created_at || 0).getTime();
+                          const tB = new Date(b.updated_at || b.created_at || 0).getTime();
+                          return tB - tA;
+                        });
+                        const latestPast = pastHwSnapshots[0];
+                        if (latestPast && latestPast.homework_notes) {
+                          try {
+                            const parsed = typeof latestPast.homework_notes === 'string' ? JSON.parse(latestPast.homework_notes) : latestPast.homework_notes;
+                            if (Array.isArray(parsed)) {
+                              parsed.forEach((item: string, index: number) => {
+                                if (typeof item === 'string' && item.startsWith('AUDIO:')) {
+                                  const parts = item.substring(6).split('|');
+                                  audioTracks.push({
+                                    url: parts[0],
+                                    duration: parseFloat(parts[1]) || 0,
+                                    date: parts[2],
+                                    label: parts[3] || ('Aufnahme #' + (audioTracks.length + 1)),
+                                    author: parts[4] || 'teacher',
+                                    songTag: parts[7] || undefined,
+                                    isCarriedOver: true,
+                                    idx: index
+                                  });
+                                }
+                              });
+                            }
+                          } catch {}
+                        }
+                      }
+
                       const cleanGeneralNote = (text: string) => {
                         if (!text) return '';
                         let clean = text;
@@ -4257,7 +4442,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           try {
                             const p = JSON.parse(clean);
                             if (Array.isArray(p)) {
-                              clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:') && !x.startsWith('STUDENT_QUESTION:')).join(' ');
+                              clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('SNAPSHOT_') && !x.startsWith('FEEDBACK:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:') && !x.startsWith('STUDENT_QUESTION:')).join(' ');
                             } else if (typeof p === 'string') {
                               clean = p;
                             }
@@ -4272,10 +4457,71 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           .trim();
                       };
 
-                      const generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
+                      let isPastNoteCarriedOver = false;
+                      let generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
+                      if (!generalNoteRaw) {
+                        const pastHwSnapshots = (progressItems || []).filter((item: any) => {
+                          if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
+                          const itWeekIso = getItemWeek(item);
+                          return itWeekIso && itWeekIso < currentWeekStr;
+                        });
+                        pastHwSnapshots.sort((a: any, b: any) => {
+                          const wA = getItemWeek(a);
+                          const wB = getItemWeek(b);
+                          if (wA !== wB) return (wB || '').localeCompare(wA || '');
+                          const tA = new Date(a.updated_at || a.created_at || 0).getTime();
+                          const tB = new Date(b.updated_at || b.created_at || 0).getTime();
+                          return tB - tA;
+                        });
+                        const latestPast = pastHwSnapshots[0];
+                        if (latestPast && latestPast.homework_notes) {
+                          try {
+                            const parsed = typeof latestPast.homework_notes === 'string' ? JSON.parse(latestPast.homework_notes) : latestPast.homework_notes;
+                            if (Array.isArray(parsed)) {
+                              const pastNote = parsed.find((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
+                              if (pastNote) {
+                                generalNoteRaw = pastNote;
+                                isPastNoteCarriedOver = true;
+                              }
+                            } else if (typeof parsed === 'string') {
+                              generalNoteRaw = parsed;
+                              isPastNoteCarriedOver = true;
+                            }
+                          } catch {}
+                        }
+                      }
                       const generalNote = generalNoteRaw ? cleanGeneralNote(generalNoteRaw) : '';
 
-                      const studentQuestionEntry = currentWeekNotes.find(n => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
+                      const isAudioCarriedOver = audioTracks.some(t => t.isCarriedOver);
+                      const isCarriedOverPlan = isAudioCarriedOver || isPastNoteCarriedOver;
+
+                      let studentQuestionEntry = currentWeekNotes.find(n => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
+                      if (!studentQuestionEntry) {
+                        const pastHwSnapshots = (progressItems || []).filter((item: any) => {
+                          if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
+                          const itWeekIso = getItemWeek(item);
+                          return itWeekIso && itWeekIso < currentWeekStr;
+                        });
+                        pastHwSnapshots.sort((a: any, b: any) => {
+                          const wA = getItemWeek(a);
+                          const wB = getItemWeek(b);
+                          if (wA !== wB) return (wB || '').localeCompare(wA || '');
+                          const tA = new Date(a.updated_at || a.created_at || 0).getTime();
+                          const tB = new Date(b.updated_at || b.created_at || 0).getTime();
+                          return tB - tA;
+                        });
+                        const latestPast = pastHwSnapshots[0];
+                        if (latestPast && latestPast.homework_notes) {
+                          try {
+                            const parsed = typeof latestPast.homework_notes === 'string' ? JSON.parse(latestPast.homework_notes) : latestPast.homework_notes;
+                            if (Array.isArray(parsed)) {
+                              const pastQ = parsed.find((n: string) => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
+                              if (pastQ) studentQuestionEntry = pastQ;
+                            }
+                          } catch {}
+                        }
+                      }
+
                       let studentQuestionText = '';
                       if (studentQuestionEntry) {
                         if (studentQuestionEntry.startsWith('STUDENT_QUESTION:')) {
@@ -4317,27 +4563,28 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         const isStudentMatch = !effectiveId || String(assignment.studentId) === String(effectiveId) || String(assignment.student_id) === String(effectiveId);
                         if (!isStudentMatch || !assignment.pageStates) return;
                         const book = lehrwerke.find(g => String(g.id) === String(assignment.lehrwerkId));
-                        if (!book) return;
+                        const bookTitle = book?.title || assignment.bookTitle || assignment.lehrwerkTitle;
+                        if (!bookTitle) return;
 
                         Object.entries(assignment.pageStates).forEach(([pNumStr, pState]: [string, any]) => {
                           if (pState?.status === 'homework' || pState?.isCurrentHomework) {
                             const pageNum = parseInt(pNumStr, 10);
                             if (!isNaN(pageNum)) {
-                              if (!activeLehrwerkeMap[book.title]) {
-                                activeLehrwerkeMap[book.title] = { pages: [] };
+                              if (!activeLehrwerkeMap[bookTitle]) {
+                                activeLehrwerkeMap[bookTitle] = { pages: [] };
                               }
-                              if (!activeLehrwerkeMap[book.title].pages.some(p => p.num === pageNum)) {
+                              if (!activeLehrwerkeMap[bookTitle].pages.some(p => p.num === pageNum)) {
                                 let cleanNote = pState.homeworkNotes || pState.homework_notes || pState.notes || '';
                                 if (cleanNote.startsWith('[') || cleanNote.startsWith('{')) {
                                   try {
                                     const parsed = JSON.parse(cleanNote);
                                     if (Array.isArray(parsed)) {
-                                      cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                      cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
                                     }
                                   } catch {}
                                 }
                                 cleanNote = cleanNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-                                activeLehrwerkeMap[book.title].pages.push({
+                                activeLehrwerkeMap[bookTitle].pages.push({
                                   num: pageNum,
                                   notes: cleanNote,
                                   status: pState.status || 'homework'
@@ -4356,23 +4603,24 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           const parts = item.topic_name.split(' - Seite ');
                           const bookTitle = cleanTitle(parts[0].trim());
                           const pageNum = parseInt(parts[1], 10);
-                          const book = lehrwerke.find(g => g.title === bookTitle);
-                          if (book) {
-                            if (!activeLehrwerkeMap[bookTitle]) {
-                              activeLehrwerkeMap[bookTitle] = { pages: [] };
+                          const book = lehrwerke.find(g => (g.title || '').trim().toLowerCase() === bookTitle.toLowerCase());
+                          const resolvedTitle = book?.title || bookTitle;
+                          if (!isNaN(pageNum)) {
+                            if (!activeLehrwerkeMap[resolvedTitle]) {
+                              activeLehrwerkeMap[resolvedTitle] = { pages: [] };
                             }
-                            if (!isNaN(pageNum) && !activeLehrwerkeMap[bookTitle].pages.some(p => p.num === pageNum)) {
+                            if (!activeLehrwerkeMap[resolvedTitle].pages.some(p => p.num === pageNum)) {
                               let cleanNote = item.homework_notes || '';
                               if (cleanNote.startsWith('[') || cleanNote.startsWith('{')) {
                                 try {
                                   const parsed = JSON.parse(cleanNote);
                                   if (Array.isArray(parsed)) {
-                                    cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+                                    cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
                                   }
                                 } catch {}
                               }
                               cleanNote = cleanNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-                              activeLehrwerkeMap[bookTitle].pages.push({
+                              activeLehrwerkeMap[resolvedTitle].pages.push({
                                 num: pageNum,
                                 notes: cleanNote,
                                 status: item.status || 'homework'
@@ -4452,6 +4700,81 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         }
                       });
 
+                      // 2b. 📦 Snapshot Hydration: Falls activeLehrwerkeMap oder otherActiveHWItems leer sind, aus jüngstem SNAPSHOT hydrieren
+                      if (Object.keys(activeLehrwerkeMap).length === 0 || otherActiveHWItems.length === 0) {
+                        const allSnapshotCandidates = (progressItems || []).filter((item: any) => item.topic_name?.startsWith('Hausaufgabe KW '));
+                        allSnapshotCandidates.sort((a: any, b: any) => {
+                          const wA = getItemWeek(a);
+                          const wB = getItemWeek(b);
+                          if (wA !== wB) return (wB || '').localeCompare(wA || '');
+                          const tA = new Date(a.updated_at || a.created_at || 0).getTime();
+                          const tB = new Date(b.updated_at || b.created_at || 0).getTime();
+                          return tB - tA;
+                        });
+
+                        for (const snapItem of allSnapshotCandidates) {
+                          if (!snapItem.homework_notes) continue;
+                          let parsedSnapNotes: any = null;
+                          try {
+                            parsedSnapNotes = typeof snapItem.homework_notes === 'string' ? JSON.parse(snapItem.homework_notes) : snapItem.homework_notes;
+                          } catch {}
+                          if (!Array.isArray(parsedSnapNotes)) continue;
+
+                          if (Object.keys(activeLehrwerkeMap).length === 0) {
+                            const snapLwEntry = parsedSnapNotes.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_LEHRWERKE:'));
+                            if (snapLwEntry) {
+                              try {
+                                const rawJson = snapLwEntry.substring('SNAPSHOT_LEHRWERKE:'.length);
+                                const parsedLw = JSON.parse(rawJson);
+                                if (Array.isArray(parsedLw) && parsedLw.length > 0) {
+                                  parsedLw.forEach((lw: any) => {
+                                    const title = cleanTitle(lw.title || '');
+                                    const pages = Array.isArray(lw.pages) ? [...lw.pages].sort((a: number, b: number) => a - b) : [];
+                                    if (title && pages.length > 0 && !activeLehrwerkeMap[title]) {
+                                      activeLehrwerkeMap[title] = {
+                                        pages: pages.map((pNum: number) => ({
+                                          num: pNum,
+                                          notes: '',
+                                          status: 'homework'
+                                        }))
+                                      };
+                                    }
+                                  });
+                                }
+                              } catch (e) {
+                                console.warn('Error hydrating SNAPSHOT_LEHRWERKE in Teen:', e);
+                              }
+                            }
+                          }
+
+                          if (otherActiveHWItems.length === 0) {
+                            const snapSongEntry = parsedSnapNotes.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_SONGS:'));
+                            if (snapSongEntry) {
+                              try {
+                                const rawJson = snapSongEntry.substring('SNAPSHOT_SONGS:'.length);
+                                const parsedSongs = JSON.parse(rawJson);
+                                if (Array.isArray(parsedSongs) && parsedSongs.length > 0) {
+                                  parsedSongs.forEach((song: any) => {
+                                    const tName = cleanTitle(song.topic_name || song.title || '');
+                                    if (tName && !otherActiveHWItems.some(s => cleanTitle(s.topic_name || s.title || '').toLowerCase() === tName.toLowerCase())) {
+                                      otherActiveHWItems.push({
+                                        ...song,
+                                        topic_name: tName,
+                                        title: tName
+                                      });
+                                    }
+                                  });
+                                }
+                              } catch (e) {
+                                console.warn('Error hydrating SNAPSHOT_SONGS in Teen:', e);
+                              }
+                            }
+                          }
+
+                          if (Object.keys(activeLehrwerkeMap).length > 0 && otherActiveHWItems.length > 0) break;
+                        }
+                      }
+
                       // Sort pages for all active books
                       Object.keys(activeLehrwerkeMap).forEach(title => {
                         activeLehrwerkeMap[title].pages.sort((a, b) => a.num - b.num);
@@ -4508,6 +4831,26 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   <span style={{ fontSize: isMusicStandMode ? '0.80rem' : '0.72rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                     Diese Woche · Deine Aufgaben
                                   </span>
+                                  {isCarriedOverPlan && (
+                                    <div style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '5px',
+                                      background: '#f8fafc',
+                                      border: '1px solid #cbd5e1',
+                                      color: '#475569',
+                                      borderRadius: '100px',
+                                      padding: '2px 10px',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 850,
+                                      letterSpacing: '0.01em',
+                                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                                      marginTop: '4px'
+                                    }}>
+                                      <RotateCcw size={10} color="#0284c7" strokeWidth={2.5} />
+                                      <span>Fortlaufender Übeplan • Übertrag aus der Vorwoche</span>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                               
@@ -4644,11 +4987,42 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{studentQuestionText}</span>
                                     </div>
                                   )}
+
+                                  {/* Audio-Karussell direkt in der Teen-Karte (Volle Parität mit Desktop-Schülervorschau) */}
+                                  {audioTracks.length > 0 && (
+                                    <div style={{ paddingTop: '4px' }}>
+                                      <AudioTrackCarousel
+                                        tracks={audioTracks}
+                                        readOnly={true}
+                                        isTeacher={false}
+                                        activeTopicContext="Hausaufgabe"
+                                        defaultExpanded={true}
+                                        isCarriedOver={isAudioCarriedOver}
+                                        hideCarriedOverBadge={true}
+                                      />
+                                    </div>
+                                  )}
                                 </>
                               ) : (
-                                <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                                  Keine offenen Aufgaben für diese Woche erfasst
-                                </div>
+                                <>
+                                  {/* Auch bei keinen Text-Aufgaben Aufnahmen anzeigen, falls vorhanden */}
+                                  {audioTracks.length > 0 && (
+                                    <div style={{ paddingTop: '4px' }}>
+                                      <AudioTrackCarousel
+                                        tracks={audioTracks}
+                                        readOnly={true}
+                                        isTeacher={false}
+                                        activeTopicContext="Hausaufgabe"
+                                        defaultExpanded={true}
+                                        isCarriedOver={isAudioCarriedOver}
+                                        hideCarriedOverBadge={true}
+                                      />
+                                    </div>
+                                  )}
+                                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                                    Keine offenen Aufgaben für diese Woche erfasst
+                                  </div>
+                                </>
                               )}
                             </div>
                           </div>
@@ -5795,6 +6169,46 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         }
                       });
 
+                      // 🌉 Smart Audio Bridge: Bridge active practice tracks from latest past lesson if current week has none
+                      if (audioTracks.length === 0) {
+                        const pastHwSnapshots = (progressItems || []).filter((item: any) => {
+                          if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
+                          const itWeekIso = getItemWeek(item);
+                          return itWeekIso && itWeekIso < currentWeekStr;
+                        });
+                        pastHwSnapshots.sort((a: any, b: any) => {
+                          const wA = getItemWeek(a);
+                          const wB = getItemWeek(b);
+                          if (wA !== wB) return (wB || '').localeCompare(wA || '');
+                          const tA = new Date(a.updated_at || a.created_at || 0).getTime();
+                          const tB = new Date(b.updated_at || b.created_at || 0).getTime();
+                          return tB - tA;
+                        });
+                        const latestPast = pastHwSnapshots[0];
+                        if (latestPast && latestPast.homework_notes) {
+                          try {
+                            const parsed = typeof latestPast.homework_notes === 'string' ? JSON.parse(latestPast.homework_notes) : latestPast.homework_notes;
+                            if (Array.isArray(parsed)) {
+                              parsed.forEach((item: string, index: number) => {
+                                if (typeof item === 'string' && item.startsWith('AUDIO:')) {
+                                  const parts = item.substring(6).split('|');
+                                  audioTracks.push({
+                                    url: parts[0],
+                                    duration: parseFloat(parts[1]) || 0,
+                                    date: parts[2],
+                                    label: parts[3] || ('Aufnahme #' + (audioTracks.length + 1)),
+                                    author: parts[4] || 'teacher',
+                                    songTag: parts[7] || undefined,
+                                    isCarriedOver: true,
+                                    idx: index
+                                  });
+                                }
+                              });
+                            }
+                          } catch {}
+                        }
+                      }
+
                       const cleanGeneralNote = (text: string) => {
                         if (!text) return '';
                         let clean = text;
@@ -5802,7 +6216,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           try {
                             const p = JSON.parse(clean);
                             if (Array.isArray(p)) {
-                              clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:') && !x.startsWith('STUDENT_QUESTION:')).join(' ');
+                              clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('SNAPSHOT_') && !x.startsWith('FEEDBACK:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:') && !x.startsWith('STUDENT_QUESTION:')).join(' ');
                             } else if (typeof p === 'string') {
                               clean = p;
                             }
@@ -5817,10 +6231,71 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           .trim();
                       };
 
-                      const generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
+                      let isPastNoteCarriedOver = false;
+                      let generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
+                      if (!generalNoteRaw) {
+                        const pastHwSnapshots = (progressItems || []).filter((item: any) => {
+                          if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
+                          const itWeekIso = getItemWeek(item);
+                          return itWeekIso && itWeekIso < currentWeekStr;
+                        });
+                        pastHwSnapshots.sort((a: any, b: any) => {
+                          const wA = getItemWeek(a);
+                          const wB = getItemWeek(b);
+                          if (wA !== wB) return (wB || '').localeCompare(wA || '');
+                          const tA = new Date(a.updated_at || a.created_at || 0).getTime();
+                          const tB = new Date(b.updated_at || b.created_at || 0).getTime();
+                          return tB - tA;
+                        });
+                        const latestPast = pastHwSnapshots[0];
+                        if (latestPast && latestPast.homework_notes) {
+                          try {
+                            const parsed = typeof latestPast.homework_notes === 'string' ? JSON.parse(latestPast.homework_notes) : latestPast.homework_notes;
+                            if (Array.isArray(parsed)) {
+                              const pastNote = parsed.find((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
+                              if (pastNote) {
+                                generalNoteRaw = pastNote;
+                                isPastNoteCarriedOver = true;
+                              }
+                            } else if (typeof parsed === 'string') {
+                              generalNoteRaw = parsed;
+                              isPastNoteCarriedOver = true;
+                            }
+                          } catch {}
+                        }
+                      }
                       const generalNote = generalNoteRaw ? cleanGeneralNote(generalNoteRaw) : '';
 
-                      const studentQuestionEntry = currentWeekNotes.find(n => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
+                      const isAudioCarriedOver = audioTracks.some(t => t.isCarriedOver);
+                      const isCarriedOverPlan = isAudioCarriedOver || isPastNoteCarriedOver;
+
+                      let studentQuestionEntry = currentWeekNotes.find(n => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
+                      if (!studentQuestionEntry) {
+                        const pastHwSnapshots = (progressItems || []).filter((item: any) => {
+                          if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
+                          const itWeekIso = getItemWeek(item);
+                          return itWeekIso && itWeekIso < currentWeekStr;
+                        });
+                        pastHwSnapshots.sort((a: any, b: any) => {
+                          const wA = getItemWeek(a);
+                          const wB = getItemWeek(b);
+                          if (wA !== wB) return (wB || '').localeCompare(wA || '');
+                          const tA = new Date(a.updated_at || a.created_at || 0).getTime();
+                          const tB = new Date(b.updated_at || b.created_at || 0).getTime();
+                          return tB - tA;
+                        });
+                        const latestPast = pastHwSnapshots[0];
+                        if (latestPast && latestPast.homework_notes) {
+                          try {
+                            const parsed = typeof latestPast.homework_notes === 'string' ? JSON.parse(latestPast.homework_notes) : latestPast.homework_notes;
+                            if (Array.isArray(parsed)) {
+                              const pastQ = parsed.find((n: string) => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
+                              if (pastQ) studentQuestionEntry = pastQ;
+                            }
+                          } catch {}
+                        }
+                      }
+
                       let studentQuestionText = '';
                       if (studentQuestionEntry) {
                         if (studentQuestionEntry.startsWith('STUDENT_QUESTION:')) {
@@ -5862,16 +6337,17 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         const isStudentMatch = !effectiveId || String(assignment.studentId) === String(effectiveId) || String(assignment.student_id) === String(effectiveId);
                         if (!isStudentMatch || !assignment.pageStates) return;
                         const book = lehrwerke.find(g => String(g.id) === String(assignment.lehrwerkId));
-                        if (!book) return;
+                        const bookTitle = book?.title || assignment.bookTitle || assignment.lehrwerkTitle;
+                        if (!bookTitle) return;
 
                         Object.entries(assignment.pageStates).forEach(([pNumStr, pState]: [string, any]) => {
                           if (pState?.status === 'homework' || pState?.isCurrentHomework) {
                             const pageNum = parseInt(pNumStr, 10);
                             if (!isNaN(pageNum)) {
-                              if (!activeLehrwerkeMap[book.title]) {
-                                activeLehrwerkeMap[book.title] = { pages: [] };
+                              if (!activeLehrwerkeMap[bookTitle]) {
+                                activeLehrwerkeMap[bookTitle] = { pages: [] };
                               }
-                              if (!activeLehrwerkeMap[book.title].pages.some(p => p.num === pageNum)) {
+                              if (!activeLehrwerkeMap[bookTitle].pages.some(p => p.num === pageNum)) {
                                 let cleanNote = pState.homeworkNotes || pState.homework_notes || pState.notes || '';
                                 if (cleanNote.startsWith('[') || cleanNote.startsWith('{')) {
                                   try {
@@ -5882,7 +6358,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   } catch {}
                                 }
                                 cleanNote = cleanNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-                                activeLehrwerkeMap[book.title].pages.push({
+                                activeLehrwerkeMap[bookTitle].pages.push({
                                   num: pageNum,
                                   notes: cleanNote,
                                   status: pState.status || 'homework'
@@ -5899,14 +6375,15 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         if (!item.topic_name || item.topic_name.startsWith('Hausaufgabe KW ')) return;
                         if (item.topic_name.includes(' - Seite ')) {
                           const parts = item.topic_name.split(' - Seite ');
-                          const bookTitle = cleanTitle(parts[0].trim());
+                          const rawBookTitle = cleanTitle(parts[0].trim());
                           const pageNum = parseInt(parts[1], 10);
-                          const book = lehrwerke.find(g => g.title === bookTitle);
-                          if (book) {
-                            if (!activeLehrwerkeMap[bookTitle]) {
-                              activeLehrwerkeMap[bookTitle] = { pages: [] };
+                          const book = lehrwerke.find(g => cleanTitle(g.title).toLowerCase() === rawBookTitle.toLowerCase());
+                          const resolvedTitle = book?.title || rawBookTitle;
+                          if (resolvedTitle) {
+                            if (!activeLehrwerkeMap[resolvedTitle]) {
+                              activeLehrwerkeMap[resolvedTitle] = { pages: [] };
                             }
-                            if (!isNaN(pageNum) && !activeLehrwerkeMap[bookTitle].pages.some(p => p.num === pageNum)) {
+                            if (!isNaN(pageNum) && !activeLehrwerkeMap[resolvedTitle].pages.some(p => p.num === pageNum)) {
                               let cleanNote = item.homework_notes || '';
                               if (cleanNote.startsWith('[') || cleanNote.startsWith('{')) {
                                 try {
@@ -5917,7 +6394,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 } catch {}
                               }
                               cleanNote = cleanNote.replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-                              activeLehrwerkeMap[bookTitle].pages.push({
+                              activeLehrwerkeMap[resolvedTitle].pages.push({
                                 num: pageNum,
                                 notes: cleanNote,
                                 status: item.status || 'homework'
@@ -5997,6 +6474,85 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         }
                       });
 
+                      // 🔄 Snapshot Hydration for Pro Mode
+                      if (Object.keys(activeLehrwerkeMap).length === 0 || otherActiveHWItems.length === 0) {
+                        const allSnapshotCandidates = (progressItems || []).filter((item: any) => {
+                          if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
+                          const itWeekIso = getItemWeek(item);
+                          return itWeekIso && itWeekIso <= currentWeekStr;
+                        });
+                        allSnapshotCandidates.sort((a: any, b: any) => {
+                          const wA = getItemWeek(a);
+                          const wB = getItemWeek(b);
+                          if (wA !== wB) return (wB || '').localeCompare(wA || '');
+                          const tA = new Date(a.updated_at || a.created_at || 0).getTime();
+                          const tB = new Date(b.updated_at || b.created_at || 0).getTime();
+                          return tB - tA;
+                        });
+
+                        for (const snapItem of allSnapshotCandidates) {
+                          if (!snapItem.homework_notes) continue;
+                          let parsedSnapNotes: any = null;
+                          try {
+                            parsedSnapNotes = typeof snapItem.homework_notes === 'string' ? JSON.parse(snapItem.homework_notes) : snapItem.homework_notes;
+                          } catch {}
+                          if (!Array.isArray(parsedSnapNotes)) continue;
+
+                          if (Object.keys(activeLehrwerkeMap).length === 0) {
+                            const snapLwEntry = parsedSnapNotes.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_LEHRWERKE:'));
+                            if (snapLwEntry) {
+                              try {
+                                const rawJson = snapLwEntry.substring('SNAPSHOT_LEHRWERKE:'.length);
+                                const parsedLw = JSON.parse(rawJson);
+                                if (Array.isArray(parsedLw) && parsedLw.length > 0) {
+                                  parsedLw.forEach((lw: any) => {
+                                    const title = cleanTitle(lw.title || '');
+                                    const pages = Array.isArray(lw.pages) ? [...lw.pages].sort((a: number, b: number) => a - b) : [];
+                                    if (title && pages.length > 0 && !activeLehrwerkeMap[title]) {
+                                      activeLehrwerkeMap[title] = {
+                                        pages: pages.map((pNum: number) => ({
+                                          num: pNum,
+                                          notes: '',
+                                          status: 'homework'
+                                        }))
+                                      };
+                                    }
+                                  });
+                                }
+                              } catch (e) {
+                                console.warn('Error hydrating SNAPSHOT_LEHRWERKE in Pro:', e);
+                              }
+                            }
+                          }
+
+                          if (otherActiveHWItems.length === 0) {
+                            const snapSongEntry = parsedSnapNotes.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_SONGS:'));
+                            if (snapSongEntry) {
+                              try {
+                                const rawJson = snapSongEntry.substring('SNAPSHOT_SONGS:'.length);
+                                const parsedSongs = JSON.parse(rawJson);
+                                if (Array.isArray(parsedSongs) && parsedSongs.length > 0) {
+                                  parsedSongs.forEach((song: any) => {
+                                    const tName = cleanTitle(song.topic_name || song.title || '');
+                                    if (tName && !otherActiveHWItems.some(s => cleanTitle(s.topic_name || s.title || '').toLowerCase() === tName.toLowerCase())) {
+                                      otherActiveHWItems.push({
+                                        ...song,
+                                        topic_name: tName,
+                                        title: tName
+                                      });
+                                    }
+                                  });
+                                }
+                              } catch (e) {
+                                console.warn('Error hydrating SNAPSHOT_SONGS in Pro:', e);
+                              }
+                            }
+                          }
+
+                          if (Object.keys(activeLehrwerkeMap).length > 0 && otherActiveHWItems.length > 0) break;
+                        }
+                      }
+
                       // Sort pages for all active books
                       Object.keys(activeLehrwerkeMap).forEach(title => {
                         activeLehrwerkeMap[title].pages.sort((a, b) => a.num - b.num);
@@ -6053,6 +6609,26 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   <span style={{ fontSize: isMusicStandMode ? '0.80rem' : '0.72rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                     Diese Woche · Deine Aufgaben
                                   </span>
+                                  {isCarriedOverPlan && (
+                                    <div style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '5px',
+                                      background: '#f8fafc',
+                                      border: '1px solid #cbd5e1',
+                                      color: '#475569',
+                                      borderRadius: '100px',
+                                      padding: '2px 10px',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 850,
+                                      letterSpacing: '0.01em',
+                                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                                      marginTop: '4px'
+                                    }}>
+                                      <RotateCcw size={10} color="#0284c7" strokeWidth={2.5} />
+                                      <span>Fortlaufender Übeplan • Übertrag aus der Vorwoche</span>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                               
@@ -6189,11 +6765,42 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{studentQuestionText}</span>
                                     </div>
                                   )}
+
+                                  {/* Audio-Karussell direkt in der Pro-Karte (Volle Parität mit Desktop-Schülervorschau) */}
+                                  {audioTracks.length > 0 && (
+                                    <div style={{ paddingTop: '4px' }}>
+                                      <AudioTrackCarousel
+                                        tracks={audioTracks}
+                                        readOnly={true}
+                                        isTeacher={false}
+                                        activeTopicContext="Hausaufgabe"
+                                        defaultExpanded={true}
+                                        isCarriedOver={isAudioCarriedOver}
+                                        hideCarriedOverBadge={true}
+                                      />
+                                    </div>
+                                  )}
                                 </>
                               ) : (
-                                <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                                  Keine offenen Aufgaben für diese Woche erfasst
-                                </div>
+                                <>
+                                  {/* Auch bei keinen Text-Aufgaben Aufnahmen anzeigen, falls vorhanden */}
+                                  {audioTracks.length > 0 && (
+                                    <div style={{ paddingTop: '4px' }}>
+                                      <AudioTrackCarousel
+                                        tracks={audioTracks}
+                                        readOnly={true}
+                                        isTeacher={false}
+                                        activeTopicContext="Hausaufgabe"
+                                        defaultExpanded={true}
+                                        isCarriedOver={isAudioCarriedOver}
+                                        hideCarriedOverBadge={true}
+                                      />
+                                    </div>
+                                  )}
+                                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                                    Keine offenen Aufgaben für diese Woche erfasst
+                                  </div>
+                                </>
                               )}
                             </div>
                           </div>

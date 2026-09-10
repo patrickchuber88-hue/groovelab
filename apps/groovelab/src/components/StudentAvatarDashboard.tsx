@@ -8687,16 +8687,17 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       if (assignStdId !== String(studentId) || !assignment.pageStates) return;
       const assignBookId = String(assignment.lehrwerkId || assignment.lehrwerk_id || '');
       const book = lehrwerke.find((g: any) => String(g.id) === assignBookId);
-      if (!book) return;
+      const bookTitle = book?.title || assignment.bookTitle || assignment.lehrwerkTitle;
+      if (!bookTitle) return;
 
       Object.entries(assignment.pageStates).forEach(([pNumStr, pState]: [string, any]) => {
         if (pState?.status === 'homework' || pState?.isCurrentHomework || pState?.is_current_homework) {
           const pageNum = parseInt(pNumStr, 10);
           if (!isNaN(pageNum)) {
-            if (!activeJuniorBooksMap[book.title]) {
-              activeJuniorBooksMap[book.title] = { pages: [] };
+            if (!activeJuniorBooksMap[bookTitle]) {
+              activeJuniorBooksMap[bookTitle] = { pages: [] };
             }
-            if (!activeJuniorBooksMap[book.title].pages.some(p => p.num === pageNum)) {
+            if (!activeJuniorBooksMap[bookTitle].pages.some(p => p.num === pageNum)) {
               let cleanNote = pState.homeworkNotes || pState.homework_notes || pState.notes || '';
               if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
                 try {
@@ -8707,7 +8708,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                 } catch {}
               }
               cleanNote = String(cleanNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-              activeJuniorBooksMap[book.title].pages.push({
+              activeJuniorBooksMap[bookTitle].pages.push({
                 num: pageNum,
                 notes: cleanNote,
                 status: pState.status || 'homework'
@@ -8725,14 +8726,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       if (!item.topic_name || item.topic_name.startsWith('Hausaufgabe KW ')) return;
       if (item.topic_name.includes(' - Seite ')) {
         const parts = item.topic_name.split(' - Seite ');
-        const bookTitle = cleanTitle(parts[0].trim());
+        const rawBookTitle = cleanTitle(parts[0].trim());
         const pageNum = parseInt(parts[1], 10);
-        const book = lehrwerke.find((g: any) => g.title === bookTitle);
-        if (book) {
-          if (!activeJuniorBooksMap[bookTitle]) {
-            activeJuniorBooksMap[bookTitle] = { pages: [] };
+        const book = lehrwerke.find((g: any) => cleanTitle(g.title).toLowerCase() === rawBookTitle.toLowerCase());
+        const resolvedTitle = book?.title || rawBookTitle;
+        if (resolvedTitle) {
+          if (!activeJuniorBooksMap[resolvedTitle]) {
+            activeJuniorBooksMap[resolvedTitle] = { pages: [] };
           }
-          if (!isNaN(pageNum) && !activeJuniorBooksMap[bookTitle].pages.some(p => p.num === pageNum)) {
+          if (!isNaN(pageNum) && !activeJuniorBooksMap[resolvedTitle].pages.some(p => p.num === pageNum)) {
             let cleanNote = item.homework_notes || '';
             if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
               try {
@@ -8743,7 +8745,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
               } catch {}
             }
             cleanNote = String(cleanNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
-            activeJuniorBooksMap[bookTitle].pages.push({
+            activeJuniorBooksMap[resolvedTitle].pages.push({
               num: pageNum,
               notes: cleanNote,
               status: item.status || 'homework'
@@ -8823,6 +8825,85 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         }
       }
     });
+
+    // 🔄 Snapshot Hydration for Junior Summary
+    if (Object.keys(activeJuniorBooksMap).length === 0 || otherActiveSongs.length === 0) {
+      const allSnapshotCandidates = (progressItems || []).filter((item: any) => {
+        if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
+        const itWeekIso = getItemWeek(item);
+        return itWeekIso && itWeekIso <= currentWeekStr;
+      });
+      allSnapshotCandidates.sort((a: any, b: any) => {
+        const wA = getItemWeek(a);
+        const wB = getItemWeek(b);
+        if (wA !== wB) return (wB || '').localeCompare(wA || '');
+        const tA = new Date(a.updated_at || a.created_at || 0).getTime();
+        const tB = new Date(b.updated_at || b.created_at || 0).getTime();
+        return tB - tA;
+      });
+
+      for (const snapItem of allSnapshotCandidates) {
+        if (!snapItem.homework_notes) continue;
+        let parsedSnapNotes: any = null;
+        try {
+          parsedSnapNotes = typeof snapItem.homework_notes === 'string' ? JSON.parse(snapItem.homework_notes) : snapItem.homework_notes;
+        } catch {}
+        if (!Array.isArray(parsedSnapNotes)) continue;
+
+        if (Object.keys(activeJuniorBooksMap).length === 0) {
+          const snapLwEntry = parsedSnapNotes.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_LEHRWERKE:'));
+          if (snapLwEntry) {
+            try {
+              const rawJson = snapLwEntry.substring('SNAPSHOT_LEHRWERKE:'.length);
+              const parsedLw = JSON.parse(rawJson);
+              if (Array.isArray(parsedLw) && parsedLw.length > 0) {
+                parsedLw.forEach((lw: any) => {
+                  const title = cleanTitle(lw.title || '');
+                  const pages = Array.isArray(lw.pages) ? [...lw.pages].sort((a: number, b: number) => a - b) : [];
+                  if (title && pages.length > 0 && !activeJuniorBooksMap[title]) {
+                    activeJuniorBooksMap[title] = {
+                      pages: pages.map((pNum: number) => ({
+                        num: pNum,
+                        notes: '',
+                        status: 'homework'
+                      }))
+                    };
+                  }
+                });
+              }
+            } catch (e) {
+              console.warn('Error hydrating SNAPSHOT_LEHRWERKE in Junior summary:', e);
+            }
+          }
+        }
+
+        if (otherActiveSongs.length === 0) {
+          const snapSongEntry = parsedSnapNotes.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_SONGS:'));
+          if (snapSongEntry) {
+            try {
+              const rawJson = snapSongEntry.substring('SNAPSHOT_SONGS:'.length);
+              const parsedSongs = JSON.parse(rawJson);
+              if (Array.isArray(parsedSongs) && parsedSongs.length > 0) {
+                parsedSongs.forEach((song: any) => {
+                  const tName = cleanTitle(song.topic_name || song.title || '');
+                  if (tName && !otherActiveSongs.some(s => cleanTitle(s.topic_name || s.title || '').toLowerCase() === tName.toLowerCase())) {
+                    otherActiveSongs.push({
+                      ...song,
+                      topic_name: tName,
+                      title: tName
+                    });
+                  }
+                });
+              }
+            } catch (e) {
+              console.warn('Error hydrating SNAPSHOT_SONGS in Junior summary:', e);
+            }
+          }
+        }
+
+        if (Object.keys(activeJuniorBooksMap).length > 0 && otherActiveSongs.length > 0) break;
+      }
+    }
 
     // Sort pages for all active books
     Object.keys(activeJuniorBooksMap).forEach(title => {
@@ -8918,7 +8999,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     });
 
     // 🌉 Smart Audio Bridge: Bridge active practice tracks from latest past lesson if current week has none
-    if (audioTracks.length === 0 && (formattedJuniorBooks.length > 0 || otherActiveSongs.length > 0)) {
+    if (audioTracks.length === 0) {
       const pastHwSnapshots = (progressItems || []).filter((item: any) => {
         if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
         const itWeekIso = getItemWeek(item);
@@ -8927,7 +9008,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       pastHwSnapshots.sort((a: any, b: any) => {
         const wA = getItemWeek(a);
         const wB = getItemWeek(b);
-        if (wA !== wB) return wB.localeCompare(wA);
+        if (wA !== wB) return (wB || '').localeCompare(wA || '');
         const tA = new Date(a.updated_at || a.created_at || 0).getTime();
         const tB = new Date(b.updated_at || b.created_at || 0).getTime();
         return tB - tA;
@@ -8964,7 +9045,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         try {
           const p = JSON.parse(clean);
           if (Array.isArray(p)) {
-            clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:') && !x.startsWith('STUDENT_QUESTION:')).join(' ');
+            clean = p.filter((x: any) => typeof x === 'string' && !x.startsWith('AUDIO:') && !x.startsWith('STICKER:') && !x.startsWith('LATENCY:') && !x.startsWith('SNAPSHOT_') && !x.startsWith('FEEDBACK:') && !x.startsWith('STUDENT_NOTE_PUBLIC:') && !x.startsWith('STUDENT_NOTE_PRIVATE:') && !x.startsWith('STUDENT_QUESTION:')).join(' ');
           } else if (typeof p === 'string') {
             clean = p;
           }
@@ -8979,8 +9060,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         .trim();
     };
 
-    let generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
-    if (!generalNoteRaw && (formattedJuniorBooks.length > 0 || otherActiveSongs.length > 0)) {
+    let isPastNoteCarriedOver = false;
+    let generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
+    if (!generalNoteRaw) {
       const pastHwSnapshots = (progressItems || []).filter((item: any) => {
         if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
         const itWeekIso = getItemWeek(item);
@@ -8989,7 +9071,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       pastHwSnapshots.sort((a: any, b: any) => {
         const wA = getItemWeek(a);
         const wB = getItemWeek(b);
-        if (wA !== wB) return wB.localeCompare(wA);
+        if (wA !== wB) return (wB || '').localeCompare(wA || '');
         const tA = new Date(a.updated_at || a.created_at || 0).getTime();
         const tB = new Date(b.updated_at || b.created_at || 0).getTime();
         return tB - tA;
@@ -8999,17 +9081,50 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         try {
           const parsed = typeof latestPast.homework_notes === 'string' ? JSON.parse(latestPast.homework_notes) : latestPast.homework_notes;
           if (Array.isArray(parsed)) {
-            const pastNote = parsed.find((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
-            if (pastNote) generalNoteRaw = pastNote;
+            const pastNote = parsed.find((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
+            if (pastNote) {
+              generalNoteRaw = pastNote;
+              isPastNoteCarriedOver = true;
+            }
           } else if (typeof parsed === 'string') {
             generalNoteRaw = parsed;
+            isPastNoteCarriedOver = true;
           }
         } catch {}
       }
     }
     const generalNote = generalNoteRaw ? cleanGeneralNote(generalNoteRaw) : '';
 
-    const studentQuestionEntry = currentWeekNotes.find(n => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
+    const isAudioCarriedOver = audioTracks.some(t => t.isCarriedOver);
+    const isCarriedOverPlan = isAudioCarriedOver || isPastNoteCarriedOver;
+
+    let studentQuestionEntry = currentWeekNotes.find(n => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
+    if (!studentQuestionEntry) {
+      const pastHwSnapshots = (progressItems || []).filter((item: any) => {
+        if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
+        const itWeekIso = getItemWeek(item);
+        return itWeekIso && itWeekIso < currentWeekStr;
+      });
+      pastHwSnapshots.sort((a: any, b: any) => {
+        const wA = getItemWeek(a);
+        const wB = getItemWeek(b);
+        if (wA !== wB) return (wB || '').localeCompare(wA || '');
+        const tA = new Date(a.updated_at || a.created_at || 0).getTime();
+        const tB = new Date(b.updated_at || b.created_at || 0).getTime();
+        return tB - tA;
+      });
+      const latestPast = pastHwSnapshots[0];
+      if (latestPast && latestPast.homework_notes) {
+        try {
+          const parsed = typeof latestPast.homework_notes === 'string' ? JSON.parse(latestPast.homework_notes) : latestPast.homework_notes;
+          if (Array.isArray(parsed)) {
+            const pastQ = parsed.find((n: string) => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
+            if (pastQ) studentQuestionEntry = pastQ;
+          }
+        } catch {}
+      }
+    }
+
     let studentQuestionText = '';
     if (studentQuestionEntry) {
       if (studentQuestionEntry.startsWith('STUDENT_QUESTION:')) {
@@ -9055,7 +9170,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       generalNote: validGeneralNote,
       specificTeacherNote,
       studentQuestionText,
-      hasAnyHomework
+      hasAnyHomework,
+      isCarriedOverPlan
     };
   }, [localProgress, lehrwerke, progressItems, activeSongSkills, studentId, studentUser]);
 
