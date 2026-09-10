@@ -2227,10 +2227,10 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
             }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#34a853', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  🛡️ Das <CampusGroovelabText campusColor="#34a853" groovelabColor="#eab308" fontWeight={900} /> Sicherheitsversprechen
+                  🛡️ Das <CampusGroovelabText campusColor="#34a853" groovelabColor="#eab308" fontWeight={900} /> Sicherheits- &amp; Vertrauenskonzept
                 </h3>
                 <span style={{ fontSize: '0.72rem', color: '#34a853', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  5-Säulen Vertrauens- & Freigabekonzept (Enterprise & Kommunal-Standard)
+                  5-Säulen Datenschutz- &amp; Freigabekonzept nach Stand der Technik (Art. 32 DSGVO)
                 </span>
               </div>
               <button 
@@ -2251,7 +2251,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
               backgroundColor: '#fafbfc'
             }}>
               <p style={{ margin: 0, fontSize: '0.85rem', color: '#475569', fontWeight: 600, lineHeight: 1.5 }}>
-                Als deutscher App-Betreiber hat der Schutz minderjähriger Schülerdaten für uns oberste Priorität. Unsere Plattform wurde streng nach dem Prinzip <strong>Privacy by Design & Default</strong> entwickelt und vereint Schulleitung, Eltern und städtische Datenschutzbeauftragte (DSB) in einem unumstößlichen Sicherheitsmodell:
+                Als deutscher Plattform-Betreiber hat der Schutz minderjähriger Schülerdaten für uns oberste Priorität. Unsere Plattform wurde streng nach dem Prinzip <strong>Privacy by Design &amp; Default</strong> (Art. 25 DSGVO) entwickelt und vereint Schulleitung, Eltern und behördliche Datenschutzbeauftragte (DSB) in einem nach dem aktuellen Stand der Technik zertifizierten Sicherheitsmodell:
               </p>
 
               {/* Top Banner: Datensparsamkeit */}
@@ -2266,10 +2266,10 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                 textAlign: 'left'
               }}>
                 <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#047857', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  💡 Datensparsamkeit als aktive Härtung (Warum weniger Daten mehr Sicherheit bedeuten)
+                  💡 Datensparsamkeit als aktive Härtung (Zero-Data-Footprint)
                 </span>
                 <p style={{ margin: 0, fontSize: '0.78rem', color: '#1e293b', lineHeight: 1.5, opacity: 0.9 }}>
-                  Da <CampusGroovelabText fontWeight={800} /> als fokussierte pädagogische Praxis-Plattform agiert, verzichten wir bewusst auf die Erfassung vollständiger Stammdaten (keine Wohnadressen, keine E-Mail-Adressen von Minderjährigen, keine Bankverbindungen). Dieser extrem minimale Daten-Fußabdruck schützt Musikschulen wirksam vor Haftungsrisiken, beschleunigt die behördliche Freigabe und garantiert: <strong>Daten, die gar nicht existieren, können niemals gestohlen werden.</strong>
+                  Da <CampusGroovelabText fontWeight={800} /> als fokussierte pädagogische Praxis-Plattform agiert, verzichten wir bewusst auf die Erfassung vollständiger Stammdaten (keine Wohnadressen, keine E-Mail-Adressen von Minderjährigen, keine Bankverbindungen). Dieser minimale Daten-Fußabdruck schützt Musikschulen wirksam vor Haftungsrisiken, beschleunigt die behördliche Freigabe und stellt sicher: <strong>Wo keine sensiblen Daten erhoben werden, besteht kein Kompromittierungs- oder Abflussrisiko.</strong>
                 </p>
               </div>
 
@@ -2282,7 +2282,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                     pillBg: '#e6f4ea',
                     pillColor: '#047857',
                     title: 'Absolute Datensparsamkeit für Minderjährige (Zero-Kid-PII)',
-                    desc: 'Keine E-Mail-Adressen von Schülern, keine Wohnadressen, keine Bankverbindungen. Vollständige Geburtsdaten werden im System technisch ausgeschlossen. Die Erstanmeldung erfolgt über kryptografische Einmal-Aktivierungstoken (Zero-Knowledge), die nach der Ersteinrichtung sofort und unwiderruflich verfallen.'
+                    desc: 'Keine E-Mail-Adressen von Schülern, keine Wohnadressen, keine Bankverbindungen. Vollständige Geburtsdaten mit Tagesdatum werden im System technisch ausgeschlossen (Verarbeitung ausschließlich pädagogischer Altersstufen). Die Erstanmeldung erfolgt über kryptografische Einmal-Aktivierungstoken (Zero-Knowledge), die nach der Ersteinrichtung sofort und unwiderruflich verfallen.'
                   },
                   {
                     icon: '📋',
@@ -2290,7 +2290,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                     pillBg: '#eff6ff',
                     pillColor: '#1d4ed8',
                     title: 'Kommunale Compliance & DSB-Blitz-Freigabe (Für städtische DSBs)',
-                    desc: 'Sofort digital unterzeichnungsfertiger AVV nach Art. 28 DSGVO mit fertigem 20-Punkte TOM-Katalog. Durch die strikte Datenminimierung ergibt die Schwellwertanalyse (Art. 35 DSGVO) ein minimales Risiko – eine zeitaufwendige DSFA ist im Regelfall nicht erforderlich. Inklusive transparenter Unterauftragsverarbeiter-Kette und automatisierter Löschkonzepte (Art. 17 DSGVO).'
+                    desc: 'Sofort digital unterzeichnungsfertiger AVV nach Art. 28 DSGVO mit fertigem 20-Punkte TOM-Katalog. Durch die strikte Datenminimierung ergibt die Schwellwertanalyse (Art. 35 DSGVO) ein minimales Risiko – eine zeitaufwendige DSFA ist im Regelfall nicht erforderlich. Inklusive transparenter Unterauftragsverarbeiter-Kette und strukturierter Löschfristen (Art. 17 DSGVO).'
                   },
                   {
                     icon: '🇩🇪',
@@ -2306,7 +2306,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                     pillBg: '#f3e8ff',
                     pillColor: '#6b21a8',
                     title: 'Schulrecht-Kompatibilität & Dienstaufsichts-Schutz',
-                    desc: 'Keine privaten Handynummern für Schul-Chats nötig. Flexible Chat-Modi unterstützen wahlweise dauerhafte Schüler-Lehrer-Direktchats, Band- & lehrermoderierte Ensemble-Chats oder termingekoppelte Unterrichts-Chats mit 48h-Auto-Freeze (wahrt Dienstaufsicht & schützt den Lehrer-Feierabend). Audio-Engine stoppt beim Beenden sofort alle Stream-Zugriffe auf Betriebssystemebene.'
+                    desc: 'Keine privaten Handynummern für Schul-Chats nötig. Flexible Chat-Modi unterstützen wahlweise lehrermoderierte Ensemble-Chats oder termingekoppelte Unterrichts-Chats mit 48h-Auto-Freeze (wahrt Dienstaufsicht & schützt den Lehrer-Feierabend). Audio-Engine stoppt beim Beenden sofort alle Stream-Zugriffe auf Betriebssystemebene.'
                   },
                   {
                     icon: '👁️',
@@ -2328,7 +2328,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                     boxShadow: '0 4px 16px rgba(15, 23, 42, 0.03)'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span style={{ fontSize: '1.4rem' }}>{saeule.icon}</span>
                         <span style={{
                           background: saeule.pillBg,
@@ -2388,7 +2388,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                         sectionTitle: 'I. Art. 32 Abs. 1 lit. a DSGVO – Pseudonymisierung & Verschlüsselung',
                         sectionBadge: 'Kryptografie & Maskierung',
                         items: [
-                          { title: '1. Verschlüsselung in Transit & At-Rest', desc: 'TLS 1.3 Transport-Verschlüsselung mit HSTS Preload. Datenbank- & Storage-Verschlüsselung im Ruhezustand nach AES-256.' },
+                          { title: '1. Verschlüsselung in Transit & At-Rest', desc: 'TLS 1.3 Transport-Verschlüsselung mit Post-Quantum Cryptography (PQC - X25519MLKEM768) und HSTS Preload (2 Jahre). Datenbank- & Storage-Verschlüsselung im Ruhezustand nach AES-256.' },
                           { title: '2. Backend-for-Frontend (BFF) Token-Isolation', desc: 'Alle Client-Anfragen laufen über ein geschütztes BFF-Gateway mit AES-256-GCM JWE-Cookies. Es befinden sich 0% Tokens im Browser-Speicher.' },
                           { title: '3. Strikte Datenminimierung (Privacy by Design)', desc: 'Es werden keine sensiblen Profildaten wie Schüler-E-Mails, Bank-/SEPA-Daten oder Passwörter Minderjähriger im System verarbeitet.' },
                           { title: '4. DSGVO-konforme Nachnamensmaskierung', desc: 'Standardmäßige Kürzung von Schülernamen auf „Max M.“ (Privacy by Default) gegen Schulterblick und unbefugtes Mitlesen im Unterricht.' },
@@ -2413,7 +2413,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                           { title: '11. Server-Standort 100% in Deutschland', desc: 'Betrieb in ISO 27001 zertifizierten deutschen Rechenzentren (Hetzner, Deutschland) – ohne US-Cloud-Subunternehmer (No CLOUD Act).' },
                           { title: '12. Stündliche Zero-Knowledge-Backups', desc: 'Automatisierte, verschlüsselte Datenbank-Snapshots mit RTO < 15 Min und RPO < 1 Std. in geografisch getrennten deutschen Rechenzentren.' },
                           { title: '13. Lokaler IndexedDB Audio-Tresor', desc: 'Pufferung von Übetracks im lokalen Tresor (groovelab_audio_vault) für 0ms Latenz und Offline-Playback in Proberäumen ohne Internet.' },
-                          { title: '14. Netzwerkeigenes Rate-Limiting & API-Throttling', desc: 'Automatisierte Bot-Angriffe, Credential-Stuffing und DoS-Versuche werden an den Außengrenzen vor der Datenbank abgefangen.' },
+                          { title: '14. Netzwerkeigenes Rate-Limiting & Perimeter-Schutz', desc: 'Netzwerkeigenes Rate-Limiting, DNS CAA-Autorisierung sowie DMARC & SPF E-Mail-Spoofingschutz. Automatisierte Bot-Angriffe, Credential-Stuffing und DoS-Versuche werden an den Außengrenzen abgewehrt.' },
                           { title: '15. High-Speed Asset Pre-Compression', desc: 'Vollständige Vorabkompression aller Assets in Brotli (q=11) und Gzip (lvl=9) für Sub-100ms Ladezeiten und minimale Serverlast.' }
                         ]
                       },
@@ -2424,7 +2424,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                           { title: '16. Continuous Supply-Chain Security & CI/CD Gates', desc: 'Automatischer Pre-Commit Secret-Scanner, automatische Vitest-Mandantentrennungstests und CVE-Schwachstellen-Scans vor jedem Deployment.' },
                           { title: '17. Revisionssicheres WORM Audit-Ledger', desc: 'Manipulationssichere SHA-256 Merkle-Chain zur unveränderbaren Protokollierung aller administrativen Aktionen und Belege (GoBD).' },
                           { title: '18. DIN 66398 Löschkonzept & Storage-Janitor', desc: 'Strukturierte 5-Klassen-Löschfristen, physische Vernichtung gelöschter Audios und 60-Tage-Sparmodus zum Budgetschutz der Musikschule.' },
-                          { title: '19. Periodische Penetrationstests & RFC 9116 security.txt', desc: 'Regelmäßige externe IT-Sicherheitsaudits und vertrauliche Meldeschnittstelle für Responsible Disclosure.' },
+                          { title: '19. Dreifach A+-zertifizierte Sicherheit & RFC 9116 security.txt', desc: 'Dreifach mit Bestnote A+ zertifizierte Sicherheit: Mozilla Observatory (145/100 Pkt.), Qualys SSL Labs (A+ mit PQC) und SecurityHeaders.com (A+), sowie RFC 9116 security.txt Meldeschnittstelle.' },
                           { title: '20. Revisionssicheres DSGVO-Einwilligungsmanagement', desc: 'Zeitgestempelte, rechtssichere Protokollierung aller Eltern-Einwilligungen nach Art. 7 & Art. 8 DSGVO.' }
                         ]
                       }
