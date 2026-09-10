@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Music, Calendar, ShieldCheck, Users, 
   Layers, ChevronDown, Check, CheckCircle2, ArrowRight, X, Menu, BookOpen, Sparkles,
-  HardDrive, Lock
+  HardDrive, Lock, MessageSquare
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useMasterPricing } from '../context/MasterPricingContext';
@@ -1213,7 +1213,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
               lineHeight: 1.6,
               marginBottom: '32px'
             }}>
-              Wir überlassen Datenschutz nicht dem Zufall. Weil <span style={{ fontWeight: 800 }}><span style={{ color: '#22c55e' }}>Campus</span>-<span style={{ color: '#eab308' }}>Groovelab</span></span> als fokussierte pädagogische Praxis-Plattform konzipiert ist, verarbeiten wir nur das absolute Minimum an Daten – keine Kinder-Mails, keine Bankverbindungen, keine Wohnadressen. Dieser minimale Daten-Fußabdruck ermöglicht uns innovative Interaktionsfeatures, die klassische, überladene Administrationssoftwares aus Datenschutzgründen gar nicht erst umsetzen dürfen.
+              Wir überlassen Datenschutz nicht dem Zufall. Weil <CampusGroovelabText fontWeight={800} /> als fokussierte pädagogische Praxis-Plattform konzipiert ist, verarbeiten wir nur das absolute Minimum an Daten – keine E-Mail-Adressen Minderjähriger, keine Bankverbindungen, keine Wohnadressen. Dieser minimale Daten-Fußabdruck schützt Schulträger wirksam vor Haftungsrisiken und ermöglicht moderne Interaktionsfeatures, die klassische, überladene Verwaltungssoftwares aus Datenschutzgründen gar nicht umsetzen dürfen.
             </p>
 
             <div style={{
@@ -1226,7 +1226,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
               <div>
                 <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff', marginBottom: '4px' }}>🛡️ Hermetische Datenisolation (PostgreSQL RLS)</h4>
                 <p style={{ fontSize: '13.5px', color: '#a1a1aa', lineHeight: 1.5 }}>
-                  Schüler- und Lehrerdaten sind durch Row-Level Security direkt im Datenbankkern isoliert. Datenabfragen werden auf Kernel-Ebene validiert – Datenlecks durch Anwendungsfehler sind technisch ausgeschlossen.
+                  Schüler- und Lehrerdaten sind durch Row-Level Security direkt im Datenbankkern isoliert. Datenabfragen werden auf Kernel-Ebene validiert – wehrt unberechtigte Datenabflüsse durch Anwendungsfehler bereits auf Datenbank-Ebene zuverlässig ab.
                 </p>
               </div>
               <div>
@@ -1256,6 +1256,15 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                   Schüler-Aufnahmen und Übetracks werden auf ISO 27001 zertifizierten deutschen Servern AES-256 verschlüsselt gespeichert. Bei Löschung greift die physische Sofort-Vernichtung (Recht auf Vergessenwerden nach Art. 17 DSGVO).
                 </p>
               </div>
+              <div>
+                <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <MessageSquare size={17} style={{ color: '#22c55e' }} />
+                  <span>Dienstaufsichts-konforme Schulkommunikation</span>
+                </h4>
+                <p style={{ fontSize: '13.5px', color: '#a1a1aa', lineHeight: 1.5 }}>
+                  Rechtssichere Kommunikation ohne private Mobilfunknummern. Schützt Lehrkräfte vor Dienstaufsichtsbeschwerden und löst das schulrechtliche Verbot privater Messenger-Dienste (WhatsApp &amp; Co.) an Schulen rechtskonform.
+                </p>
+              </div>
             </div>
 
             <div style={{
@@ -1275,7 +1284,35 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                 }}>
                   <ShieldCheck size={18} style={{ color: '#eab308' }} />
                 </div>
-                <span style={{ fontSize: '15px', fontWeight: 600 }}>100% deutsches Hosting in ISO 27001 Rechenzentren</span>
+                <span style={{ fontSize: '15px', fontWeight: 600 }}>100% deutsches Hosting in ISO 27001 Rechenzentren (Hetzner – Schrems-II-fest)</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(234, 179, 8, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <ShieldCheck size={18} style={{ color: '#eab308' }} />
+                </div>
+                <span style={{ fontSize: '15px', fontWeight: 600 }}>Post-Quantum Cryptography (PQC) &amp; TLS 1.3 Transport-Verschlüsselung</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(52, 168, 83, 0.15)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <CheckCircle2 size={18} style={{ color: '#34a853' }} />
+                </div>
+                <span style={{ fontSize: '15px', fontWeight: 700, color: '#e6f4ea' }}>Dreifach A+-zertifiziert: Mozilla (145/100), SSL Labs &amp; SecurityHeaders</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{
@@ -1378,10 +1415,10 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                   <div>  <span style={{ color: '#eab308' }}>ON</span> <span style={{ color: '#ffffff' }}>public.users</span></div>
                   <div>  <span style={{ color: '#eab308' }}>FOR ALL</span></div>
                   <div>  <span style={{ color: '#eab308' }}>USING</span> (</div>
-                  <div style={{ color: '#ffffff' }}>    school_id = auth.jwt() -&gt;&gt; 'school_id'</div>
+                  <div style={{ color: '#ffffff' }}>    school_id = get_current_user_school_id()</div>
                   <div>  );</div>
                   <br />
-                  <div style={{ color: '#71717a' }}>-- Status: Hermetische Trennung aktiv</div>
+                  <div style={{ color: '#71717a' }}>-- Status: Hermetische Mandantentrennung aktiv</div>
                   <div style={{ color: '#38bdf8' }}>STATUS: SECURE_DATA_PROTECTION_ACTIVE</div>
                 </div>
               </div>
@@ -1394,7 +1431,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                 fontWeight: 500,
                 paddingLeft: '8px'
               }}>
-                <strong>Sicherheit, die im Datenbankkern lebt:</strong> Diese reale Sicherheits-Policy garantiert, dass alle Datenabfragen direkt auf Kernel-Ebene mandantenisoliert werden. Unberechtigte mandantenübergreifende Zugriffe sind durch das Zero-Trust-Prinzip technisch ausgeschlossen.
+                <strong>Sicherheit, die im Datenbankkern lebt:</strong> Diese reale Sicherheits-Policy garantiert, dass alle Datenabfragen direkt auf Kernel-Ebene mandantenisoliert werden. Unberechtigte mandantenübergreifende Zugriffe werden durch das Zero-Trust-Prinzip auf Datenbank-Ebene zuverlässig abgewehrt.
               </p>
             </div>
           </div>
