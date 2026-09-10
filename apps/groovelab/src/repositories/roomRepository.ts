@@ -56,25 +56,27 @@ export async function fetchRoomsBySchool(schoolId: string, force = false, active
 
   return dedupeQuery(`rooms_${schoolId}_${activePlatform || 'all'}`, async () => {
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('rooms')
         .select('*')
-        .eq('school_id', schoolId);
-
-      if (activePlatform === 'groovelab') {
-        query = query.eq('is_groovelab_active', true);
-      } else if (activePlatform === 'campus') {
-        query = query.eq('is_campus_active', true);
-      }
-
-      const { data, error } = await query.order('sort_order', { ascending: true });
+        .eq('school_id', schoolId)
+        .order('sort_order', { ascending: true });
 
       if (error) {
         console.warn('[RoomRepository] Error fetching rooms:', error);
         return inMemoryRooms.get(memoryKey)?.data || [];
       }
 
-      const result = data || [];
+      const allRooms = data || [];
+      let result = allRooms;
+      if (activePlatform === 'groovelab') {
+        const glRooms = allRooms.filter(r => r.is_groovelab_active !== false);
+        result = glRooms.length > 0 ? glRooms : allRooms;
+      } else if (activePlatform === 'campus') {
+        const campusRooms = allRooms.filter(r => r.is_campus_active !== false);
+        result = campusRooms.length > 0 ? campusRooms : allRooms;
+      }
+
       inMemoryRooms.set(memoryKey, { timestamp: Date.now(), data: result });
       setItemWithTTL(persistentKey, result, CACHE_TTL_MS);
       return result;
@@ -108,9 +110,8 @@ export async function fetchStationsBySchool(schoolId: string, force = false): Pr
     try {
       const { data, error } = await supabase
         .from('stations')
-        .select('*, rooms!inner(school_id, is_groovelab_active)')
+        .select('*, rooms!inner(school_id, is_groovelab_active, is_campus_active)')
         .eq('rooms.school_id', schoolId)
-        .eq('rooms.is_groovelab_active', true)
         .order('name');
 
       if (error) {

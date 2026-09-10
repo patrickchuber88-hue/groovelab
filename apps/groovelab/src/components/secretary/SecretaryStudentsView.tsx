@@ -92,6 +92,7 @@ export interface SecretaryStudentsViewProps {
   handleCreateStudentCampus: (e: React.FormEvent) => Promise<void> | void;
   handleDeleteStudentCampus: (studentId: string, name: string, instrument?: string, teacherId?: string, isCampusActive?: boolean, isGroovelabActive?: boolean) => void;
   handleUpdateStudentTeacher: (studentId: string, teacherId: string | null) => Promise<void> | void;
+  handleToggleStudentModule?: (student: any, moduleType: 'campus' | 'groovelab') => Promise<void> | void;
   getAlphabeticalColor: (name: string) => { avatarBg: string; avatarColor: string };
 }
 
@@ -177,6 +178,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
   handleCreateStudentCampus,
   handleDeleteStudentCampus,
   handleUpdateStudentTeacher,
+  handleToggleStudentModule,
   getAlphabeticalColor,
 }) => {
 
@@ -862,20 +864,37 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                         }
 
                         try {
-                          await supabase
-                            .from('users')
-                            .update({ is_campus_active: activate })
-                            .in('id', selectedStudentIds);
+                          const { data: existingUsers } = await supabase.from('users').select('id').in('id', selectedStudentIds);
+                          const existingIds = new Set((existingUsers || []).map(u => u.id));
 
-                          await supabase
-                            .from('students')
-                            .update({ is_campus_active: activate })
-                            .in('id', selectedStudentIds);
+                          if (existingIds.size > 0) {
+                            const { error: updateErr } = await supabase
+                              .from('users')
+                              .update({ is_campus_active: activate })
+                              .in('id', Array.from(existingIds));
+                            if (updateErr) throw updateErr;
+                          }
 
-                          await supabase
-                            .from('pending_students')
-                            .update({ is_campus_active: activate })
-                            .in('id', selectedStudentIds);
+                          const missingIds = selectedStudentIds.filter(id => !existingIds.has(id));
+                          if (missingIds.length > 0) {
+                            const missingStudents = students.filter(s => missingIds.includes(s.id));
+                            const newUsers = missingStudents.map(s => ({
+                              id: s.id,
+                              school_id: s.school_id || schoolId,
+                              role: 'student',
+                              first_name: s.first_name || 'Schüler',
+                              last_name: s.last_name || '',
+                              instrument: s.instrument || 'Musiker',
+                              teacher_id: s.teacher_id || null,
+                              lesson_duration: s.lesson_duration || 30,
+                              is_campus_active: activate,
+                              is_groovelab_active: false,
+                              is_active: false,
+                              status: 'offen'
+                            }));
+                            const { error: insertErr } = await supabase.from('users').insert(newUsers);
+                            if (insertErr) throw insertErr;
+                          }
 
                           fetchDashboardData();
                           alert(`Campus-Modul für ${selectedStudentIds.length} Schüler ${activate ? 'aktiviert' : 'deaktiviert'}.`);
@@ -924,20 +943,44 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                         }
 
                         try {
-                          await supabase
-                            .from('users')
-                            .update({ is_groovelab_active: activate })
-                            .in('id', selectedStudentIds);
+                          const { data: existingUsers } = await supabase.from('users').select('id').in('id', selectedStudentIds);
+                          const existingIds = new Set((existingUsers || []).map(u => u.id));
 
-                          await supabase
-                            .from('students')
-                            .update({ is_groovelab_active: activate })
-                            .in('id', selectedStudentIds);
+                          if (existingIds.size > 0) {
+                            const updatePayload: any = { is_groovelab_active: activate };
+                            if (activate) {
+                              updatePayload.is_active = true;
+                              updatePayload.is_app_user = true;
+                              updatePayload.status = 'aktiv';
+                            }
+                            const { error: updateErr } = await supabase
+                              .from('users')
+                              .update(updatePayload)
+                              .in('id', Array.from(existingIds));
+                            if (updateErr) throw updateErr;
+                          }
 
-                          await supabase
-                            .from('pending_students')
-                            .update({ is_groovelab_active: activate })
-                            .in('id', selectedStudentIds);
+                          const missingIds = selectedStudentIds.filter(id => !existingIds.has(id));
+                          if (missingIds.length > 0) {
+                            const missingStudents = students.filter(s => missingIds.includes(s.id));
+                            const newUsers = missingStudents.map(s => ({
+                              id: s.id,
+                              school_id: s.school_id || schoolId,
+                              role: 'student',
+                              first_name: s.first_name || 'Schüler',
+                              last_name: s.last_name || '',
+                              instrument: s.instrument || 'Musiker',
+                              teacher_id: s.teacher_id || null,
+                              lesson_duration: s.lesson_duration || 30,
+                              is_campus_active: false,
+                              is_groovelab_active: activate,
+                              is_active: activate ? true : false,
+                              is_app_user: activate ? true : false,
+                              status: activate ? 'aktiv' : 'offen'
+                            }));
+                            const { error: insertErr } = await supabase.from('users').insert(newUsers);
+                            if (insertErr) throw insertErr;
+                          }
 
                           fetchDashboardData();
                           alert(`GrooveLab-Modul für ${selectedStudentIds.length} Schüler ${activate ? 'aktiviert' : 'deaktiviert'}.`);
@@ -1298,89 +1341,13 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
 
                       {/* Integrated Module Chips (Campus & GrooveLab) */}
                       <div style={{ flex: '1.6', display: 'flex', gap: '6px', minWidth: 0, flexShrink: 0 }}>
-                        {/* Campus Chip with Legal Governance (§ 312j BGB) */}
+                        {/* Campus Chip with Direct 1-Click Toggle */}
                         <button
                           type="button"
                           aria-label={`Campus-Modul für ${student.first_name} ${student.last_name} ${student.is_campus_active ? 'deaktivieren' : 'aktivieren'}`}
-                          onClick={async () => {
-                            const isCampusAvailable = !isBillingBooked || hasCampusSub;
-                            if (!isCampusAvailable) {
-                              alert("Das Campus-Modul ist für deine Musikschule aktuell nicht gebucht.");
-                              return;
-                            }
-                            const sName = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'diesem Schüler';
-                            const isDirectBilling = billingPayer === 'student' || studentBillingOption === 'student_full' || studentBillingOption === 'student_partial' || studentBillingOption === 'option1';
-                            
-                            let markAsHardship = false;
-                            let markAsCashPaid = false;
-                            let nextActive = !student.is_campus_active;
-
-                            if (isDirectBilling) {
-                              if (!student.is_campus_active) {
-                                // Direct Billing Governance: Secretariat cannot force B2C contract on parents.
-                                // It can grant Hardship Exemption (school pays) or book Cash/Office payment.
-                                const choice = window.confirm(
-                                  `🔒 Rechtssichere Eltern-Direktabrechnung (§ 312j BGB)\n\nFür ${sName} zahlen regulär die Eltern direkt per GiroCode / Überweisung im Schüler-Login (max. 11 × 0,49 € = 5,39 € / Schuljahr; 1. Monat kostenlos).\n\nMöchtest du diesen Schüler als beitragsfreien HÄRTEFALL freistellen (Kosten werden von der Musikschule getragen)?\n\n[OK] = Als Härtefall freistellen\n[Abbrechen] = Keine Änderung (Eltern aktivieren selbst)`
-                                );
-                                if (choice) {
-                                  markAsHardship = true;
-                                  nextActive = true;
-                                } else {
-                                  return;
-                                }
-                              } else {
-                                if (student.exempt_from_direct_billing) {
-                                  if (!window.confirm(`Härtefall-Freistellung für ${sName} aufheben? (Schüler wechselt zurück in den regulären Eltern-Zahlungsstatus)`)) return;
-                                  nextActive = false;
-                                } else if (student.student_billing_cash_paid) {
-                                  if (!window.confirm(`Barzahlung für ${sName} stornieren und Campus deaktivieren?`)) return;
-                                  nextActive = false;
-                                } else {
-                                  if (!window.confirm(`Campus-Zugang für ${sName} pausieren / deaktivieren?`)) return;
-                                  nextActive = false;
-                                }
-                              }
-                            } else {
-                              // Sammelzahler: School pays, Secretariat has full toggle authority
-                              const actionWord = student.is_campus_active ? 'deaktivieren' : 'aktivieren';
-                              if (!window.confirm(`Campus-Modul für ${sName} ${actionWord}?`)) return;
-                            }
-
-                            try {
-                              const userUpdates: any = { 
-                                is_campus_active: nextActive,
-                                exempt_from_direct_billing: markAsHardship ? true : (nextActive ? Boolean(student.exempt_from_direct_billing) : false),
-                                payment_status: nextActive ? (markAsHardship ? 'hardship' : (isDirectBilling ? 'paid' : 'active')) : 'passive',
-                                student_billing_cash_paid: nextActive ? true : false
-                              };
-
-                              const { data: existingUser } = await supabase.from('users').select('id').eq('id', student.id).maybeSingle();
-                              if (!existingUser) {
-                                await supabase.from('users').insert({
-                                  id: student.id,
-                                  school_id: student.school_id || schoolId,
-                                  role: 'student',
-                                  first_name: student.first_name || 'Schüler',
-                                  last_name: student.last_name || '',
-                                  instrument: student.instrument || 'Musiker',
-                                  teacher_id: student.teacher_id || null,
-                                  lesson_duration: student.lesson_duration || 30,
-                                  is_campus_active: nextActive,
-                                  is_groovelab_active: !!student.is_groovelab_active,
-                                  is_active: false,
-                                  exempt_from_direct_billing: !!userUpdates.exempt_from_direct_billing,
-                                  payment_status: userUpdates.payment_status
-                                });
-                              } else {
-                                await supabase.from('users').update(userUpdates).eq('id', student.id);
-                                try {
-                                  await supabase.from('users').update(userUpdates).eq('id', student.id);
-                                } catch (e) {}
-                              }
-
-                              fetchDashboardData();
-                            } catch (err: any) {
-                              alert("Fehler beim Umschalten: " + err.message);
+                          onClick={() => {
+                            if (handleToggleStudentModule) {
+                              handleToggleStudentModule(student, 'campus');
                             }
                           }}
                           style={{
@@ -1414,9 +1381,9 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                                   ? "Campus aktiv (Härtefall - von Musikschule übernommen: 0,49 €/Mo.)" 
                                   : (student.isPendingOnboarding 
                                       ? "Campus gebucht (Einladung offen - PIN noch nicht eingelöst)" 
-                                      : "Campus aktiv (Direktabrechnung Eltern / Sammelzahlung)")) 
+                                      : "Campus aktiv (Klick zum Deaktivieren)")) 
                               : (billingPayer === 'student' 
-                                  ? "Basis-Zugang (Passiv 0,09 €) • Klick für Härtefall-Freistellung oder Barzahlung" 
+                                  ? "Campus nicht aktiv (Klick zum Aktivieren)" 
                                   : "Campus nicht gebucht (Klick zum Aktivieren)")
                           }
                         >
@@ -1432,46 +1399,13 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                           <span>Campus</span>
                         </button>
 
-                        {/* GrooveLab Chip */}
+                        {/* GrooveLab Chip with Direct 1-Click Toggle */}
                         <button
                           type="button"
                           aria-label={`GrooveLab-Modul für ${student.first_name} ${student.last_name} ${student.is_groovelab_active ? 'deaktivieren' : 'aktivieren'}`}
-                          onClick={async () => {
-                            const isGrooveAvailable = !isBillingBooked || hasGroovelabSub;
-                            if (!isGrooveAvailable) {
-                              alert("Das GrooveLab-Modul ist für deine Musikschule aktuell nicht gebucht.");
-                              return;
-                            }
-                            const sName = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'diesem Schüler';
-                            const actionWord = student.is_groovelab_active ? 'deaktivieren' : 'aktivieren';
-                            if (!window.confirm(`GrooveLab-Modul für ${sName} ${actionWord}?`)) return;
-                            try {
-                              const newVal = !student.is_groovelab_active;
-                              const { data: existingUser } = await supabase.from('users').select('id').eq('id', student.id).maybeSingle();
-                              if (!existingUser) {
-                                await supabase.from('users').insert({
-                                  id: student.id,
-                                  school_id: student.school_id || schoolId,
-                                  role: 'student',
-                                  first_name: student.first_name || 'Schüler',
-                                  last_name: student.last_name || '',
-                                  instrument: student.instrument || 'Musiker',
-                                  teacher_id: student.teacher_id || null,
-                                  lesson_duration: student.lesson_duration || 30,
-                                  is_campus_active: !!student.is_campus_active,
-                                  is_groovelab_active: newVal,
-                                  is_active: false
-                                });
-                              } else {
-                                await supabase.from('users').update({ is_groovelab_active: newVal }).eq('id', student.id);
-                                try {
-                                  await supabase.from('users').update({ is_groovelab_active: newVal }).eq('id', student.id);
-                                } catch (e) {}
-                              }
-
-                              fetchDashboardData();
-                            } catch (err: any) {
-                              alert("Fehler beim Umschalten: " + err.message);
+                          onClick={() => {
+                            if (handleToggleStudentModule) {
+                              handleToggleStudentModule(student, 'groovelab');
                             }
                           }}
                           style={{
@@ -1503,7 +1437,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                             student.is_groovelab_active 
                               ? (student.isPendingOnboarding 
                                   ? "GrooveLab gebucht (Einladung offen - PIN noch nicht eingelöst)" 
-                                  : "GrooveLab aktiv (Band- & Song-Modul)") 
+                                  : "GrooveLab aktiv (Band- & Song-Modul • Klick zum Deaktivieren)") 
                               : "GrooveLab nicht gebucht (Klick zum Aktivieren)"
                           }
                         >

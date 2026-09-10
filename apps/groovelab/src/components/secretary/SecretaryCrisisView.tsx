@@ -35,7 +35,7 @@ interface SecretaryCrisisViewProps {
   handleMarkAsNotified: (id: string) => Promise<void> | void;
   handleArchiveCrisisTicket: (id: string) => Promise<void> | void;
   handleArchiveAllResolvedTickets: (ids: string[]) => Promise<void> | void;
-  handleEndSickOnBehalf: (teacherId: string, teacherName: string) => Promise<void> | void;
+  handleEndAbsenceOnBehalf?: (teacherId: string, teacherName: string) => Promise<void> | void;
   expandedLiveDayStr: string | null;
   setExpandedLiveDayStr: (day: string | null) => void;
   selectedArchiveLog: any;
@@ -51,34 +51,35 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
   handleMarkAsNotified,
   handleArchiveCrisisTicket,
   handleArchiveAllResolvedTickets,
-  handleEndSickOnBehalf,
+  handleEndAbsenceOnBehalf,
   expandedLiveDayStr,
   setExpandedLiveDayStr,
   selectedArchiveLog,
   setSelectedArchiveLog,
 }) => {
+  const effectiveEndAbsenceOnBehalf = handleEndAbsenceOnBehalf || (() => {});
   const now = new Date();
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
   // ── Derived data ──
-  const sickTeachersMap = new Map<string, any>();
+  const absentTeachersMap = new Map<string, any>();
   crisisNotifications.forEach(n => {
     if (n.teacher && n.teacher.sick_until) {
-      const sickUntilTime = new Date(n.teacher.sick_until).getTime();
-      if (sickUntilTime >= todayStart.getTime()) {
-        sickTeachersMap.set(n.teacher.id, n.teacher);
+      const absenceUntilTime = new Date(n.teacher.sick_until).getTime();
+      if (absenceUntilTime >= todayStart.getTime()) {
+        absentTeachersMap.set(n.teacher.id, n.teacher);
       }
     }
   });
-  const sickTeachers = Array.from(sickTeachersMap.values());
+  const absentTeachers = Array.from(absentTeachersMap.values());
 
   const liveTickets = crisisNotifications.filter(n => {
     const isPast = new Date(n.slot_start_datetime).getTime() < todayStart.getTime();
     if (n.status === 'ARCHIVED' || isPast) return false;
     if (!n.teacher || !n.teacher.sick_until) return false;
-    const sickUntilTime = new Date(n.teacher.sick_until).getTime();
-    return sickUntilTime >= todayStart.getTime();
+    const absenceUntilTime = new Date(n.teacher.sick_until).getTime();
+    return absenceUntilTime >= todayStart.getTime();
   });
   const todayEnd = new Date(todayStart);
   todayEnd.setHours(23, 59, 59, 999);
@@ -88,8 +89,8 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
   });
   const archiveTickets = crisisNotifications.filter(n => {
     const isPast = new Date(n.slot_start_datetime).getTime() < todayStart.getTime();
-    const isHealthy = !n.teacher || !n.teacher.sick_until || new Date(n.teacher.sick_until).getTime() < todayStart.getTime();
-    return n.status === 'ARCHIVED' || isPast || isHealthy;
+    const isAvailable = !n.teacher || !n.teacher.sick_until || new Date(n.teacher.sick_until).getTime() < todayStart.getTime();
+    return n.status === 'ARCHIVED' || isPast || isAvailable;
   });
   const poolTickets = crisisTabMode === 'live' ? liveTickets : archiveTickets;
   const visibleTickets = selectedCrisisTeacherId
@@ -107,8 +108,8 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
     return minsUntil < 120 ? 'RED' : 'YELLOW';
   };
 
-  // ── Helper: sick duration string ──
-  const sickDurStr = (v: string | null | undefined) => {
+  // ── Helper: absence duration string ──
+  const absenceDurStr = (v: string | null | undefined) => {
     if (!v) return 'Dauer offen';
     try { 
       return `bis ${new Date(v).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}`; 
@@ -296,10 +297,10 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
             </div>
           </div>
           <div style={{ fontSize: '2.2rem', fontWeight: 950, letterSpacing: '-0.02em', lineHeight: 1, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-            {sickTeachers.length}
+            {absentTeachers.length}
           </div>
           <span style={{ fontSize: '0.72rem', opacity: 0.85, fontWeight: 600 }}>
-            {sickTeachers.length === 1 ? '1 Lehrkraft abwesend' : `${sickTeachers.length} Lehrkräfte abwesend`}
+            {absentTeachers.length === 1 ? '1 Lehrkraft abwesend' : `${absentTeachers.length} Lehrkräfte abwesend`}
           </span>
         </div>
 
@@ -464,7 +465,7 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
 
           {/* Live mode view with conditions */}
           {crisisTabMode === 'live' && (() => {
-            if (sickTeachers.length === 0) {
+            if (absentTeachers.length === 0) {
               return (
                 <div style={{
                   background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
@@ -705,7 +706,7 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
                               {group.date} &bull; {teacherName}
                             </strong>
                             <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
-                              Abwesenheit: {sickDurStr(group.teacher?.sick_until)}
+                              Abwesenheit: {absenceDurStr(group.teacher?.sick_until)}
                             </span>
                           </div>
                         </div>
@@ -811,12 +812,12 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
         {/* RIGHT SIDEBAR */}
         <div style={{ width: '310px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-          {/* Sick teacher list */}
+          {/* Absent teacher list */}
           <div style={{
-            background: sickTeachers.length === 0
+            background: absentTeachers.length === 0
               ? '#ffffff'
               : 'linear-gradient(135deg, rgba(254, 242, 242, 0.95) 0%, rgba(254, 226, 226, 0.95) 100%)',
-            border: sickTeachers.length === 0
+            border: absentTeachers.length === 0
               ? '1.5px solid #e2e8f0'
               : '1.5px solid #fca5a5',
             borderRadius: '24px',
@@ -824,34 +825,34 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
             display: 'flex',
             flexDirection: 'column',
             gap: '16px',
-            boxShadow: sickTeachers.length === 0
+            boxShadow: absentTeachers.length === 0
               ? '0 8px 32px rgba(15, 23, 42, 0.03)'
               : '0 8px 32px rgba(239, 68, 68, 0.04)',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '14px', borderBottom: sickTeachers.length === 0 ? '1px solid #e2e8f0' : '1px solid rgba(239, 68, 68, 0.15)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '14px', borderBottom: absentTeachers.length === 0 ? '1px solid #e2e8f0' : '1px solid rgba(239, 68, 68, 0.15)' }}>
               <div style={{
-                background: sickTeachers.length === 0 ? '#e6f4ea' : '#fee2e2',
+                background: absentTeachers.length === 0 ? '#e6f4ea' : '#fee2e2',
                 borderRadius: '12px', padding: '8px',
-                border: sickTeachers.length === 0 ? '1px solid #e6f4ea' : '1px solid #fca5a5',
+                border: absentTeachers.length === 0 ? '1px solid #e6f4ea' : '1px solid #fca5a5',
                 display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}>
-                {sickTeachers.length === 0 ? (
+                {absentTeachers.length === 0 ? (
                   <UserCheck size={16} color="#34a853" />
                 ) : (
                   <UserX size={16} color="#ef4444" />
                 )}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <strong style={{ fontSize: '0.9rem', fontWeight: 950, color: sickTeachers.length === 0 ? '#1e293b' : '#7f1d1d', display: 'block', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                <strong style={{ fontSize: '0.9rem', fontWeight: 950, color: absentTeachers.length === 0 ? '#1e293b' : '#7f1d1d', display: 'block', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                   Abwesenheiten
                 </strong>
-                <span style={{ fontSize: '0.72rem', color: sickTeachers.length === 0 ? '#64748b' : '#b91c1c', fontWeight: 600 }}>
-                  {sickTeachers.length === 0 ? 'Alle im Dienst' : 'Wählen zum Filtern'}
+                <span style={{ fontSize: '0.72rem', color: absentTeachers.length === 0 ? '#64748b' : '#b91c1c', fontWeight: 600 }}>
+                  {absentTeachers.length === 0 ? 'Alle im Dienst' : 'Wählen zum Filtern'}
                 </span>
               </div>
             </div>
 
-            {sickTeachers.length === 0 ? (
+            {absentTeachers.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '24px 0' }}>
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
                   <CheckCircle size={32} color="#34a853" />
@@ -860,7 +861,7 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {sickTeachers.map((teacher: any) => {
+                {absentTeachers.map((teacher: any) => {
                   const count = crisisNotifications.filter(n => n.teacher?.id === teacher.id).length;
                   const isSelected = selectedCrisisTeacherId === teacher.id;
                   return (
@@ -897,14 +898,14 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
                             {count} {count === 1 ? 'Fall' : 'Fälle'}
                           </span>
                           <span style={{ color: '#fca5a5', fontSize: '0.6rem' }}>&bull;</span>
-                          <span style={{ fontSize: '0.72rem', color: '#b91c1c', fontWeight: 600 }}>{sickDurStr(teacher.sick_until)}</span>
+                          <span style={{ fontSize: '0.72rem', color: '#b91c1c', fontWeight: 600 }}>{absenceDurStr(teacher.sick_until)}</span>
                         </div>
                       </div>
                       {/* Re-activate button */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleEndSickOnBehalf(teacher.id, formatTeacherFullName(teacher));
+                          effectiveEndAbsenceOnBehalf(teacher.id, formatTeacherFullName(teacher));
                         }}
                         title="Abwesenheit beenden (Stunden reaktivieren)"
                         style={{

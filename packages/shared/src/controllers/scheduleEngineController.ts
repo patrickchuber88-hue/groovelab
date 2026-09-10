@@ -995,10 +995,10 @@ export async function swapScheduleHandler(req: Request, res: Response): Promise<
 
 /**
  * Controller 5: LEHRER-AUSFALL-STEUERUNG & AUTOMATISIERTER ALARM-FLOW
- * POST-Endpunkt: /api/teacher/sick
+ * POST-Endpunkt: /api/teacher/report-absence
  * Setzt den Status aller heutigen Stunden auf 'teacher_sick' (storniert), meldet dies ans Sekretariat und benachrichtigt Eltern.
  */
-export async function reportTeacherIllnessHandler(req: Request, res: Response): Promise<void> {
+export async function reportTeacherAbsencePinHandler(req: Request, res: Response): Promise<void> {
   try {
     const { teacherId, pin } = req.body;
     if (!teacherId || !pin) {
@@ -1019,7 +1019,7 @@ export async function reportTeacherIllnessHandler(req: Request, res: Response): 
     }
 
     if (teacher.role !== 'teacher') {
-      res.status(403).json({ error: 'Only teachers can report illness.' });
+      res.status(403).json({ error: 'Only teachers can report absence.' });
       return;
     }
 
@@ -1069,7 +1069,9 @@ export async function reportTeacherIllnessHandler(req: Request, res: Response): 
       affectedSchedulesCount: updatedSchedules?.length || 0
     });
   } catch (err: any) {
-    console.error('Error in reportTeacherIllnessHandler:', err);
+    console.error('Error in reportTeacherAbsencePinHandler:', err);
     res.status(500).json({ error: 'Internal Server Error', details: err.message });
   }
 }
+
+export const reportTeacherIllnessHandler = reportTeacherAbsencePinHandler;

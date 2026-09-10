@@ -5,6 +5,7 @@ import {
   HelpCircle, MessageSquare, Mic, Sparkles, Users
 } from 'lucide-react';
 import { maskLastName, formatSingleStudentAnonymized } from '../../utils/nameHelper';
+import { isTeacherCurrentlyAbsent } from '../../utils/teacherAbsenceHelper';
 
 export interface TeacherTourDemoScheduleProps {
   isFreeDay?: boolean;
@@ -568,12 +569,12 @@ export interface TeacherTagesplanWidgetProps {
   setActiveChatOcc: (occ: any) => void;
   docStudent: any;
   setDocStudent: (s: any) => void;
-  allStudents: any[];
-  isSickWidgetExpanded: boolean;
-  setIsSickWidgetExpanded: React.Dispatch<React.SetStateAction<boolean>>;
-  sickUntilDate: string;
-  setSickUntilDate: React.Dispatch<React.SetStateAction<string>>;
-  bypassSickView: boolean;
+  allStudents?: any[];
+  isAbsenceWidgetExpanded?: boolean;
+  setIsAbsenceWidgetExpanded?: React.Dispatch<React.SetStateAction<boolean>>;
+  absenceUntilDate?: string;
+  setAbsenceUntilDate?: React.Dispatch<React.SetStateAction<string>>;
+  bypassAbsenceView?: boolean;
   currentTimeStr: string;
   quickAudioStudent: any;
   setQuickAudioStudent: (s: any) => void;
@@ -608,16 +609,16 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
   docStudent,
   setDocStudent,
   allStudents,
-  isSickWidgetExpanded,
-  setIsSickWidgetExpanded,
-  sickUntilDate,
-  setSickUntilDate,
-  bypassSickView,
+  isAbsenceWidgetExpanded,
+  setIsAbsenceWidgetExpanded,
+  absenceUntilDate,
+  setAbsenceUntilDate,
+  bypassAbsenceView,
   currentTimeStr,
   quickAudioStudent,
   setQuickAudioStudent,
   loadingPrepMirror,
-  windowWidth,
+  windowWidth = 1024,
   isMobileDevice,
   activeTimelineSlotRef,
   briefingData,
@@ -641,8 +642,8 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
 }) => (
     isTourDemoScheduleActive ? (
       <TeacherTourDemoSchedule isFreeDay={isFreeDay} getSimulatedNow={getSimulatedNow} windowWidth={windowWidth} showRealNames={showRealNames} toggleRealNames={toggleRealNames} />
-    ) : !(isWeekend || isFreeDay) && (
-      teacher?.sick_until && !bypassSickView ? (
+    ) : !(isWeekend || isFreeDay) ? (
+      isTeacherCurrentlyAbsent(teacher) && !bypassAbsenceView ? (
         <div style={{
           flex: '1.2 1 450px',
           minWidth: '300px',
@@ -668,19 +669,25 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
            </p>
         </div>
       ) : (
-        <div id="tour-teacher-schedule" className="google-card" style={{ 
+        <div style={{
           flex: isFreeDay ? '0.8 1 300px' : '1.2 1 450px', 
-          minWidth: '300px', 
-          padding: '20px 24px', 
-          borderRadius: '20px', 
-          border: '1px solid #f1f5f9', 
-          boxShadow: '0 2px 12px rgba(0,0,0,0.04)', 
-          background: 'white', 
-          boxSizing: 'border-box',
-          maxHeight: '620px',
+          minWidth: (windowWidth < 768 || isMobileDevice) ? '100%' : '300px',
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          gap: '12px'
         }}>
+          <div id="tour-teacher-schedule" className="google-card" style={{ 
+            width: '100%', 
+            padding: (windowWidth < 768 || isMobileDevice) ? '16px 14px' : '20px 24px', 
+            borderRadius: '20px', 
+            border: '1px solid #f1f5f9', 
+            boxShadow: '0 2px 12px rgba(0,0,0,0.04)', 
+            background: 'white', 
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
+            maxHeight: windowWidth >= 768 ? '700px' : undefined
+          }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#1f2937' }}>
               <Clock size={20} color="#0b57d0" />
@@ -731,12 +738,12 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
             position: 'relative',
             overflowY: 'auto',
             paddingRight: '6px',
-            maxHeight: '520px'
+            maxHeight: (windowWidth < 768 || isMobileDevice) ? '520px' : undefined,
+            flex: 1,
+            minHeight: 0
           }}>
             <div style={{ position: 'absolute', top: '16px', bottom: '16px', left: '9px', width: '2px', background: '#e2e8f0' }} />
-            {loadingPrepMirror ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontSize: '0.9rem', fontWeight: 600 }}>Lade Stundenplan...</div>
-            ) : briefingData ? (
+            {briefingData ? (
               <div>
                 {briefingData.timeline && briefingData.timeline.length > 0 ? (() => {
                   const rawTimeline = briefingData.timeline || [];
@@ -1120,8 +1127,8 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                });
                              }
                              const todayStr = getSimulatedNow().toLocaleDateString('sv-SE');
-                             setSickUntilDate(todayStr);
-                             setIsSickWidgetExpanded(true);
+                             if (setAbsenceUntilDate) setAbsenceUntilDate(todayStr);
+                             if (setIsAbsenceWidgetExpanded) setIsAbsenceWidgetExpanded(true);
                            }}
                            ref={el => {
                              if (isCurrentSlot || (idx === prepIndex && !isFinished)) {
@@ -1235,7 +1242,7 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                        {(() => {
                                          if (slot.students && slot.students.length > 0) {
                                            const names = slot.students.map((stud: any) => {
-                                             const found = allStudents.find(s => s.id === stud.id);
+                                             const found = allStudents?.find((s: any) => s.id === stud.id);
                                              const rawFn = stud.first_name || found?.first_name || (stud.name ? stud.name.split(' ')[0] : '');
                                              const cleanFn = rawFn.replace(/&.*/, '').trim() || 'Schüler';
                                              const rawLn = stud.last_name || found?.last_name || (stud.name ? stud.name.split(' ').slice(1).join(' ') : '');
@@ -1264,7 +1271,7 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                            <Sparkles size={13} color="#eab308" />
                                          </span>
                                        )}{(() => {
-                                         const found = allStudents.find(s => s.id === slot.student?.id);
+                                         const found = allStudents?.find((s: any) => s.id === slot.student?.id);
                                          const fn = slot.student?.first_name || found?.first_name || (slot.student?.name ? slot.student.name.split(' ')[0] : '');
                                          const ln = slot.student?.last_name || found?.last_name || (slot.student?.name ? slot.student.name.split(' ').slice(1).join(' ') : '');
                                          if (fn || ln) {
@@ -1575,11 +1582,12 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                 )}
               </div>
             ) : (
-              <div style={{ padding: '30px', textAlign: 'center', color: '#ef4444' }}>Fehler beim Laden des Briefings.</div>
+              <div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontSize: '0.9rem', fontWeight: 600 }}>Lade Stundenplan...</div>
             )}
           </div>
-          <TeacherTagesplanRoomIssuesBanner isDesktop={false} relevantRoomIssuesToday={relevantRoomIssuesToday} teacherTodayRooms={teacherTodayRooms} handleResolveRoomIssueInTagesplan={handleResolveRoomIssueInTagesplan} getIssueRoomLabel={getIssueRoomLabel} teacher={teacher} userId={userId} />
         </div>
-      )
+        <TeacherTagesplanRoomIssuesBanner isDesktop={!isMobileDevice && windowWidth >= 768} relevantRoomIssuesToday={relevantRoomIssuesToday} teacherTodayRooms={teacherTodayRooms} handleResolveRoomIssueInTagesplan={handleResolveRoomIssueInTagesplan} getIssueRoomLabel={getIssueRoomLabel} teacher={teacher} userId={userId} />
+      </div>
     )
-  );
+  ) : null
+);

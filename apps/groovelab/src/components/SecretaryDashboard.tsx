@@ -227,7 +227,8 @@ const AvatarImage = React.memo(({ src, style, className, user, userId, onClick, 
   const displaySrc = React.useMemo(() => {
     const r = (user?.role || '').toLowerCase();
     const roles = Array.isArray(user?.roles) ? user.roles.map((x: any) => String(x).toLowerCase()) : [];
-    const isExplicitTeacher = r === 'teacher' || user?.isTeacherContext === true || user?.isTeacher === true;
+    const hasTeacherRole = r === 'teacher' || roles.includes('teacher');
+    const isExplicitTeacher = hasTeacherRole || user?.isTeacherContext === true || user?.isTeacher === true;
     const isExplicitStudent = r === 'student';
     if (!isExplicitTeacher && !isExplicitStudent) {
       if (r === 'admin' || r === 'secretary' || roles.includes('admin') || roles.includes('secretary')) {
@@ -236,12 +237,13 @@ const AvatarImage = React.memo(({ src, style, className, user, userId, onClick, 
     }
     const activePlat = activePlatform || (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_platform') || localStorage.getItem('groovelab_active_platform')) : 'groovelab');
     if (activePlat === 'groovelab') {
-      const isTeacherAvatar = src && (
-        src.includes('teacher_') ||
-        src.includes('avatar_teacher')
-      );
-      if (r === 'teacher') {
-        return isTeacherAvatar ? src : '/avatar_ghost.jpg';
+      if (isExplicitTeacher) {
+        const candidate = (src && src !== '/campus_login_hero.png') 
+          ? src 
+          : (user?.avatar_url && user.avatar_url !== '/campus_login_hero.png' 
+              ? user.avatar_url 
+              : (user?.photo_url && user.photo_url !== '/campus_login_hero.png' ? user.photo_url : null));
+        return candidate || '/avatar_ghost.jpg';
       }
       const isStudent = src && (
         src.includes('student_') ||
@@ -253,8 +255,11 @@ const AvatarImage = React.memo(({ src, style, className, user, userId, onClick, 
       if (r === 'student') {
         return isStudent ? src : '/avatar_ghost.jpg';
       }
+      if (!src || src === '/avatar_ghost.jpg' || src === '/campus_login_hero.png') {
+        return '/avatar_ghost.jpg';
+      }
     }
-    if (hasError || !src) return '/avatar_ghost.jpg';
+    if (hasError || !src || (activePlat === 'groovelab' && src === '/campus_login_hero.png')) return '/avatar_ghost.jpg';
     return src;
   }, [src, hasError, user, activePlatform]);
 
@@ -628,7 +633,7 @@ const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform }: { 
               }}
             >
               <div style={{ width: '84px', height: '84px', borderRadius: '50%', border: '4px solid white', boxShadow: '0 8px 20px rgba(0,0,0,0.15)', overflow: 'hidden', flexShrink: 0 }}>
-                <AvatarImage src={c.users?.photo_url || c.photo_url} user={c.users || c} activePlatform={activePlatform} />
+                <AvatarImage src={c.users?.photo_url || c.photo_url} user={{ ...(c.users || c), isTeacherContext: true, isTeacher: true }} activePlatform={activePlatform} />
               </div>
               <div style={{ background: 'white', padding: '5px 12px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)', textAlign: 'center', minWidth: '90px' }}>
                 <div style={{ fontWeight: 900, color: '#1e293b', fontSize: '0.8rem' }}>{c.users?.first_name || c.first_name} {activePlatform === 'groovelab' ? (c.users?.last_name || c.last_name || '') : `${c.users?.last_name?.[0] || c.last_name?.[0] || ''}.`}</div>
@@ -2154,31 +2159,66 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   };
 
   const handleToggleStudentModule = async (student: any, moduleType: 'campus' | 'groovelab') => {
-    try {
-      const isCampus = student.is_campus_active || student.isCampusActive;
-      const isGroove = student.is_groovelab_active || student.isGroovelabActive;
-      
-      const newCampusValue = moduleType === 'campus' ? !isCampus : isCampus;
-      const newGrooveValue = moduleType === 'groovelab' ? !isGroove : isGroove;
+    const isCampus = !!(student.is_campus_active || student.isCampusActive);
+    const isGroove = !!(student.is_groovelab_active || student.isGroovelabActive);
+    
+    const newCampusValue = moduleType === 'campus' ? !isCampus : isCampus;
+    const newGrooveValue = moduleType === 'groovelab' ? !isGroove : isGroove;
 
-      // Annual billing grace period check: If deactivating campus/groovelab for pre-paid annual students
-      const isDeactivatingCampus = moduleType === 'campus' && isCampus;
-      const isDeactivatingGroove = moduleType === 'groovelab' && isGroove;
-      const hasAnnualBilling = studentBillingOption === 'option3_2' || studentBillingOption === 'option3_3';
+    // Annual billing grace period check: If deactivating campus/groovelab for pre-paid annual students
+    const isDeactivatingCampus = moduleType === 'campus' && isCampus;
+    const isDeactivatingGroove = moduleType === 'groovelab' && isGroove;
+    const hasAnnualBilling = studentBillingOption === 'option3_2' || studentBillingOption === 'option3_3';
 
-      if ((isDeactivatingCampus || isDeactivatingGroove) && hasAnnualBilling) {
-        alert("Da für diesen Schüler der Jahresbeitrag bereits vorab entrichtet wurde, bleiben das Profil und alle Funktionen des Schülers bis zum Ende des Schuljahres aktiv. Die Deaktivierung wird zum Schuljahreswechsel wirksam.");
-        return;
+    if ((isDeactivatingCampus || isDeactivatingGroove) && hasAnnualBilling) {
+      alert("Da für diesen Schüler der Jahresbeitrag bereits vorab entrichtet wurde, bleiben das Profil und alle Funktionen des Schülers bis zum Ende des Schuljahres aktiv. Die Deaktivierung wird zum Schuljahreswechsel wirksam.");
+      return;
+    }
+
+    // Check school-level module availability
+    if (moduleType === 'campus' && isBillingBooked && !hasCampusSub) {
+      alert("Das Campus-Modul ist für deine Musikschule aktuell nicht gebucht.");
+      return;
+    }
+    if (moduleType === 'groovelab' && isBillingBooked && !hasGroovelabSub) {
+      alert("Das GrooveLab-Modul ist für deine Musikschule aktuell nicht gebucht.");
+      return;
+    }
+
+    // 1. Optimistic UI update for instant feedback
+    setStudents(prev => prev.map(s => {
+      if (s.id === student.id) {
+        return {
+          ...s,
+          is_campus_active: newCampusValue,
+          isCampusActive: newCampusValue,
+          is_groovelab_active: newGrooveValue,
+          isGroovelabActive: newGrooveValue,
+          ...(newGrooveValue ? {
+            is_active: true,
+            is_app_user: true,
+            status: 'aktiv',
+            isPendingOnboarding: false
+          } : {})
+        };
       }
+      return s;
+    }));
 
-      const moduleUpdates = {
+    try {
+      const moduleUpdates: any = {
         is_campus_active: newCampusValue,
         is_groovelab_active: newGrooveValue,
       };
+      if (newGrooveValue) {
+        moduleUpdates.is_active = true;
+        moduleUpdates.is_app_user = true;
+        moduleUpdates.status = 'aktiv';
+      }
 
       const { data: existingUser } = await supabase.from('users').select('id').eq('id', student.id).maybeSingle();
       if (!existingUser) {
-        await supabase.from('users').insert({
+        const { error: insertErr } = await supabase.from('users').insert({
           id: student.id,
           school_id: student.school_id || schoolId,
           role: 'student',
@@ -2189,21 +2229,35 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           lesson_duration: student.lesson_duration || 30,
           is_campus_active: newCampusValue,
           is_groovelab_active: newGrooveValue,
-          is_active: false
+          is_active: newGrooveValue ? true : false,
+          is_app_user: newGrooveValue ? true : false,
+          status: newGrooveValue ? 'aktiv' : 'offen'
         });
+        if (insertErr) throw insertErr;
       } else {
         const { error: rawErr } = await supabase
           .from('users')
           .update(moduleUpdates)
           .eq('id', student.id);
         if (rawErr) throw rawErr;
-        try {
-          await supabase.from('users').update(moduleUpdates).eq('id', student.id);
-        } catch (e) {}
       }
 
+      // Background reconciliation without full page reload
       fetchDashboardData();
     } catch (err: any) {
+      // Revert optimistic update on failure
+      setStudents(prev => prev.map(s => {
+        if (s.id === student.id) {
+          return {
+            ...s,
+            is_campus_active: isCampus,
+            isCampusActive: isCampus,
+            is_groovelab_active: isGroove,
+            isGroovelabActive: isGroove
+          };
+        }
+        return s;
+      }));
       alert('Fehler beim Umschalten: ' + err.message);
     }
   };
@@ -3691,33 +3745,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       .on('postgres_changes', { event: '*', schema: 'public', table: 'system_alerts' }, () => {
         debouncedFetchDashboardData();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users', filter: `school_id=eq.${schoolId}` }, (payload: any) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users', filter: `school_id=eq.${schoolId}` }, () => {
         debouncedFetchDashboardData();
         debouncedFetchCrisisNotifications();
-
-        if (payload.new && payload.new.school_id === schoolId) {
-          const uId = payload.new.id;
-          const newCampus = !!(payload.new.is_campus_active || payload.new.isCampusActive);
-          const newGroove = !!(payload.new.is_groovelab_active || payload.new.isGroovelabActive);
-
-          const localTeacher = allTeachersRef.current.find(t => t.id === uId);
-          if (localTeacher) {
-            const oldCampus = !!(localTeacher.isCampusActive || localTeacher.is_campus_active);
-            const oldGroove = !!(localTeacher.isGroovelabActive || localTeacher.is_groovelab_active);
-            if (oldCampus !== newCampus || oldGroove !== newGroove) {
-              window.location.reload();
-            }
-          } else {
-            const localStudent = studentsRef.current.find(s => s.id === uId);
-            if (localStudent) {
-              const oldCampus = !!(localStudent.isCampusActive || localStudent.is_campus_active);
-              const oldGroove = !!(localStudent.isGroovelabActive || localStudent.is_groovelab_active);
-              if (oldCampus !== newCampus || oldGroove !== newGroove) {
-                window.location.reload();
-              }
-            }
-          }
-        }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'room_bookings' }, (payload: any) => {
         fetchPendingBookings();
@@ -4981,8 +5011,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           const pendingMatch = pendingStudents?.find(p => p.id === u.id || (p.first_name && u.first_name && p.first_name.toLowerCase().trim() === u.first_name.toLowerCase().trim()));
           const resolvedDay = activationDaysMap[u.id] || (u as any).day_of_birth || pendingMatch?.day_of_birth || (pendingMatch ? activationDaysMap[pendingMatch.id] : null) || 1;
           const hasCreatedPin = Boolean(activationDaysMap[u.id] || (pendingMatch && activationDaysMap[pendingMatch.id]) || (u as any).onboarding_pin || (u as any).pin);
-          const resolvedStatus = hasCreatedPin ? 'aktiv' : 'offen';
-          const isPending = !hasCreatedPin;
+          const isGrooveActive = Boolean(u.is_groovelab_active);
+          const resolvedStatus = (hasCreatedPin || isGrooveActive) ? 'aktiv' : (u.status || 'offen');
+          const isPending = !hasCreatedPin && !isGrooveActive;
 
           let resolvedInstrument = u.instrument;
           if (!u.teacher_id) {
@@ -4996,7 +5027,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             instrument: resolvedInstrument,
             isPendingOnboarding: isPending,
             day_of_birth: resolvedDay,
-            status: resolvedStatus
+            status: resolvedStatus,
+            is_active: isGrooveActive ? true : (u.is_active ?? false),
+            is_app_user: isGrooveActive ? true : (u.is_app_user ?? false)
           });
         }
       });
@@ -5048,13 +5081,14 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               last_name: lName,
               email: '',
               instrument: resolvedInstrument,
-              is_active: false,
+              is_active: isGrooveAct ? true : false,
+              is_app_user: isGrooveAct ? true : false,
               is_campus_active: isCampusAct,
               is_groovelab_active: isGrooveAct,
-              status: 'inactive',
-              isPendingOnboarding: true,
+              status: isGrooveAct ? 'aktiv' : 'inactive',
+              isPendingOnboarding: isGrooveAct ? false : true,
               day_of_birth: ps.day_of_birth || null,
-              ausweis_nummer: 'Ausstehend (Onboarding)',
+              ausweis_nummer: isGrooveAct ? 'GrooveLab Aktiv' : 'Ausstehend (Onboarding)',
               created_at: ps.created_at || new Date().toISOString()
             });
           }
@@ -6170,7 +6204,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     }
   };
 
-  const handleEndSickOnBehalf = async (teacherId: string, teacherName: string) => {
+  const handleEndAbsenceOnBehalf = async (teacherId: string, teacherName: string) => {
     try {
       const confirmOk = window.confirm(`Möchten Sie ${teacherName} wirklich als wieder im Dienst verfügbar melden? Alle betroffenen zukünftigen Stunden werden reaktiviert.`);
       if (!confirmOk) return;
@@ -6558,7 +6592,14 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   };
 
   useEffect(() => {
-    const handleSchoolUpdated = () => {
+    const handleSchoolUpdated = (e?: Event) => {
+      if (e && 'key' in e) {
+        const se = e as StorageEvent;
+        // Ignore internal dashboard caches to prevent infinite inter-tab ping-pong loop
+        if (!se.key || !['groovelab_school_overrides', 'groovelab_school_settings_sync'].includes(se.key)) {
+          return;
+        }
+      }
       fetchDashboardData();
     };
     window.addEventListener('groovelab_school_updated', handleSchoolUpdated);
@@ -11539,8 +11580,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 return crisisNotifications.filter(n => {
                   if (n.status !== 'UNREAD') return false;
                   if (!n.teacher || !n.teacher.sick_until) return false;
-                  const sickUntilTime = new Date(n.teacher.sick_until).getTime();
-                  if (sickUntilTime < todayStart.getTime()) return false;
+                  const absenceUntilTime = new Date(n.teacher.sick_until).getTime();
+                  if (absenceUntilTime < todayStart.getTime()) return false;
                   const isPast = new Date(n.slot_start_datetime).getTime() < todayStart.getTime();
                   return !isPast;
                 }).length;
@@ -12399,7 +12440,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               handleMarkAsNotified={handleMarkAsNotified}
               handleArchiveCrisisTicket={handleArchiveCrisisTicket}
               handleArchiveAllResolvedTickets={handleArchiveAllResolvedTickets}
-              handleEndSickOnBehalf={handleEndSickOnBehalf}
+              handleEndAbsenceOnBehalf={handleEndAbsenceOnBehalf}
               expandedLiveDayStr={expandedLiveDayStr}
               setExpandedLiveDayStr={setExpandedLiveDayStr}
               selectedArchiveLog={selectedArchiveLog}
@@ -13579,6 +13620,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 handleCreateStudentCampus={handleCreateStudentCampus}
                 handleDeleteStudentCampus={handleDeleteStudentCampus}
                 handleUpdateStudentTeacher={handleUpdateStudentTeacher}
+                handleToggleStudentModule={handleToggleStudentModule}
                 getAlphabeticalColor={getAlphabeticalColor}
               />
             </Suspense>
@@ -17278,7 +17320,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                                   onClick={() => c.users && setSelectedCoachProfile(c.users)}
                                 >
                                   <div style={{ width: '32px', height: '32px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
-                                    <AvatarImage src={c.users?.photo_url} user={c.users} activePlatform={activePlatform} />
+                                    <AvatarImage src={c.users?.photo_url} user={{ ...c.users, isTeacherContext: true, isTeacher: true }} activePlatform={activePlatform} />
                                   </div>
                                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                                     <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.75rem', lineHeight: 1.1 }}>{coachName}</span>
@@ -23253,8 +23295,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     return crisisNotifications.filter(n => {
                       if (n.status !== 'UNREAD') return false;
                       if (!n.teacher || !n.teacher.sick_until) return false;
-                      const sickUntilTime = new Date(n.teacher.sick_until).getTime();
-                      if (sickUntilTime < todayStart.getTime()) return false;
+                      const absenceUntilTime = new Date(n.teacher.sick_until).getTime();
+                      if (absenceUntilTime < todayStart.getTime()) return false;
                       const isPast = new Date(n.slot_start_datetime).getTime() < todayStart.getTime();
                       return !isPast;
                     }).length;

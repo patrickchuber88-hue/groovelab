@@ -5,10 +5,11 @@ import {
   getInstrumentAvatarUrl, 
   getDefaultMusicianAvatarUrl, 
   resolveCampusStudentAvatar, 
+  resolveGrooveLabTeacherAvatar,
   getEffectiveInstrument, 
   isGenericInstrument 
 } from "../StudioAvatar";
-export { getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, resolveCampusStudentAvatar };
+export { getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, resolveCampusStudentAvatar, resolveGrooveLabTeacherAvatar };
 
 export interface AvatarImageProps {
   src: string | null;
@@ -65,8 +66,10 @@ export const AvatarImage = React.memo(({
     const targetUser = user;
     
     const r = (targetUser?.role || "").toLowerCase();
+    const roles = Array.isArray(targetUser?.roles) ? targetUser.roles.map((x: any) => String(x).toLowerCase()) : [];
+    const hasTeacherRole = r === "teacher" || roles.includes("teacher");
     const activeWorkspace = typeof window !== "undefined" ? (sessionStorage.getItem("groovelab_active_workspace") || localStorage.getItem("groovelab_active_workspace")) : null;
-    const isExplicitTeacher = targetUser?.isTeacherContext === true || r === "teacher" || (activeWorkspace === "teacher" && (r === "teacher" || (Array.isArray(targetUser?.roles) && targetUser.roles.includes("teacher"))));
+    const isExplicitTeacher = targetUser?.isTeacherContext === true || targetUser?.isTeacher === true || hasTeacherRole || (activeWorkspace === "teacher" && (r === "teacher" || roles.includes("teacher")));
     const isVerwaltungContext = (r === "admin" || r === "secretary") && !isExplicitTeacher;
 
     if (isVerwaltungContext || activePlat === "secretary") {
@@ -89,9 +92,9 @@ export const AvatarImage = React.memo(({
         return "/avatars/gitarre_avatar_new.png";
       }
     } else {
+      // GrooveLab module: teachers and students MUST display musician avatars, NEVER /campus_login_hero.png
       if (isExplicitTeacher) {
-        const isTeacherAvatar = src && !src.includes('_avatar') && src !== '/campus_login_hero.png';
-        return isTeacherAvatar ? src : '/avatar_ghost.jpg';
+        return resolveGrooveLabTeacherAvatar(targetUser, src);
       }
       const isStudent = src && (
         src.includes("student_") ||
@@ -137,11 +140,11 @@ export const AvatarImage = React.memo(({
       if (r === "admin" || r === "secretary") {
         return (src && src !== "/campus_login_hero.png") ? src : "/avatar_ghost.jpg";
       }
-      if (!src || isInstrument || src === "/avatar_ghost.jpg") {
+      if (!src || isInstrument || src === "/avatar_ghost.jpg" || src === "/campus_login_hero.png") {
         return "/avatar_ghost.jpg";
       }
     }
-    if (hasError || !src) return "/avatar_ghost.jpg";
+    if (hasError || !src || (activePlat === "groovelab" && src === "/campus_login_hero.png")) return "/avatar_ghost.jpg";
     return src;
   }, [src, hasError, user, resolvedInstrument, activePlatform]);
 

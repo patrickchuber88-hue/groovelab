@@ -26,6 +26,7 @@ const StudentScheduleSlotsModal = lazy(() => import('./StudentScheduleSlotsModal
 const MeisterwerkDocumentationModal = lazy(() => import('./MeisterwerkDocumentationModal').then(m => ({ default: m.MeisterwerkDocumentationModal })));
 const AdminCampusRoomsView = lazy(() => import('./admin/AdminCampusRoomsView').then(m => ({ default: m.AdminCampusRoomsView })));
 const AdminSongsView = lazy(() => import('./admin/AdminSongsView').then(m => ({ default: m.AdminSongsView })));
+const GrooveLabSongsView = lazy(() => import('./admin/GrooveLabSongsView').then(m => ({ default: m.GrooveLabSongsView })));
 const AdminStatsView = lazy(() => import('./admin/AdminStatsView').then(m => ({ default: m.AdminStatsView })));
 const AdminMissionsView = lazy(() => import('./admin/AdminMissionsView').then(m => ({ default: m.AdminMissionsView })));
 const AdminBandsView = lazy(() => import('./admin/AdminBandsView').then(m => ({ default: m.AdminBandsView })));
@@ -2175,24 +2176,30 @@ export function AdminDashboard({
         const activeWorkspace = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null;
         const isTeacherMode = adminData.role === 'teacher' || activeWorkspace === 'teacher';
 
-        // REGEL: Lehrer sehen nur ihre eigenen Songs (teacher_id-Filter)
-        if (isTeacherMode) sq = sq.eq('teacher_id', adminData.id);
+        // REGEL: Lehrer sehen ihre eigenen Songs oder schulseitig geteilte Songs (teacher_id IS NULL)
+        if (isTeacherMode) {
+          sq = sq.or(`teacher_id.eq.${adminData.id},teacher_id.is.null`);
+        }
         const { data: songsData } = await sq.order('title');
         if (songsData) setSongs(songsData);
 
-        // REGEL: Lehrer sehen nur ihre eigenen Lehrwerke (teacher_id-Filter)
-        let lwSq = supabase
-          .from('lehrwerke')
-          .select('*')
-          .eq('school_id', adminData.school_id);
-        if (isTeacherMode) lwSq = lwSq.eq('teacher_id', adminData.id);
-        const { data: lehrwerkeData } = await lwSq.order('title');
-        if (lehrwerkeData) {
-          const mappedLw = lehrwerkeData.map((item: any) => ({
-            ...item,
-            totalPages: item.total_pages || 50
-          }));
-          setLehrwerke(mappedLw);
+        // Lehrwerke & Textbausteine nur für Campus laden!
+        if (activePlatform === 'campus') {
+          let lwSq = supabase
+            .from('lehrwerke')
+            .select('*')
+            .eq('school_id', adminData.school_id);
+          if (isTeacherMode) lwSq = lwSq.or(`teacher_id.eq.${adminData.id},teacher_id.is.null`);
+          const { data: lehrwerkeData } = await lwSq.order('title');
+          if (lehrwerkeData) {
+            const mappedLw = lehrwerkeData.map((item: any) => ({
+              ...item,
+              totalPages: item.total_pages || 50
+            }));
+            setLehrwerke(mappedLw);
+          }
+        } else {
+          setLehrwerke([]);
         }
 
         // Fetch students for assignments in songs/lehrwerke detail modal
@@ -3843,6 +3850,7 @@ export function AdminDashboard({
       if (error) alert('Fehler: ' + error.message);
       else if (data) {
         setSongs(prev => [...prev, ...data]);
+        window.dispatchEvent(new CustomEvent('groovelab_songs_updated'));
         setShowAddSong(false);
         setBulkModeSongs(false);
         setBulkTextSongs('');
@@ -3885,6 +3893,7 @@ export function AdminDashboard({
     if (error) alert('Fehler: ' + error.message);
     else if (data) { 
       setSongs(prev => [...prev, data]); 
+      window.dispatchEvent(new CustomEvent('groovelab_songs_updated'));
       setShowAddSong(false); 
       setNewSong({ artist: '', title: '', level: 1, media_link: '', tomplay_url: '', pdf_folder_url: '', guitar_pro_url: '', pdf_drums_url: '', pdf_guitar_url: '', pdf_bass_url: '', pdf_vocals_url: '', pdf_keys_url: '', playalong_url: '', bypass_wlan_check: false, instrumentation: { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1, 'E-Piano': 1 } }); 
     }
@@ -3925,6 +3934,7 @@ export function AdminDashboard({
     if (error) alert('Fehler: ' + error.message);
     else {
       setSongs(songs.map(s => s.id === editingSong.id ? editingSong : s));
+      window.dispatchEvent(new CustomEvent('groovelab_songs_updated'));
       setEditingSong(null);
       alert('Song erfolgreich aktualisiert! ✅');
     }
@@ -3974,6 +3984,7 @@ export function AdminDashboard({
       
       console.log('[Admin] Delete successful');
       setSongs(prev => prev.filter(s => s.id !== songId));
+      window.dispatchEvent(new CustomEvent('groovelab_songs_updated'));
       alert('Song wurde inklusive aller Verknüpfungen erfolgreich gelöscht. 🗑️');
     } catch (err: any) {
       console.error('[Admin] Global Delete error:', err);
@@ -4670,55 +4681,78 @@ export function AdminDashboard({
   };
 
   const renderSongsTab = () => (
-    <Suspense fallback={<div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>Mediathek wird geladen...</div>}>
-      <AdminSongsView
-        activePlatform={activePlatform}
-        admin={admin}
-        userId={userId}
-        songs={songs}
-        lehrwerke={lehrwerke}
-        setLehrwerke={setLehrwerke}
-        songSearch={songSearch}
-        setSongSearch={setSongSearch}
-        mediathekTab={mediathekTab}
-        setMediathekTab={setMediathekTab}
-        bulkModeSongs={bulkModeSongs}
-        setBulkModeSongs={setBulkModeSongs}
-        bulkTextSongs={bulkTextSongs}
-        setBulkTextSongs={setBulkTextSongs}
-        bulkModeLehrwerke={bulkModeLehrwerke}
-        setBulkModeLehrwerke={setBulkModeLehrwerke}
-        bulkTextLehrwerke={bulkTextLehrwerke}
-        setBulkTextLehrwerke={setBulkTextLehrwerke}
-        showAddSong={showAddSong}
-        setShowAddSong={setShowAddSong}
-        showAddLehrwerk={showAddLehrwerk}
-        setShowAddLehrwerk={setShowAddLehrwerk}
-        editingSong={editingSong}
-        setEditingSong={setEditingSong}
-        editingLehrwerk={editingLehrwerk}
-        setEditingLehrwerk={setEditingLehrwerk}
-        newSong={newSong}
-        setNewSong={setNewSong}
-        newLehrwerk={newLehrwerk}
-        setNewLehrwerk={setNewLehrwerk}
-        textbausteine={textbausteine}
-        copiedTbId={copiedTbId}
-        setCopiedTbId={setCopiedTbId}
-        selectedSongForDetail={selectedSongForDetail}
-        selectedLehrwerkForDetail={selectedLehrwerkForDetail}
-        selectedStudentForProgress={selectedStudentForProgress}
-        setShowTeacherToolsModal={setShowTeacherToolsModal}
-        setShowTextbausteinModal={setShowTextbausteinModal}
-        setPreviewingTextbaustein={setPreviewingTextbaustein}
-        setNewHomeworkNoteText={setNewHomeworkNoteText}
-        setSongLessonNotes={setSongLessonNotes}
-        handleAddSong={handleAddSong}
-        handleDeleteSong={handleDeleteSong}
-        handleUpdateSong={handleUpdateSong}
-        handleMediathekTouchStart={handleMediathekTouchStart}
-        handleMediathekTouchEnd={handleMediathekTouchEnd}
-      />
+    <Suspense fallback={<div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>{activePlatform === 'campus' ? 'Mediathek wird geladen...' : 'Songs werden geladen...'}</div>}>
+      {activePlatform === 'campus' ? (
+        <AdminSongsView
+          activePlatform={activePlatform}
+          admin={admin}
+          userId={userId}
+          songs={songs}
+          lehrwerke={lehrwerke}
+          setLehrwerke={setLehrwerke}
+          songSearch={songSearch}
+          setSongSearch={setSongSearch}
+          mediathekTab={mediathekTab}
+          setMediathekTab={setMediathekTab}
+          bulkModeSongs={bulkModeSongs}
+          setBulkModeSongs={setBulkModeSongs}
+          bulkTextSongs={bulkTextSongs}
+          setBulkTextSongs={setBulkTextSongs}
+          bulkModeLehrwerke={bulkModeLehrwerke}
+          setBulkModeLehrwerke={setBulkModeLehrwerke}
+          bulkTextLehrwerke={bulkTextLehrwerke}
+          setBulkTextLehrwerke={setBulkTextLehrwerke}
+          showAddSong={showAddSong}
+          setShowAddSong={setShowAddSong}
+          showAddLehrwerk={showAddLehrwerk}
+          setShowAddLehrwerk={setShowAddLehrwerk}
+          editingSong={editingSong}
+          setEditingSong={setEditingSong}
+          editingLehrwerk={editingLehrwerk}
+          setEditingLehrwerk={setEditingLehrwerk}
+          newSong={newSong}
+          setNewSong={setNewSong}
+          newLehrwerk={newLehrwerk}
+          setNewLehrwerk={setNewLehrwerk}
+          textbausteine={textbausteine}
+          copiedTbId={copiedTbId}
+          setCopiedTbId={setCopiedTbId}
+          selectedSongForDetail={selectedSongForDetail}
+          selectedLehrwerkForDetail={selectedLehrwerkForDetail}
+          selectedStudentForProgress={selectedStudentForProgress}
+          setShowTeacherToolsModal={setShowTeacherToolsModal}
+          setShowTextbausteinModal={setShowTextbausteinModal}
+          setPreviewingTextbaustein={setPreviewingTextbaustein}
+          setNewHomeworkNoteText={setNewHomeworkNoteText}
+          setSongLessonNotes={setSongLessonNotes}
+          handleAddSong={handleAddSong}
+          handleDeleteSong={handleDeleteSong}
+          handleUpdateSong={handleUpdateSong}
+          handleMediathekTouchStart={handleMediathekTouchStart}
+          handleMediathekTouchEnd={handleMediathekTouchEnd}
+        />
+      ) : (
+        <GrooveLabSongsView
+          admin={admin}
+          userId={userId}
+          songs={songs}
+          songSearch={songSearch}
+          setSongSearch={setSongSearch}
+          showAddSong={showAddSong}
+          setShowAddSong={setShowAddSong}
+          editingSong={editingSong}
+          setEditingSong={setEditingSong}
+          newSong={newSong}
+          setNewSong={setNewSong}
+          bulkModeSongs={bulkModeSongs}
+          setBulkModeSongs={setBulkModeSongs}
+          bulkTextSongs={bulkTextSongs}
+          setBulkTextSongs={setBulkTextSongs}
+          handleAddSong={handleAddSong}
+          handleDeleteSong={handleDeleteSong}
+          handleUpdateSong={handleUpdateSong}
+        />
+      )}
     </Suspense>
   );
   const renderStatsTab = () => (

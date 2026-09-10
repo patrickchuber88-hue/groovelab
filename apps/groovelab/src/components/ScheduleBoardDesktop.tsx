@@ -313,7 +313,12 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
   // Teacher selector states
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>(userId);
   const [teachers, setTeachers] = useState<any[]>([]);
-  const [currentUserRole, setCurrentUserRole] = useState<string>('');
+  const [currentUserRole, setCurrentUserRole] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('user_role') || sessionStorage.getItem('groovelab_active_role') || '';
+    }
+    return '';
+  });
   
   // Create Board form state
   const [newBoardDay, setNewBoardDay] = useState(1);
@@ -663,9 +668,17 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
   useEffect(() => {
     if (!schoolId) return;
 
+    let debounceTimer: any = null;
+    const debouncedReload = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        loadInitialData();
+      }, 500);
+    };
+
     const handleStudentsUpdated = () => {
       console.log('[ScheduleBoard] Received student update event (Campus & GrooveLab). Auto-refreshing designer...');
-      loadInitialData();
+      debouncedReload();
     };
 
     window.addEventListener('students_updated', handleStudentsUpdated);
@@ -677,9 +690,22 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'users', filter: `school_id=eq.${schoolId}` },
-        (payload) => {
-          console.log('[ScheduleBoard] Realtime users table change detected:', payload);
-          loadInitialData();
+        (payload: any) => {
+          // 🛡️ Enterprise Performance Guard: Ignore pure presence/heartbeat updates ('last_seen')
+          if (payload.eventType === 'UPDATE' && payload.old && payload.new) {
+            const substantiveFields = [
+              'role', 'roles', 'school_id', 'is_active', 'is_campus_active', 
+              'is_groovelab_active', 'token_version', 'is_master_admin', 
+              'first_name', 'last_name', 'instrument', 'lesson_duration', 
+              'sibling_group_id', 'group_id', 'status', 'teacher_id'
+            ];
+            const hasSubstantiveChange = substantiveFields.some(
+              field => payload.old[field] !== undefined && payload.new[field] !== undefined && payload.old[field] !== payload.new[field]
+            );
+            if (!hasSubstantiveChange) return;
+          }
+          console.log('[ScheduleBoard] Realtime users table substantive change detected:', payload);
+          debouncedReload();
         }
       )
       .on(
@@ -687,7 +713,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         { event: '*', schema: 'public', table: 'students', filter: `school_id=eq.${schoolId}` },
         (payload) => {
           console.log('[ScheduleBoard] Realtime students table change detected:', payload);
-          loadInitialData();
+          debouncedReload();
         }
       )
       .subscribe();
@@ -696,6 +722,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
       window.removeEventListener('students_updated', handleStudentsUpdated);
       window.removeEventListener('campus_students_updated', handleStudentsUpdated);
       window.removeEventListener('groovelab_students_updated', handleStudentsUpdated);
+      if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
   }, [schoolId, selectedTeacherId]);
@@ -1066,7 +1093,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         }
       }
 
-      // 2. High-Performance Enterprise Single-Flight Batch Query (Consolidated 6 serial waterfalls into 1 parallel Promise.all)
+      // 2. High-Performance Enterprise Single-Flight Batch Query (Consolidated 6 serial waterfalls into 1 parallel Promise.all with SWR)
       const [
         loadedRooms,
         { data: schedData },
@@ -1076,8 +1103,9 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         allStudentsDb,
         allSchoolStudentUsers,
         pendingData,
-        { data: otherSchedData },
-        { data: blockedSlotsData }
+        otherSchedData,
+        blockedSlotsData,
+        allDbPrefs
       ] = await Promise.all([
         // Rooms (Cached with SWR 60s)
         queryCache.fetch(`rooms_${schoolId}`, async () => {
@@ -1085,8 +1113,8 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
           return data || [];
         }, { ttlMs: 60_000, staleWhileRevalidate: true }),
 
-        // Teacher Schedules
-        supabase.from('schedules').select('*, student:users!schedules_student_id_fkey(*)').eq('school_id', schoolId).eq('teacher_id', selectedTeacherId),
+        // Teacher Schedules with pruned student fields
+        supabase.from('schedules').select('*, student:users!schedules_student_id_fkey(id, first_name, last_name, instrument, lesson_duration, sibling_group_id, group_id, is_campus_active, is_groovelab_active, is_active)').eq('school_id', schoolId).eq('teacher_id', selectedTeacherId),
 
         // Teacher Occurrences
         supabase.from('schedule_occurrences').select('student_id').eq('teacher_id', selectedTeacherId),
@@ -1115,18 +1143,33 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
           return data || [];
         }, { ttlMs: 60_000, staleWhileRevalidate: true }),
 
-        // Other teachers' schedules for real-time room conflict checking (parallelized)
-        supabase
-          .from('schedules')
-          .select('*, student:users!schedules_student_id_fkey(id, first_name, last_name), teacher:users!schedules_teacher_id_fkey(id, first_name, last_name)')
-          .eq('school_id', schoolId)
-          .neq('teacher_id', selectedTeacherId),
+        // Other teachers' schedules for real-time room conflict checking (Cached with SWR 30s)
+        queryCache.fetch(`other_schedules_${schoolId}_${selectedTeacherId}`, async () => {
+          const { data } = await supabase
+            .from('schedules')
+            .select('*, student:users!schedules_student_id_fkey(id, first_name, last_name), teacher:users!schedules_teacher_id_fkey(id, first_name, last_name)')
+            .eq('school_id', schoolId)
+            .neq('teacher_id', selectedTeacherId);
+          return data || [];
+        }, { ttlMs: 30_000, staleWhileRevalidate: true }),
 
-        // Wöchentliche Raumblockierungen (parallelized)
-        supabase
-          .from('room_blocked_slots')
-          .select('*')
-          .eq('school_id', schoolId)
+        // Wöchentliche Raumblockierungen (Cached with SWR 60s)
+        queryCache.fetch(`blocked_slots_${schoolId}`, async () => {
+          const { data } = await supabase
+            .from('room_blocked_slots')
+            .select('*')
+            .eq('school_id', schoolId);
+          return data || [];
+        }, { ttlMs: 60_000, staleWhileRevalidate: true }),
+
+        // Student Schedule Preferences (Cached with SWR 60s, scoped to school_id)
+        queryCache.fetch(`student_schedule_preferences_${schoolId}`, async () => {
+          const { data } = await supabase
+            .from('student_schedule_preferences')
+            .select('*')
+            .eq('school_id', schoolId);
+          return data || [];
+        }, { ttlMs: 60_000, staleWhileRevalidate: true })
       ]);
 
       setOtherTeachersSchedules(otherSchedData || []);
@@ -1369,11 +1412,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
       const prefSubmittedSet = new Set<string>();
       const prefMap: Record<string, any[]> = {};
 
-      const { data: allDbPrefs } = await supabase
-        .from('student_schedule_preferences')
-        .select('*');
-
-      allDbPrefs?.forEach(p => {
+      allDbPrefs?.forEach((p: any) => {
         if (!p.student_id) return;
         prefSubmittedSet.add(p.student_id);
         
@@ -4229,6 +4268,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         .eq('id', selectedTeacherId);
         
       // 4. Force refresh of the data
+      queryCache.invalidatePrefix('other_schedules_');
       setHasSubmittedSchedule(false);
       setScheduleStatus('none');
       setDrafts([{ id: `draft-${crypto.randomUUID()}`, name: 'Entwurf 1', boards: [] }]);

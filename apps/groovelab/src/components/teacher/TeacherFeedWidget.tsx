@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase';
 import { formatSingleStudentAnonymized } from '../../utils/nameHelper';
+import { isTeacherCurrentlyAbsent } from '../../utils/teacherAbsenceHelper';
 import React from 'react';
 import {
   AlertCircle, AlertTriangle, Bell, Building2, Calendar,
@@ -20,7 +21,8 @@ export interface TeacherFeedWidgetProps {
   setShowAllChangedAppointments: React.Dispatch<React.SetStateAction<boolean>>;
   showAllBookings: boolean;
   setShowAllBookings: React.Dispatch<React.SetStateAction<boolean>>;
-  bypassSickView: boolean;
+  bypassAbsenceView?: boolean;
+  bypassSickView?: boolean;
   adminFeedbackRequests: any[];
   adminFeedbackResponses: any[];
   campusFeedAnnouncements: any[];
@@ -65,6 +67,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
   setShowAllChangedAppointments,
   showAllBookings,
   setShowAllBookings,
+  bypassAbsenceView,
   bypassSickView,
   adminFeedbackRequests,
   adminFeedbackResponses,
@@ -674,7 +677,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
       )}
 
       {/* 3. INFOS DER VERWALTUNG & MITTEILUNGEN */}
-      {(!teacher?.sick_until || bypassSickView) && (
+      {(!isTeacherCurrentlyAbsent(teacher) || bypassAbsenceView || bypassSickView) && (
         <>
           {/* INFOS DER VERWALTUNG */}
           <div style={{ 

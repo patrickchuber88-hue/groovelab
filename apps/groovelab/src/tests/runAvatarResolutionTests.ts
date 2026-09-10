@@ -152,9 +152,48 @@ assert.strictEqual(resolveCampusStudentAvatar({ ...dualRoleAdmin, isTeacherConte
 console.log('✔ Test 10: Dual-role teacher/admin correctly receives guitar avatar in teacher context and hero avatar in admin context');
 
 // Test 11: Musician avatar for teacher in GrooveLab
-import { getDefaultMusicianAvatarUrl } from '../utils/avatarResolutionEngine';
+import { getDefaultMusicianAvatarUrl, resolveGrooveLabTeacherAvatar } from '../utils/avatarResolutionEngine';
 assert.strictEqual(getDefaultMusicianAvatarUrl('Gitarre', 'teacher'), '/avatar_ghost.jpg');
 assert.strictEqual(getDefaultMusicianAvatarUrl(null, 'teacher'), '/avatar_ghost.jpg');
 console.log('✔ Test 11: Teacher in GrooveLab correctly receives ghost musician avatar (/avatar_ghost.jpg)');
 
+// Test 12: Teacher with default administration chalkboard in GrooveLab safely resolves to ghost musician avatar
+const teacherWithChalkboard = {
+  id: 'teacher-peter',
+  first_name: 'Peter',
+  last_name: 'P.',
+  role: 'teacher',
+  photo_url: '/campus_login_hero.png',
+  avatar_url: '/campus_login_hero.png'
+};
+assert.strictEqual(resolveGrooveLabTeacherAvatar(teacherWithChalkboard), '/avatar_ghost.jpg');
+assert.strictEqual(resolveGrooveLabTeacherAvatar(teacherWithChalkboard, '/campus_login_hero.png'), '/avatar_ghost.jpg');
+console.log('✔ Test 12: Teacher with chalkboard image correctly falls back to ghost musician avatar (/avatar_ghost.jpg)');
+
+// Test 13: Teacher with selected 3D musician avatar or custom photo in GrooveLab preserves their avatar
+const teacherWithGuitarAvatar = {
+  id: 'teacher-peter',
+  first_name: 'Peter',
+  last_name: 'P.',
+  role: 'teacher',
+  photo_url: '/avatars/gitarre_avatar_new.png'
+};
+assert.strictEqual(resolveGrooveLabTeacherAvatar(teacherWithGuitarAvatar), '/avatars/gitarre_avatar_new.png');
+assert.strictEqual(resolveGrooveLabTeacherAvatar({ ...teacherWithGuitarAvatar, photo_url: '/uploads/custom_rocker.jpg' }), '/uploads/custom_rocker.jpg');
+console.log('✔ Test 13: Teacher with selected 3D avatar (/avatars/gitarre_avatar_new.png) or custom photo preserves musician avatar');
+
+// Test 14: Dual-role coach (admin + teacher) in GrooveLab Live Lab receives musician avatar, never chalkboard
+const coachAdmin = {
+  id: 'admin-peter',
+  first_name: 'Peter',
+  last_name: 'P.',
+  role: 'admin',
+  roles: ['admin', 'teacher'],
+  photo_url: '/campus_login_hero.png',
+  avatar_url: '/campus_login_hero.png'
+};
+assert.strictEqual(resolveGrooveLabTeacherAvatar(coachAdmin), '/avatar_ghost.jpg');
+console.log('✔ Test 14: Dual-role coach (admin + teacher) in GrooveLab receives ghost musician avatar instead of chalkboard');
+
 console.log('\n🎉 ALL AVATAR RESOLUTION INVARIANT TESTS PASSED WITH 100% SUCCESS!');
+

@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Solid Campus Green Background -->
+  <rect width="1024" height="1024" fill="#34a853"/>
+  
+  <!-- Apple SF Symbols Solid Graduation Cap Glyph (Optically Centered) -->
+  <g fill="#ffffff">
+    <!-- Skull Cap / Headband (Distinctly separated below the diamond) -->
+    <path d="M 330 580 
+             C 330 730, 694 730, 694 580 
+             C 694 570, 680 564, 672 570 
+             C 580 625, 444 625, 352 570 
+             C 344 564, 330 570, 330 580 
+             Z" 
+          fill="#ffffff"/>
+    
+    <!-- Mortarboard Top Diamond with Smooth Apple Radii -->
+    <path d="M 488 280 
+             C 502 272, 522 272, 536 280 
+             L 830 435 
+             C 844 442, 844 458, 830 465 
+             L 536 620 
+             C 522 628, 502 628, 488 620 
+             L 194 465 
+             C 180 458, 180 442, 194 435 
+             Z" 
+          fill="#ffffff"/>
+          
+    <!-- Tassel Cord (curving smoothly from near apex to right and down) -->
+    <path d="M 512 450 
+             C 660 470, 784 495, 788 535 
+             L 788 660" 
+          fill="none" stroke="#ffffff" stroke-width="22" stroke-linecap="round"/>
+          
+    <!-- Tassel Ring Knot -->
+    <circle cx="788" cy="672" r="16" fill="#ffffff"/>
+    
+    <!-- Tassel Bell Fringe -->
+    <path d="M 776 684 
+             C 772 710, 762 755, 760 775 
+             C 758 786, 766 794, 777 794 
+             L 799 794 
+             C 810 794, 818 786, 816 775 
+             C 814 755, 804 710, 800 684 
+             Z" 
+          fill="#ffffff"/>
+  </g>
+</svg>

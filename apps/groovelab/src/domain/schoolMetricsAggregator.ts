@@ -201,7 +201,7 @@ export function aggregateSchoolMetrics(
         is_campus_active: isCampusAct,
         is_groovelab_active: isGrooveAct,
         exempt_from_direct_billing: false,
-        isPendingOnboarding: true
+        isPendingOnboarding: !isGrooveAct
       });
     }
   });

@@ -10,7 +10,8 @@ import {
   getDefaultMusicianAvatarUrl,
   getInstrumentTypeKey,
   getEffectiveInstrument,
-  resolveCampusStudentAvatar
+  resolveCampusStudentAvatar,
+  resolveGrooveLabTeacherAvatar
 } from '../utils/avatarResolutionEngine';
 
 export {
@@ -21,7 +22,8 @@ export {
   getDefaultMusicianAvatarUrl,
   getInstrumentTypeKey,
   getEffectiveInstrument,
-  resolveCampusStudentAvatar
+  resolveCampusStudentAvatar,
+  resolveGrooveLabTeacherAvatar
 };
 
 export const resolveStudentInstrumentAsync = async (user: any): Promise<string> => {
@@ -179,8 +181,10 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
   let displaySrc = src;
   const targetUser = user;
   const role = (targetUser?.role || '').toLowerCase();
+  const roles = Array.isArray(targetUser?.roles) ? targetUser.roles.map((x: any) => String(x).toLowerCase()) : [];
+  const hasTeacherRole = role === 'teacher' || roles.includes('teacher');
   const activeWorkspace = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null;
-  const isExplicitTeacher = targetUser?.isTeacherContext === true || role === 'teacher' || (activeWorkspace === 'teacher' && (role === 'teacher' || (Array.isArray(targetUser?.roles) && targetUser.roles.includes('teacher'))));
+  const isExplicitTeacher = targetUser?.isTeacherContext === true || targetUser?.isTeacher === true || hasTeacherRole || (activeWorkspace === 'teacher' && (role === 'teacher' || roles.includes('teacher')));
   const isVerwaltungContext = (role === 'admin' || role === 'secretary') && !isExplicitTeacher;
 
   if (isVerwaltungContext) {
@@ -190,17 +194,17 @@ export const StudioAvatar = React.memo(({ src, style, className, user, userId, o
     // Teachers in Campus module must ALWAYS display their Instrumenten-Avatar!
     displaySrc = resolveCampusStudentAvatar(targetUser ? { ...targetUser, role: 'teacher', isTeacherContext: true, resolved_instrument: resolvedInstrument || targetUser.resolved_instrument } : { instrument: resolvedInstrument, role: 'teacher', isTeacherContext: true });
   } else if (activePlat === 'groovelab') {
-    const effectiveSrc = (src === '/campus_login_hero.png') ? null : src;
-    const userPhoto = (targetUser?.photo_url === '/campus_login_hero.png') ? null : targetUser?.photo_url;
-    const userAvatar = (targetUser?.avatar_url === '/campus_login_hero.png') ? null : targetUser?.avatar_url;
-    
-    const candidate = effectiveSrc || userPhoto || userAvatar;
-    const isCustomMusician = candidate && !candidate.includes('_avatar') && !candidate.includes('campus_login_hero');
-    if (isCustomMusician) {
-      displaySrc = candidate;
+    if (isExplicitTeacher) {
+      displaySrc = resolveGrooveLabTeacherAvatar(targetUser, src);
     } else {
-      if (isExplicitTeacher) {
-        displaySrc = '/avatar_ghost.jpg';
+      const effectiveSrc = (src === '/campus_login_hero.png') ? null : src;
+      const userPhoto = (targetUser?.photo_url === '/campus_login_hero.png') ? null : targetUser?.photo_url;
+      const userAvatar = (targetUser?.avatar_url === '/campus_login_hero.png') ? null : targetUser?.avatar_url;
+      
+      const candidate = effectiveSrc || userPhoto || userAvatar;
+      const isCustomMusician = candidate && !candidate.includes('campus_login_hero');
+      if (isCustomMusician) {
+        displaySrc = candidate;
       } else {
         displaySrc = getDefaultMusicianAvatarUrl(resolvedInstrument || getEffectiveInstrument(targetUser), role);
       }

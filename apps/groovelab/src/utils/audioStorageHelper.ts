@@ -98,8 +98,58 @@ export interface AudioUploadIntegrityResult {
   error?: any;
 }
 
+export interface PresignedUploadTicket {
+  success: boolean;
+  bucket: string;
+  path: string;
+  signedUrl: string;
+  token?: string;
+  expiresInSeconds: number;
+  maxSizeBytes: number;
+  contentType: string;
+}
+
 /**
- * Uploads an audio blob to Supabase storage with cryptographic SHA-256 verification and metadata embedding.
+ * Requests an ephemeral, cryptographically authenticated Pre-signed Upload URL
+ * from the Express BFF (/api/storage/presign-upload).
+ * Guarantees zero host memory buffering for large audio streams.
+ */
+export async function requestPresignedUploadTicket(options: {
+  context: string;
+  extension: string;
+  contentType: string;
+  sizeBytes: number;
+  schoolId?: string | null;
+  uniqueId?: string | null;
+  bucket?: string;
+}): Promise<PresignedUploadTicket | null> {
+  try {
+    const bffOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+    const res = await fetch(`${bffOrigin}/api/storage/presign-upload`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(options),
+    });
+
+    if (!res.ok) {
+      console.warn(`[AudioStorageHelper] Presigned upload ticket request failed (HTTP ${res.status}).`);
+      return null;
+    }
+
+    const data: PresignedUploadTicket = await res.json();
+    return data;
+  } catch (err) {
+    console.warn('[AudioStorageHelper] Network error requesting presigned upload ticket, falling back to direct storage:', err);
+    return null;
+  }
+}
+
+/**
+ * Uploads an audio blob directly to Supabase Storage via signed URL or direct upload,
+ * enforcing SHA-256 cryptographic verification and metadata embedding.
  */
 export async function uploadAudioWithIntegrityVerification(
   filePath: string,
@@ -126,6 +176,61 @@ export async function uploadAudioWithIntegrityVerification(
     };
   }
 
+  // 1. Attempt Zero-Memory Direct-to-Storage Upload via Pre-signed URL
+  try {
+    // Extract context, schoolId, uniqueId, extension from target filePath if structured
+    const pathParts = filePath.split('/');
+    let schoolId: string | null = null;
+    let context = 'audio';
+    let filename = pathParts[pathParts.length - 1];
+
+    if (pathParts[0] === 'schools' && pathParts.length >= 4) {
+      schoolId = pathParts[1];
+      context = pathParts[2];
+    } else if (pathParts.length >= 2) {
+      context = pathParts[0];
+    }
+
+    const extMatch = filename.match(/\.([a-zA-Z0-9]+)$/);
+    const extension = extMatch ? extMatch[1] : 'webm';
+    const uniqueId = filename.replace(/\.[a-zA-Z0-9]+$/, '');
+
+    const ticket = await requestPresignedUploadTicket({
+      context,
+      extension,
+      contentType,
+      sizeBytes,
+      schoolId,
+      uniqueId,
+      bucket
+    });
+
+    if (ticket && ticket.token) {
+      // Direct-to-Storage via Supabase Signed Upload Token
+      const { data: uploadData, error: uploadErr } = await supabase.storage
+        .from(ticket.bucket)
+        .uploadToSignedUrl(ticket.path, ticket.token, sanitizedBlob, {
+          contentType,
+          upsert: true
+        });
+
+      if (!uploadErr && uploadData) {
+        const publicUrl = await getSecureAudioUrl(ticket.path, ticket.bucket);
+        return {
+          success: true,
+          filePath: ticket.path,
+          checksumSha256: checksum,
+          sizeBytes,
+          publicUrl
+        };
+      }
+      console.warn('[AudioStorageHelper] Signed token upload encountered error, falling back to standard upload:', uploadErr);
+    }
+  } catch (directUploadErr) {
+    console.warn('[AudioStorageHelper] Direct presigned upload attempt bypassed, using fallback:', directUploadErr);
+  }
+
+  // 2. Fallback: Standard authenticated Supabase Storage upload
   try {
     const { error } = await supabase.storage.from(bucket).upload(filePath, sanitizedBlob, {
       contentType,

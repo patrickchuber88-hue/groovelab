@@ -1,0 +1,308 @@
+# ==============================================================================
+# 🛡️ Campus-Groovelab Tier-1 Enterprise+ Hardened Production Docker Compose
+# Platform: Campus-Groovelab (https://campus-groovelab.de)
+# Calibrated 100% for Hetzner Cloud Single-Node VM (2 vCPU / 4 GB RAM / 40 GB NVMe)
+# Standards: OWASP ASVS Level 3 / Fail-Closed / BSI IT-Grundschutz
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. Reverse Proxy & API Gateway (Kong)
+  # ----------------------------------------------------------------------------
+  kong:
+    container_name: supabase-kong
+    image: kong/kong:3.9.1
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+        reservations:
+          memory: 128M
+    networks:
+      - default
+      - coolify
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.supabase-http.entryPoints=http"
+      - "traefik.http.routers.supabase-http.rule=Host(`supabase.campus-groovelab.de`)"
+      - "traefik.http.routers.supabase-http.service=supabase-service"
+      - "traefik.http.routers.supabase-https.entryPoints=https"
+      - "traefik.http.routers.supabase-https.rule=Host(`supabase.campus-groovelab.de`)"
+      - "traefik.http.routers.supabase-https.tls=true"
+      - "traefik.http.routers.supabase-https.tls.certresolver=letsencrypt"
+      - "traefik.http.services.supabase-service.loadbalancer.server.port=8000"
+      - "traefik.docker.network=coolify"
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - 127.0.0.1:8000:8000/tcp
+      - 127.0.0.1:8443:8443/tcp
+    volumes:
+      - ./volumes/api/kong.yml:/home/kong/temp.yml:ro,z
+      - ./volumes/api/kong-entrypoint.sh:/home/kong/kong-entrypoint.sh:ro,z
+    environment:
+      KONG_DATABASE: "off"
+      KONG_PROXY_LISTEN: 0.0.0.0:8000, [::]:8000, 0.0.0.0:8443 ssl, [::]:8443 ssl
+      KONG_DECLARATIVE_CONFIG: /usr/local/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_DNS_NOT_FOUND_TTL: 1
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth,request-termination,ip-restriction,post-function
+      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
+      KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+      KONG_PROXY_ACCESS_LOG: /dev/stdout combined
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+    entrypoint: /home/kong/kong-entrypoint.sh
+
+  # ----------------------------------------------------------------------------
+  # 2. Stateful Database Engine (PostgreSQL 15 on Local NVMe)
+  # ----------------------------------------------------------------------------
+  db:
+    container_name: supabase-db
+    image: supabase/postgres:15.8.1.085
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.50'
+          memory: 1800M       # Hard boundary: guarantees host never OOM crashes
+        reservations:
+          memory: 1024M       # Guaranteed baseline allocation
+    ports:
+      # Zero-Trust: Strictly local loopback binding (never 0.0.0.0)
+      - 127.0.0.1:5432:5432
+    volumes:
+      # High-IOPS Local NVMe persistence (replaces Ceph network volume)
+      - /var/lib/supabase_nvme/data:/var/lib/postgresql/data:Z
+      # Production Hardened Configuration
+      - ./deploy/postgres/postgresql.production.conf:/etc/postgresql/postgresql.conf:ro,z
+      - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/migrations/99-realtime.sql:Z
+      - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-roles.sql:Z
+      - ./volumes/db/jwt.sql:/docker-entrypoint-initdb.d/init-scripts/99-jwt.sql:Z
+      - db-config:/etc/postgresql-custom
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      POSTGRES_HOST: /var/run/postgresql
+      PGPORT: 5432
+      POSTGRES_PORT: 5432
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: postgres
+      POSTGRES_DB: postgres
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXP: ${JWT_EXPIRY:-3600}
+    command:
+      [
+        "postgres",
+        "-c", "config_file=/etc/postgresql/postgresql.conf"
+      ]
+
+  # ----------------------------------------------------------------------------
+  # 3. Backend Gateway & BFF (Express / Zero-Memory Direct-Upload)
+  # ----------------------------------------------------------------------------
+  groovelab-bff:
+    container_name: groovelab-bff
+    build:
+      context: ../packages/bff-server
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 320M
+        reservations:
+          memory: 128M
+    environment:
+      - NODE_ENV=production
+      - BFF_PORT=4000
+      - VITE_SUPABASE_URL=http://supabase-kong:8000
+      - VITE_SUPABASE_ANON_KEY=${ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SERVICE_ROLE_KEY}
+      - FRONTEND_URL=https://campus-groovelab.de
+      - SESSION_ENCRYPTION_KEY=${SESSION_ENCRYPTION_KEY}
+    networks:
+      - default
+      - coolify
+
+  # ----------------------------------------------------------------------------
+  # 4. Storage Engine (Supabase Storage API)
+  # ----------------------------------------------------------------------------
+  storage:
+    container_name: supabase-storage
+    image: supabase/storage-api:v1.48.26
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 320M
+        reservations:
+          memory: 128M
+    depends_on:
+      db:
+        condition: service_healthy
+      rest:
+        condition: service_started
+    environment:
+      ANON_KEY: ${ANON_KEY}
+      SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      POSTGREST_URL: http://rest:3000
+      AUTH_JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      STORAGE_PUBLIC_URL: https://supabase.campus-groovelab.de
+      REQUEST_ALLOW_X_FORWARDED_PATH: "true"
+      FILE_SIZE_LIMIT: 26214400 # 25 MB Limit
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      GLOBAL_S3_BUCKET: campus-groovelab-assets
+    volumes:
+      # Storage data resides on the 100 GB Cloud Volume
+      - /mnt/cloud-volume/storage-data:/var/lib/storage:z
+    networks:
+      - default
+      - coolify
+
+  # ----------------------------------------------------------------------------
+  # 5. PostgREST (Data API Bridge)
+  # ----------------------------------------------------------------------------
+  rest:
+    container_name: supabase-rest
+    image: postgrest/postgrest:v12.2.3
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 200M
+        reservations:
+          memory: 64M
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgresql://authenticator:${POSTGRES_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public,storage
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_BUILTIN_AUTH: "false"
+      PGRST_DB_POOL: 25
+      PGRST_DB_POOL_TIMEOUT: 10
+    networks:
+      - default
+
+  # ----------------------------------------------------------------------------
+  # 6. GoTrue Auth Engine
+  # ----------------------------------------------------------------------------
+  auth:
+    container_name: supabase-auth
+    image: supabase/gotrue:v2.186.0
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 160M
+        reservations:
+          memory: 64M
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: https://supabase.campus-groovelab.de
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      GOTRUE_SITE_URL: https://campus-groovelab.de
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_JWT_EXP: ${JWT_EXPIRY:-3600}
+    networks:
+      - default
+
+  # ----------------------------------------------------------------------------
+  # 7. Realtime WebSockets Engine
+  # ----------------------------------------------------------------------------
+  realtime:
+    container_name: supabase-realtime
+    image: supabase/realtime:v2.76.5
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 200M
+        reservations:
+          memory: 64M
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 4000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: supabase_admin
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: postgres
+      API_JWT_SECRET: ${JWT_SECRET}
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}
+    networks:
+      - default
+
+volumes:
+  db-config:
+
+networks:
+  default:
+  coolify:
+    external: true
+    name: coolify

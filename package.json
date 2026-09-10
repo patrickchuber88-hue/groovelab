@@ -16,10 +16,15 @@
     "verify:invariants": "tsx scripts/verify_rls_catalog_invariants.ts",
     "typecheck": "tsc -p apps/groovelab/tsconfig.json --noEmit",
     "gate": "npm run security:check && npm run security:secrets && npm run typecheck && npm run test:billing",
+    "gate:fast": "node scripts/security_drift_guard.mjs && npx tsc --noEmit",
     "verify:enterprise": "npm run gate",
-    "check:budget": "node scripts/check-bundle-budget.js"
+    "check:budget": "node scripts/check-bundle-budget.js",
+    "prepare": "husky install"
   },
   "dependencies": {
     "ssh2": "^1.17.0"
+  },
+  "devDependencies": {
+    "husky": "^8.0.0"
   }
 }

@@ -7,13 +7,15 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
 /**
- * POST /api/teacher/report-sick
- * body: { teacherId, sickUntilDate }
- * If sickUntilDate is null or empty, it ends the sickness.
+ * POST /api/teacher/report-absence
+ * body: { teacherId, absenceUntilDate, absenceStartDate }
+ * If absenceUntilDate is null or empty, it ends the absence.
  */
-export async function reportSickHandler(req: Request, res: Response): Promise<void> {
+export async function reportAbsenceHandler(req: Request, res: Response): Promise<void> {
   try {
-    const { teacherId, sickUntilDate, sickStartDate } = req.body;
+    const { teacherId, absenceUntilDate, absenceStartDate, sickUntilDate, sickStartDate } = req.body;
+    const resolvedUntilDate = absenceUntilDate !== undefined ? absenceUntilDate : sickUntilDate;
+    const resolvedStartDate = absenceStartDate !== undefined ? absenceStartDate : sickStartDate;
 
     if (!teacherId) {
       res.status(400).json({ error: 'teacherId is required.' });
@@ -32,20 +34,20 @@ export async function reportSickHandler(req: Request, res: Response): Promise<vo
       return;
     }
 
-    const prevSickUntilStr = teacher.sick_until;
-    let sickStartVal: string | null = null;
-    if (sickUntilDate) {
+    const prevAbsenceUntilStr = teacher.sick_until;
+    let absenceStartVal: string | null = null;
+    if (resolvedUntilDate) {
       const todayD = new Date();
       const localTodayStr = `${todayD.getFullYear()}-${String(todayD.getMonth() + 1).padStart(2, '0')}-${String(todayD.getDate()).padStart(2, '0')}`;
-      sickStartVal = sickStartDate || teacher.sick_start || localTodayStr;
+      absenceStartVal = resolvedStartDate || teacher.sick_start || localTodayStr;
     }
     
-    // Update teacher's sick_until and sick_start columns
+    // Update teacher's absence columns in database
     const { error: userUpdateError } = await supabase
       .from('users')
       .update({ 
-        sick_until: sickUntilDate || null,
-        sick_start: sickUntilDate ? sickStartVal : null
+        sick_until: resolvedUntilDate || null,
+        sick_start: resolvedUntilDate ? absenceStartVal : null
       })
       .eq('id', teacherId);
 
@@ -70,8 +72,8 @@ export async function reportSickHandler(req: Request, res: Response): Promise<vo
     const todayStart = new Date(now);
     todayStart.setHours(0, 0, 0, 0);
 
-    const sickUntil = sickUntilDate ? new Date(sickUntilDate) : null;
-    const prevSickUntil = prevSickUntilStr ? new Date(prevSickUntilStr) : null;
+    const absenceUntil = resolvedUntilDate ? new Date(resolvedUntilDate) : null;
+    const prevAbsenceUntil = prevAbsenceUntilStr ? new Date(prevAbsenceUntilStr) : null;
 
     // Define the date range to check/revert: up to 30 days into the future
     const maxDate = new Date(now);
@@ -106,9 +108,9 @@ export async function reportSickHandler(req: Request, res: Response): Promise<vo
         startDateTime.setHours(hours, minutes, 0, 0);
 
         if (startDateTime >= now) {
-          const isCurrentlySick = sickUntil && startDateTime <= new Date(sickUntil.getTime() + 24 * 60 * 60 * 1000 - 1);
+          const isCurrentlyAbsent = absenceUntil && startDateTime <= new Date(absenceUntil.getTime() + 24 * 60 * 60 * 1000 - 1);
           
-          if (isCurrentlySick) {
+          if (isCurrentlyAbsent) {
             scheduleIdsToCancel.add(sched.id);
             
             const notifKey = `${startDateTime.toISOString()}-${sched.student_id}`;
@@ -121,7 +123,7 @@ export async function reportSickHandler(req: Request, res: Response): Promise<vo
               });
             }
           } else {
-            // Restore schedules that are no longer in the sick window (or if sick leave was ended/shortened)
+            // Restore schedules that are no longer in the absence window (or if absence was ended/shortened)
             scheduleIdsToRestore.add(sched.id);
             datesToDeleteNotifs.push(startDateTime.toISOString());
           }
@@ -131,7 +133,7 @@ export async function reportSickHandler(req: Request, res: Response): Promise<vo
       currentDate.setDate(currentDate.getDate() + 1);
     }
 
-    // Apply Sickness Cancellations
+    // Apply Absence Cancellations
     if (scheduleIdsToCancel.size > 0) {
       await supabase
         .from('schedules')
@@ -155,9 +157,9 @@ export async function reportSickHandler(req: Request, res: Response): Promise<vo
         .insert(notificationsToInsert);
     }
 
-    // Delete/update future crisis notifications if sickness shortened or ended
+    // Delete/update future crisis notifications if absence shortened or ended
     if (datesToDeleteNotifs.length > 0) {
-      if (!sickUntilDate) {
+      if (!resolvedUntilDate) {
         // Update matching notifications to is_reinstated = true and status = 'UNREAD'
         await supabase
           .from('crisis_notifications')
@@ -175,12 +177,12 @@ export async function reportSickHandler(req: Request, res: Response): Promise<vo
 
     // Insert alert for Secretary Cockpit (Ausfall-Cockpit)
     let alertMessage = '';
-    if (!sickUntilDate) {
+    if (!resolvedUntilDate) {
       alertMessage = `🟢 WIEDER IM DIENST: Lehrkraft ${teacher.first_name} ${teacher.last_name} steht wieder regulär zur Verfügung.`;
-    } else if (prevSickUntilStr && sickUntilDate !== prevSickUntilStr.substring(0, 10)) {
-      alertMessage = `🚨 TERMIN-ANPASSUNG: Lehrkraft ${teacher.first_name} ${teacher.last_name} hat den Abwesenheitszeitraum auf den ${new Date(sickUntilDate).toLocaleDateString('de-DE')} geändert.`;
+    } else if (prevAbsenceUntilStr && resolvedUntilDate !== prevAbsenceUntilStr.substring(0, 10)) {
+      alertMessage = `🚨 TERMIN-ANPASSUNG: Lehrkraft ${teacher.first_name} ${teacher.last_name} hat den Abwesenheitszeitraum auf den ${new Date(resolvedUntilDate).toLocaleDateString('de-DE')} geändert.`;
     } else {
-      alertMessage = `🚨 TERMINABSAGE: Lehrkraft ${teacher.first_name} ${teacher.last_name} hat Termine bis zum ${new Date(sickUntilDate).toLocaleDateString('de-DE')} abgesagt.`;
+      alertMessage = `🚨 TERMINABSAGE: Lehrkraft ${teacher.first_name} ${teacher.last_name} hat Termine bis zum ${new Date(resolvedUntilDate).toLocaleDateString('de-DE')} abgesagt.`;
     }
 
     await supabase
@@ -195,13 +197,14 @@ export async function reportSickHandler(req: Request, res: Response): Promise<vo
 
     res.status(200).json({
       success: true,
-      message: 'Sickness status successfully updated and synchronized.',
-      sickUntil: sickUntilDate || null,
+      message: 'Absence status successfully updated and synchronized.',
+      absenceUntil: resolvedUntilDate || null,
+      sickUntil: resolvedUntilDate || null,
       notificationsCreated: notificationsToInsert.length
     });
 
   } catch (err: any) {
-    console.error('Error in reportSickHandler:', err);
+    console.error('Error in reportAbsenceHandler:', err);
     res.status(500).json({ error: 'Internal Server Error', details: err.message });
   }
 }

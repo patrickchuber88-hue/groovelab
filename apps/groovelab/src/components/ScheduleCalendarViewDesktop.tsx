@@ -648,8 +648,8 @@ export function ScheduleCalendarViewDesktop({
     targetId: string;
   } | null>(null);
 
-  const [sickUntil, setSickUntil] = useState<string | null>(null);
-  const [sickStart, setSickStart] = useState<string | null>(null);
+  const [absenceUntil, setAbsenceUntil] = useState<string | null>(null);
+  const [absenceStart, setAbsenceStart] = useState<string | null>(null);
   const [rooms, setRooms] = useState<any[]>([]);
 
   useEffect(() => {
@@ -1893,9 +1893,14 @@ export function ScheduleCalendarViewDesktop({
     loadOccurrencesRef.current = loadOccurrences;
   });
 
+  const boardsFingerprint = useMemo(() => {
+    if (!Array.isArray(boards)) return '';
+    return boards.map((b: any) => `${b.id || b.dayOfWeek}_${b.students?.length || 0}_${b.room_id || b.roomId || ''}`).join('|');
+  }, [boards]);
+
   useEffect(() => {
     loadOccurrencesRef.current();
-  }, [weekStart.getTime(), userId, JSON.stringify(boards), holidays]);
+  }, [weekStart.getTime(), userId, boardsFingerprint, holidays]);
 
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -1909,7 +1914,8 @@ export function ScheduleCalendarViewDesktop({
         {
           event: '*',
           schema: 'public',
-          table: 'schedule_occurrences'
+          table: 'schedule_occurrences',
+          filter: `teacher_id=eq.${userId}`
         },
         (payload) => {
           const newRec = payload.new as any;
@@ -1930,7 +1936,8 @@ export function ScheduleCalendarViewDesktop({
         {
           event: '*',
           schema: 'public',
-          table: 'students'
+          table: 'students',
+          filter: `teacher_id=eq.${userId}`
         },
         (payload) => {
           const newRec = payload.new as any;
@@ -1959,31 +1966,31 @@ export function ScheduleCalendarViewDesktop({
 
   useEffect(() => {
     if (!userId) return;
-    const fetchSickUntil = async () => {
+    const fetchAbsenceDates = async () => {
       const { data } = await supabase
         .from('users')
         .select('sick_start, sick_until')
         .eq('id', userId)
         .single();
       if (data?.sick_until) {
-        setSickStart(data.sick_start || null);
-        setSickUntil(data.sick_until);
+        setAbsenceStart(data.sick_start || null);
+        setAbsenceUntil(data.sick_until);
       } else {
-        setSickStart(null);
-        setSickUntil(null);
+        setAbsenceStart(null);
+        setAbsenceUntil(null);
       }
     };
-    fetchSickUntil();
+    fetchAbsenceDates();
 
     const channel = supabase
-      .channel(`user_profile_sick_${userId}`)
+      .channel(`user_profile_absence_${userId}`)
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${userId}` },
         (payload) => {
           if (payload.new && 'sick_until' in payload.new) {
-            setSickStart(payload.new.sick_start || null);
-            setSickUntil(payload.new.sick_until || null);
+            setAbsenceStart(payload.new.sick_start || null);
+            setAbsenceUntil(payload.new.sick_until || null);
           }
         }
       )
@@ -6297,19 +6304,19 @@ export function ScheduleCalendarViewDesktop({
                     return null;
                   }
 
-                   const isSick = !isBreak && !isVacant && (
+                   const isAbsentSlot = !isBreak && !isVacant && (
                     occ.status === 'teacher_sick' || 
                     occ.status === 'canceled_by_teacher_sick' ||
-                    isSlotCancelledByAbsence(occ.date, occ.start_time, { sick_start: sickStart, sick_until: sickUntil })
+                    isSlotCancelledByAbsence(occ.date, occ.start_time, { sick_start: absenceStart, sick_until: absenceUntil })
                   );
 
                   const isExcused = !isBreak && !isVacant && occ.status === 'cancelled' && !!occ.notes?.startsWith('[Entschuldigt]');
                   const isUnexcused = !isBreak && !isVacant && occ.status === 'cancelled' && !!occ.notes?.startsWith('[Unentschuldigt]');
-                  const hasProtocol = !isBreak && !isVacant && !['cancelled', 'canceled_by_student'].includes(occ.status) && !isSick && !!occ.notes?.trim();
+                  const hasProtocol = !isBreak && !isVacant && !['cancelled', 'canceled_by_student'].includes(occ.status) && !isAbsentSlot && !!occ.notes?.trim();
 
                   const colors = isBreak 
                     ? { bg: '#fff7ed', border: '#f97316', text: '#c2410c' } 
-                    : isSick 
+                    : isAbsentSlot 
                       ? { bg: 'rgba(254, 226, 226, 0.45)', border: '#ef4444', text: '#991b1b' }
                       : isExcused
                         ? { bg: 'rgba(245, 158, 11, 0.05)', border: '#f59e0b', text: '#b45309' }
@@ -6413,13 +6420,13 @@ export function ScheduleCalendarViewDesktop({
                   );
 
                   // 1. Gelb gestrichelt = Verschoben aber noch nicht bestätigt durch den Schüler / Entwurf
-                  const isWaiting = !isBreak && !isVacant && !isSick && (
+                  const isWaiting = !isBreak && !isVacant && !isAbsentSlot && (
                     hasPendingEdit ||
                     (isMovedFromMaster && (occ.status === 'pending_reschedule' || occ.student_acknowledged === false))
                   );
 
                   // 2. Vollton Gelb = Termin verschoben und durch Schüler bestätigt
-                  const isConfirmedReschedule = !isBreak && !isVacant && !isSick && !hasPendingEdit && isMovedFromMaster && (
+                  const isConfirmedReschedule = !isBreak && !isVacant && !isAbsentSlot && !hasPendingEdit && isMovedFromMaster && (
                     occ.status === 'rescheduled_confirmed' || occ.student_acknowledged === true
                   );
 
@@ -6427,7 +6434,7 @@ export function ScheduleCalendarViewDesktop({
                   const isRescheduled = isWaiting || isConfirmedReschedule;
                   const isResetPending = false;
 
-                  const isCancelledAck = (isCancelled || isSick) && (occ.student_acknowledged === true || occ.teacher_acknowledged === true || occ.status === 'cancelled_acknowledged');
+                  const isCancelledAck = (isCancelled || isAbsentSlot) && (occ.student_acknowledged === true || occ.teacher_acknowledged === true || occ.status === 'cancelled_acknowledged');
 
                   const fn = occ.student?.first_name || occ.student_first_name || occ.first_name || '';
                   const ln = occ.student?.last_name || occ.student_last_name || occ.last_name || '';
@@ -6476,7 +6483,7 @@ export function ScheduleCalendarViewDesktop({
 
                   const isGroupLesson = !isSwap && !occ.notes?.includes('[Tauschtermin]') && (isGroup || Boolean(displayNames && (displayNames.includes('&') || displayNames.includes(' & '))));
 
-                  if (isCancelled || isSick) {
+                  if (isCancelled || isAbsentSlot) {
                     if (!isCancelledAck) {
                       cardBackground = 'repeating-linear-gradient(-45deg, #fef2f2 0px, #fef2f2 8px, #ffffff 8px, #ffffff 16px)';
                       finalColors.border = '#ef4444';
@@ -6604,7 +6611,7 @@ export function ScheduleCalendarViewDesktop({
                     occ.isExtraRoom
                   );
 
-                  const isOutsideSchedule = !isAtMasterSlot && !isBreak && !isVacant && !isSick && !isCancelled && (
+                  const isOutsideSchedule = !isAtMasterSlot && !isBreak && !isVacant && !isAbsentSlot && !isCancelled && (
                     isExplicitExtraRoomBooking ||
                     (isMovedFromMaster && hasRegularDayBlock && (occStartMinutes < regularDayMin || occEndMinutes > regularDayMax))
                   );
@@ -6628,7 +6635,7 @@ export function ScheduleCalendarViewDesktop({
                   }
 
                   // Vertretung (Option 1: Indigo/Purple Theme für Hauptlehrer & Vertretung)
-                  const isSubstitutedCard = Boolean(!isBreak && !isVacant && !isSick && !isCancelled && (occ.substitute_teacher_id || occ.is_substitute));
+                  const isSubstitutedCard = Boolean(!isBreak && !isVacant && !isAbsentSlot && !isCancelled && (occ.substitute_teacher_id || occ.is_substitute));
                   if (isSubstitutedCard) {
                     cardBackground = 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)';
                     finalColors.border = '#6366f1';
@@ -6669,7 +6676,7 @@ export function ScheduleCalendarViewDesktop({
                         id={`occ-${occ.id}`}
                         role="button"
                         tabIndex={0}
-                        aria-label={`Termin ${displayNames || (isBreak ? 'Pause' : 'Freier Slot')}, ${occStartLabel} bis ${occEndLabel} Uhr${cardRoomName ? `, ${cardRoomName}` : ''}${isSwap ? ', getauschter Termin' : ''}${isRescheduled ? ', verschobener Termin' : ''}${(isSick || isCancelled) ? ', abgesagter Termin' : ''}`}
+                        aria-label={`Termin ${displayNames || (isBreak ? 'Pause' : 'Freier Slot')}, ${occStartLabel} bis ${occEndLabel} Uhr${cardRoomName ? `, ${cardRoomName}` : ''}${isSwap ? ', getauschter Termin' : ''}${isRescheduled ? ', verschobener Termin' : ''}${(isAbsentSlot || isCancelled) ? ', abgesagter Termin' : ''}`}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
@@ -6761,10 +6768,10 @@ export function ScheduleCalendarViewDesktop({
                               duration: occ.duration
                             });
                           }
-                          // Save selected sick date to localStorage for persistence across tab unmounts
-                          localStorage.setItem('selected_sick_date', occ.date);
-                          localStorage.setItem('expand_sick_widget', 'true');
-                          // Dispatch custom event to sync date with sickUntilDate state in TeacherDashboard
+                          // Save selected absence date to localStorage for persistence across tab unmounts
+                          localStorage.setItem('selected_absence_date', occ.date);
+                          localStorage.setItem('expand_absence_widget', 'true');
+                          // Dispatch custom event to sync date with absenceUntilDate state in TeacherDashboard
                           window.dispatchEvent(new CustomEvent('select-appointment-date', { detail: { date: occ.date } }));
                         }}
                         className={isGap ? 'schedule-gap-slot' : ''}
@@ -6788,7 +6795,7 @@ export function ScheduleCalendarViewDesktop({
                                     ? `1px dashed ${brandColor}` 
                                     : isBreak 
                                       ? '1px dashed #f97316' 
-                                      : (isSick || isCancelled)
+                                      : (isAbsentSlot || isCancelled)
                                         ? '2px dashed #ef4444' 
                                         : (isWaiting ? `2px dashed ${finalColors.border}` : `1px solid ${finalColors.border}`))),
                           borderLeft: isGap 
@@ -6803,20 +6810,20 @@ export function ScheduleCalendarViewDesktop({
                                     ? `3px dashed ${brandColor}` 
                                     : isBreak 
                                       ? '4px solid #f97316' 
-                                      : (isSick || isCancelled)
+                                      : (isAbsentSlot || isCancelled)
                                         ? '3px solid #ef4444'
                                         : `4px solid ${finalColors.border}`)),
                           borderRadius: '8px', 
                           padding: (occ.duration || 30) <= 15 ? '0 6px' : ((occ.duration || 30) <= 30 ? '5px 8px' : '8px 10px'),
-                          cursor: isSwapModeActive ? 'pointer' : ((isSick || isCancelled) ? 'pointer' : (isVacant || isBreak) ? 'pointer' : 'grab'),
+                          cursor: isSwapModeActive ? 'pointer' : ((isAbsentSlot || isCancelled) ? 'pointer' : (isVacant || isBreak) ? 'pointer' : 'grab'),
                           opacity: draggedId 
                              ? (draggedId === occ.id ? 0.25 : 0.6) 
                              : (selectedRoomIdForXRay && (occ.schedules?.room_id || occ.room_id) !== selectedRoomIdForXRay ? 0.22 : 1),
                           filter: (selectedRoomIdForXRay && (occ.schedules?.room_id || occ.room_id) !== selectedRoomIdForXRay) ? 'grayscale(40%) contrast(85%)' : 'none',
                           position: 'absolute',
                           top: `${topPx}px`,
-                          left: (isCancelled || isSick) ? 'calc(0% + 8px)' : `calc(${layout?.left || 0}% + 8px)`,
-                          width: (isCancelled || isSick) ? 'calc(100% - 16px)' : `calc(${layout?.width || 100}% - 16px)`,
+                          left: (isCancelled || isAbsentSlot) ? 'calc(0% + 8px)' : `calc(${layout?.left || 0}% + 8px)`,
+                          width: (isCancelled || isAbsentSlot) ? 'calc(100% - 16px)' : `calc(${layout?.width || 100}% - 16px)`,
                           boxShadow: isSelectedForSwap
                             ? '0 0 16px rgba(234, 179, 8, 0.55)'
                             : (isGroupModeActive && selectedForGroup.includes(occ.id))
@@ -7065,46 +7072,46 @@ export function ScheduleCalendarViewDesktop({
                                        );
                                      })()}
 
-                                     {((!isBreak && !isVacant && !isSick && !isCancelled) || (isBreak && occ.status !== 'cancelled')) && (
-                                       <button 
-                                         onClick={async (e) => {
-                                           e.stopPropagation();
-                                           if (isBreak) {
-                                             handleCancelBreak(e, occ);
-                                           } else {
-                                             if (isGroup) {
-                                               if (await showConfirm('Möchtest du den gesamten Gruppentermin absagen? Der Termin bleibt im Kalender rot/weiß gestreift als "Abgesagt" dokumentiert.')) {
-                                                 const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
-                                                 occurrencesInGroup.forEach(go => {
-                                                   updatesMap[go.id] = { status: 'cancelled' };
-                                                 });
-                                                 updateMultipleOccurrences(updatesMap, 'Gruppentermin abgesagt');
-                                               }
-                                             } else {
-                                               handleCancel(e, occ.id, displayNames);
-                                             }
-                                           }
-                                         }}
-                                         title={isBreak ? "Pause löschen" : "Termin absagen (bleibt rot/weiß dokumentiert)"}
-                                         style={{ 
-                                           background: 'transparent', 
-                                           border: 'none', 
-                                           cursor: 'pointer', 
-                                           color: finalColors.text, 
-                                           opacity: 0.5, 
-                                           padding: '1px', 
-                                           display: 'flex', 
-                                           alignItems: 'center', 
-                                           justifyContent: 'center', 
-                                           borderRadius: '3px',
-                                           transition: 'all 0.1s' 
-                                         }}
-                                         onMouseOver={e => e.currentTarget.style.opacity = '1'}
-                                         onMouseOut={e => e.currentTarget.style.opacity = '0.5'}
-                                       >
-                                         <X size={10} strokeWidth={2.5} />
-                                       </button>
-                                     )}
+                                      {((!isBreak && !isVacant && !isAbsentSlot && !isCancelled) || (isBreak && occ.status !== 'cancelled')) && (
+                                        <button 
+                                          onClick={async (e) => {
+                                            e.stopPropagation();
+                                            if (isBreak) {
+                                              handleCancelBreak(e, occ);
+                                            } else {
+                                              if (isGroup) {
+                                                if (await showConfirm('Möchtest du den gesamten Gruppentermin absagen? Der Termin bleibt im Kalender rot/weiß gestreift als "Abgesagt" dokumentiert.')) {
+                                                  const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
+                                                  occurrencesInGroup.forEach(go => {
+                                                    updatesMap[go.id] = { status: 'cancelled' };
+                                                  });
+                                                  updateMultipleOccurrences(updatesMap, 'Gruppentermin abgesagt');
+                                                }
+                                              } else {
+                                                handleCancel(e, occ.id, displayNames);
+                                              }
+                                            }
+                                          }}
+                                          title={isBreak ? "Pause löschen" : "Termin absagen (bleibt rot/weiß dokumentiert)"}
+                                          style={{ 
+                                            background: 'transparent', 
+                                            border: 'none', 
+                                            cursor: 'pointer', 
+                                            color: finalColors.text, 
+                                            opacity: 0.5, 
+                                            padding: '1px', 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            justifyContent: 'center', 
+                                            borderRadius: '3px',
+                                            transition: 'all 0.1s' 
+                                          }}
+                                          onMouseOver={e => e.currentTarget.style.opacity = '1'}
+                                          onMouseOut={e => e.currentTarget.style.opacity = '0.5'}
+                                        >
+                                          <X size={10} strokeWidth={2.5} />
+                                        </button>
+                                      )}
                                   </div>
                                 </div>
 
@@ -7125,7 +7132,7 @@ export function ScheduleCalendarViewDesktop({
                                       {isBreak ? 'Pause' : displayNames}
                                     </span>
                                   </div>
-                                  {(isCancelled || isSick) ? (
+                                  {(isCancelled || isAbsentSlot) ? (
                                     <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', flexShrink: 0 }}>
                                       Abgesagt
                                     </span>
@@ -7323,7 +7330,7 @@ export function ScheduleCalendarViewDesktop({
                                         <span>Kollision</span>
                                       </span>
                                     )}
-                                   {isSick && (
+                                    {isAbsentSlot && (
                                       <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(239,68,68,0.15)' }}>
                                         Entfällt
                                       </span>
@@ -7365,7 +7372,7 @@ export function ScheduleCalendarViewDesktop({
                                            setHoveredTooltip(null);
                                          }}
                                          style={{ 
-                                           fontSize: '0.58rem',
+                                           fontSize: '0.62rem',
                                            fontWeight: 800,
                                            padding: '1px 5px',
                                            borderRadius: '4px',
@@ -7385,7 +7392,7 @@ export function ScheduleCalendarViewDesktop({
                                      );
                                    })()}
                                    
-                                   {((!isBreak && !isVacant && !isSick && !isCancelled) || (isBreak && occ.status !== 'cancelled')) && (
+                                   {((!isBreak && !isVacant && !isAbsentSlot && !isCancelled) || (isBreak && occ.status !== 'cancelled')) && (
                                      <button 
                                        onClick={async (e) => {
                                          e.stopPropagation();
@@ -7575,7 +7582,7 @@ return (
                                   {isGroup && (
                                     <Users size={13} style={{ color: finalColors.text, opacity: 0.7 }} />
                                   )}
-                                  {isSick && (
+                                  {isAbsentSlot && (
                                     <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#991b1b', background: '#fee2e2', padding: '1px 5px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.02em', border: '1px solid rgba(239,68,68,0.15)' }}>
                                       Entfällt
                                     </span>
@@ -7662,7 +7669,7 @@ return (
                                   )}
                                 </div>
                                 
-                                {((!isBreak && !isVacant && !isSick && !isCancelled) || (isBreak && occ.status !== 'cancelled')) && (
+                                {((!isBreak && !isVacant && !isAbsentSlot && !isCancelled) || (isBreak && occ.status !== 'cancelled')) && (
                                   <button 
                                     onClick={async (e) => {
                                       e.stopPropagation();
@@ -8198,14 +8205,14 @@ return (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '180px', overflowY: 'auto' }}>
                           {uniqueGroupOccs.map(go => {
                             const isGoCancelled = ['cancelled', 'canceled_by_student'].includes(go.status);
-                            const isGoSick = go.status === 'teacher_sick' || go.status === 'canceled_by_teacher_sick';
+                            const isGoAbsent = go.status === 'teacher_sick' || go.status === 'canceled_by_teacher_sick';
                             const isConfirmed = go.student_acknowledged === true;
 
                             let itemBg = 'rgba(0, 0, 0, 0.02)';
                             let itemBorder = '1px solid rgba(0, 0, 0, 0.05)';
                             let nameColor = '#1d1d1f';
 
-                            if (isGoCancelled || isGoSick) {
+                            if (isGoCancelled || isGoAbsent) {
                               itemBg = 'rgba(239, 68, 68, 0.05)';
                               itemBorder = '1px solid rgba(239, 68, 68, 0.15)';
                               nameColor = '#ef4444';
@@ -8220,7 +8227,7 @@ return (
                                 <span style={{ fontSize: '0.82rem', fontWeight: 700, color: nameColor, textDecoration: 'none' }}>
                                   {go.student?.first_name} {maskLastName(go.student?.last_name, showRealNames)}
                                 </span>
-                                {!isGoCancelled && !isGoSick && (
+                                {!isGoCancelled && !isGoAbsent && (
                                   <button
                                     onClick={async () => {
                                       if (await showConfirm(`Möchtest du ${go.student?.first_name} für diesen Gruppentermin absagen?`)) {

@@ -298,3 +298,32 @@ export const resolveCampusStudentAvatar = (
   // 4. Fail-closed fallback: guitar avatar for music school students (never neutral room!)
   return '/avatars/gitarre_avatar_new.png';
 };
+
+/**
+ * Resolves the musician avatar for a teacher/coach in GrooveLab.
+ * - Prioritizes chosen musician avatars (custom photo or 3D instrument avatar from TeacherSettingsView).
+ * - Strictly filters out /campus_login_hero.png.
+ * - Falls back to /avatar_ghost.jpg (the ghost musician avatar).
+ */
+export const resolveGrooveLabTeacherAvatar = (user?: any, src?: string | null): string => {
+  if (!user && !src) return '/avatar_ghost.jpg';
+
+  // 1. Direct explicit valid src (custom upload or selected avatar)
+  if (src && src !== '/campus_login_hero.png') {
+    return src;
+  }
+
+  // 2. User avatar_url attribute
+  if (user?.avatar_url && user.avatar_url !== '/campus_login_hero.png') {
+    return user.avatar_url;
+  }
+
+  // 3. User photo_url attribute
+  if (user?.photo_url && user.photo_url !== '/campus_login_hero.png') {
+    return user.photo_url;
+  }
+
+  // 4. Fallback: ghost musician avatar
+  return '/avatar_ghost.jpg';
+};
+

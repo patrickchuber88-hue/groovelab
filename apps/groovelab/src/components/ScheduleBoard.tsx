@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
-import { supabase, deleteUserStorageAssets } from '../lib/supabase';
+import { supabase, deleteUserStorageAssets, queryCache } from '../lib/supabase';
 import { 
   Calendar, 
   Plus, 
@@ -467,7 +467,12 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
   // Teacher selector states
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>(userId);
   const [teachers, setTeachers] = useState<any[]>([]);
-  const [currentUserRole, setCurrentUserRole] = useState<string>('');
+  const [currentUserRole, setCurrentUserRole] = useState<string>(() => {
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem('user_role') || sessionStorage.getItem('user_role') || '';
+    }
+    return '';
+  });
   
   // Create Board form state
   const [newBoardDay, setNewBoardDay] = useState(1);
@@ -838,9 +843,17 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
   useEffect(() => {
     if (!schoolId) return;
 
+    let debounceTimer: any = null;
+    const debouncedReload = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        loadInitialData();
+      }, 500);
+    };
+
     const handleStudentsUpdated = () => {
       console.log('[ScheduleBoard] Received student update event (Campus & GrooveLab). Auto-refreshing designer...');
-      loadInitialData();
+      debouncedReload();
     };
 
     window.addEventListener('students_updated', handleStudentsUpdated);
@@ -852,9 +865,22 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'users', filter: `school_id=eq.${schoolId}` },
-        (payload) => {
-          console.log('[ScheduleBoard] Realtime users table change detected:', payload);
-          loadInitialData();
+        (payload: any) => {
+          // 🛡️ Enterprise Performance Guard: Ignore pure presence/heartbeat updates ('last_seen')
+          if (payload.eventType === 'UPDATE' && payload.old && payload.new) {
+            const substantiveFields = [
+              'role', 'roles', 'school_id', 'is_active', 'is_campus_active', 
+              'is_groovelab_active', 'token_version', 'is_master_admin', 
+              'first_name', 'last_name', 'instrument', 'lesson_duration', 
+              'sibling_group_id', 'group_id', 'status', 'teacher_id'
+            ];
+            const hasSubstantiveChange = substantiveFields.some(
+              field => payload.old[field] !== undefined && payload.new[field] !== undefined && payload.old[field] !== payload.new[field]
+            );
+            if (!hasSubstantiveChange) return;
+          }
+          console.log('[ScheduleBoard] Realtime users table substantive change detected:', payload);
+          debouncedReload();
         }
       )
       .on(
@@ -862,7 +888,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
         { event: '*', schema: 'public', table: 'students', filter: `school_id=eq.${schoolId}` },
         (payload) => {
           console.log('[ScheduleBoard] Realtime students table change detected:', payload);
-          loadInitialData();
+          debouncedReload();
         }
       )
       .subscribe();
@@ -871,6 +897,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
       window.removeEventListener('students_updated', handleStudentsUpdated);
       window.removeEventListener('campus_students_updated', handleStudentsUpdated);
       window.removeEventListener('groovelab_students_updated', handleStudentsUpdated);
+      if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
   }, [schoolId, selectedTeacherId]);
@@ -1217,38 +1244,115 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
           .maybeSingle();
         role = userProfile?.role || 'teacher';
         setCurrentUserRole(role);
+      }
 
-        if (role === 'admin' || role === 'secretary') {
+      if ((role === 'admin' || role === 'secretary') && teachersList.length === 0) {
+        teachersList = await queryCache.fetch(`teachers_${schoolId}`, async () => {
           const { data: tData } = await supabase
             .from('users')
             .select('id, first_name, last_name, planned_boards, campus_räume, groovelab_räume')
             .eq('school_id', schoolId)
             .in('role', ['teacher', 'admin', 'secretary'])
             .order('first_name');
-          
-          teachersList = tData || [];
-          setTeachers(teachersList);
-          
-          // Default to the first teacher ONLY if the logged-in user is NOT a teacher in the list
-          const isUserATeacher = teachersList.some(t => t.id === userId);
-          if (!isUserATeacher && selectedTeacherId === userId && teachersList.length > 0) {
-            const firstTeacher = teachersList.find(t => t.id !== userId) || teachersList[0];
-            if (firstTeacher) {
-              setSelectedTeacherId(firstTeacher.id);
-              return; // Exiting early as the state change will trigger this effect again
-            }
+          return tData || [];
+        }, { ttlMs: 60_000, staleWhileRevalidate: true });
+        
+        setTeachers(teachersList);
+        
+        // Default to the first teacher ONLY if the logged-in user is NOT a teacher in the list
+        const isUserATeacher = teachersList.some(t => t.id === userId);
+        if (!isUserATeacher && selectedTeacherId === userId && teachersList.length > 0) {
+          const firstTeacher = teachersList.find(t => t.id !== userId) || teachersList[0];
+          if (firstTeacher) {
+            setSelectedTeacherId(firstTeacher.id);
+            return; // Exiting early as the state change will trigger this effect again
           }
         }
       }
 
-      // Fetch all rooms
-      const { data: rData } = await supabase
-        .from('rooms')
-        .select('id, name')
-        .eq('school_id', schoolId)
-        .order('name');
-      const loadedRooms = rData || [];
-      setRooms(loadedRooms);
+      // 2. High-Performance Enterprise Single-Flight Batch Query (Consolidated 9 serial waterfalls into 1 parallel Promise.all with SWR)
+      const [
+        loadedRooms,
+        { data: schedData },
+        { data: occData },
+        { data: groupData },
+        { data: teacherProfile },
+        allStudentsDb,
+        allSchoolStudentUsers,
+        pendingData,
+        otherSchedData,
+        blockedSlotsData,
+        allDbPrefs
+      ] = await Promise.all([
+        // Rooms (Cached with SWR 60s)
+        queryCache.fetch(`rooms_${schoolId}`, async () => {
+          const { data } = await supabase.from('rooms').select('id, name').eq('school_id', schoolId).order('name');
+          return data || [];
+        }, { ttlMs: 60_000, staleWhileRevalidate: true }),
+
+        // Teacher Schedules with pruned student fields
+        supabase.from('schedules').select('*, student:users!schedules_student_id_fkey(id, first_name, last_name, instrument, lesson_duration, sibling_group_id, group_id, is_campus_active, is_groovelab_active, is_active)').eq('school_id', schoolId).eq('teacher_id', selectedTeacherId),
+
+        // Teacher Occurrences
+        supabase.from('schedule_occurrences').select('student_id').eq('teacher_id', selectedTeacherId),
+
+        // Teacher Bands with members in single-hop join
+        supabase.from('bands').select('id, coach_id, band_members(user_id)').eq('coach_id', selectedTeacherId),
+
+        // Teacher Profile
+        supabase.from('users').select('*').eq('id', selectedTeacherId).maybeSingle(),
+
+        // School Students Catalog (Cached with SWR 60s)
+        queryCache.fetch(`students_table_${schoolId}`, async () => {
+          const { data } = await supabase.from('students').select('*').eq('school_id', schoolId);
+          return data || [];
+        }, { ttlMs: 60_000, staleWhileRevalidate: true }),
+
+        // School Student Users (Cached with SWR 60s)
+        queryCache.fetch(`student_users_${schoolId}`, async () => {
+          const { data } = await supabase.from('users').select('id, first_name, last_name, instrument, lesson_duration, sibling_group_id, group_id, is_campus_active, is_groovelab_active, is_active, status, teacher_id, role, avatar_url').eq('school_id', schoolId).in('role', ['student', 'learner']);
+          return data || [];
+        }, { ttlMs: 60_000, staleWhileRevalidate: true }),
+
+        // School Pending Students (Cached with SWR 60s)
+        queryCache.fetch(`pending_students_${schoolId}`, async () => {
+          const { data } = await supabase.from('pending_students_decrypted').select('id, first_name, last_name, instrument, lesson_duration, sibling_group_id, group_id, teacher_id').eq('school_id', schoolId);
+          return data || [];
+        }, { ttlMs: 60_000, staleWhileRevalidate: true }),
+
+        // Other teachers' schedules for real-time room conflict checking (Cached with SWR 30s)
+        queryCache.fetch(`other_schedules_${schoolId}_${selectedTeacherId}`, async () => {
+          const { data } = await supabase
+            .from('schedules')
+            .select('*, student:users!schedules_student_id_fkey(id, first_name, last_name), teacher:users!schedules_teacher_id_fkey(id, first_name, last_name)')
+            .eq('school_id', schoolId)
+            .neq('teacher_id', selectedTeacherId);
+          return data || [];
+        }, { ttlMs: 30_000, staleWhileRevalidate: true }),
+
+        // Wöchentliche Raumblockierungen (Cached with SWR 60s)
+        queryCache.fetch(`blocked_slots_${schoolId}`, async () => {
+          const { data } = await supabase
+            .from('room_blocked_slots')
+            .select('*')
+            .eq('school_id', schoolId);
+          return data || [];
+        }, { ttlMs: 60_000, staleWhileRevalidate: true }),
+
+        // Student Schedule Preferences (Cached with SWR 60s, scoped to school_id)
+        queryCache.fetch(`student_schedule_preferences_${schoolId}`, async () => {
+          const { data } = await supabase
+            .from('student_schedule_preferences')
+            .select('*')
+            .eq('school_id', schoolId);
+          return data || [];
+        }, { ttlMs: 60_000, staleWhileRevalidate: true })
+      ]);
+
+      setOtherTeachersSchedules(otherSchedData || []);
+      setBlockedSlots(blockedSlotsData || []);
+
+      setRooms(loadedRooms || []);
       const activePlatformVal = localStorage.getItem('groovelab_active_platform') || 'groovelab';
       const defaultRoomObj = activePlatformVal === 'groovelab'
         ? (loadedRooms.find((r: any) => r.name.toLowerCase().includes('groovelab')) || loadedRooms[0])
@@ -1258,23 +1362,19 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
       if (loadedRooms.length > 0) {
         setNewBoardRoom(defaultRoomId);
       }
-      
-      // 2. Fetch assigned student IDs across schedules, occurrences, bands, and teacher profile for selected teacher
-      const [{ data: schedData }, { data: occData }, { data: groupData }, { data: teacherProfile }] = await Promise.all([
-        supabase.from('schedules').select('*, student:users!schedules_student_id_fkey(*)').eq('teacher_id', selectedTeacherId),
-        supabase.from('schedule_occurrences').select('student_id').eq('teacher_id', selectedTeacherId),
-        supabase.from('bands').select('id').eq('coach_id', selectedTeacherId),
-        supabase.from('users').select('*').eq('id', selectedTeacherId).maybeSingle()
-      ]);
 
       const schedStudentIds = (schedData || []).map(s => s.student_id).filter(Boolean);
       const occStudentIds = (occData || []).map(s => s.student_id).filter(Boolean);
 
       let groupStudentIds: string[] = [];
       if (groupData && groupData.length > 0) {
-        const groupIds = groupData.map(g => g.id);
-        const { data: gsData } = await supabase.from('band_members').select('user_id').in('band_id', groupIds);
-        groupStudentIds = (gsData || []).map(gs => gs.user_id).filter(Boolean);
+        groupData.forEach((g: any) => {
+          if (Array.isArray(g.band_members)) {
+            g.band_members.forEach((bm: any) => {
+              if (bm?.user_id) groupStudentIds.push(bm.user_id);
+            });
+          }
+        });
       }
 
       const rawPlannedEarly = teacherProfile?.planned_boards || (teacherProfile as any)?.campus_räume || (teacherProfile as any)?.groovelab_räume;
@@ -1286,34 +1386,15 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
 
       const teacherAssignedStudentIds = new Set([...schedStudentIds, ...occStudentIds, ...groupStudentIds]);
 
-      // 2. Fetch student records from students table for this school
-      const { data: allStudentsDb } = await supabase
-        .from('students')
-        .select('*')
-        .eq('school_id', schoolId);
-
       const statusMap: Record<string, string> = {};
       const stDbStudentIds = new Set<string>();
-      allStudentsDb?.forEach(st => {
+      allStudentsDb?.forEach((st: any) => {
         if (st.id) stDbStudentIds.add(st.id);
         if ((st as any).user_id) stDbStudentIds.add((st as any).user_id);
         if ((st as any).student_id) stDbStudentIds.add((st as any).student_id);
         statusMap[st.id] = st.status;
         if ((st as any).user_id) statusMap[(st as any).user_id] = st.status;
       });
-
-      // Fetch students from users table
-      const { data: allSchoolStudentUsers } = await supabase
-        .from('users')
-        .select('id, first_name, last_name, instrument, lesson_duration, sibling_group_id, group_id, is_campus_active, is_groovelab_active, is_active, teacher_id, role, avatar_url')
-        .eq('school_id', schoolId)
-        .in('role', ['student', 'learner']);
-
-      // Fetch pending students from pending_students_decrypted view
-      const { data: pendingData } = await supabase
-        .from('pending_students_decrypted')
-        .select('id, first_name, last_name, instrument, lesson_duration, sibling_group_id, group_id, teacher_id')
-        .eq('school_id', schoolId);
 
       const studentMap = new Map<string, Student>();
       const userToStudentIdMap = new Map<string, string>();
@@ -1509,11 +1590,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
       const prefSubmittedSet = new Set<string>();
       const prefMap: Record<string, any[]> = {};
 
-      const { data: allDbPrefs } = await supabase
-        .from('student_schedule_preferences')
-        .select('*');
-
-      allDbPrefs?.forEach(p => {
+      allDbPrefs?.forEach((p: any) => {
         if (!p.student_id) return;
         prefSubmittedSet.add(p.student_id);
         
@@ -1698,22 +1775,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
       const currentActiveDraft = loadedDrafts.find(d => d.id === loadedActiveDraftId) || loadedDrafts[0];
       const dbPlannedBoards = currentActiveDraft ? currentActiveDraft.boards : [];
 
-      // 4. Existing schedules already pre-fetched as schedData
-
-      // Fetch other teachers' schedules for room conflict checking
-      const { data: otherSchedData } = await supabase
-        .from('schedules')
-        .select('*, student:users!schedules_student_id_fkey(id, first_name, last_name), teacher:users!schedules_teacher_id_fkey(id, first_name, last_name)')
-        .eq('school_id', schoolId)
-        .neq('teacher_id', selectedTeacherId);
-      setOtherTeachersSchedules(otherSchedData || []);
-
-      // Fetch wöchentliche Blockierungen (room_blocked_slots)
-      const { data: blockedSlotsData } = await supabase
-        .from('room_blocked_slots')
-        .select('*')
-        .eq('school_id', schoolId);
-      setBlockedSlots(blockedSlotsData || []);
+      // 4. Existing schedules, other teachers' schedules, and blocked slots already pre-fetched in Promise.all
 
       if (schedData && schedData.length > 0) {
         setHasSubmittedSchedule(true);
@@ -4237,6 +4299,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
         .eq('id', selectedTeacherId);
         
       // 4. Force refresh of the data
+      queryCache.invalidatePrefix('other_schedules_');
       setHasSubmittedSchedule(false);
       setScheduleStatus('none');
       setDrafts([{ id: `draft-${crypto.randomUUID()}`, name: 'Entwurf 1', boards: [] }]);

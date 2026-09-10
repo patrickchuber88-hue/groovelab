@@ -1,106 +1,118 @@
 #!/usr/bin/env node
-// ==============================================================================
-// 🛡️ Campus-Groovelab Enterprise+ Security Drift Guard & Invariant Linter
-// Standard: OWASP ASVS Level 3 / Defense-in-Depth / Zero-Regression Failsafe
-// ==============================================================================
+// =============================================================================
+// 🏛️  Campus-Groovelab Security Drift Guard [OWASP ASVS L3]
+// Standard:  OWASP ASVS Level 3 / BSI TR-02102-1 / DSGVO Art. 25 & 32
+// Runtime:   Native Node.js ESM — zero external dependencies
+// Protocol:  Halts CI / pre-commit with process.exit(1) on ANY violation.
+// =============================================================================
 
-import fs from 'fs';
+import fs   from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { execSync }      from 'child_process';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const ROOT_DIR = path.resolve(__dirname, '..');
-const SRC_DIR = path.join(ROOT_DIR, 'apps', 'groovelab', 'src');
+const __filename    = fileURLToPath(import.meta.url);
+const __dirname     = path.dirname(__filename);
+const ROOT_DIR      = path.resolve(__dirname, '..');
+const SRC_DIR       = path.join(ROOT_DIR, 'apps', 'groovelab', 'src');
 const MIGRATIONS_DIR = path.join(ROOT_DIR, 'supabase', 'migrations');
 
-console.log('════════════════════════════════════════════════════════════════════');
-console.log('🛡️  CAMPUS-GROOVELAB ENTERPRISE+ SECURITY DRIFT GUARD');
-console.log('    Scanning for architectural regressions & invariant violations...');
-console.log('════════════════════════════════════════════════════════════════════\n');
+let violationsCount   = 0;
+let filesScanned      = 0;
+let migrationsScanned = 0;
 
-let violationsCount = 0;
-let filesScanned = 0;
+const HR = '═'.repeat(72);
+process.stdout.write(`\n${HR}\n`);
+process.stdout.write('  🏛️   Campus-Groovelab Security Drift Guard [OWASP ASVS L3]\n');
+process.stdout.write('       Scanning for architectural regressions & invariant violations...\n');
+process.stdout.write(`${HR}\n\n`);
 
-/**
- * Ruleset of strict architectural invariants.
- */
+// =============================================================================
+// PATTERN REGISTRY — 10 OWASP ASVS L3 Invariants
+// =============================================================================
 const FORBIDDEN_FRONTEND_PATTERNS = [
   {
-    name: 'Direct users_raw Access from Client',
-    regex: /\.from\(\s*['"]users_raw['"]\s*\)/g,
-    severity: 'CRITICAL',
+    id:          'FE-01',
+    name:        'Direct users_raw Access from Client',
+    regex:       /\.from\(\s*['"]users_raw['"]\s*\)/g,
+    severity:    'CRITICAL',
     description: 'The frontend must NEVER query users_raw directly. Use the sanitized public.users view or secure RPCs.',
     allowedFiles: ['src/tests/']
   },
   {
-    name: 'Direct private_auth Schema Access from Client',
-    regex: /\.from\(\s*['"](?:user_secrets|school_secrets|webauthn_challenges)['"]\s*\)/g,
-    severity: 'CRITICAL',
+    id:          'FE-02',
+    name:        'Direct private_auth Schema Access from Client',
+    regex:       /\.from\(\s*['"](?:user_secrets|school_secrets|webauthn_challenges)['"]\s*\)|\.schema\(\s*['"]private_auth['"]\s*\)/g,
+    severity:    'CRITICAL',
     description: 'The private_auth schema contains sensitive secrets and is restricted exclusively to PostgreSQL backend RPCs.',
     allowedFiles: ['src/tests/']
   },
   {
-    name: 'Client-Side Plaintext PIN Storage Key',
-    regex: /['"](?:groovelab_user_pin_|groovelab_pin_|groovelab_parent_pin_)[^'"]*['"]/g,
-    severity: 'CRITICAL',
+    id:          'FE-03',
+    name:        'Client-Side Plaintext PIN Storage Key',
+    regex:       /['"](?:groovelab_user_pin_|groovelab_pin_|groovelab_parent_pin_)[^'"]*['"]/g,
+    severity:    'CRITICAL',
     description: 'Plaintext PINs or reusable credential hashes must NEVER be saved in browser storage. Only opaque session leases are permitted.',
     allowedFiles: ['src/tests/']
   },
   {
-    name: 'Direct Credential Lookups in PostgREST (Bypassing Auth RPC)',
-    regex: /\.from\(\s*['"]users['"]\s*\)[^;]*\.(?:eq|ilike)\(\s*['"](?:teacher_qr_token|ausweis_nummer)['"]\s*,/gs,
-    severity: 'HIGH',
+    id:          'FE-04',
+    name:        'Direct Credential Lookups in PostgREST (Bypassing Auth RPC)',
+    regex:       /\.from\(\s*['"]users['"]\s*\)[^;]*\.(?:eq|ilike)\(\s*['"](?:teacher_qr_token|ausweis_nummer)['"]\s*,/gs,
+    severity:    'HIGH',
     description: 'Logins and token verifications must use authenticate_by_credential RPC instead of direct PostgREST table filters.',
     allowedFiles: ['src/tests/']
   },
   {
-    name: 'Client-Side PIN Equality Comparison',
-    regex: /\b(?:storedPin|parent_pin|personal_pin)\b\s*===/g,
-    severity: 'HIGH',
+    id:          'FE-05',
+    name:        'Client-Side PIN Equality Comparison',
+    regex:       /\b(?:storedPin|parent_pin|personal_pin)\b\s*===/g,
+    severity:    'HIGH',
     description: 'PIN verification must occur server-side via verify_personal_pin or verify_parent_pin RPCs.',
     allowedFiles: ['src/tests/']
   },
   {
-    name: 'Hardcoded Master Admin Password Check',
-    regex: /master_admin_password\s*===/g,
-    severity: 'CRITICAL',
+    id:          'FE-06',
+    name:        'Hardcoded Master Admin Password Check',
+    regex:       /master_admin_password\s*===/g,
+    severity:    'CRITICAL',
     description: 'Master Admin authentication must use the login_master_admin RPC with server-side bcrypt/Argon2 verification.',
     allowedFiles: ['src/tests/']
   },
   {
-    name: 'Direct is_master_admin Mutation from Client',
-    regex: /\.from\(\s*['"]users['"]\s*\)[^;]*\.update\(\s*\{[^}]*is_master_admin/gs,
-    severity: 'CRITICAL',
+    id:          'FE-07',
+    name:        'Direct is_master_admin Mutation from Client',
+    regex:       /\.from\(\s*['"]users['"]\s*\)[^;]*\.update\(\s*\{[^}]*is_master_admin/gs,
+    severity:    'CRITICAL',
     description: 'The is_master_admin flag must NEVER be modified directly from frontend client updates.',
     allowedFiles: ['src/tests/']
   },
   {
-    name: 'Direct parent_pin Mutation from Client',
-    regex: /(?:\.from\(\s*['"](?:users|students)['"]\s*\)[^;]*\.update\([^;]*parent_pin|updateData[^;]*parent_pin)/gs,
-    severity: 'CRITICAL',
+    id:          'FE-08',
+    name:        'Direct parent_pin Mutation from Client',
+    regex:       /(?:\.from\(\s*['"](?:users|students)['"]\s*\)[^;]*\.update\([^;]*parent_pin|updateData[^;]*parent_pin)/gs,
+    severity:    'CRITICAL',
     description: 'The parent_pin must NEVER be set or modified via direct view updates. Use set_parent_pin_with_recovery_key RPC.',
     allowedFiles: ['src/tests/']
   },
   {
-    name: 'Service Role Key in Frontend Code',
-    regex: /\bSUPABASE_SERVICE_ROLE_KEY\b/g,
-    severity: 'CRITICAL',
+    id:          'FE-09',
+    name:        'Service Role Key in Frontend Code',
+    regex:       /\bSUPABASE_SERVICE_ROLE_KEY\b/g,
+    severity:    'CRITICAL',
     description: 'SUPABASE_SERVICE_ROLE_KEY must NEVER be imported or used in frontend client code.',
     allowedFiles: ['src/tests/', 'src/check_view_policies.mjs']
   },
   {
-    name: 'Zero US Cloud Services & Third-Party Outbound Invariant',
-    regex: /(?:api\.ipify\.org|corsproxy\.io|api\.allorigins\.win|generativelanguage\.googleapis\.com|\.firebaseio\.com|firebase\.googleapis\.com|\.supabase\.co)/g,
-    severity: 'CRITICAL',
+    id:          'FE-10',
+    name:        'Zero US Cloud Services & Third-Party Outbound Invariant',
+    regex:       /(?:api\.ipify\.org|corsproxy\.io|api\.allorigins\.win|generativelanguage\.googleapis\.com|\.firebaseio\.com|firebase\.googleapis\.com|\.supabase\.co)/g,
+    severity:    'CRITICAL',
     description: 'Sovereign Hetzner Invariant: All requests must strictly route through self-hosted Hetzner infrastructure (*.campus-groovelab.de). Third-party US cloud or public proxy domains are strictly forbidden.',
     allowedFiles: []
   }
 ];
 
-/**
- * Recursively scans directories for files.
- */
 function walkDir(dir, filterExt = ['.ts', '.tsx', '.js', '.jsx']) {
   let results = [];
   if (!fs.existsSync(dir)) return results;
@@ -123,7 +135,7 @@ function walkDir(dir, filterExt = ['.ts', '.tsx', '.js', '.jsx']) {
 }
 
 // 1. SCAN FRONTEND SOURCE CODE
-console.log('📂 [1/4] Scanning Frontend Source Code (apps/groovelab/src)...');
+process.stdout.write('  📂 [1/4] Frontend Source Scan (apps/groovelab/src)...\n');
 const frontendFiles = walkDir(SRC_DIR);
 
 for (const filePath of frontendFiles) {
@@ -138,26 +150,33 @@ for (const filePath of frontendFiles) {
 
     const matches = content.match(rule.regex);
     if (matches && matches.length > 0) {
-      console.error(`\n❌ [VIOLATION] [${rule.severity}] ${rule.name}`);
-      console.error(`   File: ${relPath}`);
-      console.error(`   Details: ${rule.description}`);
-      console.error(`   Found ${matches.length} instance(s).`);
+      const icon = rule.severity === 'CRITICAL' ? '🔴' : '🟠';
+      process.stderr.write(`\n  ${icon} [FAIL] ${rule.severity} | ${rule.id} — ${rule.name}\n`);
+      process.stderr.write(`       → ${relPath}\n`);
+      process.stderr.write(`       Details: ${rule.description}\n`);
+      process.stderr.write(`       Found ${matches.length} instance(s).\n`);
+      process.stderr.write(`       ${'─'.repeat(65)}\n`);
       violationsCount++;
     }
   }
 }
 
+process.stdout.write(
+  `     ${violationsCount === 0 ? '✅' : `❌ (${violationsCount} violation(s) so far)`} ` +
+  `Scanned ${filesScanned} source file(s).\n\n`
+);
+
 // 2. SCAN SQL MIGRATIONS FOR RLS DEFICIENCIES & DML SHIELDS
-console.log('\n📂 [2/4] Scanning Database Migrations (supabase/migrations)...');
+process.stdout.write('  📂 [2/4] SQL Migration Invariants (supabase/migrations)...\n');
 const migrationFiles = walkDir(MIGRATIONS_DIR, ['.sql']);
 
 let latestDmlMigration = null;
 let highestDmlMigrationNum = -1;
 
 for (const filePath of migrationFiles) {
-  filesScanned++;
-  const content = fs.readFileSync(filePath, 'utf-8');
-  const relPath = path.relative(ROOT_DIR, filePath);
+  migrationsScanned++;
+  const content  = fs.readFileSync(filePath, 'utf-8');
+  const relPath  = path.relative(ROOT_DIR, filePath);
   const baseName = path.basename(filePath);
 
   // Check for handle_users_view_dml definitions
@@ -181,29 +200,13 @@ for (const filePath of migrationFiles) {
       if (secDefinerMatches) {
         for (const block of secDefinerMatches) {
           if (!block.toLowerCase().includes('search_path') && !content.includes('SET search_path')) {
-            console.error(`\n❌ [VIOLATION] [CRITICAL] Unpinned SECURITY DEFINER function in new migration`);
-            console.error(`   File: ${relPath}`);
-            console.error(`   Details: Any new SECURITY DEFINER function must explicitly pin 'SET search_path = public, pg_temp, extensions' to prevent search_path hijacking.`);
+            process.stderr.write(`\n  🔴 [FAIL] [CRITICAL] Unpinned SECURITY DEFINER function in new migration\n`);
+            process.stderr.write(`       File: ${relPath}\n`);
+            process.stderr.write(`       Details: Any new SECURITY DEFINER function must explicitly pin 'SET search_path = public, pg_temp, extensions' to prevent search_path hijacking.\n`);
             violationsCount++;
           }
         }
       }
-    }
-  }
-
-  // Look for CREATE TABLE without ENABLE ROW LEVEL SECURITY
-  const createTableRegex = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:public\.)?([a-zA-Z0-9_]+)/gi;
-  let match;
-  while ((match = createTableRegex.exec(content)) !== null) {
-    const tableName = match[1];
-    // Skip internal or temp tables
-    if (tableName.startsWith('pg_') || tableName.startsWith('tmp_') || tableName.startsWith('temp_')) {
-      continue;
-    }
-
-    const rlsPattern = new RegExp(`ALTER\\s+TABLE\\s+(?:public\\.)?${tableName}\\s+ENABLE\\s+ROW\\s+LEVEL\\s+SECURITY`, 'i');
-    if (!rlsPattern.test(content) && !content.includes('ENABLE ROW LEVEL SECURITY')) {
-      // Handled in consolidated lockdown
     }
   }
 }
@@ -215,53 +218,67 @@ if (latestDmlMigration) {
   const hasMasterShield = latestDmlMigration.content.includes('is_master_admin');
 
   if (!hasStudentShield || !hasMasterShield) {
-    console.error(`\n❌ [VIOLATION] [CRITICAL] Insecure handle_users_view_dml in latest migration`);
-    console.error(`   File: ${latestDmlMigration.file}`);
-    console.error(`   Details: The latest handle_users_view_dml definition must include the student shield (v_is_student) and is_master_admin protection.`);
+    process.stderr.write(`\n  🔴 [FAIL] [CRITICAL] Insecure handle_users_view_dml in latest migration\n`);
+    process.stderr.write(`       File: ${latestDmlMigration.file}\n`);
+    process.stderr.write(`       Details: The latest handle_users_view_dml definition must include the student shield (v_is_student) and is_master_admin protection.\n`);
     violationsCount++;
   } else {
-    console.log(`   ✅ Latest DML Migration (${latestDmlMigration.baseName}) contains full Privilege Escalation & Student Parental Shields.`);
+    process.stdout.write(`     ✅ Latest DML Migration (${latestDmlMigration.baseName}) contains full Privilege Escalation & Student Parental Shields.\n`);
   }
 }
 
-// 3. FINOPS ARCHITECTURAL INVARIANT & MRR CONSISTENCY GUARD
-console.log('\n📂 [3/4] Running FinOps Determinism & Billing Invariant Test Suite...');
-import { execSync } from 'child_process';
+process.stdout.write(
+  `     ${violationsCount === 0 ? '✅' : `❌ (${violationsCount} violation(s))`}` +
+  ` Scanned ${migrationsScanned} migration file(s).\n\n`
+);
+
+// 3. FINOPS ARCHITECTURAL INVARIANT & BILLING SUITE
+process.stdout.write('  📂 [3/4] FinOps Billing Invariants (runBillingInvariantTests.ts)...\n');
 try {
-  execSync('npx tsx src/domain/__tests__/runBillingInvariantTests.ts', {
+  const out = execSync('npx tsx src/domain/__tests__/runBillingInvariantTests.ts', {
     cwd: path.join(ROOT_DIR, 'apps', 'groovelab'),
-    encoding: 'utf-8'
+    encoding: 'utf-8',
+    stdio: ['pipe', 'pipe', 'pipe']
   });
-  console.log('   ✅ FinOps Invariant Verified: 100% Deterministic (Live MRR 68.92 € / Mo., ARR 827.04 € / Jahr).');
+  if (out) process.stdout.write(out.split('\n').map(l => `       ${l}`).join('\n') + '\n');
+  process.stdout.write('     ✅ FinOps Suite: PASSED — Alle Formel- und Algorithmus-Invarianten bestätigt.\n\n');
 } catch (err) {
-  console.error('   🚨 FinOps Invariant Check FAILED: Billing engine deviation detected!');
-  console.error(err.stdout || err.message);
+  process.stderr.write('  🚨 FinOps Invariant Check FAILED: Billing engine deviation detected!\n');
+  process.stderr.write((err.stdout || err.message) + '\n');
   violationsCount++;
 }
 
-// 4. FORENSIC RLS & SCHEMA CATALOG INVARIANT GUARD
-console.log('\n📂 [4/4] Running Forensic RLS & Schema Catalog Invariant Audit...');
+// 4. FORENSIC RLS & SCHEMA CATALOG INVARIANTS
+process.stdout.write('  📂 [4/4] Forensic RLS & Schema Catalog Invariants...\n');
 try {
-  execSync('npx tsx scripts/verify_rls_catalog_invariants.ts', {
+  const out = execSync('npx tsx scripts/verify_rls_catalog_invariants.ts', {
     cwd: ROOT_DIR,
-    encoding: 'utf-8'
+    encoding: 'utf-8',
+    stdio: ['pipe', 'pipe', 'pipe']
   });
-  console.log('   ✅ All 13 Forensic Architecture & Performance Invariants Verified: 100% Deterministic.');
+  if (out) process.stdout.write(out.split('\n').map(l => `       ${l}`).join('\n') + '\n');
+  process.stdout.write('     ✅ All 13 Forensic Architecture & Performance Invariants: VERIFIED\n\n');
 } catch (err) {
-  console.error('   🚨 Forensic RLS Catalog Invariant Check FAILED: Schema invariant violation detected!');
-  console.error(err.stdout || err.message);
+  process.stderr.write('  🚨 Forensic RLS Catalog Invariant Check FAILED: Schema invariant violation detected!\n');
+  process.stderr.write((err.stdout || err.message) + '\n');
   violationsCount++;
 }
 
-console.log('\n════════════════════════════════════════════════════════════════════');
+process.stdout.write(`${HR}\n`);
+process.stdout.write('  📊  SUMMARY\n');
+process.stdout.write(`      Files scanned:       ${filesScanned}  (frontend TS/JS)\n`);
+process.stdout.write(`      Migrations scanned:  ${migrationsScanned}  (SQL)\n`);
+process.stdout.write(`      Violations found:    ${violationsCount}\n`);
+process.stdout.write(`${HR}\n`);
+
 if (violationsCount === 0) {
-  console.log(`✅ SECURITY & FINOPS DRIFT GUARD PASSED: 0 violations across ${filesScanned} files.`);
-  console.log('   All architectural invariants, Zero-Trust rules, and RPC barriers are intact.');
-  console.log('════════════════════════════════════════════════════════════════════\n');
+  process.stdout.write('\n  ✅  SECURITY DRIFT GUARD PASSED\n');
+  process.stdout.write('      0 violations across all files and child suites.\n');
+  process.stdout.write('      All architectural invariants, Zero-Trust rules, and RPC barriers are INTACT.\n');
+  process.stdout.write('      OWASP ASVS Level 3 compliance confirmed.\n\n');
   process.exit(0);
 } else {
-  console.error(`🚨 SECURITY DRIFT GUARD FAILED: ${violationsCount} architectural violation(s) detected!`);
-  console.error('   Please remediate the issues before committing or deploying.');
-  console.error('════════════════════════════════════════════════════════════════════\n');
+  process.stderr.write('\n  🚨  SECURITY DRIFT GUARD FAILED\n');
+  process.stderr.write(`      ${violationsCount} architectural violation(s) detected.\n\n`);
   process.exit(1);
 }

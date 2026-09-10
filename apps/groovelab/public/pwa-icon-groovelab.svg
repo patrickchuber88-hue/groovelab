@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Solid GrooveLab Warm Gold Background -->
+  <rect width="1024" height="1024" fill="#eab308"/>
+  
+  <!-- Apple SF Symbols Solid Beamed Music Note Glyph (Optically Centered) -->
+  <g fill="#ffffff" transform="translate(10, 0)">
+    <!-- Connecting Slanted Top Beam with Rounded Outer Terminals -->
+    <path d="M 376 348 
+             C 376 332, 388 320, 404 316 
+             L 726 216 
+             C 742 211, 758 223, 758 240 
+             L 758 304 
+             C 758 320, 746 332, 730 336 
+             L 408 436 
+             C 392 441, 376 429, 376 412 
+             Z" 
+          fill="#ffffff"/>
+          
+    <!-- Left Vertical Stem -->
+    <rect x="376" y="340" width="48" height="340" rx="6" fill="#ffffff"/>
+    
+    <!-- Right Vertical Stem -->
+    <rect x="710" y="240" width="48" height="340" rx="6" fill="#ffffff"/>
+    
+    <!-- Left Angled Notehead (Rotated Ellipse) -->
+    <g transform="translate(340, 680) rotate(-28)">
+      <ellipse cx="0" cy="0" rx="98" ry="72" fill="#ffffff"/>
+    </g>
+    
+    <!-- Right Angled Notehead (Rotated Ellipse) -->
+    <g transform="translate(674, 580) rotate(-28)">
+      <ellipse cx="0" cy="0" rx="98" ry="72" fill="#ffffff"/>
+    </g>
+  </g>
+</svg>

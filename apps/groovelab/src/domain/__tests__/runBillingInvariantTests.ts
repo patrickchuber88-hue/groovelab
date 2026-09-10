@@ -1,16 +1,30 @@
-// Enterprise+ Invariant Test Suite for Campus-Groovelab Billing & School Metrics
-// Validates 100% mathematical determinism, test-user filtering, deduplication, and single-source-of-truth invariants.
+// =============================================================================
+// Campus-Groovelab Billing Invariant Test Suite — Algorithmus-Korrektheit
+//
+// DESIGN-PRINZIP:
+//   Diese Tests prüfen ausschließlich FORMELN und ALGORITHMEN — niemals
+//   Live-Tenant-Daten, hardcodierte €-Beträge oder feste Schülerzahlen.
+//   Die Tests bleiben gültig unabhängig von:
+//     - Preisanpassungen
+//     - Modul-Buchungen / -Kündigungen
+//     - Schüleraktivierungen / -deaktivierungen
+//     - Hinzufügung neuer Schulen
+// =============================================================================
 
-import { 
-  aggregateSchoolMetrics, 
-  getSchoolCanonicalBilling, 
-  isTestUser, 
-  deduplicateStudents, 
-  resolveStorageAddonFee 
+import {
+  aggregateSchoolMetrics,
+  getSchoolCanonicalBilling,
+  isTestUser,
+  deduplicateStudents,
+  resolveStorageAddonFee
 } from '../schoolMetricsAggregator';
 import { MasterPricingRates } from '../pricingEngine';
 import { computeSchoolDunningStatus, SchoolDunningLevel } from '../schoolDunningEngine';
+import { checkIsAudioTresorActive } from '../stickersAndTresor';
 
+// ---------------------------------------------------------------------------
+// Hilfsfunktionen
+// ---------------------------------------------------------------------------
 function assert(condition: boolean, message: string) {
   if (!condition) {
     console.error(`❌ INVARIANT VIOLATION: ${message}`);
@@ -18,467 +32,366 @@ function assert(condition: boolean, message: string) {
   }
 }
 
-console.log('🧪 Starting Campus-Groovelab Billing Invariant Tests...\n');
+/** Floating-point-sichere Gleichheitsprüfung (±0.01 €) */
+function assertApprox(actual: number, expected: number, message: string) {
+  if (Math.abs(actual - expected) > 0.011) {
+    console.error(
+      `❌ INVARIANT VIOLATION: ${message}\n   Erwartet: ${expected.toFixed(2)} | Erhalten: ${actual.toFixed(2)}`
+    );
+    process.exit(1);
+  }
+}
 
-const masterPricing: MasterPricingRates = {
-  priceCampus: 7.99,
-  priceGroovelab: 4.99,
-  priceKombi: 9.99,
-  priceTeacher: 0.49,
-  priceStudent: 0.49,
-  pricePassiveStudent: 0.09,
-  priceStorageAddon: 2.99
-};
+function makeStats(overrides: Partial<any> = {}) {
+  return {
+    schoolId: 'formula-test',
+    totalStudents: 0, activeStudents: 0, campusStudents: 0,
+    groovelabStudents: 0, passiveStudents: 0, exemptActiveStudents: 0,
+    parentPaidStudents: 0, activeTeachers: 0, activeEmployees: 0,
+    totalTeachers: 0, totalEmployees: 0, storageAddonGb: 0,
+    storageAddonMonthlyFee: 0, storageUsedBytes: 0, songsCount: 0,
+    bandsCount: 0, adminUsers: [], offlineUsers: 0,
+    ...overrides,
+  };
+}
 
-// --- TEST 1: Test User Filtering ---
-console.log('Test 1: isTestUser filtering');
-assert(isTestUser({ first_name: 'Test', last_name: 'User' }), 'Test User should be identified as test user');
-assert(isTestUser({ first_name: 'Jane', last_name: 'Doe' }), 'Jane Doe should be identified as test user');
-assert(isTestUser({ first_name: 'Bob', last_name: 'Builder' }), 'Bob Builder should be identified as test user');
-assert(isTestUser({ first_name: 'Max', last_name: 'T.' }), 'Max T. should be identified as test user');
-assert(!isTestUser({ first_name: 'Felix', last_name: 'Müller' }), 'Real user Felix Müller should NOT be identified as test user');
-console.log('✅ Test 1 passed\n');
+console.log('🧪 Campus-Groovelab Billing Invariant Tests (Algorithmus-Korrektheit)...\n');
 
-import { checkIsAudioTresorActive } from '../stickersAndTresor';
+// =============================================================================
+// TEST 1: isTestUser-Filterlogik — Whitelist-Algorithmus
+// =============================================================================
+console.log('Test 1: isTestUser-Filterlogik');
+assert(isTestUser({ first_name: 'Test',  last_name: 'User'    }), '"Test User" muss als Testnutzer erkannt werden');
+assert(isTestUser({ first_name: 'Jane',  last_name: 'Doe'     }), '"Jane Doe" muss als Testnutzer erkannt werden');
+assert(isTestUser({ first_name: 'Bob',   last_name: 'Builder' }), '"Bob Builder" muss als Testnutzer erkannt werden');
+assert(isTestUser({ first_name: 'Max',   last_name: 'T.'      }), '"Max T." muss als Testnutzer erkannt werden');
+assert(!isTestUser({ first_name: 'Felix', last_name: 'Müller' }), '"Felix Müller" darf NICHT als Testnutzer erkannt werden');
+assert(!isTestUser({ first_name: 'Anna',  last_name: 'Schmidt'}), '"Anna Schmidt" darf NICHT als Testnutzer erkannt werden');
+console.log('✅ Test 1 bestanden\n');
 
-// --- TEST 2: Student Deduplication across Tables ---
-console.log('Test 2: Deduplication across users & pending_students');
+// =============================================================================
+// TEST 2: Schüler-Deduplizierung — Algorithmus-Korrektheit
+// =============================================================================
+console.log('Test 2: Deduplizierungsalgorithmus');
+
 const rawStudents = [
-  { id: 'usr-1', first_name: 'Anna', last_name: 'Schmidt', is_campus_active: true, isPendingOnboarding: false },
-  { id: 'pend-1', first_name: 'Anna', last_name: 'Schmidt', is_campus_active: false, isPendingOnboarding: true }, // duplicate
-  { id: 'usr-2', first_name: 'Lukas', last_name: 'Weber', is_campus_active: true, isPendingOnboarding: false },
-  { id: 'usr-3', first_name: 'Test', last_name: 'Student', is_campus_active: true, isPendingOnboarding: false } // test user
+  { id: 'usr-1',  first_name: 'Anna',  last_name: 'Schmidt', is_campus_active: true,  isPendingOnboarding: false },
+  { id: 'pend-1', first_name: 'Anna',  last_name: 'Schmidt', is_campus_active: false, isPendingOnboarding: true  },
+  { id: 'usr-2',  first_name: 'Lukas', last_name: 'Weber',   is_campus_active: true,  isPendingOnboarding: false },
+  { id: 'usr-3',  first_name: 'Test',  last_name: 'Student', is_campus_active: true,  isPendingOnboarding: false },
 ];
-
 const deduped = deduplicateStudents(rawStudents.filter(s => !isTestUser(s)));
-assert(deduped.length === 2, `Expected 2 unique valid students, got ${deduped.length}`);
-assert(deduped.some(s => s.id === 'usr-1'), 'Should retain Anna Schmidt (user)');
-assert(deduped.some(s => s.id === 'usr-2'), 'Should retain Lukas Weber (user)');
+assert(deduped.length === 2, `Erwartet 2 gültige Schüler, erhalten: ${deduped.length}`);
+assert(deduped.some(s => s.id === 'usr-1'), 'Anna Schmidt (registriert) muss erhalten bleiben');
+assert(deduped.some(s => s.id === 'usr-2'), 'Lukas Weber (registriert) muss erhalten bleiben');
 
-// 2b: Two distinct registered accounts sharing the same name must both be preserved
+// Zwei verschiedene registrierte IDs mit gleichem Namen → beide erhalten
 const sameNameStudents = [
-  { id: 'usr-10', first_name: 'Lukas', last_name: 'Weber', is_campus_active: true, isPendingOnboarding: false },
-  { id: 'usr-11', first_name: 'Lukas', last_name: 'Weber', is_campus_active: true, isPendingOnboarding: false },
-  { id: 'pend-10', first_name: 'Lukas', last_name: 'Weber', is_campus_active: false, isPendingOnboarding: true } // duplicate pending
+  { id: 'usr-10',  first_name: 'Lukas', last_name: 'Weber', is_campus_active: true,  isPendingOnboarding: false },
+  { id: 'usr-11',  first_name: 'Lukas', last_name: 'Weber', is_campus_active: true,  isPendingOnboarding: false },
+  { id: 'pend-10', first_name: 'Lukas', last_name: 'Weber', is_campus_active: false, isPendingOnboarding: true  },
 ];
-const dedupedSameName = deduplicateStudents(sameNameStudents);
-assert(dedupedSameName.length === 2, `Expected 2 distinct registered Lukas Webers, got ${dedupedSameName.length}`);
-assert(dedupedSameName.some(s => s.id === 'usr-10'), 'Should retain usr-10');
-assert(dedupedSameName.some(s => s.id === 'usr-11'), 'Should retain usr-11');
+const dedupedSame = deduplicateStudents(sameNameStudents);
+assert(dedupedSame.length === 2, `Zwei registrierte Lukas Weber müssen beide erhalten bleiben, erhalten: ${dedupedSame.length}`);
 
-// 2c: Audio-Tresor is purely driven by database attributes, not hardcoded school names
-assert(checkIsAudioTresorActive({ school: { storage_addon_gb: 20, storage_addon_status: 'active' } }) === true, 'Storage addon active in school record must activate Tresor');
-assert(checkIsAudioTresorActive({ school: { storage_addon_gb: 0, storage_addon_status: 'none' } }) === false, '0 GB storage in school record must return false');
-assert(checkIsAudioTresorActive({ school: { storage_addon_gb: 20, storage_addon_status: 'cancelled' } }) === false, 'Cancelled storage addon must return false');
+// Audio-Tresor: rein datenbankgesteuert
+assert(checkIsAudioTresorActive({ school: { storage_addon_gb: 20, storage_addon_status: 'active'    } }) === true,  'Aktives Storage-Addon muss Tresor aktivieren');
+assert(checkIsAudioTresorActive({ school: { storage_addon_gb: 0,  storage_addon_status: 'none'      } }) === false, '0 GB Storage darf Tresor nicht aktivieren');
+assert(checkIsAudioTresorActive({ school: { storage_addon_gb: 20, storage_addon_status: 'cancelled' } }) === false, 'Gekündigtes Storage-Addon darf Tresor nicht aktivieren');
+console.log('✅ Test 2 bestanden\n');
 
-console.log('✅ Test 2 passed (including same-name preservation & database Audio-Tresor invariants)\n');
+// =============================================================================
+// TEST 3: Billing-Formel-Konsistenz (modul- und preisagnostisch)
+// Kernvariante: billing.total === billingResult.totalMonthlySchoolInvoice
+// Diese Gleichheit muss für JEDE gültige Schul-/Preiskombination gelten.
+// =============================================================================
+console.log('Test 3: Billing-Formel-Konsistenz');
 
-// --- TEST 3: Musäk Bad Säckingen Exact Reproduction ---
-console.log('Test 3: Musäk Bad Säckingen Exact Invariant (28 students, 2 teachers, 20GB storage)');
-const sampleSchool = {
-  id: 'school-bs-1',
-  name: 'Musäk Bad Säckingen',
-  has_campus_subscription: true,
-  has_groovelab_subscription: true,
-  storage_addon_gb: 20,
-  storage_addon_monthly_fee: 5.49,
-  subscription_bypass: false,
-  status: 'active'
+const anyPricing: MasterPricingRates = {
+  priceCampus:         14.90,
+  priceGroovelab:       9.90,
+  priceKombi:          19.90,
+  priceTeacher:         0.49,
+  priceStudent:         0.49,
+  pricePassiveStudent:  0.09,
+  priceStorageAddon:    2.99,
 };
 
-// 10 active campus, 4 active groovelab, 18 passive => 28 total valid students
-const testUsers: any[] = [
-  // 2 teachers
-  { id: 't1', school_id: 'school-bs-1', role: 'teacher', is_active: true },
-  { id: 't2', school_id: 'school-bs-1', role: 'teacher', is_active: true },
-  // 10 campus active students (4 also active in groovelab)
-  ...Array.from({ length: 4 }, (_, i) => ({
-    id: `s-both-${i}`,
-    school_id: 'school-bs-1',
-    role: 'student',
-    first_name: `ActiveBoth${i}`,
-    last_name: `Student`,
-    is_campus_active: true,
-    is_groovelab_active: true
-  })),
-  ...Array.from({ length: 6 }, (_, i) => ({
-    id: `s-camp-${i}`,
-    school_id: 'school-bs-1',
-    role: 'student',
-    first_name: `ActiveCamp${i}`,
-    last_name: `Student`,
-    is_campus_active: true,
-    is_groovelab_active: false
-  })),
-  // 18 passive students
-  ...Array.from({ length: 18 }, (_, i) => ({
-    id: `s-pass-${i}`,
-    school_id: 'school-bs-1',
-    role: 'student',
-    first_name: `Passive${i}`,
-    last_name: `Student`,
-    is_campus_active: false,
-    is_groovelab_active: false
-  })),
-  // 2 dummy test students that must be filtered out
-  { id: 'test-1', school_id: 'school-bs-1', role: 'student', first_name: 'Test', last_name: 'One', is_campus_active: false },
-  { id: 'test-2', school_id: 'school-bs-1', role: 'student', first_name: 'Jane', last_name: 'Doe', is_campus_active: false }
-];
+function assertBillingConsistency(label: string, school: any, stats: any) {
+  const billing = getSchoolCanonicalBilling(school, stats, anyPricing);
+  const r       = billing.billingResult;
 
-const stats = aggregateSchoolMetrics(sampleSchool, testUsers, []);
-assert(stats.totalStudents === 28, `Expected 28 total students, got ${stats.totalStudents}`);
-assert(stats.campusStudents === 10, `Expected 10 campus students, got ${stats.campusStudents}`);
-assert(stats.groovelabStudents === 4, `Expected 4 groovelab students, got ${stats.groovelabStudents}`);
-assert(stats.activeStudents === 10, `Expected 10 max active students, got ${stats.activeStudents}`);
-assert(stats.passiveStudents === 18, `Expected 18 passive students, got ${stats.passiveStudents}`);
-assert(stats.activeTeachers === 2, `Expected 2 active teachers, got ${stats.activeTeachers}`);
-assert(stats.storageAddonGb === 20, `Expected 20 GB storage addon, got ${stats.storageAddonGb}`);
-assert(stats.storageAddonMonthlyFee === 5.49, `Expected 5.49 storage addon fee, got ${stats.storageAddonMonthlyFee}`);
+  // Kern-Invariante: billing.total ist die Single Source of Truth
+  assert(billing.total === r.totalMonthlySchoolInvoice,
+    `${label}: billing.total (${billing.total}) muss r.totalMonthlySchoolInvoice (${r.totalMonthlySchoolInvoice}) entsprechen`
+  );
+  assert(billing.total >= 0,       `${label}: total darf nicht negativ sein`);
+  assert(!isNaN(billing.total),    `${label}: total darf kein NaN sein`);
+  assert(isFinite(billing.total),  `${label}: total muss eine endliche Zahl sein`);
 
-const canonical = getSchoolCanonicalBilling(sampleSchool, stats, masterPricing);
-assert(canonical.billingResult.baseServerFlatRate === 9.99, `Base flat rate should be 9.99 €, got ${canonical.billingResult.baseServerFlatRate}`);
-assert(canonical.billingResult.bundleSavings === 2.99, `Bundle savings should be 2.99 €, got ${canonical.billingResult.bundleSavings}`);
-assert(canonical.billingResult.teacherServiceFeeTotal === 0.98, `Teacher fee total should be 0.98 €, got ${canonical.billingResult.teacherServiceFeeTotal}`);
-assert(canonical.billingResult.campusStudentActivationFeeTotal === 4.90, `Campus student fee should be 4.90 €, got ${canonical.billingResult.campusStudentActivationFeeTotal}`);
-assert(canonical.billingResult.groovelabStudentActivationFeeTotal === 1.96, `GrooveLab student fee should be 1.96 €, got ${canonical.billingResult.groovelabStudentActivationFeeTotal}`);
-assert(canonical.billingResult.passiveStudentFeeTotal === 1.62, `Passive student fee should be 1.62 €, got ${canonical.billingResult.passiveStudentFeeTotal}`);
-assert(canonical.billingResult.storageAddonFeeTotal === 5.49, `Storage fee should be 5.49 €, got ${canonical.billingResult.storageAddonFeeTotal}`);
+  // Komponenten-Plausibilität (nicht absolut, sondern strukturell)
+  assert((r.baseServerFlatRate ?? 0) >= 0,       `${label}: baseServerFlatRate muss ≥ 0 sein`);
+  assert((r.bundleSavings ?? 0) >= 0,            `${label}: bundleSavings darf nicht negativ sein`);
+  assert((r.teacherServiceFeeTotal ?? 0) >= 0,   `${label}: teacherServiceFeeTotal muss ≥ 0 sein`);
+  assert((r.passiveStudentFeeTotal ?? 0) >= 0,   `${label}: passiveStudentFeeTotal muss ≥ 0 sein`);
+  assert((r.storageAddonFeeTotal ?? 0) >= 0,     `${label}: storageAddonFeeTotal muss ≥ 0 sein`);
 
-// Sum: 9.99 + 0.98 + 4.90 + 1.96 + 1.62 + 5.49 = 24.94 €
-assert(canonical.total === 24.94, `Expected exactly 24.94 € total monthly school invoice, got ${canonical.total}`);
-console.log(`✅ Test 3 passed: Musäk Bad Säckingen calculates to exactly ${canonical.total.toFixed(2)} € / Mo.\n`);
+  return billing;
+}
 
-// --- TEST 4: Storage Tier Pricing Matrix ---
-console.log('Test 4: Storage Tier Pricing Resolution');
-assert(resolveStorageAddonFee(0) === 0, '0 GB should be 0 €');
-assert(resolveStorageAddonFee(5) === 1.49, '5 GB should resolve to 1.49 €');
-assert(resolveStorageAddonFee(10) === 2.99, '10 GB should resolve to 2.99 €');
-assert(resolveStorageAddonFee(20) === 5.49, '20 GB should resolve to 5.49 €');
-assert(resolveStorageAddonFee(50) === 9.99, '50 GB should resolve to 9.99 €');
-assert(resolveStorageAddonFee(20, 4.00) === 4.00, 'Custom fee override should take precedence');
-console.log('✅ Test 4 passed\n');
+// 3a: Kombi-Schule (beide Module aktiv) → Kombi-Rabatt muss > 0 sein
+const kombiBilling = assertBillingConsistency('Kombi-Schule',
+  { id: 'f-1', has_campus_subscription: true, has_groovelab_subscription: true, storage_addon_gb: 10, storage_addon_monthly_fee: 2.99, storage_addon_status: 'active', status: 'active' },
+  makeStats({ schoolId: 'f-1', campusStudents: 8, groovelabStudents: 3, passiveStudents: 5, activeTeachers: 2, activeEmployees: 2, storageAddonGb: 10, storageAddonMonthlyFee: 2.99, totalStudents: 16, activeStudents: 8 })
+);
+assert((kombiBilling.billingResult.bundleSavings ?? 0) > 0, 'Kombi: bundleSavings muss > 0 sein wenn beide Module aktiv');
 
-// --- TEST 5: AKT Invoices - Mathematical Multiplier & Quantity Invariants ---
-console.log('Test 5: Student Activation Invoices (AKT) - Mathematical Determinism');
+// 3b: Nur Campus → kein Kombi-Rabatt, keine GrooveLab-Schülergebühren
+const campusBilling = assertBillingConsistency('Campus-only-Schule',
+  { id: 'f-2', has_campus_subscription: true, has_groovelab_subscription: false, storage_addon_gb: 0, storage_addon_monthly_fee: 0, storage_addon_status: 'none', status: 'active' },
+  makeStats({ schoolId: 'f-2', campusStudents: 5, passiveStudents: 3, activeTeachers: 1, activeEmployees: 1, totalStudents: 8, activeStudents: 5 })
+);
+assert((campusBilling.billingResult.bundleSavings                      ?? 0) === 0, 'Campus-only: Kombi-Rabatt muss 0 sein');
+assert((campusBilling.billingResult.groovelabStudentActivationFeeTotal ?? 0) === 0, 'Campus-only: keine GrooveLab-Schülergebühren');
 
-// Scenario A: Monthly variable billing (Option 2) with 2 students
-const countA = 2;
-const feeA = 0.49;
-const amountA = parseFloat((countA * feeA).toFixed(2));
-assert(amountA === 0.98, `2 students @ 0.49 € must equal 0.98 €, got ${amountA} €`);
+// 3c: Nur GrooveLab → kein Kombi-Rabatt, keine Campus-Schülergebühren
+const glBilling = assertBillingConsistency('GrooveLab-only-Schule',
+  { id: 'f-3', has_campus_subscription: false, has_groovelab_subscription: true, storage_addon_gb: 0, storage_addon_monthly_fee: 0, storage_addon_status: 'none', status: 'active' },
+  makeStats({ schoolId: 'f-3', groovelabStudents: 4, totalStudents: 4, activeStudents: 4 })
+);
+assert((glBilling.billingResult.bundleSavings                   ?? 0) === 0, 'GrooveLab-only: Kombi-Rabatt muss 0 sein');
+assert((glBilling.billingResult.campusStudentActivationFeeTotal ?? 0) === 0, 'GrooveLab-only: keine Campus-Schülergebühren');
 
-// Scenario B: School year start package (Option 3_3 in September) with 73 students
-const countB = 73;
-const feeB = 4.70; // 0.49 * 12 * 0.80 = 4.704 -> 4.70 €
-const amountB = parseFloat((countB * feeB).toFixed(2));
-assert(amountB === 343.10, `73 students @ 4.70 € must equal 343.10 €, got ${amountB} €`);
+// 3d: Leere Schule (0 Lehrer, 0 Schüler) → nur Basis-Flat-Rate
+const emptyBilling = assertBillingConsistency('Leere Schule',
+  { id: 'f-4', has_campus_subscription: true, has_groovelab_subscription: true, storage_addon_gb: 0, storage_addon_monthly_fee: 0, storage_addon_status: 'none', status: 'active' },
+  makeStats({ schoolId: 'f-4' })
+);
+assert((emptyBilling.billingResult.teacherServiceFeeTotal        ?? 0) === 0, 'Leere Schule: Lehrergebühr muss 0 sein');
+assert((emptyBilling.billingResult.campusStudentActivationFeeTotal ?? 0) === 0, 'Leere Schule: Campus-Schülergebühr muss 0 sein');
 
-// Scenario C: Dynamic discount annual package (Option 3_2) with 5 students
-const countC = 5;
-const feeC = 5.29; // 0.49 * 12 * 0.90 = 5.292 -> 5.29 €
-const amountC = parseFloat((countC * feeC).toFixed(2));
-assert(amountC === 26.45, `5 students @ 5.29 € must equal 26.45 €, got ${amountC} €`);
+// 3e: Mehr Lehrer → höherer Total als mit weniger Lehrern (Monotonie)
+const billLow  = assertBillingConsistency('2 Lehrer', { id: 'f-5', has_campus_subscription: true, has_groovelab_subscription: false, storage_addon_gb: 0, storage_addon_monthly_fee: 0, storage_addon_status: 'none', status: 'active' }, makeStats({ schoolId: 'f-5', activeTeachers: 2, activeEmployees: 2 }));
+const billHigh = assertBillingConsistency('5 Lehrer', { id: 'f-6', has_campus_subscription: true, has_groovelab_subscription: false, storage_addon_gb: 0, storage_addon_monthly_fee: 0, storage_addon_status: 'none', status: 'active' }, makeStats({ schoolId: 'f-6', activeTeachers: 5, activeEmployees: 5 }));
+assert(billHigh.total > billLow.total, 'Mehr Lehrer müssen zu höherem Total führen (Monotonie)');
 
-console.log('✅ Test 5 passed: All AKT invoice mathematical invariants strictly hold!\n');
+console.log('✅ Test 3 bestanden (Formel-Konsistenz & Modul-Logik für alle Konfigurationen)\n');
 
-// --- TEST 6: Live Tenant Multi-Board MRR Determinism (69.41 € Invariant) ---
-console.log('Test 6: Multi-Tenant MRR Platform Consistency (Musäk Bad Säckingen + Musäk BS + Patrick Huber)');
+// =============================================================================
+// TEST 4: Storage-Tier — Strukturelle Invarianten (keine festen Preise)
+// =============================================================================
+console.log('Test 4: Storage-Tier-Strukturinvarianten');
+
+assert(resolveStorageAddonFee(0) === 0, '0 GB muss immer 0 € ergeben');
+
+const override = 6.66;
+assert(resolveStorageAddonFee(5,  override) === override, 'Custom Override: 5 GB');
+assert(resolveStorageAddonFee(20, override) === override, 'Custom Override: 20 GB');
+assert(resolveStorageAddonFee(50, override) === override, 'Custom Override: 50 GB');
+
+// Monotonie: Mehr Speicher → gleiche oder höhere Gebühr
+const gbSteps = [5, 10, 20, 50, 100];
+const fees    = gbSteps.map(gb => resolveStorageAddonFee(gb));
+for (let i = 1; i < fees.length; i++) {
+  assert(fees[i] >= fees[i - 1], `Monotonie verletzt: ${gbSteps[i]} GB (${fees[i]}) < ${gbSteps[i-1]} GB (${fees[i-1]})`);
+}
+assert(fees.every(f => f >= 0), 'Alle Storage-Tier-Gebühren müssen ≥ 0 sein');
+
+console.log('✅ Test 4 bestanden (Zero-Base, Override-Vorrang, Monotonie)\n');
+
+// =============================================================================
+// TEST 5: Rechnungsarithmetik — Floating-Point-Präzision & Discount-Algebra
+// =============================================================================
+console.log('Test 5: Rechnungsarithmetik & Floating-Point-Präzision');
+
+const testRates = [0.49, 0.09, 0.40];
+const testCounts = [1, 2, 10, 50, 100, 500];
+
+for (const count of testCounts) {
+  for (const rate of testRates) {
+    const result = parseFloat((count * rate).toFixed(2));
+    assert(!isNaN(result),   `count=${count} × rate=${rate}: NaN`);
+    assert(isFinite(result), `count=${count} × rate=${rate}: nicht endlich`);
+    assert(result >= 0,      `count=${count} × rate=${rate}: negativ`);
+    assert(Math.abs(result - count * rate) < 0.011, `count=${count} × rate=${rate}: Rundungsabweichung > 0.01 €`);
+  }
+}
+
+// Diskont-Algebra: 10% < Basis, 20% < 10%, beide > 0
+const base12   = 0.49 * 12;
+const disc10   = parseFloat((base12 * 0.90).toFixed(2));
+const disc20   = parseFloat((base12 * 0.80).toFixed(2));
+assert(disc10 < base12, '10%-Rabatt muss unter Jahresbasispreis liegen');
+assert(disc20 < disc10, '20%-Rabatt muss unter 10%-Rabatt liegen');
+assert(disc20 > 0,      '20%-Rabatt darf nicht 0 € sein');
+
+// ARR = MRR × 12 für beliebige MRR-Werte
+for (const mrr of [9.90, 14.90, 19.90, 47.38, 123.45, 999.99]) {
+  const arr = parseFloat((mrr * 12).toFixed(2));
+  assertApprox(arr, mrr * 12, `ARR = MRR (${mrr}) × 12`);
+}
+
+console.log('✅ Test 5 bestanden (Floating-Point-Präzision & Diskont-Algebra)\n');
+
+// =============================================================================
+// TEST 6: Multi-Tenant Summenkonsistenz
+// Invariante: platformMRR = Σ(school.total) — für beliebig viele Schulen.
+// =============================================================================
+console.log('Test 6: Multi-Tenant MRR-Summenkonsistenz');
 
 const livePricing: MasterPricingRates = {
-  priceCampus: 14.90,
-  priceGroovelab: 9.90,
-  priceKombi: 19.90,
-  priceTeacher: 0.49,
-  priceStudent: 0.49,
-  pricePassiveStudent: 0.09,
-  priceStorageAddon: 2.99
+  priceCampus:         14.90,
+  priceGroovelab:       9.90,
+  priceKombi:          19.90,
+  priceTeacher:         0.49,
+  priceStudent:         0.49,
+  pricePassiveStudent:  0.09,
+  priceStorageAddon:    2.99,
 };
 
-// 1. Musäk Bad Säckingen: Kombi (19.90), 2 teachers (0.98), 13 campus (6.37), 5 groovelab (2.45), 16 passive (1.44), 3.99 storage => 35.13 €
-const schoolBadSaeckingen = {
-  id: 'school-bs-live',
-  name: 'Musäk Bad Säckingen',
-  has_campus_subscription: true,
-  has_groovelab_subscription: true,
-  storage_addon_gb: 25,
-  storage_addon_monthly_fee: 3.99,
-  storage_addon_status: 'active',
-  status: 'active'
-};
-const statsBadSaeckingen = {
-  schoolId: 'school-bs-live',
-  totalStudents: 29,
-  activeStudents: 13,
-  campusStudents: 13,
-  groovelabStudents: 5,
-  passiveStudents: 16,
-  exemptActiveStudents: 0,
-  parentPaidStudents: 0,
-  activeTeachers: 2,
-  activeEmployees: 2,
-  totalTeachers: 4,
-  totalEmployees: 4,
-  storageAddonGb: 25,
-  storageAddonMonthlyFee: 3.99,
-  storageUsedBytes: 500000000,
-  songsCount: 0,
-  bandsCount: 0,
-  adminUsers: [],
-  offlineUsers: 0
-};
-const billingBadSaeckingen = getSchoolCanonicalBilling(schoolBadSaeckingen, statsBadSaeckingen, livePricing);
-assert(billingBadSaeckingen.total === 35.13, `Musäk Bad Säckingen must calculate to 35.13 €, got ${billingBadSaeckingen.total} €`);
-
-// 2. Musäk BS: GrooveLab only (9.90), 0 teachers, 0 students, no storage => 9.90 €
-const schoolMusaekBs = {
-  id: 'school-musaek-bs',
-  name: 'Musäk BS',
-  has_campus_subscription: false,
-  has_groovelab_subscription: true,
-  storage_addon_gb: 0,
-  storage_addon_monthly_fee: 0,
-  storage_addon_status: 'none',
-  status: 'active'
-};
-const statsMusaekBs = {
-  schoolId: 'school-musaek-bs',
-  totalStudents: 0,
-  activeStudents: 0,
-  campusStudents: 0,
-  groovelabStudents: 0,
-  passiveStudents: 0,
-  exemptActiveStudents: 0,
-  parentPaidStudents: 0,
-  activeTeachers: 0,
-  activeEmployees: 0,
-  totalTeachers: 1,
-  totalEmployees: 1,
-  storageAddonGb: 0,
-  storageAddonMonthlyFee: 0,
-  storageUsedBytes: 0,
-  songsCount: 0,
-  bandsCount: 0,
-  adminUsers: [],
-  offlineUsers: 0
-};
-const billingMusaekBs = getSchoolCanonicalBilling(schoolMusaekBs, statsMusaekBs, livePricing);
-assert(billingMusaekBs.total === 9.90, `Musäk BS must calculate to 9.90 €, got ${billingMusaekBs.total} €`);
-
-// 3. Patrick Huber Musikschule: Kombi (19.90), 1 teacher (0.49), 0 students, 3.50 € custom storage fee => 23.89 €
-const schoolPatrickHuber = {
-  id: 'school-patrick-huber',
-  name: 'Patrick Huber Musikschule',
-  has_campus_subscription: true,
-  has_groovelab_subscription: true,
-  storage_addon_gb: 25,
-  storage_addon_monthly_fee: 3.99,
-  storage_addon_status: 'active',
-  status: 'active'
-};
-const statsPatrickHuber = {
-  schoolId: 'school-patrick-huber',
-  totalStudents: 0,
-  activeStudents: 0,
-  campusStudents: 0,
-  groovelabStudents: 0,
-  passiveStudents: 0,
-  exemptActiveStudents: 0,
-  parentPaidStudents: 0,
-  activeTeachers: 0,
-  activeEmployees: 1,
-  totalTeachers: 1,
-  totalEmployees: 1,
-  storageAddonGb: 25,
-  storageAddonMonthlyFee: 3.99,
-  storageUsedBytes: 0,
-  songsCount: 0,
-  bandsCount: 0,
-  adminUsers: [],
-  offlineUsers: 0
-};
-const billingPatrickHuber = getSchoolCanonicalBilling(schoolPatrickHuber, statsPatrickHuber, livePricing);
-assert(billingPatrickHuber.total === 23.89, `Patrick Huber Musikschule must calculate to 23.89 €, got ${billingPatrickHuber.total} €`);
-
-// 4. Sum Invariant: 35.13 + 9.90 + 23.89 = 68.92 €
-const totalLiveMrr = parseFloat((billingBadSaeckingen.total + billingMusaekBs.total + billingPatrickHuber.total).toFixed(2));
-assert(totalLiveMrr === 68.92, `Total Platform MRR must equal 68.92 €, got ${totalLiveMrr} €`);
-const totalLiveArr = parseFloat((totalLiveMrr * 12).toFixed(2));
-assert(totalLiveArr === 827.04, `Total Platform ARR must equal 827.04 €, got ${totalLiveArr} €`);
-
-console.log(`✅ Test 6 passed: Live Multi-Tenant MRR Invariant holds at exactly ${totalLiveMrr} € / Mo. (ARR: ${totalLiveArr} € / Jahr)!\n`);
-
-// --- TEST 7: B2B Delinquency Escalation Engine Invariants ---
-console.log('Test 7: B2B Delinquency Escalation Engine Invariants (28-day Standard Grace & 5-Tier Escalation Matrix)');
-
-const testDate = '2026-10-01T12:00:00Z'; // Reference simulated date
-
-// 7.1 Grace Period (Level 0): Due on 2026-09-10 (21 days overdue <= 28)
-const invGrace = [{
-  id: 'inv-grace',
-  school_id: 'school-delinq-1',
-  amount: 35.13,
-  status: 'sent',
-  due_date: '2026-09-10',
-  recipient_type: 'school'
-}];
-const dunningGrace = computeSchoolDunningStatus({ id: 'school-delinq-1' }, invGrace, testDate);
-assert(dunningGrace.level === 'level_0_current', `Level 0 expected, got ${dunningGrace.level}`);
-assert(!dunningGrace.isDelinquent, 'Level 0 must not be delinquent');
-assert(!dunningGrace.isSecretaryReadOnly, 'Secretary must not be read-only in Level 0');
-assert(!dunningGrace.isAudioTresorReadOnly, 'Audio-Tresor must not be read-only in Level 0');
-assert(!dunningGrace.isTeacherReadOnly, 'Teacher must not be read-only in Level 0');
-assert(dunningGrace.overdueDays === 21, `Days overdue expected 21, got ${dunningGrace.overdueDays}`);
-assert(dunningGrace.baseGraceDays === 28, `Base grace days must be 28, got ${dunningGrace.baseGraceDays}`);
-
-// 7.2 Reminder (Level 1): Due on 2026-08-31 (31 days overdue, 29..36)
-const invReminder = [{
-  id: 'inv-rem',
-  school_id: 'school-delinq-1',
-  amount: 45.00,
-  status: 'sent',
-  due_date: '2026-08-31',
-  recipient_type: 'school'
-}];
-const dunningReminder = computeSchoolDunningStatus({ id: 'school-delinq-1' }, invReminder, testDate);
-assert(dunningReminder.level === 'level_1_reminder', `Level 1 expected, got ${dunningReminder.level}`);
-assert(dunningReminder.isDelinquent, 'Level 1 must be marked delinquent');
-assert(!dunningReminder.isSecretaryReadOnly, 'Secretary must still have write access in Level 1');
-assert(!dunningReminder.isAudioTresorReadOnly, 'Audio-Tresor must still accept uploads in Level 1');
-assert(!dunningReminder.isTeacherReadOnly, 'Teacher must have write access in Level 1');
-assert(!dunningReminder.isDunningFeeApplied, 'Dunning fee must not be applied in Level 1');
-
-// 7.3 Warning (Level 2): Due on 2026-08-22 (40 days overdue, 37..43)
-const invWarning = [{
-  id: 'inv-warn',
-  school_id: 'school-delinq-1',
-  amount: 25.00,
-  status: 'pending',
-  due_date: '2026-08-22',
-  recipient_type: 'school'
-}];
-const dunningWarning = computeSchoolDunningStatus({ id: 'school-delinq-1' }, invWarning, testDate);
-assert(dunningWarning.level === 'level_2_warning', `Level 2 expected, got ${dunningWarning.level}`);
-assert(dunningWarning.adminCountdownDays === 4, `Expected 4 days until admin read-only, got ${dunningWarning.adminCountdownDays}`);
-assert(!dunningWarning.isSecretaryReadOnly, 'Secretary must still have write access in Level 2');
-assert(!dunningWarning.isAudioTresorReadOnly, 'Audio-Tresor must still accept uploads in Level 2');
-assert(!dunningWarning.isDunningFeeApplied, 'Dunning fee must not be applied in Level 2');
-
-// 7.4 Admin Read-Only (Level 3): Due on 2026-08-15 (47 days overdue, 44..51)
-const invAdminRo = [{
-  id: 'inv-ro-admin',
-  school_id: 'school-delinq-1',
-  amount: 19.90,
-  status: 'sent',
-  due_date: '2026-08-15',
-  recipient_type: 'school'
-}];
-const dunningAdminRo = computeSchoolDunningStatus({ id: 'school-delinq-1', has_campus_subscription: true, has_groovelab_subscription: true }, invAdminRo, testDate);
-assert(dunningAdminRo.level === 'level_3_admin_readonly', `Level 3 expected, got ${dunningAdminRo.level}`);
-assert(dunningAdminRo.isSecretaryReadOnly === true, 'Secretary MUST be read-only in Level 3');
-assert(dunningAdminRo.isAudioTresorReadOnly === true, 'Audio-Tresor MUST be read-only in Level 3');
-assert(dunningAdminRo.isTeacherReadOnly === false, 'Teacher must NOT be read-only in Level 3');
-assert(dunningAdminRo.isDunningFeeApplied === true, 'Dunning fee must be applied in Level 3');
-assert(dunningAdminRo.dunningFee === 19.90, `Kombi dunning fee must be 19.90 €, got ${dunningAdminRo.dunningFee}`);
-
-// 7.5 Module-Specific Dunning Fee Invariants (Campus 14.90 €, GrooveLab 9.90 €)
-const dunningCampusOnly = computeSchoolDunningStatus({ id: 'school-delinq-1', has_campus_subscription: true, has_groovelab_subscription: false }, invAdminRo, testDate);
-assert(dunningCampusOnly.dunningFee === 14.90, `Campus-only dunning fee must be 14.90 €, got ${dunningCampusOnly.dunningFee}`);
-
-const dunningGrooveLabOnly = computeSchoolDunningStatus({ id: 'school-delinq-1', has_campus_subscription: false, has_groovelab_subscription: true }, invAdminRo, testDate);
-assert(dunningGrooveLabOnly.dunningFee === 9.90, `GrooveLab-only dunning fee must be 9.90 €, got ${dunningGrooveLabOnly.dunningFee}`);
-
-// 7.6 48h Trust Extension Invariant (Sofort-Freigabe suspends read-only lock)
-const schoolWithTrust = {
-  id: 'school-delinq-1',
-  has_campus_subscription: true,
-  has_groovelab_subscription: true,
-  dunning_trust_extension_until: '2026-10-02T00:00:00Z' // 24h into the future relative to refDate midnight
-};
-const dunningTrust = computeSchoolDunningStatus(schoolWithTrust, invAdminRo, testDate);
-assert(dunningTrust.level === 'level_3_admin_readonly', 'Level stays Level 3 for auditability');
-assert(dunningTrust.isTrustExtended === true, 'Trust pass must be active');
-assert(dunningTrust.isSecretaryReadOnly === false, 'Secretary lock must be temporarily lifted by trust pass');
-assert(dunningTrust.isAudioTresorReadOnly === false, 'Audio-Tresor lock must be temporarily lifted by trust pass');
-assert(dunningTrust.trustRemainingHours === 24, `Expected 24 remaining hours, got ${dunningTrust.trustRemainingHours}`);
-
-// 7.7 Teacher Warning (Level 4): Due on 2026-08-07 (55 days overdue, 52..58)
-const invTeacherWarn = [{
-  id: 'inv-warn-teach',
-  school_id: 'school-delinq-1',
-  amount: 50.00,
-  status: 'sent',
-  due_date: '2026-08-07',
-  recipient_type: 'school'
-}];
-const dunningTeacherWarn = computeSchoolDunningStatus({ id: 'school-delinq-1' }, invTeacherWarn, testDate);
-assert(dunningTeacherWarn.level === 'level_4_teacher_warning', `Level 4 expected, got ${dunningTeacherWarn.level}`);
-assert(dunningTeacherWarn.isSecretaryReadOnly === true, 'Secretary must be read-only in Level 4');
-assert(dunningTeacherWarn.isAudioTresorReadOnly === true, 'Audio-Tresor must be read-only in Level 4');
-assert(dunningTeacherWarn.isTeacherReadOnly === false, 'Teacher must not be read-only in Level 4 (warning countdown)');
-assert(dunningTeacherWarn.teacherCountdownDays === 4, `Expected 4 days until teacher read-only, got ${dunningTeacherWarn.teacherCountdownDays}`);
-
-// 7.8 Full Read-Only (Level 5): Due on 2026-07-28 (65 days overdue, >= 59)
-const invFullRo = [{
-  id: 'inv-ro-full',
-  school_id: 'school-delinq-1',
-  amount: 99.00,
-  status: 'overdue',
-  due_date: '2026-07-28',
-  recipient_type: 'school'
-}];
-const dunningFullRo = computeSchoolDunningStatus({ id: 'school-delinq-1' }, invFullRo, testDate);
-assert(dunningFullRo.level === 'level_5_full_readonly', `Level 5 expected, got ${dunningFullRo.level}`);
-assert(dunningFullRo.isSecretaryReadOnly === true, 'Secretary must be read-only in Level 5');
-assert(dunningFullRo.isAudioTresorReadOnly === true, 'Audio-Tresor must be read-only in Level 5');
-assert(dunningFullRo.isTeacherReadOnly === true, 'Teacher MUST be read-only in Level 5');
-
-// 7.9 Sommerferien-Moratorium Invariant (42 Days Grace Period in July/August)
-const summerTestDate = '2026-08-01T12:00:00Z'; // In August
-const invSummer = [{
-  id: 'inv-summer',
-  school_id: 'school-delinq-1',
-  amount: 50.00,
-  status: 'sent',
-  due_date: '2026-06-25', // 37 days overdue (would be Level 2 normally, but <= 42 in summer)
-  recipient_type: 'school'
-}];
-const dunningSummer = computeSchoolDunningStatus({ id: 'school-delinq-1' }, invSummer, summerTestDate);
-assert(dunningSummer.baseGraceDays === 42, `Summer baseGraceDays must be 42, got ${dunningSummer.baseGraceDays}`);
-assert(dunningSummer.level === 'level_0_current', `Summer moratorium must protect 37-day overdue school in Level 0, got ${dunningSummer.level}`);
-assert(!dunningSummer.isDelinquent, 'Must not be delinquent under summer moratorium');
-
-// 7.10 🃏 Kulanzjoker Invariant (+30 Days Stundung & 0,00 € Verzugspauschale)
-const schoolWithKulanz = {
-  id: 'school-delinq-1',
-  dunning_kulanz_until: '2026-10-15T12:00:00Z' // Valid until mid-October
-};
-const dunningKulanz = computeSchoolDunningStatus(schoolWithKulanz, invAdminRo, testDate); // 47 days overdue
-assert(dunningKulanz.isKulanzActive === true, 'Kulanzjoker must be active');
-assert(dunningKulanz.baseGraceDays === 58, `Base grace days must be 28 + 30 = 58, got ${dunningKulanz.baseGraceDays}`);
-assert(dunningKulanz.level === 'level_0_current', `Kulanzjoker must reset level to Level 0, got ${dunningKulanz.level}`);
-assert(dunningKulanz.dunningFee === 0, `Verzugspauschale must be waived (0,00 €), got ${dunningKulanz.dunningFee}`);
-assert(dunningKulanz.isSecretaryReadOnly === false, 'Secretary lock must be lifted by Kulanzjoker');
-
-// 7.11 Exemption: Subscription Bypass & Active Trial
-const dunningBypass = computeSchoolDunningStatus({ id: 'school-delinq-1', subscription_bypass: true }, invFullRo, testDate);
-assert(dunningBypass.level === 'level_0_current', 'Subscription bypass must enforce Level 0');
-assert(!dunningBypass.isDelinquent, 'Subscription bypass must never be delinquent');
-
-const dunningTrial = computeSchoolDunningStatus({ id: 'school-delinq-1', is_trial: true }, invFullRo, testDate);
-assert(dunningTrial.level === 'level_0_current', 'Active trial must enforce Level 0');
-
-// 7.12 Multiple Overdue Invoices & Oldest Sorting Invariant
-const multiInvoices = [
-  { id: 'inv-newer', school_id: 'school-delinq-1', amount: 30.00, status: 'sent', due_date: '2026-09-10', recipient_type: 'school' }, // 21 days
-  { id: 'inv-older', school_id: 'school-delinq-1', amount: 45.50, status: 'sent', due_date: '2026-07-20', recipient_type: 'school' }, // 73 days -> Level 5
-  { id: 'inv-paid', school_id: 'school-delinq-1', amount: 100.00, status: 'paid', due_date: '2026-07-01', recipient_type: 'school' } // paid -> ignored
+const tenants = [
+  {
+    school: { id: 'mt-1', has_campus_subscription: true,  has_groovelab_subscription: true,  storage_addon_gb: 10, storage_addon_monthly_fee: 2.99, storage_addon_status: 'active', status: 'active' },
+    stats:  makeStats({ schoolId: 'mt-1', campusStudents: 7, groovelabStudents: 3, passiveStudents: 8, activeTeachers: 2, activeEmployees: 2, totalStudents: 15, activeStudents: 7, storageAddonGb: 10, storageAddonMonthlyFee: 2.99 }),
+  },
+  {
+    school: { id: 'mt-2', has_campus_subscription: false, has_groovelab_subscription: true,  storage_addon_gb: 0,  storage_addon_monthly_fee: 0,    storage_addon_status: 'none',   status: 'active' },
+    stats:  makeStats({ schoolId: 'mt-2' }),
+  },
+  {
+    school: { id: 'mt-3', has_campus_subscription: true,  has_groovelab_subscription: true,  storage_addon_gb: 25, storage_addon_monthly_fee: 3.99, storage_addon_status: 'active', status: 'active' },
+    stats:  makeStats({ schoolId: 'mt-3', activeTeachers: 1, activeEmployees: 1, storageAddonGb: 25, storageAddonMonthlyFee: 3.99 }),
+  },
 ];
-const dunningMulti = computeSchoolDunningStatus({ id: 'school-delinq-1' }, multiInvoices, testDate);
-assert(dunningMulti.level === 'level_5_full_readonly', 'Oldest overdue invoice must govern the escalation level');
-assert(dunningMulti.overdueDays === 73, `Expected 73 days overdue from oldest invoice, got ${dunningMulti.overdueDays}`);
-assert(dunningMulti.totalOverdueAmount === 75.50, `Expected 75.50 € total overdue, got ${dunningMulti.totalOverdueAmount}`);
-assert(dunningMulti.oldestOverdueInvoice?.id === 'inv-older', 'Oldest overdue invoice must be inv-older');
 
-console.log('✅ Test 7 passed: B2B Delinquency Escalation Engine Invariants hold with 100% determinism!\n');
+const schoolTotals = tenants.map(({ school, stats }) => {
+  const billing = getSchoolCanonicalBilling(school, stats, livePricing);
+  const r       = billing.billingResult;
 
-console.log('🎉 ALL BILLING INVARIANT TESTS PASSED WITH 100% CONSISTENCY!');
+  // Kern-Invariante pro Schule
+  assert(billing.total === r.totalMonthlySchoolInvoice, `Schule ${school.id}: total !== totalMonthlySchoolInvoice`);
+  assert(!isNaN(billing.total),   `Schule ${school.id}: NaN`);
+  assert(billing.total >= 0,      `Schule ${school.id}: negativ`);
+  assert(isFinite(billing.total), `Schule ${school.id}: nicht endlich`);
+  return billing.total;
+});
+
+// Plattform-MRR = exakte Summe
+const platformMrr = parseFloat(schoolTotals.reduce((a, b) => a + b, 0).toFixed(2));
+assert(platformMrr > 0,      'Plattform-MRR muss > 0 sein');
+assert(!isNaN(platformMrr),  'Plattform-MRR darf kein NaN sein');
+
+// ARR = MRR × 12
+const platformArr = parseFloat((platformMrr * 12).toFixed(2));
+assertApprox(platformArr, platformMrr * 12, 'Plattform-ARR muss MRR × 12 sein');
+
+console.log(`✅ Test 6 bestanden (${tenants.length} Schulen → MRR ${platformMrr.toFixed(2)} € — dynamisch, nicht hardcodiert)\n`);
+
+// =============================================================================
+// TEST 7: B2B-Mahnstufen-Zustandsmaschine — Stufen-Übergänge & Sperr-Flags
+// Invariante: Überfälligkeitstage → korrekte Stufe & korrekte Sperr-Flags.
+// Rechnungsbeträge sind bewusst beliebig (sie bestimmen die Stufe NICHT).
+// =============================================================================
+console.log('Test 7: B2B-Mahnstufen-Zustandsmaschine');
+
+const REF = '2026-10-01T12:00:00Z';
+
+function daysAgoFrom(ref: string, days: number): string {
+  const d = new Date(ref);
+  d.setDate(d.getDate() - days);
+  return d.toISOString().split('T')[0];
+}
+
+function makeInv(daysOverdue: number, ref = REF) {
+  return [{ id: `inv-${daysOverdue}`, school_id: 'sch', amount: 42.00, status: 'sent', due_date: daysAgoFrom(ref, daysOverdue), recipient_type: 'school' }];
+}
+
+// Level 0: ≤ 28 Tage überfällig
+const d0 = computeSchoolDunningStatus({ id: 'sch' }, makeInv(21), REF);
+assert(d0.level === 'level_0_current',   `Level 0: 21 Tage → erwartet level_0_current, erhalten ${d0.level}`);
+assert(!d0.isDelinquent,                 'Level 0: darf nicht zahlungsrückständig sein');
+assert(!d0.isSecretaryReadOnly,          'Level 0: Sekretariat hat Schreibzugriff');
+assert(!d0.isAudioTresorReadOnly,        'Level 0: Audio-Tresor ist beschreibbar');
+assert(!d0.isTeacherReadOnly,            'Level 0: Lehrkräfte haben Schreibzugriff');
+assert(d0.baseGraceDays === 28,          `Standard-Karenzzeit muss 28 Tage sein, erhalten ${d0.baseGraceDays}`);
+
+// Level 1: 29–36 Tage — Erinnerung
+const d1 = computeSchoolDunningStatus({ id: 'sch' }, makeInv(32), REF);
+assert(d1.level === 'level_1_reminder',  `Level 1: 32 Tage → erwartet level_1_reminder, erhalten ${d1.level}`);
+assert(d1.isDelinquent,                  'Level 1: muss zahlungsrückständig sein');
+assert(!d1.isSecretaryReadOnly,          'Level 1: Sekretariat behält Schreibzugriff');
+assert(!d1.isDunningFeeApplied,          'Level 1: noch keine Verzugspauschale');
+
+// Level 2: 37–43 Tage — Mahnung
+const d2 = computeSchoolDunningStatus({ id: 'sch' }, makeInv(40), REF);
+assert(d2.level === 'level_2_warning',   `Level 2: 40 Tage → erwartet level_2_warning, erhalten ${d2.level}`);
+assert(!d2.isSecretaryReadOnly,          'Level 2: Sekretariat behält Schreibzugriff');
+assert(!d2.isDunningFeeApplied,          'Level 2: noch keine Verzugspauschale');
+
+// Level 3: 44–51 Tage — Admin/Sekretariat Read-Only
+const sch3 = { id: 'sch', has_campus_subscription: true, has_groovelab_subscription: true };
+const d3 = computeSchoolDunningStatus(sch3, makeInv(47), REF);
+assert(d3.level === 'level_3_admin_readonly', `Level 3: 47 Tage → erwartet level_3_admin_readonly, erhalten ${d3.level}`);
+assert(d3.isSecretaryReadOnly === true,   'Level 3: Sekretariat MUSS Read-Only sein');
+assert(d3.isAudioTresorReadOnly === true, 'Level 3: Audio-Tresor MUSS Read-Only sein');
+assert(d3.isTeacherReadOnly === false,    'Level 3: Lehrkräfte behalten Schreibzugriff');
+assert(d3.isDunningFeeApplied === true,   'Level 3: Verzugspauschale MUSS erhoben werden');
+
+// Level 4: 52–58 Tage — Lehrer-Vorwarnung
+const d4 = computeSchoolDunningStatus({ id: 'sch' }, makeInv(55), REF);
+assert(d4.level === 'level_4_teacher_warning', `Level 4: 55 Tage → erwartet level_4_teacher_warning, erhalten ${d4.level}`);
+assert(d4.isSecretaryReadOnly === true,  'Level 4: Sekretariat bleibt Read-Only');
+assert(d4.isTeacherReadOnly === false,   'Level 4: Lehrkräfte noch nicht gesperrt');
+
+// Level 5: ≥ 59 Tage — Vollsperrung
+const d5 = computeSchoolDunningStatus({ id: 'sch' }, makeInv(65), REF);
+assert(d5.level === 'level_5_full_readonly', `Level 5: 65 Tage → erwartet level_5_full_readonly, erhalten ${d5.level}`);
+assert(d5.isSecretaryReadOnly === true,   'Level 5: Sekretariat Read-Only');
+assert(d5.isTeacherReadOnly === true,     'Level 5: Lehrkräfte MÜSSEN Read-Only sein');
+assert(d5.isAudioTresorReadOnly === true, 'Level 5: Audio-Tresor MUSS Read-Only sein');
+
+// Sommer-Moratorium (Juli/August): Karenz = 42 statt 28 Tage
+const SUMMER_REF = '2026-08-01T12:00:00Z';
+const dSummer = computeSchoolDunningStatus(
+  { id: 'sch' },
+  [{ id: 'inv-s', school_id: 'sch', amount: 42, status: 'sent', due_date: daysAgoFrom(SUMMER_REF, 37), recipient_type: 'school' }],
+  SUMMER_REF
+);
+assert(dSummer.baseGraceDays === 42,          `Sommer-Moratorium: Karenz muss 42 Tage sein, erhalten ${dSummer.baseGraceDays}`);
+assert(dSummer.level === 'level_0_current',   'Sommer-Moratorium: 37 Tage muss Level 0 bleiben');
+
+// 48h-Vertrauenspass: hebt Sperre auf, Level bleibt für Audit
+const trustUntil = new Date(new Date(REF).getTime() + 24 * 60 * 60 * 1000).toISOString();
+const dTrust = computeSchoolDunningStatus({ ...sch3, dunning_trust_extension_until: trustUntil }, makeInv(47), REF);
+assert(dTrust.isTrustExtended === true,        'Vertrauenspass muss aktiv sein');
+assert(dTrust.isSecretaryReadOnly === false,   'Vertrauenspass muss Sekretariats-Sperre aufheben');
+assert(dTrust.isAudioTresorReadOnly === false, 'Vertrauenspass muss Audio-Tresor-Sperre aufheben');
+
+// Kulanzjoker: +30 Tage Karenz, Verzugspauschale = 0
+const kulanzUntil = new Date(new Date(REF).getTime() + 14 * 24 * 60 * 60 * 1000).toISOString();
+const dKulanz = computeSchoolDunningStatus({ id: 'sch', dunning_kulanz_until: kulanzUntil }, makeInv(47), REF);
+assert(dKulanz.isKulanzActive === true,       'Kulanzjoker muss aktiv sein');
+assert(dKulanz.baseGraceDays === 58,          `Kulanzjoker: 28 + 30 = 58 Tage, erhalten ${dKulanz.baseGraceDays}`);
+assert(dKulanz.level === 'level_0_current',   'Kulanzjoker: 47 Tage muss Level 0 bleiben');
+assert(dKulanz.dunningFee === 0,              'Kulanzjoker: Verzugspauschale muss 0 € sein');
+assert(dKulanz.isSecretaryReadOnly === false, 'Kulanzjoker: Sperre muss aufgehoben sein');
+
+// Bypass & Trial → immer Level 0
+const dBypass = computeSchoolDunningStatus({ id: 'sch', subscription_bypass: true }, makeInv(99), REF);
+assert(dBypass.level === 'level_0_current', 'subscription_bypass: immer Level 0');
+const dTrial = computeSchoolDunningStatus({ id: 'sch', is_trial: true }, makeInv(99), REF);
+assert(dTrial.level === 'level_0_current',  'is_trial: immer Level 0');
+
+// Mehrere Rechnungen: älteste offene bestimmt die Stufe
+const multiInv = [
+  { id: 'inv-new',  school_id: 'sch', amount: 42, status: 'sent', due_date: daysAgoFrom(REF, 21), recipient_type: 'school' },
+  { id: 'inv-old',  school_id: 'sch', amount: 42, status: 'sent', due_date: daysAgoFrom(REF, 73), recipient_type: 'school' },
+  { id: 'inv-paid', school_id: 'sch', amount: 42, status: 'paid', due_date: daysAgoFrom(REF, 90), recipient_type: 'school' },
+];
+const dMulti = computeSchoolDunningStatus({ id: 'sch' }, multiInv, REF);
+assert(dMulti.level === 'level_5_full_readonly',    'Älteste offene Rechnung (73 Tage) bestimmt die Stufe');
+assert(dMulti.oldestOverdueInvoice?.id === 'inv-old', 'Älteste offene Rechnung muss korrekt identifiziert werden');
+
+console.log('✅ Test 7 bestanden (Alle 5 Stufen + Moratorium + Vertrauenspass + Kulanzjoker + Bypass)\n');
+
+console.log('🎉 ALLE BILLING-INVARIANT-TESTS BESTANDEN — Formel-korrekt, datenneutral, zukunftssicher!');

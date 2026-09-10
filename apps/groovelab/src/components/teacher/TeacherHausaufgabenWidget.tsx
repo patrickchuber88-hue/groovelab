@@ -7,6 +7,7 @@ import {
   Activity, BookOpen, Calendar, Clock, Edit3, Flame,
   Mic, Music, Sparkles, Sun, User, Users
 } from 'lucide-react';
+import { isTeacherCurrentlyAbsent } from '../../utils/teacherAbsenceHelper';
 
 export interface TeacherHausaufgabenWidgetProps {
   teacher: any;
@@ -15,7 +16,8 @@ export interface TeacherHausaufgabenWidgetProps {
   selectedGroupStudentId: string | null;
   setSelectedGroupStudentId: (id: string | null) => void;
   allStudents: any[];
-  bypassSickView: boolean;
+  bypassAbsenceView?: boolean;
+  bypassSickView?: boolean;
   selectedStudentProfile: any;
   setSelectedStudentProfile: (s: any) => void;
   docStudent: any;
@@ -41,6 +43,7 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
   selectedGroupStudentId,
   setSelectedGroupStudentId,
   allStudents,
+  bypassAbsenceView,
   bypassSickView,
   selectedStudentProfile,
   setSelectedStudentProfile,
@@ -60,27 +63,28 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
   widgetState,
 }) => {
   return (
-    (!teacher?.sick_until || bypassSickView) && (isTourDemoScheduleActive || (!isFreeDay && !isWeekend)) && (
-      <div className="google-card" style={{ 
-        width: '100%', 
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        borderLeft: isTourDemoScheduleActive 
-          ? '4px solid #34a853' 
-          : widgetState === 'VORBEREITUNG' 
-          ? '4px solid #fbbc05' 
-          : widgetState === 'ACTIVE' 
-          ? '4px solid #34a853' 
-          : widgetState === 'WEEKEND' 
-          ? '4px solid #8b5cf6' 
-          : '4px solid #f59e0b', 
-        opacity: loadingPrepMirror ? 0.6 : 1, 
-        transition: 'opacity 0.2s', 
-        boxSizing: 'border-box' 
-      }}>
-        {(() => {
-          if (isTourDemoScheduleActive) {
+    <div className="google-card" style={{ 
+      width: '100%', 
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'column',
+      borderLeft: isTourDemoScheduleActive 
+        ? '4px solid #34a853' 
+        : (isTeacherCurrentlyAbsent(teacher) && !(bypassAbsenceView || bypassSickView))
+        ? '4px solid #ef4444'
+        : widgetState === 'VORBEREITUNG' 
+        ? '4px solid #fbbc05' 
+        : widgetState === 'ACTIVE' 
+        ? '4px solid #34a853' 
+        : widgetState === 'WEEKEND' 
+        ? '4px solid #8b5cf6' 
+        : '4px solid #f59e0b',
+      background: '#ffffff',
+      opacity: 1,
+      boxSizing: 'border-box' 
+    }}>
+      {(() => {
+        if (isTourDemoScheduleActive) {
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {/* Header: Student Info & Profile Button */}
@@ -172,6 +176,35 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
                   <Edit3 size={15} color="#ffffff" />
                   <span>Hausaufgabe / Notiz erfassen</span>
                 </button>
+              </div>
+            );
+          }
+
+          if (isTeacherCurrentlyAbsent(teacher) && !(bypassAbsenceView || bypassSickView)) {
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'center', padding: '16px 8px' }}>
+                <div style={{ 
+                  background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(220, 38, 38, 0.06) 100%)', 
+                  color: '#dc2626', 
+                  width: '42px', 
+                  height: '42px', 
+                  borderRadius: '12px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  margin: '0 auto',
+                  boxShadow: '0 2px 8px rgba(239, 68, 68, 0.1)'
+                }}>
+                  <Calendar size={20} color="#dc2626" />
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#991b1b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                    Abwesenheits-Modus aktiv
+                  </h4>
+                  <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', color: '#b91c1c', fontWeight: 600, lineHeight: 1.4 }}>
+                    Du bist gegenwärtig abwesend gemeldet. Deine heutigen Termine wurden pausiert. Erhole dich gut!
+                  </p>
+                </div>
               </div>
             );
           }
@@ -334,7 +367,36 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
 
           if (widgetState === 'ACTIVE') {
             if (!dynamicPrepMirror && !briefingData?.prepMirror) {
-              return <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Keine Unterrichtsdaten geladen.</div>;
+              if (loadingPrepMirror) {
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 20px', gap: '10px', color: '#64748b' }}>
+                    <Sparkles size={18} className="animate-spin" color="#34a853" />
+                    <span style={{ fontSize: '0.86rem', fontWeight: 600 }}>Unterrichtsdaten werden geladen...</span>
+                  </div>
+                );
+              }
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '24px 16px', textAlign: 'center' }}>
+                  <div style={{
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '12px',
+                    background: '#f1f5f9',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto'
+                  }}>
+                    <Clock size={18} color="#64748b" />
+                  </div>
+                  <div>
+                    <h5 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 800, color: '#1e293b' }}>Unterrichtspause</h5>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
+                      Gegenwärtig findet kein aktiver Unterricht statt. Wähle im Tagesplan einen Schüler aus oder nutze die Toolbox.
+                    </p>
+                  </div>
+                </div>
+              );
             }
             const prep = dynamicPrepMirror || briefingData.prepMirror;
 
@@ -497,11 +559,12 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
                     style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', minWidth: 0, flex: '1 1 200px' }}
                     onClick={() => {
                       const foundStud = allStudents.find(s => s.id === prep.studentId);
+                      const sName = prep.studentName || 'Schüler';
                       setDocStudent({
                         ...(foundStud || {}),
                         id: prep.studentId,
-                        first_name: prep.studentName.split(' ')[0],
-                        last_name: prep.studentName.split(' ').slice(1).join(' '),
+                        first_name: sName.split(' ')[0],
+                        last_name: sName.split(' ').slice(1).join(' '),
                         photo_url: '/avatar_ghost.jpg',
                         is_campus_active: foundStud ? foundStud.is_campus_active : false,
                         school_id: foundStud?.school_id || teacher?.school_id,
@@ -525,11 +588,11 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
                       boxShadow: '0 2px 6px rgba(52, 168, 83, 0.18)',
                       flexShrink: 0
                     }}>
-                      {prep.studentName.charAt(0)}
+                      {(prep.studentName || 'S').charAt(0)}
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.96rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                        {prep.studentName}
+                        {prep.studentName || 'Schüler'}
                       </div>
                       <div style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 600 }}>
                         {activeStudent?.id === prep.studentId ? 'Aktueller Schüler' : 'Nächster Schüler'}
@@ -543,10 +606,11 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
                     <button
                       type="button"
                       onClick={() => {
+                        const sName = prep.studentName || 'Schüler';
                         setSelectedStudentProfile({
                           id: prep.studentId,
-                          first_name: prep.studentName.split(' ')[0],
-                          last_name: prep.studentName.split(' ').slice(1).join(' '),
+                          first_name: sName.split(' ')[0],
+                          last_name: sName.split(' ').slice(1).join(' '),
                           photo_url: '/avatar_ghost.jpg'
                         });
                       }}
@@ -912,8 +976,7 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
             );
           }
 
-          // WEEKEND or FEIERABEND (fallback)
-          // 10 Seeded Feierabend wishes
+          // WEEKEND or FEIERABEND / FREIER TAG (fallback)
           const wishes = [
             "Du hast heute Großartiges geleistet. Entspanne dich, tanke neue Energie und lass den Tag gemütlich ausklingen!",
             "Der produktive Teil des Tages ist geschafft! Mach es dir bequem, leg die Füße hoch und genieße deinen wohlverdienten Abend.",
@@ -927,11 +990,18 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
             "Schönen Feierabend! Zeit für frische Luft, gutes Essen und eine wohlverdiente Auszeit vom Schulalltag."
           ];
 
+          const freeDayWishes = [
+            "Heute hast du unterrichtsfrei! Nutze den Tag für dich, neue kreative Ideen oder pure Entspannung.",
+            "Kein Unterricht heute! Zeit, die Seele baumeln zu lassen und frische Energie zu tanken.",
+            "Dein freier Tag! Genieße die Pause vom Lehralltag und mach genau das, was dir am meisten Freude bringt.",
+            "Ein Tag für Inspiration, eigene Musikprojekte oder einfach eine wohlverdiente Auszeit.",
+            "Heute ruht der Stundenplan! Wir wünschen dir einen erholsamen und inspirierenden freien Tag."
+          ];
+
           const today = getSimulatedNow();
           const dateSeed = today.getDate() + today.getMonth() * 31 + today.getFullYear();
-          const dailyWishIndex = dateSeed % wishes.length;
-
-          const dailyWish = wishes[dailyWishIndex];
+          const dailyWishIndex = isFreeDay ? (dateSeed % freeDayWishes.length) : (dateSeed % wishes.length);
+          const dailyWish = isFreeDay ? freeDayWishes[dailyWishIndex] : wishes[dailyWishIndex];
           const dailyItem = getDailyQuote(dateSeed, 'teacher');
 
           if (widgetState === 'WEEKEND') {
@@ -1025,9 +1095,11 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
                 </div>
                 <div>
                   <h4 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#1d1d1f', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.01em' }}>
-                    Feierabend
+                    {isFreeDay ? 'Freier Tag' : 'Feierabend'}
                   </h4>
-                  <div style={{ fontSize: '0.72rem', color: '#86868b', fontWeight: 500, marginTop: '1px' }}>Entspannung &amp; Inspiration</div>
+                  <div style={{ fontSize: '0.72rem', color: '#86868b', fontWeight: 500, marginTop: '1px' }}>
+                    {isFreeDay ? 'Ruhe & Inspiration' : 'Entspannung & Inspiration'}
+                  </div>
                 </div>
               </div>
 
@@ -1068,7 +1140,7 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
                     fontFamily: "'Plus Jakarta Sans', sans-serif"
                   }}>
                     <Sparkles size={20} color="#d97706" />
-                    <span>Schönen Feierabend!</span>
+                    <span>{isFreeDay ? 'Genieße deinen freien Tag!' : 'Schönen Feierabend!'}</span>
                   </div>
                   <div style={{ fontSize: '0.86rem', fontWeight: 600, color: '#4b5563', lineHeight: '1.5' }}>
                     {dailyWish}
@@ -1148,7 +1220,5 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
           );
         })()}
       </div>
-    )
-
   );
 };

@@ -7,7 +7,7 @@ const TeacherTagesplanWidget = lazy(() => import('./teacher/TeacherTagesplanWidg
 const TeacherTagesplanRoomIssuesBanner = lazy(() => import('./teacher/TeacherTagesplanWidget').then(m => ({ default: m.TeacherTagesplanRoomIssuesBanner })));
 const TeacherTourDemoSchedule = lazy(() => import('./teacher/TeacherTagesplanWidget').then(m => ({ default: m.TeacherTourDemoSchedule })));
 const TeacherLiveView = lazy(() => import('./teacher/TeacherLiveView').then(m => ({ default: m.TeacherLiveView })));
-import { AvatarImage, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, resolveCampusStudentAvatar } from './common/AvatarImage';
+import { AvatarImage, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, resolveCampusStudentAvatar, resolveGrooveLabTeacherAvatar } from './common/AvatarImage';
 import { MUSIC_QUOTES, getQuotesForAudience, getDailyQuote } from '@groovelab/shared';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
@@ -1420,10 +1420,10 @@ export function TeacherDashboard({
 
     try {
       const todayStr = new Date().toLocaleDateString('sv-SE');
-      const resp = await fetch('/api/teacher/report-sick', {
+      const resp = await fetch('/api/teacher/report-absence', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teacherId: userId, sickUntilDate: todayStr })
+        body: JSON.stringify({ teacherId: userId, absenceUntilDate: todayStr })
       });
 
       if (resp.ok) {
@@ -1501,19 +1501,19 @@ export function TeacherDashboard({
   // 4-week maximum: longer absences must be entered by administration
   const MAX_SELF_REPORT_DAYS = 28;
 
-  const handleReportSick = async () => {
-    if (!sickUntilDate) {
+  const handleReportAbsence = async () => {
+    if (!absenceUntilDate) {
       alert('Bitte wähle ein bis-Datum aus.');
       return;
     }
-    if (!sickStartDate) {
+    if (!absenceStartDate) {
       alert('Bitte wähle ein von-Datum aus.');
       return;
     }
 
-    // Check if sick period exceeds 4 weeks
-    const startD = new Date(sickStartDate);
-    const untilD = new Date(sickUntilDate);
+    // Check if absence period exceeds 4 weeks
+    const startD = new Date(absenceStartDate);
+    const untilD = new Date(absenceUntilDate);
     startD.setHours(0, 0, 0, 0);
     untilD.setHours(0, 0, 0, 0);
     const diffDays = Math.round((untilD.getTime() - startD.getTime()) / (24 * 3600 * 1000)) + 1;
@@ -1524,12 +1524,12 @@ export function TeacherDashboard({
       return;
     }
 
-    const confirmMsg = `Möchtest du die Unterrichtstermine vom ${new Date(sickStartDate + 'T00:00:00').toLocaleDateString('de-DE')} bis zum ${new Date(sickUntilDate + 'T00:00:00').toLocaleDateString('de-DE')} wirklich absagen?`;
+    const confirmMsg = `Möchtest du die Unterrichtstermine vom ${new Date(absenceStartDate + 'T00:00:00').toLocaleDateString('de-DE')} bis zum ${new Date(absenceUntilDate + 'T00:00:00').toLocaleDateString('de-DE')} wirklich absagen?`;
 
     if (!confirm(confirmMsg)) return;
 
     try {
-      setReportingSick(true);
+      setSubmittingAbsence(true);
 
       // Direct Client-Side Supabase logic matching CampusTeacherDashboard
       const { data: profile, error: profileErr } = await supabase
@@ -1542,24 +1542,24 @@ export function TeacherDashboard({
         throw new Error('Teacher profile not found.');
       }
 
-      const prevSickUntilStr = profile.sick_until;
+      const prevAbsenceUntilStr = profile.sick_until;
       const todayD = new Date();
       const localTodayStr = `${todayD.getFullYear()}-${String(todayD.getMonth() + 1).padStart(2, '0')}-${String(todayD.getDate()).padStart(2, '0')}`;
       // When reporting from today, use exact current ISO timestamp so earlier slots today do NOT get cancelled.
       // For future dates, use start of day (00:00:00).
-      const sickStartVal = (sickStartDate === localTodayStr) 
+      const absenceStartVal = (absenceStartDate === localTodayStr) 
         ? todayD.toISOString() 
-        : (sickStartDate ? `${sickStartDate}T00:00:00.000Z` : (profile.sick_start || todayD.toISOString()));
+        : (absenceStartDate ? `${absenceStartDate}T00:00:00.000Z` : (profile.sick_start || todayD.toISOString()));
       
       // Absence until end of day (23:59:59.999)
-      const sickUntilVal = sickUntilDate.includes('T') ? sickUntilDate : `${sickUntilDate}T23:59:59.999Z`;
+      const absenceUntilVal = absenceUntilDate.includes('T') ? absenceUntilDate : `${absenceUntilDate}T23:59:59.999Z`;
 
       // 1. Update user table
       const { error: userErr } = await supabase
         .from('users')
         .update({ 
-          sick_until: sickUntilVal,
-          sick_start: sickStartVal
+          sick_until: absenceUntilVal,
+          sick_start: absenceStartVal
         })
         .eq('id', userId);
 
@@ -1585,7 +1585,7 @@ export function TeacherDashboard({
       const todayStart = new Date(now);
       todayStart.setHours(0, 0, 0, 0);
 
-      const sickUntil = new Date(sickUntilDate);
+      const absenceUntil = new Date(absenceUntilDate);
       const maxDate = new Date(now);
       maxDate.setDate(maxDate.getDate() + 30); // 30 days window
 
@@ -1616,9 +1616,9 @@ export function TeacherDashboard({
           startDateTime.setHours(hours, minutes, 0, 0);
 
           if (startDateTime >= now) {
-            const isCurrentlySick = startDateTime <= new Date(sickUntil.getTime() + 24 * 60 * 60 * 1000 - 1);
+            const isCurrentlyAbsent = startDateTime <= new Date(absenceUntil.getTime() + 24 * 60 * 60 * 1000 - 1);
             
-            if (isCurrentlySick) {
+            if (isCurrentlyAbsent) {
               scheduleIdsToCancel.add(sched.id);
               if (sched.student_id) {
                 const notifKey = `${startDateTime.toISOString()}-${sched.student_id}`;
@@ -1645,7 +1645,7 @@ export function TeacherDashboard({
         currentDate.setDate(currentDate.getDate() + 1);
       }
 
-      // Process one-off schedule occurrences for sickness cancellations and restores
+      // Process one-off schedule occurrences for absence cancellations and restores
       const occurrenceIdsToCancel = new Set<string>();
       const occurrenceIdsToRestore = new Set<string>();
 
@@ -1653,9 +1653,9 @@ export function TeacherDashboard({
         const startDateTime = new Date(`${occ.date}T${occ.start_time}`);
         
         if (startDateTime >= now) {
-          const isCurrentlySick = startDateTime <= new Date(sickUntil.getTime() + 24 * 60 * 60 * 1000 - 1);
+          const isCurrentlyAbsent = startDateTime <= new Date(absenceUntil.getTime() + 24 * 60 * 60 * 1000 - 1);
           
-          if (isCurrentlySick) {
+          if (isCurrentlyAbsent) {
             occurrenceIdsToCancel.add(occ.id);
             if (occ.student_id) {
               const notifKey = `${startDateTime.toISOString()}-${occ.student_id}`;
@@ -1738,9 +1738,9 @@ export function TeacherDashboard({
       }
 
       // Add Secretary alarm ticket
-      const alertMessage = prevSickUntilStr
-        ? `TERMIN-ANPASSUNG: Lehrkraft ${formatTeacherFullName(profile)} hat den Abwesenheitszeitraum auf den ${new Date(sickUntilDate + 'T00:00:00').toLocaleDateString('de-DE')} geändert.`
-        : `TERMINABSAGE: Lehrkraft ${formatTeacherFullName(profile)} hat Termine bis zum ${new Date(sickUntilDate + 'T00:00:00').toLocaleDateString('de-DE')} abgesagt.`;
+      const alertMessage = prevAbsenceUntilStr
+        ? `TERMIN-ANPASSUNG: Lehrkraft ${formatTeacherFullName(profile)} hat den Abwesenheitszeitraum auf den ${new Date(absenceUntilDate + 'T00:00:00').toLocaleDateString('de-DE')} geändert.`
+        : `TERMINABSAGE: Lehrkraft ${formatTeacherFullName(profile)} hat Termine bis zum ${new Date(absenceUntilDate + 'T00:00:00').toLocaleDateString('de-DE')} abgesagt.`;
 
       await supabase
         .from('system_alerts')
@@ -1761,36 +1761,36 @@ export function TeacherDashboard({
       if (updatedTeacher) setTeacher(updatedTeacher);
 
       // Open notification modal showing affected students
-      setSickNotifModal({
+      setAbsenceNotifModal({
         notifs: notificationsToInsert,
-        sickUntilDateStr: sickUntilDate,
+        absenceUntilDateStr: absenceUntilDate,
       });
 
-      setSickSuccessShown(true);
-      setIsSickWidgetExpanded(false);
+      setAbsenceSuccessShown(true);
+      setIsAbsenceWidgetExpanded(false);
       setTicker(t => t + 1);
       setTimeout(() => {
-        setSickSuccessShown(false);
+        setAbsenceSuccessShown(false);
       }, 2500);
     } catch (err) {
       console.error(err);
       alert('Fehler bei der Terminabsage.');
     } finally {
-      setReportingSick(false);
+      setSubmittingAbsence(false);
     }
   };
 
-  const handleEndSick = async () => {
+  const handleEndAbsence = async () => {
     if (!confirm('Möchtest du die Abwesenheit wirklich beenden und dich wieder verfügbar melden? Alle zukünftigen Termine werden reaktiviert und die betroffenen Schüler per Direktnachricht informiert.')) return;
 
     try {
-      setReportingSick(true);
+      setSubmittingAbsence(true);
 
-      // Optimistic instant UI update: clear sick status immediately
-      setBypassSickView(false);
-      setSickUntilDate('');
+      // Optimistic instant UI update: clear absence status immediately
+      setBypassAbsenceView(false);
+      setAbsenceUntilDate('');
       const today = new Date();
-      setSickStartDate(today.toISOString().substring(0, 10));
+      setAbsenceStartDate(today.toISOString().substring(0, 10));
       setTeacher((prev: any) => prev ? { ...prev, sick_until: null, sick_start: null } : prev);
 
       const { data: profile, error: profileErr } = await supabase
@@ -1990,11 +1990,11 @@ export function TeacherDashboard({
       alert('Abwesenheit beendet! Du stehst wieder als regulär verfügbar im System.');
     } catch (err) {
       console.error('Fehler bei Verfügbarkeitsmeldung:', err);
-      // Fallback: force local clear so teacher is never trapped in sick mode
+      // Fallback: force local clear so teacher is never trapped in absence mode
       setTeacher((prev: any) => prev ? { ...prev, sick_until: null, sick_start: null } : prev);
       alert('Abwesenheit beendet.');
     } finally {
-      setReportingSick(false);
+      setSubmittingAbsence(false);
     }
   };
 
@@ -2421,7 +2421,7 @@ export function TeacherDashboard({
 
     return myChangedAppointments.filter((b: any) => {
       if (!b) return false;
-      const isCancelled = b.status === 'cancelled' || b.status === 'canceled' || b.isCancelled || b.isSick;
+      const isCancelled = b.status === 'cancelled' || b.status === 'canceled' || b.isCancelled || b.isAbsent;
       if (isCancelled) return false;
 
       const isConfirmed = b.student_acknowledged === true || b.studentAcknowledged === true || b.status === 'rescheduled_confirmed';
@@ -2953,10 +2953,7 @@ export function TeacherDashboard({
   // - Lehrer Dashboard + GrooveLab Modul: ALWAYS Musiker-Avatar (/avatar_ghost.jpg or custom musician photo)
   const teacherBriefingAvatarSrc = useMemo(() => {
     if (activePlatform === 'groovelab') {
-      const isMusicianCustom = teacher?.photo_url && 
-        !teacher.photo_url.includes('_avatar') && 
-        teacher.photo_url !== '/campus_login_hero.png';
-      return isMusicianCustom ? teacher.photo_url : '/avatar_ghost.jpg';
+      return resolveGrooveLabTeacherAvatar(teacher);
     }
     return resolveCampusStudentAvatar({ 
       ...(teacher || {}), 
@@ -3119,52 +3116,53 @@ export function TeacherDashboard({
   }, []);
 
 
-  // New Right Sidebar Sickness & Administrative feedback states
-  const [isSickWidgetExpanded, setIsSickWidgetExpanded] = useState(() => {
-    const shouldExpand = localStorage.getItem('expand_sick_widget') === 'true';
+  // New Right Sidebar Absence & Administrative feedback states
+  const [isAbsenceWidgetExpanded, setIsAbsenceWidgetExpanded] = useState(() => {
+    const shouldExpand = localStorage.getItem('expand_absence_widget') === 'true';
     if (shouldExpand) {
-      localStorage.removeItem('expand_sick_widget');
+      localStorage.removeItem('expand_absence_widget');
       return true;
     }
     return false;
   });
-  const [sickStartDate, setSickStartDate] = useState<string>(() => {
+  const [absenceStartDate, setAbsenceStartDate] = useState<string>(() => {
     const today = new Date();
     return today.toLocaleDateString('sv-SE');
   });
-  const [sickUntilDate, setSickUntilDate] = useState<string>(() => {
-    const saved = localStorage.getItem('selected_sick_date');
+  const [absenceUntilDate, setAbsenceUntilDate] = useState<string>(() => {
+    const saved = localStorage.getItem('selected_absence_date');
     if (saved) {
-      localStorage.removeItem('selected_sick_date');
+      localStorage.removeItem('selected_absence_date');
       return saved;
     }
     const today = new Date();
     return today.toLocaleDateString('sv-SE');
   });
   const [showCustomStart, setShowCustomStart] = useState(false);
-  const [showSickModal, setShowSickModal] = useState(false);
+  const [showAbsenceModal, setShowAbsenceModal] = useState(false);
   const [showAbsenceOverviewModal, setShowAbsenceOverviewModal] = useState(false);
-  const [quickSickPreset, setQuickSickPreset] = useState<'today' | 'friday' | 'next_friday' | 'custom'>('today');
-  const [reportingSick, setReportingSick] = useState(false);
-  const [bypassSickView, setBypassSickView] = useState(false);
-  const [sickSuccessShown, setSickSuccessShown] = useState(false);
-  const [sickNotifModal, setSickNotifModal] = useState<{ notifs: any[]; sickUntilDateStr: string } | null>(null);
+  const [quickAbsencePreset, setQuickAbsencePreset] = useState<'today' | 'friday' | 'next_friday' | 'custom'>('today');
+  const [submittingAbsence, setSubmittingAbsence] = useState(false);
+  const [bypassAbsenceView, setBypassAbsenceView] = useState(false);
+  const [absenceSuccessShown, setAbsenceSuccessShown] = useState(false);
+  const [absenceNotifModal, setAbsenceNotifModal] = useState<{ notifs: any[]; absenceUntilDateStr?: string } | null>(null);
+
   const [openAnnouncementDetailModal, setOpenAnnouncementDetailModal] = useState<any>(null);
   const [dismissedAnnouncementBannerIds, setDismissedAnnouncementBannerIds] = useState<string[]>([]);
 
   useEffect(() => {
-    if (!showSickModal && !sickNotifModal && !openAnnouncementDetailModal && !showAbsenceOverviewModal) return;
+    if (!showAbsenceModal && !absenceNotifModal && !openAnnouncementDetailModal && !showAbsenceOverviewModal) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (openAnnouncementDetailModal) setOpenAnnouncementDetailModal(null);
-        else if (sickNotifModal) setSickNotifModal(null);
-        else if (showSickModal) setShowSickModal(false);
+        else if (absenceNotifModal) setAbsenceNotifModal(null);
+        else if (showAbsenceModal) setShowAbsenceModal(false);
         else if (showAbsenceOverviewModal) setShowAbsenceOverviewModal(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showSickModal, sickNotifModal, openAnnouncementDetailModal, showAbsenceOverviewModal]);
+  }, [showAbsenceModal, absenceNotifModal, openAnnouncementDetailModal, showAbsenceOverviewModal]);
 
   const [crisisNotifications, setCrisisNotifications] = useState<any[]>([]);
   const [isCrisisWidgetExpanded, setIsCrisisWidgetExpanded] = useState(false);
@@ -3172,15 +3170,15 @@ export function TeacherDashboard({
   // Volljuristische Ausfall- und Kenntnisnahme-Erfassung (§ 130 BGB) für den gesamten Abwesenheitszeitraum
   const activeAbsenceCancellations = useMemo(() => {
     if (!isTeacherCurrentlyAbsent(teacher)) return [];
-    const sickStart = teacher.sick_start ? new Date(teacher.sick_start) : new Date();
-    sickStart.setHours(0, 0, 0, 0);
-    const sickEnd = new Date(teacher.sick_until);
-    sickEnd.setHours(23, 59, 59, 999);
+    const absenceStart = teacher.sick_start ? new Date(teacher.sick_start) : new Date();
+    absenceStart.setHours(0, 0, 0, 0);
+    const absenceEnd = new Date(teacher.sick_until);
+    absenceEnd.setHours(23, 59, 59, 999);
 
     const fromCrisis = (crisisNotifications || []).filter((n: any) => {
       if (n.is_reinstated) return false;
       const slotDate = new Date(n.slot_start_datetime);
-      return slotDate >= sickStart && slotDate <= sickEnd;
+      return slotDate >= absenceStart && slotDate <= absenceEnd;
     }).map((n: any) => {
       const student = n.student || allStudents.find(s => s.id === n.student_id);
       return {
@@ -3277,17 +3275,17 @@ export function TeacherDashboard({
     }
   };
 
-  const lastSickUntilRef = useRef<string | undefined>(undefined);
+  const lastAbsenceUntilRef = useRef<string | undefined>(undefined);
   const activeTimelineSlotRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (teacher?.sick_until) {
-      if (teacher.sick_until !== lastSickUntilRef.current) {
-        lastSickUntilRef.current = teacher.sick_until;
-        setSickUntilDate(teacher.sick_until.substring(0, 10));
+      if (teacher.sick_until !== lastAbsenceUntilRef.current) {
+        lastAbsenceUntilRef.current = teacher.sick_until;
+        setAbsenceUntilDate(teacher.sick_until.substring(0, 10));
       }
     } else {
-      lastSickUntilRef.current = undefined;
+      lastAbsenceUntilRef.current = undefined;
     }
   }, [teacher?.sick_until]);
 
@@ -3295,8 +3293,8 @@ export function TeacherDashboard({
     const handleSelectDate = (e: Event) => {
       const customEvent = e as CustomEvent;
       if (customEvent.detail && customEvent.detail.date) {
-        setSickUntilDate(customEvent.detail.date);
-        setIsSickWidgetExpanded(true);
+        setAbsenceUntilDate(customEvent.detail.date);
+        setIsAbsenceWidgetExpanded(true);
       }
     };
     window.addEventListener('select-appointment-date', handleSelectDate);
@@ -5440,11 +5438,21 @@ export function TeacherDashboard({
 
     const channelUsers = supabase
       .channel(`realtime_teacher_users_${userId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'users_raw' }, (payload: any) => {
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'users_raw',
+        ...(sId ? { filter: `school_id=eq.${sId}` } : {})
+      }, (payload: any) => {
         // Ignore pure heartbeat / presence updates to prevent continuous re-render cascades
         if (payload.old && payload.new) {
-          const hasSubstantiveChange = Object.keys(payload.new).some(
-            k => k !== 'last_seen' && payload.old[k] !== payload.new[k]
+          const substantiveFields = [
+            'role', 'roles', 'school_id', 'is_active', 'is_campus_active', 
+            'is_groovelab_active', 'token_version', 'is_master_admin', 
+            'first_name', 'last_name', 'instrument', 'sick_until', 'sick_start'
+          ];
+          const hasSubstantiveChange = substantiveFields.some(
+            field => payload.old[field] !== undefined && payload.new[field] !== undefined && payload.old[field] !== payload.new[field]
           );
           if (!hasSubstantiveChange) return;
         }
@@ -5732,9 +5740,9 @@ export function TeacherDashboard({
         setCrisisNotifications(prev => areArraysEqualFast(prev, crisisData || []) ? prev : (crisisData || []));
 
         const effectivePlatform = activePlatform || (typeof window !== 'undefined' ? (localStorage.getItem('groovelab_active_platform') || 'campus') : 'campus');
-        const effectiveRooms = (rData || []).filter((r: any) => {
+        let effectiveRooms = (rData || []).filter((r: any) => {
           if (effectivePlatform === 'groovelab') {
-            return r.is_groovelab_active === true;
+            return r.is_groovelab_active !== false;
           }
           if (effectivePlatform === 'campus') {
             return r.is_campus_active !== false;
@@ -5742,18 +5750,36 @@ export function TeacherDashboard({
           return true;
         });
 
+        if (effectiveRooms.length === 0 && (rData || []).length > 0) {
+          effectiveRooms = rData || [];
+        }
+
         setRooms(prev => areArraysEqualFast(prev, effectiveRooms) ? prev : effectiveRooms);
         setAvailabilities(prev => areArraysEqualFast(prev, avData || []) ? prev : (avData || []));
+        setStations(prev => areArraysEqualFast(prev, sData || []) ? prev : (sData || []));
         
-        if (effectiveRooms && effectiveRooms.length > 0 && (!selectedRoomId || !effectiveRooms.some(r => r.id === selectedRoomId))) {
-          const savedRoomId = localStorage.getItem(`groovelab_teacher_selected_room_id_${effectivePlatform}`) || localStorage.getItem('groovelab_teacher_selected_room_id');
-          if (savedRoomId && effectiveRooms.some(r => r.id === savedRoomId)) {
-            setSelectedRoomId(savedRoomId);
-          } else {
-            setSelectedRoomId(effectiveRooms[0].id);
+        const stationsList: any[] = sData || [];
+        if (effectiveRooms && effectiveRooms.length > 0) {
+          let chosenRoomId = selectedRoomId;
+          const currentHasStations = chosenRoomId && stationsList.some(s => s.room_id === chosenRoomId);
+
+          if (!chosenRoomId || !effectiveRooms.some(r => r.id === chosenRoomId) || (!currentHasStations && stationsList.length > 0)) {
+            const roomWithStations = effectiveRooms.find(r => stationsList.some(s => s.room_id === r.id));
+            if (roomWithStations) {
+              chosenRoomId = roomWithStations.id;
+            } else {
+              const savedRoomId = localStorage.getItem(`groovelab_teacher_selected_room_id_${effectivePlatform}`) || localStorage.getItem('groovelab_teacher_selected_room_id');
+              if (savedRoomId && effectiveRooms.some(r => r.id === savedRoomId)) {
+                chosenRoomId = savedRoomId;
+              } else {
+                chosenRoomId = effectiveRooms[0].id;
+              }
+            }
+          }
+          if (chosenRoomId && chosenRoomId !== selectedRoomId) {
+            setSelectedRoomId(chosenRoomId);
           }
         }
-        setStations(prev => areArraysEqualFast(prev, sData || []) ? prev : (sData || []));
 
         if (sessErr) {
           console.error('[Dashboard] Error fetching sessions:', sessErr);
@@ -7172,52 +7198,52 @@ useEffect(() => {
     return `${minutes}Min übrig`;
   };
 
-  const renderSickCardWidget = () => {
-    const isSick = isTeacherCurrentlyAbsent(teacher);
-    const sickUntilFormatted = isSick ? formatAbsenceEndDate(teacher?.sick_until) : '';
+  const renderAbsenceCardWidget = () => {
+    const isAbsent = isTeacherCurrentlyAbsent(teacher);
+    const absenceUntilFormatted = isAbsent ? formatAbsenceEndDate(teacher?.sick_until) : '';
 
     return (
       <div 
-        className="sick-card-container hover-scale"
-        role={isSick ? undefined : "button"}
-        tabIndex={isSick ? undefined : 0}
-        aria-label={isSick ? undefined : "Abwesenheit erfassen"}
+        className="absence-card-container hover-scale"
+        role={isAbsent ? undefined : "button"}
+        tabIndex={isAbsent ? undefined : 0}
+        aria-label={isAbsent ? undefined : "Abwesenheit erfassen"}
         onKeyDown={(e) => {
-          if (!isSick && (e.key === 'Enter' || e.key === ' ')) {
+          if (!isAbsent && (e.key === 'Enter' || e.key === ' ')) {
             e.preventDefault();
             const today = new Date().toLocaleDateString('sv-SE');
-            setSickStartDate(today);
-            setSickUntilDate(today);
-            setQuickSickPreset('today');
-            setShowSickModal(true);
+            setAbsenceStartDate(today);
+            setAbsenceUntilDate(today);
+            setQuickAbsencePreset('today');
+            setShowAbsenceModal(true);
           }
         }}
         onClick={() => {
-          if (!isSick) {
+          if (!isAbsent) {
             const today = new Date().toLocaleDateString('sv-SE');
-            setSickStartDate(today);
-            setSickUntilDate(today);
-            setQuickSickPreset('today');
-            setShowSickModal(true);
+            setAbsenceStartDate(today);
+            setAbsenceUntilDate(today);
+            setQuickAbsencePreset('today');
+            setShowAbsenceModal(true);
           }
         }}
         style={{ 
           padding: '14px 18px', 
           borderRadius: '20px',
-          background: isSick 
+          background: isAbsent 
             ? 'linear-gradient(135deg, #fef2f2 0%, #fff1f2 100%)' 
             : 'linear-gradient(135deg, #ffffff 0%, #fff5f5 100%)',
-          boxShadow: isSick 
+          boxShadow: isAbsent 
             ? '0 6px 20px -4px rgba(239, 68, 68, 0.18)' 
             : '0 4px 16px -2px rgba(239, 68, 68, 0.08)',
-          border: isSick ? '1.5px solid #fca5a5' : '1.5px solid #fecaca',
+          border: isAbsent ? '1.5px solid #fca5a5' : '1.5px solid #fecaca',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: '12px',
           width: '100%',
           boxSizing: 'border-box',
-          cursor: isSick ? 'default' : 'pointer',
+          cursor: isAbsent ? 'default' : 'pointer',
           transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
         }}
       >
@@ -7226,27 +7252,27 @@ useEffect(() => {
             width: '40px',
             height: '40px',
             borderRadius: '12px',
-            background: isSick ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'rgba(239, 68, 68, 0.1)',
-            color: isSick ? '#ffffff' : '#dc2626',
+            background: isAbsent ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'rgba(239, 68, 68, 0.1)',
+            color: isAbsent ? '#ffffff' : '#dc2626',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
-            boxShadow: isSick ? '0 4px 12px rgba(239, 68, 68, 0.3)' : 'none'
+            boxShadow: isAbsent ? '0 4px 12px rgba(239, 68, 68, 0.3)' : 'none'
           }}>
-            {isSick ? <AlertTriangle size={20} /> : <Activity size={20} />}
+            {isAbsent ? <AlertTriangle size={20} /> : <Activity size={20} />}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <h3 style={{ 
                 fontSize: '0.95rem', fontWeight: 800, margin: 0,
-                color: isSick ? '#991b1b' : '#7f1d1d',
+                color: isAbsent ? '#991b1b' : '#7f1d1d',
                 letterSpacing: '-0.01em',
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
               }}>
-                {isSick ? 'Abwesenheit aktiv' : 'Ausfall / Abwesenheit melden'}
+                {isAbsent ? 'Abwesenheit aktiv' : 'Ausfall / Abwesenheit melden'}
               </h3>
-              {isSick && (
+              {isAbsent && (
                 <span style={{ 
                   background: '#fee2e2', 
                   color: '#b91c1c', 
@@ -7263,25 +7289,25 @@ useEffect(() => {
             <p style={{ 
               margin: '2px 0 0 0', 
               fontSize: '0.75rem', 
-              color: isSick ? '#b91c1c' : '#94a3b8', 
+              color: isAbsent ? '#b91c1c' : '#94a3b8', 
               fontWeight: 500,
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
             }}>
-              {isSick 
-                ? `Abwesend bis ${sickUntilFormatted} (${totalAbsenceCancellationsCount} Ausfälle)` 
+              {isAbsent 
+                ? `Abwesend bis ${absenceUntilFormatted} (${totalAbsenceCancellationsCount} Ausfälle)` 
                 : 'Termine absagen & Verwaltung informieren'}
             </p>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-          {isSick ? (
+          {isAbsent ? (
             <>
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setShowSickModal(true);
+                  setShowAbsenceModal(true);
                 }}
                 style={{
                   background: '#ffffff',
@@ -7305,9 +7331,9 @@ useEffect(() => {
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleEndSick();
+                  handleEndAbsence();
                 }}
-                disabled={reportingSick}
+                disabled={submittingAbsence}
                 style={{
                   background: 'linear-gradient(135deg, #34a853 0%, #2e8b57 100%)',
                   color: '#ffffff',
@@ -7316,7 +7342,7 @@ useEffect(() => {
                   borderRadius: '12px',
                   fontWeight: 800,
                   fontSize: '0.72rem',
-                  cursor: reportingSick ? 'not-allowed' : 'pointer',
+                  cursor: submittingAbsence ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '4px',
@@ -7332,10 +7358,10 @@ useEffect(() => {
               onClick={(e) => {
                 e.stopPropagation();
                 const today = new Date().toLocaleDateString('sv-SE');
-                setSickStartDate(today);
-                setSickUntilDate(today);
-                setQuickSickPreset('today');
-                setShowSickModal(true);
+                setAbsenceStartDate(today);
+                setAbsenceUntilDate(today);
+                setQuickAbsencePreset('today');
+                setShowAbsenceModal(true);
               }}
               style={{
                 background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
@@ -7370,7 +7396,7 @@ useEffect(() => {
         selectedGroupStudentId={selectedGroupStudentId}
         setSelectedGroupStudentId={setSelectedGroupStudentId}
         allStudents={allStudents}
-        bypassSickView={bypassSickView}
+        bypassAbsenceView={bypassAbsenceView}
         selectedStudentProfile={selectedStudentProfile}
         setSelectedStudentProfile={setSelectedStudentProfile}
         docStudent={docStudent}
@@ -7427,11 +7453,11 @@ useEffect(() => {
         docStudent={docStudent}
         setDocStudent={setDocStudent}
         allStudents={allStudents}
-        isSickWidgetExpanded={isSickWidgetExpanded}
-        setIsSickWidgetExpanded={setIsSickWidgetExpanded}
-        sickUntilDate={sickUntilDate}
-        setSickUntilDate={setSickUntilDate}
-        bypassSickView={bypassSickView}
+        isAbsenceWidgetExpanded={isAbsenceWidgetExpanded}
+        setIsAbsenceWidgetExpanded={setIsAbsenceWidgetExpanded}
+        absenceUntilDate={absenceUntilDate}
+        setAbsenceUntilDate={setAbsenceUntilDate}
+        bypassAbsenceView={bypassAbsenceView}
         currentTimeStr={currentTimeStr}
         quickAudioStudent={quickAudioStudent}
         setQuickAudioStudent={setQuickAudioStudent}
@@ -7474,7 +7500,7 @@ useEffect(() => {
         setShowAllChangedAppointments={setShowAllChangedAppointments}
         showAllBookings={showAllBookings}
         setShowAllBookings={setShowAllBookings}
-        bypassSickView={bypassSickView}
+        bypassAbsenceView={bypassAbsenceView}
         adminFeedbackRequests={adminFeedbackRequests}
         adminFeedbackResponses={adminFeedbackResponses}
         campusFeedAnnouncements={campusFeedAnnouncements}
@@ -8467,16 +8493,16 @@ useEffect(() => {
                       </div>
                     </div>
                   )}
-                  {/* Sick-week note banner in Briefing Board */}
+                  {/* Absence note banner in Briefing Board */}
                   {isTeacherCurrentlyAbsent(teacher) && (() => {
                     const todayLocal = new Date();
                     todayLocal.setHours(0, 0, 0, 0);
-                    const sickUntilLocal = new Date(teacher.sick_until);
-                    sickUntilLocal.setHours(23, 59, 59, 999);
-                    const sickStartLocal = teacher.sick_start ? new Date(teacher.sick_start) : todayLocal;
-                    sickStartLocal.setHours(0, 0, 0, 0);
-                    // Show banner if today is within sick period
-                    if (todayLocal >= sickStartLocal && todayLocal <= sickUntilLocal) {
+                    const absenceUntilLocal = new Date(teacher.sick_until);
+                    absenceUntilLocal.setHours(23, 59, 59, 999);
+                    const absenceStartLocal = teacher.sick_start ? new Date(teacher.sick_start) : todayLocal;
+                    absenceStartLocal.setHours(0, 0, 0, 0);
+                    // Show banner if today is within absence period
+                    if (todayLocal >= absenceStartLocal && todayLocal <= absenceUntilLocal) {
                       const endStr = formatAbsenceEndDate(teacher.sick_until);
                       return (
                         <div style={{
@@ -8567,7 +8593,7 @@ useEffect(() => {
                   })()}
 
                   {/* Bypass banner */}
-                  {isTeacherCurrentlyAbsent(teacher) && bypassSickView && (
+                  {isTeacherCurrentlyAbsent(teacher) && bypassAbsenceView && (
                     <div style={{
                       background: 'rgba(239, 68, 68, 0.08)',
                       backdropFilter: 'blur(20px) saturate(190%)',
@@ -8606,7 +8632,7 @@ useEffect(() => {
                           <span>Ausfälle ({totalAbsenceCancellationsCount})</span>
                         </button>
                         <button 
-                          onClick={() => setBypassSickView(false)}
+                          onClick={() => setBypassAbsenceView(false)}
                           style={{
                             background: '#ff3b30',
                             color: '#ffffff',
@@ -8628,7 +8654,7 @@ useEffect(() => {
                     </div>
                   )}
 
-                  {isTeacherCurrentlyAbsent(teacher) && !bypassSickView ? (
+                  {isTeacherCurrentlyAbsent(teacher) && !bypassAbsenceView ? (
                     <div style={{
                       display: 'flex',
                       flexDirection: 'column',
@@ -8726,7 +8752,7 @@ useEffect(() => {
                         {/* 2. Zeitraum anpassen Button */}
                         <button
                           type="button"
-                          onClick={() => setShowSickModal(true)}
+                          onClick={() => setShowAbsenceModal(true)}
                           style={{
                             background: '#ffffff',
                             color: '#334155',
@@ -8758,7 +8784,7 @@ useEffect(() => {
                         {/* 3. Briefing Board ansehen Button */}
                         <button
                           type="button"
-                          onClick={() => setBypassSickView(true)}
+                          onClick={() => setBypassAbsenceView(true)}
                           style={{
                             background: 'transparent',
                             color: '#475569',
@@ -8786,8 +8812,8 @@ useEffect(() => {
                         {/* 4. Wieder verfügbar melden Button */}
                         <button
                           type="button"
-                          onClick={handleEndSick}
-                          disabled={reportingSick}
+                          onClick={handleEndAbsence}
+                          disabled={submittingAbsence}
                           style={{
                             background: 'linear-gradient(135deg, #34a853 0%, #2e8b57 100%)',
                             color: 'white',
@@ -8797,7 +8823,7 @@ useEffect(() => {
                             borderRadius: '12px',
                             fontSize: '0.9rem',
                             fontWeight: 800,
-                            cursor: reportingSick ? 'not-allowed' : 'pointer',
+                            cursor: submittingAbsence ? 'not-allowed' : 'pointer',
                             boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)',
                             transition: 'all 0.2s',
                             display: 'inline-flex',
@@ -8822,7 +8848,7 @@ useEffect(() => {
                         /* Slide 1: Combined Hero Cockpit (Greeting Banner + Integrated 2x2 KPI Grid) */
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%', boxSizing: 'border-box' }}>
                           {/* Premium Greeting Banner with Avatar & Wave Design */}
-                          {(!isTeacherCurrentlyAbsent(teacher) || bypassSickView) && (
+                          {(!isTeacherCurrentlyAbsent(teacher) || bypassAbsenceView) && (
                             <div style={{
                               background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
                               backdropFilter: 'blur(24px) saturate(1.8)',
@@ -8936,7 +8962,7 @@ useEffect(() => {
                           )}
 
                           {/* Integrated 2x2 KPI Cards Grid inside Slide 1 */}
-                          {(!isTeacherCurrentlyAbsent(teacher) || bypassSickView) && (
+                          {(!isTeacherCurrentlyAbsent(teacher) || bypassAbsenceView) && (
                             <div id="tour-teacher-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', width: '100%' }}>
                               {/* Card 1: Heutige Schüler */}
                               <div style={{
@@ -9034,7 +9060,8 @@ useEffect(() => {
                           )}
                         </div>
                       }
-                      sickWidget={renderSickCardWidget()}
+                      absenceWidget={renderAbsenceCardWidget()}
+                      sickWidget={renderAbsenceCardWidget()}
                       tagesplanWidget={renderTagesplanWidget()}
                       hausaufgabenWidget={renderHausaufgabenWidget()}
                       mitteilungenWidget={renderFeedWidget()}
@@ -9042,7 +9069,7 @@ useEffect(() => {
                   ) : (
                     <>
                       {/* Gamified KPI Cards row (Desktop 100% Untouched) */}
-                      {(!isTeacherCurrentlyAbsent(teacher) || bypassSickView) && (
+                      {(!isTeacherCurrentlyAbsent(teacher) || bypassAbsenceView) && (
                         <div id="tour-teacher-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
 
                       {/* Card 1: Heutige Schüler */}
@@ -9151,11 +9178,11 @@ useEffect(() => {
                       gap: '20px', 
                       flex: (isWeekend || isFreeDay) && !isTourDemoScheduleActive ? '1 1 100%' : '1 1 350px', 
                       minWidth: (windowWidth < 768 || isMobileDevice) ? '100%' : '300px',
-                      maxHeight: windowWidth >= 768 ? '700px' : undefined,
+                      maxHeight: (isWeekend || isFreeDay) && !isTourDemoScheduleActive ? undefined : (windowWidth >= 768 ? '700px' : undefined),
                       boxSizing: 'border-box'
                     }}>
                       {/* Premium Greeting Banner with Avatar & Wave Design */}
-                      {(!isTeacherCurrentlyAbsent(teacher) || bypassSickView) && (
+                      {(!isTeacherCurrentlyAbsent(teacher) || bypassAbsenceView) && (
                         <div style={{
                           background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
                           backdropFilter: 'blur(24px) saturate(1.8)',
@@ -9168,8 +9195,8 @@ useEffect(() => {
                           boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
                           transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                           width: '100%',
-                          minHeight: windowWidth < 768 ? 'auto' : (((isWeekend || isFreeDay) && !isTourDemoScheduleActive) ? '300px' : '200px'),
-                          flex: (isFreeDay || isWeekend) && !isTourDemoScheduleActive ? 1 : '0 1 auto',
+                          minHeight: windowWidth < 768 ? 'auto' : (((isWeekend || isFreeDay) && !isTourDemoScheduleActive) ? '260px' : '200px'),
+                          flex: (isFreeDay || isWeekend) && !isTourDemoScheduleActive ? '0 0 auto' : '0 1 auto',
                           boxSizing: 'border-box',
                           overflow: 'hidden'
                         }}>
@@ -9376,7 +9403,7 @@ useEffect(() => {
                       </div>
 
                       {leftColumnTab === 'briefing' ? (
-                        <div role="tabpanel" id="tabpanel-briefing" aria-labelledby="tab-briefing" tabIndex={0} style={{ width: '100%' }}>
+                        <div role="tabpanel" id="tabpanel-briefing" aria-labelledby="tab-briefing" tabIndex={0} style={{ width: '100%', display: 'flex', flexDirection: 'column', flex: 1 }}>
                           {renderHausaufgabenWidget()}
                         </div>
                       ) : leftColumnTab === 'notes' ? (
@@ -9414,7 +9441,7 @@ useEffect(() => {
                     {isTourDemoScheduleActive ? (
                       renderTourDemoScheduleJSX()
                     ) : !(isWeekend || isFreeDay) && (
-                      isTeacherCurrentlyAbsent(teacher) && !bypassSickView ? (
+                      isTeacherCurrentlyAbsent(teacher) && !bypassAbsenceView ? (
                       <div style={{
                         flex: '1.2 1 450px',
                         minWidth: (windowWidth < 768 || isMobileDevice) ? '100%' : '300px',
@@ -9904,8 +9931,8 @@ useEffect(() => {
                                            });
                                          }
                                          const todayStr = getSimulatedNow().toLocaleDateString('sv-SE');
-                                         setSickUntilDate(todayStr);
-                                         setIsSickWidgetExpanded(true);
+                                         setAbsenceUntilDate(todayStr);
+                                         setIsAbsenceWidgetExpanded(true);
                                        }
                                      }
                                    }}
@@ -9937,8 +9964,8 @@ useEffect(() => {
                                      }
                                      // Log the date of the clicked appointment (today's date)
                                      const todayStr = getSimulatedNow().toLocaleDateString('sv-SE');
-                                     setSickUntilDate(todayStr);
-                                     setIsSickWidgetExpanded(true);
+                                     setAbsenceUntilDate(todayStr);
+                                     setIsAbsenceWidgetExpanded(true);
                                    }}
                                    ref={el => {
                                      if (isCurrentSlot || (idx === prepIndex && !isFinished)) {
@@ -10612,1694 +10639,13 @@ useEffect(() => {
                 </button>
               </div>
               
-              {/* SICKNESS CARD – 1:1 Unified Apple Squircle Card */}
-              {renderSickCardWidget()}
+              {/* ABSENCE CARD – 1:1 Unified Apple Squircle Card */}
+              {renderAbsenceCardWidget()}
 
               {/* ⚡ 2h-Emergency-Check Outreach Guard in Sidebar */}
               {renderEmergencyCallout(true)}
 
-              {visibleChangedAppointments.length > 0 && (
-                <div style={{ 
-                  background: '#ffffff', 
-                  borderRadius: '24px', 
-                  padding: '20px', 
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
-                  marginBottom: '20px'
-                }}>
-                {/* Header with Title */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <AlertCircle size={18} color="#475569" />
-                    <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      Terminänderungen
-                    </h3>
-                  </div>
-                  <span style={{
-                    fontSize: '0.68rem',
-                    fontWeight: 750,
-                    color: '#64748b',
-                    background: '#f1f5f9',
-                    padding: '2px 8px',
-                    borderRadius: '100px'
-                  }}>
-                    Nächste 7 Tage
-                  </span>
-                </div>
-
-                {/* List of Compact Item Rows */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {(showAllChangedAppointments ? visibleChangedAppointments : visibleChangedAppointments.slice(0, 3)).map((b: any) => {
-                      const dateObj = new Date(b.date);
-                      const isCancelled = ['cancelled', 'canceled_by_student', 'teacher_sick', 'canceled_by_teacher_sick'].includes(b.status);
-                      const isReactivated = Boolean(b.status === 'scheduled' && b.original_date && b.original_date === b.date);
-                      const isRescheduled = ['pending_reschedule', 'rescheduled_confirmed', 'rescheduled', 'open_reschedule', 'changed', 'pending', 'draft'].includes(b.status) || 
-                        Boolean(b.original_date && b.original_date !== b.date) ||
-                        Boolean(b.original_start_time && b.startTime && b.original_start_time !== b.startTime);
-                      const isConfirmed = b.status === 'rescheduled_confirmed' || b.student_acknowledged === true || b.studentAcknowledged === true;
-                      const isPending = b.status === 'pending' && !isRescheduled && !isReactivated;
-
-                      const isGroup = Boolean(b.isGroup || (b.studentName && b.studentName.includes('&')));
-
-                      // Determine compact colors & icon tags based on status, confirmation & lesson type (Group vs Single)
-                      let cardBg = '#f8fafc';
-                      let cardBorder = '1px solid #e2e8f0';
-                      let dateHeaderBg = '#34a853';
-                      let iconComponent: React.ReactNode = <Check size={11} strokeWidth={2.5} />;
-                      let iconBg = '#dcfce7';
-                      let iconColor = '#166534';
-                      let iconBorder = '1px solid #86efac';
-                      let textColor = '#0f172a';
-                      let subTextColor = '#64748b';
-                      let commentButtonBg = '#ffffff';
-                      let commentButtonColor = '#34a853';
-
-                      const rName = b.room_override_name || b.roomOverrideName || ((b.roomName && b.roomName !== 'Raum') ? b.roomName : (b.rooms?.name && b.rooms?.name !== 'Raum' ? b.rooms?.name : (b.room || b.raum || '')));
-                      const defaultRoomName = b.schedules?.rooms?.name || b.schedules?.room?.name || b.original_room_name || b.originalRoomName || b.template_room_name;
-                      const isRoomChanged = Boolean(
-                        b.room_override_id || 
-                        b.roomOverrideId || 
-                        b.room_override_name || 
-                        b.roomOverrideName || 
-                        b.is_room_changed || 
-                        b.isRoomChanged || 
-                        b.is_room_booking || 
-                        b.isRoomBooking || 
-                        (defaultRoomName && rName && defaultRoomName !== rName) || 
-                        (b.original_room_id && b.roomId && String(b.original_room_id) !== String(b.roomId)) ||
-                        (b.original_room_id && b.room_id && String(b.original_room_id) !== String(b.room_id))
-                      );
-
-                      if (isCancelled) {
-                        dateHeaderBg = '#ef4444';
-                        iconComponent = <X size={11} strokeWidth={2.5} />;
-                        iconBg = '#fee2e2';
-                        iconColor = '#991b1b';
-                        iconBorder = '1px solid #fca5a5';
-                        textColor = '#991b1b';
-                        subTextColor = '#b91c1c';
-                        commentButtonBg = '#ffffff';
-                        commentButtonColor = '#ef4444';
-
-                        if (isConfirmed) {
-                          cardBg = '#fee2e2';
-                          cardBorder = '1.5px solid #ef4444';
-                        } else {
-                          cardBg = 'repeating-linear-gradient(-45deg, #fef2f2 0px, #fef2f2 8px, #ffffff 8px, #ffffff 16px)';
-                          cardBorder = '1.5px dashed #ef4444';
-                        }
-                      } else if (isRoomChanged) {
-                        // Lila Theme für Raumbuchungen / Raumwechsel
-                        dateHeaderBg = '#7c3aed';
-                        textColor = '#6b21a8';
-                        subTextColor = '#7c3aed';
-                        commentButtonBg = '#ffffff';
-                        commentButtonColor = '#7c3aed';
-
-                        if (isConfirmed) {
-                          cardBg = '#faf5ff';
-                          cardBorder = '1.5px solid #7c3aed';
-                          iconComponent = <Check size={11} strokeWidth={2.5} />;
-                          iconBg = '#f3e8ff';
-                          iconColor = '#6b21a8';
-                          iconBorder = '1px solid #ddd6fe';
-                        } else {
-                          cardBg = 'repeating-linear-gradient(-45deg, #faf5ff 0px, #faf5ff 8px, #ffffff 8px, #ffffff 16px)';
-                          cardBorder = '1.5px dashed #7c3aed';
-                          iconComponent = <Hourglass size={10} />;
-                          iconBg = '#f3e8ff';
-                          iconColor = '#7c3aed';
-                          iconBorder = '1px solid #ddd6fe';
-                        }
-                      } else if (isReactivated) {
-                        dateHeaderBg = '#34a853';
-                        iconComponent = <Check size={11} strokeWidth={2.5} />;
-                        iconBg = '#dcfce7';
-                        iconColor = '#166534';
-                        iconBorder = '1px solid #86efac';
-                        textColor = '#166534';
-                        subTextColor = '#15803d';
-                        commentButtonBg = '#ffffff';
-                        commentButtonColor = '#34a853';
-                        cardBg = '#f0fdf4';
-                        cardBorder = '1.5px solid #86efac';
-                      } else if (isRescheduled) {
-                        if (isGroup) {
-                          // Gruppentermine: Signature Blue Palette
-                          dateHeaderBg = '#0284c7';
-                          textColor = '#0369a1';
-                          subTextColor = '#0284c7';
-                          commentButtonBg = '#ffffff';
-                          commentButtonColor = '#0284c7';
-
-                          if (isConfirmed) {
-                            // Bestätigte Gruppen-Verschiebung: Vollton Blau
-                            cardBg = '#f0f9ff';
-                            cardBorder = '1.5px solid #0284c7';
-                            iconComponent = <Check size={11} strokeWidth={2.5} />;
-                            iconBg = '#dcfce7';
-                            iconColor = '#15803d';
-                            iconBorder = '1px solid #86efac';
-                          } else {
-                            // Unbestätigte Gruppen-Verschiebung: Blau gestreift / gestrichelt
-                            cardBg = 'repeating-linear-gradient(-45deg, #f0f9ff 0px, #f0f9ff 8px, #ffffff 8px, #ffffff 16px)';
-                            cardBorder = '1.5px dashed #0284c7';
-                            iconComponent = <Hourglass size={10} />;
-                            iconBg = '#e0f2fe';
-                            iconColor = '#0284c7';
-                            iconBorder = '1px solid #bae6fd';
-                          }
-                        } else {
-                          // Einzeltermine: Gelb Palette
-                          dateHeaderBg = '#eab308';
-                          textColor = '#854d0e';
-                          subTextColor = '#a16207';
-                          commentButtonBg = '#ffffff';
-                          commentButtonColor = '#ca8a04';
-
-                          if (isConfirmed) {
-                            // Bestätigte Einzeltermin-Verschiebung: Vollton Gelb
-                            cardBg = '#fffbeb';
-                            cardBorder = '1.5px solid #eab308';
-                            iconComponent = <Check size={11} strokeWidth={2.5} />;
-                            iconBg = '#dcfce7';
-                            iconColor = '#15803d';
-                            iconBorder = '1px solid #86efac';
-                          } else {
-                            // Unbestätigte Einzeltermin-Verschiebung: Gelb gestreift / gestrichelt
-                            cardBg = 'repeating-linear-gradient(-45deg, #fefce8 0px, #fefce8 8px, #ffffff 8px, #ffffff 16px)';
-                            cardBorder = '1.5px dashed #eab308';
-                            iconComponent = <Hourglass size={10} />;
-                            iconBg = '#fef3c7';
-                            iconColor = '#b45309';
-                            iconBorder = '1px solid #fde68a';
-                          }
-                        }
-                      } else if (isPending) {
-                        cardBg = '#f5f3ff';
-                        cardBorder = '1px solid #ddd6fe';
-                        dateHeaderBg = '#8b5cf6';
-                        iconComponent = <Hourglass size={10} />;
-                        iconBg = '#ede9fe';
-                        iconColor = '#6d28d9';
-                        iconBorder = '1px solid #c4b5fd';
-                        textColor = '#5b21b6';
-                        subTextColor = '#6d28d9';
-                        commentButtonBg = '#ffffff';
-                        commentButtonColor = '#7c3aed';
-                      }
-
-                      const displayStudentName = (() => {
-                        if (!b.studentName) return null;
-                        if (b.studentName.includes('&')) {
-                          const parts = b.studentName.split('&');
-                          const firstNames = parts.map((part: string) => part.trim().split(' ')[0]);
-                          return firstNames.join(', ');
-                        }
-                        return b.studentName;
-                      })();
-
-                      return (
-                        <div 
-                          key={b.id} 
-                          role="button"
-                          tabIndex={0}
-                          aria-label={`Terminänderung: ${displayStudentName || 'Termin'} am ${b.formattedDate || b.date} um ${b.startTime || b.time}`}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              handleBookingClick(b);
-                            }
-                          }}
-                          onClick={() => handleBookingClick(b)}
-                          style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '10px', 
-                            background: cardBg, 
-                            borderRadius: '12px', 
-                            padding: '8px 12px', 
-                            cursor: 'pointer',
-                            border: cardBorder,
-                            transition: 'all 0.15s ease',
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
-                          }}
-                          className="hover-scale"
-                        >
-                          {/* Compact Date Badge */}
-                          <div style={{ 
-                            width: '44px', 
-                            height: '44px',
-                            borderRadius: '10px', 
-                            overflow: 'hidden', 
-                            border: '1px solid rgba(0,0,0,0.08)', 
-                            display: 'flex', 
-                            flexDirection: 'column', 
-                            textAlign: 'center', 
-                            justifyContent: 'center',
-                            flexShrink: 0,
-                            background: 'white',
-                            boxSizing: 'border-box'
-                          }}>
-                            <div style={{ background: dateHeaderBg, color: '#ffffff', fontSize: '9.5px', fontWeight: 900, padding: '2px 0', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                              {dateObj.toLocaleDateString('de-DE', { month: 'short' })}
-                            </div>
-                            <div style={{ color: '#1e293b', fontSize: '15px', fontWeight: 900, padding: '2px 0 3px 0', lineHeight: 1 }}>
-                              {dateObj.toLocaleDateString('de-DE', { day: '2-digit' })}
-                            </div>
-                          </div>
-
-                          {/* Content Block */}
-                          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', width: '100%' }}>
-                              <div style={{ fontSize: '13.5px', fontWeight: 800, color: textColor, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                                {dateObj.toLocaleDateString('de-DE', { weekday: 'short' })} {b.startTime} Uhr
-                              </div>
-
-                              <span 
-                                title={isCancelled ? 'Ausfall' : (isReactivated ? 'Reaktiviert' : (isConfirmed ? 'Bestätigt' : 'Unbestätigt'))}
-                                style={{ 
-                                  fontSize: '9px', 
-                                  fontWeight: 800, 
-                                  background: iconBg, 
-                                  color: iconColor, 
-                                  border: iconBorder,
-                                  padding: '2px 6px', 
-                                  borderRadius: '6px', 
-                                  lineHeight: 1,
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: '3px',
-                                  flexShrink: 0
-                                }}
-                              >
-                                {iconComponent}
-                              </span>
-                            </div>
-
-                            <div style={{ fontSize: '0.80rem', color: subTextColor, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              {isGroup && <Users size={12} style={{ color: subTextColor, flexShrink: 0 }} />}
-                              <span>{displayStudentName ? displayStudentName : ''}</span>
-                              {rName && (() => {
-                                if (isRoomChanged) {
-                                  return (
-                                    <span style={{
-                                      fontSize: '0.72rem',
-                                      fontWeight: 800,
-                                      background: '#f3e8ff',
-                                      color: '#7c3aed',
-                                      border: '1px solid #ddd6fe',
-                                      padding: '1px 6px',
-                                      borderRadius: '6px',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '3px'
-                                    }} title={`Raumbuchung vorgenommen: ${rName}`}>
-                                      • {rName}
-                                      <span 
-                                        style={{
-                                          width: '6px',
-                                          height: '6px',
-                                          borderRadius: '50%',
-                                          background: '#7c3aed',
-                                          display: 'inline-block',
-                                          flexShrink: 0,
-                                          boxShadow: '0 0 6px rgba(124, 58, 237, 0.4)'
-                                        }} 
-                                      />
-                                    </span>
-                                  );
-                                }
-                                return (
-                                  <span style={{ fontSize: '0.76rem', fontWeight: 600, color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                    • {rName}
-                                    <span 
-                                      title="Raumbuchung vorgenommen" 
-                                      style={{
-                                        width: '6px',
-                                        height: '6px',
-                                        borderRadius: '50%',
-                                        background: '#7c3aed',
-                                        display: 'inline-block',
-                                        flexShrink: 0,
-                                        boxShadow: '0 0 6px rgba(124, 58, 237, 0.4)'
-                                      }} 
-                                    />
-                                  </span>
-                                );
-                              })()}
-                            </div>
-                          </div>
-
-                          {/* Cancellation Acknowledge & Shoutbox Chat Button */}
-                          {(isCancelled || isReactivated) && !b.teacher_acknowledged && b.teacherAcknowledged !== true && (
-                            <button
-                              type="button"
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                try {
-                                  const occId = b.id || b.occurrence_id || b.ids?.[0];
-                                  if (occId) {
-                                    await supabase
-                                      .from('schedule_occurrences')
-                                      .update({ teacher_acknowledged: true })
-                                      .eq('id', occId);
-                                  }
-                                  setMyChangedAppointments((prev: any[]) => prev.map((a: any) => (a.id === b.id || a.id === occId) ? { ...a, teacher_acknowledged: true, teacherAcknowledged: true } : a));
-                                } catch(err) {
-                                  console.error(err);
-                                }
-                              }}
-                              title={isReactivated ? "Reaktivierung quittieren" : "Terminabsage quittieren"}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '6px 12px',
-                                minHeight: '36px',
-                                borderRadius: '10px',
-                                background: isReactivated ? '#dcfce7' : '#fee2e2',
-                                color: isReactivated ? '#166534' : '#dc2626',
-                                border: isReactivated ? '1px solid #86efac' : '1px solid #fecaca',
-                                fontSize: '0.80rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                flexShrink: 0,
-                                boxSizing: 'border-box'
-                              }}
-                              className="hover-scale"
-                            >
-                              <Check size={13} strokeWidth={2.5} />
-                              <span>Quittieren</span>
-                            </button>
-                          )}
-
-                          {b.isSchedule && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveChatOcc({
-                                  ...b,
-                                  id: b.id || b.ids?.[0],
-                                  date: b.date,
-                                  start_time: b.startTime || b.start_time,
-                                  student_id: b.student_id || b.studentId || b.id,
-                                  student: {
-                                    first_name: displayStudentName || b.studentName || 'Schüler'
-                                  }
-                                });
-                              }}
-                              title="Termingekoppelte Shoutbox öffnen"
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                background: commentButtonBg,
-                                color: commentButtonColor,
-                                width: '36px',
-                                height: '36px',
-                                borderRadius: '10px',
-                                border: '1px solid rgba(0,0,0,0.06)',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                                flexShrink: 0,
-                                boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
-                              }}
-                            >
-                              <MessageSquare size={16} />
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Toggle Button for More Changes */}
-                  {visibleChangedAppointments.length > 3 && (
-                    <button
-                      onClick={() => setShowAllChangedAppointments(!showAllChangedAppointments)}
-                      style={{
-                        width: '100%',
-                        marginTop: '10px',
-                        background: '#f8fafc',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        padding: '6px 12px',
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        color: '#475569',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      {showAllChangedAppointments ? (
-                        <>
-                          <span>Weniger anzeigen</span>
-                          <ChevronUp size={14} />
-                        </>
-                      ) : (
-                        <>
-                          <span>Alle {visibleChangedAppointments.length} Terminänderungen anzeigen</span>
-                          <ChevronDown size={14} />
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {myBookings.length > 0 && (
-                <div style={{ 
-                  background: '#ffffff', 
-                  borderRadius: '24px', 
-                  padding: '20px', 
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
-                  marginBottom: '20px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-                    <Calendar size={18} color="#475569" />
-                    <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Meine Buchungen</h3>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {(showAllBookings ? myBookings : myBookings.slice(0, 3)).map((b: any) => {
-                      const dateObj = new Date(b.date);
-                      const isCancelled = b.status === 'cancelled';
-                      const isRescheduled = b.status === 'pending_reschedule' || b.status === 'rescheduled_confirmed';
-                      const isPending = b.status === 'pending';
-
-                      // Determine colors and labels based on status
-                      let cardBg = '#f8fafc';
-                      let dateHeaderBg = '#8b5cf6';
-                      let label = 'Gebucht';
-                      let labelBg = 'rgba(139, 92, 246, 0.12)';
-                      let labelTextColor = '#7c3aed';
-                      let textColor = '#0f172a';
-                      let subTextColor = '#64748b';
-
-                      if (isCancelled) {
-                        cardBg = '#fef2f2';
-                        dateHeaderBg = '#ef4444';
-                        label = 'Ausfall';
-                        labelBg = '#ef4444';
-                        labelTextColor = '#ffffff';
-                        textColor = '#991b1b';
-                        subTextColor = '#b91c1c';
-                      } else if (isRescheduled) {
-                        cardBg = '#fefce8';
-                        dateHeaderBg = '#eab308';
-                        label = 'Verschoben';
-                        labelBg = '#eab308';
-                        labelTextColor = '#ffffff';
-                        textColor = '#854d0e';
-                        subTextColor = '#a16207';
-                      } else if (isPending) {
-                        cardBg = '#f5f3ff';
-                        dateHeaderBg = '#8b5cf6';
-                        label = 'Reserviert';
-                        labelBg = '#8b5cf6';
-                        labelTextColor = '#ffffff';
-                        textColor = '#5b21b6';
-                        subTextColor = '#6d28d9';
-                      }
-
-                      const rName = (b.roomName && b.roomName !== 'Raum') ? b.roomName : (b.rooms?.name && b.rooms?.name !== 'Raum' ? b.rooms?.name : '');
-                      const isGroup = Boolean(b.isGroup || (b.studentName && b.studentName.includes('&')));
-                      const displayStudentName = (() => {
-                        if (!b.studentName) return null;
-                        if (b.studentName.includes('&')) {
-                          const parts = b.studentName.split('&');
-                          const firstNames = parts.map((part: string) => part.trim().split(' ')[0]);
-                          return firstNames.join(', ');
-                        }
-                        return b.studentName;
-                      })();
-
-                      return (
-                        <div 
-                          key={b.id} 
-                          role="button"
-                          tabIndex={0}
-                          aria-label={`Buchung: ${displayStudentName || rName || 'Termin'} am ${b.formattedDate || b.date} um ${b.startTime || b.time}`}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              handleBookingClick(b);
-                            }
-                          }}
-                          onClick={() => handleBookingClick(b)}
-                          style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '10px', 
-                            background: cardBg, 
-                            borderRadius: '12px', 
-                            padding: '8px 12px', 
-                            cursor: 'pointer',
-                            border: '1px solid #e2e8f0',
-                            transition: 'all 0.15s ease',
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
-                          }}
-                          className="hover-scale"
-                        >
-                          {/* Compact Date Card */}
-                          <div style={{ 
-                            width: '38px', 
-                            borderRadius: '8px', 
-                            overflow: 'hidden', 
-                            border: '1px solid rgba(0,0,0,0.08)', 
-                            display: 'flex', 
-                            flexDirection: 'column', 
-                            textAlign: 'center', 
-                            flexShrink: 0,
-                            background: 'white'
-                          }}>
-                            <div style={{ background: dateHeaderBg, color: '#ffffff', fontSize: '0.55rem', fontWeight: 800, padding: '2px 0', textTransform: 'uppercase' }}>
-                              {dateObj.toLocaleDateString('de-DE', { month: 'short' })}
-                            </div>
-                            <div style={{ color: '#1e293b', fontSize: '0.95rem', fontWeight: 900, padding: '2px 0', lineHeight: 1 }}>
-                              {dateObj.toLocaleDateString('de-DE', { day: '2-digit' })}
-                            </div>
-                          </div>
-
-                          {/* Content details block */}
-                          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', width: '100%' }}>
-                              <div style={{ fontSize: '0.78rem', fontWeight: 800, color: textColor, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                                {dateObj.toLocaleDateString('de-DE', { weekday: 'short' })} {b.startTime} Uhr
-                              </div>
-
-                              <span style={{ 
-                                fontSize: '0.55rem', 
-                                fontWeight: 900, 
-                                background: labelBg, 
-                                color: labelTextColor, 
-                                padding: '2px 6px', 
-                                borderRadius: '4px', 
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.02em',
-                                whiteSpace: 'nowrap',
-                                flexShrink: 0
-                              }}>
-                                {label}
-                              </span>
-                            </div>
-
-                            <div style={{ fontSize: '0.72rem', color: subTextColor, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              {isGroup && <Users size={12} style={{ color: subTextColor, flexShrink: 0 }} />}
-                              <span>
-                                {displayStudentName ? displayStudentName : ''}
-                                {displayStudentName && rName ? ` • ${rName}` : rName}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Deletion button */}
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleDeleteMyBooking(b); }}
-                            style={{
-                              background: '#ff453a15',
-                              color: '#ff453a',
-                              border: 'none',
-                              borderRadius: '8px',
-                              width: '28px',
-                              height: '28px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s',
-                              flexShrink: 0
-                            }}
-                            onMouseOver={e => e.currentTarget.style.background = '#ff453a25'}
-                            onMouseOut={e => e.currentTarget.style.background = '#ff453a15'}
-                            title="Buchung stornieren"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Toggle Button for More Bookings */}
-                  {myBookings.length > 3 && (
-                    <button
-                      onClick={() => setShowAllBookings(!showAllBookings)}
-                      style={{
-                        width: '100%',
-                        marginTop: '10px',
-                        background: '#f8fafc',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        padding: '6px 12px',
-                        fontSize: '0.72rem',
-                        fontWeight: 700,
-                        color: '#475569',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      {showAllBookings ? (
-                        <>
-                          <span>Weniger anzeigen</span>
-                          <ChevronUp size={14} />
-                        </>
-                      ) : (
-                        <>
-                          <span>Alle {myBookings.length} Buchungen anzeigen</span>
-                          <ChevronDown size={14} />
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {(!isTeacherCurrentlyAbsent(teacher) || bypassSickView) && (
-                <>
-                  {/* INFOS DER VERWALTUNG */}
-                  <div style={{ 
-                    background: '#ffffff', 
-                    borderRadius: '16px', 
-                    padding: '16px', 
-                    boxShadow: '0 2px 12px rgba(0,0,0,0.03)',
-                    border: '1px solid #e2e8f0'
-                  }}>
-                    {/* Header row */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Bell size={16} color="#34a853" style={{ strokeWidth: 2.2 }} />
-                        <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', margin: 0, letterSpacing: '-0.01em' }}>Infos der Verwaltung</h3>
-                      </div>
-                    </div>
-
-                    {/* Offen / Erledigt Switch */}
-                    <div style={{
-                      display: 'inline-flex',
-                      background: '#f1f5f9',
-                      borderRadius: '8px',
-                      padding: '3px',
-                      marginBottom: '14px',
-                      width: '100%',
-                      boxSizing: 'border-box'
-                    }}>
-                      {(['open', 'done'] as const).map(tab => {
-                        const isActive = adminFeedbackTab === tab;
-                        const feedbackCount = adminFeedbackRequests.filter(r => !adminFeedbackResponses.find(res => res.request_id === r.id)).length;
-                        const pendingFeedbackPoints = mySubmittedProgramPoints.filter(pp => 
-                          pp.additional_feedback_responses?.questions?.some((_: any, idx: number) => !pp.additional_feedback_responses.answers?.[idx])
-                        );
-                        const openCount = feedbackCount + activePlanningEvents.length + pendingFeedbackPoints.length;
-                        const label = tab === 'open' ? `Offen${openCount > 0 ? ` (${openCount})` : ''}` : 'Erledigt';
-                        return (
-                          <button
-                            key={tab}
-                            onClick={() => setAdminFeedbackTab(tab)}
-                            style={{
-                              flex: 1,
-                              padding: '6px 0',
-                              borderRadius: '6px',
-                              border: 'none',
-                              fontWeight: 600,
-                              fontSize: '0.76rem',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease',
-                              background: isActive ? '#ffffff' : 'transparent',
-                              color: isActive ? '#0f172a' : '#64748b',
-                              boxShadow: isActive ? '0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04)' : 'none',
-                            }}
-                            onMouseOver={e => {
-                              if (!isActive) e.currentTarget.style.color = '#0f172a';
-                            }}
-                            onMouseOut={e => {
-                              if (!isActive) e.currentTarget.style.color = '#64748b';
-                            }}
-                          >
-                            {label}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {(() => {
-                        const pendingFeedbackPoints = mySubmittedProgramPoints.filter(pp => 
-                          pp.additional_feedback_responses?.questions?.some((_: any, idx: number) => !pp.additional_feedback_responses.answers?.[idx])
-                        );
-
-                        if (adminFeedbackRequests.length === 0 && activePlanningEvents.length === 0 && pendingFeedbackPoints.length === 0) {
-                          return (
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '16px 0', textAlign: 'center', opacity: 0.6 }}>
-                              <Bell size={20} color="#94a3b8" style={{ strokeWidth: 1.5 }} />
-                              <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }}>
-                                Keine neuen Mitteilungen oder Anfragen vorhanden.
-                              </span>
-                            </div>
-                          );
-                        }
-
-                        if (adminFeedbackTab === 'open') {
-                          const openItems = adminFeedbackRequests.filter(r => !adminFeedbackResponses.find(res => res.request_id === r.id));
-                          if (openItems.length === 0 && activePlanningEvents.length === 0 && pendingFeedbackPoints.length === 0) {
-                            return (
-                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '16px 0', textAlign: 'center' }}>
-                                <CheckCircle size={20} color="#34a853" style={{ strokeWidth: 1.5 }} />
-                                <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>Alle Anfragen beantwortet!</span>
-                              </div>
-                            );
-                          }
-                          return (
-                            <>
-                              {pendingFeedbackPoints.map(pp => {
-                                const ev = planningEvents.find(e => e.id === pp.event_id);
-                                const evTitle = ev ? ev.title : 'Event';
-                                return (
-                                  <div
-                                    key={`feedback-card-${pp.id}`}
-                                    style={{
-                                      background: '#ffffff',
-                                      border: '1px solid #f1f5f9',
-                                      borderLeft: '4px solid #f59e0b',
-                                      borderRadius: '12px',
-                                      padding: '12px 14px',
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      gap: '8px',
-                                      boxShadow: '0 4px 12px rgba(15, 23, 42, 0.04), 0 1px 4px rgba(0, 0, 0, 0.01)',
-                                      marginBottom: '2px'
-                                    }}
-                                  >
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                        <h4 style={{ margin: 0, fontSize: '0.86rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.3 }}>
-                                          {pp.name} ({evTitle})
-                                        </h4>
-                                        <p style={{ margin: 0, fontSize: '0.76rem', color: '#475569', lineHeight: 1.4, fontWeight: 500 }}>
-                                          Die Verwaltung hat eine Rückfrage zu deiner Einreichung gestellt.
-                                        </p>
-                                      </div>
-                                      <span style={{ fontSize: '9px', fontWeight: 700, color: '#d97706', background: '#fef3c7', padding: '3px 8px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                                        <AlertTriangle size={11} /> Offene Rückfrage
-                                      </span>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px', flexWrap: 'wrap', gap: '8px' }}>
-                                      <span style={{ fontSize: '0.7rem', color: '#b45309', fontWeight: 600 }}>
-                                        Aktion erforderlich
-                                      </span>
-                                      <button
-                                        onClick={() => {
-                                          localStorage.setItem('groovelab_auto_submit_event_id', pp.event_id);
-                                          localStorage.setItem('groovelab_auto_submit_tab', 'feedback');
-                                          onTabChange?.('events');
-                                        }}
-                                        style={{
-                                          background: '#d97706',
-                                          color: '#ffffff',
-                                          border: 'none',
-                                          padding: '5px 12px',
-                                          borderRadius: '8px',
-                                          fontWeight: 600,
-                                          fontSize: '0.74rem',
-                                          cursor: 'pointer',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '4px',
-                                          transition: 'all 0.15s ease'
-                                        }}
-                                        className="hover-scale"
-                                      >
-                                        <MessageSquare size={12} /> Jetzt beantworten
-                                      </button>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                              {activePlanningEvents.map(ev => (
-                                <div
-                                  key={`planning-card-${ev.id}`}
-                                  style={{
-                                    background: '#ffffff',
-                                    border: '1px solid #f1f5f9',
-                                    borderLeft: '4px solid #f97316',
-                                    borderRadius: '12px',
-                                    padding: '12px 14px',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '8px',
-                                    boxShadow: '0 4px 12px rgba(15, 23, 42, 0.04), 0 1px 4px rgba(0, 0, 0, 0.01)',
-                                    marginBottom: '2px'
-                                  }}
-                                >
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                      <h4 style={{ margin: 0, fontSize: '0.86rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.3 }}>
-                                        {ev.title}
-                                      </h4>
-                                      <p style={{ margin: 0, fontSize: '0.76rem', color: '#475569', lineHeight: 1.4, fontWeight: 500 }}>
-                                        Bitte reiche dein Programm für diese Veranstaltung ein.
-                                      </p>
-                                    </div>
-                                    <span style={{ fontSize: '9px', fontWeight: 700, color: '#ea580c', background: '#ffedd5', padding: '3px 8px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                                      <Calendar size={11} /> Programmeinreichung
-                                    </span>
-                                  </div>
-                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px', flexWrap: 'wrap', gap: '8px' }}>
-                                    {ev.submission_deadline ? (
-                                      <span style={{ fontSize: '0.7rem', color: '#f97316', fontWeight: 600 }}>
-                                        {getCountdownString(ev.submission_deadline)}
-                                      </span>
-                                    ) : (
-                                      <span />
-                                    )}
-                                    <div style={{ display: 'flex', gap: '8px' }}>
-                                      <button
-                                        onClick={async () => {
-                                          if (confirm('Bist du sicher, dass du für diese Veranstaltung keine Beiträge einreichen möchtest?')) {
-                                            const currentIds = ev.no_submission_teacher_ids || [];
-                                            const { error } = await supabase
-                                              .from('campus_events')
-                                              .update({ no_submission_teacher_ids: [...currentIds, userId] })
-                                              .eq('id', ev.id);
-                                            if (!error) {
-                                              fetchData();
-                                            } else {
-                                              alert('Fehler beim Speichern: ' + error.message);
-                                            }
-                                          }
-                                        }}
-                                        style={{
-                                          background: 'transparent',
-                                          color: '#ea580c',
-                                          border: '1px solid #ea580c',
-                                          padding: '5px 12px',
-                                          borderRadius: '8px',
-                                          fontWeight: 600,
-                                          fontSize: '0.74rem',
-                                          cursor: 'pointer',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '4px',
-                                          transition: 'all 0.15s ease'
-                                        }}
-                                        className="hover-scale"
-                                      >
-                                        <X size={12} /> Keine Beiträge
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          localStorage.setItem('groovelab_auto_submit_event_id', ev.id);
-                                          onTabChange?.('events');
-                                        }}
-                                        style={{
-                                          background: '#ea580c',
-                                          color: '#ffffff',
-                                          border: 'none',
-                                          padding: '5px 12px',
-                                          borderRadius: '8px',
-                                          fontWeight: 600,
-                                          fontSize: '0.74rem',
-                                          cursor: 'pointer',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '4px',
-                                          transition: 'all 0.15s ease'
-                                        }}
-                                        className="hover-scale"
-                                      >
-                                        <Plus size={12} /> Jetzt Einreichen
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-
-                              {openItems.map((item, idx) => {
-                                const isResponding = respondingToRequestId === item.id;
-                                return (
-                                  <div 
-                                    key={item.id} 
-                                    style={{ 
-                                      display: 'flex', 
-                                      flexDirection: 'column', 
-                                      gap: '8px',
-                                      border: '1px solid #f1f5f9',
-                                      borderLeft: '4px solid #34a853',
-                                      background: '#ffffff',
-                                      borderRadius: '12px',
-                                      padding: '12px 14px',
-                                      boxShadow: '0 4px 12px rgba(15, 23, 42, 0.04), 0 1px 4px rgba(0, 0, 0, 0.01)',
-                                      marginBottom: '2px'
-                                    }}
-                                  >
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                        <h4 style={{ margin: 0, fontSize: '0.86rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.3 }}>{item.title}</h4>
-                                        {item.description && (
-                                          <p style={{ margin: 0, fontSize: '0.76rem', color: '#475569', lineHeight: 1.4, fontWeight: 500 }}>
-                                            {item.description}
-                                          </p>
-                                        )}
-                                      </div>
-                                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
-                                        <span style={{ fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', background: '#e6f4ea', color: '#34a853', display: 'inline-flex', alignItems: 'center', gap: '3px', whiteSpace: 'nowrap' }}>
-                                          <AlertCircle size={11} /> Aktion erforderlich
-                                        </span>
-                                        <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 500 }}>
-                                          {new Date(item.created_at).toLocaleDateString('de-DE')}
-                                        </span>
-                                      </div>
-                                    </div>
-
-                                    <div style={{ marginTop: '2px' }}>
-                                      {isResponding ? (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                          {item.questions && item.questions.length > 0 ? (
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                              {item.questions.map((q: string, qIdx: number) => (
-                                                <div key={qIdx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                  <label style={{ fontSize: '0.74rem', fontWeight: 800, color: '#475569', textAlign: 'left' }}>
-                                                    {q}
-                                                  </label>
-                                                  <textarea
-                                                    value={questionnaireAnswers[q] || ''}
-                                                    onChange={(e) => setQuestionnaireAnswers(prev => ({
-                                                      ...prev,
-                                                      [q]: e.target.value
-                                                    }))}
-                                                    placeholder="Deine Antwort..."
-                                                    rows={2}
-                                                    style={{
-                                                      width: '100%',
-                                                      padding: '8px 10px',
-                                                      borderRadius: '8px',
-                                                      border: '1px solid #cbd5e1',
-                                                      fontSize: '0.76rem',
-                                                      fontFamily: 'inherit',
-                                                      outline: 'none',
-                                                      resize: 'vertical',
-                                                      boxSizing: 'border-box'
-                                                    }}
-                                                  />
-                                                </div>
-                                              ))}
-                                            </div>
-                                          ) : (
-                                            <textarea
-                                              value={responseTextInput}
-                                              onChange={(e) => setResponseTextInput(e.target.value)}
-                                              placeholder="Schreibe deine Antwort an die Verwaltung..."
-                                              rows={2}
-                                              style={{
-                                                width: '100%',
-                                                padding: '8px 10px',
-                                                borderRadius: '8px',
-                                                border: '1px solid #cbd5e1',
-                                                fontSize: '0.76rem',
-                                                fontFamily: 'inherit',
-                                                outline: 'none',
-                                                resize: 'none',
-                                                boxSizing: 'border-box'
-                                              }}
-                                            />
-                                          )}
-                                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                                            <button
-                                              onClick={() => { setRespondingToRequestId(null); setResponseTextInput(''); setQuestionnaireAnswers({}); }}
-                                              style={{ background: '#ffffff', color: '#475569', border: '1px solid #cbd5e1', padding: '5px 12px', borderRadius: '8px', fontWeight: 600, fontSize: '0.74rem', cursor: 'pointer' }}
-                                            >
-                                              Abbrechen
-                                            </button>
-                                            <button
-                                              onClick={() => handleSubmitFeedbackResponse(item.id)}
-                                              disabled={submittingFeedback || (!item.questions?.length && !responseTextInput.trim())}
-                                              style={{ background: '#34a853', color: '#ffffff', border: 'none', padding: '5px 16px', borderRadius: '8px', fontWeight: 600, fontSize: '0.74rem', cursor: 'pointer' }}
-                                            >
-                                              Senden
-                                            </button>
-                                          </div>
-                                        </div>
-                                      ) : (
-                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                                          <button
-                                            onClick={() => { setRespondingToRequestId(item.id); setResponseTextInput(''); setQuestionnaireAnswers({}); }}
-                                            style={{ 
-                                              background: '#e6f4ea', 
-                                              color: '#34a853', 
-                                              border: 'none', 
-                                              padding: '5px 12px', 
-                                              borderRadius: '8px', 
-                                              fontWeight: 600, 
-                                              fontSize: '0.74rem', 
-                                              cursor: 'pointer', 
-                                              display: 'inline-flex',
-                                              alignItems: 'center',
-                                              gap: '4px',
-                                              transition: 'all 0.15s ease' 
-                                            }}
-                                            className="hover-scale"
-                                          >
-                                            <MessageSquare size={12} /> Rückmeldung geben
-                                          </button>
-                                          <button
-                                            onClick={() => handleMarkRequestAsDone(item.id)}
-                                            disabled={submittingFeedback}
-                                            style={{ 
-                                              background: '#34a853', 
-                                              color: '#ffffff', 
-                                              border: 'none', 
-                                              padding: '5px 12px', 
-                                              borderRadius: '8px', 
-                                              fontWeight: 600, 
-                                              fontSize: '0.74rem', 
-                                              cursor: 'pointer', 
-                                              display: 'inline-flex',
-                                              alignItems: 'center',
-                                              gap: '4px',
-                                              transition: 'all 0.15s ease' 
-                                            }}
-                                            className="hover-scale"
-                                          >
-                                            <CheckCircle size={12} /> Erledigt
-                                          </button>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </>
-                          );
-                        }
-
-                        // Erledigt tab – max 5 most recent
-                        const doneItems = adminFeedbackRequests
-                          .filter(r => adminFeedbackResponses.find(res => res.request_id === r.id))
-                          .slice(0, 5);
-                        if (doneItems.length === 0) {
-                          return (
-                            <span style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic', padding: '12px 0', textAlign: 'center', display: 'block' }}>
-                              Noch keine erledigten Rückmeldungen.
-                            </span>
-                          );
-                        }
-                        return doneItems.map((item, idx) => {
-                          const response = adminFeedbackResponses.find(res => res.request_id === item.id);
-                          return (
-                            <div 
-                              key={item.id} 
-                              style={{ 
-                                display: 'flex', 
-                                flexDirection: 'column', 
-                                gap: '8px',
-                                border: '1px solid #e2e8f0',
-                                borderLeft: '3px solid #34a853',
-                                background: '#ffffff',
-                                borderRadius: '12px',
-                                padding: '12px',
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.01)',
-                                marginBottom: '2px'
-                              }}
-                            >
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '9px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: '#e6f4ea', color: '#34a853', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                  <CheckCircle size={11} /> Erledigt
-                                </span>
-                                <span style={{ fontSize: '10px', color: '#8e8e93', fontWeight: 500 }}>
-                                  {new Date(item.created_at).toLocaleDateString('de-DE')}
-                                </span>
-                              </div>
-                              <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 700, color: '#1e293b', lineHeight: 1.3 }}>{item.title}</h4>
-                              {response && (
-                                <div style={{ marginTop: '4px' }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => setExpandedResponseIds(prev => ({
-                                      ...prev,
-                                      [response.id]: !prev[response.id]
-                                    }))}
-                                    style={{
-                                      background: 'transparent',
-                                      border: 'none',
-                                      padding: 0,
-                                      color: '#34a853',
-                                      fontSize: '0.74rem',
-                                      fontWeight: 750,
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                      fontFamily: 'inherit'
-                                    }}
-                                  >
-                                    {expandedResponseIds[response.id] ? '▲ Rückmeldung einklappen' : '▼ Deine Rückmeldung anzeigen'}
-                                  </button>
-
-                                  {expandedResponseIds[response.id] && (() => {
-                                    let isJson = false;
-                                    let answersObj: Record<string, string> = {};
-                                    try {
-                                      if (response.response_text.startsWith('{')) {
-                                        answersObj = JSON.parse(response.response_text);
-                                        isJson = true;
-                                      }
-                                    } catch (e) {}
-
-                                    return (
-                                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px 12px', borderRadius: '8px', marginTop: '4px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                        <div style={{ fontSize: '9px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Deine Rückmeldung:</div>
-                                        {isJson ? (
-                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                            {Object.entries(answersObj).map(([q, ans], ansIdx) => (
-                                              <div key={ansIdx} style={{ fontSize: '0.76rem', borderBottom: ansIdx < Object.keys(answersObj).length - 1 ? '1px solid #e2e8f0' : 'none', paddingBottom: '4px' }}>
-                                                <div style={{ fontWeight: 800, color: '#475569' }}>{q}</div>
-                                                <div style={{ color: '#0f172a', fontStyle: 'italic', marginTop: '2px' }}>{ans || '(keine Antwort)'}</div>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        ) : (
-                                          <div style={{ fontSize: '0.76rem', color: '#334155', fontStyle: 'italic', fontWeight: 500, whiteSpace: 'pre-wrap' }}>{response.response_text}</div>
-                                        )}
-                                      </div>
-                                    );
-                                  })()}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        });
-                      })()}
-                    </div>
-                  </div>
-
-              {/* LIVE CAMPUS FEED */}
-              <div style={{ 
-                background: '#ffffff', 
-                borderRadius: '24px', 
-                padding: '24px', 
-                boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
-                border: '1px solid #e2e8f0'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                  <Sparkles size={18} color={activePlatform === 'campus' ? '#34a853' : '#eab308'} />
-                  <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#1e293b', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mitteilungen</h3>
-                </div>
-
-                {/* Campus / Klassen-Feed Switch */}
-                <div style={{
-                  display: 'inline-flex',
-                  background: '#f1f5f9',
-                  borderRadius: '8px',
-                  padding: '3px',
-                  marginBottom: '16px',
-                  width: '100%',
-                  boxSizing: 'border-box'
-                }}>
-                  {([
-                    { id: 'campus', label: 'Campus', icon: <Building2 size={13} style={{ marginRight: '4px' }} /> },
-                    { id: 'class', label: 'Klassen-Feed', icon: <Users size={13} style={{ marginRight: '4px' }} /> }
-                  ] as const).map(t => {
-                    const isActive = teacherFeedTab === t.id;
-                    return (
-                      <button
-                        key={t.id}
-                        onClick={() => setTeacherFeedTab(t.id)}
-                        style={{
-                          flex: 1,
-                          padding: '6px 0',
-                          borderRadius: '6px',
-                          border: 'none',
-                          fontWeight: 600,
-                          fontSize: '0.76rem',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          background: isActive ? '#ffffff' : 'transparent',
-                          color: isActive ? '#0f172a' : '#64748b',
-                          boxShadow: isActive ? '0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04)' : 'none',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
-                        onMouseOver={e => {
-                          if (!isActive) e.currentTarget.style.color = '#0f172a';
-                        }}
-                        onMouseOut={e => {
-                          if (!isActive) e.currentTarget.style.color = '#64748b';
-                        }}
-                      >
-                        {t.icon}
-                        {t.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {teacherFeedTab === 'campus' ? (
-                    campusFeedAnnouncements.length === 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '16px 0', textAlign: 'center', opacity: 0.6 }}>
-                        <Sparkles size={24} color="#94a3b8" style={{ strokeWidth: 1.5 }} />
-                        <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
-                          Keine aktuellen Campus-Mitteilungen vorhanden.
-                        </span>
-                      </div>
-                    ) : (
-                      campusFeedAnnouncements.slice(0, 5).map((item, idx, arr) => {
-                        const postReactions = feedInteractions.filter(i => i.post_id === item.id);
-                        const thumbsUpCount = postReactions.filter(i => i.emoji_unicode === '👍').length;
-                        const heartCount = postReactions.filter(i => i.emoji_unicode === '❤️').length;
-                        const userHasThumbsUp = postReactions.some(i => i.emoji_unicode === '👍' && i.user_id === userId);
-                        const userHasHeart = postReactions.some(i => i.emoji_unicode === '❤️' && i.user_id === userId);
-
-                        let categoryLabel = 'Info';
-                        let categoryBg = '#f1f5f9';
-                        let categoryColor = '#475569';
-                        if (item.category === 'announcement') {
-                          categoryLabel = 'Ankündigung';
-                        } else if (item.category === 'event') {
-                          categoryLabel = 'Event';
-                        } else if (item.category === 'holidays') {
-                          categoryLabel = 'Ferien';
-                        }
-
-                        if (item.is_emergency) {
-                          categoryColor = '#b91c1c';
-                          categoryBg = '#fce8e6';
-                        }
-
-                        return (
-                          <div key={item.id} style={{
-                            paddingBottom: idx === arr.length - 1 ? '0' : '16px',
-                            borderBottom: idx === arr.length - 1 ? 'none' : '1px solid #f1f5f9',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '6px'
-                          }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <span style={{
-                                  fontSize: '9px',
-                                  fontWeight: 800,
-                                  color: '#475569',
-                                  background: '#f1f5f9',
-                                  padding: '2px 8px',
-                                  borderRadius: '100px',
-                                  textTransform: 'uppercase',
-                                  letterSpacing: '0.04em'
-                                }}>
-                                  {item.target_type === 'all' ? 'Alle' : item.target_type === 'teachers' ? 'Lehrer' : item.target_type === 'students' ? 'Schüler' : 'Mitteilung'}
-                                </span>
-                                <span style={{
-                                  fontSize: '9px',
-                                  fontWeight: 800,
-                                  color: categoryColor,
-                                  background: categoryBg,
-                                  padding: '2px 8px',
-                                  borderRadius: '100px',
-                                  textTransform: 'uppercase',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '2px'
-                                }}>
-                                  {item.is_emergency && <AlertTriangle size={9} color="#b91c1c" />}
-                                  {categoryLabel}
-                                </span>
-                              </div>
-                              <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 650 }}>
-                                {new Date(item.created_at).toLocaleDateString('de-DE')}
-                              </span>
-                            </div>
-                            
-                            <h5 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>
-                              {item.title}
-                            </h5>
-                            
-                            <p style={{ fontSize: '0.78rem', color: '#475569', margin: 0, fontWeight: 500, lineHeight: 1.4 }}>
-                              {item.content}
-                            </p>
-
-                            {item.attachment_url && (
-                              <div style={{ marginTop: '4px' }}>
-                                {item.attachment_url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
-                                  <a href={item.attachment_url} target="_blank" rel="noopener noreferrer">
-                                    <img 
-                                      src={item.attachment_url} 
-                                      alt="Anhang" 
-                                      style={{ maxWidth: '100%', maxHeight: '100px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
-                                    />
-                                  </a>
-                                ) : (
-                                  <a 
-                                    href={item.attachment_url} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer" 
-                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', color: '#34a853', textDecoration: 'none', fontWeight: 650 }}
-                                  >
-                                    📄 Dokument öffnen
-                                  </a>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Emoji Reactions */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                              <button 
-                                onClick={() => handleReactToPost(item.id, '👍', 'campus')}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  background: userHasThumbsUp ? '#e6f4ea' : 'transparent',
-                                  border: '1px solid',
-                                  borderColor: userHasThumbsUp ? '#34a853' : '#e2e8f0',
-                                  color: userHasThumbsUp ? '#34a853' : '#64748b',
-                                  padding: '3px 8px',
-                                  borderRadius: '9999px',
-                                  fontSize: '0.7rem',
-                                  fontWeight: 700,
-                                  cursor: 'pointer',
-                                  transition: 'all 0.2s'
-                                }}
-                              >
-                                <ThumbsUp size={11} color={userHasThumbsUp ? '#34a853' : '#64748b'} />
-                                <span>{thumbsUpCount}</span>
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {/* Button / Form to create Class Feed Post */}
-                      {!showClassPostForm ? (
-                        <button
-                          onClick={() => setShowClassPostForm(true)}
-                          style={{
-                            background: '#e6f4ea',
-                            color: '#34a853',
-                            border: 'none',
-                            padding: '6px 12px',
-                            borderRadius: '8px',
-                            fontWeight: 700,
-                            fontSize: '0.74rem',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '4px',
-                            width: '100%',
-                            transition: 'all 0.15s ease'
-                          }}
-                          className="hover-scale"
-                        >
-                          <Plus size={12} /> Beitrag erstellen
-                        </button>
-                      ) : (
-                        <div style={{
-                          background: '#f8fafc',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '12px',
-                          padding: '12px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '8px'
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#1e293b' }}>
-                              {editingPostId ? 'Beitrag bearbeiten' : 'Neuer Beitrag'}
-                            </span>
-                            <div style={{ display: 'flex', gap: '4px' }}>
-                              <button
-                                onClick={() => setNewPostType('announcement')}
-                                style={{
-                                  background: newPostType === 'announcement' ? '#e6f4ea' : 'transparent',
-                                  color: newPostType === 'announcement' ? '#34a853' : '#64748b',
-                                  border: 'none',
-                                  padding: '2px 8px',
-                                  borderRadius: '6px',
-                                  fontSize: '0.65rem',
-                                  fontWeight: 700,
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                Info
-                              </button>
-                              <button
-                                onClick={() => setNewPostType('homework')}
-                                style={{
-                                  background: newPostType === 'homework' ? '#fef3c7' : 'transparent',
-                                  color: newPostType === 'homework' ? '#b45309' : '#64748b',
-                                  border: 'none',
-                                  padding: '2px 8px',
-                                  borderRadius: '6px',
-                                  fontSize: '0.65rem',
-                                  fontWeight: 700,
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                Hausaufgabe
-                              </button>
-                            </div>
-                          </div>
-
-                          <input
-                            type="text"
-                            value={newPostTitle}
-                            onChange={e => setNewPostTitle(e.target.value)}
-                            placeholder="Titel..."
-                            style={{
-                              width: '100%',
-                              padding: '6px 8px',
-                              borderRadius: '6px',
-                              border: '1px solid #cbd5e1',
-                              fontSize: '0.74rem',
-                              fontFamily: 'inherit',
-                              outline: 'none',
-                              boxSizing: 'border-box'
-                            }}
-                          />
-
-                          <textarea
-                            value={newPostContent}
-                            onChange={e => setNewPostContent(e.target.value)}
-                            placeholder="Inhalt..."
-                            rows={3}
-                            style={{
-                              width: '100%',
-                              padding: '6px 8px',
-                              borderRadius: '6px',
-                              border: '1px solid #cbd5e1',
-                              fontSize: '0.74rem',
-                              fontFamily: 'inherit',
-                              outline: 'none',
-                              resize: 'none',
-                              boxSizing: 'border-box'
-                            }}
-                          />
-
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                            <button
-                              onClick={() => {
-                                setShowClassPostForm(false);
-                                setNewPostTitle('');
-                                setNewPostContent('');
-                                setEditingPostId(null);
-                              }}
-                              style={{
-                                background: 'transparent',
-                                color: '#64748b',
-                                border: 'none',
-                                padding: '4px 10px',
-                                fontSize: '0.72rem',
-                                fontWeight: 600,
-                                cursor: 'pointer'
-                              }}
-                            >
-                              Abbrechen
-                            </button>
-                            <button
-                              onClick={handleCreateClassPost}
-                              disabled={submittingClassPost || !newPostTitle.trim() || !newPostContent.trim()}
-                              style={{
-                                background: '#34a853',
-                                color: '#ffffff',
-                                border: 'none',
-                                padding: '5px 12px',
-                                borderRadius: '6px',
-                                fontSize: '0.72rem',
-                                fontWeight: 700,
-                                cursor: 'pointer'
-                              }}
-                            >
-                              {editingPostId ? 'Speichern' : 'Veröffentlichen'}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {classFeedPosts.length === 0 ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '16px 0', textAlign: 'center', opacity: 0.6 }}>
-                          <Users size={24} color="#94a3b8" style={{ strokeWidth: 1.5 }} />
-                          <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
-                            Keine Beiträge im Klassen-Feed vorhanden.
-                          </span>
-                        </div>
-                      ) : (
-                        classFeedPosts.slice(0, 5).map((item, idx, arr) => {
-                          const postReactions = classFeedInteractions.filter(i => i.post_id === item.id);
-                          const thumbsUpCount = postReactions.filter(i => i.emoji_unicode === '👍').length;
-                          const heartCount = postReactions.filter(i => i.emoji_unicode === '❤️').length;
-                          const userHasThumbsUp = postReactions.some(i => i.emoji_unicode === '👍' && i.user_id === userId);
-                          const userHasHeart = postReactions.some(i => i.emoji_unicode === '❤️' && i.user_id === userId);
-
-                          let badgeLabel = 'Mitteilung';
-                          let badgeBg = '#e6f4ea';
-                          let badgeColor = '#34a853';
-                          if (item.post_type === 'homework') {
-                            badgeLabel = 'Hausaufgabe';
-                            badgeBg = '#fef3c7';
-                            badgeColor = '#b45309';
-                          }
-
-                          return (
-                            <div key={item.id} style={{
-                              paddingBottom: idx === arr.length - 1 ? '0' : '16px',
-                              borderBottom: idx === arr.length - 1 ? 'none' : '1px solid #f1f5f9',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '6px'
-                            }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '9px', fontWeight: 800, color: badgeColor, background: badgeBg, padding: '2px 8px', borderRadius: '100px', textTransform: 'uppercase' }}>
-                                  {badgeLabel}
-                                </span>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 650 }}>
-                                    {new Date(item.created_at).toLocaleDateString('de-DE')}
-                                  </span>
-                                  <button
-                                    onClick={() => {
-                                      setEditingPostId(item.id);
-                                      setNewPostTitle(item.title);
-                                      setNewPostContent(item.content);
-                                      setNewPostType(item.post_type);
-                                      setShowClassPostForm(true);
-                                    }}
-                                    style={{
-                                      background: 'transparent',
-                                      border: 'none',
-                                      color: '#94a3b8',
-                                      cursor: 'pointer',
-                                      padding: '2px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      borderRadius: '4px',
-                                      transition: 'all 0.2s'
-                                    }}
-                                    onMouseOver={e => e.currentTarget.style.color = '#34a853'}
-                                    onMouseOut={e => e.currentTarget.style.color = '#94a3b8'}
-                                    title="Beitrag bearbeiten"
-                                  >
-                                    <Edit3 size={12} />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteClassPost(item.id)}
-                                    style={{
-                                      background: 'transparent',
-                                      border: 'none',
-                                      color: '#94a3b8',
-                                      cursor: 'pointer',
-                                      padding: '2px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      borderRadius: '4px',
-                                      transition: 'all 0.2s'
-                                    }}
-                                    onMouseOver={e => e.currentTarget.style.color = '#ea4335'}
-                                    onMouseOut={e => e.currentTarget.style.color = '#94a3b8'}
-                                    title="Beitrag löschen"
-                                  >
-                                    <Trash2 size={12} />
-                                  </button>
-                                </div>
-                              </div>
-                              
-                              <h5 style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>
-                                {item.title}
-                              </h5>
-                              
-                              <p style={{ fontSize: '0.78rem', color: '#475569', margin: 0, fontWeight: 500, lineHeight: 1.4 }}>
-                                {item.content}
-                              </p>
-
-                              {/* Emoji Reactions */}
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                                <button 
-                                  onClick={() => handleReactToPost(item.id, '👍', 'class')}
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px',
-                                    background: userHasThumbsUp ? '#e6f4ea' : 'transparent',
-                                    border: '1px solid',
-                                    borderColor: userHasThumbsUp ? '#34a853' : '#e2e8f0',
-                                    color: userHasThumbsUp ? '#34a853' : '#64748b',
-                                    padding: '3px 8px',
-                                    borderRadius: '9999px',
-                                    fontSize: '0.7rem',
-                                    fontWeight: 700,
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s'
-                                  }}
-                                >
-                                  <ThumbsUp size={11} color={userHasThumbsUp ? '#34a853' : '#64748b'} />
-                                  <span>{thumbsUpCount}</span>
-                                </button>
-                                <button 
-                                  onClick={() => handleReactToPost(item.id, '❤️', 'class')}
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '4px',
-                                    background: userHasHeart ? '#fce8e6' : 'transparent',
-                                    border: '1px solid',
-                                    borderColor: userHasHeart ? '#ea4335' : '#e2e8f0',
-                                    color: userHasHeart ? '#ea4335' : '#64748b',
-                                    padding: '3px 8px',
-                                    borderRadius: '9999px',
-                                    fontSize: '0.7rem',
-                                    fontWeight: 700,
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s'
-                                  }}
-                                >
-                                  <Heart size={11} color={userHasHeart ? '#ea4335' : '#64748b'} fill={userHasHeart ? '#ea4335' : 'transparent'} />
-                                  <span>{heartCount}</span>
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-
-                </>
-              )}
+              {renderFeedWidget()}
             </aside>
             )}
           </div>
@@ -12785,7 +11131,7 @@ useEffect(() => {
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                   <div style={{ width: '48px', height: '48px', borderRadius: '16px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 10px rgba(0,0,0,0.05)', flexShrink: 0 }}>
-                    <AvatarImage src={coach.photo_url} user={coach} activePlatform={activePlatform} />
+                    <AvatarImage src={coach.photo_url} user={{ ...coach, isTeacherContext: true, isTeacher: true }} activePlatform={activePlatform} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 900, fontSize: '1rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -13195,7 +11541,7 @@ useEffect(() => {
       )}
 
       {/* ── TIER-1 APPLE BOTTOM SHEET TERMINABSAGE / ABWESENHEIT MODAL ── */}
-      {showSickModal && (
+      {showAbsenceModal && (
         <div
           style={{
             position: 'fixed',
@@ -13210,12 +11556,12 @@ useEffect(() => {
             padding: windowWidth <= 768 ? '0px' : '20px',
             animation: 'fadeIn 0.2s ease-out'
           }}
-          onClick={() => setShowSickModal(false)}
+          onClick={() => setShowAbsenceModal(false)}
         >
           <div
             role="dialog"
             aria-modal="true"
-            aria-labelledby="sick-modal-title"
+            aria-labelledby="absence-modal-title"
             onClick={(e) => e.stopPropagation()}
             style={{
               background: '#ffffff',
@@ -13259,7 +11605,7 @@ useEffect(() => {
                   <AlertTriangle size={22} />
                 </div>
                 <div>
-                  <h2 id="sick-modal-title" style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  <h2 id="absence-modal-title" style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                     {isTeacherCurrentlyAbsent(teacher) ? 'Abwesenheit anpassen' : 'Abwesenheit / Ausfall melden'}
                   </h2>
                   <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }}>
@@ -13268,7 +11614,7 @@ useEffect(() => {
                 </div>
               </div>
               <button
-                onClick={() => setShowSickModal(false)}
+                onClick={() => setShowAbsenceModal(false)}
                 aria-label="Abwesenheitsdialog schließen"
                 style={{
                   background: '#f1f5f9',
@@ -13316,18 +11662,18 @@ useEffect(() => {
                     type="button"
                     onClick={() => {
                       const today = new Date().toLocaleDateString('sv-SE');
-                      setSickStartDate(today);
-                      setSickUntilDate(today);
-                      setQuickSickPreset('today');
+                      setAbsenceStartDate(today);
+                      setAbsenceUntilDate(today);
+                      setQuickAbsencePreset('today');
                       setShowCustomStart(false);
                     }}
                     style={{
                       padding: '12px 14px',
                       borderRadius: '14px',
-                      border: quickSickPreset === 'today' ? '2px solid #ef4444' : '1.5px solid #e2e8f0',
-                      background: quickSickPreset === 'today' ? '#fee2e2' : '#f8fafc',
-                      color: quickSickPreset === 'today' ? '#b91c1c' : '#334155',
-                      fontWeight: quickSickPreset === 'today' ? 800 : 600,
+                      border: quickAbsencePreset === 'today' ? '2px solid #ef4444' : '1.5px solid #e2e8f0',
+                      background: quickAbsencePreset === 'today' ? '#fee2e2' : '#f8fafc',
+                      color: quickAbsencePreset === 'today' ? '#b91c1c' : '#334155',
+                      fontWeight: quickAbsencePreset === 'today' ? 800 : 600,
                       fontSize: '0.82rem',
                       display: 'flex',
                       alignItems: 'center',
@@ -13351,18 +11697,18 @@ useEffect(() => {
                         d.setDate(d.getDate() + diffToFri);
                         return d.toLocaleDateString('sv-SE');
                       })();
-                      setSickStartDate(today);
-                      setSickUntilDate(fri);
-                      setQuickSickPreset('friday');
+                      setAbsenceStartDate(today);
+                      setAbsenceUntilDate(fri);
+                      setQuickAbsencePreset('friday');
                       setShowCustomStart(false);
                     }}
                     style={{
                       padding: '12px 14px',
                       borderRadius: '14px',
-                      border: quickSickPreset === 'friday' ? '2px solid #ef4444' : '1.5px solid #e2e8f0',
-                      background: quickSickPreset === 'friday' ? '#fee2e2' : '#f8fafc',
-                      color: quickSickPreset === 'friday' ? '#b91c1c' : '#334155',
-                      fontWeight: quickSickPreset === 'friday' ? 800 : 600,
+                      border: quickAbsencePreset === 'friday' ? '2px solid #ef4444' : '1.5px solid #e2e8f0',
+                      background: quickAbsencePreset === 'friday' ? '#fee2e2' : '#f8fafc',
+                      color: quickAbsencePreset === 'friday' ? '#b91c1c' : '#334155',
+                      fontWeight: quickAbsencePreset === 'friday' ? 800 : 600,
                       fontSize: '0.82rem',
                       display: 'flex',
                       alignItems: 'center',
@@ -13386,18 +11732,18 @@ useEffect(() => {
                         d.setDate(d.getDate() + diffToFri + 7);
                         return d.toLocaleDateString('sv-SE');
                       })();
-                      setSickStartDate(today);
-                      setSickUntilDate(nextFri);
-                      setQuickSickPreset('next_friday');
+                      setAbsenceStartDate(today);
+                      setAbsenceUntilDate(nextFri);
+                      setQuickAbsencePreset('next_friday');
                       setShowCustomStart(false);
                     }}
                     style={{
                       padding: '12px 14px',
                       borderRadius: '14px',
-                      border: quickSickPreset === 'next_friday' ? '2px solid #ef4444' : '1.5px solid #e2e8f0',
-                      background: quickSickPreset === 'next_friday' ? '#fee2e2' : '#f8fafc',
-                      color: quickSickPreset === 'next_friday' ? '#b91c1c' : '#334155',
-                      fontWeight: quickSickPreset === 'next_friday' ? 800 : 600,
+                      border: quickAbsencePreset === 'next_friday' ? '2px solid #ef4444' : '1.5px solid #e2e8f0',
+                      background: quickAbsencePreset === 'next_friday' ? '#fee2e2' : '#f8fafc',
+                      color: quickAbsencePreset === 'next_friday' ? '#b91c1c' : '#334155',
+                      fontWeight: quickAbsencePreset === 'next_friday' ? 800 : 600,
                       fontSize: '0.82rem',
                       display: 'flex',
                       alignItems: 'center',
@@ -13413,16 +11759,16 @@ useEffect(() => {
                   <button
                     type="button"
                     onClick={() => {
-                      setQuickSickPreset('custom');
+                      setQuickAbsencePreset('custom');
                       setShowCustomStart(true);
                     }}
                     style={{
                       padding: '12px 14px',
                       borderRadius: '14px',
-                      border: quickSickPreset === 'custom' ? '2px solid #ef4444' : '1.5px solid #e2e8f0',
-                      background: quickSickPreset === 'custom' ? '#fee2e2' : '#f8fafc',
-                      color: quickSickPreset === 'custom' ? '#b91c1c' : '#334155',
-                      fontWeight: quickSickPreset === 'custom' ? 800 : 600,
+                      border: quickAbsencePreset === 'custom' ? '2px solid #ef4444' : '1.5px solid #e2e8f0',
+                      background: quickAbsencePreset === 'custom' ? '#fee2e2' : '#f8fafc',
+                      color: quickAbsencePreset === 'custom' ? '#b91c1c' : '#334155',
+                      fontWeight: quickAbsencePreset === 'custom' ? 800 : 600,
                       fontSize: '0.82rem',
                       display: 'flex',
                       alignItems: 'center',
@@ -13453,9 +11799,9 @@ useEffect(() => {
                   </span>
                   <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#ef4444', background: '#fee2e2', padding: '2px 8px', borderRadius: '100px' }}>
                     {(() => {
-                      if (!sickStartDate || !sickUntilDate) return '1 Tag';
-                      const s = new Date(sickStartDate + 'T00:00:00');
-                      const u = new Date(sickUntilDate + 'T00:00:00');
+                      if (!absenceStartDate || !absenceUntilDate) return '1 Tag';
+                      const s = new Date(absenceStartDate + 'T00:00:00');
+                      const u = new Date(absenceUntilDate + 'T00:00:00');
                       s.setHours(0,0,0,0);
                       u.setHours(0,0,0,0);
                       const diff = Math.round((u.getTime() - s.getTime()) / (24*3600*1000)) + 1;
@@ -13468,29 +11814,29 @@ useEffect(() => {
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Von</span>
                     <strong style={{ fontSize: '0.92rem', color: '#0f172a', fontWeight: 800 }}>
-                      {sickStartDate ? new Date(sickStartDate + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Sofort'}
+                      {absenceStartDate ? new Date(absenceStartDate + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Sofort'}
                     </strong>
                   </div>
                   <div style={{ color: '#cbd5e1' }}>➔</div>
                   <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'right' }}>
                     <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Bis einschließlich</span>
                     <strong style={{ fontSize: '0.92rem', color: '#b91c1c', fontWeight: 800 }}>
-                      {sickUntilDate ? new Date(sickUntilDate + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Nicht gewählt'}
+                      {absenceUntilDate ? new Date(absenceUntilDate + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Nicht gewählt'}
                     </strong>
                   </div>
                 </div>
 
                 {/* Custom Date Pickers */}
-                {(quickSickPreset === 'custom' || showCustomStart) && (
+                {(quickAbsencePreset === 'custom' || showCustomStart) && (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', paddingTop: '10px', borderTop: '1px solid #e2e8f0', marginTop: '4px' }}>
                     <div>
                       <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '4px' }}>Startdatum:</label>
                       <input 
                         type="date"
-                        value={sickStartDate}
+                        value={absenceStartDate}
                         onChange={(e) => {
-                          setSickStartDate(e.target.value);
-                          setQuickSickPreset('custom');
+                          setAbsenceStartDate(e.target.value);
+                          setQuickAbsencePreset('custom');
                         }}
                         style={{
                           width: '100%',
@@ -13510,10 +11856,10 @@ useEffect(() => {
                       <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '4px' }}>Enddatum:</label>
                       <input 
                         type="date"
-                        value={sickUntilDate}
+                        value={absenceUntilDate}
                         onChange={(e) => {
-                          setSickUntilDate(e.target.value);
-                          setQuickSickPreset('custom');
+                          setAbsenceUntilDate(e.target.value);
+                          setQuickAbsencePreset('custom');
                         }}
                         style={{
                           width: '100%',
@@ -13563,8 +11909,8 @@ useEffect(() => {
               gap: '10px'
             }}>
               <button
-                onClick={handleReportSick}
-                disabled={reportingSick}
+                onClick={handleReportAbsence}
+                disabled={submittingAbsence}
                 style={{
                   background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
                   color: '#ffffff',
@@ -13573,29 +11919,29 @@ useEffect(() => {
                   borderRadius: '16px',
                   fontWeight: 900,
                   fontSize: '0.92rem',
-                  cursor: reportingSick ? 'not-allowed' : 'pointer',
+                  cursor: submittingAbsence ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
                   boxShadow: '0 4px 18px rgba(239, 68, 68, 0.35)',
-                  opacity: reportingSick ? 0.7 : 1,
+                  opacity: submittingAbsence ? 0.7 : 1,
                   letterSpacing: '-0.01em',
                   transition: 'all 0.15s'
                 }}
                 className="hover-scale"
               >
                 <CalendarX size={18} />
-                <span>{reportingSick ? 'Wird übermittelt...' : (isTeacherCurrentlyAbsent(teacher) ? 'Abwesenheit anpassen' : 'Terminabsage jetzt einreichen')}</span>
+                <span>{submittingAbsence ? 'Wird übermittelt...' : (isTeacherCurrentlyAbsent(teacher) ? 'Abwesenheit anpassen' : 'Terminabsage jetzt einreichen')}</span>
               </button>
 
               {isTeacherCurrentlyAbsent(teacher) && (
                 <button
                   onClick={() => {
-                    handleEndSick();
-                    setShowSickModal(false);
+                    handleEndAbsence();
+                    setShowAbsenceModal(false);
                   }}
-                  disabled={reportingSick}
+                  disabled={submittingAbsence}
                   style={{
                     background: 'linear-gradient(135deg, #34a853 0%, #2e8b57 100%)',
                     color: '#ffffff',
@@ -13604,7 +11950,7 @@ useEffect(() => {
                     borderRadius: '14px',
                     fontWeight: 800,
                     fontSize: '0.85rem',
-                    cursor: reportingSick ? 'not-allowed' : 'pointer',
+                    cursor: submittingAbsence ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -13620,7 +11966,7 @@ useEffect(() => {
 
               <button
                 type="button"
-                onClick={() => setShowSickModal(false)}
+                onClick={() => setShowAbsenceModal(false)}
                 style={{
                   background: 'none',
                   border: 'none',
@@ -13639,7 +11985,7 @@ useEffect(() => {
       )}
 
       {/* ── TERMINABSAGE-BESTÄTIGUNG MODAL ── */}
-      {sickNotifModal && (
+      {absenceNotifModal && (
         <div
           style={{
             position: 'fixed', inset: 0, zIndex: 9999,
@@ -13647,12 +11993,12 @@ useEffect(() => {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             padding: '24px',
           }}
-          onClick={() => setSickNotifModal(null)}
+          onClick={() => setAbsenceNotifModal(null)}
         >
           <div
             role="dialog"
             aria-modal="true"
-            aria-labelledby="sick-notif-title"
+            aria-labelledby="absence-notif-title"
             onClick={e => e.stopPropagation()}
             style={{
               background: 'white', borderRadius: '28px',
@@ -13672,18 +12018,18 @@ useEffect(() => {
                 <AlertTriangle size={22} color="white" />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <h2 id="sick-notif-title" style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                <h2 id="absence-notif-title" style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                   Abwesenheit registriert
                 </h2>
                 <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
                   Abwesend gemeldet bis einschließlich{' '}
                   <strong style={{ color: '#ef4444' }}>
-                    {new Date(sickNotifModal.sickUntilDateStr + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+                    {new Date((absenceNotifModal.absenceUntilDateStr || '') + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
                   </strong>
                 </p>
               </div>
               <button
-                onClick={() => setSickNotifModal(null)}
+                onClick={() => setAbsenceNotifModal(null)}
                 aria-label="Bestätigung schließen"
                 style={{
                   background: '#f1f5f9', border: 'none', borderRadius: '10px',
@@ -13697,22 +12043,22 @@ useEffect(() => {
 
             {/* Status bar */}
             <div style={{
-              background: sickNotifModal.notifs.length > 0 ? '#fff5f5' : '#e6f4ea',
-              border: `1.5px solid ${sickNotifModal.notifs.length > 0 ? '#fecaca' : '#e6f4ea'}`,
+              background: absenceNotifModal.notifs.length > 0 ? '#fff5f5' : '#e6f4ea',
+              border: `1.5px solid ${absenceNotifModal.notifs.length > 0 ? '#fecaca' : '#e6f4ea'}`,
               borderRadius: '16px', padding: '14px 16px',
               display: 'flex', alignItems: 'center', gap: '12px',
             }}>
               <span style={{ fontSize: '1.5rem' }}>
-                {sickNotifModal.notifs.length > 0 ? '🔔' : '🎉'}
+                {absenceNotifModal.notifs.length > 0 ? '🔔' : '🎉'}
               </span>
               <div>
                 <strong style={{ fontSize: '0.85rem', color: '#0f172a', display: 'block', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                  {sickNotifModal.notifs.length > 0
-                    ? `${sickNotifModal.notifs.length} Schüler werden benachrichtigt`
+                  {absenceNotifModal.notifs.length > 0
+                    ? `${absenceNotifModal.notifs.length} Schüler werden benachrichtigt`
                     : 'Keine Stunden betroffen'}
                 </strong>
                 <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                  {sickNotifModal.notifs.length > 0
+                  {absenceNotifModal.notifs.length > 0
                     ? 'Die Verwaltung sieht alle Fälle im Ausfall-Cockpit und informiert die Schüler.'
                     : 'Für diesen Zeitraum gibt es keine geplanten Stunden.'}
                 </span>
@@ -13720,12 +12066,12 @@ useEffect(() => {
             </div>
 
             {/* Affected student list */}
-            {sickNotifModal.notifs.length > 0 && (
+            {absenceNotifModal.notifs.length > 0 && (
               <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <p style={{ margin: 0, fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  Betroffene Stunden ({sickNotifModal.notifs.length})
+                  Betroffene Stunden ({absenceNotifModal.notifs.length})
                 </p>
-                {sickNotifModal.notifs.map((n, i) => {
+                {absenceNotifModal.notifs.map((n, i) => {
                   const dt = new Date(n.slot_start_datetime);
                   const dateStr = dt.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
                   
@@ -13796,7 +12142,7 @@ useEffect(() => {
                 ℹ️ Die <strong>Verwaltung</strong> wurde automatisch alarmiert. Im Ausfall-Cockpit können alle Fälle eingesehen und als <em>"Informiert"</em> markiert werden.
               </div>
               <button
-                onClick={() => setSickNotifModal(null)}
+                onClick={() => setAbsenceNotifModal(null)}
                 style={{
                   background: 'linear-gradient(135deg, #0f172a, #1e293b)',
                   color: 'white', border: 'none', borderRadius: '14px',

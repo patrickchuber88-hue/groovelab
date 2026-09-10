@@ -34,12 +34,10 @@
 
 ## ⚡ Hermetisches Vibe Coding & Enterprise Quality Gate
 - **Hermetischer Master-Prompt**: Bei KI-gestützten Feature-Erweiterungen und Refactorings ist zwingend der Prompt aus `.agents/prompts/VIBE_CODING_MASTER_PROMPT.md` zu verwenden. Der Prompt bindet die KI an strikte Bounded Contexts, verbietet unkontrollierte Dateimodifikationen außerhalb des Scopes und schützt alle OWASP ASVS Level 3 Axiome.
-- **Enterprise Quality Gate (`npm run gate`)**: Vor dem Abschluss jeder Arbeitsaufgabe und vor jedem Git-Commit MUSS zwingend das vereinheitlichte Qualitäts-Gate ausgeführt werden:
-  ```bash
-  npm run gate
-  ```
-  *(oder `npm run verify:enterprise`)*. Dieses Gate führt synchron den Security Drift Guard (0 Violations), den Secret-Scanner (0 Leaks), den TypeScript Typechecker (`tsc --noEmit`) und die FinOps Invariant Tests (`runBillingInvariantTests.ts`) aus. Ein Task gilt erst als erfolgreich, wenn dieses Gate mit Exit-Code 0 abschließt.
-- **Bypass-Befehl `#no` (Fast Iteration)**: Wenn der Benutzer in seiner Nachricht explizit `#no` schreibt, MUSS das zeitaufwändige Enterprise Quality Gate am Ende der Aufgabe übersprungen werden (für schnelle Iterations- und Feedbackschleifen). Standardmäßig ohne `#no` bleibt das Gate weiterhin Pflicht.
+- Der KI-Agent führt `npm run gate` oder Terminal-Prüfroutinen NIEMALS eigenständig oder automatisch aus.
+- Keine automatischen Test- oder Validierungs-Schleifen am Ende von Antworten.
+- Die Ausführung von `npm run gate` erfolgt ausschließlich manuell durch den Entwickler im Host-Terminal oder per Git-Hook beim Commit.
+- #no-Bypass gilt unverändert für den Code-Standard selbst (keine Verletzung der Invarianten).
 
 ## 🏛️ Monolith Goldstandard Guardian & Positive Intervention Directive
 - **Automatische Wächter- & Veredelungsrolle**: Bei jeder Prompt-Ausführung übernimmt der Agent automatisch die Rolle des *Principal Monolith Architecture Guardians*. Alle im Rahmen des Prompts angefassten, erweiterten oder neu erzeugten Dateien werden aktiv auf Konformität mit dem Monolith-Goldstandard von Campus-Groovelab geprüft.

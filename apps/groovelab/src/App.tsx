@@ -1757,8 +1757,14 @@ function App() {
   });
   const setActivePlatform = React.useCallback((val: any, forceUnlock = false) => {
     const schoolObj = Array.isArray(user?.schools) ? user.schools[0] : user?.schools;
-    const schoolHasCampus = schoolObj?.has_campus_subscription ?? true;
-    const schoolHasGroove = schoolObj?.has_groovelab_subscription ?? true;
+    const schoolHasCampus = Boolean(
+      user?.is_campus_active || 
+      (schoolObj ? (schoolObj.has_campus_subscription || !schoolObj.is_billing_booked || schoolObj.subscription_bypass) : true)
+    );
+    const schoolHasGroove = Boolean(
+      user?.is_groovelab_active || 
+      (schoolObj ? (schoolObj.has_groovelab_subscription || !schoolObj.is_billing_booked || schoolObj.subscription_bypass) : true)
+    );
 
     let targetVal = val;
     if (targetVal === 'campus' && !schoolHasCampus) {
@@ -2915,6 +2921,28 @@ function App() {
     }
   }, [loggedInUserId]);
 
+  // Listen for song catalog updates dispatched from teacher/admin GrooveLab Songs View
+  useEffect(() => {
+    const handleSongsUpdated = () => {
+      const uId = loggedInUserId || (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null);
+      if (uId) {
+        console.log('[GrooveLab] Songs catalog updated event received, refreshing dashboard data...');
+        fetchDashboardData(uId, false);
+      }
+    };
+    window.addEventListener('groovelab_songs_updated', handleSongsUpdated);
+    return () => {
+      window.removeEventListener('groovelab_songs_updated', handleSongsUpdated);
+    };
+  }, [loggedInUserId]);
+
+  // When student visits library tab, ensure songs data is fresh
+  useEffect(() => {
+    if (activeStudentTab === 'library' && loggedInUserId) {
+      fetchDashboardData(loggedInUserId, false);
+    }
+  }, [activeStudentTab, loggedInUserId]);
+
   useEffect(() => {
     let interval: any;
     if (session && !session.check_out_time) {
@@ -3225,8 +3253,14 @@ function App() {
 
       // Determine what platform the user is allowed to access and what is default:
       const schoolObj = Array.isArray(userData.schools) ? userData.schools[0] : userData.schools;
-      const schoolHasCampus = schoolObj?.has_campus_subscription ?? true;
-      const schoolHasGroove = schoolObj?.has_groovelab_subscription ?? true;
+      const schoolHasCampus = Boolean(
+        userData.is_campus_active || 
+        (schoolObj ? (schoolObj.has_campus_subscription || !schoolObj.is_billing_booked || schoolObj.subscription_bypass) : true)
+      );
+      const schoolHasGroove = Boolean(
+        userData.is_groovelab_active || 
+        (schoolObj ? (schoolObj.has_groovelab_subscription || !schoolObj.is_billing_booked || schoolObj.subscription_bypass) : true)
+      );
 
       const isCampusActive = Boolean(schoolHasCampus && userData.is_campus_active);
       const isGroovelabActive = Boolean(schoolHasGroove && userData.is_groovelab_active);
@@ -3484,26 +3518,34 @@ function App() {
       const bandIds = (membershipsRes?.data || []).map((m: any) => m.bands?.id).filter(Boolean);
 
       // Stage 2: Fetch all detailed boards, library, school bands, teachers, active session metrics in a single parallel block
+      let songsQuery = supabase.from('songs').select(`
+        *,
+        user_song_skills (
+          id, song_id, instrument, part_number, difficulty_level, is_stage_ready, user_id, created_at, formation_group,
+          profiles:users!user_song_skills_user_id_fkey(first_name, photo_url, school_id)
+        ),
+        band_songs (
+          id, band_id, status, is_exclusive, difficulty_level,
+          bands (id, name, photo_url, school_id),
+          band_song_slots (
+            id, user_id, instrument, status,
+            profiles:users!band_song_slots_user_id_fkey(first_name, photo_url)
+          )
+        )
+      `).eq('school_id', schoolId).eq('is_groovelab_active', true);
+
+      const effectiveTeacherId = userData?.role === 'teacher' ? userData?.id : userData?.teacher_id;
+      if (effectiveTeacherId) {
+        songsQuery = songsQuery.or(`teacher_id.eq.${effectiveTeacherId},teacher_id.is.null`);
+      }
+      songsQuery = songsQuery.order('level').order('artist');
+
       const [skillsRes, wallRes, membersRes, userBandsRes, bandsRes, teachersRes, activeSessionsRes] = await Promise.all([
         supabase.from('user_song_skills').select(`
           id, progress_percent, is_stage_ready, is_pending_approval, instrument, part_number, difficulty_level, is_favorite, verified_by_id,
           songs (*)
         `).eq('user_id', userId),
-        supabase.from('songs').select(`
-          *,
-          user_song_skills (
-            id, song_id, instrument, part_number, difficulty_level, is_stage_ready, user_id, created_at, formation_group,
-            profiles:users!user_song_skills_user_id_fkey(first_name, photo_url, school_id)
-          ),
-          band_songs (
-            id, band_id, status, is_exclusive, difficulty_level,
-            bands (id, name, photo_url, school_id),
-            band_song_slots (
-              id, user_id, instrument, status,
-              profiles:users!band_song_slots_user_id_fkey(first_name, photo_url)
-            )
-          )
-        `).eq('school_id', schoolId).eq('is_groovelab_active', true).eq('user_song_skills.is_stage_ready', true).order('level').order('artist'),
+        songsQuery,
         Promise.resolve({ data: [], error: null }),
         bandIds.length > 0
           ? supabase.from('bands').select(`
@@ -6061,7 +6103,7 @@ function App() {
     }
     setLoggedInUserIdRaw(userId);
 
-    const { data: userToLogin } = await supabase.from('users').select('role, roles, contract_ends_at, contract_decision_made, is_external_vocalist, is_campus_active, is_groovelab_active, is_master_admin, schools(has_campus_subscription, has_groovelab_subscription)').eq('id', userId).single();
+    const { data: userToLogin } = await supabase.from('users').select('role, roles, contract_ends_at, contract_decision_made, is_external_vocalist, is_campus_active, is_groovelab_active, is_master_admin, schools(has_campus_subscription, has_groovelab_subscription, is_billing_booked, subscription_bypass)').eq('id', userId).single();
     if (userToLogin?.role === 'student' && userToLogin.contract_ends_at) {
       const endsAt = new Date(userToLogin.contract_ends_at).getTime();
       if (Date.now() > endsAt) {
@@ -6107,9 +6149,15 @@ function App() {
     }
 
     // Determine module availability for user & school
-    const schoolObj = Array.isArray(userToLogin?.schools) ? userToLogin.schools[0] : userToLogin?.schools;
-    const schoolHasCampus = schoolObj?.has_campus_subscription ?? true;
-    const schoolHasGroove = schoolObj?.has_groovelab_subscription ?? true;
+    const schoolObj: any = Array.isArray(userToLogin?.schools) ? userToLogin.schools[0] : userToLogin?.schools;
+    const schoolHasCampus = Boolean(
+      userToLogin?.is_campus_active || 
+      (schoolObj ? (schoolObj.has_campus_subscription || !schoolObj.is_billing_booked || schoolObj.subscription_bypass) : true)
+    );
+    const schoolHasGroove = Boolean(
+      userToLogin?.is_groovelab_active || 
+      (schoolObj ? (schoolObj.has_groovelab_subscription || !schoolObj.is_billing_booked || schoolObj.subscription_bypass) : true)
+    );
 
     const isCampusActive = Boolean(schoolHasCampus && userToLogin?.is_campus_active);
     const isGroovelabActive = Boolean(schoolHasGroove && userToLogin?.is_groovelab_active);
@@ -6336,8 +6384,14 @@ function App() {
     if (user && user.id) {
       const schoolObj = Array.isArray(user.schools) ? user.schools[0] : user.schools;
       if (!schoolObj) return;
-      const schoolHasCampus = schoolObj?.has_campus_subscription ?? true;
-      const schoolHasGroove = schoolObj?.has_groovelab_subscription ?? true;
+      const schoolHasCampus = Boolean(
+        user?.is_campus_active || 
+        (schoolObj ? (schoolObj.has_campus_subscription || !schoolObj.is_billing_booked || schoolObj.subscription_bypass) : true)
+      );
+      const schoolHasGroove = Boolean(
+        user?.is_groovelab_active || 
+        (schoolObj ? (schoolObj.has_groovelab_subscription || !schoolObj.is_billing_booked || schoolObj.subscription_bypass) : true)
+      );
 
       if (activePlatform === 'campus' && !schoolHasCampus) {
         console.log('[Subscription Lock] Campus not active. Redirecting to GrooveLab.');
@@ -7192,8 +7246,14 @@ function App() {
       // 3. Update active workspace and platform tabs
       if (newRole === 'teacher') {
         const schoolObj = Array.isArray(user?.schools) ? user.schools[0] : user?.schools;
-        const schoolHasCampus = schoolObj?.has_campus_subscription ?? true;
-        const schoolHasGroove = schoolObj?.has_groovelab_subscription ?? true;
+        const schoolHasCampus = Boolean(
+          user?.is_campus_active || 
+          (schoolObj ? (schoolObj.has_campus_subscription || !schoolObj.is_billing_booked || schoolObj.subscription_bypass) : true)
+        );
+        const schoolHasGroove = Boolean(
+          user?.is_groovelab_active || 
+          (schoolObj ? (schoolObj.has_groovelab_subscription || !schoolObj.is_billing_booked || schoolObj.subscription_bypass) : true)
+        );
 
         let targetPlatform: 'campus' | 'groovelab' = 'campus';
         const savedPlat = sessionStorage.getItem('groovelab_active_platform');
@@ -9090,8 +9150,27 @@ function App() {
               </div>
             )}
 
-            {school && (school.has_groovelab_subscription || !school.is_billing_booked) && user?.is_groovelab_active && (
+            {Boolean((school ? (school.has_groovelab_subscription || !school.is_billing_booked || school.subscription_bypass) : true) && user?.is_groovelab_active) && (
               <div 
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    if (user?.role === 'teacher') {
+                      sessionStorage.setItem('groovelab_active_workspace', 'teacher');
+                    }
+                    setActivePlatform('groovelab');
+                    const isStaff = user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'secretary';
+                    if (isStaff) {
+                      setLocationMode('lab');
+                      sessionStorage.setItem('groovelab_location_mode', 'lab');
+                    }
+                    setActiveStudentTab('live');
+                    sessionStorage.setItem('groovelab_active_tab', 'live');
+                    localStorage.setItem('groovelab_active_tab', 'live');
+                  }
+                }}
                 onClick={() => {
                   if (user?.role === 'teacher') {
                     sessionStorage.setItem('groovelab_active_workspace', 'teacher');
@@ -9975,7 +10054,7 @@ function App() {
         {/* Student Campus Dashboard Tabs (Kept mounted for instant platform switching) */}
         {user.role?.toLowerCase() === 'student' && (
           <div style={{ 
-            display: ((activePlatform === 'campus' || (activePlatform === 'groovelab' && activeStudentTab !== 'profile')) && activeStudentTab !== 'messages') ? 'block' : 'none',
+            display: (activePlatform === 'campus' && activeStudentTab !== 'messages') ? 'block' : 'none',
             width: '100%'
           }}>
             <ErrorBoundary>
@@ -13091,17 +13170,49 @@ function App() {
                             }}>
                               {song.title}
                             </div>
-                            <div style={{ display: 'flex', gap: '8px', marginTop: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', gap: '6px', marginTop: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                               <span style={{ 
                                 background: '#fef3c7', 
-                                color: '#b45309', 
+                                color: '#92400e', 
                                 padding: '4px 10px', 
                                 borderRadius: '8px', 
                                 fontSize: '0.75rem', 
-                                fontWeight: 700 
+                                fontWeight: 800 
                               }}>
-                                Level {song.level}
+                                Level {song.level || '1'}
                               </span>
+                              {song.bpm && (
+                                <span style={{
+                                  background: '#f1f5f9',
+                                  color: '#475569',
+                                  padding: '4px 8px',
+                                  borderRadius: '8px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700
+                                }}>
+                                  {song.bpm} BPM
+                                </span>
+                              )}
+                              {song.instrumentation && typeof song.instrumentation === 'object' && !Array.isArray(song.instrumentation) && (
+                                Object.entries(song.instrumentation)
+                                  .filter(([_, count]) => Number(count) > 0)
+                                  .map(([inst]) => (
+                                    <span
+                                      key={inst}
+                                      style={{
+                                        background: '#f8fafc',
+                                        border: '1px solid #e2e8f0',
+                                        color: '#334155',
+                                        padding: '3px 8px',
+                                        borderRadius: '6px',
+                                        fontSize: '0.72rem',
+                                        fontWeight: 700
+                                      }}
+                                    >
+                                      {inst}
+                                    </span>
+                                  ))
+                              )}
                               {song.media_link && (
                                 <a 
                                   href={song.media_link} 
@@ -13115,7 +13226,7 @@ function App() {
                                     display: 'flex', 
                                     alignItems: 'center', 
                                     gap: '4px',
-                                    marginLeft: '8px' 
+                                    marginLeft: '4px' 
                                   }}
                                 >
                                   <ExternalLink size={12} /> Noten / Media

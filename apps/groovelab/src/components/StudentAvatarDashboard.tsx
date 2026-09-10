@@ -2964,7 +2964,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         {
           event: '*',
           schema: 'public',
-          table: 'campus_direct_messages'
+          table: 'campus_direct_messages',
+          filter: `recipient_id=eq.${studentId}`
         },
         () => {
           fetchOccurrencesWithMessages();
@@ -10216,11 +10217,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       effectiveAvatar.xp = metrics.totalXp;
       effectiveAvatar.streak_flame = metrics.streakFlame;
 
-      if (!avatarRecord && user.is_app_user && currentPlatform === 'groovelab') {
-        setShowSelector(true);
-      } else {
-        setShowSelector(false);
-      }
+      // Sofort aktiv ohne Onboarding: Niemals den Dashboard-Zugang durch blockierende Heldenauswahl sperren
+      setShowSelector(false);
       setAvatar(effectiveAvatar);
 
       setMonthlyFocusMinutes(metrics.totalFocusMinutes);

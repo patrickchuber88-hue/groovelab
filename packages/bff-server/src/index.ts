@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
+import storageRoutes from './routes/storage';
 import { supabaseProxy, silentRefreshMiddleware } from './routes/proxy';
 
 dotenv.config();
@@ -75,6 +76,17 @@ const apiRateLimiter = rateLimit({
   }
 });
 
+const storageRateLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 60, // 60 presigned upload tickets per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    dispatchSecurityAlert('STORAGE_RATE_LIMIT_EXCEEDED', req, { threshold: 60, window: '1m' });
+    res.status(429).json({ error: 'Too many storage requests. Rate limit active.' });
+  }
+});
+
 // --- TIER-1 SECURITY: Advanced Origin-Guard & Anti-CSRF ---
 app.use((req, res, next) => {
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
@@ -136,6 +148,9 @@ app.use('/api/auth', authRateLimiter, express.json({ limit: '1mb' }), authRoutes
 
 // 2. Supabase PostgREST Proxy with API Rate Limiting & Silent Refresh
 app.use('/api/db', apiRateLimiter, silentRefreshMiddleware, supabaseProxy);
+
+// 3. Zero-Memory Direct-to-Storage Presign Routes (Audio & Asset Ingestion)
+app.use('/api/storage', storageRateLimiter, express.json({ limit: '1mb' }), storageRoutes);
 
 app.listen(PORT, () => {
   console.log(`🛡️ BFF Server running on http://localhost:${PORT}`);

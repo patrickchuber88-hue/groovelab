@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle, Bell, Check, ChevronLeft, ChevronRight, Clock,
   Hourglass, Key, Lock, Monitor, Music, TrendingUp, User, X,
@@ -467,7 +467,7 @@ const CoachesNode = React.memo(({ coaches, onProfileSelect, activePlatform, curr
               <div 
                 onClick={() => c.users && onProfileSelect(c.users)}
                 style={{ width: '84px', height: '84px', borderRadius: '50%', border: isSelf ? '2px solid #34a853' : '2px solid white', boxShadow: isSelf ? '0 8px 20px rgba(52,168,83,0.25)' : '0 8px 20px rgba(0,0,0,0.15)', overflow: 'hidden', flexShrink: 0, cursor: 'pointer' }}>
-                <AvatarImage src={c.users?.photo_url} user={c.users} activePlatform={activePlatform} />
+                <AvatarImage src={c.users?.photo_url} user={c.users ? { ...c.users, isTeacherContext: true, isTeacher: true } : { isTeacherContext: true, isTeacher: true, role: 'teacher' }} activePlatform={activePlatform} />
               </div>
               <div style={{ background: 'white', padding: '5px 12px', borderRadius: '20px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)', textAlign: 'center', minWidth: '90px', position: 'relative' }}>
                 <div style={{ fontWeight: 900, color: '#1e293b', fontSize: '0.8rem' }}>{c.users?.first_name} {c.users?.last_name || ''}</div>
@@ -677,12 +677,44 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
   cleanRoomName,
   setToastMessage,
 }) => {
+  // Auto-align selectedRoomId if unset, invalid, or currently pointing to a room with 0 stations while other rooms have stations
+  useEffect(() => {
+    if (!rooms || rooms.length === 0) return;
+    const currentHasStations = selectedRoomId && stations.some(s => s.room_id === selectedRoomId);
+    if (!selectedRoomId || !rooms.some(r => r.id === selectedRoomId) || (!currentHasStations && stations.length > 0)) {
+      const roomWithStations = rooms.find(r => stations.some(s => s.room_id === r.id));
+      if (roomWithStations && roomWithStations.id !== selectedRoomId) {
+        setSelectedRoomId(roomWithStations.id);
+      } else if (!selectedRoomId || !rooms.some(r => r.id === selectedRoomId)) {
+        setSelectedRoomId(rooms[0].id);
+      }
+    }
+  }, [rooms, selectedRoomId, stations, setSelectedRoomId]);
+
   return (
         <div id="tour-teacher-livelab" className={`live-lab-grid ${isSidebarCollapsed ? 'collapsed' : ''}`}>
           {(() => {
             const isMobileView = windowWidth < 768 || containerWidth < 768 || windowHeight < 500;
-            const activeRoom = rooms.find(r => r.id === selectedRoomId);
-            const roomStations = stations.filter(s => s.room_id === selectedRoomId);
+            const activeRoom = rooms.find(r => r.id === selectedRoomId) || (rooms.length > 0 ? rooms[0] : null);
+            let effectiveSelectedRoomId = selectedRoomId || (rooms.length > 0 ? rooms[0]?.id : null);
+
+            let roomStations = stations.filter(s => s.room_id === effectiveSelectedRoomId);
+            if (roomStations.length === 0 && stations.length > 0) {
+              const roomWithStations = rooms.find(r => stations.some(s => s.room_id === r.id));
+              if (roomWithStations) {
+                effectiveSelectedRoomId = roomWithStations.id;
+                roomStations = stations.filter(s => s.room_id === roomWithStations.id);
+              } else {
+                roomStations = stations;
+              }
+            }
+
+            const unassignedStudentSessions = activeSessions.filter(se => {
+              if (!se || !se.user_id) return false;
+              if (se.users?.role === 'teacher' || se.users?.role === 'admin') return false;
+              if (se.user_id === userId) return false;
+              return !roomStations.some(s => s.id === se.station_id);
+            });
 
             if (isMobileView) {
               return (
@@ -718,7 +750,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                     {rooms.length > 1 && (
                       <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '6px', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
                         {rooms.map((room, idx) => {
-                          const isSelected = room.id === selectedRoomId;
+                          const isSelected = room.id === (effectiveSelectedRoomId || selectedRoomId);
                           return (
                             <button
                               key={room.id}
@@ -874,7 +906,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                                   onClick={() => c.users && setSelectedCoachProfile(c.users)}
                                 >
                                   <div style={{ width: '32px', height: '32px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
-                                    <AvatarImage src={c.users?.photo_url} user={c.users} activePlatform={activePlatform} />
+                                    <AvatarImage src={c.users?.photo_url} user={c.users ? { ...c.users, isTeacherContext: true, isTeacher: true } : { isTeacherContext: true, isTeacher: true, role: 'teacher' }} activePlatform={activePlatform} />
                                   </div>
                                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                                     <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '0.75rem', lineHeight: 1.1 }}>{coachName}</span>
@@ -1022,6 +1054,96 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
 
                               {/* Checkout Button */}
                               {isActive && (viewMode === 'admin' || isMe) && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleLogoutStudent(sess.id);
+                                  }}
+                                  style={{
+                                    background: '#fef2f2',
+                                    border: '1px solid #fee2e2',
+                                    width: '24px',
+                                    height: '24px',
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    color: '#ef4444',
+                                    fontSize: '11px',
+                                    fontWeight: 'bold',
+                                    padding: 0,
+                                    flexShrink: 0
+                                  }}
+                                  title="Auschecken"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {unassignedStudentSessions.map((sess, uIdx) => {
+                          const customName = sess.stations?.name || `Station (App ${uIdx + 1})`;
+                          const instColor = getStationColor(customName, sess.stations?.color || '#eab308');
+                          const activeMins = sess?.check_in_time ? Math.floor((new Date().getTime() - new Date(sess.check_in_time).getTime()) / 60000) : 0;
+                          const hasHelp = helpRequests.some(r => r.user_id === sess.user_id || r.session_id === sess.id);
+                          const isMe = sess?.user_id === userId;
+                          const studentName = sess?.users ? `${sess.users.first_name} ${maskLastName(sess.users.last_name, showRealNames)}` : '';
+
+                          return (
+                            <div
+                              key={sess.id || `unassigned-${uIdx}`}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                background: 'white',
+                                borderRadius: '20px',
+                                border: `2px solid ${instColor}`,
+                                padding: '12px 16px',
+                                position: 'relative',
+                                gap: '12px',
+                                boxShadow: `0 6px 16px ${instColor}08`,
+                                cursor: 'pointer',
+                                minWidth: 0
+                              }}
+                              onClick={() => {
+                                if (sess?.users) setSelectedStudentProfile({ ...sess.users, session: sess });
+                              }}
+                            >
+                              <div style={{
+                                width: '40px',
+                                height: '40px',
+                                borderRadius: '14px',
+                                background: `${instColor}15`,
+                                color: instColor,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 900,
+                                fontSize: '1rem',
+                                flexShrink: 0
+                              }}>
+                                {roomStations.length + uIdx + 1}
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {customName}
+                                  </span>
+                                  {hasHelp && (
+                                    <span style={{ background: '#ef4444', color: 'white', padding: '2px 6px', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 800 }}>
+                                      Hilfe
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                                  <span style={{ color: '#0f172a', fontWeight: 700 }}>{studentName}</span>
+                                  <span>•</span>
+                                  <span>{activeMins} min</span>
+                                </div>
+                              </div>
+                              {(viewMode === 'admin' || isMe) && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -1619,7 +1741,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                 {rooms.length > 1 && (
                   <div id="tour-teacher-livelab-rooms" style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '6px', borderRadius: '16px', alignSelf: 'flex-start', marginBottom: '8px' }}>
                     {rooms.map((room, idx) => {
-                      const isSelected = room.id === selectedRoomId;
+                      const isSelected = room.id === (effectiveSelectedRoomId || selectedRoomId);
                       return (
                         <button
                           key={room.id}
@@ -1781,6 +1903,29 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                             onProfileSelect={setSelectedStudentProfile}
                             onLogout={handleLogoutStudent}
                             hasHelpRequest={helpRequests.some(r => r.station_id === station.id)}
+                            activePlatform={activePlatform}
+                          />
+                        </div>
+                      );
+                    })}
+                    {unassignedStudentSessions.map((sess, uIdx) => {
+                      const customName = sess.stations?.name || `Station (App ${uIdx + 1})`;
+                      const inst = sess.stations?.instrument || sess.users?.instrument || 'Tablet';
+                      const instColor = getStationColor(customName, sess.stations?.color || '#eab308');
+
+                      return (
+                        <div key={sess.id || `unassigned-${uIdx}`}>
+                          <StationNode
+                            num={roomStations.length + uIdx + 1}
+                            customName={customName}
+                            color={instColor}
+                            inst={inst}
+                            sess={sess}
+                            isMe={sess.user_id === userId}
+                            viewMode={viewMode}
+                            onProfileSelect={setSelectedStudentProfile}
+                            onLogout={handleLogoutStudent}
+                            hasHelpRequest={helpRequests.some(r => r.user_id === sess.user_id || r.session_id === sess.id)}
                             activePlatform={activePlatform}
                           />
                         </div>
