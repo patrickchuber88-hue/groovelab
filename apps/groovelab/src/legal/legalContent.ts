@@ -135,7 +135,7 @@ Die Lehrkraft verpflichtet sich, alle Schüler- und Kollegendaten vertraulich zu
       'Hausaufgabenheft, digitaler Übe-Timer und persönlicher Stundenplan-Sync',
       'DSGVO-Datenminimierung: Keine Speicherung von Bank-, Vertrags- oder E-Mail-Daten',
       'Didaktische Terminübersicht & Botenmodell: Unterrichtsverträge & Aufsicht verbleiben bei der Schule',
-      'Ausschluss von Art. 9 DSGVO Gesundheitsdaten: Angabe „krankheitsbedingt“ genügt vollkommen',
+      'Ausschluss von Art. 9 DSGVO Gesundheitsdaten: Angabe „verhindert“ genügt vollkommen',
       'Jederzeit kündbar bzw. deaktivierbar'
     ],
     checkboxLabel: 'Ich akzeptiere die kostenfreien Plattform-Nutzungsbedingungen für Campus-Groovelab (bei Minderjährigen durch die Erziehungsberechtigten).',
@@ -158,7 +158,7 @@ Die Zugangsdaten (QR-Code, Ausweis-PIN) sind sorgfältig aufzubewahren und dürf
 (2) Verbindliche Unterrichtsverträge, offizielle Schulbescheinigungen sowie rechtlich bindende Unterrichtsvereinbarungen richten sich nach den Bestimmungen des Vertrags mit der Musikschule.
 (3) Die Aufsichtspflicht der Musikschule und ihrer Lehrkräfte vor Ort beginnt und endet ausschließlich mit dem tatsächlichen Antritt und Verlassen des Präsenzunterrichts gemäß der Haus- und Schulordnung der Musikschule, nicht durch die digitale Zeitanzeige in der App.
 (4) Botenstatus & Ausschluss von Hauptvertragskündigungen: Mitteilungen über Absagen oder Terminabstimmungen in der termingekoppelten Shoutbox fungieren technisch rein als elektronischer Bote zur zeitgleichen Information von Lehrkraft und Schulsekretariat. Die Plattform begründet keine Genehmigungsfiktion. Formelle Kündigungen des Unterrichtsvertrags mit der Musikschule können über die App nicht erklärt werden und bedürfen der in der Schulordnung festgelegten Form direkt gegenüber der Musikschule.
-(5) Ausschluss von Gesundheitsdaten (Art. 9 DSGVO): Die Shoutbox dient rein organisatorischen Zwecken. Die Eingabe von medizinischen Diagnosen, Attesten oder detaillierten Krankheitsdaten ist untersagt; bei Verhinderung genügt der Vermerk „krankheitsbedingt“.
+(5) Ausschluss von Gesundheitsdaten (Art. 9 DSGVO): Die Shoutbox dient rein organisatorischen Zwecken. Die Eingabe von medizinischen Diagnosen, Attesten oder detaillierten Gesundheitsdaten ist untersagt; bei Verhinderung genügt der Vermerk „verhindert“.
     `.trim()
   },
 

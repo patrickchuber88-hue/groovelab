@@ -56,6 +56,7 @@ import {
 import { isWebAuthnSupported, authenticateParentBiometricPasskey } from '../utils/webauthn';
 import { downloadCsvFile } from '../utils/csvHelper';
 import { formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel, formatTeacherFullName, formatDisplaySubjectOrInstrument, isInvalidInstrument, maskLastName } from '../utils/nameHelper';
+import { isSlotCancelledByAbsence } from '../utils/teacherAbsenceHelper';
 import { CampusAppointmentShoutboxModal } from './CampusAppointmentShoutboxModal';
 
 interface CampusEventsBoardProps {
@@ -3676,8 +3677,8 @@ export function CampusEventsBoard({
 
               const isTeacherSickOnDate = Boolean(
                 sch.status === 'canceled_by_teacher_sick' ||
-                (sch.teacher?.sick_until && dateStr <= sch.teacher.sick_until.substring(0, 10) && (!sch.teacher.sick_start || dateStr >= sch.teacher.sick_start.substring(0, 10))) ||
-                (teacherProfileObj?.sick_until && String(sch.teacher_id) === String(userId) && dateStr <= teacherProfileObj.sick_until.substring(0, 10) && (!teacherProfileObj.sick_start || dateStr >= teacherProfileObj.sick_start.substring(0, 10)))
+                isSlotCancelledByAbsence(dateStr, sch.time_slot || '00:00', sch.teacher) ||
+                (String(sch.teacher_id) === String(userId) && isSlotCancelledByAbsence(dateStr, sch.time_slot || '00:00', teacherProfileObj))
               );
 
               if (actual) {
@@ -6096,13 +6097,13 @@ export function CampusEventsBoard({
                     fontSize: '9px',
                     fontWeight: 800,
                     background: '#fee2e2',
-                    color: '#dc2626',
-                    border: '1.5px dashed #ef4444',
+                    color: '#991b1b',
+                    border: '1.5px solid #ef4444',
                     padding: '2px 6px',
                     borderRadius: '6px',
                     textTransform: 'uppercase'
                   }}>
-                    Abgesagt
+                    Entfällt
                   </span>
                 )}
               </div>

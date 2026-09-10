@@ -20,7 +20,7 @@
     "verify:enterprise": "npm run gate",
     "verify:perimeter": "node scripts/verify_perimeter_headers.mjs",
     "check:budget": "node scripts/check-bundle-budget.js",
-    "prepare": "husky install"
+    "prepare": "test -d .git && husky install || exit 0"
   },
   "dependencies": {
     "ssh2": "^1.17.0"

@@ -4927,7 +4927,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                         ) : (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <span style={{ fontSize: '0.64rem', fontWeight: 900, color: '#991b1b', background: '#fee2e2', border: '1px solid #fca5a5', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                              {occ.status === 'canceled_by_teacher_sick' || occ.status === 'teacher_sick' ? 'Abgesagt durch Lehrkraft' : 'Abgesagt'}
+                              Entfällt
                             </span>
                             {occ.status === 'canceled_by_student' && (
                               <button
@@ -6155,13 +6155,29 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     } else if (nextLesson) {
       const nextTeacherObj = nextLesson?.teacher || nextLesson?.occ?.teacher || nextLesson?.occ?.schedule?.teacher || teachers.find(t => t.id === nextLesson?.teacher_id || t.id === nextLesson?.occ?.teacher_id);
       const nextTeacherFullName = formatTeacherFullName(nextTeacherObj, (profile as any)?.teacher_name);
-      const isShiftedPending = Boolean(nextLesson.needsAck);
-      const isShiftedConfirmed = Boolean(!nextLesson.needsAck && (nextLesson.isRescheduled || nextLesson.occ?.status === 'rescheduled_confirmed'));
-      const isPendingAdmin = Boolean(nextLesson.isPendingReview && !isShiftedPending && !isShiftedConfirmed);
+      const isCancelled = Boolean(
+        nextLesson.isCancelled || 
+        nextLesson.occ?.status === 'canceled_by_teacher_sick' || 
+        nextLesson.occ?.status === 'teacher_sick' || 
+        nextLesson.occ?.status === 'cancelled'
+      );
+      const isShiftedPending = Boolean(nextLesson.needsAck && !isCancelled);
+      const isShiftedConfirmed = Boolean(!nextLesson.needsAck && !isCancelled && (nextLesson.isRescheduled || nextLesson.occ?.status === 'rescheduled_confirmed'));
+      const isPendingAdmin = Boolean(nextLesson.isPendingReview && !isShiftedPending && !isShiftedConfirmed && !isCancelled);
 
       const isShifted = isShiftedPending || isShiftedConfirmed;
-      const borderColor = isShiftedPending ? '1.5px dashed #eab308' : isPendingAdmin ? '1.5px dashed #eab308' : (styles.card ? styles.card.border : '1px solid #e2e8f0');
-      const cardBg = isShiftedPending ? 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)' : '#ffffff';
+      const borderColor = isCancelled 
+        ? '1.5px solid #ef4444' 
+        : isShiftedPending 
+          ? '1.5px dashed #eab308' 
+          : isPendingAdmin 
+            ? '1.5px dashed #eab308' 
+            : (styles.card ? styles.card.border : '1px solid #e2e8f0');
+      const cardBg = isCancelled
+        ? 'repeating-linear-gradient(-45deg, #fef2f2 0px, #fef2f2 8px, #ffffff 8px, #ffffff 16px)'
+        : isShiftedPending 
+          ? 'repeating-linear-gradient(-45deg, #fffbeb 0px, #fffbeb 8px, #ffffff 8px, #ffffff 16px)' 
+          : '#ffffff';
 
       return (
         <div style={{
@@ -6172,10 +6188,23 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           background: cardBg
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#34a853', background: '#e6f4ea', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
-              Nächster Unterrichtstermin
+            <span style={{ 
+              fontSize: '0.68rem', 
+              fontWeight: 900, 
+              color: isCancelled ? '#991b1b' : '#34a853', 
+              background: isCancelled ? '#fee2e2' : '#e6f4ea', 
+              border: isCancelled ? '1px solid #fca5a5' : 'none',
+              padding: '3px 8px', 
+              borderRadius: '6px', 
+              textTransform: 'uppercase' 
+            }}>
+              {isCancelled ? 'Unterricht entfällt' : 'Nächster Unterrichtstermin'}
             </span>
-            {isShiftedPending ? (
+            {isCancelled ? (
+              <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#ffffff', background: '#ef4444', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                Entfällt
+              </span>
+            ) : isShiftedPending ? (
               <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#b45309', background: '#fef3c7', border: '1px solid #fde047', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase' }}>
                 🗓️ Termin verschoben (ausstehend)
               </span>
@@ -6189,6 +6218,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               </span>
             ) : null}
           </div>
+
+          {isCancelled && (
+            <div style={{ fontSize: '0.78rem', color: '#991b1b', fontWeight: 700, background: '#fff5f5', padding: '8px 12px', borderRadius: '8px', border: '1px solid #fecaca', marginTop: '2px' }}>
+              Dieser Unterrichtstermin entfällt (Lehrkraft verhindert).
+            </div>
+          )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {(() => {
@@ -8090,7 +8125,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       const simNow = getSimulatedNow();
       const todayStr = simNow.toLocaleDateString('sv-SE');
       const activeOccs = occurrences.filter(o => o.status !== 'cancelled' && o.status !== 'canceled_by_student' && o.status !== 'teacher_sick' && o.status !== 'canceled_by_teacher_sick');
-      const upcomingOcc = activeOccs.find(o => o.date >= todayStr);
+      const nextAnyOcc = occurrences.find(o => o.date >= todayStr);
+      const isCancelledNext = Boolean(nextAnyOcc && ['cancelled', 'teacher_sick', 'canceled_by_teacher_sick', 'canceled_by_student'].includes(nextAnyOcc.status));
+      const upcomingOcc = isCancelledNext ? nextAnyOcc : activeOccs.find(o => o.date >= todayStr);
+
       if (upcomingOcc) {
         const d = new Date(upcomingOcc.date + 'T00:00:00');
         const isTimeShifted = Boolean(
@@ -8111,7 +8149,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           isPendingReview: upcomingOcc.schedule?.status === 'ready_for_admin_review' && !roomName && !upcomingOcc.schedule?.room_id,
           room_name: roomName,
           isRescheduled,
-          needsAck
+          needsAck,
+          isCancelled: Boolean(isCancelledNext || ['cancelled', 'teacher_sick', 'canceled_by_teacher_sick', 'canceled_by_student'].includes(upcomingOcc.status))
         };
       }
       return getVirtualNextLesson();
@@ -9447,7 +9486,10 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       const simNow = getSimulatedNow();
       const todayStr = simNow.toLocaleDateString('sv-SE');
       const activeOccs = occurrences.filter(o => o.status !== 'cancelled' && o.status !== 'canceled_by_student' && o.status !== 'teacher_sick' && o.status !== 'canceled_by_teacher_sick');
-      const upcomingOcc = activeOccs.find(o => o.date >= todayStr);
+      const nextAnyOcc = occurrences.find(o => o.date >= todayStr);
+      const isCancelledNext = Boolean(nextAnyOcc && ['cancelled', 'teacher_sick', 'canceled_by_teacher_sick', 'canceled_by_student'].includes(nextAnyOcc.status));
+      const upcomingOcc = isCancelledNext ? nextAnyOcc : activeOccs.find(o => o.date >= todayStr);
+
       if (upcomingOcc) {
         const d = new Date(upcomingOcc.date + 'T00:00:00');
         const isTimeShifted = Boolean(
@@ -9468,7 +9510,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           isPendingReview: upcomingOcc.schedule?.status === 'ready_for_admin_review' && !roomName && !upcomingOcc.schedule?.room_id,
           room_name: roomName,
           isRescheduled,
-          needsAck
+          needsAck,
+          isCancelled: Boolean(isCancelledNext || ['cancelled', 'teacher_sick', 'canceled_by_teacher_sick', 'canceled_by_student'].includes(upcomingOcc.status))
         };
       }
       return getVirtualNextLesson();

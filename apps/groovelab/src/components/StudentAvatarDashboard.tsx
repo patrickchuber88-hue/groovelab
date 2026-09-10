@@ -3002,23 +3002,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       ]);
 
       if (!error && data) {
-        if (studentSchedules && studentSchedules.length > 0) {
-          const filtered = data.filter(n => {
-            const dt = new Date(n.slot_start_datetime);
-            const dayOfWeek = dt.getDay() || 7;
-            const hours = String(dt.getHours()).padStart(2, '0');
-            const minutes = String(dt.getMinutes()).padStart(2, '0');
-            const timeSlot = `${hours}:${minutes}`;
-            
-            return studentSchedules.some(sch => 
-              sch.day_of_week === dayOfWeek && 
-              sch.time_slot === timeSlot
-            );
-          });
-          setUnreadCrisisNotifs(filtered);
-        } else {
-          setUnreadCrisisNotifs([]);
-        }
+        // Filtere alle unquittierten Ausfälle, die heute oder in der Zukunft liegen (bzw. max. 24h vergangen)
+        const nowThreshold = Date.now() - 24 * 60 * 60 * 1000;
+        const validNotifs = data.filter(n => {
+          const dt = new Date(n.slot_start_datetime);
+          return !isNaN(dt.getTime()) && dt.getTime() >= nowThreshold;
+        });
+        setUnreadCrisisNotifs(validNotifs);
       }
     } catch (err) {
       console.error('Error fetching crisis notifications:', err);
