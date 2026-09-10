@@ -57,6 +57,7 @@ export interface StudentSettingsTabProps {
   generateParentRecoveryKey: () => string;
   getTargetMinutes: (item: any) => number;
   handleBiometricUnlock: () => Promise<void>;
+  handleRegisterParentPasskey?: () => Promise<{ success: boolean; error?: string }>;
   handleCloseSettingsModal: () => void;
   handleDownloadGoBdReceipt: (rec: any) => Promise<void>;
   handleExportGdprReport: () => Promise<void>;
@@ -190,6 +191,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
     generateParentRecoveryKey,
     getTargetMinutes,
     handleBiometricUnlock,
+    handleRegisterParentPasskey,
     handleCloseSettingsModal,
     handleDownloadGoBdReceipt,
     handleExportGdprReport,
@@ -293,6 +295,24 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
   const [downloadingSection, setDownloadingSection] = React.useState<string | null>(null);
   const [downloadProgressMsg, setDownloadProgressMsg] = React.useState<string>('');
   const [downloadFeedback, setDownloadFeedback] = React.useState<string | null>(null);
+
+  // 🛡️ Passkey (FaceID / TouchID) State
+  const [hasDevicePasskey, setHasDevicePasskey] = React.useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const targetId = studentId || (studentUser as any)?.id;
+    return Boolean(targetId && localStorage.getItem(`groovelab_parent_passkey_active_${targetId}`) === 'true');
+  });
+  const [isRegisteringPasskey, setIsRegisteringPasskey] = React.useState<boolean>(false);
+  const [passkeyActionMessage, setPasskeyActionMessage] = React.useState<string | null>(null);
+  const [passkeyActionStatus, setPasskeyActionStatus] = React.useState<'success' | 'error'>('success');
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const targetId = studentId || (studentUser as any)?.id;
+    if (targetId) {
+      setHasDevicePasskey(localStorage.getItem(`groovelab_parent_passkey_active_${targetId}`) === 'true');
+    }
+  }, [studentId, (studentUser as any)?.id]);
 
   const downloadBlobAsFile = (blob: Blob, fileName: string) => {
     const url = URL.createObjectURL(blob);
@@ -606,7 +626,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                 </div>
 
                 <h2 style={{ fontSize: '1.4rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                  {hasConfiguredParentPin ? 'Elternbereich geschützt 🛡️' : '6-stellige Eltern-Master-PIN vergeben 🛡️'}
+                  {hasConfiguredParentPin ? 'Elternbereich geschützt' : '6-stellige Eltern-Master-PIN vergeben'}
                 </h2>
                 <p style={{ margin: '8px 0 18px 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: 1.4 }}>
                   {hasConfiguredParentPin
@@ -658,39 +678,50 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                     justifyContent: 'center',
                     gap: '8px'
                   }}>
-                    <span>⏳ Sicherheitssperre aktiv: Bitte warte noch <strong>{parentGateCooldownSeconds}s</strong></span>
+                    <Clock size={16} color="#92400e" />
+                    <span>Sicherheitssperre aktiv: Bitte warte noch <strong>{parentGateCooldownSeconds}s</strong></span>
                   </div>
                 )}
 
-                {/* 1-Click Biometric Quick-Unlock (FaceID / TouchID / Passkey) - Nur wenn echte Hardware verfügbar */}
-                {hasConfiguredParentPin && isWebAuthnAvailable && (
-                  <button
-                    type="button"
-                    onClick={handleBiometricUnlock}
-                    disabled={isVerifyingParentGate || parentGateCooldownSeconds > 0}
-                    style={{
-                      width: '100%',
-                      maxWidth: '300px',
-                      padding: '10px 16px',
-                      background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                      border: '1.5px solid #86efac',
-                      borderRadius: '16px',
-                      color: '#15803d',
-                      fontSize: '0.82rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      marginBottom: '16px',
-                      boxShadow: '0 2px 8px rgba(34, 197, 94, 0.12)'
-                    }}
-                    className="hover-scale"
-                  >
-                    <Fingerprint size={18} />
-                    <span>Mit FaceID / TouchID entsperren</span>
-                  </button>
+                {/* 1-Click Biometric Quick-Unlock (FaceID / TouchID / Passkey) - Duale Direktansicht */}
+                {isWebAuthnAvailable && (
+                  <div style={{ width: '100%', maxWidth: '320px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', marginBottom: '20px' }}>
+                    <button
+                      type="button"
+                      onClick={handleBiometricUnlock}
+                      disabled={isVerifyingParentGate || parentGateCooldownSeconds > 0}
+                      style={{
+                        width: '100%',
+                        padding: '13px 20px',
+                        background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                        border: '1.5px solid #86efac',
+                        borderRadius: '18px',
+                        color: '#15803d',
+                        fontSize: '0.88rem',
+                        fontWeight: 850,
+                        cursor: (isVerifyingParentGate || parentGateCooldownSeconds > 0) ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '10px',
+                        boxShadow: '0 4px 14px rgba(34, 197, 94, 0.16)',
+                        transition: 'all 0.15s ease'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Fingerprint size={20} color="#16a34a" />
+                      <span>Mit FaceID / TouchID entsperren</span>
+                    </button>
+
+                    {/* Dezenter Teiler: Oder 6-stellige PIN eingeben */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
+                      <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+                      <span style={{ fontSize: '0.70rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        oder 6-stellige PIN eingeben
+                      </span>
+                      <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+                    </div>
+                  </div>
                 )}
 
                 {/* 6 Dots Display with Shake Animation */}
@@ -957,9 +988,13 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       borderRadius: '100px',
                       background: '#dcfce7',
                       color: '#15803d',
-                      border: '1px solid #86efac'
+                      border: '1px solid #86efac',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px'
                     }}>
-                      🎁 1 Monat gratis schnuppern
+                      <Sparkles size={12} color="#15803d" />
+                      <span>1 Monat gratis schnuppern</span>
                     </span>
                   </div>
 
@@ -969,7 +1004,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
 
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', paddingTop: '4px' }}>
                     <div style={{ fontSize: '0.78rem', color: '#15803d', fontWeight: 700 }}>
-                      ✓ Laufender Monat 100% kostenlos • Danach nur 0,49 € / Mo. bis zum Schuljahresende (31.08.)
+                      Laufender Monat 100% kostenlos • Danach nur 0,49 € / Mo. bis zum Schuljahresende (31.08.)
                     </div>
                     <button
                       type="button"
@@ -987,12 +1022,14 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         alignItems: 'center',
                         gap: '8px',
                         boxShadow: '0 6px 18px rgba(16, 185, 129, 0.35)',
-                        transition: 'all 0.15s'
+                        transition: 'all 0.15s',
+                        minHeight: '44px',
+                        touchAction: 'manipulation'
                       }}
                       className="hover-scale"
                     >
                       <Sparkles size={16} />
-                      <span>Kostenfreien Schnuppermonat starten ➔</span>
+                      <span>Kostenfreien Schnuppermonat starten</span>
                     </button>
                   </div>
                 </div>
@@ -1001,12 +1038,12 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
               {/* 🌟 3 ERGONOMISCHE SINNABSCHNITTE: ELTERNZONE & EINSTELLUNGEN */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', width: '100%' }}>
 
-                {/* ABSCHNITT 1: 🛡️ Schutz & Wohlbefinden */}
+                {/* ABSCHNITT 1: Schutz & Wohlbefinden */}
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', textAlign: 'left', flexWrap: 'wrap', gap: '8px' }}>
                     <div>
                       <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span>🛡️</span>
+                        <Shield size={18} color="#0284c7" />
                         <span>{isAdultStudent ? 'Schutz & App-Design' : 'Schutz & Wohlbefinden'}</span>
                       </h3>
                       <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
@@ -1058,7 +1095,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         id: 'notifications',
                         title: 'Mitteilungen & Push',
                         subtitle: pushEnabled ? 'Push-Mitteilungen auf diesem Gerät aktiv' : 'Hausaufgaben, Chat & Stundenplan-Meldungen',
-                        badge: pushEnabled ? 'Aktiv ✓' : 'Inaktiv',
+                        badge: pushEnabled ? 'Aktiv' : 'Inaktiv',
                         gradient: currentPlatform === 'groovelab' ? 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)' : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
                         shadowColor: currentPlatform === 'groovelab' ? 'rgba(234, 179, 8, 0.40)' : 'rgba(59, 130, 246, 0.40)',
                         icon: Bell
@@ -1137,12 +1174,12 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                   </div>
                 </div>
 
-                {/* ABSCHNITT 2: 📊 Lernalltag & Einblick */}
+                {/* ABSCHNITT 2: Lernalltag & Einblick */}
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', textAlign: 'left', flexWrap: 'wrap', gap: '8px' }}>
                     <div>
                       <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span>📊</span>
+                        <BookOpen size={18} color="#16a34a" />
                         <span>Lernalltag &amp; Einblick</span>
                       </h3>
                       <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
@@ -1274,16 +1311,16 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                   </div>
                 </div>
 
-                {/* ABSCHNITT 3: 💳 Konto & Transparenz */}
+                {/* ABSCHNITT 3: Konto & Transparenz */}
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', textAlign: 'left', flexWrap: 'wrap', gap: '8px' }}>
                     <div>
                       <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span>💳</span>
+                        <FileText size={18} color="#7c3aed" />
                         <span>Konto &amp; Transparenz</span>
                       </h3>
                       <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
-                        Modul-Status, 0,00 € Musikschul-Bereitstellung und DSGVO-Datentresor
+                        Modul-Status, 0,00 € Bereitstellung, Datenschutz &amp; DSGVO-Downloads
                       </p>
                     </div>
                     <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#7c3aed', background: '#f5f3ff', padding: '3px 10px', borderRadius: '100px', border: '1px solid #ddd6fe' }}>
@@ -1318,12 +1355,21 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       },
                       {
                         id: 'legal',
-                        title: 'Datenschutz & Datentresor',
-                        subtitle: 'Art. 15 Auskunft & 4 Archiv-Downloads',
-                        badge: 'DSGVO Konform',
+                        title: 'Datenschutz & Rechtliches',
+                        subtitle: 'DSGVO-Grundsätze, Art. 15 Auskunft & Impressum',
+                        badge: 'DSGVO & Recht',
                         gradient: 'linear-gradient(135deg, #64748b 0%, #475569 100%)',
                         shadowColor: 'rgba(100, 116, 139, 0.40)',
                         icon: ShieldCheck
+                      },
+                      {
+                        id: 'downloads',
+                        title: 'Downloads & Datentresor',
+                        subtitle: 'Art. 20 Datensouveränität & 4 Archiv-Pakete',
+                        badge: '4 Archive',
+                        gradient: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                        shadowColor: 'rgba(2, 132, 199, 0.40)',
+                        icon: Download
                       }
                     ].map((module) => {
                       const IconComp = module.icon;
@@ -1590,7 +1636,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                     background: '#ffffff',
                     borderRadius: isMobile ? 0 : '24px',
                     width: '100%',
-                    maxWidth: isMobile ? '100vw' : (activeStudentSettingsModal === 'billing' ? '920px' : '680px'),
+                    maxWidth: isMobile ? '100vw' : (activeStudentSettingsModal === 'billing' ? '920px' : (activeStudentSettingsModal === 'downloads' ? '760px' : '680px')),
                     height: isMobile ? '100dvh' : 'auto',
                     maxHeight: isMobile ? '100dvh' : '88vh',
                     display: 'flex',
@@ -1667,7 +1713,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             {activeStudentSettingsModal === 'notifications' && 'Mitteilungen & Push'}
                             {activeStudentSettingsModal === 'security' && (isAdultStudent ? 'PIN & Sicherheit' : 'PIN & Eltern-Schutz')}
                             {activeStudentSettingsModal === 'billing' && (isAdultStudent ? 'Vertrag & Belege' : 'Belege & Bereitstellung')}
-                            {activeStudentSettingsModal === 'legal' && 'Datenschutz & Tresor'}
+                            {activeStudentSettingsModal === 'legal' && 'Datenschutz & Rechtliches'}
+                            {activeStudentSettingsModal === 'downloads' && 'Downloads & Datentresor'}
                           </h3>
                         </div>
 
@@ -1720,6 +1767,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                               ? 'linear-gradient(135deg, #34a853 0%, #15803d 100%)'
                               : activeStudentSettingsModal === 'billing'
                               ? 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)'
+                              : activeStudentSettingsModal === 'downloads'
+                              ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'
                               : 'linear-gradient(135deg, #64748b 0%, #475569 100%)',
                             display: 'flex',
                             alignItems: 'center',
@@ -1737,6 +1786,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             {activeStudentSettingsModal === 'security' && <Lock size={20} color="#ffffff" />}
                             {activeStudentSettingsModal === 'billing' && <FileText size={20} color="#ffffff" />}
                             {activeStudentSettingsModal === 'legal' && <ShieldCheck size={20} color="#ffffff" />}
+                            {activeStudentSettingsModal === 'downloads' && <Download size={20} color="#ffffff" />}
                           </div>
                           <div>
                             <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -1753,7 +1803,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                               {activeStudentSettingsModal === 'notifications' && 'Mitteilungen & Benachrichtigungen'}
                               {activeStudentSettingsModal === 'security' && (isAdultStudent ? 'PIN & Account-Sicherheit' : 'PIN & Sicherheit')}
                               {activeStudentSettingsModal === 'billing' && (isAdultStudent ? 'Vertrag & Belege' : 'Belege & Bereitstellung')}
-                              {activeStudentSettingsModal === 'legal' && 'Datenschutz & Datentresor'}
+                              {activeStudentSettingsModal === 'legal' && 'Datenschutz, DSGVO & Transparenz'}
+                              {activeStudentSettingsModal === 'downloads' && 'Downloads & Didaktik-Datentresor'}
                             </h3>
                             <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
                               {activeStudentSettingsModal === 'modules' && 'Verwalte Campus- & GrooveLab-Module und schalte Zusatzfunktionen frei.'}
@@ -1766,7 +1817,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                               {activeStudentSettingsModal === 'notifications' && 'Passe an, worüber und wie wir dich informieren.'}
                               {activeStudentSettingsModal === 'security' && (isAdultStudent ? '4-stellige persönliche PIN für schnellen und sicheren Login.' : (securityPinTarget === 'parent' ? '6-stellige Eltern-PIN zum Schutz des Kontrollzentrums & der Ruhezeiten.' : '4-stellige Schüler-PIN für dein Kind (schützt Stundenplan & Profil).'))}
                               {activeStudentSettingsModal === 'billing' && (isAdultStudent ? 'Übersicht über deine gebuchten Module und Zahlungsnachweise.' : 'Übersicht über 100% freie App, Bereitstellung & Zahlungsnachweise.')}
-                              {activeStudentSettingsModal === 'legal' && 'Transparente Informationen zu Datenschutz, DSGVO & Didaktik-Datentresor.'}
+                              {activeStudentSettingsModal === 'legal' && '100% datensparsam in deutschen Rechenzentren, Auskunftsrechte nach Art. 15 DSGVO & Impressum.'}
+                              {activeStudentSettingsModal === 'downloads' && 'Volle Datensouveränität nach Art. 20 DSGVO: Sichere alle Übedaten, Audioaufnahmen und Sammel-Sticker.'}
                             </p>
                           </div>
                         </div>
@@ -1947,8 +1999,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                                 </button>
                               </div>
                             ) : (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#fee2e2', color: '#ef4444', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
-                                <span>🔒 Nur für aktive Schüler</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#fee2e2', color: '#ef4444', padding: '6px 12px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
+                                <Lock size={12} strokeWidth={2.5} aria-hidden="true" />
+                                <span>Nur für aktive Schüler</span>
                               </div>
                             )}
                           </div>
@@ -1969,9 +2022,15 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                               fontSize: '0.75rem',
                               color: '#b45309',
                               lineHeight: '1.4',
-                              fontWeight: 600
+                              fontWeight: 600,
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: '8px'
                             }}>
-                              <strong>💡 iOS / iPhone Info:</strong> Um Benachrichtigungen auf Apple-Geräten zu aktivieren, musst du die App zuerst auf deinem Homescreen installieren: Tippe im Safari-Browser auf das <strong>Teilen-Symbol (Box mit Pfeil nach oben)</strong> und wähle <strong>"Zum Home-Bildschirm"</strong>. Öffne Campus-Groovelab danach über das neue App-Icon auf deinem Homescreen.
+                              <Lightbulb size={16} style={{ flexShrink: 0, marginTop: '2px', color: '#d97706' }} aria-hidden="true" />
+                              <div>
+                                <strong>iOS / iPhone Info:</strong> Um Benachrichtigungen auf Apple-Geräten zu aktivieren, musst du die App zuerst auf deinem Homescreen installieren: Tippe im Safari-Browser auf das <strong>Teilen-Symbol (Box mit Pfeil nach oben)</strong> und wähle <strong>"Zum Home-Bildschirm"</strong>. Öffne <CampusGroovelabText campusColor="#34a853" groovelabColor="#eab308" fontWeight={750} /> danach über das neue App-Icon auf deinem Homescreen.
+                              </div>
                             </div>
                           )}
 
@@ -2496,7 +2555,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                                     if (error || rpcRes !== true) {
                                       setPinFormError('Fehler beim Speichern der Eltern-PIN: ' + (error?.message || 'Serverfehler'));
                                     } else {
-                                      setPinFormSuccess('Deine 6-stellige Eltern-PIN wurde erfolgreich gespeichert! 🛡️');
+                                      setPinFormSuccess('Deine 6-stellige Eltern-PIN wurde erfolgreich gespeichert!');
                                       setStudentUser((prev: any) => prev ? {
                                         ...prev,
                                         has_parent_pin: true
@@ -2547,7 +2606,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                                     if (!rpcSuccess) {
                                       setPinFormError('Fehler beim Speichern der Schüler-PIN: ' + (rpcErrorMsg || 'Serverfehler'));
                                     } else {
-                                      setPinFormSuccess('Deine 4-stellige Schüler-PIN wurde erfolgreich gespeichert! 🎒');
+                                      setPinFormSuccess('Deine 4-stellige Schüler-PIN wurde erfolgreich gespeichert!');
                                       setStudentUser((prev: any) => prev ? {
                                         ...prev,
                                         is_pin_activated: true,
@@ -2595,6 +2654,128 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                                     : (isParentTarget ? '6-stellige Eltern-PIN jetzt speichern' : '4-stellige Schüler-PIN jetzt speichern'))}
                             </button>
                           </div>
+
+                          {/* 🛡️ Biometrischer Passkey (FaceID / TouchID) für Eltern */}
+                          {isParentTarget && (
+                            <div style={{
+                              background: '#ffffff',
+                              border: '1.5px solid #e2e8f0',
+                              borderRadius: '24px',
+                              padding: '20px 22px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '14px',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                  <div style={{
+                                    width: '42px',
+                                    height: '42px',
+                                    borderRadius: '14px',
+                                    background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                                    border: '1.5px solid #86efac',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: '#15803d',
+                                    flexShrink: 0
+                                  }}>
+                                    <Fingerprint size={22} />
+                                  </div>
+                                  <div>
+                                    <div style={{ fontSize: '0.92rem', fontWeight: 850, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <span>Biometrischer Passkey</span>
+                                      <span style={{
+                                        fontSize: '0.66rem',
+                                        fontWeight: 800,
+                                        padding: '2px 8px',
+                                        borderRadius: '100px',
+                                        background: hasDevicePasskey ? '#dcfce7' : '#f1f5f9',
+                                        color: hasDevicePasskey ? '#15803d' : '#64748b',
+                                        border: hasDevicePasskey ? '1px solid #86efac' : '1px solid #e2e8f0'
+                                      }}>
+                                        {hasDevicePasskey ? 'Aktiv auf diesem Gerät' : 'Optional'}
+                                      </span>
+                                    </div>
+                                    <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
+                                      FaceID, TouchID oder Geräteschlüssel für sekundenschnelles Entsperren ohne PIN-Eingabe.
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {passkeyActionMessage && (
+                                <div style={{
+                                  padding: '10px 14px',
+                                  borderRadius: '12px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 700,
+                                  background: passkeyActionStatus === 'success' ? '#f0fdf4' : '#fee2e2',
+                                  border: passkeyActionStatus === 'success' ? '1px solid #86efac' : '1px solid #fca5a5',
+                                  color: passkeyActionStatus === 'success' ? '#15803d' : '#dc2626'
+                                }}>
+                                  {passkeyActionMessage}
+                                </div>
+                              )}
+
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', paddingTop: '4px' }}>
+                                <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, flex: 1, minWidth: '180px' }}>
+                                  {isWebAuthnAvailable 
+                                    ? (hasDevicePasskey 
+                                        ? 'Dein Passkey ist verknüpft. Du kannst ihn bei Bedarf für diesen Browser erneuern.' 
+                                        : 'Du kannst diesen Browser jetzt mit biometrischem Passkey verknüpfen.')
+                                    : 'Biometrische Sensoren auf diesem Browser nicht verfügbar (PIN bleibt Standard).'}
+                                </div>
+                                {isWebAuthnAvailable && (
+                                  <button
+                                    type="button"
+                                    disabled={isRegisteringPasskey}
+                                    onClick={async () => {
+                                      if (!handleRegisterParentPasskey) return;
+                                      setIsRegisteringPasskey(true);
+                                      setPasskeyActionMessage(null);
+                                      try {
+                                        const res = await handleRegisterParentPasskey();
+                                        if (res.success) {
+                                          setHasDevicePasskey(true);
+                                          setPasskeyActionStatus('success');
+                                          setPasskeyActionMessage('✨ Passkey erfolgreich aktiviert! Du kannst den Elternbereich künftig mit FaceID/TouchID entsperren.');
+                                        } else {
+                                          setPasskeyActionStatus('error');
+                                          setPasskeyActionMessage(res.error || 'Einrichtung fehlgeschlagen.');
+                                        }
+                                      } catch (e: any) {
+                                        setPasskeyActionStatus('error');
+                                        setPasskeyActionMessage(e?.message || 'Fehler beim Einrichten des Passkeys.');
+                                      } finally {
+                                        setIsRegisteringPasskey(false);
+                                      }
+                                    }}
+                                    style={{
+                                      padding: '10px 16px',
+                                      borderRadius: '14px',
+                                      background: hasDevicePasskey ? '#f8fafc' : '#0284c7',
+                                      color: hasDevicePasskey ? '#0f172a' : '#ffffff',
+                                      border: hasDevicePasskey ? '1.5px solid #cbd5e1' : 'none',
+                                      fontSize: '0.82rem',
+                                      fontWeight: 850,
+                                      cursor: isRegisteringPasskey ? 'wait' : 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '8px',
+                                      boxShadow: hasDevicePasskey ? 'none' : '0 2px 8px rgba(2, 132, 199, 0.25)',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    className="hover-scale"
+                                  >
+                                    <Key size={16} />
+                                    <span>{isRegisteringPasskey ? 'Warte auf Sensor...' : (hasDevicePasskey ? 'Passkey erneuern' : 'Passkey jetzt einrichten')}</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       );
                     })()}
@@ -2655,18 +2836,30 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
 
                           {/* Feature Pills */}
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                            {['⏱️ Übe-Timer & Streaks', '🎙️ Audio-Loopstation', '📖 Hausaufgabenheft & Notizen', '🎵 Audio-Biografie'].map((feat) => (
-                              <span key={feat} style={{
-                                fontSize: '0.72rem',
-                                fontWeight: 700,
-                                color: '#1e293b',
-                                background: '#f1f5f9',
-                                padding: '4px 10px',
-                                borderRadius: '8px'
-                              }}>
-                                {feat}
-                              </span>
-                            ))}
+                            {[
+                              { label: 'Übe-Timer & Streaks', icon: Clock },
+                              { label: 'Audio-Loopstation', icon: Mic },
+                              { label: 'Hausaufgabenheft & Notizen', icon: BookOpen },
+                              { label: 'Audio-Biografie', icon: Music }
+                            ].map((feat) => {
+                              const FeatIcon = feat.icon;
+                              return (
+                                <span key={feat.label} style={{
+                                  fontSize: '0.72rem',
+                                  fontWeight: 700,
+                                  color: '#1e293b',
+                                  background: '#f1f5f9',
+                                  padding: '4px 10px',
+                                  borderRadius: '8px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px'
+                                }}>
+                                  <FeatIcon size={12} color="#15803d" />
+                                  <span>{feat.label}</span>
+                                </span>
+                              );
+                            })}
                           </div>
 
                           {/* Action Button */}
@@ -2674,93 +2867,73 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             {studentUser?.is_campus_active ? (
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <span style={{ fontSize: '0.76rem', color: '#15803d', fontWeight: 700 }}>
-                                  ✓ Aktiv für das laufende Schuljahr
+                                  Aktiv für das laufende Schuljahr
                                 </span>
                                 <button
                                   type="button"
-                                  onClick={handleDownloadGoBdReceipt}
+                                  disabled
                                   style={{
-                                    background: '#ffffff',
-                                    border: '1.5px solid #cbd5e1',
-                                    borderRadius: '8px',
-                                    padding: '5px 10px',
-                                    fontSize: '0.72rem',
-                                    fontWeight: 800,
-                                    color: '#0f172a',
-                                    cursor: 'pointer',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '5px',
-                                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                                    transition: 'all 0.15s ease'
+                                    padding: '8px 14px',
+                                    borderRadius: '10px',
+                                    background: '#f1f5f9',
+                                    color: '#64748b',
+                                    border: '1px solid #e2e8f0',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 700,
+                                    cursor: 'default',
+                                    minHeight: '44px'
                                   }}
-                                  title="Offizielle GoBD-Zahlungsquittung für Steuererklärung / Arbeitgeber-Zuschuss herunterladen"
                                 >
-                                  <Download size={13} />
-                                  <span>GoBD-Quittung (PDF)</span>
+                                  Bereits freigeschaltet
                                 </button>
                               </div>
                             ) : (
                               <button
                                 type="button"
-                                onClick={() => {
-                                  handleCloseSettingsModal();
-                                  setShowParentActivationModal(true);
-                                }}
+                                onClick={() => setShowParentActivationModal(true)}
                                 style={{
+                                  padding: '10px 18px',
+                                  borderRadius: '12px',
                                   background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                                   color: '#ffffff',
                                   border: 'none',
-                                  borderRadius: '12px',
-                                  padding: '10px 18px',
-                                  fontSize: '0.84rem',
-                                  fontWeight: 900,
+                                  fontSize: '0.82rem',
+                                  fontWeight: 850,
                                   cursor: 'pointer',
-                                  display: 'inline-flex',
+                                  display: 'flex',
                                   alignItems: 'center',
-                                  gap: '8px',
-                                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
+                                  gap: '6px',
+                                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                                  minHeight: '44px',
+                                  touchAction: 'manipulation'
                                 }}
                                 className="hover-scale"
                               >
-                                <Sparkles size={16} />
-                                <span>Gratis-Schnuppermonat starten &amp; freischalten ➔</span>
+                                <Sparkles size={14} />
+                                <span>Gratis-Schnuppermonat starten &amp; freischalten</span>
                               </button>
                             )}
                           </div>
                         </div>
 
-                        {/* Modul 2: GrooveLab */}
+                        {/* Modul 2: GrooveLab Modul */}
                         <div style={{
                           background: '#ffffff',
                           border: '1.5px solid #fef08a',
                           borderRadius: '20px',
-                          padding: '22px',
-                          boxShadow: '0 4px 16px rgba(234, 179, 8, 0.08)',
+                          padding: '20px',
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: '14px'
+                          gap: '14px',
+                          boxShadow: '0 4px 16px -4px rgba(234, 179, 8, 0.15)'
                         }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                              <div style={{
-                                width: '44px',
-                                height: '44px',
-                                borderRadius: '14px',
-                                background: 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
-                                color: '#ffffff',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                boxShadow: '0 4px 12px rgba(234, 179, 8, 0.3)'
-                              }}>
-                                <Music size={22} />
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#fefce8', border: '1px solid #fef08a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <Music size={18} color="#ca8a04" />
                               </div>
                               <div>
-                                <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#ca8a04', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                  Band- &amp; Repertoire-Suite
-                                </span>
-                                <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>
+                                <h4 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 900, color: '#0f172a' }}>
                                   Modul GrooveLab
                                 </h4>
                               </div>
@@ -2774,7 +2947,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                               color: '#a16207',
                               border: '1px solid #fef08a'
                             }}>
-                              ✓ Inklusive (Musikschule übernimmt 100%)
+                              Inklusive (Musikschule übernimmt 100%)
                             </span>
                           </div>
 
@@ -2783,19 +2956,31 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                           </p>
 
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                            {['🎸 Band-Rooms', '🎼 Song-Bibliotheken', '🎯 Skill-Radar', '👻 Musiker-Avatare'].map((feat) => (
-                              <span key={feat} style={{
-                                fontSize: '0.72rem',
-                                fontWeight: 700,
-                                color: '#1e293b',
-                                background: '#fefce8',
-                                border: '1px solid #fef9c3',
-                                padding: '4px 10px',
-                                borderRadius: '8px'
-                              }}>
-                                {feat}
-                              </span>
-                            ))}
+                            {[
+                              { label: 'Band-Rooms', icon: Users },
+                              { label: 'Song-Bibliotheken', icon: Library },
+                              { label: 'Skill-Radar', icon: Target },
+                              { label: 'Musiker-Avatare', icon: Sparkles }
+                            ].map((feat) => {
+                              const FeatIcon = feat.icon;
+                              return (
+                                <span key={feat.label} style={{
+                                  fontSize: '0.72rem',
+                                  fontWeight: 700,
+                                  color: '#1e293b',
+                                  background: '#fefce8',
+                                  border: '1px solid #fef9c3',
+                                  padding: '4px 10px',
+                                  borderRadius: '8px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px'
+                                }}>
+                                  <FeatIcon size={12} color="#ca8a04" />
+                                  <span>{feat.label}</span>
+                                </span>
+                              );
+                            })}
                           </div>
                         </div>
                       </div>
@@ -2813,11 +2998,12 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                         {/* DSGVO & Datenschutz Karte */}
                         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            🔒 Datenschutz &amp; Datenminimierung
+                          <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Shield size={14} color="#15803d" />
+                            <span>Datenschutz &amp; Datenminimierung</span>
                           </span>
                           <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155', lineHeight: 1.5, fontWeight: 550 }}>
-                            Campus-Groovelab folgt dem Grundsatz der strikten Datenvermeidung. Es werden <strong>keine Bankdaten, keine SEPA-Mandate und keine privaten E-Mail-Adressen von Schülern</strong> in der App-Datenbank gespeichert.
+                            <CampusGroovelabText campusColor="#34a853" groovelabColor="#eab308" fontWeight={750} /> folgt dem Grundsatz der strikten Datenvermeidung. Es werden <strong>keine Bankdaten, keine SEPA-Mandate und keine privaten E-Mail-Adressen von Schülern</strong> in der App-Datenbank gespeichert.
                           </p>
                           <ul style={{ margin: '4px 0 0 0', paddingLeft: '18px', fontSize: '0.78rem', color: '#475569', lineHeight: 1.6 }}>
                             <li>Hosting ausschließlich in zertifizierten deutschen Rechenzentren (Hetzner Online GmbH &amp; Supabase EU).</li>
@@ -2828,8 +3014,9 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
 
                         {/* Kostenfreie Software & Bereitstellung */}
                         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            ⚖️ <CampusGroovelabText campusColor="#0369a1" groovelabColor="#d97706" /> Bereitstellung
+                          <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <FileText size={14} color="#0369a1" />
+                            <span><CampusGroovelabText campusColor="#34a853" groovelabColor="#eab308" fontWeight={850} /> Bereitstellung</span>
                           </span>
                           <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155', lineHeight: 1.5, fontWeight: 550 }}>
                             Die <CampusGroovelabText fontWeight={700} /> Software ist ohne gesonderte Lizenzkaufgebühren im Bereitstellungspaket enthalten (Reine Cloud- &amp; Hosting-Infrastruktur).
@@ -2873,6 +3060,22 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                           </button>
                         </div>
 
+                        {/* Impressum */}
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <BookOpen size={14} color="#475569" />
+                            <span>Impressum</span>
+                          </span>
+                          <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155', lineHeight: 1.45, fontWeight: 550 }}>
+                            <CampusGroovelabText campusColor="#34a853" groovelabColor="#eab308" fontWeight={800} /> • Patrick Huber, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden<br />
+                            E-Mail: <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#059669', fontWeight: 700 }}>kontakt@campus-groovelab.de</a> (Antwort werktags &lt; 60 Min.)
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {activeStudentSettingsModal === 'downloads' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                         {/* DSGVO Art. 20 Datenübertragbarkeit / Voll-Archiv Export */}
                         {handleExportFullDataArchive && (
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px 18px' }}>
@@ -2922,17 +3125,6 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                           handleDownloadBiographyOnly={handleDownloadBiographyOnly}
                           handleDownloadChronicleAndStickers={handleDownloadChronicleAndStickers}
                         />
-
-                        {/* Impressum */}
-                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            📄 Impressum
-                          </span>
-                          <p style={{ margin: 0, fontSize: '0.82rem', color: '#334155', lineHeight: 1.45, fontWeight: 550 }}>
-                            <strong>Campus-Groovelab</strong> • Patrick Huber, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden<br />
-                            E-Mail: <a href="mailto:kontakt@campus-groovelab.de" style={{ color: '#059669', fontWeight: 700 }}>kontakt@campus-groovelab.de</a> (Antwort werktags &lt; 60 Min.)
-                          </p>
-                        </div>
                       </div>
                     )}
                   </div>
@@ -3036,7 +3228,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                   </div>
 
                   <h3 style={{ margin: '0 0 6px 0', fontSize: '1.35rem', fontWeight: 1000, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                    Dein Eltern-Notfallschlüssel 🛡️
+                    Dein Eltern-Notfallschlüssel
                   </h3>
                   <p style={{ margin: '0 0 20px 0', fontSize: '0.84rem', color: '#64748b', fontWeight: 600, lineHeight: 1.45 }}>
                     Sichere diesen Schlüssel jetzt sorgfältig. Er wird auf dem Profil deines Kindes <strong>nie wieder angezeigt</strong>!
@@ -3132,6 +3324,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                     }}
                     style={{
                       width: '100%',
+                      minHeight: '44px',
+                      touchAction: 'manipulation',
                       padding: '14px 20px',
                       borderRadius: '16px',
                       background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
@@ -3141,11 +3335,16 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                       fontWeight: 900,
                       cursor: 'pointer',
                       boxShadow: '0 8px 20px -4px rgba(2, 132, 199, 0.4)',
-                      transition: 'all 0.15s ease'
+                      transition: 'all 0.15s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px'
                     }}
                     className="hover-scale"
                   >
-                    ✓ Ich habe den Schlüssel sicher aufbewahrt ➔
+                    <Check size={18} strokeWidth={2.5} aria-hidden="true" />
+                    <span>Ich habe den Schlüssel sicher aufbewahrt</span>
                   </button>
                 </div>
               </div>
@@ -3195,7 +3394,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                 animation: 'pinShakeAnim 0.5s ease'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '1.2rem' }}>⏳</span>
+                  <Clock size={20} color="#f59e0b" />
                   <div>
                     <div style={{ fontSize: '0.86rem', fontWeight: 800 }}>
                       Eltern-Sitzung läuft in <span style={{ color: '#f59e0b', fontSize: '1rem', fontWeight: 900 }}>{parentLockRemainingSeconds}s</span> ab

@@ -114,16 +114,19 @@ export function isMicrophonePermissionCached(): boolean {
  * Studio-Grade High-Fidelity Audio Constraints (Zero Compression, Zero Filter DSP Artifacts)
  */
 export const STUDIO_AUDIO_CONSTRAINTS: MediaTrackConstraints = {
-  echoCancellation: false,
-  noiseSuppression: false,
-  autoGainControl: false,
+  echoCancellation: { ideal: false },
+  noiseSuppression: { ideal: false },
+  autoGainControl: { ideal: false },
+  voiceIsolation: { ideal: false } as any,
   googEchoCancellation: false,
   googAutoGainControl: false,
   googNoiseSuppression: false,
   googHighpassFilter: false,
+  googAudioMirroring: false,
   googTypingNoiseDetection: false,
-  channelCount: 1,
-  sampleRate: 48000
+  channelCount: { ideal: 2 },
+  sampleRate: { ideal: 48000 },
+  sampleSize: { ideal: 16 }
 } as any;
 
 /**
@@ -137,6 +140,16 @@ export async function acquireAudioStream(constraints: MediaStreamConstraints = {
   const stream = await navigator.mediaDevices.getUserMedia(constraints);
   localStorage.setItem(STORAGE_KEY, 'true');
   return stream;
+}
+
+/**
+ * Hardware & WebKit Pre-Roll Stabilization:
+ * Gives browser/driver audio units 300ms to settle, preventing initial transient clicks,
+ * zero-fill lag, and delayed AGC convergence.
+ */
+export async function stabilizeAudioStream(stream: MediaStream, waitMs = 300): Promise<void> {
+  if (!stream || !stream.active) return;
+  await new Promise(resolve => setTimeout(resolve, Math.max(50, waitMs)));
 }
 
 /**

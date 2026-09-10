@@ -4,7 +4,7 @@ import {
   Activity, Award, Bell, BookOpen, Calendar, CheckCircle, ChevronRight, Clock, 
   Disc, Edit3, FileText, Flame, GraduationCap, Headphones, Lightbulb, Moon, Music, 
   Pause, Play, Rocket, Settings, Shield, ShieldCheck, Smartphone, Sparkles, Square, 
-  Star, Target, Trophy, X, Zap 
+  Star, Target, Trophy, Users, X, Zap 
 } from "lucide-react";
 import { CampusUiLevel } from "../../campus/CampusLevelSwitcher";
 import { ZenPlayAlongDock } from "../../campus/ZenPlayAlongDock";
@@ -946,7 +946,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                           </div>
 
                           <span style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: '#64748b', fontWeight: 650 }}>
-                            {isMax ? 'Großmeister-Status erreicht! 🏆' : `Noch ${minsToNext} Min. konzentriert üben zum Freischalten!`}
+                            {isMax ? 'Großmeister-Status erreicht!' : `Noch ${minsToNext} Min. konzentriert üben zum Freischalten!`}
                           </span>
                         </div>
                       </div>
@@ -969,7 +969,8 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#15803d', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          👨‍👩‍👧 1-Klick Übezeit eintragen (Eltern-Modus)
+                          <Users size={16} color="#15803d" />
+                          <span>1-Klick Übezeit eintragen (Eltern-Modus)</span>
                         </span>
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
@@ -1406,16 +1407,20 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
 
                           <div style={{
                             background: 'rgba(255, 255, 255, 0.10)',
-                            border: '1.5px solid rgba(255, 255, 255, 0.25)',
+                            border: '1.5px solid rgba(165, 180, 252, 0.4)',
                             borderRadius: '100px',
                             padding: '8px 22px',
                             color: '#ffffff',
                             fontSize: '1.05rem',
                             fontWeight: 850,
                             backdropFilter: 'blur(12px)',
-                            boxShadow: '0 4px 16px rgba(0,0,0,0.5)'
+                            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px'
                           }}>
-                            Mache {instrumentLabel} bereit... 🎶
+                            <Music size={18} color="#c084fc" />
+                            <span>Mache {instrumentLabel} bereit...</span>
                           </div>
                         </div>
                       ) : (
@@ -2702,9 +2707,13 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                           padding: '8px 24px',
                           color: '#ffffff',
                           fontSize: '1.05rem',
-                          fontWeight: 850
+                          fontWeight: 850,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '8px'
                         }}>
-                          Kopfhörer auf, {instrumentLabel} bereit machen... 🎧
+                          <Headphones size={18} color="#fbbf24" />
+                          <span>Kopfhörer auf, {instrumentLabel} bereit machen...</span>
                         </div>
                       </div>
                     ) : (
@@ -3109,7 +3118,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                       </div>
                       <div>
                         <h3 style={{ margin: 0, fontSize: isMusicStandMode ? '1.65rem' : '1.45rem', fontWeight: 950, color: '#ffffff', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
-                          Übe-Pfad 🎧
+                          Übe-Pfad
                         </h3>
                       </div>
                     </div>
@@ -3271,8 +3280,9 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                       </button>
                     </div>
 
-                    <span style={{ fontSize: '0.80rem', color: '#94a3b8', fontWeight: 650, marginTop: '14px', zIndex: 1 }}>
-                      🎧 Kopfhörer aufsetzen &amp; konzentriert üben
+                    <span style={{ fontSize: '0.80rem', color: '#94a3b8', fontWeight: 650, marginTop: '14px', zIndex: 1, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      <Headphones size={13} color="#94a3b8" />
+                      <span>Kopfhörer aufsetzen &amp; konzentriert üben</span>
                     </span>
                   </div>
 
@@ -3476,7 +3486,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             <div style={{ width: `${progressPct}%`, height: '100%', background: 'linear-gradient(90deg, #f59e0b, #10b981)', borderRadius: '10px' }} />
                           </div>
                           <span style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: '#94a3b8', fontWeight: 650 }}>
-                            {isMax ? 'Maximaler Status erreicht! ⭐' : `Noch ${minsToNext} Min. bis zum nächsten Sticker!`}
+                            {isMax ? 'Maximaler Status erreicht!' : `Noch ${minsToNext} Min. bis zum nächsten Sticker!`}
                           </span>
                         </div>
                       </div>
@@ -3618,9 +3628,13 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                           color: '#0f172a',
                           fontSize: '1.05rem',
                           fontWeight: 850,
-                          boxShadow: '0 4px 15px rgba(0, 0, 0, 0.05)'
+                          boxShadow: '0 4px 15px rgba(0, 0, 0, 0.05)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '8px'
                         }}>
-                          Fokus einnehmen, {instrumentLabel} bereit machen... 🎓
+                          <GraduationCap size={18} color="#16a34a" />
+                          <span>Fokus einnehmen, {instrumentLabel} bereit machen...</span>
                         </div>
                       </div>
                     ) : (
@@ -4023,7 +4037,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                       </div>
                       <div>
                         <h3 style={{ margin: 0, fontSize: isMusicStandMode ? '1.65rem' : '1.45rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
-                          Übe-Pfad 🎓
+                          Übe-Pfad
                         </h3>
                       </div>
                     </div>
@@ -4157,7 +4171,8 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                           justifyContent: 'center',
                           gap: '10px',
                           boxShadow: '0 8px 25px rgba(22, 163, 74, 0.35)',
-                          transition: 'all 0.15s ease'
+                          transition: 'all 0.15s ease',
+                          touchAction: 'manipulation'
                         }}
                         className="hover-scale"
                       >
@@ -4179,11 +4194,17 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                       justifyContent: 'center',
                       zIndex: 1
                     }}>
-                      <span>🎧 Fokus setzen</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        <Headphones size={13} color="#16a34a" /> Fokus setzen
+                      </span>
                       <span>·</span>
-                      <span>🎯 Konzentration bündeln</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        <Target size={13} color="#16a34a" /> Konzentration bündeln
+                      </span>
                       <span>·</span>
-                      <span>🎓 Präzision formen</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                        <GraduationCap size={13} color="#16a34a" /> Präzision formen
+                      </span>
                     </p>
                   </div>
 
@@ -4866,7 +4887,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                               <>
                                                 <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>•</span>
                                                 <span style={{ fontSize: '0.70rem', fontWeight: 650, color: isTeen ? '#cbd5e1' : '#64748b', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                                  {isTeen ? '⏱️' : <Clock size={11} color="#16a34a" style={{ flexShrink: 0 }} />}
+                                                  <Clock size={11} color={isTeen ? '#fbbf24' : '#16a34a'} style={{ flexShrink: 0 }} />
                                                   {totalSecs < 60 ? `${totalSecs} Sek.` : `${Math.floor(totalSecs / 60)}:${String(totalSecs % 60).padStart(2, '0')} Min.`} Fokus
                                                 </span>
                                               </>
@@ -4942,19 +4963,13 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                         </span>
                                         <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '2px' }}>
                                           <span style={{ fontSize: '0.72rem', fontWeight: 700, color: isTeen ? '#34d399' : '#166534', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                            {isTeen ? '⏱️' : <Clock size={11} color="#16a34a" style={{ flexShrink: 0 }} />}
+                                            <Clock size={11} color={isTeen ? '#34d399' : '#16a34a'} style={{ flexShrink: 0 }} />
                                             {totalSecs < 60 ? `${totalSecs} Sek.` : `${Math.floor(totalSecs / 60)}:${String(totalSecs % 60).padStart(2, '0')} Min.`} Fokus
                                           </span>
                                           <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>•</span>
                                           <span style={{ fontSize: '0.72rem', fontWeight: 850, color: isTeen ? '#38bdf8' : '#15803d', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                                            {isTeen ? (
-                                              `+${xp} XP ⚡`
-                                            ) : (
-                                              <>
-                                                <Zap size={11} color="#16a34a" style={{ flexShrink: 0 }} />
-                                                <span>+{xp} XP</span>
-                                              </>
-                                            )}
+                                            <Zap size={11} color={isTeen ? '#38bdf8' : '#16a34a'} style={{ flexShrink: 0 }} />
+                                            <span>+{xp} XP</span>
                                           </span>
                                         </div>
                                       </div>

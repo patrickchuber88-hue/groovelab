@@ -294,6 +294,193 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
     return { key, label: activeWeeklyFocusKey, icon: '🎯', color: '#b45309', bg: '#fef3c7', border: '#fde047' };
   }, [activeWeeklyFocusKey]);
 
+  // 🎯 Didaktische 3-Stufen-Reflexion für Hausaufgaben (🟢 Läuft super / 🟡 Noch wackelig / 🔴 Brauche Hilfe)
+  const [taskReflections, setTaskReflections] = useState<Record<string, { status: 'super' | 'wackelig' | 'hilfe'; timestamp: string; label?: string }>>(() => {
+    if (typeof window === 'undefined') return {};
+    try {
+      const sId = props.studentId || studentUser?.id || 'default';
+      const raw = localStorage.getItem(`campus_student_task_reflections_${sId}`);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    const sId = props.studentId || studentUser?.id || 'default';
+    const handleSyncReflections = () => {
+      try {
+        const raw = localStorage.getItem(`campus_student_task_reflections_${sId}`);
+        if (raw) setTaskReflections(JSON.parse(raw));
+      } catch {}
+    };
+    window.addEventListener('campus_homework_reflection_updated', handleSyncReflections);
+    window.addEventListener('storage', handleSyncReflections);
+    return () => {
+      window.removeEventListener('campus_homework_reflection_updated', handleSyncReflections);
+      window.removeEventListener('storage', handleSyncReflections);
+    };
+  }, [props.studentId, studentUser?.id]);
+
+  const handleSetTaskReflection = (taskId: string, status: 'super' | 'wackelig' | 'hilfe', label?: string) => {
+    const sId = props.studentId || studentUser?.id || 'default';
+    setTaskReflections(prev => {
+      const current = prev[taskId]?.status;
+      const next = current === status ? undefined : { status, timestamp: new Date().toISOString(), label };
+      const updated = { ...prev };
+      if (!next) {
+        delete updated[taskId];
+      } else {
+        updated[taskId] = next;
+      }
+      try {
+        localStorage.setItem(`campus_student_task_reflections_${sId}`, JSON.stringify(updated));
+      } catch {}
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('campus_homework_reflection_updated', {
+          detail: { studentId: sId, taskId, status: next?.status, label }
+        }));
+      }
+      return updated;
+    });
+  };
+
+  const renderReflectionPills = (taskId: string, label: string) => {
+    const current = taskReflections[taskId]?.status;
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        flexWrap: 'wrap',
+        marginTop: '6px'
+      }}>
+        <span style={{ fontSize: isMusicStandMode ? '0.80rem' : '0.74rem', fontWeight: 850, color: '#64748b', marginRight: '4px' }}>
+          Reflexion:
+        </span>
+        {/* 1. Läuft super */}
+        <button
+          type="button"
+          role="button"
+          tabIndex={0}
+          aria-pressed={current === 'super'}
+          aria-label={`${label}: Läuft super markieren`}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleSetTaskReflection(taskId, 'super', label);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              e.stopPropagation();
+              handleSetTaskReflection(taskId, 'super', label);
+            }
+          }}
+          style={{
+            background: current === 'super' ? '#16a34a' : '#f0fdf4',
+            color: current === 'super' ? '#ffffff' : '#15803d',
+            border: current === 'super' ? '1.5px solid #15803d' : '1px solid #bbf7d0',
+            borderRadius: '100px',
+            padding: isMusicStandMode ? '8px 16px' : '6px 14px',
+            minHeight: '44px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: isMusicStandMode ? '0.88rem' : '0.82rem',
+            fontWeight: 900,
+            cursor: 'pointer',
+            boxShadow: current === 'super' ? '0 2px 8px rgba(22, 163, 74, 0.35)' : 'none',
+            transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
+          }}
+          className="hover-scale-mini"
+        >
+          <Check size={isMusicStandMode ? 16 : 14} strokeWidth={current === 'super' ? 3.2 : 2.5} />
+          <span>Läuft super!</span>
+        </button>
+
+        {/* 2. Noch wackelig */}
+        <button
+          type="button"
+          role="button"
+          tabIndex={0}
+          aria-pressed={current === 'wackelig'}
+          aria-label={`${label}: Noch wackelig markieren`}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleSetTaskReflection(taskId, 'wackelig', label);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              e.stopPropagation();
+              handleSetTaskReflection(taskId, 'wackelig', label);
+            }
+          }}
+          style={{
+            background: current === 'wackelig' ? '#d97706' : '#fffbeb',
+            color: current === 'wackelig' ? '#ffffff' : '#b45309',
+            border: current === 'wackelig' ? '1.5px solid #b45309' : '1px solid #fde68a',
+            borderRadius: '100px',
+            padding: isMusicStandMode ? '8px 16px' : '6px 14px',
+            minHeight: '44px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: isMusicStandMode ? '0.88rem' : '0.82rem',
+            fontWeight: 900,
+            cursor: 'pointer',
+            boxShadow: current === 'wackelig' ? '0 2px 8px rgba(217, 119, 6, 0.35)' : 'none',
+            transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
+          }}
+          className="hover-scale-mini"
+        >
+          <AlertTriangle size={isMusicStandMode ? 16 : 14} strokeWidth={current === 'wackelig' ? 2.8 : 2.2} />
+          <span>Noch wackelig</span>
+        </button>
+
+        {/* 3. Brauche Hilfe */}
+        <button
+          type="button"
+          role="button"
+          tabIndex={0}
+          aria-pressed={current === 'hilfe'}
+          aria-label={`${label}: Brauche Hilfe markieren`}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleSetTaskReflection(taskId, 'hilfe', label);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              e.stopPropagation();
+              handleSetTaskReflection(taskId, 'hilfe', label);
+            }
+          }}
+          style={{
+            background: current === 'hilfe' ? '#dc2626' : '#fef2f2',
+            color: current === 'hilfe' ? '#ffffff' : '#b91c1c',
+            border: current === 'hilfe' ? '1.5px solid #b91c1c' : '1px solid #fecaca',
+            borderRadius: '100px',
+            padding: isMusicStandMode ? '8px 16px' : '6px 14px',
+            minHeight: '44px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: isMusicStandMode ? '0.88rem' : '0.82rem',
+            fontWeight: 900,
+            cursor: 'pointer',
+            boxShadow: current === 'hilfe' ? '0 2px 8px rgba(220, 38, 38, 0.35)' : 'none',
+            transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
+          }}
+          className="hover-scale-mini"
+        >
+          <HelpCircle size={isMusicStandMode ? 16 : 14} strokeWidth={current === 'hilfe' ? 2.8 : 2.2} />
+          <span>Brauche Hilfe</span>
+        </button>
+      </div>
+    );
+  };
+
   return (
       <div style={{ display: activeTab === 'briefing' ? 'block' : 'none' }}>
         {activeTab === 'briefing' && (() => {
@@ -1339,37 +1526,69 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   </button>
                                 )}
 
-                                {/* Audio-Pille direkt in Karte 1 */}
-                                {audioTracks.length > 0 && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleOpenHomeworkBookWithView('document', 'recordings');
-                                    }}
-                                    style={{
-                                      background: '#e6f4ea',
-                                      border: '1.5px solid #c7eed2',
-                                      borderRadius: '100px',
-                                      padding: '8px 15px',
-                                      minHeight: '44px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '7px',
-                                      cursor: 'pointer',
-                                      color: '#1e7037',
-                                      fontSize: '0.84rem',
-                                      fontWeight: 900,
-                                      boxShadow: '0 2px 8px rgba(52, 168, 83, 0.12)',
-                                      transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
-                                    }}
-                                    className="hover-scale-mini"
-                                    title="Aufnahmen deiner Lehrkraft anhören"
-                                  >
-                                    <Headphones size={16} color="#1e7037" strokeWidth={2.4} />
-                                    <span>{audioTracks.length === 1 ? '1 Aufnahme' : `${audioTracks.length} Aufnahmen`}</span>
-                                  </button>
-                                )}
+                                  {/* Audio-Pille direkt in Karte 1 */}
+                                  {audioTracks.length > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenHomeworkBookWithView('document', 'recordings');
+                                      }}
+                                      style={{
+                                        background: '#e6f4ea',
+                                        border: '1.5px solid #c7eed2',
+                                        borderRadius: '100px',
+                                        padding: '8px 15px',
+                                        minHeight: '44px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '7px',
+                                        cursor: 'pointer',
+                                        color: '#1e7037',
+                                        fontSize: '0.84rem',
+                                        fontWeight: 900,
+                                        boxShadow: '0 2px 8px rgba(52, 168, 83, 0.12)',
+                                        transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
+                                      }}
+                                      className="hover-scale-mini"
+                                      title="Aufnahmen deiner Lehrkraft anhören"
+                                    >
+                                      <Headphones size={16} color="#1e7037" strokeWidth={2.4} />
+                                      <span>{audioTracks.length === 1 ? '1 Aufnahme' : `${audioTracks.length} Aufnahmen`}</span>
+                                    </button>
+                                  )}
+
+                                  {/* 1-Touch Metronom & Stimmgerät Direktzugriff */}
+                                  {props.setShowStudentToolbox && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        props.setShowStudentToolbox(true);
+                                      }}
+                                      style={{
+                                        background: '#ffffff',
+                                        border: '1.5px solid #cbd5e1',
+                                        borderRadius: '100px',
+                                        padding: '8px 15px',
+                                        minHeight: '44px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '7px',
+                                        cursor: 'pointer',
+                                        color: '#0f172a',
+                                        fontSize: '0.84rem',
+                                        fontWeight: 900,
+                                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+                                        transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
+                                      }}
+                                      className="hover-scale-mini"
+                                      title="Praxis-Toolbox: Metronom & Stimmgerät öffnen"
+                                    >
+                                      <Timer size={16} color="#34a853" strokeWidth={2.4} />
+                                      <span>Metronom</span>
+                                    </button>
+                                  )}
                               </div>
                             </div>
 
@@ -1410,20 +1629,30 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     </span>
                                   </div>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap', flexShrink: 0 }}>
-                                    {b.pages.map((pNum: number, pIdx: number) => (
-                                      <span key={`j-p-${pIdx}`} style={{
-                                        fontSize: '0.82rem',
-                                        fontWeight: 900,
-                                        color: '#15803d',
-                                        background: '#dcfce7',
-                                        padding: '3px 9px',
-                                        borderRadius: '7px',
-                                        border: '1px solid #bbf7d0',
-                                        flexShrink: 0
-                                      }}>
-                                        S. {pNum}
-                                      </span>
-                                    ))}
+                                    {b.pages.map((pNum: number, pIdx: number) => {
+                                      const taskId = `book-${b.title}-page-${pNum}`;
+                                      const refl = taskReflections[taskId]?.status;
+                                      return (
+                                        <span key={`j-p-${pIdx}`} style={{
+                                          fontSize: '0.82rem',
+                                          fontWeight: 900,
+                                          color: refl === 'super' ? '#15803d' : refl === 'wackelig' ? '#b45309' : refl === 'hilfe' ? '#b91c1c' : '#15803d',
+                                          background: refl === 'super' ? '#dcfce7' : refl === 'wackelig' ? '#fef3c7' : refl === 'hilfe' ? '#fee2e2' : '#dcfce7',
+                                          border: refl === 'super' ? '1px solid #86efac' : refl === 'wackelig' ? '1px solid #fde68a' : refl === 'hilfe' ? '1px solid #fca5a5' : '1px solid #bbf7d0',
+                                          padding: '3px 9px',
+                                          borderRadius: '7px',
+                                          flexShrink: 0,
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px'
+                                        }}>
+                                          <span>S. {pNum}</span>
+                                          {refl === 'super' && <Check size={12} strokeWidth={3} />}
+                                          {refl === 'wackelig' && <AlertTriangle size={12} strokeWidth={2.5} />}
+                                          {refl === 'hilfe' && <HelpCircle size={12} strokeWidth={2.5} />}
+                                        </span>
+                                      );
+                                    })}
                                   </div>
                                 </div>
                               ))}
@@ -1431,6 +1660,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               {/* Songs (harmonisiert wie im Teen-Widget) */}
                               {activeJuniorSongs.map((s, idx) => {
                                 const songTitle = cleanTitle(s.topic_name || s.title || 'Song');
+                                const taskId = `song-${s.id || s.topic_name || s.title || idx}`;
+                                const refl = taskReflections[taskId]?.status;
                                 return (
                                   <div key={`j-s-${idx}`} style={{
                                     background: '#ffffff',
@@ -1442,22 +1673,42 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     alignItems: 'center',
                                     gap: '10px'
                                   }}>
-                                    <div style={{
-                                      width: '28px',
-                                      height: '28px',
-                                      borderRadius: '8px',
-                                      background: '#ede9fe',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      color: '#7c3aed',
-                                      flexShrink: 0
-                                    }}>
-                                      <Music size={14} strokeWidth={2.4} />
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                                      <div style={{
+                                        width: '28px',
+                                        height: '28px',
+                                        borderRadius: '8px',
+                                        background: '#ede9fe',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#7c3aed',
+                                        flexShrink: 0
+                                      }}>
+                                        <Music size={14} strokeWidth={2.4} />
+                                      </div>
+                                      <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {songTitle}
+                                      </span>
                                     </div>
-                                    <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                      {songTitle}
-                                    </span>
+                                    {refl && (
+                                      <span style={{
+                                        fontSize: '0.74rem',
+                                        fontWeight: 850,
+                                        padding: '3px 8px',
+                                        borderRadius: '100px',
+                                        background: refl === 'super' ? '#dcfce7' : refl === 'wackelig' ? '#fef3c7' : '#fee2e2',
+                                        color: refl === 'super' ? '#15803d' : refl === 'wackelig' ? '#b45309' : '#b91c1c',
+                                        border: refl === 'super' ? '1px solid #86efac' : refl === 'wackelig' ? '1px solid #fde68a' : '1px solid #fca5a5',
+                                        flexShrink: 0,
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}>
+                                        {refl === 'super' ? <Check size={11} strokeWidth={3} /> : refl === 'wackelig' ? <AlertTriangle size={11} strokeWidth={2.5} /> : <HelpCircle size={11} strokeWidth={2.5} />}
+                                        <span>{refl === 'super' ? 'Läuft' : refl === 'wackelig' ? 'Wackelig' : 'Hilfe'}</span>
+                                      </span>
+                                    )}
                                   </div>
                                 );
                               })}
@@ -2204,48 +2455,115 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                             ))}
                                           </div>
                                         )}
+
+                                        {/* Interactive Page Reflection Rows */}
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginLeft: '38px', marginTop: '6px' }}>
+                                          {bookItem.pageNums.map((pNum: any) => {
+                                            const taskId = `book-${bookItem.title}-page-${pNum}`;
+                                            const pageLabel = `${bookItem.title} S. ${pNum}`;
+                                            const refl = taskReflections[taskId]?.status;
+                                            return (
+                                              <div key={`j-page-row-${pNum}`} style={{
+                                                background: refl === 'super' ? '#f0fdf4' : refl === 'wackelig' ? '#fffbeb' : refl === 'hilfe' ? '#fef2f2' : '#f8fafc',
+                                                border: refl === 'super' ? '1.5px solid #86efac' : refl === 'wackelig' ? '1.5px solid #fde68a' : refl === 'hilfe' ? '1.5px solid #fca5a5' : '1px solid #e2e8f0',
+                                                borderRadius: '16px',
+                                                padding: '10px 14px',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '4px',
+                                                transition: 'all 0.2s ease'
+                                              }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                  <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#0f172a' }}>
+                                                    📖 Seite {pNum}
+                                                  </span>
+                                                  {refl && (
+                                                    <span style={{
+                                                      fontSize: '0.74rem',
+                                                      fontWeight: 900,
+                                                      padding: '2px 8px',
+                                                      borderRadius: '100px',
+                                                      background: refl === 'super' ? '#dcfce7' : refl === 'wackelig' ? '#fef3c7' : '#fee2e2',
+                                                      color: refl === 'super' ? '#15803d' : refl === 'wackelig' ? '#b45309' : '#b91c1c'
+                                                    }}>
+                                                      {refl === 'super' ? '🟢 Läuft super!' : refl === 'wackelig' ? '🟡 Noch wackelig' : '🔴 Brauche Hilfe'}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                {renderReflectionPills(taskId, pageLabel)}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
                                       </div>
                                     ))}
 
                                     {/* Songs Liste */}
-                                    {otherActiveSongs.map((item, idx) => (
-                                      <div key={`j-modal-song-${idx}`} style={{
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '6px',
-                                        padding: '12px 14px',
-                                        background: '#ffffff',
-                                        border: '1px solid #f1f5f9',
-                                        boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
-                                        borderRadius: '14px'
-                                      }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                          <div style={{
-                                            width: '28px',
-                                            height: '28px',
-                                            borderRadius: '8px',
-                                            background: '#ede9fe',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            color: '#7c3aed',
-                                            flexShrink: 0
-                                          }}>
-                                            <Music size={14} strokeWidth={2.4} />
+                                    {otherActiveSongs.map((item, idx) => {
+                                      const songTitle = cleanTitle(item.topic_name || item.title);
+                                      const taskId = `song-${item.id || item.topic_name || item.title || idx}`;
+                                      const refl = taskReflections[taskId]?.status;
+                                      return (
+                                        <div key={`j-modal-song-${idx}`} style={{
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          gap: '8px',
+                                          padding: '14px 16px',
+                                          background: refl === 'super' ? '#f0fdf4' : refl === 'wackelig' ? '#fffbeb' : refl === 'hilfe' ? '#fef2f2' : '#ffffff',
+                                          border: refl === 'super' ? '1.5px solid #86efac' : refl === 'wackelig' ? '1.5px solid #fde68a' : refl === 'hilfe' ? '1.5px solid #fca5a5' : '1px solid #f1f5f9',
+                                          boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
+                                          borderRadius: '16px',
+                                          transition: 'all 0.2s ease'
+                                        }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                                              <div style={{
+                                                width: '32px',
+                                                height: '32px',
+                                                borderRadius: '10px',
+                                                background: '#ede9fe',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                color: '#7c3aed',
+                                                flexShrink: 0
+                                              }}>
+                                                <Music size={16} strokeWidth={2.4} />
+                                              </div>
+
+                                              <span style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {songTitle}
+                                              </span>
+                                            </div>
+
+                                            {refl && (
+                                              <span style={{
+                                                fontSize: '0.76rem',
+                                                fontWeight: 900,
+                                                padding: '3px 10px',
+                                                borderRadius: '100px',
+                                                background: refl === 'super' ? '#dcfce7' : refl === 'wackelig' ? '#fef3c7' : '#fee2e2',
+                                                color: refl === 'super' ? '#15803d' : refl === 'wackelig' ? '#b45309' : '#b91c1c',
+                                                border: refl === 'super' ? '1px solid #86efac' : refl === 'wackelig' ? '1px solid #fde68a' : '1px solid #fca5a5',
+                                                flexShrink: 0
+                                              }}>
+                                                {refl === 'super' ? '🟢 Läuft super!' : refl === 'wackelig' ? '🟡 Noch wackelig' : '🔴 Brauche Hilfe'}
+                                              </span>
+                                            )}
                                           </div>
 
-                                          <span style={{ fontSize: '1.02rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                            {cleanTitle(item.topic_name || item.title)}
-                                          </span>
+                                          {item.homework_notes && (
+                                            <div style={{ marginLeft: '42px', fontSize: '0.86rem', color: '#475569', fontWeight: 600, lineHeight: 1.4 }}>
+                                              <span style={{ color: '#6366f1', fontWeight: 850 }}>🚀 Fahrplan:</span> {item.homework_notes}
+                                            </div>
+                                          )}
+
+                                          <div style={{ marginLeft: '42px' }}>
+                                            {renderReflectionPills(taskId, songTitle)}
+                                          </div>
                                         </div>
-
-                                        {item.homework_notes && (
-                                          <div style={{ marginLeft: '38px', marginTop: '2px', fontSize: '0.85rem', color: '#475569', fontWeight: 600, lineHeight: 1.4 }}>
-                                            <span style={{ color: '#6366f1', fontWeight: 850 }}>🚀 Fahrplan:</span> {item.homework_notes}
-                                          </div>
-                                        )}
-                                      </div>
-                                    ))}
+                                      );
+                                    })}
 
                                     {/* Audio Tracks */}
                                     {audioTracks.length > 0 && (

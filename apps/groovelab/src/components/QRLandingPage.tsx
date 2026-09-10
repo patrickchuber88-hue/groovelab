@@ -18,6 +18,7 @@ import { registerClientSessionLease } from '../utils/sessionLeaseManager';
 import { setVaultItem } from '../utils/aesStorageVault';
 import { verifyPinPbkdf2 } from '../utils/argonPinEngine';
 import { getInstrumentAvatarUrl as getStudioInstrumentAvatarUrl } from './StudioAvatar';
+import { isSlotCancelledByAbsence } from '../utils/teacherAbsenceHelper';
 
 
 
@@ -1935,6 +1936,12 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               const dd = String(targetDate.getDate()).padStart(2, '0');
               const dateStr = `${yyyy}-${mm}-${dd}`;
 
+              // Check if teacher is absent on this date & time slot
+              const isTeacherSickOnDate = Boolean(
+                sch.status === 'canceled_by_teacher_sick' ||
+                isSlotCancelledByAbsence(dateStr, sch.time_slot || '00:00', sch.teacher)
+              );
+
               // Find if there is an actual occurrence override in the DB
               const actual = (occData || []).find((occ: any) => 
                 (occ.schedule_id === sch.id || occ.student_id === profile.id || studentIds.has(occ.student_id)) && 
@@ -1944,6 +1951,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               if (actual) {
                 allMergedOccurrences.push({
                   ...actual,
+                  status: (actual.status === 'scheduled' && isTeacherSickOnDate) ? 'canceled_by_teacher_sick' : actual.status,
                   schedule: sch
                 });
                 usedActualIds.add(actual.id);
@@ -1956,7 +1964,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   date: dateStr,
                   start_time: sch.time_slot + (sch.time_slot.split(':').length === 2 ? ':00' : ''),
                   duration: sch.duration || 45,
-                  status: 'scheduled',
+                  status: isTeacherSickOnDate ? 'canceled_by_teacher_sick' : 'scheduled',
                   is_virtual: true,
                   teacher: sch.teacher,
                   schedule: sch
@@ -3759,13 +3767,25 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         updateData.status = 'rescheduled_confirmed';
       }
       
-      const { error } = await supabase
-        .from('schedule_occurrences')
-        .update(updateData)
-        .eq('id', occ.id);
-      if (error) throw error;
+      if (occ.id && !String(occ.id).startsWith('virtual-')) {
+        const { error } = await supabase
+          .from('schedule_occurrences')
+          .update(updateData)
+          .eq('id', occ.id);
+        if (error) throw error;
+      }
+
+      // Revisionssichere Kenntnisnahme gem. § 130 BGB in crisis_notifications spiegeln
+      if (profile?.id && occ.date) {
+        await supabase
+          .from('crisis_notifications')
+          .update({ status: 'READ' })
+          .eq('student_id', profile.id)
+          .gte('slot_start_datetime', `${occ.date}T00:00:00`)
+          .lte('slot_start_datetime', `${occ.date}T23:59:59`);
+      }
       
-      setOccurrences((prev: any[]) => prev.map((o: any) => o.id === occ.id ? { ...o, student_acknowledged: true, status: 'rescheduled_confirmed' } : o));
+      setOccurrences((prev: any[]) => prev.map((o: any) => o.id === occ.id ? { ...o, student_acknowledged: true, status: isRescheduled ? 'rescheduled_confirmed' : o.status } : o));
       await fetchDashboardData();
     } catch (err) {
       console.error('Error acknowledging occurrence:', err);
@@ -3858,7 +3878,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           {(origDateStr || origTimeStr) && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '4px' }}>
               <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontWeight: 650 }}>Ursprünglich:</span>
-              <span style={{ fontSize: '0.78rem', color: '#64748b', textDecoration: 'line-through', fontWeight: 600 }}>
+              <span style={{ fontSize: '0.78rem', color: '#64748b', textDecoration: 'none', fontStyle: 'italic', fontWeight: 600 }}>
                 {origDateStr ? `${origDateStr}, ` : ''}{origTimeStr ? `${origTimeStr} Uhr` : ''}
               </span>
             </div>
@@ -4485,7 +4505,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 const isCanceled = occ.status === 'cancelled' || occ.status === 'canceled_by_student' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
                 const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed';
                 const isPendingReview = occ.schedule?.status === 'ready_for_admin_review' && !occ.room_name && !occ.schedule?.room_id;
-                const needsAcknowledge = occ.student_acknowledged === false && (isRescheduled || occ.original_date);
+                const needsAcknowledge = occ.student_acknowledged === false && (isRescheduled || occ.original_date || isCanceled);
                 const hasMessages = activeChatOccIds.has(occ.id) || Boolean(occ.schedule_id && occ.date && activeChatOccIds.has(`virtual-${occ.schedule_id}-${occ.date}`)) || Boolean(occ.occurrence_id && activeChatOccIds.has(occ.occurrence_id));
                 const isUnread = unreadMessageOccurrences.includes(occ.id) || Boolean(occ.schedule_id && occ.date && unreadMessageOccurrences.includes(`virtual-${occ.schedule_id}-${occ.date}`));
 
@@ -4495,8 +4515,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 let subColor = '#64748b';
 
                 if (isCanceled) {
-                  rowBg = '#fef2f2';
-                  rowBorder = '1px solid #fecaca';
+                  rowBg = 'repeating-linear-gradient(-45deg, #fef2f2 0px, #fef2f2 8px, #ffffff 8px, #ffffff 16px)';
+                  rowBorder = '1.5px solid #fca5a5';
                   textColor = '#991b1b';
                   subColor = '#dc2626';
                 } else if (isRescheduled) {
@@ -4764,7 +4784,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           <span style={{ fontSize: '13.5px', fontWeight: 800, color: textColor, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
                             {teacherName}
                           </span>
-                          <span style={{ fontSize: '0.80rem', color: subColor, fontWeight: 700, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', textDecoration: isCanceled ? 'line-through' : 'none', marginTop: '2px' }}>
+                          <span style={{ fontSize: '0.80rem', color: subColor, fontWeight: 700, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', textDecoration: 'none', marginTop: '2px' }}>
                             {formatDateGerman(occ.date)} • {occ.start_time.substring(0, 5)} Uhr ({occ.duration} Min)
                           </span>
                         </div>
@@ -4906,29 +4926,31 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           )
                         ) : (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span style={{ fontSize: '0.62rem', fontWeight: 900, color: '#dc2626', background: '#fee2e2', border: '1px solid #fca5a5', padding: '3px 6px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                              Abgesagt
+                            <span style={{ fontSize: '0.64rem', fontWeight: 900, color: '#991b1b', background: '#fee2e2', border: '1px solid #fca5a5', padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                              {occ.status === 'canceled_by_teacher_sick' || occ.status === 'teacher_sick' ? 'Abgesagt durch Lehrkraft' : 'Abgesagt'}
                             </span>
-                            <button
-                              type="button"
-                              onClick={() => handleUndoCancel(occ)}
-                              style={{
-                                background: '#ffffff',
-                                color: '#dc2626',
-                                border: '1px solid #fca5a5',
-                                borderRadius: '8px',
-                                padding: '4px 8px',
-                                fontSize: '0.7rem',
-                                fontWeight: 800,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '3px',
-                                whiteSpace: 'nowrap'
-                              }}
-                            >
-                              Reaktivieren
-                            </button>
+                            {occ.status === 'canceled_by_student' && (
+                              <button
+                                type="button"
+                                onClick={() => handleUndoCancel(occ)}
+                                style={{
+                                  background: '#ffffff',
+                                  color: '#dc2626',
+                                  border: '1px solid #fca5a5',
+                                  borderRadius: '8px',
+                                  padding: '4px 8px',
+                                  fontSize: '0.7rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  whiteSpace: 'nowrap'
+                                }}
+                              >
+                                Reaktivieren
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -6946,7 +6968,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     Direkte Eltern-Lehrer-Kommunikation
                   </div>
                   <div style={{ fontSize: '0.74rem', color: '#64748b', maxWidth: '280px', lineHeight: 1.4 }}>
-                    Schreibe {assignedTeacher ? assignedTeacher.first_name : 'deiner Lehrkraft'} eine Nachricht zu Krankmeldungen, Unterrichtsfragen oder Feedback.
+                    Schreibe {assignedTeacher ? assignedTeacher.first_name : 'deiner Lehrkraft'} eine Nachricht zu Abwesenheiten, Unterrichtsfragen oder Feedback.
                   </div>
                 </div>
               ) : (

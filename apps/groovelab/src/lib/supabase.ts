@@ -123,12 +123,12 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
     let timeoutId: any = null;
     try {
       let fetchInit = newInit;
-      // Wrap request with a resilient failover timeout (20s for normal queries, 60s for large audio/asset uploads)
-      // 20s guarantees the client does not abort prematurely before PostgreSQL finishes its 15s statement_timeout
+      // Wrap request with a resilient failover timeout (25s for normal queries, 60s for large audio/asset uploads)
+      // 25s guarantees the client does not abort prematurely before PostgreSQL finishes complex joins
       if (!newInit.signal && typeof AbortController !== 'undefined') {
         const inputUrlStr = typeof input === 'string' ? input : (input instanceof URL ? input.href : '');
         const isStorageUpload = inputUrlStr.includes('/storage/v1/object/');
-        const queryTimeout = isStorageUpload ? 60000 : 20000;
+        const queryTimeout = isStorageUpload ? 60000 : 25000;
         const controller = new AbortController();
         timeoutId = setTimeout(() => controller.abort(), queryTimeout);
         fetchInit = { ...newInit, signal: controller.signal };
@@ -145,7 +145,7 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
             const clone = response.clone();
             const text = await clone.text();
             if (text.includes('schema cache') || text.includes('PGRST002') || text.includes('503') || text.includes('502') || text.includes('504')) {
-              const backoff = attempt * 500 + Math.random() * 200;
+              const backoff = attempt * 400 + Math.random() * 150;
               console.warn(`[Supabase Fetch] PostgREST infrastructure transient (HTTP ${response.status}). Retrying attempt ${attempt + 1} in ${Math.round(backoff)}ms...`);
               await new Promise(r => setTimeout(r, backoff));
               continue;
@@ -172,20 +172,22 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
         (typeof navigator !== 'undefined' && !navigator.onLine);
         
       if (isNetworkError && attempt < maxAttempts) {
-        const delay = Math.min(2000, 300 * Math.pow(2, attempt - 1) + Math.random() * 150);
+        const delay = Math.min(1800, 250 * Math.pow(2, attempt - 1) + Math.random() * 100);
         console.warn(`[Supabase Fetch] Attempt ${attempt} failed with transient "${errMsg}". Retrying in ${Math.round(delay)}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
       
-      // Client-side AbortError (navigation or modal close) must NOT trip the circuit breaker
-      if (!errMsg.includes('AbortError') && !errMsg.includes('aborted')) {
+      // Client-side AbortError (navigation, modal close, component unmount) must NEVER trip the circuit breaker
+      const isAbortError = errMsg.includes('AbortError') || errMsg.includes('aborted') || err?.name === 'AbortError';
+      if (!isAbortError) {
         dbCircuitBreaker.recordFailure(err);
       }
       throw err;
     }
   }
-  if (lastError && !lastError.message?.includes('AbortError') && !lastError.message?.includes('aborted')) {
+  const isFinalAbort = lastError?.message?.includes('AbortError') || lastError?.message?.includes('aborted') || lastError?.name === 'AbortError';
+  if (lastError && !isFinalAbort) {
     dbCircuitBreaker.recordFailure(lastError);
   }
   throw lastError;
@@ -193,27 +195,31 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
 
 // ─── Automated Health & Presence Auto-Recovery Monitor ─────────────────────
 if (typeof window !== 'undefined') {
-  const triggerHealthRecovery = async () => {
-    try {
-      if (dbCircuitBreaker.getState() !== 'CLOSED') {
-        const res = await fetch(`${supabaseUrl}/rest/v1/`, {
-          method: 'HEAD',
-          headers: { apikey: supabaseAnonKey }
-        });
-        if (res.ok || res.status === 401 || res.status === 200) {
-          dbCircuitBreaker.recordSuccess();
-          console.info('[Supabase Heartbeat] Connection probe successful. Circuit Breaker reset to CLOSED.');
+  let recoveryDebounceTimer: any = null;
+  const triggerHealthRecovery = () => {
+    if (recoveryDebounceTimer) clearTimeout(recoveryDebounceTimer);
+    recoveryDebounceTimer = setTimeout(async () => {
+      try {
+        if (dbCircuitBreaker.getState() !== 'CLOSED') {
+          const res = await fetch(`${supabaseUrl}/rest/v1/`, {
+            method: 'HEAD',
+            headers: { apikey: supabaseAnonKey }
+          });
+          if (res.ok || res.status === 401 || res.status === 200) {
+            dbCircuitBreaker.recordSuccess();
+            console.info('[Supabase Heartbeat] Connection probe successful. Circuit Breaker reset to CLOSED.');
+          }
         }
+        if (supabase && (supabase as any).realtime && typeof (supabase as any).realtime.connect === 'function') {
+          (supabase as any).realtime.connect();
+        }
+        if (typeof (window as any).__groovelabRecoverRealtime === 'function') {
+          (window as any).__groovelabRecoverRealtime();
+        }
+      } catch (e) {
+        // Passive probe failed, will auto-retry on next interaction
       }
-      if (supabase && (supabase as any).realtime && typeof (supabase as any).realtime.connect === 'function') {
-        (supabase as any).realtime.connect();
-      }
-      if (typeof (window as any).__groovelabRecoverRealtime === 'function') {
-        (window as any).__groovelabRecoverRealtime();
-      }
-    } catch (e) {
-      // Passive probe failed, will auto-retry on next interaction
-    }
+    }, 350);
   };
 
   window.addEventListener('online', triggerHealthRecovery);
@@ -265,6 +271,10 @@ export const supabase = createClient(
       persistSession: false,
       autoRefreshToken: false,
       detectSessionInUrl: false,
+    },
+    realtime: {
+      timeout: 20000,
+      heartbeatIntervalMs: 15000
     }
   }
 );

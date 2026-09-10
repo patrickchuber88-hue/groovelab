@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Compass, Sliders, Volume2, Zap, Library, Mic, Headphones, Calendar, RotateCcw,
+  Compass, Sliders, Volume2, Zap, Mic, Headphones, Calendar, RotateCcw,
   Mail, Trophy, Sparkles, Check, ShieldCheck, AlertTriangle, Star, Target
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
@@ -16,7 +16,7 @@ export interface ParentProtectionSettingsViewProps {
   draftAllowChat: boolean | null;
   draftAllowTimer: boolean | null;
   draftAllowLeaderboard: boolean | null;
-  draftAllowProposals: boolean | null;
+  draftAllowProposals?: boolean | null;
   draftAllowAudio: boolean | null;
   draftAllowTts: boolean | null;
   draftBoardOverrides: Record<string, boolean>;
@@ -64,8 +64,6 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
   
   const curLeaderboard = draftAllowLeaderboard !== null ? draftAllowLeaderboard : ((studentUser as any)?.parent_allow_leaderboard !== undefined && (studentUser as any)?.parent_allow_leaderboard !== null ? Boolean((studentUser as any)?.parent_allow_leaderboard) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_leaderboard_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_leaderboard_${studentId}`) === 'true' : (currentLvlKey !== 'junior')));
   
-  const curProposals = draftAllowProposals !== null ? draftAllowProposals : ((studentUser as any)?.parent_allow_proposals !== undefined && (studentUser as any)?.parent_allow_proposals !== null ? Boolean((studentUser as any)?.parent_allow_proposals) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_proposals_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_proposals_${studentId}`) === 'true' : (draftBoardOverrides.mediathek ?? (currentLvlKey !== 'junior'))));
-  
   const curAudio = draftAllowAudio !== null ? draftAllowAudio : ((studentUser as any)?.parent_allow_audio !== undefined && (studentUser as any)?.parent_allow_audio !== null ? Boolean((studentUser as any)?.parent_allow_audio) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_audio_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_audio_${studentId}`) === 'true' : (draftBoardOverrides.recordings ?? false)));
   
   const curTeacherAudio = (studentUser as any)?.parent_permissions?.allow_teacher_audio !== undefined
@@ -88,7 +86,6 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
     curChat !== standard.allowChat ||
     curTimer !== standard.allowTimer ||
     curLeaderboard !== standard.allowLeaderboard ||
-    curProposals !== standard.allowProposals ||
     curAudio !== standard.allowAudio ||
     curTts !== standard.allowTts;
 
@@ -102,7 +99,6 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
       allowChat: curChat,
       allowTimer: curTimer,
       allowLeaderboard: curLeaderboard,
-      allowProposals: curProposals,
       allowAudio: curAudio,
       allowTts: curTts,
     };
@@ -113,7 +109,6 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
       allowChat: targetStandard.allowChat,
       allowTimer: targetStandard.allowTimer,
       allowLeaderboard: targetStandard.allowLeaderboard,
-      allowProposals: targetStandard.allowProposals,
       allowAudio: targetStandard.allowAudio,
       allowTts: targetStandard.allowTts,
     };
@@ -153,10 +148,10 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
       allowChat: targetStandard.allowChat,
       allowTimer: targetStandard.allowTimer,
       allowLeaderboard: targetStandard.allowLeaderboard,
-      allowProposals: targetStandard.allowProposals,
+      allowProposals: true,
       allowAudio: targetStandard.allowAudio,
       allowTts: targetStandard.allowTts,
-      boardOverrides: targetStandard.boardOverrides,
+      boardOverrides: { ...targetStandard.boardOverrides, mediathek: true },
       bedtimeEnabled: targetStandard.bedtimeEnabled,
       bedtimeStart: targetStandard.bedtimeStart,
       bedtimeEnd: targetStandard.bedtimeEnd,
@@ -201,7 +196,6 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
 
   const hlTts = getHighlightProps('allowTts');
   const hlTimer = getHighlightProps('allowTimer');
-  const hlProposals = getHighlightProps('allowProposals');
   const hlAudio = getHighlightProps('allowAudio');
   const hlAbsences = getHighlightProps('allowAbsences');
   const hlReschedule = getHighlightProps('allowRescheduleConfirm');
@@ -531,34 +525,6 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
             type="checkbox"
             checked={curTimer}
             onChange={(e) => applyAndSaveParentControls({ allowTimer: e.target.checked, boardOverrides: { practice_board: e.target.checked } })}
-            style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
-          />
-        </label>
-
-        {/* Toggle 3: Mediathek: Songs, Begleitspuren & Fahrpläne */}
-        <label style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '14px 16px',
-          borderRadius: '16px',
-          cursor: 'pointer',
-          ...hlProposals.style
-        }}>
-          <div style={{ paddingRight: '12px', textAlign: 'left' }}>
-            <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <Library size={16} color="#0284c7" style={{ flexShrink: 0 }} />
-              <span>Mediathek: Songs, Begleitspuren &amp; Fahrpläne</span>
-              {hlProposals.badge}
-            </div>
-            <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
-              Schulkatalog, Play-Along-Tracks und strukturierte Übe-Fahrpläne. Urheberrechtskonform ohne Notenblatt-Downloads (§ 53 Abs. 4 UrhG).
-            </div>
-          </div>
-          <input
-            type="checkbox"
-            checked={curProposals}
-            onChange={(e) => applyAndSaveParentControls({ allowProposals: e.target.checked, boardOverrides: { mediathek: e.target.checked } })}
             style={{ width: '20px', height: '20px', accentColor: '#0284c7', cursor: 'pointer' }}
           />
         </label>

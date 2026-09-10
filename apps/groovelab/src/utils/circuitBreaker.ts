@@ -9,9 +9,9 @@
 export type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 
 interface CircuitBreakerOptions {
-  failureThreshold?: number;     // Number of failures before tripping (Default: 3)
-  cooldownMs?: number;            // How long to stay open before half-open probe (Default: 6000ms)
-  timeoutMs?: number;             // Request timeout threshold (Default: 8000ms)
+  failureThreshold?: number;     // Number of failures before tripping (Default: 12)
+  cooldownMs?: number;            // How long to stay open before half-open probe (Default: 1200ms)
+  timeoutMs?: number;             // Request timeout threshold (Default: 25000ms)
 }
 
 class DatabaseCircuitBreaker {
@@ -23,15 +23,15 @@ class DatabaseCircuitBreaker {
   private readonly timeoutMs: number;
 
   constructor(options?: CircuitBreakerOptions) {
-    this.failureThreshold = options?.failureThreshold || 8;
-    this.cooldownMs = options?.cooldownMs || 2500;
-    this.timeoutMs = options?.timeoutMs || 20000;
+    this.failureThreshold = options?.failureThreshold || 12;
+    this.cooldownMs = options?.cooldownMs || 1200;
+    this.timeoutMs = options?.timeoutMs || 25000;
   }
 
   public getState(): CircuitState {
     const now = Date.now();
-    // Decay failures if no failure occurred in the last 20 seconds
-    if (this.state === 'CLOSED' && this.failureCount > 0 && now - this.lastFailureTime > 20000) {
+    // Decay failures if no failure occurred in the last 15 seconds
+    if (this.state === 'CLOSED' && this.failureCount > 0 && now - this.lastFailureTime > 15000) {
       this.failureCount = 0;
     }
 
@@ -116,9 +116,9 @@ class DatabaseCircuitBreaker {
 }
 
 export const dbCircuitBreaker = new DatabaseCircuitBreaker({
-  failureThreshold: 8,
-  cooldownMs: 2500,
-  timeoutMs: 20000
+  failureThreshold: 12,
+  cooldownMs: 1200,
+  timeoutMs: 25000
 });
 
 if (typeof window !== 'undefined') {

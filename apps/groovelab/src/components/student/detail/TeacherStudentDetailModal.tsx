@@ -309,6 +309,32 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
     return () => window.removeEventListener('skill_radar_levels_changed', handleSkillRadarChanged);
   }, [student.id]);
 
+  // 🎯 Didaktische Schüler-Reflexionen (🟢 Läuft super / 🟡 Noch wackelig / 🔴 Brauche Hilfe)
+  const [studentTaskReflections, setStudentTaskReflections] = useState<Record<string, { status: 'super' | 'wackelig' | 'hilfe'; timestamp: string; label?: string }>>(() => {
+    if (typeof window === 'undefined') return {};
+    try {
+      const raw = localStorage.getItem(`campus_student_task_reflections_${student.id}`);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    const handleSync = () => {
+      try {
+        const raw = localStorage.getItem(`campus_student_task_reflections_${student.id}`);
+        if (raw) setStudentTaskReflections(JSON.parse(raw));
+      } catch {}
+    };
+    window.addEventListener('campus_homework_reflection_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('campus_homework_reflection_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, [student.id]);
+
   const handleUpdateEvolutionLevel = async (lvl: number) => {
     try {
       await supabase.from('avatars').update({ evolution_level: lvl }).eq('user_id', student.id);
@@ -642,37 +668,70 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                   <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
                     Aktuelle Aufgaben
                   </div>
-                  {campusHomeworkItems.slice(0, 5).map((item) => (
-                    <div
-                      key={item.id}
-                      style={{
-                        background: item.status === 'mastered' ? '#f0fdf4' : '#ffffff',
-                        padding: '8px 14px',
-                        borderRadius: '12px',
-                        border: item.status === 'mastered' ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        fontSize: '0.82rem'
-                      }}
-                    >
-                      <span style={{ fontWeight: 800, color: item.status === 'mastered' ? '#15803d' : '#1e293b' }}>
-                        {item.status === 'mastered' ? '🎉 ' : '🎵 '}{item.title || item.topic_name}
-                      </span>
-                      <span
+                  {campusHomeworkItems.slice(0, 5).map((item) => {
+                    const reflEntry = Object.entries(studentTaskReflections).find(([k]) => {
+                      if (k.includes(item.id)) return true;
+                      if (item.topic_name && k.toLowerCase().includes(item.topic_name.toLowerCase())) return true;
+                      if (item.title && k.toLowerCase().includes(item.title.toLowerCase())) return true;
+                      return false;
+                    })?.[1];
+
+                    return (
+                      <div
+                        key={item.id}
                         style={{
-                          background: item.status === 'mastered' ? '#dcfce7' : '#eff6ff',
-                          color: item.status === 'mastered' ? '#15803d' : '#2563eb',
-                          padding: '2px 8px',
-                          borderRadius: '6px',
-                          fontWeight: 850,
-                          fontSize: '0.72rem'
+                          background: reflEntry?.status === 'hilfe' ? '#fef2f2' : reflEntry?.status === 'wackelig' ? '#fffbeb' : item.status === 'mastered' ? '#f0fdf4' : '#ffffff',
+                          padding: '10px 14px',
+                          borderRadius: '12px',
+                          border: reflEntry?.status === 'hilfe' ? '1.5px solid #fca5a5' : reflEntry?.status === 'wackelig' ? '1.5px solid #fde68a' : item.status === 'mastered' ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '10px',
+                          fontSize: '0.82rem',
+                          transition: 'all 0.2s ease'
                         }}
                       >
-                        {item.status === 'mastered' ? 'Gemeistert' : 'Aufgabe'}
-                      </span>
-                    </div>
-                  ))}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                          <span style={{ fontWeight: 800, color: item.status === 'mastered' ? '#15803d' : '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {item.status === 'mastered' ? '🎉 ' : '🎵 '}{item.title || item.topic_name}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                          {reflEntry && (
+                            <span
+                              style={{
+                                background: reflEntry.status === 'super' ? '#dcfce7' : reflEntry.status === 'wackelig' ? '#fef3c7' : '#fee2e2',
+                                color: reflEntry.status === 'super' ? '#15803d' : reflEntry.status === 'wackelig' ? '#b45309' : '#b91c1c',
+                                border: reflEntry.status === 'super' ? '1px solid #86efac' : reflEntry.status === 'wackelig' ? '1px solid #fde68a' : '1px solid #fca5a5',
+                                padding: '2px 8px',
+                                borderRadius: '6px',
+                                fontWeight: 900,
+                                fontSize: '0.70rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px'
+                              }}
+                            >
+                              <span>{reflEntry.status === 'super' ? '🟢 Super' : reflEntry.status === 'wackelig' ? '🟡 Wackelig' : '🔴 Braucht Hilfe!'}</span>
+                            </span>
+                          )}
+                          <span
+                            style={{
+                              background: item.status === 'mastered' ? '#dcfce7' : '#eff6ff',
+                              color: item.status === 'mastered' ? '#15803d' : '#2563eb',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              fontWeight: 850,
+                              fontSize: '0.72rem'
+                            }}
+                          >
+                            {item.status === 'mastered' ? 'Gemeistert' : 'Aufgabe'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
                   {campusHomeworkItems.length === 0 && (
                     <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic' }}>
                       Keine offenen Aufgaben eingetragen.
@@ -1255,7 +1314,7 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                   📞 Notfallkontakt (Unterrichtsausfall / Notfall)
                 </h4>
                 <div style={{ fontSize: '0.78rem', color: '#64748b', lineHeight: 1.45 }}>
-                  Im Falle einer plötzlichen Erkrankung oder eines Unfalls während der Unterrichtsstunde:
+                  Im Falle einer plötzlichen Verhinderung oder eines Notfalls während der Unterrichtsstunde:
                 </div>
                 <div style={{ background: '#f8fafc', padding: '12px 14px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '0.84rem', fontWeight: 800, color: '#0f172a' }}>
                   {(student.emergency_phone || student.parent_phone || student.phone) ? (

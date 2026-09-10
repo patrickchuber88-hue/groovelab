@@ -24,8 +24,10 @@ import {
   Music,
   HeartHandshake,
   Moon,
-  Phone
+  Phone,
+  Fingerprint
 } from 'lucide-react';
+import { isWebAuthnSupported, authenticateParentBiometricPasskey } from '../utils/webauthn';
 import { formatTeacherFullName, formatSingleStudentAnonymized, formatStudentPureFirstName } from '../utils/nameHelper';
 import { isUUID } from '../utils/uuidValidator';
 import { 
@@ -638,6 +640,38 @@ export function CampusDirectMessages({
       }
     } catch (err: any) {
       setParentPinError('Fehler bei der PIN-Prüfung: ' + (err?.message || 'Unbekannt'));
+    } finally {
+      setIsVerifyingPin(false);
+    }
+  };
+
+  const handleBiometricUnlock = async () => {
+    if (!user?.id) return;
+    setIsVerifyingPin(true);
+    setParentPinError('');
+    try {
+      const authRes = await authenticateParentBiometricPasskey(
+        supabase,
+        user.id,
+        (user as any)?.school_id || null
+      );
+
+      if (!authRes.success) {
+        if (authRes.error && !authRes.error.includes('abgebrochen')) {
+          setParentPinError(authRes.error);
+        }
+        return;
+      }
+
+      sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
+      sessionStorage.setItem(`groovelab_parent_session_${user.id}`, String(Date.now() + 180 * 1000));
+      setShowParentPinModal(false);
+      setParentPinInput('');
+      setForceUpdateTick(prev => prev + 1);
+    } catch (err: any) {
+      if (err.name !== 'NotAllowedError' && err.name !== 'AbortError') {
+        setParentPinError(err.message || 'Passkey-Entsperrung fehlgeschlagen.');
+      }
     } finally {
       setIsVerifyingPin(false);
     }
@@ -3192,6 +3226,38 @@ export function CampusDirectMessages({
                 );
               })}
             </div>
+
+            {/* Biometric Passkey Unlock (Face ID / Touch ID) */}
+            {isWebAuthnSupported() && (
+              <button
+                type="button"
+                disabled={isVerifyingPin}
+                onClick={handleBiometricUnlock}
+                style={{
+                  marginTop: '6px',
+                  width: '100%',
+                  padding: '12px 16px',
+                  borderRadius: '16px',
+                  border: '1px solid #bae6fd',
+                  background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                  color: '#0284c7',
+                  fontSize: '0.88rem',
+                  fontWeight: 800,
+                  cursor: isVerifyingPin ? 'not-allowed' : 'pointer',
+                  opacity: isVerifyingPin ? 0.6 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  boxShadow: '0 2px 8px rgba(2, 132, 199, 0.08)',
+                  transition: 'all 0.15s ease'
+                }}
+                className="hover-scale"
+              >
+                <Fingerprint size={20} />
+                <span>{isVerifyingPin ? 'Wird geprüft...' : 'Mit Face ID / Touch ID entsperren'}</span>
+              </button>
+            )}
 
             <button
               type="button"

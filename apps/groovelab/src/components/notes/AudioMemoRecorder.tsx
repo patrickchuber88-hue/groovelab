@@ -115,8 +115,17 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
 
   const stopRecording = () => {
     if (timerRef.current) clearInterval(timerRef.current);
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
+    const rec = mediaRecorderRef.current;
+    if (rec && rec.state !== 'inactive') {
+      try { rec.requestData(); } catch (e) {}
+      // 🛡️ 500ms Safety Buffer: Garantiert vollständigen Ausklang & Raumhall
+      setTimeout(() => {
+        try {
+          if (rec.state !== 'inactive') {
+            rec.stop();
+          }
+        } catch (e) {}
+      }, 500);
     }
     setIsRecording(false);
   };

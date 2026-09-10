@@ -407,3 +407,71 @@ export const authenticateMasterPasskey = async (): Promise<MasterPasskeyProfile>
   return profile;
 };
 
+/**
+ * Authoritative Biometric Passkey Unlock for Parent Gates
+ * Generates cryptographic challenge, invokes native WebAuthn get assertion,
+ * and verifies assertion via server RPC authenticate_webauthn_credential.
+ */
+export const authenticateParentBiometricPasskey = async (
+  supabase: any,
+  targetUserId: string,
+  schoolId?: string | null
+): Promise<{ success: boolean; error?: string }> => {
+  if (!isWebAuthnSupported()) {
+    return { success: false, error: 'WebAuthn / Biometrie wird von diesem Gerät nicht unterstützt.' };
+  }
+
+  try {
+    // 1. Request cryptographic challenge from server
+    const { data: chalData, error: chalErr } = await supabase.rpc('generate_webauthn_challenge', {
+      p_user_id: targetUserId,
+      p_type: 'auth'
+    });
+
+    if (chalErr || !chalData?.challenge) {
+      return { success: false, error: 'Sicherheits-Challenge konnte nicht vom Server bezogen werden.' };
+    }
+
+    const challengeBuffer = new Uint8Array(
+      chalData.challenge.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []
+    ).buffer;
+
+    const rpId = getSanitizedRpId();
+
+    // 2. Perform native WebAuthn assertion
+    const assertion = (await navigator.credentials.get({
+      publicKey: {
+        challenge: challengeBuffer,
+        userVerification: 'required',
+        timeout: 60000,
+        ...(rpId ? { rpId } : {})
+      },
+    })) as PublicKeyCredential;
+
+    if (!assertion) {
+      return { success: false, error: 'Keine biometrische Bestätigung empfangen.' };
+    }
+
+    // 3. Authenticate credential via authoritative server RPC
+    const { data: authResult, error: authErr } = await supabase.rpc('authenticate_webauthn_credential', {
+      p_credential_id: assertion.id,
+      p_challenge: chalData.challenge,
+      p_school_id: schoolId || null
+    });
+
+    if (authErr || !authResult?.success) {
+      return {
+        success: false,
+        error: authResult?.error || authErr?.message || 'Biometrischer Passkey nicht erkannt oder nicht für dieses Profil hinterlegt.'
+      };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    if (err.name === 'NotAllowedError' || err.name === 'AbortError') {
+      return { success: false, error: 'Biometrische Prüfung abgebrochen.' };
+    }
+    return { success: false, error: err.message || 'Passkey-Entsperrung fehlgeschlagen.' };
+  }
+};
+

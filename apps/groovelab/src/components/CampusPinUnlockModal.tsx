@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Key, Delete, X, Lock, ShieldCheck } from 'lucide-react';
+import { Key, Delete, X, Lock, ShieldCheck, Fingerprint } from 'lucide-react';
 import { validateNewPin } from '../utils/pinValidation';
+import { isWebAuthnSupported, authenticateParentBiometricPasskey } from '../utils/webauthn';
 
 interface CampusPinUnlockModalProps {
   user: any;
@@ -213,6 +214,35 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
     }
   };
 
+  const handleBiometricUnlock = async () => {
+    if (!user?.id) return;
+    setLoading(true);
+    try {
+      const authRes = await authenticateParentBiometricPasskey(
+        supabase,
+        user.id,
+        user.school_id || null
+      );
+
+      if (!authRes.success) {
+        if (authRes.error && !authRes.error.includes('abgebrochen')) {
+          alert(authRes.error);
+        }
+        return;
+      }
+
+      sessionStorage.setItem(`groovelab_parent_unlocked_${user.id}`, 'true');
+      sessionStorage.setItem(`groovelab_parent_session_${user.id}`, String(Date.now() + 180 * 1000));
+      onUnlock();
+    } catch (err: any) {
+      if (err.name !== 'NotAllowedError' && err.name !== 'AbortError') {
+        alert(err.message || 'Passkey-Entsperrung fehlgeschlagen.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const renderKeypad = () => {
     const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'back'];
     return (
@@ -349,6 +379,38 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
         </div>
 
         {renderKeypad()}
+
+        {/* Biometric Passkey Unlock (Face ID / Touch ID) */}
+        {!isSetupMode && isWebAuthnSupported() && (
+          <button
+            type="button"
+            disabled={loading}
+            onClick={handleBiometricUnlock}
+            style={{
+              marginTop: '12px',
+              width: '100%',
+              padding: '12px 16px',
+              borderRadius: '16px',
+              border: '1px solid #bae6fd',
+              background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+              color: '#0284c7',
+              fontSize: '0.88rem',
+              fontWeight: 800,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.6 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              boxShadow: '0 2px 8px rgba(2, 132, 199, 0.08)',
+              transition: 'all 0.15s ease'
+            }}
+            className="hover-scale"
+          >
+            <Fingerprint size={20} />
+            <span>{loading ? 'Wird geprüft...' : 'Mit Face ID / Touch ID entsperren'}</span>
+          </button>
+        )}
 
         {/* Mode switcher link */}
         {!isSetupMode && (

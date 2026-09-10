@@ -15,7 +15,9 @@ import {
   Share2,
   Check,
   Search,
-  X
+  RotateCcw,
+  X,
+  Layers
 } from 'lucide-react';
 import { getBlob } from '../../../utils/blobStorage';
 import { formatHarmonizedAudioTitle } from '../../../utils/audioNamingHelper';
@@ -350,6 +352,11 @@ export interface InlineAudioPlayerProps {
   onSelectSongTag?: (songTag: string | null) => void;
   isSharedWithTeacher?: boolean;
   onRename?: (newTitle: string) => void;
+  originalAudioUrl?: string;
+  originalDuration?: number;
+  onRevertToOriginal?: () => void;
+  onOpenDuettDeck?: () => void;
+  metronomeBpm?: number;
 }
 
 export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({ 
@@ -376,7 +383,12 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
   availableSongs,
   onSelectSongTag,
   isSharedWithTeacher,
-  onRename
+  onRename,
+  originalAudioUrl,
+  originalDuration,
+  onRevertToOriginal,
+  onOpenDuettDeck,
+  metronomeBpm
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState<number>(initialDuration || 0);
@@ -1481,6 +1493,67 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
               <Scissors size={13} strokeWidth={2.2} />
               <span>Zuschneiden</span>
             </button>
+
+            {/* 👥 Duett-Deck (Dual Layer): Streng konditioniert – nur bei Aufnahme mit Metronom-Grid */}
+            {onOpenDuettDeck && Boolean(metronomeBpm) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsToolsOpen(false);
+                  onOpenDuettDeck();
+                }}
+                style={{
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  color: isIndigoPurple ? '#6d28d9' : '#15803d',
+                  fontSize: '0.74rem',
+                  fontWeight: 700,
+                  height: '32px',
+                  padding: '0 10px',
+                  borderRadius: '9px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  transition: 'all 0.15s ease'
+                }}
+                className="hover-scale-mini"
+                title={`Duett-Deck: Mitspielen & Abgleichen (${metronomeBpm} BPM)`}
+              >
+                <Layers size={13} strokeWidth={2.2} />
+                <span>Duett-Deck</span>
+              </button>
+            )}
+
+            {/* ↩️ Original wiederherstellen (Non-destructive revert) */}
+            {originalAudioUrl && onRevertToOriginal && (
+              <button
+                type="button"
+                onClick={onRevertToOriginal}
+                style={{
+                  border: '1px solid #fed7aa',
+                  background: '#fff7ed',
+                  color: '#ea580c',
+                  fontSize: '0.74rem',
+                  fontWeight: 700,
+                  height: '32px',
+                  padding: '0 10px',
+                  borderRadius: '9px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  boxShadow: '0 1px 2px rgba(234, 88, 12, 0.08)',
+                  transition: 'all 0.15s ease'
+                }}
+                className="hover-scale-mini"
+                title="Gekürzten Zuschnitt verwerfen und ungeschnittenes Original wiederherstellen"
+              >
+                <RotateCcw size={13} strokeWidth={2.2} />
+                <span>Original</span>
+              </button>
+            )}
           </div>
 
           {/* Right: Action & Management Tools (Download & Delete) */}
@@ -1656,14 +1729,20 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
             isOpen={isEditorOpen}
             onClose={() => setIsEditorOpen(false)}
             audioUrl={resolvedUrl}
+            originalAudioUrl={originalAudioUrl}
             initialLabel={displayTitle}
             initialDuration={duration}
+            initialOriginalDuration={originalDuration}
             onSave={(res) => {
               if (onSaveEdited) {
                 onSaveEdited(res);
               }
               setIsEditorOpen(false);
             }}
+            onRevertToOriginal={onRevertToOriginal ? () => {
+              onRevertToOriginal();
+              setIsEditorOpen(false);
+            } : undefined}
           />
         </React.Suspense>
       )}

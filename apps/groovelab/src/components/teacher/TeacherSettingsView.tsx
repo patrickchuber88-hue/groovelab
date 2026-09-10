@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  BookOpen, Clock, Disc, Lightbulb, Moon, Radio, ShieldCheck, Sliders, Sparkles, Sun, X
+  BookOpen, Clock, Disc, Lightbulb, Moon, Radio, ShieldCheck, Sliders, Sparkles, Sun, X, Fingerprint
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { DEFAULT_QUIET_HOURS_CONFIG, QuietHoursConfig } from '../../utils/chatRespectGuard';
+import { isWebAuthnSupported, registerBiometrics } from '../../utils/webauthn';
 
 export interface TeacherSettingsViewProps {
   teacher: any;
@@ -812,6 +813,97 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                               className="hover-scale"
                             >
                               PIN speichern
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* BIOMETRISCHER PASSKEY FÜR LEHRER */}
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <Fingerprint size={20} style={{ color: '#ca8a04' }} />
+                              <strong style={{ fontSize: '0.84rem', color: '#0f172a' }}>Biometrischer Passkey (Apple Touch ID / Face ID)</strong>
+                            </div>
+                            {isWebAuthnSupported() && (
+                              <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', background: '#e6f4ea', color: '#166534' }}>
+                                Unterstützt ✓
+                              </span>
+                            )}
+                          </div>
+                          <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: 1.45 }}>
+                            Verknüpfe dieses Gerät mit deinem persönlichen biometrischen Passkey für blitzschnelle und passwortlose Logins. Deine biometrischen Daten verbleiben zu 100 % sicher auf deinem Gerät (Art. 9 DSGVO / Zero-Biometrie-Transfer).
+                          </span>
+                          <div style={{ marginTop: '4px' }}>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (!isWebAuthnSupported()) {
+                                  alert('WebAuthn / Biometrie wird von diesem Browser oder Gerät leider nicht unterstützt.');
+                                  return;
+                                }
+                                if (!teacher?.id) return;
+                                try {
+                                  // 1. Request registration challenge from server
+                                  const { data: chalData, error: chalErr } = await supabase.rpc('generate_webauthn_challenge', {
+                                    p_user_id: teacher.id,
+                                    p_type: 'register'
+                                  });
+                                  if (chalErr || !chalData?.challenge) {
+                                    throw new Error('Sicherheits-Challenge konnte nicht bezogen werden: ' + (chalErr?.message || 'Serverfehler'));
+                                  }
+
+                                  const email = teacher.email || `lehrer.${teacher.id.substring(0, 8)}@campus-groovelab.local`;
+                                  const teacherName = `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() || 'Lehrkraft';
+
+                                  const passkeyResult = await registerBiometrics(
+                                    email,
+                                    teacher.id,
+                                    chalData.challenge,
+                                    `${teacherName} (Lehrkraft)`
+                                  );
+
+                                  const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+                                  const deviceName = isIOS ? 'Apple Touch ID / Face ID' : 'Passkey Authenticator';
+
+                                  const { data: regResult, error: regErr } = await supabase.rpc('register_webauthn_credential', {
+                                    p_user_id: teacher.id,
+                                    p_credential_id: passkeyResult.id,
+                                    p_public_key: JSON.stringify(passkeyResult.response),
+                                    p_device_name: deviceName,
+                                    p_challenge: chalData.challenge
+                                  });
+
+                                  if (regErr || !regResult?.success) {
+                                    throw new Error(regErr?.message || regResult?.error || 'Registrierung fehlgeschlagen.');
+                                  }
+
+                                  alert('Erfolg: Dein biometrischer Passkey wurde erfolgreich auf diesem Gerät aktiviert!');
+                                } catch (err: any) {
+                                  if (err.name === 'NotAllowedError' || err.name === 'AbortError') {
+                                    return;
+                                  }
+                                  alert('Passkey-Einrichtung fehlgeschlagen: ' + err.message);
+                                }
+                              }}
+                              style={{
+                                padding: '10px 18px',
+                                minHeight: '44px',
+                                borderRadius: '10px',
+                                background: '#1e293b',
+                                color: '#ffffff',
+                                border: 'none',
+                                fontWeight: 800,
+                                fontSize: '0.82rem',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                touchAction: 'manipulation'
+                              }}
+                              className="hover-scale"
+                            >
+                              <Fingerprint size={16} />
+                              Touch ID / Face ID als Passkey aktivieren
                             </button>
                           </div>
                         </div>

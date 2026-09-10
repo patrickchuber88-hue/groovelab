@@ -50,8 +50,10 @@ import {
   Rocket,
   RefreshCw,
   Hourglass,
-  Copy
+  Copy,
+  Fingerprint
 } from 'lucide-react';
+import { isWebAuthnSupported, authenticateParentBiometricPasskey } from '../utils/webauthn';
 import { downloadCsvFile } from '../utils/csvHelper';
 import { formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel, formatTeacherFullName, formatDisplaySubjectOrInstrument, isInvalidInstrument, maskLastName } from '../utils/nameHelper';
 import { CampusAppointmentShoutboxModal } from './CampusAppointmentShoutboxModal';
@@ -507,6 +509,44 @@ export function CampusEventsBoard({
       }
     } catch (err: any) {
       setPinGateError('Fehler bei der PIN-Prüfung: ' + (err?.message || 'Unbekannt'));
+    } finally {
+      setIsVerifyingPin(false);
+    }
+  };
+
+  const handleBiometricUnlock = async () => {
+    if (!userId) return;
+    setIsVerifyingPin(true);
+    setPinGateError('');
+    try {
+      const authRes = await authenticateParentBiometricPasskey(
+        supabase,
+        userId,
+        schoolId || null
+      );
+
+      if (!authRes.success) {
+        if (authRes.error && !authRes.error.includes('abgebrochen')) {
+          setPinGateError(authRes.error);
+        }
+        return;
+      }
+
+      sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
+      sessionStorage.setItem(`groovelab_parent_unlocked_${userId}`, 'true');
+      sessionStorage.setItem(`groovelab_parent_session_${userId}`, String(Date.now() + 180 * 1000));
+      setShowPinGateModal(false);
+      setPinGateInput('');
+      setPinGateError('');
+      if (pinGatePendingAction) {
+        const action = pinGatePendingAction;
+        setPinGatePendingAction(null);
+        action();
+      }
+    } catch (err: any) {
+      if (err.name !== 'NotAllowedError' && err.name !== 'AbortError') {
+        setPinGateError(err.message || 'Passkey-Entsperrung fehlgeschlagen.');
+      }
     } finally {
       setIsVerifyingPin(false);
     }
@@ -2718,7 +2758,10 @@ export function CampusEventsBoard({
       setIcalActive(campusSettings.ical_active !== false);
       if (data?.calendar_url) {
         setCalendarUrl(data.calendar_url);
-        fetchSubscribedCalendar(data.calendar_url);
+        // Non-blocking background sync: allow instant Campus internal schedule rendering first
+        setTimeout(() => {
+          fetchSubscribedCalendar(data.calendar_url);
+        }, 100);
       }
     } catch (err) {
       console.error('Error fetching calendar settings:', err);
@@ -3511,6 +3554,33 @@ export function CampusEventsBoard({
       const allMergedOccurrences: LessonOccurrence[] = [];
       const usedActualIds = new Set<string>();
 
+      // High-Performance Optimization: Pre-group occurrences by date for O(1) instant candidate matching
+      const occurrencesByDate = new Map<string, any[]>();
+      const movedAwayByOrigDate = new Map<string, any[]>();
+
+      if (occurrences && occurrences.length > 0) {
+        occurrences.forEach((occ: any) => {
+          const occDate = occ.original_date || occ.date;
+          if (occDate) {
+            let list = occurrencesByDate.get(occDate);
+            if (!list) {
+              list = [];
+              occurrencesByDate.set(occDate, list);
+            }
+            list.push(occ);
+          }
+
+          if (occ.original_date && occ.date && occ.original_date !== occ.date) {
+            let movedList = movedAwayByOrigDate.get(occ.original_date);
+            if (!movedList) {
+              movedList = [];
+              movedAwayByOrigDate.set(occ.original_date, movedList);
+            }
+            movedList.push(occ);
+          }
+        });
+      }
+
       if (combinedSchedules.length > 0) {
         combinedSchedules.forEach((sch: any) => {
           if (!sch.student_id && !sch.student && !sch.first_name && !sch.name && !sch.board_student_id) return; // Skip unassigned slots/breaks
@@ -3596,17 +3666,18 @@ export function CampusEventsBoard({
                 return matchesTemplateStudent(occ, sch);
               };
 
-              // Check if actual occurrence (from schedule_occurrences or pending changes) exists on this date
-              const actual = occurrences?.find((occ: any) => 
-                isSameScheduleOrStudent(occ, sch) && 
-                (occ.original_date === dateStr || (!occ.original_date && occ.date === dateStr))
-              );
+              // Fast O(1) Candidate lookup from pre-grouped date map
+              const dateCandidates = occurrencesByDate.get(dateStr);
+              const actual = dateCandidates?.find((occ: any) => isSameScheduleOrStudent(occ, sch));
 
-              // Check if occurrence for this schedule was moved away from dateStr to a different date
-              const actualMovedAway = !actual && occurrences?.some((occ: any) =>
-                isSameScheduleOrStudent(occ, sch) &&
-                occ.original_date === dateStr &&
-                occ.date !== dateStr
+              // Fast O(1) Candidate lookup for occurrences moved away from this date
+              const movedCandidates = movedAwayByOrigDate.get(dateStr);
+              const actualMovedAway = !actual && movedCandidates?.some((occ: any) => isSameScheduleOrStudent(occ, sch));
+
+              const isTeacherSickOnDate = Boolean(
+                sch.status === 'canceled_by_teacher_sick' ||
+                (sch.teacher?.sick_until && dateStr <= sch.teacher.sick_until.substring(0, 10) && (!sch.teacher.sick_start || dateStr >= sch.teacher.sick_start.substring(0, 10))) ||
+                (teacherProfileObj?.sick_until && String(sch.teacher_id) === String(userId) && dateStr <= teacherProfileObj.sick_until.substring(0, 10) && (!teacherProfileObj.sick_start || dateStr >= teacherProfileObj.sick_start.substring(0, 10)))
               );
 
               if (actual) {
@@ -3623,6 +3694,7 @@ export function CampusEventsBoard({
                   );
                   allMergedOccurrences.push({
                     ...actual,
+                    status: (actual.status === 'scheduled' && isTeacherSickOnDate) ? 'canceled_by_teacher_sick' : actual.status,
                     start_time: actTime,
                     schedule: sch,
                     teacher: actual.teacher || sch.teacher || teacherProfileObj || studentTeacherObj || { first_name: 'Lehrkraft', last_name: '', instrument: 'Musik' },
@@ -3652,7 +3724,7 @@ export function CampusEventsBoard({
                   date: dateStr,
                   start_time: startTimeStr,
                   duration: sch.duration || 45,
-                  status: sch.status === 'canceled_by_teacher_sick' ? 'teacher_sick' : 'scheduled',
+                  status: isTeacherSickOnDate ? 'canceled_by_teacher_sick' : 'scheduled',
                   is_virtual: true,
                   teacher: sch.teacher || teacherProfileObj || studentTeacherObj || { first_name: 'Lehrkraft', last_name: '', instrument: 'Musik' },
                   student: sch.student,
@@ -5806,18 +5878,11 @@ export function CampusEventsBoard({
 
       if (isCanceled) {
         textColor = '#991b1b';
-        subColor = '#ef4444';
+        subColor = '#dc2626';
         dateBlockBg = '#fee2e2';
-        
-        if (isConfirmedOcc) {
-          rowBg = '#fee2e2';
-          rowBorder = '2px solid #ef4444';
-          dateBlockBorder = '1.5px solid #ef4444';
-        } else {
-          rowBg = 'repeating-linear-gradient(-45deg, #fef2f2 0px, #fef2f2 8px, #ffffff 8px, #ffffff 16px)';
-          rowBorder = '2px dashed #ef4444';
-          dateBlockBorder = '1.5px dashed #ef4444';
-        }
+        rowBg = 'repeating-linear-gradient(-45deg, #fef2f2 0px, #fef2f2 8px, #ffffff 8px, #ffffff 16px)';
+        rowBorder = '1.5px solid #fca5a5';
+        dateBlockBorder = '1.5px solid #fca5a5';
       } else if (isRoomChanged) {
         textColor = '#6b21a8';
         subColor = '#7c3aed';
@@ -14110,6 +14175,38 @@ export function CampusEventsBoard({
                 );
               })}
             </div>
+
+            {/* Biometric Passkey Unlock (Face ID / Touch ID) */}
+            {isWebAuthnSupported() && (
+              <button
+                type="button"
+                disabled={isVerifyingPin}
+                onClick={handleBiometricUnlock}
+                style={{
+                  marginTop: '6px',
+                  width: '100%',
+                  padding: '12px 16px',
+                  borderRadius: '16px',
+                  border: '1px solid #bae6fd',
+                  background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                  color: '#0284c7',
+                  fontSize: '0.88rem',
+                  fontWeight: 800,
+                  cursor: isVerifyingPin ? 'not-allowed' : 'pointer',
+                  opacity: isVerifyingPin ? 0.6 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  boxShadow: '0 2px 8px rgba(2, 132, 199, 0.08)',
+                  transition: 'all 0.15s ease'
+                }}
+                className="hover-scale"
+              >
+                <Fingerprint size={20} />
+                <span>{isVerifyingPin ? 'Wird geprüft...' : 'Mit Face ID / Touch ID entsperren'}</span>
+              </button>
+            )}
 
             <button
               type="button"

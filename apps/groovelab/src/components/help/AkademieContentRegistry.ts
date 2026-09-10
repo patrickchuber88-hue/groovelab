@@ -1004,7 +1004,7 @@ export const AKADEMIE_GUIDES_DATABASE: AkademieBoardGuide[] = [
     tier: 'student',
     boardId: 'profile',
     title: 'Eltern-Bereich: Wöchentlicher Übe-Report, Streak-Schilde & PIN',
-    subtitle: 'Transparente Übe-Minuten, Schutzschilde bei Krankheit, 4-stellige PIN und DSGVO-Datentresor',
+    subtitle: 'Transparente Übe-Minuten, Schutzschilde bei Abwesenheit, 4-stellige PIN und DSGVO-Datentresor',
     badge: 'Eltern-Schutz',
     category: 'core_boards',
     summary: 'Sicherheit, Gelassenheit und volle Transparenz für Eltern: Sehen Sie auf einen Blick die wöchentlichen Übe-Minuten Ihres Kindes, schützen Sie die Flammen-Serie mit Schutzschilden und verwalten Sie sensible Einstellungen mit einer persönlichen PIN.',
@@ -1029,7 +1029,7 @@ export const AKADEMIE_GUIDES_DATABASE: AkademieBoardGuide[] = [
       }
     ],
     proTips: [
-      '🛡️ Streak-Schutzschilde: Ist Ihr Kind krank, im Urlaub oder hat Schullandheim? Bis zu 3 automatische Schutzschilde verhindern, dass die mühsam aufgebaute Übe-Flamme erlischt.',
+      '🛡️ Streak-Schutzschilde: Ist Ihr Kind abwesend, im Urlaub oder hat Schullandheim? Bis zu 3 automatische Schutzschilde verhindern, dass die mühsam aufgebaute Übe-Flamme erlischt.',
       '👨‍👩‍👧 Gemeinsam geübte Minuten bestätigen: Hat Ihr Kind ohne Tablet am echten Klavier geübt? Bestätigen Sie die Minuten mit 1 Fingertipp im Eltern-Report.',
       '📦 Vollständiger DSGVO-Archiv-Download: Sie können jederzeit ein komplettes ZIP-Archiv aller hochgeladenen Hausaufgaben, Urkunden und Übezeiten herunterladen.'
     ],

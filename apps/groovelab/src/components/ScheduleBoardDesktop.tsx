@@ -1075,7 +1075,9 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         { data: teacherProfile },
         allStudentsDb,
         allSchoolStudentUsers,
-        pendingData
+        pendingData,
+        { data: otherSchedData },
+        { data: blockedSlotsData }
       ] = await Promise.all([
         // Rooms (Cached with SWR 60s)
         queryCache.fetch(`rooms_${schoolId}`, async () => {
@@ -1111,8 +1113,24 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         queryCache.fetch(`pending_students_${schoolId}`, async () => {
           const { data } = await supabase.from('pending_students_decrypted').select('id, first_name, last_name, instrument, lesson_duration, sibling_group_id, group_id, teacher_id').eq('school_id', schoolId);
           return data || [];
-        }, { ttlMs: 60_000, staleWhileRevalidate: true })
+        }, { ttlMs: 60_000, staleWhileRevalidate: true }),
+
+        // Other teachers' schedules for real-time room conflict checking (parallelized)
+        supabase
+          .from('schedules')
+          .select('*, student:users!schedules_student_id_fkey(id, first_name, last_name), teacher:users!schedules_teacher_id_fkey(id, first_name, last_name)')
+          .eq('school_id', schoolId)
+          .neq('teacher_id', selectedTeacherId),
+
+        // Wöchentliche Raumblockierungen (parallelized)
+        supabase
+          .from('room_blocked_slots')
+          .select('*')
+          .eq('school_id', schoolId)
       ]);
+
+      setOtherTeachersSchedules(otherSchedData || []);
+      setBlockedSlots(blockedSlotsData || []);
 
       setRooms(loadedRooms || []);
       const activePlatformVal = localStorage.getItem('groovelab_active_platform') || 'groovelab';
@@ -1547,22 +1565,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
       const currentActiveDraft = loadedDrafts.find(d => d.id === loadedActiveDraftId) || loadedDrafts[0];
       const dbPlannedBoards = currentActiveDraft ? currentActiveDraft.boards : [];
 
-      // 4. Existing schedules already pre-fetched as schedData
-
-      // Fetch other teachers' schedules for room conflict checking
-      const { data: otherSchedData } = await supabase
-        .from('schedules')
-        .select('*, student:users!schedules_student_id_fkey(id, first_name, last_name), teacher:users!schedules_teacher_id_fkey(id, first_name, last_name)')
-        .eq('school_id', schoolId)
-        .neq('teacher_id', selectedTeacherId);
-      setOtherTeachersSchedules(otherSchedData || []);
-
-      // Fetch wöchentliche Blockierungen (room_blocked_slots)
-      const { data: blockedSlotsData } = await supabase
-        .from('room_blocked_slots')
-        .select('*')
-        .eq('school_id', schoolId);
-      setBlockedSlots(blockedSlotsData || []);
+      // 4. Existing schedules already pre-fetched as schedData (otherTeachersSchedules & blockedSlots already batched in Promise.all)
 
       if (schedData && schedData.length > 0) {
         setHasSubmittedSchedule(true);

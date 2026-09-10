@@ -2506,15 +2506,21 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     setRecordingMilestoneId(null);
     setIsProcessingMastering(true);
 
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+    const rec = mediaRecorderRef.current;
+    if (rec && rec.state !== 'inactive') {
       try {
-        mediaRecorderRef.current.requestData();
+        rec.requestData();
       } catch (e) {}
-      try {
-        mediaRecorderRef.current.stop();
-      } catch (e) {
-        console.warn('Recorder stop note:', e);
-      }
+      // 🛡️ 500ms Safety Buffer: Garantiert vollständigen Ausklang & Raumhall
+      setTimeout(() => {
+        try {
+          if (rec.state !== 'inactive') {
+            rec.stop();
+          }
+        } catch (e) {
+          console.warn('Recorder stop note:', e);
+        }
+      }, 500);
     }
     // HINWEIS: activeMicStreamRef.current wird sicher in recorder.onstop gestoppt!
   };

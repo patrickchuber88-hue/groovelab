@@ -530,7 +530,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                           <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                               <span style={{ fontSize: '0.62rem', fontWeight: 900, textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.06em' }}>
-                                Cover-Wappen #{cycleYear}/15
+                                Cover-Wappen #{cycleYear}
                               </span>
                               <span style={{
                                 fontSize: '0.58rem',
@@ -1018,11 +1018,11 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                                           {st.emoji}
                                         </span>
 
-                                        {/* High-Res PNG Image */}
+                                        {/* Optimized WebP/PNG Thumbnail Image */}
                                         <img 
-                                          src={`/stickers/${st.id}.png?v=1`} 
+                                          src={`/stickers/thumbs/${st.id}.png`} 
                                           alt={st.title} 
-                                          loading="eager"
+                                          loading="lazy"
                                           decoding="async"
                                           style={{ 
                                             position: 'absolute',
@@ -1036,6 +1036,11 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                                             transition: 'opacity 0.2s ease-in-out'
                                           }}
                                           onError={(e) => {
+                                            const currentSrc = e.currentTarget.src;
+                                            if (currentSrc.includes('/thumbs/')) {
+                                              e.currentTarget.src = `/stickers/${st.id}.png?v=1`;
+                                              return;
+                                            }
                                             e.currentTarget.style.opacity = '0';
                                           }}
                                         />
@@ -1242,7 +1247,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                           </strong>
                         </div>
                         <span style={{ fontSize: '0.74rem', color: '#16a34a', fontWeight: 750 }}>
-                          #{String(cycleYear).padStart(2, '0')}/15 Wappen aktiv
+                          #{cycleYear} Wappen aktiv
                         </span>
                       </div>
 
@@ -1497,9 +1502,9 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                               </span>
 
                               <img 
-                                src={`/stickers/${st.id}.png?v=1`} 
+                                src={`/stickers/thumbs/${st.id}.png`} 
                                 alt={st.title} 
-                                loading="eager"
+                                loading="lazy"
                                 decoding="async"
                                 style={{ 
                                   position: 'absolute',
@@ -1509,10 +1514,15 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                                   objectFit: 'cover',
                                   borderRadius: '50%',
                                   zIndex: 2,
-                                  filter: isCollected ? 'drop-shadow(0 2px 6px rgba(0,0,0,0.12))' : 'grayscale(100%) opacity(0.28) blur(1px)',
+                                  filter: isCollected ? 'drop-shadow(0 2px 6px rgba(0,0,0,0.1))' : 'grayscale(100%) opacity(0.25) blur(1px)',
                                   transition: 'opacity 0.2s ease-in-out'
                                 }}
                                 onError={(e) => {
+                                  const currentSrc = e.currentTarget.src;
+                                  if (currentSrc.includes('/thumbs/')) {
+                                    e.currentTarget.src = `/stickers/${st.id}.png?v=1`;
+                                    return;
+                                  }
                                   e.currentTarget.style.opacity = '0';
                                 }}
                               />
@@ -2102,7 +2112,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
                       alignItems: 'center',
                       gap: '6px'
                     }}>
-                      <Star size={12} fill="currentColor" /> {st.rarityLabel || 'Standard'} • {st.category === 'schuljahr' ? `Ausbildungsstufe #${st.id.replace('schuljahr-', '').padStart(2, '0')}/15` : `Schuljahr ${selectedSchoolYear || getSchoolYearString(displayDate)}`}
+                      <Star size={12} fill="currentColor" /> {st.rarityLabel || 'Standard'} • {st.category === 'schuljahr' ? `Ausbildungsstufe #${parseInt(st.id.replace('schuljahr-', ''), 10)}` : `Schuljahr ${selectedSchoolYear || getSchoolYearString(displayDate)}`}
                     </span>
                     <h3 style={{ fontSize: '1.65rem', fontWeight: 900, margin: '10px 0 0 0', letterSpacing: '-0.5px', color: '#ffffff' }}>
                       {st.title}

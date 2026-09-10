@@ -7,6 +7,7 @@ import {
   Trash2, 
   Send, 
   CheckCircle, 
+  Check, 
   Users, 
   Clock, 
   Settings, 
@@ -33,7 +34,12 @@ import {
   RotateCcw,
   Grid3X3,
   MoreVertical,
-  Coffee
+  Coffee,
+  Lightbulb,
+  Scale,
+  MessageSquare,
+  Bookmark,
+  ArrowRight
 } from 'lucide-react';
 import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel } from '../utils/nameHelper';
 import { ScheduleCalendarView } from './ScheduleCalendarView';
@@ -681,27 +687,27 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
   // Guided Tour Configuration & State for Designer
   const designerTourSteps = useMemo(() => [
     {
-      title: "Willkommen beim Stundenplan-Designer! 🛠️",
+      title: "Willkommen beim Stundenplan-Designer!",
       description: "Lass uns kurz durchgehen, wie du deinen Stundenplan hier planst. Die Plattform hilft dir, deine Schüler optimal einzuteilen und Raumkonflikte zu vermeiden.",
       selector: undefined
     },
     {
-      title: "Der Schüler-Pool 👥",
+      title: "Der Schüler-Pool",
       description: "Hier siehst du alle noch nicht eingeteilten Schüler (graues Label links). Ziehe Schüler einfach per Drag & Drop auf deine Unterrichtstage.",
       selector: "tour-student-pool"
     },
     {
-      title: "Deine Wochentags-Boards 📅",
+      title: "Deine Wochentags-Boards",
       description: "Jeder Unterrichtstag hat ein eigenes Board, zugeteilt auf einen Raum. Die Unterrichtszeiten passen sich beim Hinzufügen von Schülern automatisch an.",
       selector: "tour-day-boards"
     },
     {
-      title: "Pausen & Gruppen ☕",
+      title: "Pausen & Gruppen",
       description: "Ziehe einfach einen Pausen-Block auf deine Boards, um unterrichtsfreie Zeiten einzuplanen, oder aktiviere den Gruppen-Modus für gemeinsamen Unterricht.",
       selector: "tour-special-features"
     },
     {
-      title: "Terminvorschlag abstimmen 🚀",
+      title: "Terminvorschlag abstimmen",
       description: "Wenn dein Stundenplan-Entwurf fertig abgestimmt ist, klicke auf 'Abstimmen & Freigeben', um ihn zur Freigabe an die Schulleitung zu übermitteln.",
       selector: "tour-submit-section"
     }
@@ -710,22 +716,22 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
   // Guided Tour Configuration & State for Calendar (Stundenplan)
   const calendarTourSteps = useMemo(() => [
     {
-      title: "Deine Wochenübersicht 📅",
+      title: "Deine Wochenübersicht",
       description: "Dies ist dein freigegebener Stundenplan. Hier siehst du all deine Termine auf einen Blick.",
       selector: undefined
     },
     {
-      title: "Die Röntgen-Ansicht 🔍",
+      title: "Die Röntgen-Ansicht",
       description: "Verwende die Röntgen-Ansicht, um Raumbelegungen von dir und anderen Lehrkräften transparent übereinander zu legen und Belegungen zu prüfen.",
       selector: "tour-calendar-xray"
     },
     {
-      title: "Optionen & Aktionen ⚙️",
+      title: "Optionen & Aktionen",
       description: "Hier kannst du das Wochenende ein- oder ausblenden, Gruppen organisieren oder ganze Wochenkopien erstellen und einfügen.",
       selector: "tour-calendar-actions"
     },
     {
-      title: "Zurück zum Designer 🛠️",
+      title: "Zurück zum Designer",
       description: "Möchtest du deinen Stundenplan anpassen? Wechsle hier jederzeit zurück in den Stundenplan-Designer.",
       selector: "tour-calendar-switch"
     }
@@ -2718,7 +2724,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
       // Production database tables remain 100% untouched until formal secretariat approval.
 
       if (showToastNotification) {
-        setToast({ message: 'Entwurf erfolgreich gesichert! 💾', type: 'success' });
+        setToast({ message: 'Entwurf erfolgreich gesichert!', type: 'success' });
       }
     } catch (err) {
       console.error('Error auto-saving schedule draft:', err);
@@ -2876,7 +2882,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
       });
     } finally {
       setSolverProgress(100);
-      setSolverStageText('Zuteilung perfekt abgeschlossen! 🎉');
+      setSolverStageText('Zuteilung perfekt abgeschlossen!');
       await new Promise(r => setTimeout(r, 600));
       setIsSolverRunning(false);
     }
@@ -3530,7 +3536,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
 
               nextStudents[curIndex] = { ...targetCard, customStartTime: srcTime };
               nextStudents[index] = { ...sourceCard, customStartTime: tgtTime };
-              setToast({ message: '1:1 Termintausch durchgeführt! 🔀', type: 'success' });
+              setToast({ message: '1:1 Termintausch durchgeführt!', type: 'success' });
             } else {
               // Default Move & Smart Displacement
               const [moved] = nextStudents.splice(curIndex, 1);
@@ -3591,7 +3597,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
               return s;
             }));
 
-            setToast({ message: '1:1 Termintausch durchgeführt! 🔀', type: 'success' });
+            setToast({ message: '1:1 Termintausch durchgeführt!', type: 'success' });
 
             return prev.map(b => {
               if (b.id === sourceBoard.id) return updatedSource;
@@ -4053,7 +4059,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
     }
     setBoards(newBoards);
     syncStudentsWithBoards(newBoards);
-    setToast({ message: `Zu ${targetDraft.name} gewechselt! 🗓️`, type: 'success' });
+    setToast({ message: `Zu ${targetDraft.name} gewechselt!`, type: 'success' });
   };
 
   const handleCreateDraft = () => {
@@ -4201,7 +4207,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
   };
 
   const handleHardResetSystem = async () => {
-    if (!await showConfirm("🚨 Möchtest du WIRKLICH alle bisher eingereichten Stundenpläne komplett löschen und von vorne beginnen? Dies kann nicht rückgängig gemacht werden!")) {
+    if (!await showConfirm("Möchtest du WIRKLICH alle bisher eingereichten Stundenpläne komplett löschen und von vorne beginnen? Dies kann nicht rückgängig gemacht werden!")) {
       return;
     }
     
@@ -4408,8 +4414,8 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
       const totalCount = totalAssignedCount + unassignedStudentsCount;
 
       const alertMsg = unassignedStudentsCount > 0
-        ? `🗓️ Stundenplan-Review (Teil-Einreichung): Lehrkraft ${teacherName} hat den Stundenplan eingereicht (${totalAssignedCount} von ${totalCount} Schülern eingeteilt, ${unassignedStudentsCount} offen im Pool).`
-        : `🗓️ Stundenplan-Review: Lehrkraft ${teacherName} hat den vollständigen neuen Stundenplan erstellt und zur Freigabe an die Verwaltung gesendet (${totalAssignedCount} Schüler eingeteilt).`;
+        ? `Stundenplan-Review (Teil-Einreichung): Lehrkraft ${teacherName} hat den Stundenplan eingereicht (${totalAssignedCount} von ${totalCount} Schülern eingeteilt, ${unassignedStudentsCount} offen im Pool).`
+        : `Stundenplan-Review: Lehrkraft ${teacherName} hat den vollständigen neuen Stundenplan erstellt und zur Freigabe an die Verwaltung gesendet (${totalAssignedCount} Schüler eingeteilt).`;
 
       await supabase.from('system_alerts').insert({
         school_id: schoolId,
@@ -4421,7 +4427,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
       // Generate PDF Backup & Celebration
       await generatePDFBackup(validBoards, students);
       setShowCelebration(true);
-      setToast({ message: 'Stundenplan zur Prüfung an die Verwaltung übermittelt! Bis zur Freigabe bleibt der bisherige Plan aktiv. 🚀', type: 'success' });
+      setToast({ message: 'Stundenplan zur Prüfung an die Verwaltung übermittelt! Bis zur Freigabe bleibt der bisherige Plan aktiv.', type: 'success' });
     } catch (err: any) {
       console.error('Error submitting schedule:', err);
       await showAlert('Fehler beim Einreichen: ' + err.message);
@@ -4546,14 +4552,18 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
         {/* Schnellwahl-Vorlagen & Quick-Actions Bar */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px', background: '#f8fafc', padding: '10px 12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
           <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>⚡ 1-Klick Schnell-Auswahl:</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <Zap size={13} strokeWidth={2.5} color="#d97706" aria-hidden="true" />
+              <span>1-Klick Schnell-Auswahl:</span>
+            </span>
             {Object.values(onboardingAvailability).some(c => c.checked) && (
               <button
                 type="button"
                 onClick={() => setOnboardingAvailability({ 1:{checked:false,start:'',end:''}, 2:{checked:false,start:'',end:''}, 3:{checked:false,start:'',end:''}, 4:{checked:false,start:'',end:''}, 5:{checked:false,start:'',end:''}, 6:{checked:false,start:'',end:''}, 7:{checked:false,start:'',end:''} })}
-                style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', padding: 0 }}
+                style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
               >
-                🧹 Alle abwählen
+                <Trash2 size={12} strokeWidth={2.4} aria-hidden="true" />
+                <span>Alle abwählen</span>
               </button>
             )}
           </div>
@@ -4582,11 +4592,12 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
+                gap: '5px',
                 transition: 'all 0.15s'
               }}
             >
-              📅 Mo – Fr (13:00 – 19:00)
+              <Calendar size={13} strokeWidth={2.4} aria-hidden="true" />
+              <span>Mo – Fr (13:00 – 19:00)</span>
             </button>
 
             <button
@@ -4613,11 +4624,12 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
+                gap: '5px',
                 transition: 'all 0.15s'
               }}
             >
-              ☀️ Nachmittag (14:00 – 18:00)
+              <Clock size={13} strokeWidth={2.4} aria-hidden="true" />
+              <span>Nachmittag (14:00 – 18:00)</span>
             </button>
 
             {Object.values(onboardingAvailability).filter(c => c.checked).length >= 2 && (
@@ -4649,11 +4661,12 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '4px'
+                  gap: '5px'
                 }}
                 title="Überträgt die eingestellte Zeit des ersten Tages auf alle angehakten Tage"
               >
-                📋 Zeiten auf alle übertragen
+                <Bookmark size={13} strokeWidth={2.4} aria-hidden="true" />
+                <span>Zeiten auf alle übertragen</span>
               </button>
             )}
           </div>
@@ -4791,8 +4804,9 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
         </button>
 
         {/* ⚖️ Gesetzlicher Hinweis gem. § 16 Abs. 2 ArbZG / BAG-Rechtsprechung */}
-        <div style={{ marginTop: '12px', textAlign: 'center', fontSize: '0.70rem', color: '#64748b', lineHeight: '1.4', background: 'rgba(0,0,0,0.02)', padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.04)' }}>
-          ⚖️ <strong>Hinweis gem. § 16 Abs. 2 ArbZG:</strong> Der Stundenplan-Designer ist ein didaktisches Koordinierungsinstrument und ersetzt kein betriebliches Zeiterfassungssystem.
+        <div style={{ marginTop: '12px', textAlign: 'center', fontSize: '0.70rem', color: '#64748b', lineHeight: '1.4', background: 'rgba(0,0,0,0.02)', padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+          <Scale size={13} strokeWidth={2.4} color="#64748b" aria-hidden="true" />
+          <span><strong>Hinweis gem. § 16 Abs. 2 ArbZG:</strong> Der Stundenplan-Designer ist ein didaktisches Koordinierungsinstrument und ersetzt kein betriebliches Zeiterfassungssystem.</span>
         </div>
       </div>
     );
@@ -5199,7 +5213,12 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {lastSubmittedTime && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: scheduleStatus === 'approved' ? 'rgba(230, 244, 234, 0.95)' : 'rgba(254, 243, 199, 0.95)', border: `1.5px solid ${scheduleStatus === 'approved' ? '#34a853' : '#f59e0b'}`, color: scheduleStatus === 'approved' ? '#1e7e34' : '#92400e', padding: '6px 14px', borderRadius: '10px', fontSize: '0.76rem', fontWeight: 700, boxShadow: '0 2px 6px rgba(0,0,0,0.04)' }}>
-                    <span>{scheduleStatus === 'approved' ? '✅ Freigegeben' : '⏳ Eingereicht'}</span>
+                    {scheduleStatus === 'approved' ? (
+                      <CheckCircle size={13} strokeWidth={2.4} color="#1e7e34" aria-hidden="true" />
+                    ) : (
+                      <Clock size={13} strokeWidth={2.4} color="#92400e" aria-hidden="true" />
+                    )}
+                    <span>{scheduleStatus === 'approved' ? 'Freigegeben' : 'Eingereicht'}</span>
                     <span style={{ opacity: 0.85, fontWeight: 600 }}>({lastSubmittedTime})</span>
                   </div>
                 )}
@@ -5242,7 +5261,10 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
             <CheckCircle size={36} strokeWidth={2.5} />
           </div>
           <div>
-            <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em' }}>Terminvorschlag übermittelt! 🎉</h3>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              <span>Terminvorschlag übermittelt!</span>
+              <Sparkles size={24} strokeWidth={2.4} color="#34a853" aria-hidden="true" />
+            </h3>
             <p style={{ color: '#86868b', fontSize: '0.85rem', fontWeight: 500, marginTop: '8px', lineHeight: 1.4 }}>
               Dein pädagogischer Stundenplan-Vorschlag wurde sicher gespeichert und zur einvernehmlichen Freigabe an die Schulleitung übermittelt. Eltern erhalten nach Freigabe automatisch die Terminbestätigung.
             </p>
@@ -5464,7 +5486,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
               marginBottom: '6px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '1rem' }}>⚠️</span>
+                <AlertTriangle size={16} strokeWidth={2.4} color="#92400e" aria-hidden="true" style={{ flexShrink: 0 }} />
                 <span>Du hast den Stundenplan angepasst. Klicke auf <strong>"Abstimmen & Freigeben"</strong>, um deinen Terminvorschlag zur Freigabe zu übermitteln.</span>
               </div>
             </div>
@@ -5493,7 +5515,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                 boxShadow: '0 2px 10px rgba(245, 158, 11, 0.08)'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '1.05rem' }}>⚠️</span>
+                  <AlertTriangle size={18} strokeWidth={2.4} color="#b45309" aria-hidden="true" style={{ flexShrink: 0 }} />
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                     <span style={{ fontWeight: 800, color: '#78350f' }}>
                       {currentUnassigned.length === 1
@@ -5528,7 +5550,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                   onMouseOut={e => e.currentTarget.style.transform = 'none'}
                 >
                   <span>Offene Schüler im Pool ({currentUnassigned.length})</span>
-                  <span>➔</span>
+                  <ArrowRight size={12} strokeWidth={2.4} aria-hidden="true" />
                 </button>
               </div>
             );
@@ -5549,7 +5571,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
               gap: '8px',
               marginBottom: '4px'
             }}>
-              <span style={{ fontSize: '1rem' }}>💡</span>
+              <Lightbulb size={16} strokeWidth={2.4} color="#1d4ed8" aria-hidden="true" style={{ flexShrink: 0 }} />
               <span>Nutze <strong>Automatisch zuteilen</strong> für die universitäre 4-Phasen-Zuteilung (18 Optimierungsstufen) oder ziehe Schüler per Drag & Drop flexibel in deine Unterrichtstage. <strong>Tipp: Karten rasten magnetisch im {gridSnapMinutes || 15}-Min-Raster ein und verdrängen nachfolgende Termine automatisch.</strong></span>
             </div>
           )}
@@ -5878,13 +5900,15 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                         if (totalAssigned > 360 && maxContinuous > 360) {
                           return (
                             <div style={{ padding: '3px 8px', marginTop: '4px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 700, color: '#991b1b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <span>⚠️ Gesetzliche Pflichtpause fehlt (über 6 Std. ohne Pause)</span>
+                              <AlertCircle size={12} strokeWidth={2.4} color="#991b1b" aria-hidden="true" style={{ flexShrink: 0 }} />
+                              <span>Gesetzliche Pflichtpause fehlt (über 6 Std. ohne Pause)</span>
                             </div>
                           );
                         } else if (maxContinuous > 180) {
                           return (
                             <div style={{ padding: '3px 8px', marginTop: '4px', background: '#fefce8', border: '1px solid #fef08a', borderRadius: '6px', fontSize: '0.68rem', fontWeight: 700, color: '#854d0e', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <span>💡 Pause empfohlen (über 3 Std. am Stück)</span>
+                              <Lightbulb size={12} strokeWidth={2.4} color="#854d0e" aria-hidden="true" style={{ flexShrink: 0 }} />
+                              <span>Pause empfohlen (über 3 Std. am Stück)</span>
                             </div>
                           );
                         }
@@ -6863,8 +6887,9 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                               }}
                             >
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: groupTimeColor, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                  👥 {bs.assignedTime}
+                                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: groupTimeColor, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <Users size={12} strokeWidth={2.4} aria-hidden="true" />
+                                  <span>{bs.assignedTime}</span>
                                 </span>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                                   {!bs.group_id && (
@@ -7135,7 +7160,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                                       background: '#ffffff',
                                       color: '#1d1d1f',
                                       pointerEvents: 'auto',
-                                      cursor: 'pointer',
+                                    cursor: 'pointer',
                                       width: '68px'
                                     }}
                                   />
@@ -7181,7 +7206,8 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                                   }}
                                   title="Sperrzeit-Konflikt!"
                                 >
-                                  {isMobilePortrait ? '⚠️ Sperre' : '⚠️ Sperrzeit'}
+                                  <AlertTriangle size={10} strokeWidth={2.4} color="#b91c1c" aria-hidden="true" />
+                                  <span>{isMobilePortrait ? 'Sperre' : 'Sperrzeit'}</span>
                                 </span>
                               )}
                               <span style={{ fontSize: '0.62rem', fontWeight: 700, color: badgeColor, background: badgeBg, padding: '1px 5px', borderRadius: '4px', pointerEvents: 'none', display: 'flex', alignItems: 'center', gap: '3px' }}>
@@ -7212,7 +7238,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                                   }));
                                   setToast({
                                     message: !bs.isPinned 
-                                      ? `Uhrzeit ${bs.assignedTime || '14:00'} für ${bs.first_name || 'Schüler'} fixiert! 📌` 
+                                      ? `Uhrzeit ${bs.assignedTime || '14:00'} für ${bs.first_name || 'Schüler'} fixiert!` 
                                       : `Fixierung für ${bs.first_name || 'Schüler'} gelöst.`,
                                     type: 'success'
                                   });
@@ -7332,15 +7358,28 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                     {/* Mobile Inline Add Pause/Slot Card */}
                     {isMobilePortrait && (
                       <div
+                        role="button"
+                        tabIndex={0}
                         onClick={(e) => {
                           e.stopPropagation();
                           pushUndoSnapshot();
                           handleAddBreakToBoard(board.id);
-                          setToast({ message: 'Pause zum Unterrichtstag hinzugefügt! ☕', type: 'success' });
+                          setToast({ message: 'Pause zum Unterrichtstag hinzugefügt!', type: 'success' });
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            pushUndoSnapshot();
+                            handleAddBreakToBoard(board.id);
+                            setToast({ message: 'Pause zum Unterrichtstag hinzugefügt!', type: 'success' });
+                          }
                         }}
                         style={{
                           margin: '12px auto 0 auto',
                           width: 'calc(100% - 12px)',
+                          minHeight: '44px',
+                          touchAction: 'manipulation',
                           padding: '12px',
                           borderRadius: '14px',
                           border: '2px dashed #34a853',
@@ -7359,7 +7398,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                           boxSizing: 'border-box'
                         }}
                       >
-                        <span>☕</span>
+                        <Coffee size={16} strokeWidth={2.4} color="#166534" aria-hidden="true" />
                         <span>Pause hinzufügen</span>
                       </div>
                     )}
@@ -7426,7 +7465,9 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                   transition: 'all 0.15s'
                 }}
               >
-                <div style={{ fontSize: '1rem' }}>☕</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#b45309' }}>
+                  <Coffee size={16} strokeWidth={2.4} aria-hidden="true" />
+                </div>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#b45309' }}>
                     Pause herausziehen
@@ -7566,9 +7607,13 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                               fontWeight: 650,
                               lineHeight: '1.3',
                               textAlign: 'left',
-                              wordBreak: 'break-word'
+                              wordBreak: 'break-word',
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: '5px'
                             }}>
-                              💬 <strong>Eltern-Notiz:</strong> {selectedStudentNote}
+                              <MessageSquare size={12} strokeWidth={2.4} color="#b45309" aria-hidden="true" style={{ flexShrink: 0, marginTop: '1px' }} />
+                              <div><strong>Eltern-Notiz:</strong> {selectedStudentNote}</div>
                             </div>
                           )}
 
@@ -8126,7 +8171,8 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#92400e', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  ☕ Pause anpassen
+                  <Coffee size={18} strokeWidth={2.4} color="#92400e" aria-hidden="true" />
+                  <span>Pause anpassen</span>
                 </h3>
                 <button
                   type="button"
@@ -8279,7 +8325,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                   </div>
                   <div>
                     <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em' }}>
-                      Neuen Entwurf anlegen 🗓️
+                      Neuen Entwurf anlegen
                     </h3>
                     <p style={{ fontSize: '0.8rem', color: '#515154', margin: '2px 0 0 0', fontWeight: 600 }}>
                       Entwurf {drafts.length + 1} erstellen
@@ -8417,7 +8463,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                   </div>
                   <div>
                     <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em' }}>
-                      Stundenplan mit offenen Schülern einreichen? 🗓️
+                      Stundenplan mit offenen Schülern einreichen?
                     </h3>
                     <p style={{ fontSize: '0.78rem', color: '#92400e', margin: '2px 0 0 0', fontWeight: 700 }}>
                       {partialSubmitData.unassignedStudents.length} von {partialSubmitData.totalStudents} Schülern noch nicht zugeteilt
@@ -8504,15 +8550,19 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
 
               {/* Explanatory Callout */}
               <div style={{
-                background: 'rgba(234, 179, 8, 0.08)',
-                border: '1px solid rgba(234, 179, 8, 0.25)',
+                background: '#fefce8',
+                border: '1px solid #fef08a',
                 borderRadius: '12px',
                 padding: '10px 14px',
                 fontSize: '0.76rem',
                 color: '#854d0e',
-                lineHeight: 1.45
+                lineHeight: 1.45,
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '8px'
               }}>
-                💡 <strong>Zero-Data-Loss Garantie:</strong> Wenn du jetzt einreichst, wird dein aktueller Stand mit {partialSubmitData.totalAssigned} Schülern an die Verwaltung gesendet. Alle offenen Schüler <strong>verbleiben sicher in deinem Schüler-Pool</strong> und fliegen niemals aus der Liste.
+                <Lightbulb size={16} strokeWidth={2.4} color="#854d0e" aria-hidden="true" style={{ flexShrink: 0, marginTop: '1px' }} />
+                <div><strong>Zero-Data-Loss Garantie:</strong> Wenn du jetzt einreichst, wird dein aktueller Stand mit {partialSubmitData.totalAssigned} Schülern an die Verwaltung gesendet. Alle offenen Schüler <strong>verbleiben sicher in deinem Schüler-Pool</strong> und fliegen niemals aus der Liste.</div>
               </div>
 
               {/* Action Buttons */}
@@ -8571,7 +8621,8 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                   onMouseOut={e => e.currentTarget.style.transform = 'none'}
                 >
                   <Send size={13} />
-                  <span>Als Teilplan einreichen ➔</span>
+                  <span>Als Teilplan einreichen</span>
+                  <ArrowRight size={13} strokeWidth={2.4} aria-hidden="true" />
                 </button>
               </div>
             </div>
@@ -8679,9 +8730,22 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                   fontSize: '0.82rem',
                   fontWeight: 800,
                   border: '1px solid #bbf7d0',
-                  boxShadow: '0 4px 12px rgba(34, 197, 94, 0.1)'
+                  boxShadow: '0 4px 12px rgba(34, 197, 94, 0.1)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
                 }}>
-                  {autoScheduleReportData.overallScore >= 90 ? '✨ Exzellent' : '👍 Sehr gut'}
+                  {autoScheduleReportData.overallScore >= 90 ? (
+                    <>
+                      <Sparkles size={14} strokeWidth={2.4} color="#15803d" aria-hidden="true" />
+                      <span>Exzellent</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check size={14} strokeWidth={2.4} color="#15803d" aria-hidden="true" />
+                      <span>Sehr gut</span>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -9032,7 +9096,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
               <div style={{ width: '36px', height: '4px', background: '#cbd5e1', borderRadius: '2px', margin: '0 auto 16px auto' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>⚙️</span>
+                  <Settings size={18} strokeWidth={2.4} color="#34a853" aria-hidden="true" />
                   <span>Werkzeuge & Aktionen</span>
                 </h3>
                 <button onClick={() => setShowDesignerToolsSheet(false)} style={{ background: 'rgba(0,0,0,0.05)', border: 'none', borderRadius: '50%', width: '30px', height: '30px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={16} /></button>
@@ -9087,7 +9151,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
 
                 <button type="button" onClick={() => { handleAutoAssign(); setShowDesignerToolsSheet(false); }} style={{ width: '100%', padding: '10px 14px', borderRadius: '12px', background: '#e6f4ea', border: '1px solid #a7f3d0', color: '#166534', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                   <Sparkles size={16} color="#34a853" />
-                  <span>⚡ Automatisch zuteilen (4-Phasen-Assistent)</span>
+                  <span>Automatisch zuteilen (4-Phasen-Assistent)</span>
                 </button>
               </div>
 
@@ -9100,7 +9164,10 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                     <span>+ Neuen Unterrichtstag anlegen</span>
                   </button>
                   <button type="button" onClick={() => { toggleRealNames(); setShowDesignerToolsSheet(false); }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '12px', background: '#ffffff', border: '1px solid #e2e8f0', cursor: 'pointer' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a' }}>{showRealNames ? '🔒 Namen schützen (Vorname N.)' : '👁️ Vollständige Namen anzeigen'}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {showRealNames ? <Lock size={15} color="#0f172a" /> : <Eye size={15} color="#0f172a" />}
+                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a' }}>{showRealNames ? 'Namen schützen (Vorname N.)' : 'Vollständige Namen anzeigen'}</span>
+                    </div>
                   </button>
                 </div>
               </div>
@@ -9119,16 +9186,18 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                     setShowDesignerToolsSheet(false);
                     const inviteLink = getParentOnboardingUrl(schoolProfile?.name || 'Stadtmusikschule', schoolProfile?.subdomain);
                     await navigator.clipboard.writeText(inviteLink);
-                    setToast({ message: 'Onboarding-Link kopiert! 📋', type: 'success' });
+                    setToast({ message: 'Onboarding-Link kopiert!', type: 'success' });
                   }} style={{ padding: '10px 14px', borderRadius: '12px', background: '#ffffff', border: '1px solid #e2e8f0', color: '#0f172a', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Send size={15} color="#2563eb" />
                     <span>Onboarding-Link für Eltern kopieren</span>
                   </button>
-                  <button type="button" onClick={() => { handleResetAllAssignments(); setShowDesignerToolsSheet(false); }} style={{ padding: '10px 14px', borderRadius: '12px', background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left' }}>
-                    🗑️ Alle Zuteilungen zurücksetzen
+                  <button type="button" onClick={() => { handleResetAllAssignments(); setShowDesignerToolsSheet(false); }} style={{ padding: '10px 14px', borderRadius: '12px', background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Trash2 size={16} color="#991b1b" />
+                    <span>Alle Zuteilungen zurücksetzen</span>
                   </button>
-                  <button type="button" onClick={() => { handleLockAndSend(); setShowDesignerToolsSheet(false); }} style={{ padding: '14px', borderRadius: '14px', background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)', border: 'none', color: '#ffffff', fontWeight: 800, fontSize: '0.92rem', cursor: 'pointer', textAlign: 'center', boxShadow: '0 4px 14px rgba(52, 168, 83, 0.35)', marginTop: '4px' }}>
-                    🚀 Abstimmen & Freigeben
+                  <button type="button" onClick={() => { handleLockAndSend(); setShowDesignerToolsSheet(false); }} style={{ padding: '14px', borderRadius: '14px', background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)', border: 'none', color: '#ffffff', fontWeight: 800, fontSize: '0.92rem', cursor: 'pointer', textAlign: 'center', boxShadow: '0 4px 14px rgba(52, 168, 83, 0.35)', marginTop: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                    <Send size={16} />
+                    <span>Abstimmen & Freigeben</span>
                   </button>
                 </div>
               </div>
@@ -9169,8 +9238,9 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
             >
               <div style={{ width: '36px', height: '4px', background: '#cbd5e1', borderRadius: '2px', margin: '0 auto 16px auto' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>
-                  📅 {moveStudentModalState.student.first_name} verschieben nach...
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Calendar size={18} strokeWidth={2.4} color="#0f172a" aria-hidden="true" />
+                  <span>{moveStudentModalState.student.first_name} verschieben nach...</span>
                 </h3>
                 <button onClick={() => setMoveStudentModalState(null)} style={{ background: 'rgba(0,0,0,0.05)', border: 'none', borderRadius: '50%', width: '30px', height: '30px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={16} /></button>
               </div>
@@ -9205,7 +9275,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
 
                         setStudents(prev => prev.map(s => s.id === studentId ? { ...s, assignedDay: targetDay } : s));
                         setFocusedDayOfWeek(targetDay);
-                        setToast({ message: `${moveStudentModalState.student.first_name} nach ${d.name} verschoben! 📅`, type: 'success' });
+                        setToast({ message: `${moveStudentModalState.student.first_name} nach ${d.name} verschoben!`, type: 'success' });
                         setMoveStudentModalState(null);
                       }}
                       style={{
@@ -9244,10 +9314,15 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                   color: '#991b1b',
                   fontWeight: 800,
                   fontSize: '0.85rem',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
                 }}
               >
-                🎒 Zurück in Schüler-Pool legen
+                <Trash2 size={16} strokeWidth={2.4} aria-hidden="true" />
+                <span>Zurück in Schüler-Pool legen</span>
               </button>
             </div>
           </div>
@@ -9305,7 +9380,11 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                   transition: 'all 0.2s ease'
                 }}
               >
-                <span>{unassignedCount > 0 ? '🎒' : '✨'}</span>
+                {unassignedCount > 0 ? (
+                  <Users size={14} strokeWidth={2.4} aria-hidden="true" />
+                ) : (
+                  <Sparkles size={14} strokeWidth={2.4} aria-hidden="true" />
+                )}
                 <span>{unassignedCount > 0 ? `Offene Schüler (${unassignedCount})` : 'Alle zugeteilt'}</span>
               </button>
               
@@ -9329,7 +9408,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                   boxShadow: '0 4px 16px rgba(52, 168, 83, 0.35)'
                 }}
               >
-                <span>⚙️</span>
+                <Settings size={14} strokeWidth={2.4} aria-hidden="true" />
                 <span>Werkzeuge & Senden</span>
               </button>
             </div>
@@ -9342,8 +9421,9 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
 
       {/* ⚖️ Gesetzlicher Hinweis gem. § 16 Abs. 2 ArbZG / BAG-Rechtsprechung */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px 16px', margin: '14px auto 4px auto', background: 'rgba(255, 255, 255, 0.7)', border: '1px solid rgba(0, 0, 0, 0.05)', borderRadius: '12px', maxWidth: '780px', width: '100%', boxSizing: 'border-box' }}>
+        <Scale size={13} strokeWidth={2.4} color="#64748b" aria-hidden="true" />
         <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, textAlign: 'center', lineHeight: 1.4 }}>
-          ⚖️ <strong>Hinweis gem. § 16 Abs. 2 ArbZG:</strong> Der Stundenplan-Designer ist ein pädagogisches Koordinierungsinstrument zur Abstimmung von Unterrichtseinheiten und ersetzt kein betriebliches Arbeitszeiterfassungssystem.
+          <strong>Hinweis gem. § 16 Abs. 2 ArbZG:</strong> Der Stundenplan-Designer ist ein pädagogisches Koordinierungsinstrument zur Abstimmung von Unterrichtseinheiten und ersetzt kein betriebliches Arbeitszeiterfassungssystem.
         </span>
       </div>
     </div>

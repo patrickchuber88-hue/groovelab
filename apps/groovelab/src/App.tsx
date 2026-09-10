@@ -8319,6 +8319,9 @@ function App() {
               const isBoardAllowedForChild = (boardId: string) => {
                 if (campusStudentUiLevel === 'pro') return true;
 
+                // Mediathek (reine Metadaten, Play-Alongs & Übe-Fahrpläne) ist für alle Altersstufen immer aktiv
+                if (boardId === 'mediathek') return true;
+
                 // Local override if parent configured it
                 if (typeof window !== 'undefined') {
                   const override = localStorage.getItem(`campus_board_override_${boardId}`);
@@ -8327,7 +8330,7 @@ function App() {
                 }
 
                 if (campusStudentUiLevel === 'junior') {
-                  const juniorAllowed = ['briefing', 'homework_book', 'practice_board', 'events', 'settings'];
+                  const juniorAllowed = ['briefing', 'homework_book', 'practice_board', 'mediathek', 'events', 'settings'];
                   return juniorAllowed.includes(boardId);
                 }
                 return true;

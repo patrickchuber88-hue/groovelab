@@ -25,7 +25,7 @@ import { AudioWaveformVisualizer } from './ui/AudioWaveformVisualizer';
 import { harmonizeAudioList, formatHarmonizedAudioTitle, cleanSongOrBookTitle, extractBaseTopic, formatAudioDate, getNextSequentialTakeNumber } from '../utils/audioNamingHelper';
 import { HomeworkTransferModal } from './campus/HomeworkTransferModal';
 import { broadcastPracticeUpdate } from '../utils/studentProgressEngine';
-import { acquireAudioStream, requestMicrophonePermissionOnce, STUDIO_AUDIO_CONSTRAINTS } from '../services/audioPermissionService';
+import { acquireAudioStream, requestMicrophonePermissionOnce, STUDIO_AUDIO_CONSTRAINTS, stabilizeAudioStream } from '../services/audioPermissionService';
 import { 
   ALL_STICKERS, 
   getUnifiedStickerStatus, 
@@ -174,7 +174,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       (student as any).students.forEach(addStud);
     }
     return list;
-  }, [student, propGroupStudents]);
+  }, [student?.id, (student as any)?.groupStudents, (student as any)?.students, propGroupStudents]);
   const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showProtokollOnboarding, setShowProtokollOnboarding] = useState<boolean>(() => {
@@ -378,16 +378,61 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [homeworkNotes, setHomeworkNotes] = useState<string>('');
   const [homeworkNotesList, setHomeworkNotesList] = useState<string[]>(() => {
     try {
-      const currentWeek = getISOWeek();
-      const cachedWeek = localStorage.getItem(`campus_homework_week_${student.id}`);
-      if (cachedWeek && cachedWeek !== currentWeek) {
-        return [];
+      const currentWeek = getISOWeekRaw(undefined, 1);
+      const candidateStudentIds = Array.from(new Set([
+        student?.id,
+        (student as any)?.student_id,
+        (student as any)?.studentId,
+        (student as any)?.canonical_uuid,
+        (student as any)?.slot_id
+      ].filter(Boolean))) as string[];
+
+      let initialNotes: string[] = [];
+      for (const cid of candidateStudentIds) {
+        const cachedWeek = localStorage.getItem(`campus_homework_week_${cid}`);
+        if (cachedWeek && cachedWeek !== currentWeek) {
+          continue;
+        }
+        const cached = localStorage.getItem(`campus_homework_notes_${cid}`);
+        if (cached && cached.startsWith('[') && cached.endsWith(']')) {
+          try {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              initialNotes = parsed;
+              break;
+            }
+          } catch {}
+        } else if (cached && cached.trim()) {
+          initialNotes = [cached.trim()];
+          break;
+        }
       }
-      const cached = localStorage.getItem(`campus_homework_notes_${student.id}`);
-      if (cached && cached.startsWith('[') && cached.endsWith(']')) {
-        return JSON.parse(cached);
-      }
-      return cached ? [cached] : [];
+
+      // 🛡️ Fail-Safe: Always merge all takes from campus_teacher_audio_vault across candidateStudentIds
+      candidateStudentIds.forEach(cid => {
+        const vaultKey = `campus_teacher_audio_vault_${cid}`;
+        const storedVault = localStorage.getItem(vaultKey);
+        if (storedVault) {
+          try {
+            const parsedVault = JSON.parse(storedVault);
+            if (Array.isArray(parsedVault)) {
+              parsedVault.forEach((vItem: any) => {
+                const vStr = typeof vItem === 'string' ? vItem : vItem?.audioMetaStr;
+                if (vStr && vStr.includes('AUDIO:')) {
+                  const vParts = vStr.substring(vStr.indexOf('AUDIO:') + 6).split('|');
+                  const vUrl = vParts[0]?.trim();
+                  const alreadyInList = initialNotes.some(m => typeof m === 'string' && m.includes('AUDIO:') && m.includes(vUrl));
+                  if (!alreadyInList) {
+                    initialNotes.push(vStr);
+                  }
+                }
+              });
+            }
+          } catch {}
+        }
+      });
+
+      return initialNotes;
     } catch {
       return [];
     }
@@ -474,7 +519,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       if (f && f !== 'Lehrkraft') return f;
     }
     return 'Lehrkraft';
-  }, [resolvedTeacherName, propTeacherName, student]);
+  }, [resolvedTeacherName, propTeacherName, (student as any)?.teacher_name, (student as any)?.teacher]);
 
   const [isNotesFocused, setIsNotesFocused] = useState(false);
   const isNotesExpanded = isNotesFocused || !!generalHomeworkNotes.trim();
@@ -2048,6 +2093,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const recordingMetronomeIntervalRef = useRef<any>(null);
   const recordingMetronomeAudioCtxRef = useRef<AudioContext | null>(null);
   const recordingMetronomeRef = useRef<HTMLDivElement | null>(null);
+  const isStoppingAudioRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (!showRecordingMetronomePopup) return;
@@ -2179,26 +2225,37 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
   }, [teacherNotes, activeNoteTarget]);
 
+  const isStudentTresorActive = useMemo(() => {
+    return checkIsAudioTresorActive(student);
+  }, [
+    student?.id,
+    student?.school_id,
+    (student as any)?.has_audio_tresor,
+    (student as any)?.storage_addon_gb,
+    (student as any)?.storage_addon_status,
+    (student as any)?.schools
+  ]);
+
   const [hasTresorStorage, setHasTresorStorage] = useState<boolean>(() => {
     if (propHasTresor === true) return true;
     return checkIsAudioTresorActive(student);
   });
 
   useEffect(() => {
-    if (propHasTresor === true || checkIsAudioTresorActive(student)) {
+    if (propHasTresor === true || isStudentTresorActive) {
       setHasTresorStorage(true);
-    } else if (propHasTresor === false && !checkIsAudioTresorActive(student)) {
+    } else if (propHasTresor === false && !isStudentTresorActive) {
       setHasTresorStorage(false);
     }
-  }, [propHasTresor, student]);
+  }, [propHasTresor, isStudentTresorActive]);
 
   useEffect(() => {
     let active = true;
+    if (propHasTresor === true || isStudentTresorActive) {
+      setHasTresorStorage(true);
+      return;
+    }
     const checkTresor = async () => {
-      if (propHasTresor === true || checkIsAudioTresorActive(student)) {
-        if (active) setHasTresorStorage(true);
-        return;
-      }
       const rawSch = (student as any)?.schools || (student as any)?.school;
       const schObj = Array.isArray(rawSch) ? rawSch[0] : rawSch;
       let targetSchoolId = 
@@ -2273,7 +2330,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     };
     checkTresor();
     return () => { active = false; };
-  }, [student, propHasTresor]);
+  }, [student?.id, student?.school_id, propHasTresor, isStudentTresorActive]);
 
   const formatRecordTime = (secs: number) => {
     const m = Math.floor(secs / 60);
@@ -2406,11 +2463,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   // Audio Recorder logic
   const prepareRecordingEngine = async (overrideSongId?: string | React.MouseEvent, overrideLabel?: string, isMasterworkSong = false) => {
     const rawSongId = typeof overrideSongId === 'string' ? overrideSongId : null;
-    const targetSongId = rawSongId || selectedActiveSongId;
+    const isMasterwork = Boolean(isMasterworkSong);
+    const targetSongId = rawSongId || (isMasterwork ? selectedActiveSongId : (selectedActiveSongId || undefined));
     const targetLabel = (typeof overrideLabel === 'string' ? overrideLabel : null) || audioLabel || '';
-    const isMasterwork = isMasterworkSong || Boolean(rawSongId);
     recordingTargetRef.current = { songId: targetSongId || undefined, label: targetLabel, isMasterwork };
-    if (targetSongId) {
+    if (targetSongId && isMasterwork) {
       setSelectedActiveSongId(targetSongId);
       setActiveRecordingSongId(targetSongId);
     }
@@ -2468,9 +2525,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     let durationInSeconds = 0;
     try {
       const stream = await acquireAudioStream({ audio: STUDIO_AUDIO_CONSTRAINTS });
+      await stabilizeAudioStream(stream, 350);
 
       // 🌟 WebAudio Dual-Channel Center Bridge:
-      // Takes raw microphone input and routes it 1:1 identically to Left and Right channels (100% centered stereo, 0 left-bias!)
+      // Routes microphone input to Left and Right channels (true stereo preservation + single-channel center bridge)
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       const recordAudioCtx = new AudioCtx();
       if (recordAudioCtx.state === 'suspended') {
@@ -2478,8 +2536,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       }
       const sourceNode = recordAudioCtx.createMediaStreamSource(stream);
       const mergerNode = recordAudioCtx.createChannelMerger(2);
-      sourceNode.connect(mergerNode, 0, 0); // Duplicate to Left
-      sourceNode.connect(mergerNode, 0, 1); // Duplicate to Right
+      if (sourceNode.channelCount >= 2) {
+        const splitter = recordAudioCtx.createChannelSplitter(2);
+        sourceNode.connect(splitter);
+        splitter.connect(mergerNode, 0, 0);
+        splitter.connect(mergerNode, 1, 1);
+      } else {
+        sourceNode.connect(mergerNode, 0, 0); // Duplicate to Left
+        sourceNode.connect(mergerNode, 0, 1); // Duplicate to Right
+      }
       const destNode = recordAudioCtx.createMediaStreamDestination();
       mergerNode.connect(destNode);
       const recordStream = destNode.stream;
@@ -2536,25 +2601,54 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         } catch (e) {}
 
         const rawBlob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
-        // 🎙️ 100% PURE RAW + EBU R128 Loudness Calibration (-14.5 LUFS / -1.0 dBTP / Max 3.5 dB Limiter GR):
+        // 🎙️ 100% PURE RAW & STUDIO MASTERING DSP (Calibrated Loudness from sample 0):
         let dspDuration = 0;
         let blob: Blob = rawBlob;
         let url = '';
         try {
-          const pureRawRes = await processPureRawBlob(rawBlob, { 
-            targetLufs: TARGET_PURE_RAW_LUFS, 
-            targetPeakDb: TARGET_PEAK_DBTP,
-            maxLimiterGrDb: MAX_PURE_RAW_LIMITER_GR_DB
-          });
-          blob = pureRawRes.processedBlob;
-          url = pureRawRes.processedUrl;
-          if (pureRawRes.durationSec) {
-            dspDuration = pureRawRes.durationSec;
-            durationInSeconds = Math.round(pureRawRes.durationSec);
+          if (isTeacherMode) {
+            const masterRes = await processStudioMastering(rawBlob, {
+              profile: 'acoustic_audiophile',
+              targetLufs: TARGET_STUDIO_LUFS,
+              targetPeakDb: TARGET_PEAK_DBTP
+            });
+            blob = masterRes.masteredBlob;
+            url = masterRes.masteredUrl;
+            if (masterRes.durationSec) {
+              dspDuration = masterRes.durationSec;
+              durationInSeconds = Math.round(masterRes.durationSec);
+            }
+          } else {
+            const pureRawRes = await processPureRawBlob(rawBlob, { 
+              targetLufs: TARGET_PURE_RAW_LUFS, 
+              targetPeakDb: TARGET_PEAK_DBTP,
+              maxLimiterGrDb: MAX_PURE_RAW_LIMITER_GR_DB
+            });
+            blob = pureRawRes.processedBlob;
+            url = pureRawRes.processedUrl;
+            if (pureRawRes.durationSec) {
+              dspDuration = pureRawRes.durationSec;
+              durationInSeconds = Math.round(pureRawRes.durationSec);
+            }
           }
         } catch (dspErr) {
-          console.warn('[MeisterwerkDocumentationModal] Pure RAW DSP fallback:', dspErr);
-          url = URL.createObjectURL(rawBlob);
+          console.warn('[MeisterwerkDocumentationModal] Primary DSP fallback:', dspErr);
+          try {
+            const pureRawFallback = await processPureRawBlob(rawBlob, {
+              targetLufs: TARGET_PURE_RAW_LUFS,
+              targetPeakDb: TARGET_PEAK_DBTP,
+              maxLimiterGrDb: MAX_PURE_RAW_LIMITER_GR_DB
+            });
+            blob = pureRawFallback.processedBlob;
+            url = pureRawFallback.processedUrl;
+            if (pureRawFallback.durationSec) {
+              dspDuration = pureRawFallback.durationSec;
+              durationInSeconds = Math.round(pureRawFallback.durationSec);
+            }
+          } catch {
+            blob = rawBlob;
+            url = URL.createObjectURL(rawBlob);
+          }
         }
 
         setAudioBlob(blob);
@@ -2568,8 +2662,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           Math.ceil(exactElapsedSec)
         );
         const targetInfo = recordingTargetRef.current;
-        const isMasterwork = targetInfo.isMasterwork || Boolean(targetInfo.songId);
-        const currentSongId = targetInfo.songId || selectedActiveSongId;
+        const isMasterwork = Boolean(targetInfo.isMasterwork);
+        const currentSongId = targetInfo.songId || (isMasterwork ? selectedActiveSongId : undefined);
         const currentAudioLabel = targetInfo.label || audioLabel || '';
         const normKey = currentAudioLabel.toLowerCase().trim();
         const isTeacherActor = isTeacherMode;
@@ -2692,15 +2786,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           }
         } else if (isStudentSession) {
           // 🎓 Student practice recording - INSTANT UPDATE IN LOCAL STORAGE & UI
-          const juniorKey = `campus_junior_recordings_${student.id}`;
-          let existing: any[] = [];
-          try {
-            const stored = localStorage.getItem(juniorKey);
-            if (stored) {
-              const parsed = JSON.parse(stored);
-              if (Array.isArray(parsed)) existing = parsed;
-            }
-          } catch {}
+          const candidateStudentIds = Array.from(new Set([
+            student?.id,
+            (student as any)?.student_id,
+            (student as any)?.studentId,
+            (student as any)?.canonical_uuid,
+            (student as any)?.slot_id
+          ].filter(Boolean))) as string[];
+
+          const metronomeBpmToSave = isRecordingMetronomeActive ? recordingBpm : undefined;
 
           const newRec = {
             id: uniqueRecId,
@@ -2709,11 +2803,24 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             date: new Date().toISOString(),
             title: smartTitle,
             label: currentAudioLabel,
-            visibility: 'private'
+            visibility: 'private',
+            metronomeBpm: metronomeBpmToSave
           };
 
-          const updated = [newRec, ...existing];
-          localStorage.setItem(juniorKey, JSON.stringify(updated));
+          candidateStudentIds.forEach(cid => {
+            const juniorKey = `campus_junior_recordings_${cid}`;
+            let existing: any[] = [];
+            try {
+              const stored = localStorage.getItem(juniorKey);
+              if (stored) {
+                const parsed = JSON.parse(stored);
+                if (Array.isArray(parsed)) existing = parsed;
+              }
+            } catch {}
+
+            const updated = [newRec, ...existing.filter((r: any) => r.id !== uniqueRecId && r.url !== localBlobKey)];
+            localStorage.setItem(juniorKey, JSON.stringify(updated));
+          });
           setLocalJuniorRecordingsTrigger(prev => prev + 1);
         } else {
           // 👨‍🏫 Teacher homework voice note - INSTANT UPDATE
@@ -2722,8 +2829,37 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           const activeSong = (activeSongSkills || []).find(s => (currentSongId && s.id === currentSongId) || (selectedActiveSongId && s.id === selectedActiveSongId));
           const songTitle = activeSong?.songs?.title || activeSong?.title || activeSong?.song_title;
           const assignedTag = songTitle || cleanSongOrBookTitle(currentAudioLabel) || '';
-          const audioMetaStr = `AUDIO:${localBlobKey}|${recDuration}|${new Date().toISOString()}|${smartTitle}|${creatorRole}|${initialVisibility}|${uniqueRecId}|${assignedTag}`;
+          const metronomeBpmToSave = isRecordingMetronomeActive ? recordingBpm : undefined;
+          const bpmSuffix = metronomeBpmToSave ? `||||BPM:${metronomeBpmToSave}` : '';
+          const audioMetaStr = `AUDIO:${localBlobKey}|${recDuration}|${new Date().toISOString()}|${smartTitle}|${creatorRole}|${initialVisibility}|${uniqueRecId}|${assignedTag}${bpmSuffix}`;
           
+          // 🛡️ Fail-Safe Persistent Teacher Audio Vault across all candidate IDs (Immune to weekly roll-overs & network drops)
+          const candidateStudentIds = Array.from(new Set([
+            student?.id,
+            (student as any)?.student_id,
+            (student as any)?.studentId,
+            (student as any)?.canonical_uuid,
+            (student as any)?.slot_id
+          ].filter(Boolean))) as string[];
+
+          candidateStudentIds.forEach(cid => {
+            const teacherVaultKey = `campus_teacher_audio_vault_${cid}`;
+            try {
+              const existingVaultStr = localStorage.getItem(teacherVaultKey);
+              let existingVault: string[] = [];
+              if (existingVaultStr) {
+                const parsed = JSON.parse(existingVaultStr);
+                if (Array.isArray(parsed)) existingVault = parsed;
+              }
+              if (!existingVault.includes(audioMetaStr)) {
+                const updatedVault = [audioMetaStr, ...existingVault.filter(v => typeof v === 'string' ? !v.includes(uniqueRecId) : true)];
+                localStorage.setItem(teacherVaultKey, JSON.stringify(updatedVault));
+              }
+            } catch (vErr) {
+              console.warn('[saveAudioMetadata] teacher vault write:', vErr);
+            }
+          });
+
           setHomeworkNotesList(prev => {
             const ex = prev || [];
             const updatedList = [...ex.filter(n => n !== audioMetaStr), audioMetaStr];
@@ -2813,6 +2949,34 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     syncHomeworkNotes(upgradedList).catch(() => {});
                     return upgradedList;
                   });
+
+                  // Also upgrade in teacher audio vault across all candidate IDs
+                  const candidateStudentIds = Array.from(new Set([
+                    student?.id,
+                    (student as any)?.student_id,
+                    (student as any)?.studentId,
+                    (student as any)?.canonical_uuid,
+                    (student as any)?.slot_id
+                  ].filter(Boolean))) as string[];
+
+                  candidateStudentIds.forEach(cid => {
+                    const teacherVaultKey = `campus_teacher_audio_vault_${cid}`;
+                    try {
+                      const existingVaultStr = localStorage.getItem(teacherVaultKey);
+                      if (existingVaultStr) {
+                        const parsed = JSON.parse(existingVaultStr);
+                        if (Array.isArray(parsed)) {
+                          const upgradedVault = parsed.map((item: any) => {
+                            if (typeof item === 'string' && item.includes(localBlobKey)) {
+                              return item.replace(localBlobKey, cloudUrl);
+                            }
+                            return item;
+                          });
+                          localStorage.setItem(teacherVaultKey, JSON.stringify(upgradedVault));
+                        }
+                      }
+                    } catch {}
+                  });
                 }
               }
             }
@@ -2883,20 +3047,30 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   };
 
   const stopRecordingAudio = (activeRecorder?: MediaRecorder) => {
+    if (isStoppingAudioRef.current) return;
+    isStoppingAudioRef.current = true;
     cancelPlayAlongCountIn();
+
+    // 🛡️ Mindestaufnahmedauer & Anti-Prell-Schutz (500ms): Verhindert versehentliche 0-Sekunden-Takes
+    const elapsedSinceStart = Date.now() - (recordStartTimeRef.current || 0);
+    const delayBeforeStop = Math.max(500, 500 - elapsedSinceStart);
+
     const rec = activeRecorder || mediaRecorderRef.current || mediaRecorderInstance;
     if (rec && rec.state !== 'inactive') {
       try {
         rec.requestData();
       } catch (e) {}
-      // 🛡️ Safety buffer (120ms): Garantiert, dass der letzte Takt vollständig im Puffer landet (kein vorzeitiges Abschneiden)
+      // 🛡️ Safety buffer (500ms): Garantiert, dass der letzte Takt, Ausklang & Raumhall vollständig im Puffer landen (kein vorzeitiges Abschneiden)
       setTimeout(() => {
         try {
           if (rec.state !== 'inactive') {
             rec.stop();
           }
         } catch (e) {}
-      }, 120);
+        isStoppingAudioRef.current = false;
+      }, delayBeforeStop);
+    } else {
+      isStoppingAudioRef.current = false;
     }
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
@@ -3304,11 +3478,43 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     const allNotesJson = JSON.stringify(notesList);
     const cleanNotesJson = JSON.stringify(notesList.filter(n => !n.startsWith('AUDIO:')));
 
-    // Always backup to localStorage
+    // Always backup to localStorage across all candidate IDs
     try {
-      localStorage.setItem(`campus_homework_notes_${student.id}`, allNotesJson);
-      localStorage.setItem(`campus_homework_week_${student.id}`, currentWeek);
-      localStorage.setItem(`campus_teacher_notes_${student.id}`, teacherNotes.trim());
+      const candidateStudentIds = Array.from(new Set([
+        student.id,
+        (student as any)?.student_id,
+        (student as any)?.studentId,
+        (student as any)?.canonical_uuid,
+        (student as any)?.slot_id
+      ].filter(Boolean))) as string[];
+
+      candidateStudentIds.forEach(cid => {
+        localStorage.setItem(`campus_homework_notes_${cid}`, allNotesJson);
+        localStorage.setItem(`campus_homework_week_${cid}`, currentWeek);
+        localStorage.setItem(`campus_teacher_notes_${cid}`, teacherNotes.trim());
+
+        // Guarantee all AUDIO: entries are backed up into campus_teacher_audio_vault
+        const teacherVaultKey = `campus_teacher_audio_vault_${cid}`;
+        const existingVaultStr = localStorage.getItem(teacherVaultKey);
+        let existingVault: string[] = [];
+        if (existingVaultStr) {
+          try {
+            const parsed = JSON.parse(existingVaultStr);
+            if (Array.isArray(parsed)) existingVault = parsed;
+          } catch {}
+        }
+        const audioNotesToKeep = notesList.filter(n => typeof n === 'string' && n.startsWith('AUDIO:'));
+        let vaultChanged = false;
+        audioNotesToKeep.forEach(an => {
+          if (!existingVault.includes(an)) {
+            existingVault.push(an);
+            vaultChanged = true;
+          }
+        });
+        if (vaultChanged) {
+          localStorage.setItem(teacherVaultKey, JSON.stringify(existingVault));
+        }
+      });
     } catch (lsErr) {
       console.warn('[Meisterwerk] localStorage cache notice:', lsErr);
     }
@@ -3325,9 +3531,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           .update({ homework_notes: allNotesJson, teacher_notes: teacherNotes.trim(), updated_at: new Date().toISOString() })
           .eq('id', dummyWeeklyItem.id);
         if (error) console.warn('[syncHomeworkNotes] Supabase update warning:', error);
+        else {
+          setProgressItems(prev => (prev || []).map(p => p.id === dummyWeeklyItem.id ? { ...p, homework_notes: allNotesJson, teacher_notes: teacherNotes.trim(), updated_at: new Date().toISOString() } : p));
+        }
       } else {
         const activeTId = await getCurrentTeacherId();
-        const { error } = await supabase
+        const { data: insertedData, error } = await supabase
           .from('progress_matrix')
           .insert({
             student_id: student.id,
@@ -3338,8 +3547,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             teacher_notes: teacherNotes.trim(),
             homework_notes: allNotesJson,
             updated_at: new Date().toISOString()
-          });
+          })
+          .select();
         if (error) console.warn('[syncHomeworkNotes] Supabase insert warning:', error);
+        else if (insertedData && insertedData[0]) {
+          setProgressItems(prev => [insertedData[0], ...(prev || [])]);
+        }
       }
     } catch (dbErr) {
       console.warn('[syncHomeworkNotes] Supabase sync notice (cached locally):', dbErr);
@@ -3592,15 +3805,39 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const fetchProgress = async () => {
     setLoading(true);
     setError(null);
+    let data: any[] | null = null;
     try {
-      const { data, error: dbError } = await supabase
-        .from('progress_matrix')
-        .select('*')
-        .eq('student_id', student.id)
-        .order('updated_at', { ascending: false });
+      const candidateStudentIds = Array.from(new Set([
+        student?.id,
+        (student as any)?.student_id,
+        (student as any)?.studentId,
+        (student as any)?.canonical_uuid,
+        (student as any)?.slot_id
+      ].filter(Boolean))) as string[];
 
-      if (dbError) throw dbError;
-      setProgressItems(data || []);
+      const validUuid = candidateStudentIds.find(id => typeof id === 'string' && !id.startsWith('slot_') && id.length > 10) || student?.id;
+
+      try {
+        if (validUuid && !validUuid.startsWith('slot_')) {
+          const { data: dbData, error: dbError } = await supabase
+            .from('progress_matrix')
+            .select('*')
+            .eq('student_id', validUuid)
+            .order('updated_at', { ascending: false });
+
+          if (dbError) {
+            console.warn('[fetchProgress] Supabase progress_matrix notice:', dbError.message || dbError);
+          } else {
+            data = dbData;
+          }
+        }
+      } catch (dbErr) {
+        console.warn('[fetchProgress] Network or database query notice, proceeding with local vault:', dbErr);
+      }
+
+      if (data) {
+        setProgressItems(data);
+      }
 
       // Scan and load custom tags from history
       const customFound: string[] = [];
@@ -3662,39 +3899,34 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         }
       }
 
-      // Single source of truth for active weekly homework notes - Smart Merge preserving all AUDIO: attachments
+      // Single source of truth for active weekly homework notes - Smart Merge preserving all AUDIO: attachments across candidate IDs
       try {
-        const cachedHW = localStorage.getItem(`campus_homework_notes_${student.id}`);
-        const cachedWeek = localStorage.getItem(`campus_homework_week_${student.id}`);
-        const isStaleWeekCache = Boolean(cachedWeek && cachedWeek !== currentWeek);
+        const candidateStudentIds = Array.from(new Set([
+          student.id,
+          (student as any)?.student_id,
+          (student as any)?.studentId,
+          (student as any)?.canonical_uuid,
+          (student as any)?.slot_id
+        ].filter(Boolean))) as string[];
 
-        // If no homework exists in DB for currentWeek, detect whether cachedHW is legacy/stale content from a past week
-        if (!currentWeekHomework) {
-          const isPastWeekNotes = isStaleWeekCache || (cachedHW && (data || []).some(item => 
-            item.topic_name.startsWith('Hausaufgabe KW ') && 
-            item.homework_notes && (
-              item.homework_notes === cachedHW ||
-              (typeof cachedHW === 'string' && cachedHW.trim() !== '' && item.homework_notes.includes(cachedHW.trim()))
-            )
-          ));
-          if (isPastWeekNotes) {
-            try {
-              localStorage.removeItem(`campus_homework_notes_${student.id}`);
-              localStorage.setItem(`campus_homework_week_${student.id}`, currentWeek);
-            } catch {}
+        let cachedHW: string | null = null;
+        for (const cid of candidateStudentIds) {
+          const raw = localStorage.getItem(`campus_homework_notes_${cid}`);
+          if (raw) {
+            cachedHW = raw;
+            break;
           }
         }
 
-        const effectiveCachedHW = localStorage.getItem(`campus_homework_notes_${student.id}`);
-        if (effectiveCachedHW) {
+        if (cachedHW) {
           let cachedList: string[] = [];
-          if (effectiveCachedHW.startsWith('[') && effectiveCachedHW.endsWith(']')) {
-            const parsed = JSON.parse(effectiveCachedHW);
+          if (cachedHW.startsWith('[') && cachedHW.endsWith(']')) {
+            const parsed = JSON.parse(cachedHW);
             if (Array.isArray(parsed)) {
               cachedList = parsed.map(String);
             }
-          } else if (effectiveCachedHW.trim()) {
-            cachedList = [effectiveCachedHW.trim()];
+          } else if (cachedHW.trim()) {
+            cachedList = [cachedHW.trim()];
           }
 
           if (cachedList.length > 0) {
@@ -3709,7 +3941,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 if (!alreadyExists) {
                   mergedList.push(cachedItem);
                 }
-              } else if (currentWeekHomework && !mergedList.includes(cachedItem)) {
+              } else if (!mergedList.includes(cachedItem)) {
                 if (cachedItem.trim()) {
                   mergedList.push(cachedItem);
                 }
@@ -3718,6 +3950,30 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             loadedHomeworkNotesList = mergedList;
           }
         }
+
+        // 🛡️ Fail-Safe: Always merge all takes from campus_teacher_audio_vault across all candidate IDs
+        candidateStudentIds.forEach(cid => {
+          const teacherVaultKey = `campus_teacher_audio_vault_${cid}`;
+          const storedVault = localStorage.getItem(teacherVaultKey);
+          if (storedVault) {
+            try {
+              const parsedVault = JSON.parse(storedVault);
+              if (Array.isArray(parsedVault)) {
+                parsedVault.forEach((vItem: any) => {
+                  const vStr = typeof vItem === 'string' ? vItem : vItem?.audioMetaStr;
+                  if (vStr && vStr.includes('AUDIO:')) {
+                    const vParts = vStr.substring(vStr.indexOf('AUDIO:') + 6).split('|');
+                    const vUrl = vParts[0]?.trim();
+                    const alreadyInList = loadedHomeworkNotesList.some(m => typeof m === 'string' && m.includes('AUDIO:') && m.includes(vUrl));
+                    if (!alreadyInList) {
+                      loadedHomeworkNotesList.push(vStr);
+                    }
+                  }
+                });
+              }
+            } catch {}
+          }
+        });
       } catch (lsErr) {}
 
       // Filter text notes for the textarea
@@ -3749,8 +4005,19 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   };
 
   const notifyHomeworkChange = async () => {
-    // 1. Dispatch custom DOM event for same-window / local sync
-    window.dispatchEvent(new CustomEvent('homework-updated', { detail: { studentId: student.id } }));
+    // 1. Dispatch custom DOM events for same-window / local sync across all candidate IDs
+    const candidateStudentIds = Array.from(new Set([
+      student.id,
+      (student as any)?.student_id,
+      (student as any)?.studentId,
+      (student as any)?.canonical_uuid,
+      (student as any)?.slot_id
+    ].filter(Boolean))) as string[];
+
+    candidateStudentIds.forEach(cid => {
+      window.dispatchEvent(new CustomEvent('homework-updated', { detail: { studentId: cid } }));
+      window.dispatchEvent(new CustomEvent('campus_homework_updated', { detail: { studentId: cid } }));
+    });
 
     // 2. Broadcast on Supabase channel for cross-browser / cross-device real-time websocket sync
     try {
@@ -3765,6 +4032,31 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       console.warn('Realtime broadcast error:', e);
     }
   };
+
+  // 🔄 Reactive Auto-Sync: Refresh progress immediately when homework is updated elsewhere
+  useEffect(() => {
+    const candidateIds = new Set([
+      student.id,
+      (student as any)?.student_id,
+      (student as any)?.studentId,
+      (student as any)?.canonical_uuid,
+      (student as any)?.slot_id
+    ].filter(Boolean));
+
+    const handleHwUpdate = (e: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (!detail?.studentId || candidateIds.has(detail.studentId)) {
+        fetchProgress();
+      }
+    };
+
+    window.addEventListener('homework-updated', handleHwUpdate);
+    window.addEventListener('campus_homework_updated', handleHwUpdate);
+    return () => {
+      window.removeEventListener('homework-updated', handleHwUpdate);
+      window.removeEventListener('campus_homework_updated', handleHwUpdate);
+    };
+  }, [student.id, (student as any)?.student_id]);
 
 
   useEffect(() => {
@@ -3878,27 +4170,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
   }, [student.id]);
 
-  const awardStickerSilent = async (stickerId: string, topicNameContext: string) => {
-    try {
-      const targetTopic = topicNameContext || `System-Meilenstein`;
-      const dateStr = new Date().toISOString();
-      
-      setSimulatedStickers(prev => {
-        const existing = prev[stickerId] || { count: 0, details: [] };
-        return {
-          ...prev,
-          [stickerId]: {
-            count: existing.count + 1,
-            details: [...existing.details, { topic: targetTopic, date: dateStr }]
-          }
-        };
-      });
-      await fetchProgress();
-      notifyHomeworkChange();
-    } catch (e) {
-      console.error("Error silently awarding sticker:", e);
-    }
-  };
 
   const resetStickerAlbum = async () => {
     try {
@@ -4099,9 +4370,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
     // Rarity & Stufe Stamp
     const syStr = getSchoolYearString();
-    const yearNumberStr = sticker.id.replace('schuljahr-', '').padStart(2, '0');
+    const yearNumber = parseInt(sticker.id.replace('schuljahr-', ''), 10) || 1;
     const rarityText = isSchuljahr
-      ? `⭐ ${(sticker.rarityLabel || 'STANDARD').toUpperCase()} • AUSBILDUNGSSTUFE #${yearNumberStr}/15`
+      ? `⭐ ${(sticker.rarityLabel || 'STANDARD').toUpperCase()} • AUSBILDUNGSSTUFE #${yearNumber}`
       : `⭐ ${(sticker.rarityLabel || 'STANDARD').toUpperCase()} • SCHULJAHR ${selectedSchoolYear || syStr}`;
     ctx.font = '900 18px "Helvetica Neue", Arial, sans-serif';
     ctx.fillStyle = isLegendary || isSchuljahr ? '#facc15' : isEpic ? '#c084fc' : themeColor;
@@ -4143,50 +4414,77 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     ctx.fillText(pillText, 0, 0);
     ctx.restore();
 
-    // 5. LAYER 5: Student Details Typography
-    let textY = tY + 630;
+    // 5. LAYER 5: Student Details Typography & Dynamic Layout Budgeting
+    // Safe card boundary: tY to tY + tH (65 to 1135).
+    // Bottom area reserved for Hallmark (logoY + 28), Dual-Brand Logo (logoY), and School Seal (badgeY).
+    const sealH = 58;
+    const badgeY = tY + tH - 185; // Fixed safe anchor for school seal: ~950
+    const logoY = badgeY + sealH + 34; // Fixed safe anchor for logo: ~1042
+    const hallmarkY = logoY + 28; // ~1070 (card bottom is 1135, leaving 65px breathing room)
+
+    // Calculate vertical space available for student typography between ribbon (tY + 160) and badgeY (950)
+    // Available middle slot height: ~370px (from ~580 to ~950)
+    let textY = tY + 615;
+
+    // Student Name: auto-shrink font size if name is very long
     ctx.fillStyle = '#ffffff';
-    ctx.font = '900 50px "Helvetica Neue", Arial, sans-serif';
+    let studentNameFontSize = 46;
+    ctx.font = `900 ${studentNameFontSize}px "Helvetica Neue", Arial, sans-serif`;
+    while (ctx.measureText(actualStudentName).width > 780 && studentNameFontSize > 28) {
+      studentNameFontSize -= 2;
+      ctx.font = `900 ${studentNameFontSize}px "Helvetica Neue", Arial, sans-serif`;
+    }
     ctx.textAlign = 'center';
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-    ctx.shadowBlur = 10;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+    ctx.shadowBlur = 12;
     ctx.fillText(actualStudentName, 600, textY);
     ctx.shadowColor = 'transparent';
 
     if (studentInstrument) {
-      textY += 36;
+      textY += 34;
       ctx.fillStyle = '#94a3b8';
-      ctx.font = '900 20px "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText(`✦ ${studentInstrument.toUpperCase()} • INSTRUMENTALAUSBILDUNG ✦`, 600, textY);
+      ctx.font = '900 19px "Helvetica Neue", Arial, sans-serif';
+      const instrumentStr = `✦ ${studentInstrument.toUpperCase()} • INSTRUMENTALAUSBILDUNG ✦`;
+      ctx.fillText(instrumentStr, 600, textY);
     }
 
-    textY += 52;
+    textY += 46;
     ctx.fillStyle = isLegendary || isSchuljahr ? '#facc15' : themeColor;
-    ctx.font = 'italic 900 40px "Helvetica Neue", Arial, sans-serif';
+    let titleFontSize = 36;
+    ctx.font = `italic 900 ${titleFontSize}px "Helvetica Neue", Arial, sans-serif`;
+    while (ctx.measureText(sticker.title.toUpperCase()).width > 800 && titleFontSize > 24) {
+      titleFontSize -= 2;
+      ctx.font = `italic 900 ${titleFontSize}px "Helvetica Neue", Arial, sans-serif`;
+    }
     ctx.fillText(sticker.title.toUpperCase(), 600, textY);
 
     const cardTopic = topicOverride || (collectedStickers[sticker.id]?.details?.slice(-1)[0]?.topic);
 
     if (sticker.id === 'song-master' || cardTopic) {
-      textY += 44;
-      ctx.fillStyle = '#fde047';
-      ctx.font = '900 26px "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText(`🎵 ${cardTopic || 'Song gemeistert'}`, 600, textY);
-    } else {
       textY += 38;
+      ctx.fillStyle = '#fde047';
+      ctx.font = '900 23px "Helvetica Neue", Arial, sans-serif';
+      const topicText = `🎵 ${cardTopic || 'Song gemeistert'}`;
+      ctx.fillText(topicText, 600, textY);
+    } else {
+      textY += 34;
       ctx.fillStyle = '#cbd5e1';
-      ctx.font = 'bold 21px "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText(sticker.desc, 600, textY);
+      ctx.font = 'bold 19px "Helvetica Neue", Arial, sans-serif';
+      let descText = sticker.desc || '';
+      if (ctx.measureText(descText).width > 800) {
+        ctx.font = 'bold 17px "Helvetica Neue", Arial, sans-serif';
+      }
+      ctx.fillText(descText, 600, textY);
 
-      if (sticker.equiv) {
-        textY += 34;
+      if (sticker.equiv && textY + 28 < badgeY - 15) {
+        textY += 28;
         ctx.fillStyle = '#38bdf8';
-        ctx.font = '900 19px "Helvetica Neue", Arial, sans-serif';
+        ctx.font = '900 17px "Helvetica Neue", Arial, sans-serif';
         ctx.fillText(sticker.equiv, 600, textY);
       }
     }
 
-    // 6. LAYER 6: The Authoritative Music School Certification Seal
+    // 6. LAYER 6: The Authoritative Music School Certification Seal (Anchored safely)
     let authoritativeSchool = '';
     const candidates = [
       propSchoolName,
@@ -4221,21 +4519,26 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       displaySchool = `MUSIKSCHULE • ${displaySchool}`;
     }
 
-    ctx.font = '900 20px "Helvetica Neue", Arial, sans-serif';
-    const schoolTextW = ctx.measureText(displaySchool).width;
-    const badgeW = Math.min(840, Math.max(480, schoolTextW + 80));
-    const badgeH = 62;
-    const badgeX = 600 - badgeW / 2;
-    const badgeY = Math.max(tY + 865, textY + 34);
+    let schoolFontSize = 20;
+    ctx.font = `900 ${schoolFontSize}px "Helvetica Neue", Arial, sans-serif`;
+    while (ctx.measureText(displaySchool).width > 700 && schoolFontSize > 14) {
+      schoolFontSize -= 1;
+      ctx.font = `900 ${schoolFontSize}px "Helvetica Neue", Arial, sans-serif`;
+    }
 
-    // Official Seal Container
+    const schoolTextW = ctx.measureText(displaySchool).width;
+    const badgeW = Math.min(840, Math.max(460, schoolTextW + 70));
+    const badgeH = sealH;
+    const badgeX = 600 - badgeW / 2;
+
+    // Official Seal Container with 3D Bevel & Gold Border
     ctx.save();
-    ctx.fillStyle = 'rgba(234, 179, 8, 0.07)';
-    ctx.strokeStyle = 'rgba(234, 179, 8, 0.38)';
+    ctx.fillStyle = 'rgba(234, 179, 8, 0.08)';
+    ctx.strokeStyle = 'rgba(234, 179, 8, 0.45)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     if (typeof (ctx as any).roundRect === 'function') {
-      (ctx as any).roundRect(badgeX, badgeY, badgeW, badgeH, 18);
+      (ctx as any).roundRect(badgeX, badgeY, badgeW, badgeH, 16);
     } else {
       ctx.rect(badgeX, badgeY, badgeW, badgeH);
     }
@@ -4243,11 +4546,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     ctx.stroke();
 
     // Inner dashed seal border
-    ctx.strokeStyle = 'rgba(234, 179, 8, 0.18)';
+    ctx.strokeStyle = 'rgba(234, 179, 8, 0.22)';
     ctx.setLineDash([3, 4]);
     ctx.beginPath();
     if (typeof (ctx as any).roundRect === 'function') {
-      (ctx as any).roundRect(badgeX + 4, badgeY + 4, badgeW - 8, badgeH - 8, 14);
+      (ctx as any).roundRect(badgeX + 4, badgeY + 4, badgeW - 8, badgeH - 8, 12);
     } else {
       ctx.rect(badgeX + 4, badgeY + 4, badgeW - 8, badgeH - 8);
     }
@@ -4259,17 +4562,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#ca8a04';
-    ctx.font = '900 12px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText('✦ OFFIZIELL ZERTIFIZIERT DURCH ✦', 600, badgeY + 18);
+    ctx.font = '900 11px "Helvetica Neue", Arial, sans-serif';
+    ctx.fillText('✦ OFFIZIELL ZERTIFIZIERT DURCH ✦', 600, badgeY + 16);
 
     ctx.fillStyle = '#fef08a';
-    ctx.font = '900 21px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText(displaySchool, 600, badgeY + 42);
+    ctx.font = `900 ${schoolFontSize}px "Helvetica Neue", Arial, sans-serif`;
+    ctx.fillText(displaySchool, 600, badgeY + 39);
     ctx.restore();
 
     // 7. LAYER 7: Official Dual-Brand Logo & ASVS Security Hallmark
-    const logoY = badgeY + badgeH + 40;
-    ctx.font = '900 24px "Helvetica Neue", Arial, sans-serif';
+    ctx.font = '900 23px "Helvetica Neue", Arial, sans-serif';
     const partCampus = 'Campus';
     const partDash = '-';
     const partGroove = 'Groovelab';
@@ -4311,29 +4613,30 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     ctx.font = '700 11px "Helvetica Neue", Arial, sans-serif';
     ctx.fillStyle = '#64748b';
     ctx.textAlign = 'center';
-    ctx.fillText(`✦ VERIFIZIERTE SAMMLER-EDITION • SCHULJAHR ${syDisplay} • ID: CG-${cleanStickerId} ✦`, 600, logoY + 28);
+    ctx.fillText(`✦ VERIFIZIERTE SAMMLER-EDITION • SCHULJAHR ${syDisplay} • ID: CG-${cleanStickerId} ✦`, 600, hallmarkY);
 
-    // 8. LAYER 8: Die-Cut Vinyl Sticker Presentation
+    // 8. LAYER 8: Die-Cut Vinyl Sticker Presentation with 3D Hologram Glow
     const drawStickerAsset = (imgOrEmoji: HTMLImageElement | string, isImg: boolean) => {
       ctx.save();
       ctx.translate(600, medalCenterY);
 
-      // Backlight Pedestal Glow
-      const pedestalGlow = ctx.createRadialGradient(0, 0, 30, 0, 0, 180);
-      pedestalGlow.addColorStop(0, isLegendary || isSchuljahr ? 'rgba(250, 204, 21, 0.3)' : isEpic ? 'rgba(192, 132, 252, 0.25)' : 'rgba(52, 168, 83, 0.25)');
+      // Backlight Pedestal Glow with Trading-Card holographic rings
+      const pedestalGlow = ctx.createRadialGradient(0, 0, 30, 0, 0, 190);
+      pedestalGlow.addColorStop(0, isLegendary || isSchuljahr ? 'rgba(250, 204, 21, 0.35)' : isEpic ? 'rgba(192, 132, 252, 0.3)' : 'rgba(52, 168, 83, 0.28)');
+      pedestalGlow.addColorStop(0.7, isLegendary || isSchuljahr ? 'rgba(250, 204, 21, 0.08)' : 'rgba(52, 168, 83, 0.05)');
       pedestalGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
       ctx.fillStyle = pedestalGlow;
       ctx.beginPath();
-      ctx.arc(0, 0, 180, 0, Math.PI * 2);
+      ctx.arc(0, 0, 190, 0, Math.PI * 2);
       ctx.fill();
 
       if (isImg) {
-        // Double-Stage 3D Studio Drop Shadow (Soft Ambient + Crisp Contact)
+        // Multi-stage 3D Studio Drop Shadow (Contact Shadow + Ambient Diffuse Shadow)
         ctx.save();
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
-        ctx.shadowBlur = 35;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+        ctx.shadowBlur = 38;
         ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 18;
+        ctx.shadowOffsetY = 20;
         const sSize = 300;
         ctx.drawImage(imgOrEmoji as HTMLImageElement, -sSize / 2, -sSize / 2, sSize, sSize);
         ctx.restore();
@@ -5584,26 +5887,54 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       setHomeworkNotesList(updatedList);
 
       // 5. Update localStorage campus_homework_notes
-      try {
-        localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(updatedList));
-      } catch {}
+      const candidateStudentIds = Array.from(new Set([
+        student?.id,
+        (student as any)?.student_id,
+        (student as any)?.studentId,
+        (student as any)?.canonical_uuid,
+        (student as any)?.slot_id
+      ].filter(Boolean))) as string[];
 
-      // 6. Filter from campus_junior_recordings (if present)
-      const juniorKey = `campus_junior_recordings_${student.id}`;
-      try {
-        const storedJunior = localStorage.getItem(juniorKey);
-        if (storedJunior) {
-          const parsed = JSON.parse(storedJunior);
-          if (Array.isArray(parsed)) {
-            const updatedJunior = parsed.filter((r: any) => {
-              if (targetUrl && (r.url === targetUrl || r.url?.includes(targetUrl))) return false;
-              return true;
-            });
-            localStorage.setItem(juniorKey, JSON.stringify(updatedJunior));
-            setLocalJuniorRecordingsTrigger(prev => prev + 1);
+      candidateStudentIds.forEach(cid => {
+        try {
+          localStorage.setItem(`campus_homework_notes_${cid}`, JSON.stringify(updatedList));
+        } catch {}
+
+        // 6. Filter from campus_junior_recordings (if present)
+        const juniorKey = `campus_junior_recordings_${cid}`;
+        try {
+          const storedJunior = localStorage.getItem(juniorKey);
+          if (storedJunior) {
+            const parsed = JSON.parse(storedJunior);
+            if (Array.isArray(parsed)) {
+              const updatedJunior = parsed.filter((r: any) => {
+                if (targetUrl && (r.url === targetUrl || r.url?.includes(targetUrl))) return false;
+                return true;
+              });
+              localStorage.setItem(juniorKey, JSON.stringify(updatedJunior));
+            }
           }
-        }
-      } catch {}
+        } catch {}
+
+        // 6b. Filter from campus_teacher_audio_vault
+        const teacherVaultKey = `campus_teacher_audio_vault_${cid}`;
+        try {
+          const storedVault = localStorage.getItem(teacherVaultKey);
+          if (storedVault) {
+            const parsedVault = JSON.parse(storedVault);
+            if (Array.isArray(parsedVault)) {
+              const updatedVault = parsedVault.filter((item: any) => {
+                const str = typeof item === 'string' ? item : item?.audioMetaStr || '';
+                if (targetUrl && str.includes(targetUrl)) return false;
+                if (noteToDelete && str === noteToDelete) return false;
+                return true;
+              });
+              localStorage.setItem(teacherVaultKey, JSON.stringify(updatedVault));
+            }
+          }
+        } catch {}
+      });
+      setLocalJuniorRecordingsTrigger(prev => prev + 1);
 
       // 7. Update progressItems and clean ALL progress_matrix rows in Supabase
       if (student?.id) {
@@ -5774,6 +6105,161 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       } catch {}
     } catch (err) {
       console.warn('[handleRenameTeacherAudio] Error:', err);
+    }
+  };
+
+  const handleSaveEditedTeacherAudio = async (
+    result: { url: string; original_url?: string; duration: number; original_duration?: number; label: string; mode: 'overwrite' | 'duplicate' },
+    originalIdx?: number,
+    currentUrl?: string
+  ) => {
+    try {
+      let targetIdx = originalIdx;
+      if (targetIdx === undefined || targetIdx < 0 || (currentUrl && !homeworkNotesList[targetIdx]?.includes(currentUrl))) {
+        targetIdx = homeworkNotesList.findIndex(n => typeof n === 'string' && n.startsWith('AUDIO:') && (currentUrl ? n.includes(currentUrl) : false));
+      }
+
+      let originalNote = '';
+      let updatedNote = '';
+      const list = [...(homeworkNotesList || [])];
+
+      if (targetIdx >= 0 && list[targetIdx]) {
+        originalNote = list[targetIdx];
+        const parts = originalNote.substring(6).split('|');
+        const masterOrigUrl = parts[9]?.trim() || parts[0]?.trim() || result.original_url || '';
+        const masterOrigDur = parts[10]?.trim() || parts[1]?.trim() || String(result.original_duration || result.duration || 0);
+
+        const newParts = [...parts];
+        while (newParts.length < 11) newParts.push('');
+        newParts[0] = result.url;
+        newParts[1] = String(result.duration);
+        newParts[2] = new Date().toISOString();
+        newParts[3] = result.label.trim() || newParts[3];
+        newParts[8] = 'custom';
+        newParts[9] = masterOrigUrl;
+        newParts[10] = masterOrigDur;
+
+        updatedNote = `AUDIO:${newParts.join('|')}`;
+
+        if (result.mode === 'overwrite') {
+          list[targetIdx] = updatedNote;
+        } else {
+          list.push(updatedNote);
+        }
+      } else {
+        const masterOrigUrl = result.original_url || currentUrl || result.url;
+        const masterOrigDur = String(result.original_duration || result.duration || 0);
+        updatedNote = `AUDIO:${result.url}|${result.duration}|${new Date().toISOString()}|${result.label}|teacher|shared_with_teacher|rec-${Date.now()}||custom|${masterOrigUrl}|${masterOrigDur}`;
+        list.push(updatedNote);
+      }
+
+      setHomeworkNotesList(list);
+
+      try {
+        localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(list));
+      } catch {}
+
+      await syncHomeworkNotes(list);
+      notifyHomeworkChange();
+
+      if (student?.id && originalNote && updatedNote && result.mode === 'overwrite') {
+        try {
+          const { data: allStudentMatrix } = await supabase
+            .from('progress_matrix')
+            .select('id, homework_notes')
+            .eq('student_id', student.id);
+
+          if (allStudentMatrix) {
+            for (const row of allStudentMatrix) {
+              if (row.homework_notes && row.homework_notes.includes(originalNote)) {
+                const updatedRowNotes = row.homework_notes.replace(originalNote, updatedNote);
+                await supabase
+                  .from('progress_matrix')
+                  .update({ homework_notes: updatedRowNotes, updated_at: new Date().toISOString() })
+                  .eq('id', row.id);
+              }
+            }
+          }
+        } catch (mErr) {
+          console.warn('[handleSaveEditedTeacherAudio] Error updating matrix rows:', mErr);
+        }
+
+        setProgressItems(prev => prev.map(p => {
+          let notesStr = p.homework_notes ? String(p.homework_notes) : '';
+          if (notesStr && notesStr.includes(originalNote)) {
+            return { ...p, homework_notes: notesStr.replace(originalNote, updatedNote) };
+          }
+          return p;
+        }));
+      }
+    } catch (err) {
+      console.warn('[handleSaveEditedTeacherAudio] Error:', err);
+    }
+  };
+
+  const handleRevertTeacherAudioToOriginal = async (originalIdx?: number, currentUrl?: string) => {
+    try {
+      let targetIdx = originalIdx;
+      if (targetIdx === undefined || targetIdx < 0 || (currentUrl && !homeworkNotesList[targetIdx]?.includes(currentUrl))) {
+        targetIdx = homeworkNotesList.findIndex(n => typeof n === 'string' && n.startsWith('AUDIO:') && (currentUrl ? n.includes(currentUrl) : false));
+      }
+
+      if (targetIdx < 0 || !homeworkNotesList[targetIdx]) return;
+      const originalNote = homeworkNotesList[targetIdx];
+      const parts = originalNote.substring(6).split('|');
+      const masterOrigUrl = parts[9]?.trim();
+      const masterOrigDur = parts[10]?.trim() || '0';
+      if (!masterOrigUrl) return;
+
+      const newParts = [...parts];
+      newParts[0] = masterOrigUrl;
+      newParts[1] = masterOrigDur;
+      newParts.splice(9, 2);
+      const updatedNote = `AUDIO:${newParts.join('|')}`;
+
+      const list = [...homeworkNotesList];
+      list[targetIdx] = updatedNote;
+      setHomeworkNotesList(list);
+
+      try {
+        localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(list));
+      } catch {}
+
+      await syncHomeworkNotes(list);
+      notifyHomeworkChange();
+
+      if (student?.id && originalNote && updatedNote) {
+        try {
+          const { data: allStudentMatrix } = await supabase
+            .from('progress_matrix')
+            .select('id, homework_notes')
+            .eq('student_id', student.id);
+
+          if (allStudentMatrix) {
+            for (const row of allStudentMatrix) {
+              if (row.homework_notes && row.homework_notes.includes(originalNote)) {
+                const updatedRowNotes = row.homework_notes.replace(originalNote, updatedNote);
+                await supabase
+                  .from('progress_matrix')
+                  .update({ homework_notes: updatedRowNotes, updated_at: new Date().toISOString() })
+                  .eq('id', row.id);
+              }
+            }
+          }
+        } catch (mErr) {
+          console.warn('[handleRevertTeacherAudioToOriginal] Error updating matrix rows:', mErr);
+        }
+
+        setProgressItems(prev => prev.map(p => {
+          let notesStr = p.homework_notes ? String(p.homework_notes) : '';
+          if (notesStr && notesStr.includes(originalNote)) {
+            return { ...p, homework_notes: notesStr.replace(originalNote, updatedNote) };
+          }
+          return p;
+        }));
+      }
+    } catch (err) {
+      console.warn('[handleRevertTeacherAudioToOriginal] Error:', err);
     }
   };
 
@@ -6690,47 +7176,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     });
   }, [studentPracticeMinutes, studentXP, studentStreak, effectiveMasteredSongsCount, progressItems, simulatedStickers, selectedSchoolYear, currentSchoolYear, student?.created_at, student?.activated_at, (student as any)?.registered_at]);
 
-  useEffect(() => {
-    if (!student.id || loading || progressItems.length === 0 || selectedSchoolYear !== currentSchoolYear) return;
-
-    const runAutoStickerCheck = async () => {
-      const collectedIds = new Set(Object.keys(collectedStickers).filter(id => collectedStickers[id].count > 0));
-      const completedSongsCount = simulatedSongsCount !== null 
-        ? simulatedSongsCount 
-        : activeSongSkills.filter(s => s.progress === 100 || s.status === 'MASTERED').length;
-
-      const autoAwards = [
-        { id: 'fleiss-pionier', value: isDemoMode ? 5 : 20, current: studentPracticeMinutes, context: `${studentPracticeMinutes} Min. geübt` },
-        { id: 'uebe-meister', value: isDemoMode ? 15 : 100, current: studentPracticeMinutes, context: `${studentPracticeMinutes} Min. geübt` },
-        { id: 'uebe-legende', value: isDemoMode ? 30 : 500, current: studentPracticeMinutes, context: `${studentPracticeMinutes} Min. geübt` },
-        { id: 'uebe-grossmeister', value: isDemoMode ? 40 : 1500, current: studentPracticeMinutes, context: `${studentPracticeMinutes} Min. geübt` },
-
-        { id: 'xp-sammler', value: isDemoMode ? 50 : 100, current: studentXP, context: `${studentXP} XP erreicht` },
-        { id: 'xp-champion', value: isDemoMode ? 150 : 500, current: studentXP, context: `${studentXP} XP erreicht` },
-        { id: 'xp-meister', value: isDemoMode ? 300 : 1500, current: studentXP, context: `${studentXP} XP erreicht` },
-        { id: 'xp-legende', value: isDemoMode ? 500 : 3500, current: studentXP, context: `${studentXP} XP erreicht` },
-
-        { id: 'dranbleiber', value: isDemoMode ? 1 : 3, current: studentStreak, context: `${studentStreak} Tage Streak` },
-        { id: 'wochen-held', value: isDemoMode ? 2 : 7, current: studentStreak, context: `${studentStreak} Tage Streak` },
-        { id: 'streak-koenig', value: isDemoMode ? 3 : 21, current: studentStreak, context: `${studentStreak} Tage Streak` },
-        { id: 'streak-kaiser', value: isDemoMode ? 4 : 30, current: studentStreak, context: `${studentStreak} Tage Streak` },
-
-        { id: 'erster-erfolg', value: 1, current: completedSongsCount, context: `${completedSongsCount} Songs gemeistert` },
-        { id: 'song-sammler', value: isDemoMode ? 2 : 3, current: completedSongsCount, context: `${completedSongsCount} Songs gemeistert` },
-        { id: 'repertoire-riese', value: isDemoMode ? 3 : 5, current: completedSongsCount, context: `${completedSongsCount} Songs gemeistert` },
-        { id: 'repertoire-gigant', value: isDemoMode ? 4 : 10, current: completedSongsCount, context: `${completedSongsCount} Songs gemeistert` }
-      ];
-
-      for (const award of autoAwards) {
-        if (!collectedIds.has(award.id) && award.current >= award.value) {
-          console.log(`Auto-awarding sticker: ${award.id}`);
-          await awardStickerSilent(award.id, award.context);
-        }
-      }
-    };
-
-    runAutoStickerCheck();
-  }, [student.id, progressItems, activeSongSkills, studentPracticeMinutes, studentXP, studentStreak, loading, collectedStickers, isDemoMode, simulatedSongsCount]);
 
   const triggerDirectSave = async (
     lehrwerkId: string, 
@@ -8340,7 +8785,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
 
     return list;
-  }, [globalLehrwerke, assignedLehrwerke, resolvedActiveSongs, activeSongSkills, progressItems, student]);
+  }, [globalLehrwerke, assignedLehrwerke, resolvedActiveSongs, activeSongSkills, progressItems, (student as any)?.songs]);
 
   const isBookAlbum = useCallback((rawTitle: string): boolean => {
     if (!rawTitle) return false;
@@ -9660,6 +10105,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               handleDeleteNote={handleDeleteNote}
               handleRenameStudentAudio={handleRenameStudentAudio}
               handleRenameTeacherAudio={handleRenameTeacherAudio}
+              handleSaveEditedTeacherAudio={handleSaveEditedTeacherAudio}
+              handleRevertTeacherAudioToOriginal={handleRevertTeacherAudioToOriginal}
               handleSaveShareToPlaylist={handleSaveShareToPlaylist}
               handleUpdateAudioSongTag={handleUpdateAudioSongTag}
               hasTresorStorage={hasTresorStorage}

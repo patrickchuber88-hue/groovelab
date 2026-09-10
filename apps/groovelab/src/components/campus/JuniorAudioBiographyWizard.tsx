@@ -241,6 +241,10 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
       };
 
       recorder.onstop = async () => {
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(t => t.stop());
+          streamRef.current = null;
+        }
         const rawBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         await handleAudioProcessing(rawBlob);
       };
@@ -281,12 +285,17 @@ export const JuniorAudioBiographyWizard: React.FC<JuniorAudioBiographyWizardProp
   // Stop Recording
   const stopLiveRecording = () => {
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.stop();
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
+    const rec = mediaRecorderRef.current;
+    if (rec && rec.state !== 'inactive') {
+      try { rec.requestData(); } catch (e) {}
+      // 🛡️ 500ms Safety Buffer: Garantiert vollständigen Ausklang & Raumhall
+      setTimeout(() => {
+        try {
+          if (rec.state !== 'inactive') {
+            rec.stop();
+          }
+        } catch (e) {}
+      }, 500);
     }
     setIsRecording(false);
     setIsProcessing(true);

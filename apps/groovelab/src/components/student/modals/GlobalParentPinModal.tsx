@@ -1,5 +1,6 @@
 import React from "react";
-import { Lock } from "lucide-react";
+import { Lock, Fingerprint } from "lucide-react";
+import { isWebAuthnSupported } from "../../../utils/webauthn";
 
 export interface GlobalParentPinModalProps {
   isOpen: boolean;
@@ -9,6 +10,8 @@ export interface GlobalParentPinModalProps {
   setGlobalPinInput: React.Dispatch<React.SetStateAction<string>>;
   setGlobalPinError: React.Dispatch<React.SetStateAction<string>>;
   onVerify: (pin: string) => void;
+  onBiometricUnlock?: () => void;
+  isVerifyingBiometric?: boolean;
   onClose: () => void;
 }
 
@@ -20,6 +23,8 @@ export const GlobalParentPinModal: React.FC<GlobalParentPinModalProps> = ({
   setGlobalPinInput,
   setGlobalPinError,
   onVerify,
+  onBiometricUnlock,
+  isVerifyingBiometric,
   onClose,
 }) => {
   if (!isOpen) return null;
@@ -169,11 +174,43 @@ export const GlobalParentPinModal: React.FC<GlobalParentPinModalProps> = ({
           })}
         </div>
 
+        {/* Biometric Passkey Unlock (Face ID / Touch ID) */}
+        {onBiometricUnlock && isWebAuthnSupported() && (
+          <button
+            type="button"
+            disabled={isVerifyingBiometric}
+            onClick={onBiometricUnlock}
+            style={{
+              marginTop: '4px',
+              width: '100%',
+              padding: '12px 16px',
+              borderRadius: '16px',
+              border: '1px solid #bae6fd',
+              background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+              color: '#0284c7',
+              fontSize: '0.88rem',
+              fontWeight: 800,
+              cursor: isVerifyingBiometric ? 'not-allowed' : 'pointer',
+              opacity: isVerifyingBiometric ? 0.6 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              boxShadow: '0 2px 8px rgba(2, 132, 199, 0.08)',
+              transition: 'all 0.15s ease'
+            }}
+            className="hover-scale"
+          >
+            <Fingerprint size={20} />
+            <span>{isVerifyingBiometric ? 'Wird geprüft...' : 'Mit Face ID / Touch ID entsperren'}</span>
+          </button>
+        )}
+
         <button
           type="button"
           onClick={onClose}
           style={{
-            marginTop: '6px',
+            marginTop: '4px',
             padding: '10px 18px',
             borderRadius: '100px',
             background: '#f1f5f9',

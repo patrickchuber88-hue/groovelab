@@ -153,8 +153,17 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
+    const rec = mediaRecorderRef.current;
+    if (rec && isRecording) {
+      try { rec.requestData(); } catch (e) {}
+      // 🛡️ 500ms Safety Buffer: Garantiert vollständigen Ausklang & Raumhall
+      setTimeout(() => {
+        try {
+          if (rec.state !== 'inactive') {
+            rec.stop();
+          }
+        } catch (e) {}
+      }, 500);
       setIsRecording(false);
       if (timerRef.current) clearInterval(timerRef.current);
     }

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   X, Check, BookOpen, Music, Plus, ChevronRight, ChevronDown, ChevronUp, Book, Star,
   Mic, Square, Play, Headphones, Calendar, Clock, ArrowLeft, Edit3, Search, Lock,
@@ -9,6 +9,7 @@ import { checkIsAudioTresorActive } from '../../../domain/stickersAndTresor';
 import { getSimulatedNow } from '../studentDateUtils';
 import { parseSongArtistAndTitle, Student } from '../meisterwerk.types';
 import { InlineAudioPlayer, MechanicalMetronomeIcon } from './MeisterwerkAudioPlayers';
+import { DuettDeckModal } from './DuettDeckModal';
 
 export interface MeisterwerkRecordingsTabProps {
   isTeacherTools?: boolean;
@@ -30,6 +31,8 @@ export interface MeisterwerkRecordingsTabProps {
   handleDeleteNote: (idx: number, url?: string) => void;
   handleRenameStudentAudio: (url: string, newTitle: string, id?: string) => void;
   handleRenameTeacherAudio: (url: string, newTitle: string, originalIdx?: number) => void;
+  handleSaveEditedTeacherAudio?: (result: { url: string; original_url?: string; duration: number; original_duration?: number; label: string; mode: 'overwrite' | 'duplicate' }, originalIdx?: number, currentUrl?: string) => Promise<void>;
+  handleRevertTeacherAudioToOriginal?: (originalIdx?: number, currentUrl?: string) => Promise<void>;
   handleSaveShareToPlaylist: () => Promise<void>;
   handleUpdateAudioSongTag: (url: string, tag: string | null) => void;
   hasTresorStorage: boolean;
@@ -121,6 +124,8 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
     handleDeleteNote,
     handleRenameStudentAudio,
     handleRenameTeacherAudio,
+    handleSaveEditedTeacherAudio,
+    handleRevertTeacherAudioToOriginal,
     handleSaveShareToPlaylist,
     handleUpdateAudioSongTag,
     hasTresorStorage,
@@ -190,6 +195,13 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
     topicName,
     useNotebookLayout
   } = props;
+
+  const [duettModalData, setDuettModalData] = useState<{
+    teacherUrl: string;
+    teacherTitle: string;
+    teacherBpm?: number;
+    songTag?: string;
+  } | null>(null);
 
   return (
             <div style={{
@@ -664,13 +676,26 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                     extractAudios(String(note || ''), true, undefined, idx);
                   });
 
-                  // 2. Local storage homework notes
+                  // 2. Local storage homework notes across all candidate student IDs
                   try {
-                    const stdId = student?.id || (student as any)?.student_id;
-                    if (stdId) {
+                    const candidateStudentIds = Array.from(new Set([
+                      student?.id,
+                      (student as any)?.student_id,
+                      (student as any)?.studentId,
+                      (student as any)?.canonical_uuid,
+                      (student as any)?.slot_id
+                    ].filter(Boolean))) as string[];
+
+                    candidateStudentIds.forEach(stdId => {
                       const localGen = localStorage.getItem(`campus_homework_notes_${stdId}`);
                       if (localGen) extractAudios(localGen, true);
-                    }
+
+                      // 2b. Local storage dedicated teacher audio vault
+                      const localVault = localStorage.getItem(`campus_teacher_audio_vault_${stdId}`);
+                      if (localVault) {
+                        extractAudios(localVault, true);
+                      }
+                    });
                   } catch {}
 
                   // 3. Scan progressItems across all lessons/history
@@ -762,6 +787,10 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                     const songTag = audioSongTags[url] !== undefined ? (audioSongTags[url] || undefined) : rawSongTag;
 
                     const isCustomTitle = parts[8]?.trim() === 'custom';
+                    const originalUrl = parts[9]?.trim() || undefined;
+                    const originalDuration = parseInt(parts[10] || '0', 10) || undefined;
+                    const bpmPart = parts.find(p => typeof p === 'string' && p.trim().startsWith('BPM:'));
+                    const metronomeBpm = bpmPart ? parseInt(bpmPart.trim().replace('BPM:', ''), 10) : undefined;
 
                     // Robust collision-free key
                     const uniqueKey = parts[6] || (url && url !== '#' && url.length > 8 ? url : null) || `teacher_rec_${item.originalIdx >= 0 ? item.originalIdx : rIdx}_${label}_${duration}_${date}_${songTag || 'notag'}`;
@@ -776,7 +805,10 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                       originalIdx: item.originalIdx,
                       isCurrentHomework: item.isCurrentHomework,
                       songTag,
-                      isCustomTitle
+                      isCustomTitle,
+                      originalUrl,
+                      originalDuration,
+                      metronomeBpm
                     });
                   });
 
@@ -881,6 +913,38 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
 
                   const sortedMonths = Object.values(monthGroups).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
 
+                  const renderTeacherPlayer = (aud: any, key: string, isHero = false, customThemeColor = "#15803d", customThemeBg = "#e6f4ea") => (
+                    <InlineAudioPlayer 
+                      key={key}
+                      url={aud.url} 
+                      label={aud.label} 
+                      duration={aud.duration}
+                      date={aud.date}
+                      isHero={isHero}
+                      contextBadge={aud.songTag}
+                      onContextBadgeClick={aud.songTag ? () => { setSelectedTeacherMonth(null); setShowTeacherFavoritesOnly(false); setShowTeacherHomeworkArchive(false); setSelectedTeacherSongAlbum(aud.songTag); } : undefined}
+                      availableSongs={availableSongsForTagging}
+                      onSelectSongTag={(newTag) => handleUpdateAudioSongTag(aud.url, newTag)}
+                      isFavorite={favoriteAudioUrls.includes(aud.url)}
+                      onToggleFavorite={() => toggleFavoriteAudio(aud.url)}
+                      themeColor={customThemeColor}
+                      themeBg={customThemeBg}
+                      onRename={!readOnly ? (newTitle) => handleRenameTeacherAudio(aud.url, newTitle, aud.originalIdx) : undefined}
+                      onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx, aud.url) : undefined}
+                      originalAudioUrl={aud.originalUrl}
+                      originalDuration={aud.originalDuration}
+                      onRevertToOriginal={!readOnly && aud.originalUrl && handleRevertTeacherAudioToOriginal ? () => handleRevertTeacherAudioToOriginal(aud.originalIdx, aud.url) : undefined}
+                      onSaveEdited={!readOnly && handleSaveEditedTeacherAudio ? (res) => handleSaveEditedTeacherAudio(res, aud.originalIdx, aud.url) : undefined}
+                      metronomeBpm={aud.metronomeBpm}
+                      onOpenDuettDeck={aud.metronomeBpm ? () => setDuettModalData({
+                        teacherUrl: aud.url,
+                        teacherTitle: aud.label || 'Lehrer-Aufnahme',
+                        teacherBpm: aud.metronomeBpm,
+                        songTag: aud.songTag
+                      }) : undefined}
+                    />
+                  );
+
                   // 🔍 SEARCH RESULTS VIEW
                   if (isSearching) {
                     return (
@@ -888,25 +952,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                         <div style={{ fontSize: "0.76rem", fontWeight: 850, color: "#15803d", marginBottom: "4px" }}>
                           🔍 {searchResults.length} {searchResults.length === 1 ? "Treffer" : "Treffer"} zur Suche „{recordingSearchQuery}“
                         </div>
-                        {searchResults.map((aud, idx) => (
-                          <InlineAudioPlayer 
-                            key={`teacher-search-${idx}`}
-                            url={aud.url} 
-                            label={aud.label} 
-                            duration={aud.duration}
-                            date={aud.date}
-                            contextBadge={aud.songTag}
-                            onContextBadgeClick={aud.songTag ? () => { setSelectedTeacherMonth(null); setShowTeacherFavoritesOnly(false); setSelectedTeacherSongAlbum(aud.songTag); } : undefined}
-                            availableSongs={availableSongsForTagging}
-                            onSelectSongTag={(newTag) => handleUpdateAudioSongTag(aud.url, newTag)}
-                            isFavorite={favoriteAudioUrls.includes(aud.url)}
-                            onToggleFavorite={() => toggleFavoriteAudio(aud.url)}
-                            themeColor="#15803d"
-                            themeBg="#e6f4ea"
-                            onRename={!readOnly ? (newTitle) => handleRenameTeacherAudio(aud.url, newTitle, aud.originalIdx) : undefined}
-                            onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx, aud.url) : undefined}
-                          />
-                        ))}
+                        {searchResults.map((aud, idx) => renderTeacherPlayer(aud, `teacher-search-${idx}`))}
                       </div>
                     );
                   }
@@ -947,25 +993,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                           </div>
                         ) : (
                           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                            {favoriteTeacherAudios.map((aud, idx) => (
-                              <InlineAudioPlayer 
-                                key={`teacher-fav-${idx}`}
-                                url={aud.url} 
-                                label={aud.label} 
-                                duration={aud.duration}
-                                date={aud.date}
-                                contextBadge={aud.songTag}
-                                onContextBadgeClick={aud.songTag ? () => { setSelectedTeacherMonth(null); setShowTeacherFavoritesOnly(false); setSelectedTeacherSongAlbum(aud.songTag); } : undefined}
-                                availableSongs={availableSongsForTagging}
-                                onSelectSongTag={(newTag) => handleUpdateAudioSongTag(aud.url, newTag)}
-                                isFavorite={true}
-                                onToggleFavorite={() => toggleFavoriteAudio(aud.url)}
-                                themeColor="#15803d"
-                                themeBg="#e6f4ea"
-                                onRename={!readOnly ? (newTitle) => handleRenameTeacherAudio(aud.url, newTitle, aud.originalIdx) : undefined}
-                                onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx, aud.url) : undefined}
-                              />
-                            ))}
+                            {favoriteTeacherAudios.map((aud, idx) => renderTeacherPlayer(aud, `teacher-fav-${idx}`))}
                           </div>
                         )}
                       </div>
@@ -1101,25 +1129,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                                   {/* Accordion Content */}
                                   {isWeekOpen && (
                                     <div style={{ padding: "10px", display: "flex", flexDirection: "column", gap: "8px", background: "#f8fafc" }}>
-                                      {weekGroup.takes.map((aud, idx) => (
-                                        <InlineAudioPlayer
-                                          key={`hw-week-aud-${weekGroup.weekKey}-${idx}`}
-                                          url={aud.url}
-                                          label={aud.label}
-                                          duration={aud.duration}
-                                          date={aud.date}
-                                          contextBadge={aud.songTag}
-                                          onContextBadgeClick={aud.songTag ? () => { setSelectedTeacherMonth(null); setShowTeacherFavoritesOnly(false); setShowTeacherHomeworkArchive(false); setSelectedTeacherSongAlbum(aud.songTag); } : undefined}
-                                          availableSongs={availableSongsForTagging}
-                                          onSelectSongTag={(newTag) => handleUpdateAudioSongTag(aud.url, newTag)}
-                                          isFavorite={favoriteAudioUrls.includes(aud.url)}
-                                          onToggleFavorite={() => toggleFavoriteAudio(aud.url)}
-                                          themeColor="#15803d"
-                                          themeBg="#e6f4ea"
-                                          onRename={!readOnly ? (newTitle) => handleRenameTeacherAudio(aud.url, newTitle, aud.originalIdx) : undefined}
-                                          onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx, aud.url) : undefined}
-                                        />
-                                      ))}
+                                      {weekGroup.takes.map((aud, idx) => renderTeacherPlayer(aud, `hw-week-aud-${weekGroup.weekKey}-${idx}`))}
                                     </div>
                                   )}
                                 </div>
@@ -1216,24 +1226,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
 
                         {/* Song Takes List */}
                         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                          {albumTakes.map((aud, idx) => (
-                            <InlineAudioPlayer 
-                              key={`teacher-song-aud-${idx}`}
-                              url={aud.url} 
-                              label={aud.label} 
-                              duration={aud.duration}
-                              date={aud.date}
-                              contextBadge={aud.songTag}
-                              availableSongs={availableSongsForTagging}
-                              onSelectSongTag={(newTag) => handleUpdateAudioSongTag(aud.url, newTag)}
-                              isFavorite={favoriteAudioUrls.includes(aud.url)}
-                              onToggleFavorite={() => toggleFavoriteAudio(aud.url)}
-                              themeColor="#4f46e5"
-                              themeBg="#ede9fe"
-                              onRename={!readOnly ? (newTitle) => handleRenameTeacherAudio(aud.url, newTitle, aud.originalIdx) : undefined}
-                              onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx, aud.url) : undefined}
-                            />
-                          ))}
+                          {albumTakes.map((aud, idx) => renderTeacherPlayer(aud, `teacher-song-aud-${idx}`, false, "#4f46e5", "#ede9fe"))}
                         </div>
                       </div>
                     );
@@ -1307,25 +1300,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
 
                               {isExpanded && (
                                 <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "8px" }}>
-                                  {wkAudios.map((aud, idx) => (
-                                    <InlineAudioPlayer 
-                                      key={`teacher-month-aud-${wkKey}-${idx}`}
-                                      url={aud.url} 
-                                      label={aud.label} 
-                                      duration={aud.duration}
-                                      date={aud.date}
-                                      contextBadge={aud.songTag}
-                                      onContextBadgeClick={aud.songTag ? () => { setSelectedTeacherMonth(null); setShowTeacherFavoritesOnly(false); setSelectedTeacherSongAlbum(aud.songTag); } : undefined}
-                                      availableSongs={availableSongsForTagging}
-                                      onSelectSongTag={(newTag) => handleUpdateAudioSongTag(aud.url, newTag)}
-                                      isFavorite={favoriteAudioUrls.includes(aud.url)}
-                                      onToggleFavorite={() => toggleFavoriteAudio(aud.url)}
-                                      themeColor="#15803d"
-                                      themeBg="#e6f4ea"
-                                      onRename={!readOnly ? (newTitle) => handleRenameTeacherAudio(aud.url, newTitle, aud.originalIdx) : undefined}
-                                      onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx, aud.url) : undefined}
-                                    />
-                                  ))}
+                                  {wkAudios.map((aud, idx) => renderTeacherPlayer(aud, `teacher-month-aud-${wkKey}-${idx}`))}
                                 </div>
                               )}
                             </div>
@@ -1366,26 +1341,9 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                           </div>
                         ) : (
                           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                            {((isTeacherHomeworkExpanded || readOnly) ? currentWeekAudios : currentWeekAudios.slice(0, 3)).map((aud, idx) => (
-                              <InlineAudioPlayer 
-                                key={`teacher-curr-aud-${idx}`}
-                                url={aud.url} 
-                                label={aud.label} 
-                                duration={aud.duration}
-                                date={aud.date}
-                                isHero={idx === 0}
-                                contextBadge={aud.songTag}
-                                onContextBadgeClick={aud.songTag ? () => { setSelectedTeacherMonth(null); setShowTeacherFavoritesOnly(false); setSelectedTeacherSongAlbum(aud.songTag); } : undefined}
-                                availableSongs={availableSongsForTagging}
-                                onSelectSongTag={(newTag) => handleUpdateAudioSongTag(aud.url, newTag)}
-                                isFavorite={favoriteAudioUrls.includes(aud.url)}
-                                onToggleFavorite={() => toggleFavoriteAudio(aud.url)}
-                                themeColor="#15803d"
-                                themeBg="#e6f4ea"
-                                onRename={!readOnly ? (newTitle) => handleRenameTeacherAudio(aud.url, newTitle, aud.originalIdx) : undefined}
-                                onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx, aud.url) : undefined}
-                              />
-                            ))}
+                            {((isTeacherHomeworkExpanded || readOnly) ? currentWeekAudios : currentWeekAudios.slice(0, 3)).map((aud, idx) => 
+                              renderTeacherPlayer(aud, `teacher-curr-aud-${idx}`, idx === 0)
+                            )}
                             {currentWeekAudios.length > 3 && !readOnly && (
                               <button
                                 type="button"
@@ -2440,7 +2398,8 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                                 songTag,
                                 originalIdx: -1,
                                 source: 'local_junior',
-                                isCustomTitle: rec.isCustomTitle || false
+                                isCustomTitle: rec.isCustomTitle || false,
+                                metronomeBpm: rec.metronomeBpm
                               });
                             }
                           });
@@ -2498,6 +2457,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                             badgeBg="#dcfce7"
                             badgeColor="#15803d"
                             onRename={(newTitle) => handleRenameStudentAudio(aud.url, newTitle, aud.id)}
+                            metronomeBpm={aud.metronomeBpm}
                           />
                         ))}
                       </div>
@@ -2736,6 +2696,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                         badgeBg={isShared ? "#dcfce7" : "#f1f5f9"}
                         badgeColor={isShared ? "#15803d" : "#475569"}
                         onRename={(newTitle) => handleRenameStudentAudio(aud.url, newTitle, aud.id)}
+                        metronomeBpm={aud.metronomeBpm}
                         onBadgeClick={!isTeacherMode ? () => {
                           if (student?.id) {
                             try {
@@ -2767,6 +2728,29 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                             } catch {}
                           }
                         } : undefined}
+                        originalAudioUrl={aud.original_url || aud.originalUrl}
+                        originalDuration={aud.original_duration || aud.originalDuration}
+                        onRevertToOriginal={(aud.original_url || aud.originalUrl) ? () => {
+                          if (student?.id) {
+                            try {
+                              const juniorKey = `campus_junior_recordings_${student.id}`;
+                              const stored = localStorage.getItem(juniorKey);
+                              if (stored) {
+                                const origUrl = aud.original_url || aud.originalUrl;
+                                const origDur = aud.original_duration || aud.originalDuration || aud.duration;
+                                const recs = JSON.parse(stored).map((r: any) => {
+                                  if (r.url === aud.url || r.id === aud.id) {
+                                    const { original_url, original_duration, ...rest } = r;
+                                    return { ...rest, url: origUrl, duration: origDur };
+                                  }
+                                  return r;
+                                });
+                                localStorage.setItem(juniorKey, JSON.stringify(recs));
+                                setLocalJuniorRecordingsTrigger(p => p + 1);
+                              }
+                            } catch {}
+                          }
+                        } : undefined}
                         onSaveEdited={(res) => {
                           if (student?.id) {
                             try {
@@ -2776,7 +2760,9 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                               if (res.mode === "overwrite") {
                                 recs = recs.map((r: any) => {
                                   if (r.url === aud.url || r.id === aud.id) {
-                                    return { ...r, url: res.url, duration: res.duration, label: res.label, title: res.label };
+                                    const masterOrig = r.original_url || aud.original_url || r.url;
+                                    const masterOrigDur = r.original_duration || aud.original_duration || r.duration;
+                                    return { ...r, url: res.url, original_url: masterOrig, duration: res.duration, original_duration: masterOrigDur, label: res.label, title: res.label };
                                   }
                                   return r;
                                 });
@@ -3717,6 +3703,24 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                     </div>
                   </div>
                 )}
+
+                {/* 👥 Synchronous Teacher-Student Duett-Deck Modal */}
+                {duettModalData && (
+                  <DuettDeckModal
+                    isOpen={Boolean(duettModalData)}
+                    onClose={() => setDuettModalData(null)}
+                    teacherAudioUrl={duettModalData.teacherUrl}
+                    teacherTitle={duettModalData.teacherTitle}
+                    teacherBpm={duettModalData.teacherBpm}
+                    songTag={duettModalData.songTag}
+                    studentId={student.id}
+                    studentFirstName={studentFirstName}
+                    onSaveStudentTake={() => {
+                      setLocalJuniorRecordingsTrigger(prev => prev + 1);
+                    }}
+                  />
+                )}
               </div>
   );
 }
+

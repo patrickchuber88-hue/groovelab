@@ -2552,6 +2552,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     mediaRecordersRef.current = {};
     recordStartTimesRef.current = {};
     setCountInBeats(null);
+    setIsMetronomeActive(true);
   };
 
   // ── WCAG 2.1.1 Keyboard Accessibility: Leertaste schaltet Play/Stop, Escape stoppt ──

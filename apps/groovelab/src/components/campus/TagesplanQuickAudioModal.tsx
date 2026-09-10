@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { 
   X, Mic, Square, Play, Pause, RotateCcw, Check, Loader2, Send, FileText, Plus, ChevronRight, Trash2, Zap, Sparkles, ArrowLeft, Music, Sliders, Volume2, VolumeX, Activity, Tag, Clock
 } from 'lucide-react';
@@ -7,21 +7,24 @@ import { acquireAudioStream, releaseAudioStream, requestMicrophonePermissionOnce
 import { processPureRawBlob } from '../../utils/audioMasteringEngine';
 import { capitalizeFirstLetter, formatSingleStudentAnonymized } from '../../utils/nameHelper';
 import { saveOfflineAudioRecord } from '../../utils/offlineAudioVault';
-import { checkIsAudioTresorActive } from '../../domain/stickersAndTresor';
+import { checkIsAudioTresorActive, isInternalMetadataNote } from '../../domain/stickersAndTresor';
+import { isUUID } from '../../utils/uuidValidator';
 
 interface RecordedClip {
   id: string;
-  blob: Blob;
+  blob?: Blob;
   url: string;
   durationSeconds: number;
   title: string;
   tag?: string;
+  isExisting?: boolean;
 }
 
 interface TagesplanQuickAudioModalProps {
   isOpen: boolean;
   student: any;
   teacher: any;
+  allStudents?: any[];
   dateStr?: string;
   hasTresorStorage?: boolean;
   onClose: () => void;
@@ -90,6 +93,7 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
   isOpen,
   student,
   teacher,
+  allStudents,
   dateStr,
   hasTresorStorage,
   onClose,
@@ -153,12 +157,50 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
   const isSpeechSupported = typeof window !== 'undefined' && 
     (Boolean((window as any).SpeechRecognition) || Boolean((window as any).webkitSpeechRecognition));
 
+  const [hasExistingHomework, setHasExistingHomework] = useState(false);
+
+  const studentFirstName = student?.first_name || (student?.name ? student.name.split(' ')[0] : 'Schüler');
+  const studentLastName = student?.last_name || (student?.name ? student.name.split(' ').slice(1).join(' ') : '');
+
+  const matchedStudentFromAll = allStudents?.find((s: any) => 
+    (student?.id && s.id === student.id) ||
+    (student?.student_id && s.id === student.student_id) ||
+    (student?.studentId && s.id === student.studentId) ||
+    (s.first_name && studentFirstName && s.first_name.trim().toLowerCase() === studentFirstName.trim().toLowerCase() &&
+     (!studentLastName || !s.last_name || s.last_name.trim().toLowerCase().startsWith(studentLastName.trim().toLowerCase()[0]))) ||
+    (s.name && student?.name && s.name.trim().toLowerCase() === student.name.trim().toLowerCase())
+  );
+
+  const effectiveStudentId = 
+    (isUUID(matchedStudentFromAll?.id) ? matchedStudentFromAll.id : null) ||
+    (isUUID(student?.id) ? student.id : null) ||
+    (isUUID(student?.student_id) ? student.student_id : null) ||
+    (isUUID(student?.studentId) ? student.studentId : null) ||
+    matchedStudentFromAll?.id ||
+    student?.id || 
+    student?.student_id || 
+    student?.studentId || 
+    student?.userId || 
+    student?.user_id ||
+    (studentFirstName ? `student_${studentFirstName.trim().toLowerCase()}_${(studentLastName || '').trim().toLowerCase()}`.replace(/[^a-z0-9_]/gi, '_') : 'student_active');
+
+  const allStudentKeys = useMemo(() => {
+    return Array.from(new Set([
+      effectiveStudentId,
+      student?.id,
+      student?.student_id,
+      student?.studentId,
+      (student as any)?.slot_id,
+      matchedStudentFromAll?.id
+    ].filter(Boolean))) as string[];
+  }, [effectiveStudentId, student, matchedStudentFromAll]);
+
+  const studentDisplayName = formatSingleStudentAnonymized(studentFirstName, studentLastName, effectiveStudentId, true);
+
   useEffect(() => {
-    if (student) {
-      setDictatedText('');
+    if (isOpen && student) {
       setViewState('main');
       setSaveSuccess(false);
-      setRecordedClips([]);
       setActivePlayingClipId(null);
       setPlaybackProgress(0);
       setRecordingSeconds(0);
@@ -167,8 +209,139 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
       isRecordingRef.current = false;
       hasStoppedCurrentRecordingRef.current = false;
       setCountInRemaining(null);
+
+      // Hydrate from localStorage across all known candidate keys
+      let existingList: string[] = [];
+      for (const key of allStudentKeys) {
+        try {
+          const raw = localStorage.getItem(`campus_homework_notes_${key}`);
+          if (raw) {
+            const p = JSON.parse(raw);
+            if (Array.isArray(p) && p.length > 0) {
+              existingList = p;
+              break;
+            } else if (typeof p === 'string' && p.trim()) {
+              existingList = [p.trim()];
+              break;
+            }
+          }
+        } catch {}
+      }
+
+      // Also incorporate recordings from campus_teacher_audio_vault
+      for (const key of allStudentKeys) {
+        try {
+          const vRaw = localStorage.getItem(`campus_teacher_audio_vault_${key}`);
+          if (vRaw) {
+            const vList = JSON.parse(vRaw);
+            if (Array.isArray(vList)) {
+              vList.forEach((item: any) => {
+                const s = typeof item === 'string' ? item : item?.audioMetaStr;
+                if (s && s.includes('AUDIO:') && !existingList.includes(s)) {
+                  existingList.push(s);
+                }
+              });
+            }
+          }
+        } catch {}
+      }
+
+      const loadedClips: RecordedClip[] = [];
+      const seenUrls = new Set<string>();
+      existingList.forEach((entry, idx) => {
+        if (typeof entry === 'string' && entry.includes('AUDIO:')) {
+          const clean = entry.substring(entry.indexOf('AUDIO:') + 6);
+          const parts = clean.split('|');
+          const url = parts[0]?.trim();
+          if (url && !seenUrls.has(url)) {
+            seenUrls.add(url);
+            const dur = parseInt(parts[1] || '0', 10) || 0;
+            const title = parts[3]?.trim() || `Aufnahme #${idx + 1}`;
+            loadedClips.push({
+              id: `existing_${encodeURIComponent(url)}`,
+              url,
+              durationSeconds: dur,
+              title,
+              isExisting: true,
+              blob: new Blob()
+            });
+          }
+        }
+      });
+
+      const textNotes = existingList
+        .filter(n => typeof n === 'string' && !isInternalMetadataNote(n) && !n.includes('AUDIO:'))
+        .map(s => s.trim())
+        .filter(Boolean);
+
+      setRecordedClips(loadedClips);
+      setDictatedText(textNotes.join('\n\n'));
+      const hasContent = loadedClips.length > 0 || textNotes.length > 0;
+      setHasExistingHomework(hasContent);
+
+      // If localStorage had nothing and student ID is a valid UUID, fetch from Supabase
+      if (!hasContent && isUUID(effectiveStudentId)) {
+        supabase
+          .from('progress_matrix')
+          .select('homework_notes')
+          .eq('student_id', effectiveStudentId)
+          .ilike('topic_name', 'Hausaufgabe KW %')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+          .then(({ data }) => {
+            if (data?.homework_notes) {
+              try {
+                let dbList: string[] = [];
+                const p = JSON.parse(data.homework_notes);
+                if (Array.isArray(p)) dbList = p;
+                else if (typeof p === 'string') dbList = [p];
+
+                const dbClips: RecordedClip[] = [];
+                const dbSeen = new Set<string>();
+                dbList.forEach((entry, idx) => {
+                  if (typeof entry === 'string' && entry.includes('AUDIO:')) {
+                    const clean = entry.substring(entry.indexOf('AUDIO:') + 6);
+                    const parts = clean.split('|');
+                    const url = parts[0]?.trim();
+                    if (url && !dbSeen.has(url)) {
+                      dbSeen.add(url);
+                      const dur = parseInt(parts[1] || '0', 10) || 0;
+                      const title = parts[3]?.trim() || `Aufnahme #${idx + 1}`;
+                      dbClips.push({
+                        id: `existing_${encodeURIComponent(url)}`,
+                        url,
+                        durationSeconds: dur,
+                        title,
+                        isExisting: true,
+                        blob: new Blob()
+                      });
+                    }
+                  }
+                });
+                const dbTexts = dbList
+                  .filter(n => typeof n === 'string' && !isInternalMetadataNote(n) && !n.includes('AUDIO:'))
+                  .map(s => s.trim())
+                  .filter(Boolean);
+
+                if (dbClips.length > 0 || dbTexts.length > 0) {
+                  setRecordedClips(dbClips);
+                  setDictatedText(dbTexts.join('\n\n'));
+                  setHasExistingHomework(true);
+                  allStudentKeys.forEach(k => {
+                    try { localStorage.setItem(`campus_homework_notes_${k}`, JSON.stringify(dbList)); } catch {}
+                  });
+                }
+              } catch {}
+            }
+          });
+      }
+    } else if (!isOpen) {
+      setDictatedText('');
+      setRecordedClips([]);
+      setHasExistingHomework(false);
     }
-  }, [student, dateStr, isOpen]);
+  }, [student, dateStr, isOpen, allStudentKeys, effectiveStudentId]);
 
   // Metronome Web Audio Synthesizer
   const playMetronomeClick = useCallback((isAccent: boolean) => {
@@ -335,10 +508,6 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
   }, []);
 
   if (!isOpen || !student) return null;
-
-  const studentFirstName = student.first_name || (student.name ? student.name.split(' ')[0] : 'Schüler');
-  const studentLastName = student.last_name || (student.name ? student.name.split(' ').slice(1).join(' ') : '');
-  const studentDisplayName = formatSingleStudentAnonymized(studentFirstName, studentLastName, student.id, true);
 
   // 1. DICTATION LOGIC
   const handleStartDictation = async () => {
@@ -541,12 +710,19 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
       clearInterval(timerRef.current); 
       timerRef.current = null; 
     }
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      try {
-        mediaRecorderRef.current.stop();
-      } catch (e) {
-        console.warn('Error stopping mediaRecorder:', e);
-      }
+    const rec = mediaRecorderRef.current;
+    if (rec && rec.state !== 'inactive') {
+      try { rec.requestData(); } catch (e) {}
+      // 🛡️ 500ms Safety Buffer: Garantiert vollständigen Ausklang & Raumhall
+      setTimeout(() => {
+        try {
+          if (rec.state !== 'inactive') {
+            rec.stop();
+          }
+        } catch (e) {
+          console.warn('Error stopping mediaRecorder:', e);
+        }
+      }, 500);
     }
   };
 
@@ -602,36 +778,48 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
 
   // 3. UNIFIED BLITZ-SAVE LOGIC (MULTI-AUDIO + TEXT + DB SYNC)
   const handleSaveBlitzHomework = async () => {
-    if (!student?.id || (recordedClips.length === 0 && !dictatedText.trim())) return;
+    if (recordedClips.length === 0 && !dictatedText.trim()) {
+      console.warn('[QuickAudioModal] Cannot save blitz homework - no audio clips and no text entered');
+      return;
+    }
     setIsSaving(true);
     try {
-      const storageKey = `campus_homework_notes_${student.id}`;
+      const studentIdToUse = effectiveStudentId;
+      const storageKey = `campus_homework_notes_${studentIdToUse}`;
       const existingRaw = localStorage.getItem(storageKey);
       let existingList: string[] = [];
       try {
         existingList = existingRaw ? JSON.parse(existingRaw) : [];
       } catch { existingList = []; }
 
+      // Retain non-AUDIO, non-plain-text items (e.g. STICKER:, FEEDBACK:, LOOP:, SNAPSHOT_)
+      const preservedSpecialNotes = (existingList || []).filter(n => 
+        typeof n === 'string' && isInternalMetadataNote(n)
+      );
+
+      const finalNotesList: string[] = [...preservedSpecialNotes];
+      const newAudioVaultTakes: string[] = [];
       let firstSavedUrl = '';
 
       // A) Save all recorded audio clips with Local-First IndexedDB guarantee
       for (const clip of recordedClips) {
         const isoNow = new Date().toISOString();
-        const fileName = `quick_hw_${student.id}_${clip.id}_${Date.now()}.webm`;
+        const fileName = `quick_hw_${studentIdToUse}_${clip.id}_${Date.now()}.webm`;
         const targetSchoolId = student?.school_id || (student as any)?.schoolId || teacher?.school_id || (window as any).__groovelab_school_id || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
         const schoolPathPrefix = targetSchoolId ? `schools/${targetSchoolId}/` : '';
         const filePath = `${schoolPathPrefix}recordings/${fileName}`;
 
         let finalUrl = clip.url || '';
 
-        // 1. Local-first IndexedDB save (with fallback)
-        try {
-          if (clip.blob) {
+        // If clip was newly recorded, upload and save to IndexedDB
+        if (!clip.isExisting && clip.blob && clip.blob.size > 0) {
+          // 1. Local-first IndexedDB save (with fallback)
+          try {
             const savedRecord = await saveOfflineAudioRecord({
               blob: clip.blob,
               mimeType: 'audio/webm',
               durationSeconds: clip.durationSeconds,
-              studentId: student.id,
+              studentId: studentIdToUse,
               teacherId: teacher?.id,
               schoolId: targetSchoolId,
               context: 'homework',
@@ -644,90 +832,155 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
             if (savedRecord?.id) {
               finalUrl = `offline://${savedRecord.id}`;
             }
+          } catch (vaultErr) {
+            console.warn('[QuickAudioModal] IndexedDB local save notice:', vaultErr);
           }
-        } catch (vaultErr) {
-          console.warn('[QuickAudioModal] IndexedDB local save notice:', vaultErr);
-        }
 
-        // 2. Asynchroner Cloud-Upload zu Supabase Storage (sofern online)
-        if (navigator.onLine && clip.blob) {
-          try {
-            const { error: upErr } = await supabase.storage
-              .from('campus-assets')
-              .upload(filePath, clip.blob, { contentType: 'audio/webm', upsert: true });
-            
-            if (!upErr) {
-              const { data: urlData } = supabase.storage.from('campus-assets').getPublicUrl(filePath);
-              if (urlData?.publicUrl) {
-                finalUrl = urlData.publicUrl;
-              }
+          // 2. Asynchroner Cloud-Upload zu Supabase Storage (sofern online) mit Timeout-Schutz
+          if (navigator.onLine && clip.blob) {
+            try {
+              const uploadPromise = supabase.storage
+                .from('campus-assets')
+                .upload(filePath, clip.blob, { contentType: 'audio/webm', upsert: true });
 
-              // Update school storage quota
-              if (targetSchoolId && clip.blob.size) {
-                try {
-                  const { data: schoolData } = await supabase
-                    .from('schools')
-                    .select('storage_used_bytes')
-                    .eq('id', targetSchoolId)
-                    .maybeSingle();
-                  if (schoolData) {
-                    const currentBytes = Number(schoolData.storage_used_bytes || 0);
-                    await supabase
+              const timeoutPromise = new Promise<{ data: null; error: any }>((resolve) => 
+                setTimeout(() => resolve({ data: null, error: new Error('Storage upload timeout') }), 6000)
+              );
+
+              const { error: upErr } = await Promise.race([uploadPromise, timeoutPromise]);
+              
+              if (!upErr) {
+                const { data: urlData } = supabase.storage.from('campus-assets').getPublicUrl(filePath);
+                if (urlData?.publicUrl) {
+                  finalUrl = urlData.publicUrl;
+                }
+
+                // Update school storage quota
+                if (targetSchoolId && clip.blob.size) {
+                  try {
+                    const { data: schoolData } = await supabase
                       .from('schools')
-                      .update({ storage_used_bytes: currentBytes + clip.blob.size })
-                      .eq('id', targetSchoolId);
-                  }
-                } catch {}
+                      .select('storage_used_bytes')
+                      .eq('id', targetSchoolId)
+                      .maybeSingle();
+                    if (schoolData) {
+                      const currentBytes = Number(schoolData.storage_used_bytes || 0);
+                      await supabase
+                        .from('schools')
+                        .update({ storage_used_bytes: currentBytes + clip.blob.size })
+                        .eq('id', targetSchoolId);
+                    }
+                  } catch {}
+                }
+              } else {
+                console.warn('[QuickAudioModal] Cloud upload warning (falling back to offline record):', upErr);
               }
+            } catch (cloudErr) {
+              console.warn('[QuickAudioModal] Cloud upload notice:', cloudErr);
             }
-          } catch (cloudErr) {
-            console.warn('[QuickAudioModal] Cloud upload notice:', cloudErr);
           }
         }
 
         if (!firstSavedUrl) firstSavedUrl = finalUrl;
         const formattedEntry = `AUDIO:${finalUrl}|${clip.durationSeconds}|${isoNow}|${clip.title.replace(/\|/g, '-')}|teacher|shared_with_teacher`;
-        existingList.push(formattedEntry);
+        finalNotesList.push(formattedEntry);
+        newAudioVaultTakes.push(formattedEntry);
       }
 
       // B) Save Text if entered
       if (dictatedText.trim()) {
         const cleanNote = capitalizeFirstLetter(dictatedText.trim());
-        if (!existingList.includes(cleanNote)) {
-          existingList.push(cleanNote);
+        if (!finalNotesList.includes(cleanNote)) {
+          finalNotesList.push(cleanNote);
         }
       }
 
-      // Save to localStorage immediately
-      localStorage.setItem(storageKey, JSON.stringify(existingList));
+      // Compute current KW
+      const d = new Date();
+      const startOfYear = new Date(d.getFullYear(), 0, 1);
+      const pastDays = (d.getTime() - startOfYear.getTime()) / 86400000;
+      const weekNum = Math.ceil((pastDays + startOfYear.getDay() + 1) / 7);
+      const currentWeek = `${d.getFullYear()}-W${String(weekNum).padStart(2, '0')}`;
+      const topicName = `Hausaufgabe KW ${String(weekNum).padStart(2, '0')}`;
 
-      // C) Sync to DB progress_matrix (non-blocking)
-      try {
-        const d = new Date();
-        const startOfYear = new Date(d.getFullYear(), 0, 1);
-        const pastDays = (d.getTime() - startOfYear.getTime()) / 86400000;
-        const weekNum = Math.ceil((pastDays + startOfYear.getDay() + 1) / 7);
-        const topicName = `Hausaufgabe KW ${String(weekNum).padStart(2, '0')}`;
+      // Save to primary and all candidate keys in localStorage
+      allStudentKeys.forEach(k => {
+        try {
+          localStorage.setItem(`campus_homework_notes_${k}`, JSON.stringify(finalNotesList));
+          localStorage.setItem(`campus_homework_week_${k}`, currentWeek);
 
-        const { data: existingMatrix } = await supabase
-          .from('progress_matrix')
-          .select('id')
-          .eq('student_id', student.id)
-          .eq('topic_name', topicName)
-          .maybeSingle();
+          // Update teacher vault
+          const vaultKey = `campus_teacher_audio_vault_${k}`;
+          const currentVaultStr = localStorage.getItem(vaultKey);
+          let currentVault: string[] = [];
+          if (currentVaultStr) {
+            try {
+              const pV = JSON.parse(currentVaultStr);
+              if (Array.isArray(pV)) currentVault = pV;
+            } catch {}
+          }
+          let vaultChanged = false;
+          newAudioVaultTakes.forEach(take => {
+            if (!currentVault.includes(take)) {
+              currentVault.push(take);
+              vaultChanged = true;
+            }
+          });
+          if (vaultChanged) {
+            localStorage.setItem(vaultKey, JSON.stringify(currentVault));
+          }
+        } catch {}
+      });
 
-        if (existingMatrix) {
-          await supabase.from('progress_matrix').update({ homework_notes: JSON.stringify(existingList), updated_at: new Date().toISOString() }).eq('id', existingMatrix.id);
-        } else {
-          await supabase.from('progress_matrix').insert({ student_id: student.id, teacher_id: teacher?.id, topic_name: topicName, status: 'IN_PROGRESS', homework_notes: JSON.stringify(existingList), updated_at: new Date().toISOString() });
+      // C) Sync to DB progress_matrix (non-blocking) only if studentId is a valid UUID
+      if (isUUID(studentIdToUse)) {
+        try {
+          const { data: existingMatrix } = await supabase
+            .from('progress_matrix')
+            .select('id')
+            .eq('student_id', studentIdToUse)
+            .eq('topic_name', topicName)
+            .maybeSingle();
+
+          if (existingMatrix) {
+            await supabase.from('progress_matrix').update({ 
+              homework_notes: JSON.stringify(finalNotesList), 
+              is_current_homework: true,
+              updated_at: new Date().toISOString() 
+            }).eq('id', existingMatrix.id);
+          } else {
+            await supabase.from('progress_matrix').insert({ 
+              student_id: studentIdToUse, 
+              teacher_id: teacher?.id, 
+              topic_name: topicName, 
+              status: 'IN_PROGRESS', 
+              is_current_homework: true,
+              homework_notes: JSON.stringify(finalNotesList), 
+              updated_at: new Date().toISOString() 
+            });
+          }
+        } catch (e) {
+          console.warn('[QuickAudioModal] DB sync notice:', e);
         }
-      } catch (e) {
-        console.warn('[QuickAudioModal] DB sync notice:', e);
       }
 
-      // Dispatch real-time event across app
+      // Dispatch real-time events across app
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('campus_homework_updated', { detail: { studentId: student.id } }));
+        allStudentKeys.forEach(k => {
+          window.dispatchEvent(new CustomEvent('campus_homework_updated', { detail: { studentId: k } }));
+          window.dispatchEvent(new CustomEvent('homework-updated', { detail: { studentId: k } }));
+        });
+
+        // Supabase channel broadcast for multi-device sync
+        try {
+          const channel = supabase.channel(`realtime_student_progress_${studentIdToUse}`);
+          await channel.send({
+            type: 'broadcast',
+            event: 'homework-changed',
+            payload: { studentId: studentIdToUse }
+          });
+          setTimeout(() => supabase.removeChannel(channel), 1000);
+        } catch {}
       }
 
       setSaveSuccess(true);
@@ -815,9 +1068,28 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
                   <Zap size={20} fill="currentColor" />
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
-                    Hausaufgabe eintragen
-                  </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                      Hausaufgabe eintragen
+                    </h3>
+                    {hasExistingHomework && (
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '2px 8px',
+                        borderRadius: '100px',
+                        background: '#ecfdf5',
+                        border: '1px solid #a7f3d0',
+                        color: '#059669',
+                        fontSize: '0.68rem',
+                        fontWeight: 850
+                      }}>
+                        <Check size={11} strokeWidth={3} />
+                        Bereits hinterlegt
+                      </span>
+                    )}
+                  </div>
                   <p style={{ margin: '1px 0 0', fontSize: '0.80rem', color: '#64748b', fontWeight: 600 }}>
                     Für <strong>{studentDisplayName}</strong> • Heute
                   </p>
@@ -890,7 +1162,7 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
                 {/* Top Metronome Trigger (Discreet & Non-Intrusive) */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                   <span style={{ fontSize: '0.70rem', fontWeight: 800, color: isRecording ? '#dc2626' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    {isRecording ? '🔴 Aufnahme aktiv' : recordedClips.length > 0 ? `✓ ${recordedClips.length} Aufnahme bereit` : 'Audio-Aufnahme (optional)'}
+                    {isRecording ? '🔴 Aufnahme aktiv' : recordedClips.length > 0 ? (hasExistingHomework ? `✓ ${recordedClips.length} ${recordedClips.length === 1 ? 'Aufnahme hinterlegt' : 'Aufnahmen hinterlegt'}` : `✓ ${recordedClips.length} ${recordedClips.length === 1 ? 'Aufnahme bereit' : 'Aufnahmen bereit'}`) : 'Audio-Aufnahme (optional)'}
                   </span>
 
                   <button
@@ -1323,7 +1595,7 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
                 ) : (
                   <>
                     <Zap size={16} fill="currentColor" />
-                    <span>Hausaufgabe jetzt senden ➔</span>
+                    <span>{hasExistingHomework ? 'Hausaufgabe aktualisieren ➔' : 'Hausaufgabe jetzt senden ➔'}</span>
                   </>
                 )}
               </button>

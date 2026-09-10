@@ -36,6 +36,7 @@ import {
 import { useRealNamesVisibility, maskLastName, formatTeacherFullName, formatDisplaySubjectOrInstrument } from '../utils/nameHelper';
 import { MeisterwerkDocumentationModal, checkIsAudioTresorActive } from './MeisterwerkDocumentationModal';
 import { validateChatMessageContent } from '../utils/chatRespectGuard';
+import { isSlotCancelledByAbsence } from '../utils/teacherAbsenceHelper';
 interface ScheduleOccurrence {
   id: string;
   student_id: string | null;
@@ -1965,8 +1966,8 @@ export function ScheduleCalendarViewDesktop({
         .eq('id', userId)
         .single();
       if (data?.sick_until) {
-        setSickStart(data.sick_start ? data.sick_start.substring(0, 10) : null);
-        setSickUntil(data.sick_until.substring(0, 10));
+        setSickStart(data.sick_start || null);
+        setSickUntil(data.sick_until);
       } else {
         setSickStart(null);
         setSickUntil(null);
@@ -1981,8 +1982,8 @@ export function ScheduleCalendarViewDesktop({
         { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${userId}` },
         (payload) => {
           if (payload.new && 'sick_until' in payload.new) {
-            setSickStart(payload.new.sick_start ? payload.new.sick_start.substring(0, 10) : null);
-            setSickUntil(payload.new.sick_until ? payload.new.sick_until.substring(0, 10) : null);
+            setSickStart(payload.new.sick_start || null);
+            setSickUntil(payload.new.sick_until || null);
           }
         }
       )
@@ -6299,7 +6300,7 @@ export function ScheduleCalendarViewDesktop({
                    const isSick = !isBreak && !isVacant && (
                     occ.status === 'teacher_sick' || 
                     occ.status === 'canceled_by_teacher_sick' ||
-                    (sickUntil && (!sickStart || occ.date >= sickStart) && occ.date <= sickUntil)
+                    isSlotCancelledByAbsence(occ.date, occ.start_time, { sick_start: sickStart, sick_until: sickUntil })
                   );
 
                   const isExcused = !isBreak && !isVacant && occ.status === 'cancelled' && !!occ.notes?.startsWith('[Entschuldigt]');

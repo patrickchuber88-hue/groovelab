@@ -1,6 +1,6 @@
 import React from "react";
 import { createPortal } from "react-dom";
-import { Check, Download, Music, Rocket, Star, X } from "lucide-react";
+import { Check, Download, Music, Rocket, Star, X, Lock } from "lucide-react";
 
 export interface StudentJuniorStickerDetailModalProps {
   sticker: any;
@@ -50,7 +50,7 @@ export const StudentJuniorStickerDetailModal: React.FC<StudentJuniorStickerDetai
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: '22px',
+        gap: '20px',
         boxShadow: '0 30px 80px rgba(0,0,0,0.5)',
         position: 'relative',
         animation: 'scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
@@ -77,25 +77,64 @@ export const StudentJuniorStickerDetailModal: React.FC<StudentJuniorStickerDetai
           <X size={22} />
         </button>
 
-        {/* Rarity Pill */}
-        <span style={{
-          background: sticker.rarity === 'legendary' ? '#fef3c7' : sticker.rarity === 'epic' ? '#f3e8ff' : sticker.rarity === 'rare' ? '#eff6ff' : '#f0fdf4',
-          color: sticker.rarity === 'legendary' ? '#b45309' : sticker.rarity === 'epic' ? '#7e22ce' : sticker.rarity === 'rare' ? '#1d4ed8' : '#15803d',
-          fontSize: '0.8rem',
-          fontWeight: 900,
-          textTransform: 'uppercase',
-          letterSpacing: '0.08em',
-          padding: '6px 16px',
-          borderRadius: '100px',
-          border: sticker.rarity === 'legendary' ? '1.5px solid #facc15' : 'none',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '6px'
-        }}>
-          <Star size={12} fill="currentColor" /> {sticker.rarityLabel} • {sticker.category === 'schuljahr' ? 'Schuljahr' : sticker.category === 'ueben' ? 'Übe-Fleiß' : sticker.category === 'xp' ? 'Zauber-XP' : sticker.category === 'streaks' ? 'Streaks' : sticker.category === 'songs' ? 'Repertoire' : 'Spezial'}
-        </span>
+        {/* Status Pill: Unlocked vs Locked */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+          {sticker.isUnlocked ? (
+            <span style={{
+              background: '#dcfce7',
+              color: '#15803d',
+              fontSize: '0.8rem',
+              fontWeight: 900,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              padding: '6px 16px',
+              borderRadius: '100px',
+              border: '1.5px solid #86efac',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <Check size={14} strokeWidth={3} /> Im Album freigeschaltet
+            </span>
+          ) : (
+            <span style={{
+              background: '#fef2f2',
+              color: '#b91c1c',
+              fontSize: '0.8rem',
+              fontWeight: 900,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              padding: '6px 16px',
+              borderRadius: '100px',
+              border: '1.5px solid #fecaca',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <Lock size={14} strokeWidth={2.5} /> Noch verschlossen
+            </span>
+          )}
 
-        {/* Large 150px Full-Color Floating Sticker Card */}
+          {/* Rarity Pill */}
+          <span style={{
+            background: sticker.rarity === 'legendary' ? '#fef3c7' : sticker.rarity === 'epic' ? '#f3e8ff' : sticker.rarity === 'rare' ? '#eff6ff' : '#f0fdf4',
+            color: sticker.rarity === 'legendary' ? '#b45309' : sticker.rarity === 'epic' ? '#7e22ce' : sticker.rarity === 'rare' ? '#1d4ed8' : '#15803d',
+            fontSize: '0.8rem',
+            fontWeight: 900,
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            padding: '6px 16px',
+            borderRadius: '100px',
+            border: sticker.rarity === 'legendary' ? '1.5px solid #facc15' : 'none',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}>
+            <Star size={12} fill="currentColor" /> {sticker.rarityLabel}
+          </span>
+        </div>
+
+        {/* Large 150px Floating Sticker Card (Full color vs Mystery Silhouette) */}
         <div style={{
           width: '150px',
           height: '150px',
@@ -103,20 +142,21 @@ export const StudentJuniorStickerDetailModal: React.FC<StudentJuniorStickerDetai
           background: '#0a0e1a',
           border: sticker.isUnlocked 
             ? (sticker.rarity === 'legendary' ? '4px solid #facc15' : sticker.rarity === 'epic' ? '4px solid #c084fc' : sticker.rarity === 'rare' ? '4px solid #93c5fd' : '4px solid #34a853')
-            : '4px solid #f59e0b',
+            : '3px dashed #64748b',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           boxShadow: sticker.isUnlocked 
             ? '0 16px 40px rgba(52, 168, 83, 0.35)' 
-            : '0 16px 40px rgba(245, 158, 11, 0.35)',
+            : '0 12px 30px rgba(15, 23, 42, 0.45)',
           position: 'relative',
           overflow: 'hidden',
           padding: '10px'
         }}>
           <img
-            src={`/stickers/${sticker.id}.png?v=1`}
+            src={`/stickers/thumbs/${sticker.id}.png`}
             alt={sticker.title}
+            loading="lazy"
             style={{
               width: '100%',
               height: '100%',
@@ -124,9 +164,15 @@ export const StudentJuniorStickerDetailModal: React.FC<StudentJuniorStickerDetai
               borderRadius: '24px',
               filter: sticker.isUnlocked 
                 ? 'drop-shadow(0 6px 14px rgba(255,255,255,0.2))' 
-                : 'grayscale(20%) brightness(0.85)'
+                : 'grayscale(100%) contrast(1.1) brightness(0.28)'
             }}
             onError={(e) => {
+              // Fallback to original path if thumb missing
+              const currentSrc = e.currentTarget.src;
+              if (currentSrc.includes('/thumbs/')) {
+                e.currentTarget.src = `/stickers/${sticker.id}.png?v=1`;
+                return;
+              }
               e.currentTarget.style.display = 'none';
               const parent = e.currentTarget.parentElement;
               if (parent) {
@@ -138,16 +184,34 @@ export const StudentJuniorStickerDetailModal: React.FC<StudentJuniorStickerDetai
             }}
           />
 
+          {/* Mystery Lock Icon Overlay when locked */}
           {!sticker.isUnlocked && (
             <div 
               style={{
                 position: 'absolute',
                 inset: 0,
                 borderRadius: '30px',
-                background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.02) 60%, transparent 100%)',
+                background: 'radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 0.6) 0%, rgba(15, 23, 42, 0.85) 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 pointerEvents: 'none'
               }}
-            />
+            >
+              <div style={{
+                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                width: '46px',
+                height: '46px',
+                borderRadius: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 6px 18px rgba(217, 119, 6, 0.5)',
+                border: '2px solid #ffffff'
+              }}>
+                <Lock size={22} color="#ffffff" strokeWidth={2.5} />
+              </div>
+            </div>
           )}
         </div>
 

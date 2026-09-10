@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
-import { Music, Calendar, AlertCircle, Library, Shield, ShieldCheck, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, CheckCircle2, ChevronLeft, ChevronRight, ChevronDown, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap, RefreshCw, Sliders, VolumeX, Copy, Eye, EyeOff, School, Lightbulb, Disc, XCircle, Volume2, FileText, DoorClosed, Hourglass } from 'lucide-react';
+import { Music, Calendar, AlertCircle, Library, Shield, ShieldCheck, LogOut, Users, User, Monitor, QrCode, Plus, Pencil, Trash2, Box, BarChart as LucideBarChart, Clock, Star, PieChart as LucidePieChart, TrendingUp, Tablet, ExternalLink, Settings, Search, Bell, MapPin, X, Printer, Award, Download, Mic, Check, CheckCircle2, ChevronLeft, ChevronRight, ChevronDown, GripVertical, BookOpen, Maximize2, ArrowLeft, GraduationCap, Lock, Activity, Zap, RefreshCw, Sliders, VolumeX, Copy, Eye, EyeOff, School, Lightbulb, Disc, XCircle, Volume2, FileText, DoorClosed, Hourglass, Landmark, ScrollText, Sparkles, Unplug, AlertTriangle } from 'lucide-react';
 import { 
   ResponsiveContainer,
   BarChart as RechartsBarChart, Bar, XAxis, Tooltip, Cell,
@@ -5273,7 +5273,7 @@ export function AdminDashboard({
             onMouseOver={(e) => { e.currentTarget.style.borderColor = '#94a3b8'; e.currentTarget.style.background = '#f1f5f9'; }}
             onMouseOut={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.background = '#f8fafc'; }}
           >
-            <span>🏛️</span>
+            <Landmark size={15} strokeWidth={2.4} aria-hidden="true" />
             <span>Herrenberg-Dossier (DRV)</span>
           </button>
 
@@ -5298,7 +5298,11 @@ export function AdminDashboard({
             }}
             className="focus-ring"
           >
-            <span>{schoolObj?.avv_signed_at ? '✅' : '📜'}</span>
+            {schoolObj?.avv_signed_at ? (
+              <CheckCircle2 size={15} strokeWidth={2.4} color="#15803d" aria-hidden="true" />
+            ) : (
+              <ScrollText size={15} strokeWidth={2.4} color="#dc2626" aria-hidden="true" />
+            )}
             <span>{schoolObj?.avv_signed_at ? 'AVV unterzeichnet' : 'AVV unterzeichnen'}</span>
           </button>
         </header>
@@ -6440,7 +6444,9 @@ function DeviceSetupScreen({
           fontWeight: 800,
           boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)'
         }}>
-          <div style={{ opacity: 0.6, fontSize: '1.2rem', marginBottom: '4px' }}>📴</div>
+          <div style={{ opacity: 0.6, marginBottom: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Tablet size={24} strokeWidth={2} aria-hidden="true" />
+          </div>
           {defaultName} (nicht aktiv)
         </div>
       );
@@ -6471,22 +6477,19 @@ function DeviceSetupScreen({
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          position: 'relative',
           cursor: isCurrentDevice ? 'default' : 'pointer',
-          boxShadow: isCurrentDevice 
-            ? `0 12px 24px -10px ${brandColor}30, 0 4px 6px -2px ${brandColor}10` 
-            : '0 4px 20px -2px rgba(148, 163, 184, 0.06), 0 2px 4px -1px rgba(148, 163, 184, 0.03)',
-          transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-          transform: isCurrentDevice ? 'none' : 'translateY(0px)',
-          userSelect: 'none'
+          position: 'relative',
+          boxShadow: isCurrentDevice ? `0 12px 24px -6px ${brandColor}30` : '0 4px 12px rgba(0,0,0,0.02)',
+          transition: 'all 0.2s',
+          outline: 'none'
         }}
+        className={isCurrentDevice ? '' : 'hover-scale-mini'}
       >
         {isCurrentDevice && (
           <div style={{
             position: 'absolute',
-            top: '-10px',
-            left: '50%',
-            transform: 'translateX(-50%)',
+            top: '-12px',
+            right: '16px',
             background: `linear-gradient(135deg, ${brandColor} 0%, #f59e0b 100%)`,
             color: 'white',
             fontSize: '0.6rem',
@@ -6500,7 +6503,9 @@ function DeviceSetupScreen({
             whiteSpace: 'nowrap',
             letterSpacing: '0.05em'
           }}>
-            <span>✨</span> DIESES IPAD <span>✨</span>
+            <Sparkles size={11} strokeWidth={2.5} aria-hidden="true" />
+            <span>DIESES IPAD</span>
+            <Sparkles size={11} strokeWidth={2.5} aria-hidden="true" />
           </div>
         )}
 
@@ -6603,10 +6608,11 @@ function DeviceSetupScreen({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '4px'
+                gap: '6px'
               }}
             >
-              <span>🔌</span> Kopplung aufheben
+              <Unplug size={13} strokeWidth={2.4} aria-hidden="true" />
+              <span>Kopplung aufheben</span>
             </button>
           ) : (
             <div style={{
@@ -6800,7 +6806,8 @@ function DeviceSetupScreen({
           boxShadow: '0 4px 16px rgba(234, 179, 8, 0.15)'
         }}>
           <span style={{ fontSize: '0.82rem', color: '#854d0e', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            ⚠️ Ungespeicherte Änderungen an den GrooveLab-Einstellungen vorhanden.
+            <AlertTriangle size={16} strokeWidth={2.4} color="#854d0e" aria-hidden="true" style={{ flexShrink: 0 }} />
+            <span>Ungespeicherte Änderungen an den GrooveLab-Einstellungen vorhanden.</span>
           </span>
           <button
             onClick={handleSaveAcademy}

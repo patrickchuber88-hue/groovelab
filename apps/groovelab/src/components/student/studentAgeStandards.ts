@@ -24,7 +24,7 @@ export const CAMPUS_AGE_STANDARDS: Record<string, CampusAgeStandard> = {
     allowChat: false,
     allowTimer: true,
     allowLeaderboard: false,
-    allowProposals: false,
+    allowProposals: true,
     allowAudio: false, // 🛡️ Privacy by Default (Art. 25 Abs. 2 DSGVO): Audio standardmäßig deaktiviert
     allowTts: true,
     bedtimeEnabled: true,
@@ -32,7 +32,7 @@ export const CAMPUS_AGE_STANDARDS: Record<string, CampusAgeStandard> = {
     bedtimeEnd: '07:00',
     boardOverrides: {
       practice_board: true,
-      mediathek: false,
+      mediathek: true, // 🎵 Schulische Mediathek (reine Metadaten, Play-Alongs & Übe-Fahrpläne) für alle Altersstufen aktiv
       recordings: false, // 🛡️ Privacy by Default
       events: true,
       campus_cup: false,

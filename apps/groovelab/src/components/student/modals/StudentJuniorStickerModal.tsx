@@ -1,8 +1,8 @@
 import React from "react";
 import { createPortal } from "react-dom";
-import { Check, Sparkles, X } from "lucide-react";
+import { Check, Sparkles, X, Lock, Clock, Flame, Music, Award, Star } from "lucide-react";
 
-export type JuniorStickerCategory = 'all' | 'ueben' | 'xp' | 'streaks' | 'songs' | 'spezial';
+export type JuniorStickerCategory = 'all' | 'schuljahr' | 'ueben' | 'xp' | 'streaks' | 'songs' | 'spezial';
 
 export interface StudentJuniorStickerModalProps {
   isOpen: boolean;
@@ -27,6 +27,19 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
 }) => {
   if (!isOpen || typeof document === "undefined") return null;
 
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
+  const unlockedTotal = allStickers.filter(st => unifiedStickersMap[st.id]?.isUnlocked).length;
+  const categoriesList = [
+    { id: 'all', label: `Alle (${allStickers.length})` },
+    { id: 'schuljahr', label: '🎒 Schuljahre' },
+    { id: 'ueben', label: '⏱️ Übe-Fleiß' },
+    { id: 'xp', label: '⭐ Zauber-XP' },
+    { id: 'streaks', label: '🔥 Streaks' },
+    { id: 'songs', label: '🎵 Repertoire' },
+    { id: 'spezial', label: '🏆 Spezial' }
+  ];
+
   return createPortal(
     <div style={{
       position: 'fixed',
@@ -37,22 +50,23 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '16px'
+      padding: isMobile ? '8px' : '16px'
     }}>
       <div style={{
         background: '#ffffff',
-        borderRadius: '36px',
-        maxWidth: '880px',
+        borderRadius: isMobile ? '28px' : '36px',
+        maxWidth: '920px',
         width: '100%',
-        maxHeight: '92vh',
+        height: isMobile ? '96vh' : '92vh',
         display: 'flex',
         flexDirection: 'column',
-        padding: '32px 28px',
+        padding: isMobile ? '20px 14px 14px 14px' : '28px 28px 20px 28px',
         boxShadow: '0 35px 80px rgba(0, 0, 0, 0.35)',
         position: 'relative',
         boxSizing: 'border-box',
         overflow: 'hidden'
       }}>
+
         {/* CLOSE BUTTON */}
         <button
           onClick={onClose}
@@ -166,216 +180,290 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
           </div>
         </div>
 
-        {/* SCROLLABLE 3D COLLECTOR STICKER GRID */}
+        {/* SCROLLABLE 3D COLLECTOR STICKER CONTENT */}
         <div style={{
           overflowY: 'auto',
           flex: 1,
-          padding: '6px 4px 16px 4px'
+          padding: '6px 4px 16px 4px',
+          WebkitOverflowScrolling: 'touch'
         }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
-            gap: '16px'
-          }}>
-            {allStickers
-              .filter(st => juniorStickerCategory === 'all' || st.category === juniorStickerCategory)
-              .map((st) => {
-                const status = unifiedStickersMap[st.id] || { isUnlocked: false, progressText: '', count: 0, details: [] };
-                const isUnlocked = status.isUnlocked;
-                const progressText = status.progressText;
+          {(() => {
+            const categories = [
+              { id: 'schuljahr', title: '🎒 Schuljahr-Wappen & Ausbildungs-Reise', icon: Award, iconColor: '#0284c7' },
+              { id: 'ueben', title: '⏱️ Übe-Fleiß & Zeiterfolge', icon: Clock, iconColor: '#10b981' },
+              { id: 'xp', title: '⭐ Zauber-XP & Meilensteine', icon: Sparkles, iconColor: '#eab308' },
+              { id: 'streaks', title: '🔥 Übe-Streaks & Kontinuität', icon: Flame, iconColor: '#ef4444' },
+              { id: 'songs', title: '🎵 Repertoire & Meisterstücke', icon: Music, iconColor: '#8b5cf6' },
+              { id: 'spezial', title: '🏆 Spezial-Auszeichnungen & Bühne', icon: Star, iconColor: '#d97706' }
+            ].filter(cat => juniorStickerCategory === 'all' || cat.id === juniorStickerCategory);
 
-                const isLegendary = st.rarity === 'legendary';
-                const isEpic = st.rarity === 'epic';
-                const isRare = st.rarity === 'rare';
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '20px' : '28px', width: '100%' }}>
+                {categories.map(cat => {
+                  const categoryStickers = allStickers.filter(st => st.category === cat.id);
+                  if (categoryStickers.length === 0) return null;
 
-                const rarityGlow = isLegendary 
-                  ? 'rgba(250, 204, 21, 0.45)' 
-                  : isEpic 
-                  ? 'rgba(192, 132, 252, 0.4)' 
-                  : isRare 
-                  ? 'rgba(96, 165, 250, 0.35)' 
-                  : 'rgba(52, 168, 83, 0.35)';
+                  const catUnlockedCount = categoryStickers.filter(st => unifiedStickersMap[st.id]?.isUnlocked).length;
+                  const isCatComplete = catUnlockedCount === categoryStickers.length;
+                  const CatIcon = cat.icon;
 
-                return (
-                  <div
-                    key={st.id}
-                    onClick={() => onSelectSticker({ ...st, isUnlocked, progressText })}
-                    style={{
-                      background: isUnlocked ? '#ffffff' : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                      border: isUnlocked 
-                        ? (isLegendary ? '3px solid #facc15' : isEpic ? '3px solid #c084fc' : isRare ? '3px solid #93c5fd' : '3px solid #86efac') 
-                        : '2px dashed #cbd5e1',
-                      borderRadius: '26px',
-                      padding: '16px 12px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      textAlign: 'center',
-                      gap: '10px',
-                      position: 'relative',
-                      boxShadow: isUnlocked 
-                        ? `0 12px 28px ${rarityGlow}` 
-                        : '0 4px 12px rgba(0, 0, 0, 0.03)',
-                      cursor: 'pointer',
-                      transition: 'all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                      overflow: 'hidden'
-                    }}
-                    className="hover-scale"
-                  >
-                    {/* RARITY BADGE */}
-                    <span style={{
-                      fontSize: '0.62rem',
-                      fontWeight: 950,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.06em',
-                      padding: '3px 10px',
-                      borderRadius: '100px',
-                      background: isLegendary ? '#fef3c7' : isEpic ? '#f3e8ff' : isRare ? '#eff6ff' : '#f1f5f9',
-                      color: isLegendary ? '#b45309' : isEpic ? '#7e22ce' : isRare ? '#1d4ed8' : '#64748b',
-                      border: isLegendary ? '1px solid #fde68a' : 'none'
-                    }}>
-                      {st.rarityLabel}
-                    </span>
-
-                    {/* STICKER IMAGE CONTAINER - COLLECTIBLE BADGE */}
-                    <div style={{
-                      width: '92px',
-                      height: '92px',
-                      position: 'relative',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderRadius: '22px',
-                      background: '#0a0e1a',
-                      border: isUnlocked 
-                        ? (isLegendary ? '2.5px solid #facc15' : isEpic ? '2.5px solid #c084fc' : isRare ? '2.5px solid #93c5fd' : '2.5px solid #4ade80')
-                        : '2px solid #334155',
-                      boxShadow: isUnlocked
-                        ? `0 8px 20px ${rarityGlow}`
-                        : 'inset 0 2px 6px rgba(0,0,0,0.4)',
-                      overflow: 'hidden',
-                      padding: '5px'
-                    }}>
-                      {/* Genuine Full Color Image */}
-                      <img
-                        src={`/stickers/${st.id}.png?v=1`}
-                        alt={st.title}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'contain',
-                          borderRadius: '16px',
-                          filter: isUnlocked 
-                            ? 'drop-shadow(0 4px 10px rgba(255,255,255,0.18))' 
-                            : 'grayscale(25%) contrast(0.9) brightness(0.72)',
-                          transition: 'transform 0.3s ease'
-                        }}
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          const parent = e.currentTarget.parentElement;
-                          if (parent) {
-                            const span = document.createElement('span');
-                            span.style.fontSize = '2.8rem';
-                            span.innerText = st.emoji;
-                            parent.appendChild(span);
-                          }
-                        }}
-                      />
-
-                      {/* Gentle Mystery Shimmer Overlay for Locked Stickers */}
-                      {!isUnlocked && (
-                        <div 
-                          style={{
-                            position: 'absolute',
-                            inset: 0,
-                            borderRadius: '20px',
-                            background: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.02) 60%, transparent 100%)',
-                            pointerEvents: 'none'
-                          }}
-                        />
-                      )}
-
-                      {/* Floating Mystery Badge or Checkmark */}
-                      {!isUnlocked ? (
-                        <div style={{
-                          position: 'absolute',
-                          bottom: '-2px',
-                          right: '-2px',
-                          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                          color: '#ffffff',
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '50%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          boxShadow: '0 3px 10px rgba(245, 158, 11, 0.45)',
-                          border: '2px solid #ffffff'
-                        }}>
-                          <Sparkles size={12} color="#ffffff" />
+                  return (
+                    <div key={cat.id} style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
+                      {/* Category Header Row */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '0 4px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <CatIcon size={16} color={cat.iconColor} strokeWidth={2.4} />
+                          <h3 style={{ margin: 0, fontSize: isMobile ? '0.88rem' : '0.98rem', fontWeight: 950, color: '#0f172a' }}>
+                            {cat.title}
+                          </h3>
                         </div>
-                      ) : (
-                        <div style={{
-                          position: 'absolute',
-                          bottom: '-2px',
-                          right: '-2px',
-                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                          color: '#ffffff',
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '50%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          boxShadow: '0 3px 10px rgba(16, 185, 129, 0.45)',
-                          border: '2px solid #ffffff'
-                        }}>
-                          <Check size={13} strokeWidth={3} color="#ffffff" />
-                        </div>
-                      )}
-                    </div>
 
-                    {/* TITLE & CHILD-FRIENDLY PROGRESS/STATUS */}
-                    <div style={{ width: '100%' }}>
-                      <h4 style={{ margin: '0 0 4px 0', fontSize: '0.94rem', fontWeight: 950, color: '#0f172a', lineHeight: 1.2 }}>
-                        {st.title}
-                      </h4>
-                      {isUnlocked ? (
                         <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          background: '#dcfce7',
-                          color: '#15803d',
+                          background: isCatComplete ? '#dcfce7' : '#f1f5f9',
+                          border: isCatComplete ? '1px solid #86efac' : '1px solid #e2e8f0',
+                          color: isCatComplete ? '#15803d' : '#64748b',
                           fontSize: '0.68rem',
-                          fontWeight: 950,
-                          padding: '3px 10px',
-                          borderRadius: '100px',
-                          border: '1px solid #bbf7d0'
-                        }}>
-                          ★ Im Album!
-                        </span>
-                      ) : (
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          fontSize: '0.70rem',
-                          color: '#b45309',
                           fontWeight: 900,
-                          background: '#fef3c7',
-                          padding: '3px 10px',
-                          borderRadius: '100px',
-                          border: '1px solid #fde68a'
+                          padding: '2px 8px',
+                          borderRadius: '10px'
                         }}>
-                          {progressText || 'Noch gesperrt'}
+                          {catUnlockedCount} / {categoryStickers.length} {isCatComplete ? '✓' : ''}
                         </span>
-                      )}
+                      </div>
+
+                      {/* Responsive Grid: 2-Columns on Mobile, 4-Columns on Desktop */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
+                        gap: isMobile ? '10px' : '14px',
+                        width: '100%'
+                      }}>
+                        {categoryStickers.map(st => {
+                          const status = unifiedStickersMap[st.id] || { isUnlocked: false, progressText: '', count: 0, details: [] };
+                          const isUnlocked = status.isUnlocked;
+                          const progressText = status.progressText;
+
+                          const isLegendary = st.rarity === 'legendary';
+                          const isEpic = st.rarity === 'epic';
+                          const isRare = st.rarity === 'rare';
+
+                          const rarityGlow = isLegendary 
+                            ? 'rgba(250, 204, 21, 0.45)' 
+                            : isEpic 
+                            ? 'rgba(192, 132, 252, 0.4)' 
+                            : isRare 
+                            ? 'rgba(96, 165, 250, 0.35)' 
+                            : 'rgba(52, 168, 83, 0.35)';
+
+                          return (
+                            <div
+                              key={st.id}
+                              onClick={() => onSelectSticker({ ...st, isUnlocked, progressText })}
+                              style={{
+                                background: isUnlocked ? '#ffffff' : '#f8fafc',
+                                border: isUnlocked 
+                                  ? (isLegendary ? '2.5px solid #facc15' : isEpic ? '2.5px solid #c084fc' : isRare ? '2.5px solid #93c5fd' : '2.5px solid #86efac') 
+                                  : '1.5px dashed #cbd5e1',
+                                borderRadius: '22px',
+                                padding: isMobile ? '12px 8px' : '16px 12px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                textAlign: 'center',
+                                gap: '8px',
+                                position: 'relative',
+                                boxShadow: isUnlocked 
+                                  ? `0 10px 24px ${rarityGlow}` 
+                                  : '0 2px 6px rgba(0, 0, 0, 0.02)',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                overflow: 'hidden',
+                                boxSizing: 'border-box'
+                              }}
+                              className="hover-scale"
+                            >
+                              {/* RARITY PILL */}
+                              <span style={{
+                                fontSize: '0.60rem',
+                                fontWeight: 950,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.06em',
+                                padding: '2px 8px',
+                                borderRadius: '100px',
+                                background: isLegendary ? '#fef3c7' : isEpic ? '#f3e8ff' : isRare ? '#eff6ff' : '#f1f5f9',
+                                color: isLegendary ? '#b45309' : isEpic ? '#7e22ce' : isRare ? '#1d4ed8' : '#64748b',
+                                border: isLegendary ? '1px solid #fde68a' : 'none'
+                              }}>
+                                {st.rarityLabel}
+                              </span>
+
+                              {/* STICKER THUMBNAIL BADGE */}
+                              <div style={{
+                                width: isMobile ? '74px' : '88px',
+                                height: isMobile ? '74px' : '88px',
+                                position: 'relative',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: '18px',
+                                background: '#0a0e1a',
+                                border: isUnlocked 
+                                  ? (isLegendary ? '2px solid #facc15' : isEpic ? '2px solid #c084fc' : isRare ? '2px solid #93c5fd' : '2px solid #4ade80')
+                                  : '1.5px solid #334155',
+                                boxShadow: isUnlocked
+                                  ? `0 6px 16px ${rarityGlow}`
+                                  : 'inset 0 2px 6px rgba(0,0,0,0.4)',
+                                overflow: 'hidden',
+                                padding: '4px'
+                              }}>
+                                <img
+                                  src={`/stickers/thumbs/${st.id}.png`}
+                                  alt={st.title}
+                                  loading="lazy"
+                                  style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'contain',
+                                    borderRadius: '14px',
+                                    filter: isUnlocked 
+                                      ? 'drop-shadow(0 4px 8px rgba(255,255,255,0.18))' 
+                                      : 'grayscale(100%) contrast(1.1) brightness(0.25)',
+                                    transition: 'transform 0.2s ease'
+                                  }}
+                                  onError={(e) => {
+                                    // Fallback to uncompressed png if thumb missing
+                                    const src = e.currentTarget.src;
+                                    if (src.includes('/thumbs/')) {
+                                      e.currentTarget.src = `/stickers/${st.id}.png?v=1`;
+                                      return;
+                                    }
+                                    e.currentTarget.style.display = 'none';
+                                    const parent = e.currentTarget.parentElement;
+                                    if (parent) {
+                                      const span = document.createElement('span');
+                                      span.style.fontSize = isMobile ? '2.2rem' : '2.6rem';
+                                      span.innerText = st.emoji;
+                                      parent.appendChild(span);
+                                    }
+                                  }}
+                                />
+
+                                {/* Lock Overlay for Locked Stickers */}
+                                {!isUnlocked ? (
+                                  <div style={{
+                                    position: 'absolute',
+                                    inset: 0,
+                                    borderRadius: '16px',
+                                    background: 'rgba(15, 23, 42, 0.65)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    pointerEvents: 'none'
+                                  }}>
+                                    <div style={{
+                                      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                                      color: '#ffffff',
+                                      width: '24px',
+                                      height: '24px',
+                                      borderRadius: '8px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      boxShadow: '0 2px 8px rgba(217, 119, 6, 0.4)'
+                                    }}>
+                                      <Lock size={12} color="#ffffff" strokeWidth={2.6} />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div style={{
+                                    position: 'absolute',
+                                    bottom: '-2px',
+                                    right: '-2px',
+                                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                    color: '#ffffff',
+                                    width: '22px',
+                                    height: '22px',
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: '0 2px 8px rgba(16, 185, 129, 0.45)',
+                                    border: '1.5px solid #ffffff'
+                                  }}>
+                                    <Check size={12} strokeWidth={3} color="#ffffff" />
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* TITLE & PROGRESS / STATUS */}
+                              <div style={{ width: '100%' }}>
+                                <h4 style={{
+                                  margin: '0 0 4px 0',
+                                  fontSize: isMobile ? '0.80rem' : '0.88rem',
+                                  fontWeight: 950,
+                                  color: '#0f172a',
+                                  lineHeight: 1.2,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  minHeight: isMobile ? '1.9rem' : '2.1rem'
+                                }}>
+                                  {st.title}
+                                </h4>
+
+                                {isUnlocked ? (
+                                  <span style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    background: '#dcfce7',
+                                    color: '#15803d',
+                                    fontSize: '0.64rem',
+                                    fontWeight: 950,
+                                    padding: '2px 8px',
+                                    borderRadius: '100px',
+                                    border: '1px solid #bbf7d0'
+                                  }}>
+                                    ★ Im Album!
+                                  </span>
+                                ) : (
+                                  <span style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    fontSize: '0.64rem',
+                                    color: '#b45309',
+                                    fontWeight: 900,
+                                    background: '#fef3c7',
+                                    padding: '2px 8px',
+                                    borderRadius: '100px',
+                                    border: '1px solid #fde68a',
+                                    maxWidth: '100%',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap'
+                                  }}>
+                                    <Lock size={10} /> {progressText || 'Noch gesperrt'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-          </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
 
         {/* BOTTOM ACTION BAR */}

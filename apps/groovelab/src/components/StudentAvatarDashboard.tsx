@@ -52,7 +52,7 @@ import { StudentBriefingTab } from './student/tabs/StudentBriefingTab';
 import { StudentHeroTab } from './student/tabs/StudentHeroTab';
 import { CampusAppointmentShoutboxModal } from './CampusAppointmentShoutboxModal';
 import { StudentRescheduleBottomSheetModal } from './student/modals/StudentRescheduleBottomSheetModal';
-import { getSanitizedRpId } from '../utils/webauthn';
+import { getSanitizedRpId, registerBiometrics, isWebAuthnSupported, authenticateParentBiometricPasskey } from '../utils/webauthn';
 
 // 🚀 High-Performance Lazy Loaded Sub-Suites & Heavy Modals
 const StudentPracticeTab = lazy(() => import('./student/tabs/StudentPracticeTab').then(m => ({ default: m.StudentPracticeTab })));
@@ -333,6 +333,26 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     return (initialUser as any)?.schools?.name || (initialUser as any)?.school_name || (typeof window !== 'undefined' ? (localStorage.getItem('groovelab_school_name') || localStorage.getItem('campus_school_name')) : '') || 'Campus-Groovelab Musikschule';
   });
 
+  const modalStudentUser = useMemo(() => {
+    if (!studentUser) return null;
+    return {
+      ...studentUser,
+      id: studentId,
+      first_name: studentUser.first_name || '',
+      last_name: '', // 🛡️ Zero-Knowledge: 100% last_name exclusion in student view
+      photo_url: studentUser.photo_url || '/avatar_ghost.jpg',
+      is_campus_active: studentUser.is_campus_active ?? false,
+      school_id: studentUser?.school_id,
+      schoolId: studentUser?.school_id,
+      schools: studentUser?.schools,
+      school_name: resolvedSchoolName || (Array.isArray(studentUser?.schools) ? studentUser?.schools[0]?.name : studentUser?.schools?.name) || studentUser?.school_name,
+      instrument: studentUser?.instrument,
+      teacher_id: studentUser?.teacher_id,
+      created_at: studentUser?.created_at,
+      activated_at: studentUser?.activated_at
+    };
+  }, [studentUser, studentId, resolvedSchoolName]);
+
   useEffect(() => {
     const sId = studentUser?.school_id || (typeof window !== 'undefined' ? (localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id')) : null);
     if (sId) {
@@ -602,8 +622,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const isStandalone = typeof window !== 'undefined' && ((window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches);
 
   const [studentSchedules, setStudentSchedules] = useState<any[]>([]);
-  const [settingsSubTab, setSettingsSubTab] = useState<'notifications' | 'parent_controls' | 'screentime' | 'practice_report' | 'cancellations' | 'family_profiles' | 'security' | 'modules' | 'billing' | 'legal' | 'overview'>('parent_controls');
-  const [activeStudentSettingsModal, setActiveStudentSettingsModal] = useState<'notifications' | 'parent_controls' | 'screentime' | 'practice_report' | 'cancellations' | 'family_profiles' | 'security' | 'modules' | 'billing' | 'legal' | null>(null);
+  const [settingsSubTab, setSettingsSubTab] = useState<'notifications' | 'parent_controls' | 'screentime' | 'practice_report' | 'cancellations' | 'family_profiles' | 'security' | 'modules' | 'billing' | 'legal' | 'downloads' | 'overview'>('parent_controls');
+  const [activeStudentSettingsModal, setActiveStudentSettingsModal] = useState<'notifications' | 'parent_controls' | 'screentime' | 'practice_report' | 'cancellations' | 'family_profiles' | 'security' | 'modules' | 'billing' | 'legal' | 'downloads' | null>(null);
   const [showParentActivationModal, setShowParentActivationModal] = useState(false);
   const [showSoftLockModal, setShowSoftLockModal] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
@@ -736,7 +756,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
   // Parental Gatekeeper State (6-Digit Parent Master PIN)
   const [showParentGateModal, setShowParentGateModal] = useState(false);
-  const [pendingParentTarget, setPendingParentTarget] = useState<'parent_controls' | 'security' | 'billing' | 'legal' | null>(null);
+  const [pendingParentTarget, setPendingParentTarget] = useState<'parent_controls' | 'security' | 'billing' | 'legal' | 'downloads' | null>(null);
   const [parentGatePinInput, setParentGatePinInput] = useState('');
   const [parentGateError, setParentGateError] = useState('');
   const [isVerifyingParentGate, setIsVerifyingParentGate] = useState(false);
@@ -874,9 +894,16 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       setIsParentUnlocked(true);
       setIsVerifyingParentGate(false);
       setParentGatePinInput('');
+      setShowParentGateModal(false);
       window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: true }));
-      setSettingsSubTab('overview');
-      setActiveStudentSettingsModal(null);
+      if (pendingParentTarget) {
+        setSettingsSubTab(pendingParentTarget);
+        setActiveStudentSettingsModal(pendingParentTarget);
+        setPendingParentTarget(null);
+      } else {
+        setSettingsSubTab('overview');
+        setActiveStudentSettingsModal(null);
+      }
     } catch (e: any) {
       console.warn('[Biometrics] Unlock failed:', e);
       if (e.name !== 'NotAllowedError' && e.name !== 'AbortError') {
@@ -884,6 +911,63 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       }
     } finally {
       setIsVerifyingParentGate(false);
+    }
+  };
+
+  const handleRegisterParentPasskey = async (): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const targetId = studentId || (studentUser as any)?.id;
+      if (!targetId) throw new Error('Kein Schülerprofil zugeordnet.');
+
+      // 1. Request registration challenge from server
+      const { data: chalData, error: chalErr } = await supabase.rpc('generate_webauthn_challenge', {
+        p_user_id: targetId,
+        p_type: 'register'
+      });
+
+      if (chalErr || !chalData?.challenge) {
+        throw new Error('Sicherheits-Challenge konnte nicht vom Server bezogen werden.');
+      }
+
+      const safeFirstName = (studentUser?.first_name || 'schueler')
+        .toLowerCase()
+        .replace(/[äöüß]/g, (m: string) => ({ 'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'ß': 'ss' }[m] || m))
+        .replace(/[^a-z0-9]/g, '');
+      const email = `eltern.${safeFirstName || 'kind'}@campus-groovelab.local`;
+
+      const passkeyResult = await registerBiometrics(
+        email,
+        targetId,
+        chalData.challenge,
+        `Eltern-Gerät • ${studentUser?.first_name || 'Kind'}`
+      );
+
+      // 2. Authoritative server binding
+      const deviceName = isIOS ? 'Apple Face/Touch ID' : isMobile ? 'Smartphone Biometrie / Passkey' : 'Eltern-Passkey';
+      const { data: regResult, error: regErr } = await supabase.rpc('register_webauthn_credential', {
+        p_user_id: targetId,
+        p_credential_id: passkeyResult.id,
+        p_public_key: JSON.stringify(passkeyResult.response),
+        p_device_name: deviceName,
+        p_challenge: chalData.challenge
+      });
+
+      if (regErr || !regResult?.success) {
+        throw new Error(regErr?.message || regResult?.error || 'Passkey-Registrierung auf dem Server fehlgeschlagen.');
+      }
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`groovelab_parent_passkey_active_${targetId}`, 'true');
+        if (studentId) localStorage.setItem(`groovelab_parent_passkey_active_${studentId}`, 'true');
+      }
+
+      return { success: true };
+    } catch (err: any) {
+      console.warn('[Passkey] Registration failed:', err);
+      if (err.name === 'NotAllowedError' || err.name === 'AbortError') {
+        return { success: false, error: 'Einrichtung auf diesem Gerät abgebrochen.' };
+      }
+      return { success: false, error: err.message || 'Passkey konnte nicht eingerichtet werden.' };
     }
   };
 
@@ -1005,7 +1089,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       allowChat: false,
       allowTimer: true,
       allowLeaderboard: false,
-      allowProposals: false,
+      allowProposals: true,
       allowAudio: false, // 🛡️ Privacy by Default (Art. 25 Abs. 2 DSGVO)
       allowTts: true,
       bedtimeEnabled: true,
@@ -1013,7 +1097,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       bedtimeEnd: '07:00',
       boardOverrides: {
         practice_board: true,
-        mediathek: false,
+        mediathek: true,
         recordings: false, // 🛡️ Privacy by Default
         events: true,
         campus_cup: false,
@@ -1593,7 +1677,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     });
   };
 
-  const handleOpenSettingsModule = (moduleId: 'notifications' | 'parent_controls' | 'security' | 'billing' | 'legal' | 'feedback' | any) => {
+  const handleOpenSettingsModule = (moduleId: 'notifications' | 'parent_controls' | 'security' | 'billing' | 'legal' | 'downloads' | 'feedback' | any) => {
     if (moduleId === 'feedback') {
       setIsFeedbackModalOpen(true);
       return;
@@ -1827,7 +1911,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       const curChat = draftAllowChat ?? (studentUser as any)?.parent_allow_chat ?? (currentLevelKey !== 'junior');
       const curLeaderboard = draftAllowLeaderboard !== null ? draftAllowLeaderboard : Boolean((studentUser as any)?.parent_allow_leaderboard);
       const curPractice = draftBoardOverrides.practice_board ?? (localStorage.getItem('campus_board_override_practice_board') !== 'false');
-      const curMediathek = draftBoardOverrides.mediathek ?? (localStorage.getItem('campus_board_override_mediathek') === 'true' || currentLevelKey !== 'junior');
+      const curMediathek = true;
 
       const fullStudentName = formatStudentPureFirstName(studentUser?.first_name, 'Schüler-Profil');
       const maskedStudentName = formatStudentPureFirstName(studentUser?.first_name, 'Schüler-Profil');
@@ -3108,6 +3192,47 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     }
   };
 
+  const handleBiometricUnlockForGlobalPin = async () => {
+    try {
+      setIsVerifyingGlobalPin(true);
+      setGlobalPinError('');
+      const targetId = studentId || (studentUser as any)?.id;
+      if (!targetId) throw new Error('Kein Schülerprofil zugeordnet.');
+
+      const authRes = await authenticateParentBiometricPasskey(
+        supabase,
+        targetId,
+        (studentUser as any)?.school_id || null
+      );
+
+      if (!authRes.success) {
+        if (authRes.error && !authRes.error.includes('abgebrochen')) {
+          setGlobalPinError(authRes.error);
+        }
+        return;
+      }
+
+      // Success: session lease & execute pending action
+      sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
+      sessionStorage.setItem(`groovelab_parent_unlocked_${targetId}`, 'true');
+      sessionStorage.setItem(`groovelab_parent_session_${targetId}`, String(Date.now() + 180 * 1000));
+      setShowGlobalParentPinModal(false);
+      setGlobalPinInput('');
+      setGlobalPinError('');
+      if (globalPinPendingAction) {
+        const action = globalPinPendingAction;
+        setGlobalPinPendingAction(null);
+        action();
+      }
+    } catch (e: any) {
+      if (e.name !== 'NotAllowedError' && e.name !== 'AbortError') {
+        setGlobalPinError(e.message || 'Passkey-Entsperrung fehlgeschlagen.');
+      }
+    } finally {
+      setIsVerifyingGlobalPin(false);
+    }
+  };
+
   const handleVerifyGlobalParentPinAsync = async (inputPin: string): Promise<boolean> => {
     if (!inputPin || inputPin.length !== 6) return false;
     const cleanInput = inputPin.trim();
@@ -4269,7 +4394,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const [showJuniorRecordingsModal, setShowJuniorRecordingsModal] = useState(false);
   const [showJuniorStickerModal, setShowJuniorStickerModal] = useState(false);
   const [showJuniorPracticeSettingsModal, setShowJuniorPracticeSettingsModal] = useState(false);
-  const [juniorStickerCategory, setJuniorStickerCategory] = useState<'all' | 'ueben' | 'xp' | 'streaks' | 'songs' | 'spezial'>('all');
+  const [juniorStickerCategory, setJuniorStickerCategory] = useState<'all' | 'schuljahr' | 'ueben' | 'xp' | 'streaks' | 'songs' | 'spezial'>('all');
   const [juniorAwardedStickerToCelebrate, setJuniorAwardedStickerToCelebrate] = useState<any | null>(null);
   const [juniorSelectedPreviewSticker, setJuniorSelectedPreviewSticker] = useState<any | null>(null);
   const [juniorCheckedPages, setJuniorCheckedPages] = useState<Record<string, boolean>>({});
@@ -4891,10 +5016,18 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     }
     if (juniorMediaRecorderRef.current && juniorMediaRecorderRef.current.state !== 'inactive') {
       try {
-        juniorMediaRecorderRef.current.stop();
-      } catch (e) {
-        console.warn('Recorder stop warning:', e);
-      }
+        juniorMediaRecorderRef.current.requestData();
+      } catch (e) {}
+      const jRec = juniorMediaRecorderRef.current;
+      setTimeout(() => {
+        try {
+          if (jRec && jRec.state !== 'inactive') {
+            jRec.stop();
+          }
+        } catch (e) {
+          console.warn('Recorder stop warning:', e);
+        }
+      }, 500);
     }
     setJuniorIsRecording(false);
   };
@@ -5567,15 +5700,17 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       }
     };
 
+    const isWakeLockNeeded = sessionActive || isMusicStandMode;
+
     const handleVisibility = async () => {
-      if (document.visibilityState === 'visible' && sessionActive) {
+      if (document.visibilityState === 'visible' && (sessionActive || isMusicStandMode)) {
         await acquireWakeLock();
       } else {
         await releaseWakeLock();
       }
     };
 
-    if (sessionActive) {
+    if (isWakeLockNeeded) {
       acquireWakeLock();
       document.addEventListener('visibilitychange', handleVisibility);
     } else {
@@ -5586,7 +5721,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       releaseWakeLock();
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [sessionActive]);
+  }, [sessionActive, isMusicStandMode]);
   const [expandedMonths, setExpandedMonths] = useState<Record<string, boolean>>({});
   const [hasCompletedTargetToday, setHasCompletedTargetToday] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<'logbook' | 'stats'>('logbook');
@@ -10985,6 +11120,38 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             })}
           </div>
 
+          {/* Biometric Passkey Unlock (Face ID / Touch ID) */}
+          {hasConfiguredParentPin && isWebAuthnSupported() && (
+            <button
+              type="button"
+              disabled={isVerifyingParentGate || parentGateCooldownSeconds > 0}
+              onClick={handleBiometricUnlock}
+              style={{
+                marginTop: '14px',
+                width: '100%',
+                padding: '12px 16px',
+                borderRadius: '16px',
+                border: '1px solid #bae6fd',
+                background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                color: '#0284c7',
+                fontSize: '0.9rem',
+                fontWeight: 800,
+                cursor: isVerifyingParentGate || parentGateCooldownSeconds > 0 ? 'not-allowed' : 'pointer',
+                opacity: isVerifyingParentGate || parentGateCooldownSeconds > 0 ? 0.6 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px',
+                boxShadow: '0 2px 8px rgba(2, 132, 199, 0.08)',
+                transition: 'all 0.15s ease'
+              }}
+              className="hover-scale"
+            >
+              <Fingerprint size={20} />
+              <span>Mit Face ID / Touch ID entsperren</span>
+            </button>
+          )}
+
           {/* Secure Tier-1 PIN Recovery Link */}
           {hasConfiguredParentPin && (
             <button
@@ -12105,22 +12272,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             <Suspense fallback={<HomeworkBookLoadingFallback onReload={() => setHomeworkRetryKey(k => k + 1)} />}>
               <MeisterwerkDocumentationModal
                 key={`hw-modal-${studentId}-${homeworkRetryKey}`}
-                student={{
-                  ...studentUser,
-                  id: studentId,
-                  first_name: studentUser ? studentUser.first_name : '',
-                  last_name: '', // 🛡️ Zero-Knowledge: 100% last_name exclusion in student view
-                  photo_url: (studentUser && studentUser.photo_url) || '/avatar_ghost.jpg',
-                  is_campus_active: studentUser ? studentUser.is_campus_active : false,
-                  school_id: studentUser?.school_id,
-                  schoolId: studentUser?.school_id,
-                  schools: studentUser?.schools,
-                  school_name: resolvedSchoolName || (Array.isArray(studentUser?.schools) ? studentUser?.schools[0]?.name : studentUser?.schools?.name) || studentUser?.school_name,
-                  instrument: studentUser?.instrument,
-                  teacher_id: studentUser?.teacher_id,
-                  created_at: studentUser?.created_at,
-                  activated_at: studentUser?.activated_at
-                }}
+                student={modalStudentUser!}
                 schoolName={resolvedSchoolName}
                 onClose={() => handleTabChangeLocal('briefing')}
                 teacherId={studentUser ? studentUser.teacher_id : null}
@@ -12381,6 +12533,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             generateParentRecoveryKey={generateParentRecoveryKey}
             getTargetMinutes={getTargetMinutes}
             handleBiometricUnlock={handleBiometricUnlock}
+            handleRegisterParentPasskey={handleRegisterParentPasskey}
             handleCloseSettingsModal={handleCloseSettingsModal}
             handleDownloadGoBdReceipt={handleDownloadGoBdReceipt}
             handleExportGdprReport={handleExportGdprReport}
@@ -12690,6 +12843,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         setGlobalPinInput={setGlobalPinInput}
         setGlobalPinError={setGlobalPinError}
         onVerify={handleVerifyGlobalParentPin}
+        onBiometricUnlock={handleBiometricUnlockForGlobalPin}
+        isVerifyingBiometric={isVerifyingGlobalPin}
         onClose={() => {
           setShowGlobalParentPinModal(false);
           setGlobalPinPendingAction(null);

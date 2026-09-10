@@ -226,6 +226,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
 
   const textareaRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
   const quickPeekRef = useRef<HTMLDivElement | null>(null);
+  const templatesPopoverRef = useRef<HTMLDivElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<any>(null);
@@ -251,6 +252,55 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [showTodayQuickPeek]);
+
+  // Close Quick-Templates Popover on Click-Outside or Escape
+  useEffect(() => {
+    if (!showQuickTemplates) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (templatesPopoverRef.current && !templatesPopoverRef.current.contains(e.target as Node)) {
+        setShowQuickTemplates(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowQuickTemplates(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showQuickTemplates]);
+
+  // Helper to insert smart syntax or preset templates into the input field
+  const handleInsertSyntax = (prefix: string, templateType?: 'student' | 'tag' | 'room' | 'macro' | null, fullText?: string) => {
+    if (fullText) {
+      setInputContent(fullText);
+      if (templateType) {
+        setAutocompleteType(templateType);
+        setAutocompleteQuery('');
+      } else {
+        setAutocompleteType(null);
+      }
+    } else {
+      setInputContent(prev => {
+        const trimmed = prev.trim();
+        if (!trimmed) return prefix;
+        if (trimmed.endsWith(prefix.trim())) return prev;
+        return `${trimmed} ${prefix}`;
+      });
+      if (templateType) {
+        setAutocompleteType(templateType);
+        setAutocompleteQuery('');
+      }
+    }
+    setShowQuickTemplates(false);
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+      }
+    }, 50);
+  };
 
   // 1.5s Micro-Interaction for Checkbox completion
   const handleWidgetToggleComplete = (noteId: string, currentCompleted: boolean) => {
@@ -1099,11 +1149,11 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* 1. HEADER (Titel, Zähler, Board-Modal Button & Diktier-Mikrofon)         */}
+      {/* 1. HEADER (Titel, Zähler, Vorlagen-Button, Board-Modal Button)            */}
       {/* ========================================================================= */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '1.02rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em' }}>
             Notizen
           </span>
           {activeMetronomeBpm && (
@@ -1113,26 +1163,60 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
               gap: '4px',
               background: '#e6f4ea',
               color: '#166534',
-              padding: '1px 6px',
+              padding: '2px 8px',
               borderRadius: '100px',
-              fontSize: '0.62rem',
+              fontSize: '0.72rem',
               fontWeight: 800
             }}>
-              <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#34a853', animation: 'pulse 1s infinite' }} />
+              <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853', animation: 'pulse 1s infinite' }} />
               <span>{activeMetronomeBpm} BPM</span>
               <button
                 type="button"
                 onClick={stopMetronome}
                 style={{ background: 'none', border: 'none', color: '#166534', cursor: 'pointer', padding: 0, display: 'flex' }}
               >
-                <X size={9} />
+                <X size={11} />
               </button>
             </div>
           )}
         </div>
 
-        {/* Action Cluster (Board) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+        {/* Action Cluster (Vorlagen & Board) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {/* ✨ Vorlagen Button */}
+          <button
+            type="button"
+            onClick={() => setShowQuickTemplates(prev => !prev)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: showQuickTemplates ? '#ecfdf5' : '#f8fafc',
+              color: showQuickTemplates ? '#15803d' : '#0f172a',
+              border: `1px solid ${showQuickTemplates ? '#86efac' : '#e2e8f0'}`,
+              borderRadius: '9px',
+              padding: '5px 10px',
+              fontSize: '0.80rem',
+              fontWeight: 750,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+            className="hover-scale-mini"
+            title="Vorlagen & smarte Notiz-Funktionen öffnen (!, @, #, -, /)"
+          >
+            <Zap size={13} color={showQuickTemplates ? '#16a34a' : '#d97706'} />
+            <span>Vorlagen</span>
+            <ChevronDown
+              size={12}
+              color={showQuickTemplates ? '#16a34a' : '#94a3b8'}
+              style={{
+                transform: showQuickTemplates ? 'rotate(180deg)' : 'none',
+                transition: 'transform 0.15s ease'
+              }}
+            />
+          </button>
+
+          {/* Notizen-Board Button */}
           <button
             type="button"
             onClick={() => setShowBoardModal(true)}
@@ -1143,9 +1227,9 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
               background: '#f8fafc',
               color: '#0f172a',
               border: '1px solid #e2e8f0',
-              borderRadius: '8px',
-              padding: '4px 9px',
-              fontSize: '0.70rem',
+              borderRadius: '9px',
+              padding: '5px 10px',
+              fontSize: '0.80rem',
               fontWeight: 750,
               cursor: 'pointer',
               transition: 'all 0.15s ease'
@@ -1153,36 +1237,330 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
             className="hover-scale-mini"
             title="Notizen-Board öffnen (⌘J)"
           >
-            <Layers size={11} color="#64748b" />
+            <Layers size={13} color="#64748b" />
             <span>Notizen-Board</span>
             {activeNotesCount > 0 && (
               <span style={{
                 background: '#ffffff',
                 color: '#0f172a',
                 borderRadius: '5px',
-                padding: '0.5px 5px',
-                fontSize: '0.62rem',
+                padding: '1px 5px',
+                fontSize: '0.70rem',
                 fontWeight: 800,
                 border: '1px solid #cbd5e1'
               }}>
                 {activeNotesCount}
               </span>
             )}
-            <ArrowUpRight size={10} color="#94a3b8" />
+            <ArrowUpRight size={11} color="#94a3b8" />
           </button>
         </div>
+
+        {/* ========================================================================= */}
+        {/* ✨ VORLAGEN & FUNKTIONEN POPOVER                                          */}
+        {/* ========================================================================= */}
+        {showQuickTemplates && (
+          <div
+            ref={templatesPopoverRef}
+            style={{
+              position: 'absolute',
+              top: 'calc(100% + 8px)',
+              right: 0,
+              width: '370px',
+              maxWidth: '92vw',
+              background: '#ffffff',
+              border: '1px solid #e2e8f0',
+              borderRadius: '16px',
+              boxShadow: '0 16px 36px -4px rgba(15,23,42,0.16), 0 0 0 1px rgba(0,0,0,0.04)',
+              zIndex: 70,
+              padding: '14px',
+              boxSizing: 'border-box',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Zap size={16} color="#d97706" />
+                <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
+                  Smarte Notiz-Funktionen & Vorlagen
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowQuickTemplates(false)}
+                style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', padding: '2px' }}
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            {/* Funktion 1: ! Mängel melden */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Funktionen & Syntax
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '5px' }}>
+                {/* ! Mangel */}
+                <button
+                  type="button"
+                  onClick={() => handleInsertSyntax('!', 'room')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 10px',
+                    borderRadius: '10px',
+                    border: '1px solid #fee2e2',
+                    background: '#fef2f2',
+                    cursor: 'pointer',
+                    textAlign: 'left'
+                  }}
+                  className="hover-scale-mini"
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <AlertTriangle size={15} color="#dc2626" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#991b1b' }}>! Mangel & Defekt melden</div>
+                      <div style={{ fontSize: '0.72rem', color: '#b91c1c' }}>Raum-, Saiten- & Equipment-Meldung an Verwaltung</div>
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 800, background: '#fee2e2', color: '#dc2626', padding: '2px 7px', borderRadius: '6px' }}>!Raum</span>
+                </button>
+
+                {/* @ Schüler */}
+                <button
+                  type="button"
+                  onClick={() => handleInsertSyntax('@', 'student')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 10px',
+                    borderRadius: '10px',
+                    border: '1px solid #bbf7d0',
+                    background: '#f0fdf4',
+                    cursor: 'pointer',
+                    textAlign: 'left'
+                  }}
+                  className="hover-scale-mini"
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <User size={15} color="#166534" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#166534' }}>@ Schüler verknüpfen</div>
+                      <div style={{ fontSize: '0.72rem', color: '#15803d' }}>Notiz oder Hausaufgabe direkt an Schüler anheften</div>
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 800, background: '#dcfce7', color: '#166534', padding: '2px 7px', borderRadius: '6px' }}>@Schüler</span>
+                </button>
+
+                {/* # Tag */}
+                <button
+                  type="button"
+                  onClick={() => handleInsertSyntax('#', 'tag')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 10px',
+                    borderRadius: '10px',
+                    border: '1px solid #bfdbfe',
+                    background: '#eff6ff',
+                    cursor: 'pointer',
+                    textAlign: 'left'
+                  }}
+                  className="hover-scale-mini"
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Hash size={15} color="#1d4ed8" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#1e40af' }}># Tag & Kategorie vergeben</div>
+                      <div style={{ fontSize: '0.72rem', color: '#2563eb' }}>#Wichtig, #Material, #Eltern, #Noten, #Technik</div>
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 800, background: '#dbeafe', color: '#1d4ed8', padding: '2px 7px', borderRadius: '6px' }}>#Tag</span>
+                </button>
+
+                {/* - To-Do */}
+                <button
+                  type="button"
+                  onClick={() => handleInsertSyntax('- ')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 10px',
+                    borderRadius: '10px',
+                    border: '1px solid #e2e8f0',
+                    background: '#f8fafc',
+                    cursor: 'pointer',
+                    textAlign: 'left'
+                  }}
+                  className="hover-scale-mini"
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <CheckSquare size={15} color="#475569" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#334155' }}>- To-Do Checkliste anlegen</div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Interaktive Abhakkarten-Aufgabe mit Checkbox</div>
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 800, background: '#e2e8f0', color: '#334155', padding: '2px 7px', borderRadius: '6px' }}>- To-Do</span>
+                </button>
+
+                {/* / Makros */}
+                <button
+                  type="button"
+                  onClick={() => handleInsertSyntax('/', 'macro')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 10px',
+                    borderRadius: '10px',
+                    border: '1px solid #fef08a',
+                    background: '#fefce8',
+                    cursor: 'pointer',
+                    textAlign: 'left'
+                  }}
+                  className="hover-scale-mini"
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Sparkles size={15} color="#ca8a04" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#854d0e' }}>/ Textbausteine & Makros</div>
+                      <div style={{ fontSize: '0.72rem', color: '#a16207' }}>Schnelle Vorlagen für Übe-Aufträge & Orga</div>
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 800, background: '#fef08a', color: '#854d0e', padding: '2px 7px', borderRadius: '6px' }}>/Baustein</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Sektion 2: 1-Klick Schnellvorlagen */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                1-Klick Schnell-Vorlagen
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => handleInsertSyntax('!Raum 4: Mangel melden: ', 'room', '!Raum 4: Mangel melden: ')}
+                  style={{
+                    padding: '5px 9px',
+                    borderRadius: '8px',
+                    border: '1px solid #fecaca',
+                    background: '#fef2f2',
+                    color: '#dc2626',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                  className="hover-scale-mini"
+                >
+                  ! Mangel melden
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleInsertSyntax('- Noten kopieren für nächste Stunde', null, '- Noten kopieren für nächste Stunde')}
+                  style={{
+                    padding: '5px 9px',
+                    borderRadius: '8px',
+                    border: '1px solid #e2e8f0',
+                    background: '#f8fafc',
+                    color: '#334155',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                  className="hover-scale-mini"
+                >
+                  - Noten kopieren
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleInsertSyntax('Takt 1-8 bei 80 BPM üben', null, 'Takt 1-8 bei 80 BPM üben')}
+                  style={{
+                    padding: '5px 9px',
+                    borderRadius: '8px',
+                    border: '1px solid #fef08a',
+                    background: '#fefce8',
+                    color: '#854d0e',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                  className="hover-scale-mini"
+                >
+                  ⚡ Takt & 80 BPM
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleInsertSyntax('Play-Along Track anhören und mitspielen', null, 'Play-Along Track anhören und mitspielen')}
+                  style={{
+                    padding: '5px 9px',
+                    borderRadius: '8px',
+                    border: '1px solid #bbf7d0',
+                    background: '#f0fdf4',
+                    color: '#166534',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                  className="hover-scale-mini"
+                >
+                  🎵 Play-Along
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleInsertSyntax('#Wichtig ', 'tag')}
+                  style={{
+                    padding: '5px 9px',
+                    borderRadius: '8px',
+                    border: '1px solid #fecdd3',
+                    background: '#fff1f2',
+                    color: '#9f1239',
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                  className="hover-scale-mini"
+                >
+                  📌 #Wichtig
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ========================================================================= */}
-      {/* 2. SÄULE 1: SCHLANKER 1-ZEILEN QUICK-CAPTURE INPUT (34px)                */}
+      {/* 2. SÄULE 1: ERGONOMISCHER QUICK-CAPTURE INPUT (42px)                      */}
       {/* ========================================================================= */}
       <div style={{
         position: 'relative',
         background: '#f8fafc',
-        borderRadius: '11px',
+        borderRadius: '13px',
         border: autocompleteType ? '1.5px solid #34a853' : isListening ? '1.5px solid #dc2626' : '1px solid #e2e8f0',
-        padding: '0 8px 0 10px',
-        height: '34px',
+        padding: '0 8px 0 12px',
+        height: '42px',
         display: 'flex',
         alignItems: 'center',
         gap: '6px',
@@ -1197,21 +1575,21 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
             left: 0,
             background: '#ffffff',
             border: '1px solid #e2e8f0',
-            borderRadius: '12px',
-            padding: '5px',
-            boxShadow: '0 12px 28px -4px rgba(15,23,42,0.14)',
-            zIndex: 50,
-            minWidth: '260px',
-            maxWidth: '340px',
-            maxHeight: '220px',
+            borderRadius: '14px',
+            padding: '6px',
+            boxShadow: '0 14px 32px -4px rgba(15,23,42,0.16)',
+            zIndex: 60,
+            minWidth: '280px',
+            maxWidth: '360px',
+            maxHeight: '240px',
             overflowY: 'auto',
             display: 'flex',
             flexDirection: 'column',
-            gap: '2px',
-            marginBottom: '4px'
+            gap: '3px',
+            marginBottom: '6px'
           }}>
-            <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94a3b8', padding: '2px 4px', textTransform: 'uppercase' }}>
-              {autocompleteType === 'student' ? 'Schüler wählen (@)' : autocompleteType === 'tag' ? 'Tag wählen (#)' : 'Baustein (/)'}
+            <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', padding: '3px 6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              {autocompleteType === 'student' ? 'Schüler wählen (@)' : autocompleteType === 'tag' ? 'Tag wählen (#)' : autocompleteType === 'room' ? 'Mangel / Raum wählen (!)' : 'Baustein (/)'}
             </div>
             {suggestions.map((s, idx) => (
               <button
@@ -1222,23 +1600,29 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  gap: '6px',
-                  padding: '4px 6px',
-                  borderRadius: '6px',
+                  gap: '8px',
+                  padding: '6px 8px',
+                  borderRadius: '8px',
                   border: 'none',
                   background: idx === suggestionIndex ? '#f1f5f9' : 'transparent',
                   color: '#0f172a',
                   cursor: 'pointer',
                   textAlign: 'left',
-                  fontSize: '0.74rem',
+                  fontSize: '0.84rem',
                   fontWeight: 650
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  {s.type === 'student' ? <User size={11} color="#166534" /> : <Hash size={11} color="#64748b" />}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {s.type === 'student' ? (
+                    <User size={13} color="#166534" />
+                  ) : s.type === 'room' ? (
+                    <DoorOpen size={13} color="#dc2626" />
+                  ) : (
+                    <Hash size={13} color="#64748b" />
+                  )}
                   <span>{s.label}</span>
                 </div>
-                <span style={{ fontSize: '0.62rem', color: '#94a3b8' }}>{s.sub}</span>
+                <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>{s.sub}</span>
               </button>
             ))}
           </div>
@@ -1280,62 +1664,163 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
               handleSave();
             }
           }}
-          placeholder={isListening ? '🎙️ Höre zu... Diktat aktiv...' : 'Notiz, @Schüler oder - To-Do... (⌘J)'}
+          placeholder={isListening ? '🎙️ Höre zu... Diktat aktiv...' : 'Notiz, @Schüler, !Mangel, #Tag oder - To-Do... (⌘J)'}
           style={{
             flex: 1,
             height: '100%',
             background: 'transparent',
             border: 'none',
             outline: 'none',
-            fontSize: '0.80rem',
+            fontSize: '0.90rem',
             color: '#0f172a',
             fontWeight: 550,
             padding: 0
           }}
         />
 
-        {/* Integrated Apple Spotlight Dictation Microphone */}
-        <button
-          type="button"
-          onClick={handleToggleVoiceDictation}
-          title={isListening ? 'Diktat beenden' : 'Sprachnotiz diktieren'}
-          style={{
-            background: isListening ? '#dc2626' : 'transparent',
-            color: isListening ? '#ffffff' : '#94a3b8',
-            border: 'none',
-            borderRadius: '6px',
-            padding: '4px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-            transition: 'all 0.15s ease'
-          }}
-          className="hover-scale-mini"
-        >
-          <Mic size={12} color={isListening ? '#ffffff' : '#94a3b8'} />
-        </button>
-
-        {inputContent.trim() && (
+        {/* Dezente Schnellauswahl-Icons (!, @, #, -, /) direkt im Eingabefeld */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+          {/* ! Mangel */}
           <button
             type="button"
-            onClick={() => handleSave()}
+            onClick={() => handleInsertSyntax('!', 'room')}
+            title="! Mangel oder Raum-Defekt melden"
             style={{
-              border: 'none',
-              background: '#0f172a',
-              color: '#ffffff',
-              borderRadius: '6px',
-              padding: '3px 8px',
-              fontSize: '0.64rem',
+              background: '#fee2e2',
+              color: '#dc2626',
+              border: '1px solid #fecaca',
+              borderRadius: '7px',
+              padding: '3px 7px',
+              fontSize: '0.78rem',
               fontWeight: 800,
               cursor: 'pointer',
-              flexShrink: 0
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.12s ease'
             }}
+            className="hover-scale-mini"
           >
-            ↵
+            !
           </button>
-        )}
+
+          {/* @ Schüler */}
+          <button
+            type="button"
+            onClick={() => handleInsertSyntax('@', 'student')}
+            title="@ Schüler zuordnen"
+            style={{
+              background: '#dcfce7',
+              color: '#166534',
+              border: '1px solid #bbf7d0',
+              borderRadius: '7px',
+              padding: '3px 7px',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.12s ease'
+            }}
+            className="hover-scale-mini"
+          >
+            @
+          </button>
+
+          {/* # Tag */}
+          <button
+            type="button"
+            onClick={() => handleInsertSyntax('#', 'tag')}
+            title="# Tag vergeben (#Wichtig, #Material...)"
+            style={{
+              background: '#dbeafe',
+              color: '#1d4ed8',
+              border: '1px solid #bfdbfe',
+              borderRadius: '7px',
+              padding: '3px 7px',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.12s ease'
+            }}
+            className="hover-scale-mini"
+          >
+            #
+          </button>
+
+          {/* - To-Do */}
+          <button
+            type="button"
+            onClick={() => handleInsertSyntax('- ')}
+            title="- To-Do Checkliste anlegen"
+            style={{
+              background: '#f1f5f9',
+              color: '#334155',
+              border: '1px solid #e2e8f0',
+              borderRadius: '7px',
+              padding: '3px 7px',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.12s ease'
+            }}
+            className="hover-scale-mini"
+          >
+            ✓
+          </button>
+
+          <div style={{ width: '1px', height: '18px', background: '#e2e8f0', margin: '0 2px' }} />
+
+          {/* Integrated Apple Spotlight Dictation Microphone */}
+          <button
+            type="button"
+            onClick={handleToggleVoiceDictation}
+            title={isListening ? 'Diktat beenden' : 'Sprachnotiz diktieren'}
+            style={{
+              background: isListening ? '#dc2626' : 'transparent',
+              color: isListening ? '#ffffff' : '#64748b',
+              border: 'none',
+              borderRadius: '7px',
+              padding: '5px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              transition: 'all 0.15s ease'
+            }}
+            className="hover-scale-mini"
+          >
+            <Mic size={15} color={isListening ? '#ffffff' : '#64748b'} />
+          </button>
+
+          {inputContent.trim() && (
+            <button
+              type="button"
+              onClick={() => handleSave()}
+              style={{
+                border: 'none',
+                background: '#0f172a',
+                color: '#ffffff',
+                borderRadius: '8px',
+                padding: '4px 10px',
+                fontSize: '0.74rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                flexShrink: 0
+              }}
+            >
+              ↵
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ========================================================================= */}
@@ -1367,20 +1852,20 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
           return (
             <div style={{
               background: '#f8fafc',
-              borderRadius: '11px',
-              padding: '12px',
+              borderRadius: '13px',
+              padding: '16px 14px',
               textAlign: 'center',
-              color: '#94a3b8',
-              fontSize: '0.74rem',
+              color: '#64748b',
+              fontSize: '0.86rem',
               fontWeight: 600,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px',
-              border: '1px dashed #e2e8f0'
+              gap: '8px',
+              border: '1px dashed #cbd5e1'
             }}>
-              <Sparkles size={12} color="#cbd5e1" />
-              <span>Keine offenen Notizen • Tippe oben eine Notiz oder @Schüler</span>
+              <Sparkles size={16} color="#94a3b8" />
+              <span>Keine offenen Notizen • Tippe oben eine Notiz, @Schüler oder klicke auf Vorlagen</span>
             </div>
           );
         }
@@ -1426,13 +1911,13 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                   style={{
                     background: isDone ? 'rgba(248, 250, 252, 0.7)' : (note.is_pinned ? 'rgba(248, 250, 252, 0.9)' : '#ffffff'),
                     border: `1px solid ${isDone ? '#e2e8f0' : 'rgba(226, 232, 240, 0.9)'}`,
-                    borderRadius: '12px',
-                    padding: '8px 12px',
+                    borderRadius: '13px',
+                    padding: '9px 13px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     gap: '10px',
-                    minHeight: '40px',
+                    minHeight: '44px',
                     boxShadow: isDone ? 'none' : '0 2px 5px rgba(0, 0, 0, 0.02)',
                     opacity: isDone ? 0.6 : 1,
                     transition: 'all 0.2s ease'
@@ -1449,7 +1934,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                           background: '#fee2e2',
                           border: '1px solid #fca5a5',
                           borderRadius: '8px',
-                          padding: '3px 5px',
+                          padding: '4px 6px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -1461,7 +1946,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                         title="Beim Sekretariat gemeldet – Klicken für Erledigungs-Optionen"
                         className="hover-scale-mini"
                       >
-                        <DoorOpen size={13} color="#dc2626" />
+                        <DoorOpen size={14} color="#dc2626" />
                       </button>
                     ) : (
                       <button
@@ -1489,7 +1974,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                     )}
 
                     <span style={{
-                      fontSize: '0.84rem',
+                      fontSize: '0.88rem',
                       color: isDone ? '#94a3b8' : '#0f172a',
                       textDecoration: isDone ? 'line-through' : 'none',
                       fontWeight: isDone ? 500 : (note.is_pinned ? 700 : 650),
@@ -1503,19 +1988,19 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                     {/* Student Badge */}
                     {note.student_name && (
                       <span style={{
-                        fontSize: '0.66rem',
+                        fontSize: '0.74rem',
                         color: '#166534',
                         fontWeight: 750,
                         background: '#e6f4ea',
                         border: '1px solid #bbf7d0',
-                        padding: '2px 7px',
-                        borderRadius: '6px',
+                        padding: '3px 8px',
+                        borderRadius: '7px',
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '3px',
+                        gap: '4px',
                         flexShrink: 0
                       }}>
-                        <User size={8} />
+                        <User size={10} />
                         {maskStudentName(note.student_name)}
                       </span>
                     )}
@@ -1523,19 +2008,19 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                     {/* Room Badge */}
                     {isRoomItem && (
                       <span style={{
-                        fontSize: '0.64rem',
+                        fontSize: '0.72rem',
                         fontWeight: 750,
-                        padding: '2px 6px',
-                        borderRadius: '6px',
+                        padding: '3px 8px',
+                        borderRadius: '7px',
                         background: '#fee2e2',
                         color: '#991b1b',
                         border: '1px solid #fecaca',
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '3px',
+                        gap: '4px',
                         flexShrink: 0
                       }}>
-                        <DoorOpen size={8.5} color="#dc2626" />
+                        <DoorOpen size={10} color="#dc2626" />
                         <span>{detectedRoom || 'Raum'}</span>
                       </span>
                     )}
@@ -1552,20 +2037,20 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                         <span
                           key={tag}
                           style={{
-                            fontSize: '0.64rem',
+                            fontSize: '0.72rem',
                             fontWeight: 750,
-                            padding: '2px 6px',
-                            borderRadius: '6px',
+                            padding: '3px 8px',
+                            borderRadius: '7px',
                             background: style.bg,
                             color: style.color,
                             border: `1px solid ${style.border}`,
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '3px',
+                            gap: '4px',
                             flexShrink: 0
                           }}
                         >
-                          {renderMonochromeTagIcon(style.iconName, 8, style.color)}
+                          {renderMonochromeTagIcon(style.iconName, 10, style.color)}
                           <span>{style.label || tag.replace(/^#/, '')}</span>
                         </span>
                       );
@@ -1573,7 +2058,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                   </div>
 
                   {/* Actions */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
                     {note.is_pinned && (
                       <button
                         type="button"
@@ -1584,7 +2069,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                           background: 'transparent',
                           color: '#64748b',
                           cursor: 'pointer',
-                          padding: '4px',
+                          padding: '5px',
                           borderRadius: '6px',
                           display: 'flex',
                           alignItems: 'center',
@@ -1593,7 +2078,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                         }}
                         className="hover-scale-mini"
                       >
-                        <Pin size={12} />
+                        <Pin size={14} />
                       </button>
                     )}
                     <button
@@ -1608,7 +2093,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                         background: 'transparent',
                         color: '#cbd5e1',
                         cursor: 'pointer',
-                        padding: '4px',
+                        padding: '5px',
                         borderRadius: '6px',
                         display: 'flex',
                         alignItems: 'center',
@@ -1618,7 +2103,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                       }}
                       className="hover-scale-mini"
                     >
-                      <Trash2 size={13} />
+                      <Trash2 size={14} />
                     </button>
                   </div>
                 </div>
@@ -1628,7 +2113,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
 
           {/* SÄULE 4: Moderner Überlauf-Indikator mit Apple Quick-Peek Trigger */}
           {remainingCount > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', paddingTop: '2px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', paddingTop: '4px' }}>
               <button
                 type="button"
                 onClick={() => setShowTodayQuickPeek(prev => !prev)}
@@ -1637,8 +2122,8 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                   border: `1px solid ${showTodayQuickPeek ? '#cbd5e1' : 'rgba(226, 232, 240, 0.9)'}`,
                   color: showTodayQuickPeek ? '#0f172a' : '#475569',
                   borderRadius: '100px',
-                  padding: '4px 12px',
-                  fontSize: '0.72rem',
+                  padding: '5px 14px',
+                  fontSize: '0.78rem',
                   fontWeight: 650,
                   cursor: 'pointer',
                   display: 'inline-flex',
@@ -1654,15 +2139,15 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                   background: showTodayQuickPeek ? '#e2e8f0' : '#f1f5f9',
                   color: '#0f172a',
                   borderRadius: '100px',
-                  padding: '1px 6px',
-                  fontSize: '0.68rem',
+                  padding: '1px 7px',
+                  fontSize: '0.72rem',
                   fontWeight: 750
                 }}>
                   +{remainingCount}
                 </span>
                 <span>weitere</span>
                 <ChevronDown
-                  size={12}
+                  size={13}
                   color={showTodayQuickPeek ? '#0f172a' : '#94a3b8'}
                   style={{
                     transform: showTodayQuickPeek ? 'rotate(180deg)' : 'none',
@@ -1683,25 +2168,25 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingTop: '3px',
+        paddingTop: '6px',
         borderTop: '1px solid #f1f5f9',
-        fontSize: '0.62rem',
-        color: '#94a3b8',
+        fontSize: '0.76rem',
+        color: '#64748b',
         fontWeight: 600
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#34a853' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34a853' }} />
           <span>Auto-Sync</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span 
             onClick={() => setShowBoardModal(true)}
-            style={{ color: '#64748b', cursor: 'pointer', fontWeight: 700 }}
+            style={{ color: '#334155', cursor: 'pointer', fontWeight: 750, fontSize: '0.78rem' }}
           >
             Alle {activeNotesCount} im Board ➔
           </span>
-          <span>
-            Shortcut <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '3px', padding: '1px 3px', fontFamily: 'monospace', fontSize: '0.58rem' }}>⌘J</kbd>
+          <span style={{ fontSize: '0.74rem' }}>
+            Shortcut <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '4px', padding: '2px 5px', fontFamily: 'monospace', fontSize: '0.70rem' }}>⌘J</kbd>
           </span>
         </div>
       </div>

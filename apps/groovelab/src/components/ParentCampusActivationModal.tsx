@@ -3,7 +3,7 @@ import QRCode from 'react-qr-code';
 import { 
   Users, X, Check, Copy, Download, ShieldCheck, QrCode, Building2, 
   HelpCircle, ArrowRight, Sparkles, HeartHandshake, CheckCircle2,
-  Lock, ChevronLeft, Mic, MessageSquare, Shield, Zap, Crown, Eye, EyeOff
+  Lock, ChevronLeft, Mic, MessageSquare, Shield, Zap, Crown, Eye, EyeOff, Fingerprint
 } from 'lucide-react';
 import { 
   generateEpcGiroCodePayload, 
@@ -11,6 +11,7 @@ import {
   generateStudentGoBdCode,
   calculateSchoolYearDirectBilling
 } from '../utils/epcGiroCode';
+import { isWebAuthnSupported, authenticateParentBiometricPasskey } from '../utils/webauthn';
 import { supabase } from '../lib/supabase';
 import { formatSingleStudentAnonymized } from '../utils/nameHelper';
 import { logSecurityEvent } from '../services/auditLogService';
@@ -201,6 +202,35 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
       }
     } catch (err: any) {
       setParentPinError('Fehler bei der Verifikation: ' + (err.message || 'Unbekannt'));
+    } finally {
+      setIsVerifyingPin(false);
+    }
+  };
+
+  const handleBiometricUnlock = async () => {
+    if (!student?.id) return;
+    setIsVerifyingPin(true);
+    setParentPinError(null);
+    try {
+      const authRes = await authenticateParentBiometricPasskey(
+        supabase,
+        student.id,
+        student.school_id || null
+      );
+
+      if (!authRes.success) {
+        if (authRes.error && !authRes.error.includes('abgebrochen')) {
+          setParentPinError(authRes.error);
+        }
+        return;
+      }
+
+      setParentPinError(null);
+      setWizardStep('permissions');
+    } catch (err: any) {
+      if (err.name !== 'NotAllowedError' && err.name !== 'AbortError') {
+        setParentPinError('Fehler bei der Passkey-Prüfung: ' + (err.message || 'Unbekannt'));
+      }
     } finally {
       setIsVerifyingPin(false);
     }
@@ -1362,6 +1392,38 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                 {parentPinError}
               </div>
             )}
+
+            {/* Biometric Passkey Unlock (Face ID / Touch ID) */}
+            {isWebAuthnSupported() && (
+              <button
+                type="button"
+                disabled={isVerifyingPin}
+                onClick={handleBiometricUnlock}
+                style={{
+                  width: '100%',
+                  maxWidth: '320px',
+                  padding: '12px 16px',
+                  borderRadius: '16px',
+                  border: '1px solid #bae6fd',
+                  background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                  color: '#0284c7',
+                  fontSize: '0.88rem',
+                  fontWeight: 800,
+                  cursor: isVerifyingPin ? 'not-allowed' : 'pointer',
+                  opacity: isVerifyingPin ? 0.6 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  boxShadow: '0 2px 8px rgba(2, 132, 199, 0.08)',
+                  transition: 'all 0.15s ease'
+                }}
+                className="hover-scale"
+              >
+                <Fingerprint size={20} />
+                <span>{isVerifyingPin ? 'Wird geprüft...' : 'Mit Face ID / Touch ID bestätigen'}</span>
+              </button>
+            )}
           </div>
 
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'space-between' }}>
@@ -1603,7 +1665,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                   </span>
                 </div>
                 <p style={{ margin: '3px 0 0 0', fontSize: '0.76rem', color: '#64748b', lineHeight: 1.35 }}>
-                  Darf das Kind Unterrichtsstunden bei Krankheit selbst absagen? (Standard: Deaktiviert, Absagen erfolgen über die Eltern).
+                  Darf das Kind Unterrichtsstunden bei Abwesenheit selbst absagen? (Standard: Deaktiviert, Absagen erfolgen über die Eltern).
                 </p>
               </div>
             </div>

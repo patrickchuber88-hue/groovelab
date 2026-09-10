@@ -3447,7 +3447,7 @@ export const generateExecutiveSummaryPDF = async (params: ExecutiveSummaryPdfPar
 
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
-  doc.text(`Status: GESUND (SLA: ${uptime.toFixed(2)}%)`, 190, 25, { align: 'right' });
+  doc.text(`Status: BETRIEBSBEREIT (SLA: ${uptime.toFixed(2)}%)`, 190, 25, { align: 'right' });
 
   // Divider
   doc.setDrawColor(borderLight[0], borderLight[1], borderLight[2]);

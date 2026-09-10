@@ -507,6 +507,61 @@ export const TeacherTagesplanRoomIssuesBanner: React.FC<TeacherTagesplanRoomIssu
   };
 
 
+const isUUID = (str?: string) => Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
+
+export const resolveSlotStudent = (slotOrStudent: any, allStudents?: any[]) => {
+  if (!slotOrStudent) return null;
+  const target = slotOrStudent.isGroup 
+    ? (slotOrStudent.students?.[0] || slotOrStudent.student) 
+    : (slotOrStudent.student || slotOrStudent.students?.[0] || slotOrStudent);
+  
+  if (!target) return null;
+
+  const targetFn = target.first_name || (target.name ? target.name.trim().split(/\s+/)[0] : '');
+  const targetLn = target.last_name || (target.name ? target.name.trim().split(/\s+/).slice(1).join(' ') : '');
+
+  const matchedFromAll = allStudents?.find((s: any) => 
+    (target.id && s.id === target.id) ||
+    (target.student_id && s.id === target.student_id) ||
+    (target.studentId && s.id === target.studentId) ||
+    (slotOrStudent.student_id && s.id === slotOrStudent.student_id) ||
+    (slotOrStudent.studentId && s.id === slotOrStudent.studentId) ||
+    (s.first_name && targetFn && s.first_name.trim().toLowerCase() === targetFn.trim().toLowerCase() && 
+     (!targetLn || !s.last_name || s.last_name.trim().toLowerCase().startsWith(targetLn.trim().toLowerCase()[0]))) ||
+    (s.name && target.name && s.name.trim().toLowerCase() === target.name.trim().toLowerCase()) ||
+    (s.first_name && target.name && s.first_name.trim().toLowerCase() === target.name.trim().split(' ')[0].toLowerCase())
+  );
+
+  const canonicalId = (isUUID(matchedFromAll?.id) ? matchedFromAll.id : null) ||
+                      (isUUID(target.id) ? target.id : null) ||
+                      (isUUID(target.student_id) ? target.student_id : null) ||
+                      (isUUID(slotOrStudent.student_id) ? slotOrStudent.student_id : null) ||
+                      matchedFromAll?.id ||
+                      target.id ||
+                      target.student_id ||
+                      slotOrStudent.student_id;
+
+  const resolvedStudent = {
+    ...target,
+    ...(matchedFromAll || {}),
+    id: canonicalId,
+    student_id: canonicalId,
+    slot_id: target.id,
+    first_name: matchedFromAll?.first_name || targetFn || 'Schüler',
+    last_name: matchedFromAll?.last_name || targetLn || '',
+    photo_url: matchedFromAll?.photo_url || target.photo_url || '/avatar_ghost.jpg',
+    is_campus_active: matchedFromAll ? matchedFromAll.is_campus_active : target.is_campus_active,
+    canonical_uuid: isUUID(canonicalId) ? canonicalId : (isUUID(matchedFromAll?.id) ? matchedFromAll.id : undefined)
+  };
+
+  return {
+    targetStudent: target,
+    matchedFromAll,
+    canonicalId,
+    resolvedStudent
+  };
+};
+
 export interface TeacherTagesplanWidgetProps {
   teacher: any;
   activeChatOcc: any;
@@ -1050,28 +1105,17 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                          <div 
                            onClick={() => {
                              if (isCanceled || isRescheduledAway) return;
-                             const activeStudentObj = slot.isGroup ? slot.students[0] : slot.student;
-                             if (activeStudentObj) {
-                               const foundStud = allStudents.find(s => s.id === activeStudentObj.id);
+                             const resolved = resolveSlotStudent(slot, allStudents);
+                             if (resolved) {
                                const groupStudentsList = (slot.isGroup && Array.isArray(slot.students))
                                  ? slot.students.map((s: any) => {
-                                     const dbS = allStudents.find(as => as.id === s.id);
-                                     return {
-                                       id: s.id,
-                                       first_name: s.name ? s.name.split(' ')[0] : (dbS?.first_name || ''),
-                                       last_name: s.name ? s.name.split(' ').slice(1).join(' ') : (dbS?.last_name || ''),
-                                       photo_url: s.photo_url || dbS?.photo_url || '/avatar_ghost.jpg',
-                                       is_campus_active: dbS ? dbS.is_campus_active : s.is_campus_active
-                                     };
+                                     const grpRes = resolveSlotStudent({ student: s }, allStudents);
+                                     return grpRes ? grpRes.resolvedStudent : s;
                                    })
                                  : undefined;
 
                                setDocStudent({
-                                 id: activeStudentObj.id,
-                                 first_name: activeStudentObj.name.split(' ')[0],
-                                 last_name: activeStudentObj.name.split(' ').slice(1).join(' '),
-                                 photo_url: activeStudentObj.photo_url || '/avatar_ghost.jpg',
-                                 is_campus_active: foundStud ? foundStud.is_campus_active : activeStudentObj.is_campus_active,
+                                 ...resolved.resolvedStudent,
                                  groupStudents: groupStudentsList
                                });
                              }
@@ -1305,83 +1349,84 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                    </span>
                                  )}
 
-                                 {/* 1-Click Audio-Hausaufgabe Button on Top Row Right */}
-                                 {(slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway && (() => {
-                                   const targetStudent = slot.isGroup ? slot.students[0] : slot.student;
-                                   const hasAudioToday = targetStudent?.id ? checkHasTodayAudio(targetStudent.id) : false;
-                                   return (
-                                     <button
-                                       type="button"
-                                       onClick={(e) => {
-                                         e.stopPropagation();
-                                         if (targetStudent) {
-                                           setQuickAudioStudent({
-                                             ...targetStudent,
-                                             id: targetStudent.id,
-                                             first_name: targetStudent.first_name || (targetStudent.name ? targetStudent.name.split(' ')[0] : 'Schüler'),
-                                             last_name: targetStudent.last_name || (targetStudent.name ? targetStudent.name.split(' ').slice(1).join(' ') : '')
-                                           });
-                                         }
-                                       }}
-                                       title={`Hausaufgabe diktieren / Audio aufnehmen für ${targetStudent?.name || 'Schüler'}`}
-                                       style={{
-                                         display: 'flex',
-                                         alignItems: 'center',
-                                         justifyContent: 'center',
-                                         background: hasAudioToday ? '#e6f4ea' : '#ffffff',
-                                         color: hasAudioToday ? '#15803d' : '#64748b',
-                                         width: (isMobileDevice || windowWidth < 768) ? '44px' : '36px',
-                                         height: (isMobileDevice || windowWidth < 768) ? '44px' : '36px',
-                                         minWidth: (isMobileDevice || windowWidth < 768) ? '44px' : '36px',
-                                         minHeight: (isMobileDevice || windowWidth < 768) ? '44px' : '36px',
-                                         borderRadius: '10px',
-                                         border: hasAudioToday ? '1px solid rgba(52, 168, 83, 0.3)' : '1px solid rgba(0,0,0,0.06)',
-                                         cursor: 'pointer',
-                                         transition: 'all 0.2s',
-                                         flexShrink: 0,
-                                         boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                                         marginLeft: slot.isGroup ? '4px' : 'auto',
-                                         marginRight: '2px',
-                                         position: 'relative',
-                                         touchAction: 'manipulation'
-                                       }}
-                                     >
-                                       <Mic size={16} color={hasAudioToday ? '#15803d' : '#64748b'} />
-                                       {hasAudioToday && (
-                                         <span style={{
-                                           position: 'absolute',
-                                           top: '3px',
-                                           right: '3px',
-                                           width: '6px',
-                                           height: '6px',
-                                           borderRadius: '50%',
-                                           background: '#34a853'
-                                         }} />
-                                       )}
-                                     </button>
-                                   );
-                                 })()}
+                                  {/* 1-Click Audio-Hausaufgabe Button on Top Row Right */}
+                                  {(slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway && (() => {
+                                    const resolved = resolveSlotStudent(slot, allStudents);
+                                    if (!resolved) return null;
+                                    const { targetStudent, matchedFromAll, canonicalId, resolvedStudent } = resolved;
+                                    const hasAudioToday = Boolean(
+                                      (canonicalId && checkHasTodayAudio(canonicalId)) ||
+                                      (targetStudent?.id && checkHasTodayAudio(targetStudent.id)) ||
+                                      (matchedFromAll?.id && checkHasTodayAudio(matchedFromAll.id))
+                                    );
+                                    return (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setQuickAudioStudent(resolvedStudent);
+                                        }}
+                                        title={`Hausaufgabe diktieren / Audio aufnehmen für ${resolvedStudent.first_name || 'Schüler'}`}
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          background: hasAudioToday ? '#e6f4ea' : '#ffffff',
+                                          color: hasAudioToday ? '#15803d' : '#64748b',
+                                          width: (isMobileDevice || windowWidth < 768) ? '44px' : '36px',
+                                          height: (isMobileDevice || windowWidth < 768) ? '44px' : '36px',
+                                          minWidth: (isMobileDevice || windowWidth < 768) ? '44px' : '36px',
+                                          minHeight: (isMobileDevice || windowWidth < 768) ? '44px' : '36px',
+                                          borderRadius: '10px',
+                                          border: hasAudioToday ? '1px solid rgba(52, 168, 83, 0.3)' : '1px solid rgba(0,0,0,0.06)',
+                                          cursor: 'pointer',
+                                          transition: 'all 0.2s',
+                                          flexShrink: 0,
+                                          boxShadow: hasAudioToday ? '0 2px 4px rgba(21, 128, 61, 0.15)' : '0 1px 2px rgba(0,0,0,0.04)',
+                                          marginLeft: slot.isGroup ? '4px' : 'auto',
+                                          marginRight: '2px',
+                                          position: 'relative',
+                                          touchAction: 'manipulation'
+                                        }}
+                                        className="hover-scale-mini"
+                                      >
+                                        <Mic size={16} color={hasAudioToday ? '#15803d' : '#64748b'} />
+                                        {hasAudioToday && (
+                                          <span style={{
+                                            position: 'absolute',
+                                            top: '3px',
+                                            right: '3px',
+                                            width: '6px',
+                                            height: '6px',
+                                            borderRadius: '50%',
+                                            background: '#34a853'
+                                          }} />
+                                        )}
+                                      </button>
+                                    );
+                                  })()}
 
-                                 {/* 1:1 Shoutbox Icon Button on Top Row Right */}
-                                 {(slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway && (
-                                   <button
-                                     type="button"
-                                     onClick={(e) => {
-                                       e.stopPropagation();
-                                       const targetSlot = slot.isGroup ? slot.slots[0] : slot;
-                                       if (targetSlot) {
-                                         setActiveChatOcc({
-                                           id: targetSlot.id,
-                                           student_id: slot.isGroup ? slot.students[0]?.id : slot.student?.id,
-                                           teacher_id: targetSlot.teacher_id || userId,
-                                           date: targetSlot.date,
-                                           start_time: targetSlot.timeSlot,
-                                           student: {
-                                             first_name: slot.isGroup ? slot.students?.map((st: any) => st.name.split(' ')[0]).join(', ') : (slot.student?.name ? slot.student.name.split(' ')[0] : 'Schüler')
-                                           }
-                                         });
-                                       }
-                                     }}
+                                  {/* 1:1 Shoutbox Icon Button on Top Row Right */}
+                                  {(slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const targetSlot = slot.isGroup ? slot.slots[0] : slot;
+                                        const resolved = resolveSlotStudent(slot, allStudents);
+                                        if (targetSlot && resolved) {
+                                          setActiveChatOcc({
+                                            id: targetSlot.id,
+                                            student_id: resolved.canonicalId,
+                                            teacher_id: targetSlot.teacher_id || userId,
+                                            date: targetSlot.date,
+                                            start_time: targetSlot.timeSlot,
+                                            student: {
+                                              first_name: slot.isGroup ? slot.students?.map((st: any) => st.name.split(' ')[0]).join(', ') : (resolved.resolvedStudent.first_name || 'Schüler')
+                                            }
+                                          });
+                                        }
+                                      }}
                                      title="Termingekoppelte Shoutbox öffnen"
                                      style={{
                                        display: 'flex',

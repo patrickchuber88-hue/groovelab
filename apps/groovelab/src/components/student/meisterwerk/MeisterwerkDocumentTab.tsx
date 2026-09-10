@@ -6480,58 +6480,79 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
 
                             {/* 3. Schülervorschau-Bühne (Master Stage Box: Der gerahmte Wochen-Fahrplan) */}
                             <div style={{
-                              minHeight: isMobileView ? '100px' : '140px',
-                              background: 'linear-gradient(180deg, #fcfdfe 0%, #f8fafc 100%)',
-                              border: '1px solid #f1f5f9',
-                              borderRadius: isMobileView ? '14px' : '18px',
-                              padding: isMobileView ? '12px 10px' : '16px 18px',
+                              minHeight: !hasActiveItems ? 'auto' : (isMobileView ? '100px' : '140px'),
+                              background: !hasActiveItems ? 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)' : 'linear-gradient(180deg, #fcfdfe 0%, #f8fafc 100%)',
+                              border: !hasActiveItems ? '1px solid #e2e8f0' : '1px solid #f1f5f9',
+                              borderRadius: !hasActiveItems ? (isMobileView ? '12px' : '14px') : (isMobileView ? '14px' : '18px'),
+                              padding: !hasActiveItems ? (isMobileView ? '10px 12px' : '12px 16px') : (isMobileView ? '12px 10px' : '16px 18px'),
                               display: 'flex',
                               flexDirection: 'column',
                               gap: isMobileView ? '8px' : '12px',
-                              boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.02)'
+                              boxShadow: !hasActiveItems ? '0 1px 3px rgba(0, 0, 0, 0.02)' : 'inset 0 1px 3px rgba(0, 0, 0, 0.02)'
                             }}>
                               {!hasActiveItems ? (
                                 <div style={{
                                   display: 'flex',
-                                  flexDirection: 'column',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: isMobileView ? '8px' : '12px',
-                                  padding: isMobileView ? '14px 8px' : '24px 12px',
-                                  textAlign: 'center'
+                                  flexDirection: isMobileView ? 'column' : 'row',
+                                  alignItems: isMobileView ? 'flex-start' : 'center',
+                                  justifyContent: 'space-between',
+                                  gap: isMobileView ? '10px' : '14px',
+                                  padding: 0
                                 }}>
-                                  <div style={{
-                                    width: isMobileView ? '38px' : '44px',
-                                    height: isMobileView ? '38px' : '44px',
-                                    borderRadius: isMobileView ? '12px' : '14px',
-                                    background: '#ffffff',
-                                    border: '1px solid #e2e8f0',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-                                  }}>
-                                    <BookOpen size={isMobileView ? 17 : 20} color="#64748b" strokeWidth={1.75} />
+                                  {/* Left: Subtle Icon + Compact Information */}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                                    <div style={{
+                                      width: '32px',
+                                      height: '32px',
+                                      borderRadius: '9px',
+                                      background: '#f8fafc',
+                                      border: '1px solid #e2e8f0',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      flexShrink: 0
+                                    }}>
+                                      <BookOpen size={15} color="#64748b" strokeWidth={1.8} />
+                                    </div>
+
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', minWidth: 0 }}>
+                                      <span style={{
+                                        fontSize: isMobileView ? '0.82rem' : '0.86rem',
+                                        color: '#0f172a',
+                                        fontWeight: 800,
+                                        letterSpacing: '-0.01em',
+                                        lineHeight: 1.3
+                                      }}>
+                                        {isPastWeek
+                                          ? (isMobileView ? `Keine Hausaufgaben (${weekRange.dateSpan})` : `Keine Hausaufgaben archiviert (${weekRange.dateSpan})`)
+                                          : `Leeres Hausaufgabenheft (${weekRange.dateSpan})`}
+                                      </span>
+                                      <span style={{
+                                        fontSize: isMobileView ? '0.72rem' : '0.75rem',
+                                        color: '#64748b',
+                                        fontWeight: 500,
+                                        lineHeight: 1.35
+                                      }}>
+                                        {isPastWeek
+                                          ? 'Unterrichtsfreie Zeit oder keine Notizen hinterlegt.'
+                                          : (hasTransferableHomework
+                                            ? 'Aus Vorwoche übernehmen oder neue Aufgaben starten.'
+                                            : 'Noch keine Aufgaben für diesen Zeitraum eingetragen.')}
+                                      </span>
+                                    </div>
                                   </div>
 
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                                    <span style={{ fontSize: isMobileView ? '0.86rem' : '0.92rem', color: '#0f172a', fontWeight: 850, letterSpacing: '-0.01em' }}>
-                                      {isPastWeek
-                                        ? (isMobileView ? 'Keine Hausaufgaben archiviert' : `Keine Hausaufgaben für ${weekRange.label.toLowerCase()} (${weekRange.dateSpan}) archiviert`)
-                                        : (isMobileView ? 'Noch keine Hausaufgaben für diese Woche' : `Leeres Hausaufgabenheft für ${weekRange.label.toLowerCase()} (${weekRange.dateSpan})`)}
-                                    </span>
-                                    <span style={{ fontSize: isMobileView ? '0.74rem' : '0.78rem', color: '#64748b', fontWeight: 550, maxWidth: isMobileView ? '280px' : '380px', lineHeight: 1.45 }}>
-                                      {isPastWeek
-                                        ? 'Unterrichtsfreie Zeit, Ferien oder keine Notizen hinterlegt.'
-                                        : (hasTransferableHomework
-                                          ? 'Starte mit einer leeren Maske oder übertrage bestehende Aufgaben aus der Vorwoche.'
-                                          : 'Starte die neue Woche mit einem neuen Lehrwerk oder weise einen neuen Song zu.')}
-                                    </span>
-                                  </div>
-
-                                  {/* Primary Transfer Action & Quick Shortcuts */}
+                                  {/* Right: Sleek Action Pills */}
                                   {!isPastWeek && !readOnly && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginTop: '6px' }}>
+                                    <div style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      flexWrap: 'wrap',
+                                      flexShrink: 0,
+                                      width: isMobileView ? '100%' : 'auto',
+                                      justifyContent: isMobileView ? 'flex-start' : 'flex-end'
+                                    }}>
                                       {hasTransferableHomework && (
                                         <button
                                           type="button"
@@ -6540,80 +6561,78 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                             background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
                                             color: '#ffffff',
                                             border: 'none',
-                                            fontSize: '0.84rem',
-                                            fontWeight: 850,
-                                            padding: '9px 20px',
+                                            fontSize: '0.74rem',
+                                            fontWeight: 800,
+                                            padding: '5px 12px',
                                             borderRadius: '100px',
                                             cursor: 'pointer',
                                             display: 'inline-flex',
                                             alignItems: 'center',
-                                            gap: '8px',
-                                            boxShadow: '0 4px 14px rgba(22, 163, 74, 0.28)',
+                                            gap: '5px',
+                                            boxShadow: '0 2px 6px rgba(22, 163, 74, 0.22)',
                                             transition: 'all 0.15s ease'
                                           }}
                                           className="hover-scale"
                                           title="Hausaufgaben aus der Vorwoche übernehmen, abhaken oder pausieren"
                                         >
-                                          <ArrowRightLeft size={14} strokeWidth={2.4} />
-                                          <span>Hausaufgaben übertragen</span>
+                                          <ArrowRightLeft size={12} strokeWidth={2.4} />
+                                          <span>Aus Vorwoche übertragen</span>
                                         </button>
                                       )}
 
-                                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setActiveSubView('hub');
-                                            setActiveInputTab('free');
-                                          }}
-                                          style={{
-                                            background: '#ffffff',
-                                            border: '1px solid #e2e8f0',
-                                            color: '#334155',
-                                            fontSize: '0.74rem',
-                                            fontWeight: 750,
-                                            padding: '6px 13px',
-                                            borderRadius: '100px',
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '6px',
-                                            boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                                            transition: 'all 0.15s ease'
-                                          }}
-                                          className="hover-scale"
-                                        >
-                                          <BookOpen size={12} color="#16a34a" />
-                                          <span>Neues Lehrwerk aufschlagen</span>
-                                        </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setActiveSubView('hub');
+                                          setActiveInputTab('free');
+                                        }}
+                                        style={{
+                                          background: '#ffffff',
+                                          border: '1px solid #e2e8f0',
+                                          color: '#334155',
+                                          fontSize: '0.74rem',
+                                          fontWeight: 700,
+                                          padding: '5px 11px',
+                                          borderRadius: '100px',
+                                          cursor: 'pointer',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '5px',
+                                          boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                                          transition: 'all 0.15s ease'
+                                        }}
+                                        className="hover-scale"
+                                      >
+                                        <BookOpen size={12} color="#16a34a" />
+                                        <span>Lehrwerk aufschlagen</span>
+                                      </button>
 
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setActiveSubView('hub');
-                                            setActiveInputTab('free');
-                                          }}
-                                          style={{
-                                            background: '#ffffff',
-                                            border: '1px solid #e2e8f0',
-                                            color: '#334155',
-                                            fontSize: '0.74rem',
-                                            fontWeight: 750,
-                                            padding: '6px 13px',
-                                            borderRadius: '100px',
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '6px',
-                                            boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                                            transition: 'all 0.15s ease'
-                                          }}
-                                          className="hover-scale"
-                                        >
-                                          <Music size={12} color="#4f46e5" />
-                                          <span>Neuen Song zuweisen</span>
-                                        </button>
-                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setActiveSubView('hub');
+                                          setActiveInputTab('free');
+                                        }}
+                                        style={{
+                                          background: '#ffffff',
+                                          border: '1px solid #e2e8f0',
+                                          color: '#334155',
+                                          fontSize: '0.74rem',
+                                          fontWeight: 700,
+                                          padding: '5px 11px',
+                                          borderRadius: '100px',
+                                          cursor: 'pointer',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '5px',
+                                          boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                                          transition: 'all 0.15s ease'
+                                        }}
+                                        className="hover-scale"
+                                      >
+                                        <Music size={12} color="#4f46e5" />
+                                        <span>Song zuweisen</span>
+                                      </button>
                                     </div>
                                   )}
 
@@ -6622,15 +6641,15 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       type="button"
                                       onClick={() => setViewingWeekOffset(0)}
                                       style={{
-                                        marginTop: '4px',
-                                        padding: '6px 14px',
+                                        padding: '5px 12px',
                                         borderRadius: '100px',
                                         background: '#0f172a',
                                         color: '#ffffff',
                                         border: 'none',
                                         fontSize: '0.74rem',
                                         fontWeight: 800,
-                                        cursor: 'pointer'
+                                        cursor: 'pointer',
+                                        flexShrink: 0
                                       }}
                                       className="hover-scale"
                                     >
