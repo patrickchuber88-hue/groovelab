@@ -47,15 +47,27 @@ else
   echo -e "         Führe folgenden Befehl aus: ssh-copy-id -p ${STORAGE_PORT} ${STORAGE_USER}@${STORAGE_HOST}"
 fi
 
-# 5. Konfiguration kopieren
+# 5. Konfiguration kopieren & Cipher-Pass injizieren
 echo -e "${INFO} [4/6] Wende pgBackRest Produktions-Konfiguration an..."
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONF_SRC=""
 if [ -f "${SCRIPT_DIR}/pgbackrest.conf" ]; then
-  cp "${SCRIPT_DIR}/pgbackrest.conf" /etc/pgbackrest/pgbackrest.conf
+  CONF_SRC="${SCRIPT_DIR}/pgbackrest.conf"
 elif [ -f "/root/deploy/backup/pgbackrest.conf" ]; then
-  cp "/root/deploy/backup/pgbackrest.conf" /etc/pgbackrest/pgbackrest.conf
+  CONF_SRC="/root/deploy/backup/pgbackrest.conf"
 fi
-chmod 640 /etc/pgbackrest/pgbackrest.conf
+
+if [ -n "$CONF_SRC" ]; then
+  cp "$CONF_SRC" /etc/pgbackrest/pgbackrest.conf
+  
+  # Cipher-Pass: Falls Placeholder vorhanden, aus Env oder neu via OpenSSL generieren
+  if grep -q "__PGBACKREST_CIPHER_PASS_PLACEHOLDER__" /etc/pgbackrest/pgbackrest.conf; then
+    NEW_CIPHER_PASS="${PGBACKREST_REPO1_CIPHER_PASS:-$(openssl rand -base64 32)}"
+    sed -i "s|__PGBACKREST_CIPHER_PASS_PLACEHOLDER__|${NEW_CIPHER_PASS}|g" /etc/pgbackrest/pgbackrest.conf
+    echo -e "  [${PASS}] Sicherer AES-256 Cipher-Key generiert und in /etc/pgbackrest/pgbackrest.conf hinterlegt."
+  fi
+fi
+chmod 600 /etc/pgbackrest/pgbackrest.conf
 
 # 6. PostgreSQL Stanza erstellen & prüfen
 echo -e "${INFO} [5/6] Initialisiere pgBackRest Stanza 'campus_db'..."
