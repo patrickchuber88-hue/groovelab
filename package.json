@@ -18,6 +18,7 @@
     "gate": "npm run security:check && npm run security:secrets && npm run typecheck && npm run test:billing",
     "gate:fast": "node scripts/security_drift_guard.mjs && npx tsc --noEmit",
     "verify:enterprise": "npm run gate",
+    "verify:perimeter": "node scripts/verify_perimeter_headers.mjs",
     "check:budget": "node scripts/check-bundle-budget.js",
     "prepare": "husky install"
   },

@@ -36,33 +36,9 @@ RUN rm -rf /usr/share/nginx/html/*
 # Copy built assets from builder
 COPY --from=builder /app/apps/groovelab/dist /usr/share/nginx/html
 
-# SPA routing: all unknown paths → index.html
-RUN printf 'server {\n\
-    listen 80;\n\
-    root /usr/share/nginx/html;\n\
-    index index.html;\n\
-    \n\
-    # Optimization: Tuned gzip for high traffic\n\
-    gzip on;\n\
-    gzip_vary on;\n\
-    gzip_proxied any;\n\
-    gzip_comp_level 6;\n\
-    gzip_min_length 256;\n\
-    gzip_types text/plain text/css application/json application/javascript text/xml application/xml image/svg+xml;\n\
-    \n\
-    location / {\n\
-        try_files $uri $uri/ /index.html;\n\
-        # Optimization: Prevent browser caching index.html to ensure instant updates\n\
-        add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0";\n\
-    }\n\
-    location /assets/ {\n\
-        gzip_static on;\n\
-        expires 1y;\n\
-        add_header Cache-Control "public, immutable";\n\
-        # Optimization: Turn off logging for static assets to drastically reduce disk I/O\n\
-        access_log off;\n\
-    }\n\
-}\n' > /etc/nginx/conf.d/default.conf
+# Copy hardened Nginx security configuration and server definition
+COPY apps/groovelab/nginx.security.conf /etc/nginx/conf.d/security-headers.conf
+COPY apps/groovelab/nginx.default.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
