@@ -326,6 +326,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
   const barCountRef = useRef<number>(0);
   const timerIntervalRef = useRef<number | null>(null);
   const completionCooldownRef = useRef<number>(0);
+  const autoOffsetBufferRef = useRef<number[]>([]);
 
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [anticipatingStep, setAnticipatingStep] = useState<number | null>(null);
@@ -900,6 +901,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
     setScoreSum(0);
     setPerfectHits(0);
     setSessionHits([]);
+    autoOffsetBufferRef.current = [];
     setSessionCompleted(false);
     setTimingOffsetMs(null);
     setLastRating(null);
@@ -974,6 +976,16 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
     }
 
     const now = ctx.currentTime;
+
+    // 🛡️ Guard 3: Im Call-&-Response-Modus in der Vorspiel-Phase („HÖR GUT ZU!“) keine Fehlschläge werten
+    if (trainingMode === 'call_response' && isCallPhase) {
+      // Nur akustischen Feedback-Sound spielen, aber keine Wertung oder Streak-Zerstörung!
+      playDrumSound('snare', now, false);
+      setIsPadPressed(true);
+      setTimeout(() => setIsPadPressed(false), 100);
+      return;
+    }
+
     const subCount = activeLevelConfig.subdivisions;
     const secondsPerSub = (60 / bpm) / (subCount / 4);
     
@@ -987,9 +999,30 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
     // Mathematical Quantizer
     const nearestStepIndex = Math.max(0, Math.round(elapsedSinceStart / secondsPerSub));
     const targetTime = playbackStartTimeRef.current + (nearestStepIndex * secondsPerSub);
-    const diffSec = effectiveTapTime - targetTime;
-    const diffMs = Math.round(diffSec * 1000);
+    const rawDiffSec = effectiveTapTime - targetTime;
+    const rawDiffMs = Math.round(rawDiffSec * 1000);
 
+    // 🎯 Tier-1 SaaS Enterprise+ Auto-Centering Engine (Rolling Hardware Offset)
+    // Wenn der Nutzer sehr gleichmäßig spielt, aber ein konstanter Hardware-Versatz vorliegt,
+    // ermitteln die ersten 3-5 Schläge den konstanten Versatz und kompensieren ihn unbemerkt.
+    if (autoOffsetBufferRef.current.length < 5 && Math.abs(rawDiffMs) < 180) {
+      autoOffsetBufferRef.current.push(rawDiffMs);
+      if (autoOffsetBufferRef.current.length >= 3) {
+        const sorted = [...autoOffsetBufferRef.current].sort((a, b) => a - b);
+        const medianOffset = sorted[Math.floor(sorted.length / 2)];
+        // Wenn ein signifikanter Hardware-Trend (> 12ms) vorliegt, adaptieren:
+        if (Math.abs(medianOffset) >= 12) {
+          const adaptiveCorrection = Math.round(medianOffset * 0.75);
+          const newOffset = Math.max(0, Math.min(250, latencyOffsetMs + adaptiveCorrection));
+          setLatencyOffsetMs(newOffset);
+          try {
+            localStorage.setItem('campus_timing_latency_offset', String(newOffset));
+          } catch (_) {}
+        }
+      }
+    }
+
+    const diffMs = rawDiffMs;
     setTimingOffsetMs(diffMs);
     setTotalHits(prev => prev + 1);
 
@@ -1036,8 +1069,8 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
 
     playDrumSound(hitSoundType, now, isHitAccent);
 
-    // Sub-15ms Perfect Aura Glow Trigger
-    if (Math.abs(diffMs) <= 15) {
+    // Sub-20ms Perfect Aura Glow Trigger
+    if (Math.abs(diffMs) <= 20) {
       setIsCenterAuraPulse(true);
       setTimeout(() => setIsCenterAuraPulse(false), 240);
     }
@@ -1051,11 +1084,12 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
     setIsPadPressed(true);
     setTimeout(() => setIsPadPressed(false), 120);
 
-    // Multi-Tier Musician Grading Scale & History Recording
+    // Multi-Tier Musician Grading Scale (Goldstandard: Musikalisch fair & touch-kalibriert)
     const absDiff = Math.abs(diffMs);
     let currentRating: 'pocket' | 'good' | 'rush' | 'drag' | 'miss' = 'miss';
 
-    if (absDiff <= 28) {
+    if (absDiff <= 38) {
+      // 🌟 In the Pocket (Volle Punktzahl)
       currentRating = 'pocket';
       setLastRating('pocket');
       setPerfectHits(prev => prev + 1);
@@ -1065,7 +1099,8 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
         setBestStreak(b => Math.max(b, next));
         return next;
       });
-    } else if (absDiff <= 55) {
+    } else if (absDiff <= 72) {
+      // 🌟 Gut im Puls (Sehr solides Timing)
       currentRating = 'good';
       setLastRating('good');
       setScoreSum(prev => prev + 85);
@@ -1074,17 +1109,20 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
         setBestStreak(b => Math.max(b, next));
         return next;
       });
-    } else if (diffMs < -55 && diffMs >= -115) {
+    } else if (diffMs < -72 && diffMs >= -135) {
+      // ⏩ Leicht vor dem Schlag (Rush)
       currentRating = 'rush';
       setLastRating('rush');
-      setScoreSum(prev => prev + 50);
+      setScoreSum(prev => prev + 55);
       setPocketStreak(0);
-    } else if (diffMs > 55 && diffMs <= 115) {
+    } else if (diffMs > 72 && diffMs <= 135) {
+      // ⏪ Leicht nach dem Schlag (Drag)
       currentRating = 'drag';
       setLastRating('drag');
-      setScoreSum(prev => prev + 50);
+      setScoreSum(prev => prev + 55);
       setPocketStreak(0);
     } else {
+      // 💨 Daneben
       currentRating = 'miss';
       setLastRating('miss');
       setScoreSum(prev => prev + 0);
@@ -1103,7 +1141,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
       }
     ]);
 
-  }, [activeLevelConfig, bpm, getAudioContext, isPlaying, latencyOffsetMs, playDrumSound]);
+  }, [activeLevelConfig, bpm, getAudioContext, isCallPhase, isPlaying, latencyOffsetMs, playDrumSound, trainingMode]);
 
   // Spacebar Keyboard Listener
   useEffect(() => {
@@ -1121,7 +1159,8 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleUserTap, sessionCompleted, showCalibrationModal]);
 
-  // 4-Tap Wizard Runner
+  // 4-Tap Wizard Runner with Real Mathematical Time Difference Measurement
+  const wizardClicksRef = useRef<number[]>([]);
   const start4TapWizard = useCallback(() => {
     const ctx = getAudioContext();
     if (!ctx) return;
@@ -1130,13 +1169,15 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
     setWizardTapCount(0);
     setWizardMeasuredOffsets([]);
     setWizardSuccessMessage(null);
+    wizardClicksRef.current = [];
 
     const wizardBpm = 60;
     const intervalSec = 60 / wizardBpm;
-    const startTime = ctx.currentTime + 0.1;
+    const startTime = ctx.currentTime + 0.12;
 
     for (let i = 0; i < 4; i++) {
       const clickTime = startTime + (i * intervalSec);
+      wizardClicksRef.current.push(clickTime);
       playDrumSound('click', clickTime, i === 0);
     }
   }, [getAudioContext, playDrumSound]);
@@ -1148,18 +1189,32 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
     const now = ctx.currentTime;
     playDrumSound('snare', now, true);
 
-    const nextCount = wizardTapCount + 1;
+    const currentTapIndex = wizardTapCount;
+    const targetClickTime = wizardClicksRef.current[currentTapIndex] || now;
+    const measuredRawDeltaMs = Math.round((now - targetClickTime) * 1000);
+
+    const nextOffsets = [...wizardMeasuredOffsets, measuredRawDeltaMs];
+    setWizardMeasuredOffsets(nextOffsets);
+
+    const nextCount = currentTapIndex + 1;
     setWizardTapCount(nextCount);
 
     if (nextCount >= 4) {
       setIs4TapWizardActive(false);
-      const calculatedOffset = Math.max(10, Math.min(180, Math.round(25 + Math.random() * 8)));
-      setLatencyOffsetMs(calculatedOffset);
-      localStorage.setItem('campus_timing_latency_offset', String(calculatedOffset));
+      // Echter Median-Filter über die 4 Messungen:
+      const sorted = [...nextOffsets].sort((a, b) => a - b);
+      const medianOffset = Math.round((sorted[1] + sorted[2]) / 2);
+      // Sicherheits-Clamp für Web-Audio (0ms bis 220ms)
+      const finalOffset = Math.max(0, Math.min(220, medianOffset));
+      
+      setLatencyOffsetMs(finalOffset);
+      try {
+        localStorage.setItem('campus_timing_latency_offset', String(finalOffset));
+      } catch (_) {}
       setCalibrationSource('trainer');
-      setWizardSuccessMessage(`Perfekt eingemessen! Dein Hardware-Offset beträgt ${calculatedOffset}ms.`);
+      setWizardSuccessMessage(`Perfekt eingemessen! Dein realer Hardware-Offset beträgt ${finalOffset}ms.`);
     }
-  }, [getAudioContext, is4TapWizardActive, playDrumSound, wizardTapCount]);
+  }, [getAudioContext, is4TapWizardActive, playDrumSound, wizardMeasuredOffsets, wizardTapCount]);
 
   const accuracyPercent = totalHits > 0 ? Math.round(scoreSum / totalHits) : 0;
   const starsEarned = accuracyPercent >= 90 ? 3 : (accuracyPercent >= 75 ? 2 : (accuracyPercent >= 50 ? 1 : 0));

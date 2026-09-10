@@ -8924,8 +8924,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     const currentWeekNotes: string[] = [];
     (progressItems || []).forEach((item: any) => {
       const itemW = getItemWeek(item);
-      const isCurrentHwSnapshot = item.topic_name === `Hausaufgabe KW ${currentWeekStr.split('-W')[1] || ''}` || itemW === currentWeekStr;
-      const isActive = Boolean(item.is_current_homework) || isCurrentHwSnapshot;
+      const curWkNum = (currentWeekStr.split('-W')[1] || '').replace(/^0+/, '');
+      const isCurrentHwSnapshot = item.topic_name === `Hausaufgabe KW ${curWkNum}` || item.topic_name === `Hausaufgabe KW ${currentWeekStr.split('-W')[1] || ''}` || itemW === currentWeekStr;
+      const isOtherActiveHw = Boolean(item.is_current_homework) && !item.topic_name?.startsWith('Hausaufgabe KW ');
+      const isActive = isCurrentHwSnapshot || isOtherActiveHw;
       if (isActive && item.homework_notes && item.homework_notes.trim()) {
         try {
           const parsed = JSON.parse(item.homework_notes);
@@ -9139,7 +9141,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     const isPlaceholderNote = (t: string) => {
       if (!t) return true;
       const lower = t.trim().toLowerCase();
-      return lower === 'zusätzliche bemerkung' || lower === 'zusätzliche bemerkungen' || lower === 'keine' || lower === 'keine hausaufgabe' || lower === 'keine hausaufgaben';
+      return lower === 'keine' || lower === 'keine hausaufgabe' || lower === 'keine hausaufgaben';
     };
     const validGeneralNote = isPlaceholderNote(generalNote) ? '' : generalNote;
 

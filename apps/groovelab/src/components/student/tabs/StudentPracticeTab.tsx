@@ -2910,7 +2910,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                         {songTitle}
                                       </span>
                                     </div>
-                                    {s.homework_notes && s.homework_notes.trim() && s.homework_notes.trim().toLowerCase() !== 'zusätzliche bemerkung' && (
+                                    {s.homework_notes && s.homework_notes.trim() && (
                                       <span style={{ fontSize: '0.82rem', color: '#94a3b8', fontWeight: 650, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', maxWidth: '150px' }}>
                                         {s.homework_notes}
                                       </span>
@@ -2919,8 +2919,8 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                 );
                               })}
 
-                              {/* Spezifische Lehrkraft-Notiz (falls kein Platzhalter) */}
-                              {missionInfo.hasSpecificNote && missionInfo.teacherNote && missionInfo.teacherNote.trim().toLowerCase() !== 'zusätzliche bemerkung' && (
+                              {/* Spezifische Lehrkraft-Notiz */}
+                              {missionInfo.hasSpecificNote && missionInfo.teacherNote && (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingTop: '2px', borderTop: (missionInfo.books?.length || missionInfo.songs?.length) ? '1px solid rgba(255, 255, 255, 0.06)' : 'none' }}>
                                   <Lightbulb size={13} color="#fcd34d" style={{ flexShrink: 0 }} />
                                   <span style={{ fontSize: '0.84rem', color: '#cbd5e1', fontWeight: 650, fontStyle: 'italic', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
@@ -3832,7 +3832,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                         {songTitle}
                                       </span>
                                     </div>
-                                    {s.homework_notes && s.homework_notes.trim() && s.homework_notes.trim().toLowerCase() !== 'zusätzliche bemerkung' && (
+                                    {s.homework_notes && s.homework_notes.trim() && (
                                       <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 650, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', maxWidth: '150px' }}>
                                         {s.homework_notes}
                                       </span>
@@ -3842,7 +3842,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                               })}
 
                               {/* Spezifische Lehrkraft-Notiz */}
-                              {missionInfo.hasSpecificNote && missionInfo.teacherNote && missionInfo.teacherNote.trim().toLowerCase() !== 'zusätzliche bemerkung' && (
+                              {missionInfo.hasSpecificNote && missionInfo.teacherNote && (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingTop: '2px', borderTop: (missionInfo.books?.length || missionInfo.songs?.length) ? '1px solid #f1f5f9' : 'none' }}>
                                   <Lightbulb size={13} color="#16a34a" style={{ flexShrink: 0 }} />
                                   <span style={{ fontSize: '0.84rem', color: '#475569', fontWeight: 650, fontStyle: 'italic', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>

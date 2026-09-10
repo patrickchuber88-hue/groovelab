@@ -1376,8 +1376,10 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                     const currentWeekNotes: string[] = [];
                     (progressItems || []).forEach(item => {
                       const itemW = getItemWeek(item);
-                      const isCurrentHwSnapshot = item.topic_name === 'Hausaufgabe KW ' + (currentWeekStr.split('-W')[1] || '') || itemW === currentWeekStr;
-                      const isActive = Boolean(item.is_current_homework) || isCurrentHwSnapshot;
+                      const curWkNum = (currentWeekStr.split('-W')[1] || '').replace(/^0+/, '');
+                      const isCurrentHwSnapshot = item.topic_name === `Hausaufgabe KW ${curWkNum}` || item.topic_name === `Hausaufgabe KW ${currentWeekStr.split('-W')[1] || ''}` || itemW === currentWeekStr;
+                      const isOtherActiveHw = Boolean(item.is_current_homework) && !item.topic_name?.startsWith('Hausaufgabe KW ');
+                      const isActive = isCurrentHwSnapshot || isOtherActiveHw;
                       if (isActive && item.homework_notes && item.homework_notes.trim()) {
                         try {
                           const parsed = JSON.parse(item.homework_notes);
@@ -1890,7 +1892,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               })}
 
                               {/* Zusätzliche Bemerkung */}
-                              {generalNote && generalNote.trim().toLowerCase() !== 'zusätzliche bemerkung' && (
+                              {generalNote && (
                                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.88rem', color: '#334155', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
                                   <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
                                   <strong style={{ color: '#15803d', fontWeight: 850, flexShrink: 0 }}>Zusätzliche Bemerkung:</strong>
@@ -4356,9 +4358,12 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
 
                       const getNotesForWeek = (weekStr: string): string[] => {
                         const notes: string[] = [];
+                        const wkNum = (weekStr.split('-W')[1] || '').replace(/^0+/, '');
                         (progressItems || []).forEach(item => {
                           const itemW = getItemWeek(item);
-                          const isActive = item.is_current_homework || item.topic_name.startsWith('Hausaufgabe KW ') || itemW === weekStr;
+                          const isThisWeekSnapshot = item.topic_name === `Hausaufgabe KW ${wkNum}` || item.topic_name === `Hausaufgabe KW ${weekStr.split('-W')[1] || ''}` || itemW === weekStr;
+                          const isOtherActiveHw = Boolean(item.is_current_homework) && !item.topic_name?.startsWith('Hausaufgabe KW ');
+                          const isActive = isThisWeekSnapshot || isOtherActiveHw;
                           if (isActive && item.homework_notes && item.homework_notes.trim()) {
                             parseHomeworkNotes(item.homework_notes).forEach(n => {
                               if (n && n.trim() && !notes.includes(n.trim())) notes.push(n.trim());
@@ -4971,7 +4976,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   ))}
 
                                   {/* Zusätzliche Bemerkung */}
-                                  {generalNote && generalNote.trim().toLowerCase() !== 'zusätzliche bemerkung' && (
+                                  {generalNote && (
                                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.88rem', color: '#334155', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
                                       <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
                                       <strong style={{ color: '#15803d', fontWeight: 850, flexShrink: 0 }}>Zusätzliche Bemerkung:</strong>
@@ -6130,9 +6135,12 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
 
                       const getNotesForWeek = (weekStr: string): string[] => {
                         const notes: string[] = [];
+                        const wkNum = (weekStr.split('-W')[1] || '').replace(/^0+/, '');
                         (progressItems || []).forEach(item => {
                           const itemW = getItemWeek(item);
-                          const isActive = item.is_current_homework || item.topic_name.startsWith('Hausaufgabe KW ') || itemW === weekStr;
+                          const isThisWeekSnapshot = item.topic_name === `Hausaufgabe KW ${wkNum}` || item.topic_name === `Hausaufgabe KW ${weekStr.split('-W')[1] || ''}` || itemW === weekStr;
+                          const isOtherActiveHw = Boolean(item.is_current_homework) && !item.topic_name?.startsWith('Hausaufgabe KW ');
+                          const isActive = isThisWeekSnapshot || isOtherActiveHw;
                           if (isActive && item.homework_notes && item.homework_notes.trim()) {
                             parseHomeworkNotes(item.homework_notes).forEach(n => {
                               if (n && n.trim() && !notes.includes(n.trim())) notes.push(n.trim());
@@ -6749,7 +6757,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   ))}
 
                                   {/* Zusätzliche Bemerkung */}
-                                  {generalNote && generalNote.trim().toLowerCase() !== 'zusätzliche bemerkung' && (
+                                  {generalNote && (
                                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.88rem', color: '#334155', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
                                       <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
                                       <strong style={{ color: '#15803d', fontWeight: 850, flexShrink: 0 }}>Zusätzliche Bemerkung:</strong>
