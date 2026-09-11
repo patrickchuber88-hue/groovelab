@@ -14,7 +14,7 @@
 - **Mandantentrennung (Multi-Tenancy)**: Jede Datenbank-Abfrage und RLS-Policy muss strikt auf `school_id = get_current_user_school_id()` beschränkt sein (Default-Deny).
 - **Storage-Scoping**: Löschoperationen auf `storage.objects` (Buckets `campus-assets`, `groovelab-assets`) müssen strikt auf den Ordner des angemeldeten Benutzers beschränkt sein. Anonymes Löschen ist verboten.
 - **Revisionssicheres Audit-Logging**: Alle administrativen Aktionen, Ghost-Support-Sitzungen, Notfall-Resets und Master-Logins müssen unveränderbar in `public.audit_logs` oder `master_audit_trail` protokolliert werden.
-- **Verifikations-Doktrin (Striktes Verbot automatischer Terminal-Runs)**: Der KI-Agent führt NIEMALS eigenständig oder automatisch `npm run ...` oder `npx ...` (wie `security:check`, `security:secrets`, `tsc`, `vite build` oder `gate`) im Terminal aus. Keine automatischen Test- oder Validierungs-Schleifen am Ende von Antworten. Die Prüfung erfolgt AUSNAHMSLOS erst beim Commit (über den Git-Pre-Commit-Hook) oder manuell durch den Entwickler.
+- **Verifikations-Doktrin (Striktes Verbot automatischer Terminal-Runs mit Ausnahme des Codeworts „commit“)**: Der KI-Agent führt außerhalb expliziter Aufforderungen NIEMALS eigenständig oder ungefragt `npm run ...` oder `npx ...` (wie `security:check`, `security:secrets`, `tsc`, `vite build` oder `gate`) im Terminal aus. Keine automatischen Test- oder Validierungs-Schleifen am Ende von regulären Antworten. **Ausdrückliche Ausnahme**: Beim Codewort „commit“ (oder „commit and deploy“) darf und soll der KI-Agent alle relevanten `npm runs` (`npm run gate`, `npm run build:groovelab`, `npm run verify:invariants` etc.) vollständig und eigenständig ausführen, um vor dem Commit und Deployment 100%ige Integrität sicherzustellen.
 
 ## 🌅 Automatischer Guten-Morgen-Sicherheitscheck (Morning Security Routine)
 - **Automatischer Trigger**: Wenn der Benutzer eine Nachricht mit einer morgendlichen Begrüßung (z. B. „Guten Morgen“, „Morning Check“, „Moin“, „Morgen-Audit“) sendet, MUSS automatisch und ohne gesonderte Aufforderung der vollständige Sicherheits- und Integritätscheck ausgeführt werden:
@@ -34,9 +34,9 @@
 
 ## ⚡ Hermetisches Vibe Coding & Enterprise Quality Gate
 - **Hermetischer Master-Prompt**: Bei KI-gestützten Feature-Erweiterungen und Refactorings ist zwingend der Prompt aus `.agents/prompts/VIBE_CODING_MASTER_PROMPT.md` zu verwenden. Der Prompt bindet die KI an strikte Bounded Contexts, verbietet unkontrollierte Dateimodifikationen außerhalb des Scopes und schützt alle OWASP ASVS Level 3 Axiome.
-- Der KI-Agent führt `npm run gate` oder Terminal-Prüfroutinen NIEMALS eigenständig oder automatisch aus.
-- Keine automatischen Test- oder Validierungs-Schleifen am Ende von Antworten.
-- Die Ausführung von `npm run gate` erfolgt ausschließlich manuell durch den Entwickler im Host-Terminal oder per Git-Hook beim Commit.
+- Der KI-Agent führt `npm run gate` oder Terminal-Prüfroutinen außerhalb des Codeworts „commit“ NIEMALS ungefragt aus. Keine automatischen Test-Schleifen am Ende von regulären Antworten.
+- Beim Codewort „commit“ (oder „commit and deploy“) führt der Agent `npm run gate` sowie alle Build- und Integritätsprüfungen eigenständig aus.
+- Die finale Sicherheitsprüfung beim Commit erfolgt zusätzlich über den Git-Pre-Commit-Hook.
 - #no-Bypass gilt unverändert für den Code-Standard selbst (keine Verletzung der Invarianten).
 
 ## 🏛️ Monolith Goldstandard Guardian & Positive Intervention Directive
