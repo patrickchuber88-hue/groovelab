@@ -14,7 +14,7 @@
 - **Mandantentrennung (Multi-Tenancy)**: Jede Datenbank-Abfrage und RLS-Policy muss strikt auf `school_id = get_current_user_school_id()` beschränkt sein (Default-Deny).
 - **Storage-Scoping**: Löschoperationen auf `storage.objects` (Buckets `campus-assets`, `groovelab-assets`) müssen strikt auf den Ordner des angemeldeten Benutzers beschränkt sein. Anonymes Löschen ist verboten.
 - **Revisionssicheres Audit-Logging**: Alle administrativen Aktionen, Ghost-Support-Sitzungen, Notfall-Resets und Master-Logins müssen unveränderbar in `public.audit_logs` oder `master_audit_trail` protokolliert werden.
-- **Verifikationspflicht**: Nach jeder Code-Änderung zwingend `npm run security:check`, `npm run security:secrets`, `npx tsc --noEmit` und `npx vite build` ausführen.
+- **Verifikations-Doktrin (Striktes Verbot automatischer Terminal-Runs)**: Der KI-Agent führt NIEMALS eigenständig oder automatisch `npm run ...` oder `npx ...` (wie `security:check`, `security:secrets`, `tsc`, `vite build` oder `gate`) im Terminal aus. Keine automatischen Test- oder Validierungs-Schleifen am Ende von Antworten. Die Prüfung erfolgt AUSNAHMSLOS erst beim Commit (über den Git-Pre-Commit-Hook) oder manuell durch den Entwickler.
 
 ## 🌅 Automatischer Guten-Morgen-Sicherheitscheck (Morning Security Routine)
 - **Automatischer Trigger**: Wenn der Benutzer eine Nachricht mit einer morgendlichen Begrüßung (z. B. „Guten Morgen“, „Morning Check“, „Moin“, „Morgen-Audit“) sendet, MUSS automatisch und ohne gesonderte Aufforderung der vollständige Sicherheits- und Integritätscheck ausgeführt werden:
@@ -54,7 +54,7 @@
 - **Kompaktes Reporting (Bedarfsgesteuert)**:
   - Wurde aktiv eingegriffen und veredelt: Ausgabe eines kurzen Abschnitts `### 🏛️ Monolith Goldstandard Delta` (Präzise Vorher/Nachher-Stichpunkte).
   - War bereits alles konform: Ein dezenter Vermerk (`🏛️ Monolith Goldstandard: Konform`) genügt.
-- **Verifikations-Abschluss**: Jede Veredelung muss zwingend mit `npm run gate` verifiziert werden (Exit-Code 0).
+- **Verifikations-Abschluss**: Die formale Verifikation (`npm run gate`) erfolgt ausschließlich manuell durch den Entwickler im Host-Terminal oder per Git-Hook beim Commit. Keine automatische Ausführung durch den Agenten.
 
 ## ♿ Barrierefreiheits-Wächter & BFSG 2025 / WCAG 2.2 AA Governance (Zero-Regression Directive)
 - **Automatischer Barrierefreiheits-Schutz (Wächter-Pflicht)**: Bei JEDER Modifikation an interaktiven UI-Komponenten, Buttons, Menüs, Karten, Formularen, Modals, Widgets oder Footern MUSS zwingend und ohne gesonderte Aufforderung geprüft werden, ob die digitale Barrierefreiheit nach dem Barrierefreiheitsstärkungsgesetz (BFSG 2025), BITV 2.0 und WCAG 2.2 Stufe AA gewahrt bleibt. Keine Code-Änderung darf die Barrierefreiheit einschränken oder herabsetzen.

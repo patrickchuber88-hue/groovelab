@@ -2593,7 +2593,11 @@ export function AdminDashboard({
       const isAtStation = (sessions || []).some((s: any) => {
         if (s.user_id !== log.user_id || !s.station_id) return false;
         const start = new Date(s.check_in_time).getTime();
-        const end = s.check_out_time ? new Date(s.check_out_time).getTime() : Date.now();
+        const end = s.check_out_time 
+          ? new Date(s.check_out_time).getTime() 
+          : s.last_active_at 
+            ? Math.min(Date.now(), new Date(s.last_active_at).getTime() + 5 * 60000)
+            : Math.min(Date.now(), start + 60 * 60000);
         // 15 minutes tolerance on either side
         return logTime >= start - 900000 && logTime <= end + 900000;
       });
@@ -4046,7 +4050,7 @@ export function AdminDashboard({
 
     const { data: allSessions } = await supabase
       .from('sessions')
-      .select('check_in_time, check_out_time, station_id')
+      .select('check_in_time, check_out_time, station_id, last_active_at')
       .eq('user_id', student.id);
     
     if (allSessions) {
@@ -4070,7 +4074,11 @@ export function AdminDashboard({
 
       allSessions.forEach(s => {
         const start = new Date(s.check_in_time);
-        const end = s.check_out_time ? new Date(s.check_out_time) : new Date();
+        const end = s.check_out_time 
+          ? new Date(s.check_out_time) 
+          : s.last_active_at 
+            ? new Date(Math.min(Date.now(), new Date(s.last_active_at).getTime() + 5 * 60000))
+            : new Date(Math.min(Date.now(), start.getTime() + 60 * 60000));
         const duration = Math.floor((end.getTime() - start.getTime()) / 60000);
         const mins = Math.max(0, duration);
         

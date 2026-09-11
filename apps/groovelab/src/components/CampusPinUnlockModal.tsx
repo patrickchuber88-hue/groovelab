@@ -7,6 +7,9 @@ interface CampusPinUnlockModalProps {
   user: any;
   supabase: any;
   schoolData: any;
+  mode?: 'adaptive' | 'parent_only' | 'student_only';
+  title?: string;
+  subtitle?: string;
   onUnlock: () => void;
   onClose: () => void;
 }
@@ -15,20 +18,36 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
   user,
   supabase,
   schoolData,
+  mode = 'adaptive',
+  title,
+  subtitle,
   onUnlock,
   onClose
 }) => {
+  const isParentOnly = mode === 'parent_only';
   const [loading, setLoading] = useState(false);
   const [studentBirthDay, setStudentBirthDay] = useState<string>('');
   const [isSetupMode, setIsSetupMode] = useState(false);
   const [pinInput, setPinInput] = useState('');
   const [attempts, setAttempts] = useState(0);
-  const [isParentMode, setIsParentMode] = useState(false);
+  const [isParentMode, setIsParentMode] = useState(isParentOnly);
 
-  const primaryColor = isParentMode ? '#0284c7' : '#34a853';
+  const primaryColor = (isParentOnly || isParentMode) ? '#0284c7' : '#34a853';
+
+  // WAI-ARIA Escape Listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   // Determine PIN mode on mount
   useEffect(() => {
+    if (isParentOnly) return;
     async function checkPinMode() {
       try {
         setLoading(true);
@@ -72,12 +91,12 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
       setPinInput(nextPin);
 
       // Dynamically detect parent 5th/6th digit
-      if (nextPin.length === 5 && !isParentMode) {
+      if (nextPin.length === 5 && !isParentMode && !isParentOnly) {
         setIsParentMode(true);
       }
 
       // Check verification at 4 digits (student) or 6 digits (parent)
-      if (nextPin.length === 4 && !isParentMode && !isSetupMode) {
+      if (nextPin.length === 4 && !isParentMode && !isSetupMode && !isParentOnly) {
         handleVerify(nextPin, false);
       } else if (nextPin.length === 6) {
         handleVerify(nextPin, true);
@@ -87,10 +106,51 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
 
   const handleVerify = async (explicitPin?: string, isSixDigits: boolean = false) => {
     const pinToVerify = typeof explicitPin === 'string' ? explicitPin : pinInput;
-    if (pinToVerify.length < 4 || loading) return;
+    if (loading) return;
+    if (isParentOnly && pinToVerify.length < 6) return;
+    if (!isParentOnly && pinToVerify.length < 4) return;
     setLoading(true);
 
     try {
+      if (isParentOnly) {
+        const cleanInput = pinToVerify.trim();
+        if (cleanInput.length !== 6) {
+          setLoading(false);
+          return;
+        }
+
+        // 🛡️ Volljährigkeits-Schutz (§ 2 BGB, §§ 1626, 1629 BGB, Art. 6, 8 DSGVO)
+        if (user?.is_adult && !user?.adult_allow_parent_access) {
+          alert('Dieser Schüler ist volljährig (18+). Der elterliche Einblick wurde zum Schutz der Privatsphäre deaktiviert.');
+          setPinInput('');
+          setLoading(false);
+          return;
+        }
+
+        const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
+          student_id: user.id,
+          input_pin: cleanInput
+        });
+
+        if (parentOk === true) {
+          sessionStorage.setItem(`groovelab_parent_unlocked_${user.id}`, 'true');
+          sessionStorage.setItem(`groovelab_parent_session_${user.id}`, String(Date.now() + 180 * 1000));
+          sessionStorage.setItem(`campus_parent_module_unlock_${user.id}`, String(Date.now() + 180 * 1000));
+          onUnlock();
+        } else {
+          const newAttempts = attempts + 1;
+          setAttempts(newAttempts);
+          if (newAttempts >= 5) {
+            alert('Zu viele Fehlversuche. Bitte wende dich an deine Musikschule.');
+            onClose();
+          } else {
+            alert(`Falsche Eltern-PIN. Noch ${5 - newAttempts} Versuche.`);
+            setPinInput('');
+          }
+        }
+        return;
+      }
+
       if (isSetupMode) {
         // Validate proposed PIN against trivial and birthday patterns
         const validation = validateNewPin(pinToVerify, studentBirthDay || user.day_of_birth);
@@ -191,6 +251,7 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
           if (isParentMatch) {
             sessionStorage.setItem(`groovelab_parent_unlocked_${user.id}`, 'true');
             sessionStorage.setItem(`groovelab_parent_session_${user.id}`, String(Date.now() + 180 * 1000));
+            sessionStorage.setItem(`campus_parent_module_unlock_${user.id}`, String(Date.now() + 180 * 1000));
           }
           onUnlock();
         } else {
@@ -233,6 +294,7 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
 
       sessionStorage.setItem(`groovelab_parent_unlocked_${user.id}`, 'true');
       sessionStorage.setItem(`groovelab_parent_session_${user.id}`, String(Date.now() + 180 * 1000));
+      sessionStorage.setItem(`campus_parent_module_unlock_${user.id}`, String(Date.now() + 180 * 1000));
       onUnlock();
     } catch (err: any) {
       if (err.name !== 'NotAllowedError' && err.name !== 'AbortError') {
@@ -289,20 +351,36 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
     );
   };
 
-  const activeSlotsCount = (isParentMode || pinInput.length > 4) ? 6 : 4;
+  const activeSlotsCount = isParentOnly ? 6 : ((isParentMode || pinInput.length > 4) ? 6 : 4);
+
+  const computedTitle = title || (isParentOnly ? 'Module freischalten' : (isParentMode ? 'Eltern-Master-Zugang' : (isSetupMode ? 'Persönliche PIN einrichten' : 'Campus freischalten')));
+  const computedSubtitle = subtitle || (isParentOnly ? (
+    <>Eltern-Freigabe erforderlich:<br/>Bitte 6-stellige Eltern-Master-PIN eingeben.</>
+  ) : isParentMode ? (
+    <>Bitte gib deine 6-stellige Eltern-Master-PIN ein,<br/>um die Eltern-Zentrale zu öffnen.</>
+  ) : isSetupMode ? (
+    <>Lege eine geheime 4-stellige PIN fest,<br/>um deine privaten Campus-Daten zu schützen.</>
+  ) : (
+    <>Bitte gib deine 4-stellige Schüler-PIN ein<br/>oder deine 6-stellige Eltern-Master-PIN.</>
+  ));
 
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      background: 'rgba(15, 23, 42, 0.40)',
-      backdropFilter: 'blur(16px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 11000,
-      padding: '20px'
-    }}>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={typeof computedTitle === 'string' ? computedTitle : 'PIN-Eingabe'}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(15, 23, 42, 0.40)',
+        backdropFilter: 'blur(16px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 11000,
+        padding: '20px'
+      }}
+    >
       <div style={{
         background: '#ffffff',
         borderRadius: '32px',
@@ -319,6 +397,7 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
       }}>
         <button
           onClick={onClose}
+          aria-label="Schließen"
           style={{
             position: 'absolute',
             top: '20px',
@@ -337,28 +416,22 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
           width: '56px',
           height: '56px',
           borderRadius: '50%',
-          background: isParentMode ? '#f0f9ff' : '#e6f4ea',
+          background: (isParentOnly || isParentMode) ? '#e0f2fe' : '#e6f4ea',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           color: primaryColor,
           marginBottom: '16px'
         }}>
-          {isParentMode ? <ShieldCheck size={28} /> : (isSetupMode ? <Key size={28} /> : <Lock size={28} />)}
+          {(isParentOnly || isParentMode) ? <ShieldCheck size={28} /> : (isSetupMode ? <Key size={28} /> : <Lock size={28} />)}
         </div>
 
         <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
-          {isParentMode ? 'Eltern-Master-Zugang' : (isSetupMode ? 'Persönliche PIN einrichten' : 'Campus freischalten')}
+          {computedTitle}
         </h3>
         
         <p style={{ margin: '8px 0 20px 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: '1.4' }}>
-          {isParentMode ? (
-            <>Bitte gib deine 6-stellige Eltern-Master-PIN ein,<br/>um die Eltern-Zentrale zu öffnen.</>
-          ) : isSetupMode ? (
-            <>Lege eine geheime 4-stellige PIN fest,<br/>um deine privaten Campus-Daten zu schützen.</>
-          ) : (
-            <>Bitte gib deine 4-stellige Schüler-PIN ein<br/>oder deine 6-stellige Eltern-Master-PIN.</>
-          )}
+          {computedSubtitle}
         </p>
 
         {/* Input indicators with smooth transition */}
@@ -412,8 +485,8 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
           </button>
         )}
 
-        {/* Mode switcher link */}
-        {!isSetupMode && (
+        {/* Mode switcher link - Excluded in parent_only mode */}
+        {!isSetupMode && !isParentOnly && (
           <button
             type="button"
             onClick={() => {

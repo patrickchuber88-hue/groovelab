@@ -556,12 +556,15 @@ export function ScheduleCalendarViewDesktop({
         try {
           let text = '';
           try {
-            const res = await fetch(singleUrl);
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2500);
+            const res = await fetch(singleUrl, { signal: controller.signal });
+            clearTimeout(timeoutId);
             if (!res.ok) throw new Error();
             text = await res.text();
           } catch (corsErr) {
             // Zero US / Third-Party Cloud: Fail-safe without third-party proxies
-            console.warn('[ScheduleCalendarViewDesktop] Direct calendar sync failed, skipping unreachable external feed:', singleUrl);
+            console.warn('[ScheduleCalendarViewDesktop] Direct calendar sync failed or timed out (2.5s), skipping unreachable external feed:', singleUrl);
             continue;
           }
 
@@ -716,7 +719,6 @@ export function ScheduleCalendarViewDesktop({
         const key = `groovelab_calendar_active_occurrences_${userId}`;
         localStorage.setItem(key, JSON.stringify(occurrences));
         localStorage.setItem('groovelab_calendar_active_occurrences_latest', JSON.stringify(occurrences));
-        window.dispatchEvent(new Event('groovelab_schedule_changed'));
       } catch (e) {}
     }
   }, [occurrences, userId]);

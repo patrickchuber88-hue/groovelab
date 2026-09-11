@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import QRCode from 'react-qr-code';
 import { usePremiumOnboardingTour, TourStartButton } from './PremiumOnboardingTour';
 import { CampusGroovelabText } from './CampusGroovelabBrand';
@@ -295,28 +295,20 @@ export function CampusEventsBoard({
   const [orientationTick, setOrientationTick] = useState(0);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [eventsCardIndex, setEventsCardIndex] = useState<number>(0);
+  const fullYearLoadedRef = useRef(false);
 
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
     const handleOrientationChange = () => setOrientationTick(prev => prev + 1);
 
     window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleOrientationChange);
     window.addEventListener('groovelab_orientation_changed', handleOrientationChange);
-
-    const observer = new MutationObserver(() => {
-      setOrientationTick(prev => prev + 1);
-    });
-    if (document.documentElement) {
-      observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    }
-    if (document.body) {
-      observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
-    }
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleOrientationChange);
       window.removeEventListener('groovelab_orientation_changed', handleOrientationChange);
-      observer.disconnect();
     };
   }, []);
 
@@ -2158,14 +2150,17 @@ export function CampusEventsBoard({
       fetchStudentProgramPoints();
     }
 
+    let debounceTimer: any = null;
     const handleSync = () => {
-      fetchLessons();
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        fetchLessons();
+      }, 350);
     };
 
     window.addEventListener('focus', handleSync);
-    window.addEventListener('visibilitychange', handleSync);
-    window.addEventListener('storage', handleSync);
     window.addEventListener('groovelab_schedule_changed', handleSync);
+    window.addEventListener('campus_schedule_mutated', handleSync);
 
     const channel = supabase
       .channel(`realtime_events_board_schedule_sync_${schoolId || 'global'}`)
@@ -2174,10 +2169,10 @@ export function CampusEventsBoard({
       .subscribe();
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       window.removeEventListener('focus', handleSync);
-      window.removeEventListener('visibilitychange', handleSync);
-      window.removeEventListener('storage', handleSync);
       window.removeEventListener('groovelab_schedule_changed', handleSync);
+      window.removeEventListener('campus_schedule_mutated', handleSync);
       supabase.removeChannel(channel);
     };
   }, [userId, schoolId, role]);
@@ -2833,6 +2828,19 @@ export function CampusEventsBoard({
     setCalendarError(null);
 
     try {
+      const cacheKey = `groovelab_subscribed_cal_${schoolId || 'global'}_${encodeURIComponent(url.slice(0, 40))}`;
+      try {
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+          const parsedCache = JSON.parse(cached);
+          if (parsedCache && typeof parsedCache.timestamp === 'number' && (Date.now() - parsedCache.timestamp < 24 * 60 * 60 * 1000) && Array.isArray(parsedCache.data) && parsedCache.data.length > 0) {
+            setSubscribedEvents(parsedCache.data);
+            setLoadingCalendar(false);
+            return;
+          }
+        }
+      } catch (e) {}
+
       const urls = (() => {
         try {
           if (url.startsWith('[')) return JSON.parse(url) as string[];
@@ -2847,15 +2855,24 @@ export function CampusEventsBoard({
       for (const singleUrl of urls) {
         try {
           let text = '';
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 2500);
+
           try {
-            const res = await fetch(singleUrl);
+            const res = await fetch(singleUrl, { signal: controller.signal });
             if (!res.ok) throw new Error();
             text = await res.text();
-          } catch (corsErr) {
+          } catch (corsErr: any) {
             // Zero US / Third-Party Cloud: Fail-safe without third-party proxies
-            console.warn('[CampusEventsBoard] Direct calendar sync failed, skipping unreachable external feed:', singleUrl);
+            if (corsErr?.name === 'AbortError') {
+              console.warn('[CampusEventsBoard] Calendar feed timed out after 2.5s, skipping:', singleUrl);
+            } else {
+              console.warn('[CampusEventsBoard] Direct calendar sync failed, skipping unreachable external feed:', singleUrl);
+            }
             loadFailedCount++;
             continue;
+          } finally {
+            clearTimeout(timeoutId);
           }
 
           if (text) {
@@ -2897,6 +2914,9 @@ export function CampusEventsBoard({
             is_subscribed: true
           };
         });
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), data: parsed }));
+        } catch (e) {}
         setSubscribedEvents(parsed);
         return;
       }
@@ -2943,21 +2963,24 @@ export function CampusEventsBoard({
     }
   };
 
-  // Fetch teaching schedules/occurrences for Column 1
-  const fetchLessons = async () => {
-    setLoadingLessons(true);
+  // Fetch teaching schedules/occurrences for Column 1 (Tier-1 70-Day Sliding Window + Background Expansion)
+  const fetchLessons = async (loadFullYear = false) => {
+    if (!loadFullYear) {
+      setLoadingLessons(true);
+    }
     try {
       const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
       const now = simStr ? new Date(simStr + 'T00:00:00') : new Date();
       const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       
-      // Rolling 12-month window (365 days) aligned to start of current week (Monday)
+      // Tier-1 Enterprise Sliding Window: 70 days rolling ahead for instant initial render, 365 days for full year
       const startRange = new Date(now);
       const day = startRange.getDay() || 7;
       startRange.setDate(startRange.getDate() - day + 1); // Monday of current week
 
       const endRange = new Date(startRange);
-      endRange.setDate(startRange.getDate() + 365); // 365 days rolling ahead into the future
+      const rollingDays = loadFullYear ? 365 : 70;
+      endRange.setDate(startRange.getDate() + rollingDays);
 
       const startYear = `${startRange.getFullYear()}-${String(startRange.getMonth() + 1).padStart(2, '0')}-${String(startRange.getDate()).padStart(2, '0')}`;
       const endYear = `${endRange.getFullYear()}-${String(endRange.getMonth() + 1).padStart(2, '0')}-${String(endRange.getDate()).padStart(2, '0')}`;
@@ -3810,10 +3833,20 @@ export function CampusEventsBoard({
         setActiveChatOccIds(occIds);
         setActiveChatStudentIds(studentIds);
       }
+
+      // Schedule non-blocking background expansion for remaining months
+      if (!loadFullYear && !fullYearLoadedRef.current) {
+        setTimeout(() => {
+          fullYearLoadedRef.current = true;
+          fetchLessons(true);
+        }, 700);
+      }
     } catch (err) {
       console.error('Error fetching lessons schedule:', err);
     } finally {
-      setLoadingLessons(false);
+      if (!loadFullYear) {
+        setLoadingLessons(false);
+      }
     }
   };
 
@@ -4746,8 +4779,8 @@ export function CampusEventsBoard({
     });
   };
 
-  // Split lesson list for Column 1
-  const getFilteredLessons = () => {
+  // Split lesson list for Column 1 (Tier-1 Memoized to prevent render-blocking)
+  const filteredLessons = useMemo(() => {
     const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
     const d = simStr ? new Date(simStr + 'T00:00:00') : new Date();
     const yyyy = d.getFullYear();
@@ -4767,7 +4800,31 @@ export function CampusEventsBoard({
       const isPast = occ.date < todayStr || (occ.date === todayStr && occ.start_time < nowTimeStr);
       return lessonTab === 'upcoming' ? !isPast : isPast;
     });
-  };
+  }, [lessons, lessonTab]);
+
+  const getFilteredLessons = useCallback(() => filteredLessons, [filteredLessons]);
+
+  // Tier-1 Memoized month grouping for instantaneous layout & scrolling
+  const groupedLessonsByMonth = useMemo(() => {
+    const grouped: Record<string, any[]> = {};
+    filteredLessons.forEach(occ => {
+      const monthKey = occ.date.substring(0, 7); // "YYYY-MM"
+      if (!grouped[monthKey]) {
+        grouped[monthKey] = [];
+      }
+      grouped[monthKey].push(occ);
+    });
+
+    const monthKeys = Object.keys(grouped);
+    monthKeys.sort((a, b) => {
+      if (lessonTab === 'past' || lessonTab === 'cancelled') {
+        return b.localeCompare(a);
+      }
+      return a.localeCompare(b);
+    });
+
+    return { grouped, monthKeys };
+  }, [filteredLessons, lessonTab]);
 
   // Helpers for formatting
   const formatDateGerman = (dateStr: string) => {
@@ -6407,34 +6464,18 @@ export function CampusEventsBoard({
             <div style={{ textAlign: 'center', padding: '32px', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>
               Stundenplan lädt...
             </div>
-          ) : getFilteredLessons().length === 0 ? (
+          ) : filteredLessons.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 20px', border: '1.5px dashed #e2e8f0', borderRadius: '16px', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>
               {lessonTab === 'cancelled' ? 'Keine Unterrichtsabsagen verzeichnet.' : 'Keine Termine vorhanden.'}
             </div>
           ) : (() => {
-            const grouped: Record<string, any[]> = {};
-            const list = getFilteredLessons();
-            list.forEach(occ => {
-              const monthKey = occ.date.substring(0, 7); // "YYYY-MM"
-              if (!grouped[monthKey]) {
-                grouped[monthKey] = [];
-              }
-              grouped[monthKey].push(occ);
-            });
-
-            const monthKeys = Object.keys(grouped);
+            const { grouped, monthKeys } = groupedLessonsByMonth;
             const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
             const simNow = simStr ? new Date(simStr + 'T00:00:00') : new Date();
             const currentMonthKey = `${simNow.getFullYear()}-${String(simNow.getMonth() + 1).padStart(2, '0')}`;
-            monthKeys.sort((a, b) => {
-              if (lessonTab === 'past' || lessonTab === 'cancelled') {
-                return b.localeCompare(a);
-              }
-              return a.localeCompare(b);
-            });
 
             return monthKeys.map((monthKey, idx) => {
-              const occs = grouped[monthKey];
+              const occs = grouped[monthKey] || [];
               const isExpanded = expandedMonths[monthKey] !== undefined 
                 ? expandedMonths[monthKey] 
                 : (monthKey === currentMonthKey || idx === 0);

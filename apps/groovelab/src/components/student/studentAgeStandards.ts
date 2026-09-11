@@ -86,3 +86,60 @@ export const CAMPUS_AGE_STANDARDS: Record<string, CampusAgeStandard> = {
     }
   }
 };
+
+export interface TeacherRecommendation {
+  teacher_id: string;
+  teacher_name: string;
+  recommended_level: 'junior' | 'teen' | 'pro';
+  recommended_modules?: string[];
+  note?: string;
+  created_at: string;
+  dismissed?: boolean;
+}
+
+export interface ParentPermissionsConfig {
+  allow_student_audio?: boolean;
+  allow_teacher_audio?: boolean;
+  board_overrides?: Record<string, boolean>;
+  module_overrides?: Record<string, boolean>; // e.g. { loopstation: true, archive: true }
+  custom_layout?: {
+    order?: StudioModuleKey[];
+    hidden?: StudioModuleKey[];
+  };
+  teacher_recommendation?: TeacherRecommendation;
+  bedtime_mode?: any;
+  daytime_lock?: any;
+  instant_lock_until?: number;
+}
+
+export type StudioModuleKey = 'practice' | 'recordings' | 'groovetrainer' | 'tuner' | 'loopstation' | 'earlab' | 'skillradar' | 'protocol' | 'archive';
+
+export const ALL_STUDIO_MODULE_KEYS: StudioModuleKey[] = [
+  'practice',
+  'recordings',
+  'groovetrainer',
+  'tuner',
+  'loopstation',
+  'earlab',
+  'skillradar',
+  'protocol',
+  'archive'
+];
+
+export function isStudioModuleActive(
+  moduleKey: StudioModuleKey,
+  uiLevel: 'junior' | 'teen' | 'pro',
+  moduleOverrides?: Record<string, boolean>
+): boolean {
+  if (moduleOverrides && moduleOverrides[moduleKey] !== undefined) {
+    return Boolean(moduleOverrides[moduleKey]);
+  }
+  if (moduleKey === 'loopstation') {
+    return uiLevel !== 'junior';
+  }
+  if (moduleKey === 'archive') {
+    return uiLevel === 'pro';
+  }
+  return true;
+}
+

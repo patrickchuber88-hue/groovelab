@@ -1,7 +1,7 @@
 import React, { Suspense, useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import {
-  Activity, ArrowRightLeft, Award, BookOpen, Calendar, Check, ChevronDown, ChevronLeft,
+  Activity, ArrowRightLeft, Award, BookOpen, Calendar, Check, CheckCircle, ChevronDown, ChevronLeft,
   ChevronRight, Clock, Copy, Disc, Edit3, FileText, Hash, Headphones, HelpCircle, History, Lightbulb,
   Lock, Mail, Mic, Moon, Music, Pin, Plus, Radio, RotateCcw, Search, Share2, Sliders,
   Sparkles, Square, Star, Target, Timer, Trash2, User, Volume2, VolumeX, AlertCircle,
@@ -9,9 +9,11 @@ import {
 } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { AudioTrackCarousel } from '../../AudioTrackCarousel';
+import { CampusPinUnlockModal } from '../../CampusPinUnlockModal';
 import { SpeechDictationButton } from '../SpeechDictationButton';
 import { MechanicalMetronomeIcon } from './MeisterwerkAudioPlayers';
 import { Student } from '../meisterwerk.types';
+import { StudioModuleKey, ALL_STUDIO_MODULE_KEYS } from '../studentAgeStandards';
 import {
   cleanSongOrBookTitle,
   formatHarmonizedAudioTitle,
@@ -512,9 +514,288 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     return !isAllowed;
   }, [student]);
 
+  const [showModuleUnlockModal, setShowModuleUnlockModal] = useState(false);
+  const [showParentPinModalForModules, setShowParentPinModalForModules] = useState(false);
+  const [localModuleOverrides, setLocalModuleOverrides] = useState<Record<string, boolean>>(() => {
+    return (student as any)?.parent_permissions?.module_overrides || {};
+  });
+
+  // 🎛️ STUDIO MODULES CUSTOM DRAG & DROP + JIGGLE MODE STATE
+  const [isModuleEditMode, setIsModuleEditMode] = useState(false);
+  const [activeModuleUnlockTab, setActiveModuleUnlockTab] = useState<'restore' | 'extensions'>('restore');
+  const [draggedModuleKey, setDraggedModuleKey] = useState<StudioModuleKey | null>(null);
+
+  const studentIdVal = (student as any)?.id;
+  const [customModuleLayout, setCustomModuleLayout] = useState<{ order: StudioModuleKey[]; hidden: StudioModuleKey[] }>(() => {
+    if (typeof window !== 'undefined' && studentIdVal) {
+      try {
+        const cached = localStorage.getItem(`campus_studio_modules_layout_${studentIdVal}`);
+        if (cached) return JSON.parse(cached);
+      } catch (e) {}
+    }
+    const dbLayout = (student as any)?.parent_permissions?.custom_layout;
+    return {
+      order: dbLayout?.order && Array.isArray(dbLayout.order) && dbLayout.order.length > 0 ? dbLayout.order : [...ALL_STUDIO_MODULE_KEYS],
+      hidden: dbLayout?.hidden && Array.isArray(dbLayout.hidden) ? dbLayout.hidden : []
+    };
+  });
+
+  useEffect(() => {
+    if ((student as any)?.parent_permissions?.custom_layout) {
+      const dbLayout = (student as any).parent_permissions.custom_layout;
+      setCustomModuleLayout(prev => ({
+        order: dbLayout.order && Array.isArray(dbLayout.order) && dbLayout.order.length > 0 ? dbLayout.order : prev.order,
+        hidden: dbLayout.hidden && Array.isArray(dbLayout.hidden) ? dbLayout.hidden : prev.hidden
+      }));
+    }
+  }, [(student as any)?.parent_permissions?.custom_layout]);
+
+  const saveCustomLayout = useCallback(async (nextLayout: { order: StudioModuleKey[]; hidden: StudioModuleKey[] }) => {
+    setCustomModuleLayout(nextLayout);
+    if (studentIdVal && typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(`campus_studio_modules_layout_${studentIdVal}`, JSON.stringify(nextLayout));
+      } catch (e) {}
+    }
+    if (student?.id) {
+      try {
+        const existingPermissions = (student as any)?.parent_permissions || {};
+        const updatedPermissions = {
+          ...existingPermissions,
+          custom_layout: nextLayout
+        };
+        await supabase
+          .from('users')
+          .update({ parent_permissions: updatedPermissions })
+          .eq('id', student.id);
+        (student as any).parent_permissions = updatedPermissions;
+      } catch (err) {
+        console.error('[Meisterwerk] Could not save custom module layout:', err);
+      }
+    }
+  }, [student, studentIdVal]);
+
+  // 🔔 Local Toast Feedback for Module Layout Actions
+  const [moduleToast, setModuleToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (moduleToast) {
+      const timer = setTimeout(() => setModuleToast(null), 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [moduleToast]);
+
+  const studentDisplayName = (student as any)?.first_name || 'Schüler';
+
+  const handleResetModuleLayout = useCallback(async () => {
+    const defaultLayout = {
+      order: [...ALL_STUDIO_MODULE_KEYS],
+      hidden: [] as StudioModuleKey[]
+    };
+    await saveCustomLayout(defaultLayout);
+    setIsModuleEditMode(false);
+    setShowModuleUnlockModal(false);
+    setModuleToast(isTeacherMode 
+      ? `Standard-Anordnung für ${studentDisplayName} wiederhergestellt` 
+      : 'Standard-Anordnung wiederhergestellt'
+    );
+  }, [saveCustomLayout, isTeacherMode, studentDisplayName]);
+
+  // 🔄 Automatic Layout Reset on UI Level change by parents (Junior <-> Teen <-> Pro)
+  const prevUiLevelRef = useRef(uiLevel);
+  useEffect(() => {
+    if (prevUiLevelRef.current && prevUiLevelRef.current !== uiLevel) {
+      handleResetModuleLayout();
+    }
+    prevUiLevelRef.current = uiLevel;
+  }, [uiLevel, handleResetModuleLayout]);
+
+  // 📱 Long-Press Handlers for iPads / Tablets (500ms)
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const handleTouchStartTile = useCallback(() => {
+    if (readOnly) return;
+    longPressTimerRef.current = setTimeout(() => {
+      setIsModuleEditMode(true);
+      if (typeof navigator !== 'undefined' && (navigator as any).vibrate) {
+        (navigator as any).vibrate(50);
+      }
+    }, 500);
+  }, [readOnly]);
+
+  const handleTouchCancelTile = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  const handleHideModule = useCallback(async (key: StudioModuleKey) => {
+    const nextHidden = customModuleLayout.hidden.includes(key) 
+      ? customModuleLayout.hidden 
+      : [...customModuleLayout.hidden, key];
+    await saveCustomLayout({
+      ...customModuleLayout,
+      hidden: nextHidden
+    });
+    setModuleToast(isTeacherMode 
+      ? `Modul für ${studentDisplayName} ausgeblendet` 
+      : 'Modul ausgeblendet'
+    );
+  }, [customModuleLayout, saveCustomLayout, isTeacherMode, studentDisplayName]);
+
+  const handleRestoreModule = useCallback(async (key: StudioModuleKey) => {
+    const nextHidden = customModuleLayout.hidden.filter(k => k !== key);
+    let nextOrder = [...customModuleLayout.order];
+    if (!nextOrder.includes(key)) {
+      nextOrder.push(key);
+    }
+    await saveCustomLayout({
+      order: nextOrder,
+      hidden: nextHidden
+    });
+    setModuleToast(isTeacherMode 
+      ? `Modul für ${studentDisplayName} wiederhergestellt` 
+      : 'Modul wiederhergestellt'
+    );
+  }, [customModuleLayout, saveCustomLayout, isTeacherMode, studentDisplayName]);
+
+  const handleDropOnModule = useCallback(async (targetKey: StudioModuleKey) => {
+    if (!draggedModuleKey || draggedModuleKey === targetKey) {
+      setDraggedModuleKey(null);
+      return;
+    }
+    const currentOrder = [...customModuleLayout.order];
+    const sourceIdx = currentOrder.indexOf(draggedModuleKey);
+    const targetIdx = currentOrder.indexOf(targetKey);
+    if (sourceIdx !== -1 && targetIdx !== -1) {
+      currentOrder.splice(sourceIdx, 1);
+      currentOrder.splice(targetIdx, 0, draggedModuleKey);
+      await saveCustomLayout({
+        ...customModuleLayout,
+        order: currentOrder
+      });
+      if (isTeacherMode) {
+        setModuleToast(`Layout für ${studentDisplayName} gespeichert`);
+      }
+    }
+    setDraggedModuleKey(null);
+  }, [draggedModuleKey, customModuleLayout, saveCustomLayout, isTeacherMode, studentDisplayName]);
+
+  useEffect(() => {
+    if ((student as any)?.parent_permissions?.module_overrides) {
+      setLocalModuleOverrides((student as any).parent_permissions.module_overrides);
+    }
+  }, [(student as any)?.parent_permissions?.module_overrides]);
+
+  const isLoopstationUnlocked = uiLevel !== "junior" || Boolean(localModuleOverrides.loopstation);
+  const isArchiveUnlocked = uiLevel === "pro" || Boolean(localModuleOverrides.archive);
+
+  const handleSaveModuleOverride = async (key: string, enabled: boolean) => {
+    const nextOverrides = {
+      ...localModuleOverrides,
+      [key]: enabled
+    };
+    setLocalModuleOverrides(nextOverrides);
+
+    if (student?.id) {
+      try {
+        const existingPermissions = (student as any)?.parent_permissions || {};
+        const updatedPermissions = {
+          ...existingPermissions,
+          module_overrides: nextOverrides
+        };
+        await supabase
+          .from("users")
+          .update({ parent_permissions: updatedPermissions })
+          .eq("id", student.id);
+        
+        (student as any).parent_permissions = updatedPermissions;
+      } catch (err) {
+        console.error("[Meisterwerk] Could not save module overrides:", err);
+      }
+    }
+  };
+
+  const checkIsParentModuleUnlocked = useCallback(() => {
+    if (typeof window === 'undefined' || !student?.id) return false;
+    const expiresAtStr = sessionStorage.getItem(`campus_parent_module_unlock_${student.id}`);
+    if (!expiresAtStr) return false;
+    const expiresAt = parseInt(expiresAtStr, 10);
+    if (isNaN(expiresAt) || Date.now() > expiresAt) {
+      sessionStorage.removeItem(`campus_parent_module_unlock_${student.id}`);
+      return false;
+    }
+    return true;
+  }, [student?.id]);
+
+  const closeAndLockModuleModal = useCallback(() => {
+    if (typeof window !== 'undefined' && student?.id) {
+      sessionStorage.removeItem(`campus_parent_module_unlock_${student.id}`);
+      sessionStorage.removeItem('campus_parent_unlocked');
+    }
+    setShowModuleUnlockModal(false);
+    setShowParentPinModalForModules(false);
+  }, [student?.id]);
+
+  // 🛡️ Fail-Closed Parent Auto-Lock on Tab Switch, Pagehide, or 3-Minute Timeout
+  useEffect(() => {
+    if (!showModuleUnlockModal && !showParentPinModalForModules) return;
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        closeAndLockModuleModal();
+      }
+    };
+    const handlePageHide = () => {
+      closeAndLockModuleModal();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handlePageHide);
+
+    const timer = setInterval(() => {
+      if (showModuleUnlockModal && activeModuleUnlockTab === 'extensions') {
+        if (!checkIsParentModuleUnlocked()) {
+          closeAndLockModuleModal();
+        }
+      }
+    }, 1000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', handlePageHide);
+      clearInterval(timer);
+    };
+  }, [showModuleUnlockModal, showParentPinModalForModules, activeModuleUnlockTab, closeAndLockModuleModal, checkIsParentModuleUnlocked]);
+
+  const handleToggleModuleOverride = (key: string, enabled: boolean) => {
+    if (!checkIsParentModuleUnlocked()) {
+      setShowParentPinModalForModules(true);
+      return;
+    }
+    handleSaveModuleOverride(key, enabled);
+  };
+
+  const handleOpenModuleUnlock = () => {
+    if (customModuleLayout.hidden.length > 0) {
+      setActiveModuleUnlockTab('restore');
+      setShowModuleUnlockModal(true);
+      return;
+    }
+    if (checkIsParentModuleUnlocked()) {
+      setActiveModuleUnlockTab('extensions');
+      setShowModuleUnlockModal(true);
+    } else {
+      setShowParentPinModalForModules(true);
+    }
+  };
   const [teacherConsentRequested, setTeacherConsentRequested] = useState(false);
   const [showMobileMoreMenu, setShowMobileMoreMenu] = useState(false);
+  const [isCarriedOverDismissed, setIsCarriedOverDismissed] = useState(false);
   const mobileMoreMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setIsCarriedOverDismissed(false);
+  }, [viewingWeekOffset, student?.id]);
 
   useEffect(() => {
     if (!showMobileMoreMenu) return;
@@ -1916,419 +2197,403 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                   /* ========================================================================= */
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }} className="animation-fade-in">
                     {(() => {
-                      const activeModulesCount = 5 + (uiLevel !== 'junior' ? 2 : 0) + (uiLevel === 'pro' ? 1 : 0);
+                      const activeModulesCount = 5 + (isLoopstationUnlocked ? 1 : 0) + (isArchiveUnlocked ? 1 : 0);
+
+                      // Check if customized (either order changed from default or any modules hidden)
+                      const isOrderCustomized = customModuleLayout.order.some((key, idx) => key !== ALL_STUDIO_MODULE_KEYS[idx]);
+                      const hasHiddenModules = customModuleLayout.hidden.length > 0;
+                      const hasLayoutModifications = isOrderCustomized || hasHiddenModules;
+
+                      // Module definitions map for dynamic rendering
+                      const moduleDefinitions: Record<StudioModuleKey, {
+                        title: string;
+                        subtitle?: string;
+                        icon: React.ReactNode;
+                        gradient: string;
+                        boxShadow: string;
+                        onClick: () => void;
+                        isUnlocked: boolean;
+                        showInView: boolean;
+                        borderOverride?: string;
+                      }> = {
+                        practice: {
+                          title: 'Übe-Begleiter',
+                          icon: <Clock size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
+                          gradient: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
+                          boxShadow: '0 6px 14px -2px rgba(234, 179, 8, 0.40)',
+                          isUnlocked: true,
+                          showInView: true,
+                          onClick: () => {
+                            setActiveModalTab('document');
+                            setActiveViewMode('practice');
+                            setActiveSubView('hub');
+                          }
+                        },
+                        recordings: {
+                          title: 'Aufnahmen',
+                          icon: <Mic size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
+                          gradient: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
+                          boxShadow: '0 6px 14px -2px rgba(99, 102, 241, 0.40)',
+                          isUnlocked: true,
+                          showInView: true,
+                          onClick: () => {
+                            setActiveModalTab('document');
+                            setActiveViewMode('recordings');
+                            setActiveSubView('hub');
+                          }
+                        },
+                        groovetrainer: {
+                          title: 'Groove-Trainer',
+                          icon: <Radio size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
+                          gradient: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                          boxShadow: '0 6px 14px -2px rgba(249, 115, 22, 0.40)',
+                          isUnlocked: true,
+                          showInView: true,
+                          onClick: () => {
+                            setActiveModalTab('document');
+                            setActiveViewMode('groovetrainer' as any);
+                            setActiveSubView('hub');
+                          }
+                        },
+                        tuner: {
+                          title: 'Stimmgerät',
+                          icon: <Radio size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
+                          gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+                          boxShadow: '0 6px 14px -2px rgba(6, 182, 212, 0.40)',
+                          isUnlocked: true,
+                          showInView: true,
+                          onClick: () => {
+                            setActiveModalTab('document');
+                            setActiveViewMode('tuner');
+                            setActiveSubView('hub');
+                          }
+                        },
+                        loopstation: {
+                          title: 'Loopstation',
+                          icon: <Sliders size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
+                          gradient: isLoopstationUnlocked 
+                            ? 'linear-gradient(135deg, #f43f5e 0%, #be123c 100%)'
+                            : 'linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%)',
+                          boxShadow: isLoopstationUnlocked ? '0 6px 14px -2px rgba(244, 63, 94, 0.40)' : 'none',
+                          isUnlocked: isLoopstationUnlocked,
+                          showInView: isLoopstationUnlocked || !readOnly,
+                          borderOverride: isLoopstationUnlocked ? '1.5px solid #e2e8f0' : '1.5px dashed #cbd5e1',
+                          onClick: () => {
+                            setActiveModalTab('document');
+                            setActiveViewMode('loopstation');
+                            setActiveSubView('hub');
+                          }
+                        },
+                        earlab: {
+                          title: uiLevel === 'junior' ? 'Klang-Detektiv' : 'EarLab & Harmony',
+                          icon: <Headphones size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
+                          gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                          boxShadow: '0 6px 14px -2px rgba(16, 185, 129, 0.40)',
+                          isUnlocked: true,
+                          showInView: true,
+                          onClick: () => {
+                            setActiveModalTab('document');
+                            setActiveViewMode('earlab' as any);
+                            setActiveSubView('hub');
+                          }
+                        },
+                        skillradar: {
+                          title: uiLevel === 'junior' ? 'Musik-Stern ⭐' : uiLevel === 'pro' ? 'Kompetenz-Radar' : 'Skill-Radar',
+                          icon: uiLevel === 'junior' ? (
+                            <Star size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                          ) : (
+                            <Activity size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                          ),
+                          gradient: uiLevel === 'junior'
+                            ? 'linear-gradient(135deg, #f59e0b 0%, #ec4899 50%, #8b5cf6 100%)'
+                            : 'linear-gradient(135deg, #d946ef 0%, #a21caf 100%)',
+                          boxShadow: uiLevel === 'junior'
+                            ? '0 6px 14px -2px rgba(245, 158, 11, 0.40)'
+                            : '0 6px 14px -2px rgba(217, 70, 239, 0.40)',
+                          isUnlocked: true,
+                          showInView: true,
+                          onClick: () => {
+                            setActiveModalTab('skillradar');
+                          }
+                        },
+                        protocol: {
+                          title: 'Protokoll',
+                          icon: <BookOpen size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
+                          gradient: 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
+                          boxShadow: '0 6px 14px -2px rgba(16, 185, 129, 0.40)',
+                          isUnlocked: true,
+                          showInView: true,
+                          onClick: () => {
+                            setHubTab('protocol');
+                          }
+                        },
+                        archive: {
+                          title: 'Archiv',
+                          icon: <History size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />,
+                          gradient: isArchiveUnlocked
+                            ? 'linear-gradient(135deg, #64748b 0%, #334155 100%)'
+                            : 'linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%)',
+                          boxShadow: isArchiveUnlocked ? '0 6px 14px -2px rgba(100, 116, 139, 0.40)' : 'none',
+                          isUnlocked: isArchiveUnlocked,
+                          showInView: isArchiveUnlocked || !readOnly,
+                          borderOverride: isArchiveUnlocked ? '1.5px solid #e2e8f0' : '1.5px dashed #cbd5e1',
+                          onClick: () => {
+                            setActiveModalTab('document');
+                            setActiveSubView('history');
+                            if (!selectedHistoryWeek) {
+                              setSelectedHistoryWeek(getISOWeek());
+                            }
+                          }
+                        }
+                      };
+
+                      // Filter visible ordered modules
+                      const visibleModuleKeys = customModuleLayout.order.filter(key => {
+                        const def = moduleDefinitions[key];
+                        if (!def) return false;
+                        if (!def.showInView) return false;
+                        return !customModuleLayout.hidden.includes(key);
+                      });
 
                       return (
                         <>
+                          <style>{`
+                            @keyframes campusJiggle {
+                              0% { transform: rotate(-1deg); }
+                              50% { transform: rotate(1deg); }
+                              100% { transform: rotate(-1deg); }
+                            }
+                            .campus-jiggle-tile {
+                              animation: campusJiggle 0.28s infinite ease-in-out;
+                            }
+                          `}</style>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <span style={{ fontSize: '0.82rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <Sliders size={15} style={{ color: '#34a853' }} />
                                 <span>Campus Studio Module</span>
                               </span>
+
+                              {/* 🔄 DEZENTER ZURÜCKSETZEN-KNOPF (sichtbar wenn Layout angepasst wurde) */}
+                              {hasLayoutModifications && !readOnly && (
+                                <button
+                                  type="button"
+                                  onClick={handleResetModuleLayout}
+                                  style={{
+                                    background: 'rgba(241, 245, 249, 0.85)',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: '100px',
+                                    padding: '3px 8px',
+                                    fontSize: '0.68rem',
+                                    fontWeight: 750,
+                                    color: '#475569',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  className="hover-scale-mini"
+                                  title="Standard-Anordnung des aktuellen UI-Levels wiederherstellen"
+                                >
+                                  <RotateCcw size={11} color="#475569" strokeWidth={2.4} />
+                                  <span>Zurücksetzen</span>
+                                </button>
+                              )}
                             </div>
-                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#15803d', background: '#e6f4ea', border: '1px solid #bbf7d0', padding: '2px 8px', borderRadius: '100px' }}>
-                              {activeModulesCount} Module aktiv
-                            </span>
+
+                            {/* ✏️ EDIT-MODUS (JIGGLE) BUTTON */}
+                            {!readOnly && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => setIsModuleEditMode(!isModuleEditMode)}
+                                  style={{
+                                    background: isModuleEditMode ? '#0f172a' : '#f8fafc',
+                                    color: isModuleEditMode ? '#ffffff' : '#475569',
+                                    border: `1px solid ${isModuleEditMode ? '#0f172a' : '#e2e8f0'}`,
+                                    borderRadius: '100px',
+                                    padding: '3px 10px',
+                                    fontSize: '0.68rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    boxShadow: isModuleEditMode ? '0 2px 6px rgba(15, 23, 42, 0.25)' : 'none',
+                                    transition: 'all 0.18s ease'
+                                  }}
+                                  className="hover-scale-mini"
+                                  title={isModuleEditMode ? 'Bearbeitungsmodus beenden' : 'Module sortieren oder ausblenden'}
+                                >
+                                  {isModuleEditMode ? (
+                                    <>
+                                      <Check size={12} strokeWidth={3} />
+                                      <span>Fertig</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Edit3 size={12} strokeWidth={2.4} />
+                                      <span>Anpassen</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            )}
                           </div>
 
+                          {/* 🧩 KACHEL-RASTER */}
                           <div style={{
                             display: 'grid',
                             gridTemplateColumns: 'repeat(3, 1fr)',
                             gap: '14px 12px',
                             padding: '4px 0 12px 0'
                           }}>
-                            {/* 1. Übe-Begleiter (Für alle Altersstufen) */}
-                            <div
-                              onClick={() => {
-                                setActiveModalTab('document');
-                                setActiveViewMode('practice');
-                                setActiveSubView('hub');
-                              }}
-                              style={{
-                                background: '#ffffff',
-                                border: '1.5px solid #e2e8f0',
-                                borderRadius: '18px',
-                                padding: '16px 8px 14px 8px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                textAlign: 'center',
-                                cursor: 'pointer',
-                                boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-                                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                              }}
-                              className="hover-scale"
-                            >
-                              <div style={{
-                                width: '72px',
-                                height: '72px',
-                                borderRadius: '18px',
-                                background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
-                                boxShadow: '0 6px 14px -2px rgba(234, 179, 8, 0.40)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                position: 'relative',
-                                overflow: 'hidden',
-                                border: '1px solid rgba(255, 255, 255, 0.25)'
-                              }}>
-                                <Clock size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
-                              </div>
-                              <div style={{ marginTop: '10px', padding: '0 2px' }}>
-                                <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                                  Übe-Begleiter
-                                </div>
-                              </div>
-                            </div>
+                            {visibleModuleKeys.map((moduleKey) => {
+                              const mod = moduleDefinitions[moduleKey];
+                              if (!mod) return null;
 
-                            {/* 2. Aufnahmen (Für alle Altersstufen) */}
-                            <div
-                              onClick={() => {
-                                setActiveModalTab('document');
-                                setActiveViewMode('recordings');
-                                setActiveSubView('hub');
-                              }}
-                              style={{
-                                background: '#ffffff',
-                                border: '1.5px solid #e2e8f0',
-                                borderRadius: '18px',
-                                padding: '16px 8px 14px 8px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                textAlign: 'center',
-                                cursor: 'pointer',
-                                boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-                                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                              }}
-                              className="hover-scale"
-                            >
-                              <div style={{
-                                width: '72px',
-                                height: '72px',
-                                borderRadius: '18px',
-                                background: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
-                                boxShadow: '0 6px 14px -2px rgba(99, 102, 241, 0.40)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                position: 'relative',
-                                overflow: 'hidden',
-                                border: '1px solid rgba(255, 255, 255, 0.25)'
-                              }}>
-                                <Mic size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
-                              </div>
-                              <div style={{ marginTop: '10px', padding: '0 2px' }}>
-                                <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                                  Aufnahmen
-                                </div>
-                              </div>
-                            </div>
+                              const isGhosted = !mod.isUnlocked;
+                              const isDraggingCurrent = draggedModuleKey === moduleKey;
 
-                            {/* 3. Groove-Trainer (Für alle Altersstufen!) */}
-                            <div
-                              onClick={() => {
-                                setActiveModalTab('document');
-                                setActiveViewMode('groovetrainer' as any);
-                                setActiveSubView('hub');
-                              }}
-                              style={{
-                                background: '#ffffff',
-                                border: '1.5px solid #e2e8f0',
-                                borderRadius: '18px',
-                                padding: '16px 8px 14px 8px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                textAlign: 'center',
-                                cursor: 'pointer',
-                                boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-                                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                              }}
-                              className="hover-scale"
-                            >
-                              <div style={{
-                                width: '72px',
-                                height: '72px',
-                                borderRadius: '18px',
-                                background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-                                boxShadow: '0 6px 14px -2px rgba(249, 115, 22, 0.40)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                position: 'relative',
-                                overflow: 'hidden',
-                                border: '1px solid rgba(255, 255, 255, 0.3)'
-                              }}>
-                                <Radio size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
-                              </div>
-                              <div style={{ marginTop: '10px', padding: '0 2px' }}>
-                                <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                                  Groove-Trainer
-                                </div>
-                              </div>
-                            </div>
+                              return (
+                                <div
+                                  key={moduleKey}
+                                  draggable={isModuleEditMode && !readOnly}
+                                  onDragStart={(e) => {
+                                    if (readOnly) return;
+                                    setDraggedModuleKey(moduleKey);
+                                    e.dataTransfer.effectAllowed = 'move';
+                                  }}
+                                  onDragOver={(e) => {
+                                    if (readOnly) return;
+                                    e.preventDefault();
+                                    e.dataTransfer.dropEffect = 'move';
+                                  }}
+                                  onDrop={(e) => {
+                                    if (readOnly) return;
+                                    e.preventDefault();
+                                    handleDropOnModule(moduleKey);
+                                  }}
+                                  onTouchStart={handleTouchStartTile}
+                                  onTouchEnd={handleTouchCancelTile}
+                                  onTouchMove={handleTouchCancelTile}
+                                  onClick={() => {
+                                    if (isModuleEditMode) return;
+                                    mod.onClick();
+                                  }}
+                                  style={{
+                                    background: isGhosted ? '#f8fafc' : '#ffffff',
+                                    border: isDraggingCurrent ? '2px dashed #3b82f6' : (mod.borderOverride || '1.5px solid #e2e8f0'),
+                                    borderRadius: '18px',
+                                    padding: '16px 8px 14px 8px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    textAlign: 'center',
+                                    cursor: isModuleEditMode ? 'grab' : 'pointer',
+                                    opacity: isDraggingCurrent ? 0.35 : (isGhosted ? 0.55 : 1),
+                                    position: 'relative',
+                                    boxShadow: isGhosted ? 'none' : '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                                    transition: isModuleEditMode ? 'transform 0.15s ease' : 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+                                  }}
+                                  className={`${isModuleEditMode ? 'campus-jiggle-tile' : 'hover-scale'}`}
+                                  title={isGhosted ? `In ${uiLevel === 'junior' ? 'Junior' : 'Teen'} inaktiv – Klick für Lehrer-Demo-Modus` : undefined}
+                                >
+                                  {/* ❌ AUSBLENDEN-BADGE IM EDIT-MODUS */}
+                                  {isModuleEditMode && !readOnly && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleHideModule(moduleKey);
+                                      }}
+                                      style={{
+                                        position: 'absolute',
+                                        top: '-7px',
+                                        left: '-7px',
+                                        width: '24px',
+                                        height: '24px',
+                                        borderRadius: '50%',
+                                        background: '#ef4444',
+                                        color: '#ffffff',
+                                        border: '2px solid #ffffff',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                        boxShadow: '0 2px 5px rgba(239, 68, 68, 0.4)',
+                                        zIndex: 40
+                                      }}
+                                      className="hover-scale"
+                                      title="Modul von dieser Leiste ausblenden (kann über '+' wiederhergestellt werden)"
+                                    >
+                                      <X size={13} strokeWidth={3} />
+                                    </button>
+                                  )}
 
-                            {/* 4. Stimmgerät (Für alle) */}
-                            <div
-                              onClick={() => {
-                                setActiveModalTab('document');
-                                setActiveViewMode('tuner');
-                                setActiveSubView('hub');
-                              }}
-                              style={{
-                                background: '#ffffff',
-                                border: '1.5px solid #e2e8f0',
-                                borderRadius: '18px',
-                                padding: '16px 8px 14px 8px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                textAlign: 'center',
-                                cursor: 'pointer',
-                                boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-                                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                              }}
-                              className="hover-scale"
-                            >
-                              <div style={{
-                                width: '72px',
-                                height: '72px',
-                                borderRadius: '18px',
-                                background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
-                                boxShadow: '0 6px 14px -2px rgba(6, 182, 212, 0.40)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                position: 'relative',
-                                overflow: 'hidden',
-                                border: '1px solid rgba(255, 255, 255, 0.25)'
-                              }}>
-                                <Radio size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
-                              </div>
-                              <div style={{ marginTop: '10px', padding: '0 2px' }}>
-                                <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                                  Stimmgerät
-                                </div>
-                              </div>
-                            </div>
+                                  {/* 🔒 INAKTIV-BADGE FÜR LEHRER-GHOSTING */}
+                                  {isGhosted && !isModuleEditMode && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: '8px',
+                                      right: '8px',
+                                      background: 'rgba(100, 116, 139, 0.12)',
+                                      color: '#64748b',
+                                      padding: '2px 6px',
+                                      borderRadius: '6px',
+                                      fontSize: '0.62rem',
+                                      fontWeight: 800,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '3px'
+                                    }}>
+                                      <Lock size={10} />
+                                      <span>Inaktiv</span>
+                                    </div>
+                                  )}
 
-                            {/* 5. Loopstation (Für Teen & Pro) */}
-                            {uiLevel !== 'junior' && (
-                              <div
-                                onClick={() => {
-                                  setActiveModalTab('document');
-                                  setActiveViewMode('loopstation');
-                                  setActiveSubView('hub');
-                                }}
-                                style={{
-                                  background: '#ffffff',
-                                  border: '1.5px solid #e2e8f0',
-                                  borderRadius: '18px',
-                                  padding: '16px 8px 14px 8px',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  alignItems: 'center',
-                                  textAlign: 'center',
-                                  cursor: 'pointer',
-                                  boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-                                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                                }}
-                                className="hover-scale"
-                              >
-                                <div style={{
-                                  width: '72px',
-                                  height: '72px',
-                                  borderRadius: '18px',
-                                  background: 'linear-gradient(135deg, #f43f5e 0%, #be123c 100%)',
-                                  boxShadow: '0 6px 14px -2px rgba(244, 63, 94, 0.40)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  position: 'relative',
-                                  overflow: 'hidden',
-                                  border: '1px solid rgba(255, 255, 255, 0.25)'
-                                }}>
-                                  <Sliders size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
-                                </div>
-                                <div style={{ marginTop: '10px', padding: '0 2px' }}>
-                                  <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                                    Loopstation
+                                  <div style={{
+                                    width: '72px',
+                                    height: '72px',
+                                    borderRadius: '18px',
+                                    background: mod.gradient,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: isGhosted ? 'none' : mod.boxShadow
+                                  }}>
+                                    {mod.icon}
+                                  </div>
+                                  <div style={{ marginTop: '10px', padding: '0 2px' }}>
+                                    <div style={{ fontSize: '0.90rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                                      {mod.title}
+                                    </div>
+                                    {mod.subtitle && (
+                                      <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#64748b', marginTop: '3px' }}>
+                                        {mod.subtitle}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
-                              </div>
-                            )}
+                              );
+                            })}
 
-                            {/* 5b. EarLab & Harmony-Studio (Für alle Altersstufen verfügbar!) */}
-                            <div
-                              role="button"
-                              tabIndex={0}
-                              onClick={() => {
-                                setActiveModalTab('document');
-                                setActiveViewMode('earlab' as any);
-                                setActiveSubView('hub');
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                  e.preventDefault();
-                                  setActiveModalTab('document');
-                                  setActiveViewMode('earlab' as any);
-                                  setActiveSubView('hub');
-                                }
-                              }}
-                              aria-label={uiLevel === 'junior' ? 'Klang-Detektiv Gehörbildung öffnen' : 'EarLab & Harmony-Studio öffnen'}
-                              style={{
-                                background: '#ffffff',
-                                border: '1.5px solid #e2e8f0',
-                                borderRadius: '18px',
-                                padding: '16px 8px 14px 8px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                textAlign: 'center',
-                                cursor: 'pointer',
-                                boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-                                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                              }}
-                              className="hover-scale"
-                            >
-                              <div style={{
-                                width: '72px',
-                                height: '72px',
-                                borderRadius: '18px',
-                                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                                boxShadow: '0 6px 14px -2px rgba(16, 185, 129, 0.40)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                position: 'relative',
-                                overflow: 'hidden',
-                                border: '1px solid rgba(255, 255, 255, 0.3)'
-                              }}>
-                                <Headphones size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
-                              </div>
-                              <div style={{ marginTop: '10px', padding: '0 2px' }}>
-                                <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                                  {uiLevel === 'junior' ? 'Klang-Detektiv' : 'EarLab & Harmony'}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* 6. Skill-Radar / Musik-Stern / Kompetenz-Radar (Für alle Altersstufen verfügbar) */}
-                            <div
-                              role="button"
-                              tabIndex={0}
-                              onClick={() => {
-                                setActiveModalTab('skillradar');
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                  e.preventDefault();
-                                  setActiveModalTab('skillradar');
-                                }
-                              }}
-                              aria-label={uiLevel === 'junior' ? 'Mein Musik-Stern öffnen' : uiLevel === 'pro' ? 'Kompetenz-Radar öffnen' : 'Skill-Radar öffnen'}
-                              style={{
-                                background: '#ffffff',
-                                border: '1.5px solid #e2e8f0',
-                                borderRadius: '18px',
-                                padding: '16px 8px 14px 8px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                textAlign: 'center',
-                                cursor: 'pointer',
-                                boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-                                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                              }}
-                              className="hover-scale"
-                            >
-                              <div style={{
-                                width: '72px',
-                                height: '72px',
-                                borderRadius: '18px',
-                                background: uiLevel === 'junior'
-                                  ? 'linear-gradient(135deg, #f59e0b 0%, #ec4899 50%, #8b5cf6 100%)'
-                                  : 'linear-gradient(135deg, #d946ef 0%, #a21caf 100%)',
-                                boxShadow: uiLevel === 'junior'
-                                  ? '0 6px 14px -2px rgba(245, 158, 11, 0.40)'
-                                  : '0 6px 14px -2px rgba(217, 70, 239, 0.40)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                position: 'relative',
-                                overflow: 'hidden',
-                                border: '1px solid rgba(255, 255, 255, 0.25)'
-                              }}>
-                                {uiLevel === 'junior' ? (
-                                  <Star size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
-                                ) : (
-                                  <Activity size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
-                                )}
-                              </div>
-                              <div style={{ marginTop: '10px', padding: '0 2px' }}>
-                                <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                                  {uiLevel === 'junior' ? 'Musik-Stern ⭐' : uiLevel === 'pro' ? 'Kompetenz-Radar' : 'Skill-Radar'}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* 7. Protokoll (Für alle Altersstufen verfügbar) */}
-                            <div
-                              onClick={() => {
-                                setHubTab('protocol');
-                              }}
-                              style={{
-                                background: '#ffffff',
-                                border: '1.5px solid #e2e8f0',
-                                borderRadius: '18px',
-                                padding: '16px 8px 14px 8px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                textAlign: 'center',
-                                cursor: 'pointer',
-                                boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
-                                transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
-                              }}
-                              className="hover-scale"
-                            >
-                              <div style={{
-                                width: '72px',
-                                height: '72px',
-                                borderRadius: '18px',
-                                background: 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
-                                boxShadow: '0 6px 14px -2px rgba(16, 185, 129, 0.40)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                position: 'relative',
-                                overflow: 'hidden',
-                                border: '1px solid rgba(255, 255, 255, 0.25)'
-                              }}>
-                                <BookOpen size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
-                              </div>
-                              <div style={{ marginTop: '10px', padding: '0 2px' }}>
-                                <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                                  Protokoll
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* 8. Archiv (Für Pro) */}
-                            {uiLevel === 'pro' && (
+                            {/* ➕ SCHÜLER- & ELTERN-FREISCHALTKACHEL (Bei ausgeblendeten Modulen oder inaktiven Studio-Erweiterungen) */}
+                            {(hasHiddenModules || !isLoopstationUnlocked || !isArchiveUnlocked) && (
                               <div
-                                onClick={() => {
-                                  setActiveModalTab('document');
-                                  setActiveSubView('history');
-                                  if (!selectedHistoryWeek) {
-                                    setSelectedHistoryWeek(getISOWeek());
+                                role="button"
+                                tabIndex={0}
+                                onClick={handleOpenModuleUnlock}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    handleOpenModuleUnlock();
                                   }
                                 }}
                                 style={{
-                                  background: '#ffffff',
-                                  border: '1.5px solid #e2e8f0',
+                                  background: 'rgba(248, 250, 252, 0.7)',
+                                  border: '2px dashed #94a3b8',
                                   borderRadius: '18px',
                                   padding: '16px 8px 14px 8px',
                                   display: 'flex',
@@ -2336,34 +2601,68 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   alignItems: 'center',
                                   textAlign: 'center',
                                   cursor: 'pointer',
-                                  boxShadow: '0 2px 8px -2px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)',
+                                  boxShadow: '0 2px 8px -2px rgba(0,0,0,0.02)',
                                   transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                                 }}
                                 className="hover-scale"
+                                title="Module hinzufügen oder Studio-Erweiterungen freischalten"
+                                aria-label="Studio-Module verwalten"
                               >
                                 <div style={{
                                   width: '72px',
                                   height: '72px',
                                   borderRadius: '18px',
-                                  background: 'linear-gradient(135deg, #64748b 0%, #334155 100%)',
-                                  boxShadow: '0 6px 14px -2px rgba(100, 116, 139, 0.40)',
+                                  background: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  position: 'relative',
-                                  overflow: 'hidden',
-                                  border: '1px solid rgba(255, 255, 255, 0.25)'
+                                  border: '1px solid rgba(255, 255, 255, 0.5)'
                                 }}>
-                                  <History size={34} color="#ffffff" strokeWidth={2.3} style={{ filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.25))' }} />
+                                  <Plus size={34} color="#64748b" strokeWidth={2.3} />
                                 </div>
                                 <div style={{ marginTop: '10px', padding: '0 2px' }}>
-                                  <div style={{ fontSize: '0.92rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
-                                    Archiv
+                                  <div style={{ fontSize: '0.90rem', fontWeight: 900, color: '#334155', letterSpacing: '-0.02em', lineHeight: '1.2' }}>
+                                    {hasHiddenModules ? 'Module verwalten' : 'Modul freischalten'}
+                                  </div>
+                                  <div style={{ fontSize: '0.66rem', fontWeight: 800, color: '#64748b', marginTop: '3px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
+                                    {hasHiddenModules ? (
+                                      <span>{customModuleLayout.hidden.length} ausgeblendet</span>
+                                    ) : (
+                                      <>
+                                        <Lock size={10} />
+                                        <span>Eltern-Freigabe</span>
+                                      </>
+                                    )}
                                   </div>
                                 </div>
                               </div>
                             )}
                           </div>
+
+                          {/* 🔔 FLOATING TOAST NOTIFICATION */}
+                          {moduleToast && (
+                            <div style={{
+                              position: 'fixed',
+                              bottom: '28px',
+                              left: '50%',
+                              transform: 'translateX(-50%)',
+                              background: '#0f172a',
+                              color: '#ffffff',
+                              padding: '9px 18px',
+                              borderRadius: '100px',
+                              fontSize: '0.80rem',
+                              fontWeight: 750,
+                              boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.4)',
+                              zIndex: 9999,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '7px',
+                              animation: 'fadeIn 0.2s ease'
+                            }}>
+                              <CheckCircle size={15} color="#34a853" strokeWidth={2.6} />
+                              <span>{moduleToast}</span>
+                            </div>
+                          )}
                         </>
                       );
                     })()}
@@ -5307,6 +5606,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         let histWeekItem: any = null;
                         let isAudioCarriedOver = false;
                         let isNotesCarriedOver = false;
+                        let isBooksCarriedOver = false;
+                        let isSongsCarriedOver = false;
                         let carriedOverWeekLabel = '';
                         let pastBridgedQuestion: any = null;
 
@@ -5483,12 +5784,12 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
 
                           homeworkNoteItems = getHomeworkNoteItems(generalHomeworkNotes);
 
-                          // 🌉 SMART AUDIO & NOTE BRIDGE: Pädagogische Kontinuität
-                          // Wenn der Schüler aktive Hausaufgaben hat (Lehrwerk oder Song), aber für die aktuelle Woche
-                          // noch keine neuen Audioaufnahmen oder Notizen vorliegen, übernehme nahtlos die Aufnahmen
-                          // und Notizen der vorherigen Unterrichtsstunde aus dem jüngsten Wochen-Snapshot.
-                          const hasActiveOngoingHomework = (lehrwerkeList.length > 0 || otherHWs.length > 0);
-                          if (isCurrentWeek && hasActiveOngoingHomework && (audioNotes.length === 0 || homeworkNoteItems.length === 0)) {
+                          // 🌉 SMART VORWOCHEN-FALLBACK & AUDIO/NOTE BRIDGE: Pädagogische Kontinuität (Zero-LocalStorage)
+                          // Wenn für die aktuelle Woche noch keine neuen Hausaufgaben eingetragen sind (oder auf Mobile/Cold Cache),
+                          // übernehme nahtlos Lehrwerke, Songs, Audioaufnahmen und Notizen der vorherigen Unterrichtsstunde
+                          // aus dem jüngsten Wochen-Snapshot.
+                          const hasActiveCurrentHomework = (lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0 || homeworkNoteItems.length > 0);
+                          if (isCurrentWeek && (!hasActiveCurrentHomework || audioNotes.length === 0 || homeworkNoteItems.length === 0)) {
                             const pastWeekSnapshots = (progressItems || []).filter((item: any) => {
                               if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
                               const itWeekIso = getItemWeek(item);
@@ -5498,7 +5799,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             pastWeekSnapshots.sort((a: any, b: any) => {
                               const wA = getItemWeek(a);
                               const wB = getItemWeek(b);
-                              if (wA !== wB) return wB.localeCompare(wA);
+                              if (wA !== wB) return (wB || '').localeCompare(wA || '');
                               const tA = new Date(a.updated_at || a.created_at || 0).getTime();
                               const tB = new Date(b.updated_at || b.created_at || 0).getTime();
                               return tB - tA;
@@ -5512,7 +5813,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   : latestPastHwSnapshot.homework_notes;
 
                                 const kwMatch = latestPastHwSnapshot.topic_name.match(/Hausaufgabe KW\s*(\d+)/i);
-                                carriedOverWeekLabel = kwMatch ? `KW ${kwMatch[1]}` : 'Letzte Stunde';
+                                carriedOverWeekLabel = kwMatch ? `KW ${kwMatch[1]}` : 'der Vorwoche';
 
                                 if (Array.isArray(parsedPastNotes)) {
                                   // 0. Noch offene Schülerfrage aus jüngstem Snapshot übernehmen
@@ -5521,7 +5822,41 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     pastBridgedQuestion = candidatePastQ;
                                   }
 
-                                  // 1. Audio-Aufnahmen der Vorwoche übernehmen
+                                  // 1. Lehrwerke der Vorwoche übernehmen (falls aktuell leer)
+                                  if (lehrwerkeList.length === 0) {
+                                    const snapLwEntry = parsedPastNotes.find((n: string) => typeof n === 'string' && n.startsWith('SNAPSHOT_LEHRWERKE:'));
+                                    if (snapLwEntry) {
+                                      try {
+                                        const rawJson = snapLwEntry.substring('SNAPSHOT_LEHRWERKE:'.length);
+                                        const parsedLw = JSON.parse(rawJson);
+                                        if (Array.isArray(parsedLw) && parsedLw.length > 0) {
+                                          lehrwerkeList = parsedLw;
+                                          isBooksCarriedOver = true;
+                                        }
+                                      } catch (e) {
+                                        console.warn('Error parsing SNAPSHOT_LEHRWERKE in carryover:', e);
+                                      }
+                                    }
+                                  }
+
+                                  // 2. Songs der Vorwoche übernehmen (falls aktuell leer)
+                                  if (otherHWs.length === 0) {
+                                    const snapSongEntry = parsedPastNotes.find((n: string) => typeof n === 'string' && n.startsWith('SNAPSHOT_SONGS:'));
+                                    if (snapSongEntry) {
+                                      try {
+                                        const rawJson = snapSongEntry.substring('SNAPSHOT_SONGS:'.length);
+                                        const parsedSongs = JSON.parse(rawJson);
+                                        if (Array.isArray(parsedSongs) && parsedSongs.length > 0) {
+                                          otherHWs = parsedSongs;
+                                          isSongsCarriedOver = true;
+                                        }
+                                      } catch (e) {
+                                        console.warn('Error parsing SNAPSHOT_SONGS in carryover:', e);
+                                      }
+                                    }
+                                  }
+
+                                  // 3. Audio-Aufnahmen der Vorwoche übernehmen
                                   if (audioNotes.length === 0) {
                                     const pastAudios = parsedPastNotes
                                       .filter((n: string) => typeof n === 'string' && n.includes('AUDIO:'))
@@ -5547,12 +5882,18 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     }
                                   }
 
-                                  // 2. Lehrkraft-Notiz der Vorwoche übernehmen (strikt ohne Rohcode / Metadaten)
+                                  // 4. Lehrkraft-Notiz der Vorwoche übernehmen (strikt ohne Rohcode / Metadaten)
                                   if (homeworkNoteItems.length === 0) {
                                     const pastNotes = parsedPastNotes
                                       .filter((n: string) => {
                                         if (typeof n !== 'string') return false;
-                                        return !isInternalMetadataNote(n);
+                                        return !isInternalMetadataNote(n) &&
+                                               !n.startsWith('AUDIO:') &&
+                                               !n.startsWith('STICKER:') &&
+                                               !n.startsWith('LOOP:') &&
+                                               !n.startsWith('SNAPSHOT_') &&
+                                               !n.startsWith('FEEDBACK:') &&
+                                               !n.startsWith('STUDENT_NOTE_');
                                       })
                                       .map((s: string) => s.trim())
                                       .filter(Boolean);
@@ -5584,6 +5925,14 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 console.warn('[MeisterwerkDocumentTab] Error bridging past lesson notes:', bridgeErr);
                               }
                             }
+                          }
+
+                          // 🛡️ Lehrer-Vorschau: Wurde der Entwurf im Editor geleert ("Leeren"), zeige der Lehrkraft eine leere Seite
+                          if (isCarriedOverDismissed && !readOnly) {
+                            if (isBooksCarriedOver) lehrwerkeList = [];
+                            if (isSongsCarriedOver) otherHWs = [];
+                            if (isAudioCarriedOver) audioNotes = [];
+                            if (isNotesCarriedOver) homeworkNoteItems = [];
                           }
                         } else {
                           // === HISTORICAL OR FUTURE WEEK ARCHIVED SNAPSHOT ===
@@ -5831,7 +6180,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 })()
                               : { hasQuestion: false, rawEntry: null, text: '', timestamp: null });
 
-                        const isCarriedOverPlan = isCurrentWeek && (isAudioCarriedOver || isNotesCarriedOver);
+                        const isCarriedOverPlan = isCurrentWeek && (isAudioCarriedOver || isNotesCarriedOver || isBooksCarriedOver || isSongsCarriedOver) && !isCarriedOverDismissed;
 
                         return (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -6408,34 +6757,35 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     </button>
                                   </div>
 
-                                  {(progressItems.some(item => item.is_current_homework) || generalHomeworkNotes.trim() !== '') && !readOnly && (
-                                    <button 
-                                      type="button" 
-                                      onClick={async () => {
-                                        await handleResetAllCurrentHomework();
-                                        setGeneralHomeworkNotes('');
-                                      }}
-                                      style={{ 
-                                        border: 'none', 
-                                        background: 'transparent', 
-                                        color: '#94a3b8', 
-                                        fontSize: '0.76rem', 
-                                        fontWeight: 750, 
-                                        cursor: 'pointer', 
-                                        padding: '4px 6px',
-                                        borderRadius: '6px',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        transition: 'all 0.15s ease'
-                                      }}
-                                      className="hover-scale-mini"
-                                      title="Hausaufgaben für diese Woche zurücksetzen"
-                                    >
-                                      <RotateCcw size={11} />
-                                      <span>Leeren</span>
-                                    </button>
-                                  )}
+                                   {(progressItems.some(item => item.is_current_homework) || generalHomeworkNotes.trim() !== '' || isCarriedOverPlan) && !readOnly && (
+                                     <button 
+                                       type="button" 
+                                       onClick={async () => {
+                                         await handleResetAllCurrentHomework();
+                                         setGeneralHomeworkNotes('');
+                                         setIsCarriedOverDismissed(true);
+                                       }}
+                                       style={{ 
+                                         border: 'none', 
+                                         background: 'transparent', 
+                                         color: '#94a3b8', 
+                                         fontSize: '0.76rem', 
+                                         fontWeight: 750, 
+                                         cursor: 'pointer', 
+                                         padding: '4px 6px',
+                                         borderRadius: '6px',
+                                         display: 'inline-flex',
+                                         alignItems: 'center',
+                                         gap: '4px',
+                                         transition: 'all 0.15s ease'
+                                       }}
+                                       className="hover-scale-mini"
+                                       title="Hausaufgaben für diese Woche zurücksetzen"
+                                     >
+                                       <RotateCcw size={11} />
+                                       <span>Leeren</span>
+                                     </button>
+                                   )}
                                 </div>
                               )}
                             </div>
@@ -6458,7 +6808,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)'
                               }}>
                                 <RotateCcw size={11} color="#0284c7" strokeWidth={2.5} />
-                                <span>Fortlaufender Übeplan • Übertrag aus der Vorwoche</span>
+                                <span>Fortlaufender Übeplan • Übertrag aus {carriedOverWeekLabel || 'der Vorwoche'}</span>
                               </div>
                             )}
 
@@ -6925,117 +7275,136 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     </div>
                                   )}
 
-                                  {readOnly && !isQuestionEditorOpen && effectiveViewingQuestion.hasQuestion && (
-                                    <div style={{
-                                      background: '#fefce8',
-                                      border: '1px solid #fef08a',
-                                      borderRadius: '16px',
-                                      padding: '12px 14px',
-                                      boxShadow: '0 2px 6px rgba(234, 179, 8, 0.08)',
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      gap: '8px'
-                                    }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                                          <HelpCircle size={14} color="#ca8a04" strokeWidth={2.4} />
-                                          <span style={{ fontSize: '0.80rem', fontWeight: 850, color: '#854d0e', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                                            Deine Frage für den Unterricht:
-                                          </span>
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                          <button
-                                            type="button"
-                                            onClick={() => handleSpeakText(effectiveViewingQuestion.text, 'student_q')}
-                                            title="Frage vorlesen"
-                                            aria-label="Frage vorlesen"
-                                            style={{
-                                              border: '1px solid #fde047',
-                                              background: '#fef08a',
-                                              color: '#854d0e',
-                                              borderRadius: '8px',
-                                              minWidth: '30px',
-                                              minHeight: '30px',
-                                              padding: '0 8px',
-                                              cursor: 'pointer',
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'center',
-                                              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                                              transition: 'all 0.15s ease'
-                                            }}
-                                            className="hover-scale-mini"
-                                          >
-                                            <Volume2 size={15} />
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              setQuestionDraftText(effectiveViewingQuestion.text);
-                                              setIsQuestionEditorOpen(true);
-                                            }}
-                                            title="Frage bearbeiten"
-                                            aria-label="Frage bearbeiten"
-                                            style={{
-                                              border: '1px solid #fde047',
-                                              background: '#fef08a',
-                                              color: '#854d0e',
-                                              borderRadius: '8px',
-                                              minWidth: '30px',
-                                              minHeight: '30px',
-                                              padding: '0 8px',
-                                              cursor: 'pointer',
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'center',
-                                              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                                              transition: 'all 0.15s ease'
-                                            }}
-                                            className="hover-scale-mini"
-                                          >
-                                            <Edit3 size={15} />
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={handleResolveStudentQuestion}
-                                            title="Frage löschen oder als erledigt markieren"
-                                            aria-label="Frage löschen oder als erledigt markieren"
-                                            style={{
-                                              border: '1px solid #fecaca',
-                                              background: '#fee2e2',
-                                              color: '#dc2626',
-                                              borderRadius: '8px',
-                                              minWidth: '30px',
-                                              minHeight: '30px',
-                                              padding: '0 8px',
-                                              cursor: 'pointer',
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              justifyContent: 'center',
-                                              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                                              transition: 'all 0.15s ease'
-                                            }}
-                                            className="hover-scale-mini"
-                                          >
-                                            <Trash2 size={15} />
-                                          </button>
-                                        </div>
-                                      </div>
-                                      <div style={{
-                                        fontSize: '0.92rem',
-                                        fontWeight: 700,
-                                        color: '#1e293b',
-                                        lineHeight: 1.5,
-                                        paddingLeft: '2px'
-                                      }}>
-                                        „{effectiveViewingQuestion.text}“
-                                      </div>
-                                      <div style={{ fontSize: '0.78rem', fontWeight: 650, color: '#854d0e', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                        <Sparkles size={13} color="#854d0e" />
-                                        <span>{effectiveTeacherFullName} sieht diese Frage zu Beginn eurer nächsten Stunde!</span>
-                                      </div>
-                                    </div>
-                                  )}
+                                   {readOnly && !isQuestionEditorOpen && effectiveViewingQuestion.hasQuestion && (
+                                     <div style={{
+                                       background: '#fefce8',
+                                       border: '1px solid #fef08a',
+                                       borderRadius: '14px',
+                                       padding: '8px 12px',
+                                       boxShadow: '0 2px 6px rgba(234, 179, 8, 0.06)',
+                                       display: 'flex',
+                                       flexDirection: 'column',
+                                       gap: '4px'
+                                     }}>
+                                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                                           <span style={{
+                                             display: 'inline-flex',
+                                             alignItems: 'center',
+                                             gap: '4px',
+                                             background: '#fef08a',
+                                             border: '1px solid #fde047',
+                                             color: '#854d0e',
+                                             fontSize: '0.70rem',
+                                             fontWeight: 850,
+                                             textTransform: 'uppercase',
+                                             letterSpacing: '0.03em',
+                                             padding: '2px 7px',
+                                             borderRadius: '100px',
+                                             flexShrink: 0
+                                           }}>
+                                             <HelpCircle size={12} color="#ca8a04" strokeWidth={2.5} />
+                                             Frage
+                                           </span>
+                                           <span style={{
+                                             fontSize: '0.90rem',
+                                             fontWeight: 700,
+                                             color: '#0f172a',
+                                             lineHeight: 1.35,
+                                             wordBreak: 'break-word'
+                                           }}>
+                                             „{effectiveViewingQuestion.text}“
+                                           </span>
+                                         </div>
+                                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                                           <button
+                                             type="button"
+                                             onClick={() => handleSpeakText(effectiveViewingQuestion.text, 'student_q')}
+                                             title="Frage vorlesen"
+                                             aria-label="Frage vorlesen"
+                                             style={{
+                                               border: '1px solid rgba(253, 224, 71, 0.6)',
+                                               background: 'rgba(254, 240, 138, 0.7)',
+                                               color: '#854d0e',
+                                               borderRadius: '7px',
+                                               width: '28px',
+                                               height: '28px',
+                                               padding: 0,
+                                               cursor: 'pointer',
+                                               display: 'flex',
+                                               alignItems: 'center',
+                                               justifyContent: 'center',
+                                               transition: 'all 0.15s ease'
+                                             }}
+                                             className="hover-scale-mini"
+                                           >
+                                             <Volume2 size={14} />
+                                           </button>
+                                           <button
+                                             type="button"
+                                             onClick={() => {
+                                               setQuestionDraftText(effectiveViewingQuestion.text);
+                                               setIsQuestionEditorOpen(true);
+                                             }}
+                                             title="Frage bearbeiten"
+                                             aria-label="Frage bearbeiten"
+                                             style={{
+                                               border: '1px solid rgba(253, 224, 71, 0.6)',
+                                               background: 'rgba(254, 240, 138, 0.7)',
+                                               color: '#854d0e',
+                                               borderRadius: '7px',
+                                               width: '28px',
+                                               height: '28px',
+                                               padding: 0,
+                                               cursor: 'pointer',
+                                               display: 'flex',
+                                               alignItems: 'center',
+                                               justifyContent: 'center',
+                                               transition: 'all 0.15s ease'
+                                             }}
+                                             className="hover-scale-mini"
+                                           >
+                                             <Edit3 size={14} />
+                                           </button>
+                                           <button
+                                             type="button"
+                                             onClick={handleResolveStudentQuestion}
+                                             title="Frage löschen oder als erledigt markieren"
+                                             aria-label="Frage löschen oder als erledigt markieren"
+                                             style={{
+                                               border: '1px solid rgba(254, 202, 202, 0.8)',
+                                               background: 'rgba(254, 226, 226, 0.7)',
+                                               color: '#dc2626',
+                                               borderRadius: '7px',
+                                               width: '28px',
+                                               height: '28px',
+                                               padding: 0,
+                                               cursor: 'pointer',
+                                               display: 'flex',
+                                               alignItems: 'center',
+                                               justifyContent: 'center',
+                                               transition: 'all 0.15s ease'
+                                             }}
+                                             className="hover-scale-mini"
+                                           >
+                                             <Trash2 size={14} />
+                                           </button>
+                                         </div>
+                                       </div>
+                                       <div style={{
+                                         fontSize: '0.74rem',
+                                         fontWeight: 650,
+                                         color: '#854d0e',
+                                         display: 'flex',
+                                         alignItems: 'center',
+                                         gap: '4px',
+                                         paddingLeft: '2px'
+                                       }}>
+                                         <Sparkles size={11} color="#ca8a04" />
+                                         <span>Für {effectiveTeacherFullName} zur nächsten Stunde vorgemerkt</span>
+                                       </div>
+                                     </div>
+                                   )}
 
                                   {/* 🍎 LEHRKRAFT-BANNER: Prominenter Schülerfrage-Hinweis */}
                                   {!readOnly && effectiveViewingQuestion.hasQuestion && (
@@ -8687,7 +9056,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
 
                                   {/* 2. Textarea Bereich */}
                                   <div style={{ padding: '12px 16px' }}>
-                                    {activeNoteTarget === 'student' && viewingWeekOffset === 0 && (isAudioCarriedOver || isNotesCarriedOver) && !generalHomeworkNotes.trim() && (
+                                    {activeNoteTarget === 'student' && viewingWeekOffset === 0 && (isAudioCarriedOver || isNotesCarriedOver || isBooksCarriedOver || isSongsCarriedOver) && !generalHomeworkNotes.trim() && (
                                       <div style={{
                                         display: 'flex',
                                         alignItems: 'center',
@@ -8703,7 +9072,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       }}>
                                         <span style={{ fontSize: '0.9rem' }}>💡</span>
                                         <span>
-                                          Schüler übt aktuell mit den Unterrichtsaufnahmen & Notizen aus {carriedOverWeekLabel || 'der letzten Stunde'}. Sobald du neue Einträge speicherst, lösen diese die Vorwoche ab.
+                                          Schüler übt aktuell mit den Aufgaben, Unterrichtsaufnahmen & Notizen aus {carriedOverWeekLabel || 'der Vorwoche'}. Sobald du neue Einträge speicherst, lösen diese die Vorwoche ab.
                                         </span>
                                       </div>
                                     )}
@@ -8903,7 +9272,387 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
               </>
             )}
           </div>
-        </>
 
+        {/* 🔒 ELTERN-PIN MODAL FÜR MODUL-FREISCHALTUNG */}
+        {showParentPinModalForModules && (
+          <CampusPinUnlockModal
+            user={student}
+            supabase={supabase}
+            schoolData={{ id: student?.school_id }}
+            mode="parent_only"
+            title="Module freischalten"
+            subtitle="Eltern-Freigabe erforderlich: Bitte 6-stellige Eltern-Master-PIN eingeben."
+            onUnlock={() => {
+              setShowParentPinModalForModules(false);
+              setActiveModuleUnlockTab('extensions');
+              setShowModuleUnlockModal(true);
+            }}
+            onClose={closeAndLockModuleModal}
+          />
+        )}
+
+        {/* 🎛️ MODUL-FREISCHALT-SHEET (ELTERN) */}
+        {showModuleUnlockModal && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Studio-Module freischalten"
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(15, 23, 42, 0.65)",
+              backdropFilter: "blur(6px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 99999,
+              padding: "16px"
+            }}
+            onClick={closeAndLockModuleModal}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: "#ffffff",
+                borderRadius: "24px",
+                width: "100%",
+                maxWidth: "480px",
+                boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+                border: "1px solid #e2e8f0",
+                overflow: "hidden"
+              }}
+            >
+              <div style={{
+                padding: "20px 24px",
+                background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)",
+                borderBottom: "1px solid #bfdbfe",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <div style={{
+                    width: "38px",
+                    height: "38px",
+                    borderRadius: "12px",
+                    background: "#ffffff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow: "0 2px 6px rgba(0,0,0,0.08)"
+                  }}>
+                    <Sliders size={20} color="#2563eb" />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 900, color: "#1e3a8a" }}>
+                      Zusatzmodule freischalten
+                    </h3>
+                    <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "#64748b" }}>
+                      Eltern-Freigabe für {studentFirstName}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeAndLockModuleModal}
+                  aria-label="Schließen"
+                  style={{
+                    background: "rgba(255,255,255,0.8)",
+                    border: "1px solid rgba(0,0,0,0.08)",
+                    borderRadius: "50%",
+                    width: "30px",
+                    height: "30px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer"
+                  }}
+                >
+                  <X size={15} color="#475569" />
+                </button>
+              </div>
+
+              {/* Tabs: Ausgeblendete Module vs. Erweiterungen */}
+              <div style={{
+                display: "flex",
+                borderBottom: "1px solid #e2e8f0",
+                background: "#f8fafc"
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setActiveModuleUnlockTab('restore')}
+                  style={{
+                    flex: 1,
+                    padding: "12px 16px",
+                    border: "none",
+                    background: activeModuleUnlockTab === 'restore' ? "#ffffff" : "transparent",
+                    color: activeModuleUnlockTab === 'restore' ? "#0f172a" : "#64748b",
+                    fontSize: "0.80rem",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    borderBottom: activeModuleUnlockTab === 'restore' ? "2px solid #2563eb" : "none",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px"
+                  }}
+                >
+                  <RotateCcw size={14} color={activeModuleUnlockTab === 'restore' ? "#2563eb" : "#64748b"} />
+                  <span>Ausgeblendet ({customModuleLayout.hidden.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (checkIsParentModuleUnlocked()) {
+                      setActiveModuleUnlockTab('extensions');
+                    } else {
+                      setShowParentPinModalForModules(true);
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: "12px 16px",
+                    border: "none",
+                    background: activeModuleUnlockTab === 'extensions' ? "#ffffff" : "transparent",
+                    color: activeModuleUnlockTab === 'extensions' ? "#0f172a" : "#64748b",
+                    fontSize: "0.80rem",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    borderBottom: activeModuleUnlockTab === 'extensions' ? "2px solid #2563eb" : "none",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px"
+                  }}
+                >
+                  <Lock size={13} color={activeModuleUnlockTab === 'extensions' ? "#2563eb" : "#64748b"} />
+                  <span>Studio-Erweiterungen</span>
+                </button>
+              </div>
+
+              <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
+                {activeModuleUnlockTab === 'restore' ? (
+                  <>
+                    <p style={{ margin: 0, fontSize: "0.78rem", color: "#475569", lineHeight: 1.45 }}>
+                      Hier siehst du Module, die du auf deiner Leiste ausgeblendet hast. Du kannst sie jederzeit ohne Eltern-PIN wieder einblenden.
+                    </p>
+
+                    {customModuleLayout.hidden.length === 0 ? (
+                      <div style={{
+                        padding: "24px 16px",
+                        textAlign: "center",
+                        background: "#f8fafc",
+                        border: "1px dashed #cbd5e1",
+                        borderRadius: "16px",
+                        color: "#64748b",
+                        fontSize: "0.82rem",
+                        fontWeight: 650
+                      }}>
+                        Aktuell sind alle verfügbaren Module auf deiner Leiste sichtbar! ✨
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                        {customModuleLayout.hidden.map((hiddenKey) => {
+                          const labelMap: Record<string, string> = {
+                            practice: 'Übe-Begleiter',
+                            recordings: 'Aufnahmen',
+                            groovetrainer: 'Groove-Trainer',
+                            tuner: 'Stimmgerät',
+                            loopstation: 'Loopstation',
+                            earlab: uiLevel === 'junior' ? 'Klang-Detektiv' : 'EarLab & Harmony',
+                            skillradar: uiLevel === 'junior' ? 'Musik-Stern ⭐' : uiLevel === 'pro' ? 'Kompetenz-Radar' : 'Skill-Radar',
+                            protocol: 'Protokoll',
+                            archive: 'Archiv'
+                          };
+                          return (
+                            <div
+                              key={hiddenKey}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                padding: "12px 14px",
+                                background: "#f8fafc",
+                                border: "1.5px solid #e2e8f0",
+                                borderRadius: "14px"
+                              }}
+                            >
+                              <span style={{ fontSize: "0.86rem", fontWeight: 800, color: "#0f172a" }}>
+                                {labelMap[hiddenKey] || hiddenKey}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleRestoreModule(hiddenKey)}
+                                style={{
+                                  background: "#22c55e",
+                                  color: "#ffffff",
+                                  border: "none",
+                                  borderRadius: "10px",
+                                  padding: "6px 12px",
+                                  fontSize: "0.76rem",
+                                  fontWeight: 800,
+                                  cursor: "pointer",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "4px"
+                                }}
+                                className="hover-scale"
+                              >
+                                <Plus size={13} strokeWidth={2.6} />
+                                <span>Einblenden</span>
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+                      <button
+                        type="button"
+                        onClick={handleResetModuleLayout}
+                        style={{
+                          flex: 1,
+                          background: "#f1f5f9",
+                          color: "#475569",
+                          border: "1px solid #cbd5e1",
+                          borderRadius: "12px",
+                          padding: "10px 14px",
+                          fontSize: "0.80rem",
+                          fontWeight: 750,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "6px"
+                        }}
+                        className="hover-scale"
+                      >
+                        <RotateCcw size={13} />
+                        <span>Alles auf Standard zurücksetzen</span>
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p style={{ margin: 0, fontSize: "0.78rem", color: "#475569", lineHeight: 1.45 }}>
+                      Hier können Erziehungsberechtigte zusätzliche Profi-Werkzeuge für {studentFirstName} freischalten.
+                    </p>
+
+                    {/* Loopstation switch */}
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "14px 16px",
+                      background: "#f8fafc",
+                      border: "1.5px solid #e2e8f0",
+                      borderRadius: "16px"
+                    }}>
+                      <div>
+                        <div style={{ fontSize: "0.86rem", fontWeight: 800, color: "#0f172a" }}>
+                          Loopstation
+                        </div>
+                        <div style={{ fontSize: "0.72rem", color: "#64748b", marginTop: "2px" }}>
+                          Mehrspur-Aufnahmen & kreatives Jammen
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleModuleOverride("loopstation", !isLoopstationUnlocked)}
+                        style={{
+                          width: "48px",
+                          height: "28px",
+                          borderRadius: "14px",
+                          background: isLoopstationUnlocked ? "#22c55e" : "#cbd5e1",
+                          border: "none",
+                          padding: "2px",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: isLoopstationUnlocked ? "flex-end" : "flex-start",
+                          transition: "all 0.2s ease"
+                        }}
+                      >
+                        <div style={{
+                          width: "24px",
+                          height: "24px",
+                          borderRadius: "50%",
+                          background: "#ffffff",
+                          boxShadow: "0 1px 3px rgba(0,0,0,0.2)"
+                        }} />
+                      </button>
+                    </div>
+
+                    {/* Archiv switch */}
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "14px 16px",
+                      background: "#f8fafc",
+                      border: "1.5px solid #e2e8f0",
+                      borderRadius: "16px"
+                    }}>
+                      <div>
+                        <div style={{ fontSize: "0.86rem", fontWeight: 800, color: "#0f172a" }}>
+                          Unterrichts-Archiv
+                        </div>
+                        <div style={{ fontSize: "0.72rem", color: "#64748b", marginTop: "2px" }}>
+                          Vergangene Wochen & Hausaufgaben-Chronik
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleModuleOverride("archive", !isArchiveUnlocked)}
+                        style={{
+                          width: "48px",
+                          height: "28px",
+                          borderRadius: "14px",
+                          background: isArchiveUnlocked ? "#22c55e" : "#cbd5e1",
+                          border: "none",
+                          padding: "2px",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: isArchiveUnlocked ? "flex-end" : "flex-start",
+                          transition: "all 0.2s ease"
+                        }}
+                      >
+                        <div style={{
+                          width: "24px",
+                          height: "24px",
+                          borderRadius: "50%",
+                          background: "#ffffff",
+                          boxShadow: "0 1px 3px rgba(0,0,0,0.2)"
+                        }} />
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setShowModuleUnlockModal(false)}
+                  style={{
+                    marginTop: "4px",
+                    background: "#0f172a",
+                    color: "#ffffff",
+                    border: "none",
+                    borderRadius: "12px",
+                    padding: "10px 16px",
+                    fontSize: "0.82rem",
+                    fontWeight: 800,
+                    cursor: "pointer"
+                  }}
+                  className="hover-scale"
+                >
+                  Fertig
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
   );
 }

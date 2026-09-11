@@ -756,6 +756,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
   // Parental Gatekeeper State (6-Digit Parent Master PIN)
   const [showParentGateModal, setShowParentGateModal] = useState(false);
+  const [showTeacherRecModal, setShowTeacherRecModal] = useState<boolean>(true);
   const [pendingParentTarget, setPendingParentTarget] = useState<'parent_controls' | 'security' | 'billing' | 'legal' | 'downloads' | null>(null);
   const [parentGatePinInput, setParentGatePinInput] = useState('');
   const [parentGateError, setParentGateError] = useState('');
@@ -6866,6 +6867,54 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   };
                 }
               }
+            } else if (item.topic_name && item.topic_name.startsWith('Hausaufgabe KW ') && item.teacher_notes && item.teacher_notes.includes('SNAPSHOT_LEHRWERKE:')) {
+              // 📚 Cold Cache / Online: Unpack assigned Lehrwerke and homework page states from SNAPSHOT_LEHRWERKE
+              try {
+                const snapshotIdx = item.teacher_notes.indexOf('SNAPSHOT_LEHRWERKE:');
+                const afterSnapshot = item.teacher_notes.slice(snapshotIdx + 'SNAPSHOT_LEHRWERKE:'.length);
+                const endIdx = afterSnapshot.search(/\n\n--- [A-Z_]+ ---|\n\nSNAPSHOT_/);
+                const jsonStr = (endIdx !== -1 ? afterSnapshot.slice(0, endIdx) : afterSnapshot).trim();
+                const parsed = JSON.parse(jsonStr);
+                if (Array.isArray(parsed)) {
+                  parsed.forEach((lw: any) => {
+                    const bookTitle = (lw.title || lw.bookTitle || lw.lehrwerkTitle || '').trim();
+                    if (!bookTitle) return;
+                    const book = loadedLehrwerke.find((g: any) => (g.title || '').trim().toLowerCase() === bookTitle.toLowerCase());
+                    const bId = lw.id || lw.lehrwerkId || book?.id || `custom-${bookTitle.toLowerCase()}`;
+                    let assignment = combined.find((a: any) =>
+                      (String(a.studentId) === String(targetId) || !a.studentId) &&
+                      (String(a.lehrwerkId) === String(bId) || ((a.bookTitle || a.lehrwerkTitle || '').trim().toLowerCase() === bookTitle.toLowerCase()))
+                    );
+                    if (!assignment) {
+                      assignment = {
+                        studentId: targetId,
+                        lehrwerkId: bId,
+                        bookTitle: book?.title || bookTitle,
+                        lehrwerkTitle: book?.title || bookTitle,
+                        totalPages: lw.totalPages || book?.totalPages || book?.total_pages || 50,
+                        assignedAt: item.created_at || new Date().toISOString(),
+                        pageStates: {}
+                      };
+                      combined.push(assignment);
+                    }
+                    if (Array.isArray(lw.pages) && assignment.pageStates) {
+                      lw.pages.forEach((p: any) => {
+                        const pNum = typeof p === 'object' ? p.page : parseInt(p, 10);
+                        if (!isNaN(pNum) && !assignment.pageStates[pNum]) {
+                          assignment.pageStates[pNum] = {
+                            status: 'homework',
+                            isCurrentHomework: true,
+                            notes: (typeof p === 'object' ? p.notes : '') || '',
+                            homework_notes: (typeof p === 'object' ? p.notes : '') || ''
+                          };
+                        }
+                      });
+                    }
+                  });
+                }
+              } catch (e) {
+                console.warn('Could not parse SNAPSHOT_LEHRWERKE in fetchStudentProgress:', e);
+              }
             }
           });
           return combined;
@@ -7006,6 +7055,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       const customEvent = e as CustomEvent;
       if (customEvent.detail?.studentId === studentId && customEvent.detail?.amount) {
         setAvatar((prev: any) => prev ? { ...prev, xp: (prev.xp || 0) + customEvent.detail.amount } : prev);
+        // ⚡ 100% Synchronizität: Ground-Truth KPIs (Level XP, Übeminuten, Flammenserien) sofort persistent nachladen
+        setTimeout(() => {
+          fetchStudentAndAvatar(true);
+        }, 150);
       }
     };
     const handleMasteryCompleteAwarded = () => {
@@ -11414,6 +11467,194 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     );
   };
 
+  const renderTeacherRecommendationModal = () => {
+    const teacherRecommendation = (studentUser as any)?.parent_permissions?.teacher_recommendation;
+    if (!isParentUnlocked || !teacherRecommendation || teacherRecommendation.dismissed || !showTeacherRecModal) return null;
+
+    return (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Didaktische Empfehlung der Lehrkraft"
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(15, 23, 42, 0.70)",
+          backdropFilter: "blur(8px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 100003,
+          padding: "16px"
+        }}
+      >
+        <div
+          style={{
+            background: "#ffffff",
+            borderRadius: "24px",
+            width: "100%",
+            maxWidth: "500px",
+            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.35)",
+            border: "1px solid #e2e8f0",
+            overflow: "hidden",
+            animation: "fadeIn 0.2s ease-out"
+          }}
+        >
+          <div style={{
+            padding: "20px 24px",
+            background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)",
+            borderBottom: "1.5px solid #bfdbfe",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <div style={{
+                width: "40px",
+                height: "40px",
+                borderRadius: "12px",
+                background: "#ffffff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 2px 6px rgba(37, 99, 235, 0.15)"
+              }}>
+                <Sparkles size={22} color="#2563eb" />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 900, color: "#1e3a8a" }}>
+                  Empfehlung der Lehrkraft
+                </h3>
+                <span style={{ fontSize: "0.74rem", fontWeight: 700, color: "#64748b" }}>
+                  von {teacherRecommendation.teacher_name || "Fachlehrkraft"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
+            <div style={{
+              background: "#f8fafc",
+              border: "1.5px solid #e2e8f0",
+              borderRadius: "16px",
+              padding: "16px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px"
+            }}>
+              <div style={{ fontSize: "0.82rem", fontWeight: 850, color: "#0f172a" }}>
+                Empfohlene Freigabe für {(studentUser?.first_name || "dein Kind").trim()}:
+              </div>
+              <div style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                background: "#dbeafe",
+                border: "1px solid #93c5fd",
+                borderRadius: "100px",
+                padding: "4px 12px",
+                fontSize: "0.80rem",
+                fontWeight: 800,
+                color: "#1e40af",
+                alignSelf: "flex-start"
+              }}>
+                <span>
+                  {teacherRecommendation.recommended_level === "teen"
+                    ? "⚡ Wechsel zur Teen-Stufe (11–15 J. / inkl. Loopstation)"
+                    : teacherRecommendation.recommended_level === "loopstation"
+                      ? "🎛️ Freischaltung der Loopstation (im Junior-Profil)"
+                      : "🎓 Wechsel zur Pro-Stufe (ab 16 J.)"}
+                </span>
+              </div>
+              {teacherRecommendation.note && (
+                <p style={{ margin: "6px 0 0 0", fontSize: "0.80rem", color: "#475569", fontStyle: "italic", lineHeight: 1.5 }}>
+                  „{teacherRecommendation.note}“
+                </p>
+              )}
+            </div>
+
+            <p style={{ margin: 0, fontSize: "0.76rem", color: "#64748b", lineHeight: 1.45 }}>
+              Du entscheidest als Erziehungsberechtigte(r) frei, ob du diese Empfehlung übernehmen möchtest.
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "4px" }}>
+              <button
+                type="button"
+                onClick={async () => {
+                  setShowTeacherRecModal(false);
+                  setSettingsSubTab("parent_controls");
+                  setActiveStudentSettingsModal("parent_controls");
+                  setParentControlsTab("governance");
+                  if (studentId) {
+                    try {
+                      const updatedPerms = {
+                        ...((studentUser as any)?.parent_permissions || {}),
+                        teacher_recommendation: {
+                          ...teacherRecommendation,
+                          dismissed: true
+                        }
+                      };
+                      await supabase.from("users").update({ parent_permissions: updatedPerms }).eq("id", studentId);
+                    } catch (e) {}
+                  }
+                }}
+                style={{
+                  background: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "14px",
+                  padding: "12px 18px",
+                  fontSize: "0.86rem",
+                  fontWeight: 900,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                  boxShadow: "0 4px 12px rgba(37, 99, 235, 0.25)"
+                }}
+                className="hover-scale"
+              >
+                <Sliders size={16} />
+                <span>Jetzt zu Kinderschutz & Freigaben</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  setShowTeacherRecModal(false);
+                  if (studentId) {
+                    try {
+                      const updatedPerms = {
+                        ...((studentUser as any)?.parent_permissions || {}),
+                        teacher_recommendation: {
+                          ...teacherRecommendation,
+                          dismissed: true
+                        }
+                      };
+                      await supabase.from("users").update({ parent_permissions: updatedPerms }).eq("id", studentId);
+                    } catch (e) {}
+                  }
+                }}
+                style={{
+                  background: "transparent",
+                  color: "#64748b",
+                  border: "none",
+                  padding: "8px",
+                  fontSize: "0.78rem",
+                  fontWeight: 750,
+                  cursor: "pointer"
+                }}
+              >
+                Später erinnern / Schließen
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderRecoveryKeyModal = () => {
     if (!showRecoveryKeyModal) return null;
     return (
@@ -11946,6 +12187,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     )}
     {renderParentGateModal()}
     {renderRecoveryKeyModal()}
+      {renderTeacherRecommendationModal()}
   </>
 );
 }
@@ -13258,6 +13500,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           assignedCampusSongs={assignedCampusSongs}
           progressItems={progressItems}
           isSongMastered={isSongMastered}
+          actualStudentName={formatStudentPureFirstName(studentUser?.first_name, 'Musik-Schüler')}
+          studentInstrument={studentUser?.instrument || 'Instrumentalausbildung'}
+          schoolName={resolvedSchoolName || studentUser?.school_name}
           onDownloadJpg={downloadJuniorStickerJpg}
           onStickInAlbum={() => {
             setJuniorAwardedStickerToCelebrate(null);

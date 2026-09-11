@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Calendar, Pencil, Eye, EyeOff, Award, QrCode } from 'lucide-react';
+import { X, Calendar, Pencil, Eye, EyeOff, Award, QrCode, Trophy } from 'lucide-react';
 import { formatSingleStudentAnonymized } from '../../../../utils/nameHelper';
 
 export interface StudentModalHeaderProps {
@@ -289,6 +289,27 @@ export const StudentModalHeader: React.FC<StudentModalHeaderProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', color: '#64748b', fontWeight: 650 }}>
               <Calendar size={14} /> Member seit {memberSince}
             </div>
+
+            {student?.nickname && (
+              <span
+                style={{
+                  background: '#fef3c7',
+                  color: '#92400e',
+                  border: '1px solid #fde68a',
+                  padding: '3px 10px',
+                  borderRadius: '100px',
+                  fontSize: '0.72rem',
+                  fontWeight: 900,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+                title="Aktueller Musiker-Nickname für Ranglisten & Hall of Groove"
+              >
+                <Trophy size={11} color="#d97706" />
+                <span>Nickname: {student.nickname}</span>
+              </span>
+            )}
 
             {mode === 'admin' && (
               <span

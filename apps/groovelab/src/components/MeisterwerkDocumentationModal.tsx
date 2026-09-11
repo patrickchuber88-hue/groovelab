@@ -133,7 +133,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   initialLocalProgress,
   onSongsUpdated
 }) => {
-  const uiLevel: 'junior' | 'teen' | 'pro' = propUiLevel || (student as any)?.campus_ui_level || 'pro';
+  const uiLevel: 'junior' | 'teen' | 'pro' = propUiLevel || (student as any)?.campus_ui_level || 'junior';
+  const [showAgeUiInfoModal, setShowAgeUiInfoModal] = useState<boolean>(false);
+  const [recTargetLevel, setRecTargetLevel] = useState<'teen' | 'pro' | 'loopstation'>('teen');
+  const [recNote, setRecNote] = useState<string>('');
+  const [isSavingRec, setIsSavingRec] = useState<boolean>(false);
+  const [recSuccess, setRecSuccess] = useState<boolean>(false);
   const isSessionTeacher = typeof window !== 'undefined' && (() => {
     try {
       const ws = sessionStorage.getItem('groovelab_active_workspace');
@@ -612,6 +617,51 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               homework_notes: item.homework_notes || assignment.pageStates[pageNum]?.homework_notes || ''
             };
           }
+        }
+      } else if (item.topic_name && item.topic_name.startsWith('Hausaufgabe KW ') && item.teacher_notes && item.teacher_notes.includes('SNAPSHOT_LEHRWERKE:')) {
+        // 📚 Cold Cache / Online: Also unpack Lehrwerke and homework page states from SNAPSHOT_LEHRWERKE
+        try {
+          const snapshotIdx = item.teacher_notes.indexOf('SNAPSHOT_LEHRWERKE:');
+          const afterSnapshot = item.teacher_notes.slice(snapshotIdx + 'SNAPSHOT_LEHRWERKE:'.length);
+          const endIdx = afterSnapshot.search(/\n\n--- [A-Z_]+ ---|\n\nSNAPSHOT_/);
+          const jsonStr = (endIdx !== -1 ? afterSnapshot.slice(0, endIdx) : afterSnapshot).trim();
+          const parsed = JSON.parse(jsonStr);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((lw: any) => {
+              const bookTitle = (lw.title || lw.bookTitle || lw.lehrwerkTitle || '').trim();
+              if (!bookTitle) return;
+              const book = globalLehrwerke.find(g => (g.title || '').trim().toLowerCase() === bookTitle.toLowerCase());
+              const targetId = lw.id || lw.lehrwerkId || book?.id || `custom-${bookTitle.toLowerCase()}`;
+              let assignment = combined.find(a => String(a.lehrwerkId) === String(targetId) || ((a.bookTitle || a.lehrwerkTitle || '').trim().toLowerCase() === bookTitle.toLowerCase()));
+              if (!assignment) {
+                assignment = {
+                  studentId: student.id,
+                  lehrwerkId: targetId,
+                  bookTitle: book?.title || bookTitle,
+                  lehrwerkTitle: book?.title || bookTitle,
+                  totalPages: lw.totalPages || book?.totalPages || book?.total_pages || 50,
+                  assignedAt: item.created_at || new Date().toISOString(),
+                  pageStates: {}
+                };
+                combined.push(assignment);
+              }
+              if (Array.isArray(lw.pages) && assignment.pageStates) {
+                lw.pages.forEach((p: any) => {
+                  const pNum = typeof p === 'object' ? p.page : parseInt(p, 10);
+                  if (!isNaN(pNum) && !assignment.pageStates[pNum]) {
+                    assignment.pageStates[pNum] = {
+                      status: 'homework',
+                      isCurrentHomework: true,
+                      notes: (typeof p === 'object' ? p.notes : '') || '',
+                      homework_notes: (typeof p === 'object' ? p.notes : '') || ''
+                    };
+                  }
+                });
+              }
+            });
+          }
+        } catch (e) {
+          console.warn('Could not parse SNAPSHOT_LEHRWERKE in sortedAssignedLehrwerke:', e);
         }
       }
     });
@@ -2595,8 +2645,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           }, () => {});
       }
 
-      // 256 kbps Crystal-Clear Studio Audio when Audio-Tresor is booked, else 128 kbps High-Quality Audio
-      const targetBitrate = effectiveTresor ? 256000 : 128000;
+      // 192 kbps Transparent Studio Audio (Opus 48kHz Stereo) when Audio-Tresor is booked, else 128 kbps
+      const targetBitrate = effectiveTresor ? 192000 : 128000;
       let mimeType = 'audio/webm;codecs=opus';
       if (typeof MediaRecorder !== 'undefined') {
         if (!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
@@ -4257,7 +4307,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     const isEpic = sticker.rarity === 'epic';
     const isRare = sticker.rarity === 'rare';
     const isSchuljahr = sticker.category === 'schuljahr';
-    const themeColor = sticker.color || '#34a853';
+    const borderColor = isLegendary || isSchuljahr ? '#facc15' : isEpic ? '#c084fc' : '#22c55e';
+    const cardGlow = isLegendary || isSchuljahr ? 'rgba(250, 204, 21, 0.35)' : isEpic ? 'rgba(192, 132, 252, 0.3)' : 'rgba(34, 197, 94, 0.28)';
 
     // 1. LAYER 1: Deep Studio Atmosphere & Radial Vignette
     const bgGrad = ctx.createRadialGradient(600, 500, 60, 600, 600, 780);
@@ -4281,7 +4332,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
     // 1c. Ambient Backlight Spotlight behind the card plaque
     const ambientSpot = ctx.createRadialGradient(600, medalCenterY, 80, 600, medalCenterY, 520);
-    ambientSpot.addColorStop(0, isLegendary ? 'rgba(234, 179, 8, 0.28)' : isEpic ? 'rgba(168, 85, 247, 0.22)' : 'rgba(52, 168, 83, 0.24)');
+    ambientSpot.addColorStop(0, cardGlow);
     ambientSpot.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = ambientSpot;
     ctx.fillRect(0, 0, 1200, 1200);
@@ -4330,13 +4381,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     // 3. LAYER 3: Precision Multi-Stage Metallic Border & Corner Ornaments
     ctx.save();
     // Outer Border
-    ctx.strokeStyle = isLegendary 
-      ? 'rgba(234, 179, 8, 0.85)' 
-      : isEpic 
-        ? 'rgba(168, 85, 247, 0.8)' 
-        : isSchuljahr
-          ? 'rgba(250, 204, 21, 0.75)'
-          : 'rgba(52, 168, 83, 0.75)';
+    ctx.strokeStyle = borderColor;
     ctx.lineWidth = 3;
     ctx.beginPath();
     if (typeof (ctx as any).roundRect === 'function') {
@@ -4361,7 +4406,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     // 4 Precision Artisan Corner Brackets
     const bracketLen = 22;
     const cornerInset = 20;
-    ctx.strokeStyle = isLegendary || isSchuljahr ? '#facc15' : themeColor;
+    ctx.strokeStyle = borderColor;
     ctx.lineWidth = 2.5;
 
     // Top-Left
@@ -4408,7 +4453,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       ? `⭐ ${(sticker.rarityLabel || 'STANDARD').toUpperCase()} • AUSBILDUNGSSTUFE #${yearNumber}`
       : `⭐ ${(sticker.rarityLabel || 'STANDARD').toUpperCase()} • SCHULJAHR ${selectedSchoolYear || syStr}`;
     ctx.font = '900 18px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillStyle = isLegendary || isSchuljahr ? '#facc15' : isEpic ? '#c084fc' : themeColor;
+    ctx.fillStyle = borderColor;
     ctx.fillText(rarityText, 600, tY + 76);
 
     // Slanted "GEMEISTERT!" Ribbon with 3D Bevel
@@ -4425,9 +4470,17 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     ctx.shadowOffsetY = 4;
 
     const ribbonGrad = ctx.createLinearGradient(0, -pillH / 2, 0, pillH / 2);
-    ribbonGrad.addColorStop(0, themeColor);
-    ribbonGrad.addColorStop(1, '#15803d');
-    ctx.fillStyle = isLegendary || isSchuljahr ? '#ca8a04' : ribbonGrad;
+    if (isLegendary || isSchuljahr) {
+      ribbonGrad.addColorStop(0, '#eab308');
+      ribbonGrad.addColorStop(1, '#ca8a04');
+    } else if (isEpic) {
+      ribbonGrad.addColorStop(0, '#a855f7');
+      ribbonGrad.addColorStop(1, '#7e22ce');
+    } else {
+      ribbonGrad.addColorStop(0, '#22c55e');
+      ribbonGrad.addColorStop(1, '#15803d');
+    }
+    ctx.fillStyle = ribbonGrad;
     ctx.beginPath();
     if (typeof (ctx as any).roundRect === 'function') {
       (ctx as any).roundRect(-pillW/2, -pillH/2, pillW, pillH, 23);
@@ -4482,7 +4535,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
 
     textY += 46;
-    ctx.fillStyle = isLegendary || isSchuljahr ? '#facc15' : themeColor;
+    ctx.fillStyle = borderColor;
     let titleFontSize = 36;
     ctx.font = `italic 900 ${titleFontSize}px "Helvetica Neue", Arial, sans-serif`;
     while (ctx.measureText(sticker.title.toUpperCase()).width > 800 && titleFontSize > 24) {
@@ -4491,13 +4544,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
     ctx.fillText(sticker.title.toUpperCase(), 600, textY);
 
-    const cardTopic = topicOverride || (collectedStickers[sticker.id]?.details?.slice(-1)[0]?.topic);
+    const rawTopic = topicOverride || (collectedStickers[sticker.id]?.details?.slice(-1)[0]?.topic);
+    const cleanTopic = (rawTopic && rawTopic !== 'Simulation' && rawTopic !== 'Allgemein') ? rawTopic : undefined;
+    const isSongCard = sticker.category === 'songs' || sticker.id === 'song-master' || Boolean(cleanTopic);
 
-    if (sticker.id === 'song-master' || cardTopic) {
+    if (isSongCard && (cleanTopic || sticker.id === 'song-master')) {
       textY += 38;
       ctx.fillStyle = '#fde047';
       ctx.font = '900 23px "Helvetica Neue", Arial, sans-serif';
-      const topicText = `🎵 ${cardTopic || 'Song gemeistert'}`;
+      const topicText = `🎵 ${cleanTopic || 'Song gemeistert'}`;
       ctx.fillText(topicText, 600, textY);
     } else {
       textY += 34;
@@ -4664,14 +4719,37 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       ctx.fill();
 
       if (isImg) {
-        // Multi-stage 3D Studio Drop Shadow (Contact Shadow + Ambient Diffuse Shadow)
+        const sSize = 300;
+        const sRadius = 28;
+        const sX = -sSize / 2;
+        const sY = -sSize / 2;
+
+        // Multi-stage 3D Studio Drop Shadow behind rounded image shape
         ctx.save();
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
         ctx.shadowBlur = 38;
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 20;
-        const sSize = 300;
-        ctx.drawImage(imgOrEmoji as HTMLImageElement, -sSize / 2, -sSize / 2, sSize, sSize);
+        ctx.fillStyle = '#080d18';
+        ctx.beginPath();
+        if (typeof (ctx as any).roundRect === 'function') {
+          (ctx as any).roundRect(sX, sY, sSize, sSize, sRadius);
+        } else {
+          ctx.rect(sX, sY, sSize, sSize);
+        }
+        ctx.fill();
+        ctx.restore();
+
+        // Clipped image with smooth 28px squircle radius (matching DOM borderRadius: 24px)
+        ctx.save();
+        ctx.beginPath();
+        if (typeof (ctx as any).roundRect === 'function') {
+          (ctx as any).roundRect(sX, sY, sSize, sSize, sRadius);
+        } else {
+          ctx.rect(sX, sY, sSize, sSize);
+        }
+        ctx.clip();
+        ctx.drawImage(imgOrEmoji as HTMLImageElement, sX, sY, sSize, sSize);
         ctx.restore();
       } else {
         // Stenciled Coin Emblem for Emoji Fallback
@@ -4696,7 +4774,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       ctx.restore();
       
-      const filename = (topicOverride || sticker.title).toLowerCase().replace(/[^a-z0-9]/gi, '_');
+      const filename = (cleanTopic || sticker.title || 'sticker').toLowerCase().replace(/[^a-z0-9]/gi, '_');
       const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
       const link = document.createElement('a');
       link.download = `campus_sticker_${filename}.jpg`;
@@ -4706,7 +4784,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
     // Load sticker asset
     const img = new Image();
-    img.crossOrigin = 'anonymous';
     img.onload = () => {
       drawStickerAsset(img, true);
     };
@@ -9407,6 +9484,305 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
 
 
+  const handleSendTeacherRecommendation = async () => {
+    if (!student?.id) return;
+    setIsSavingRec(true);
+    try {
+      const existingPermissions = (student as any)?.parent_permissions || propParentPermissions || {};
+      const updatedPermissions = {
+        ...existingPermissions,
+        teacher_recommendation: {
+          teacher_id: teacherId || "",
+          teacher_name: effectiveTeacherFullName || "Fachlehrkraft",
+          recommended_level: recTargetLevel,
+          note: recNote.trim() || `${studentFirstName} macht tolle Fortschritte und ist bereit für zusätzliche Funktionen.`,
+          created_at: new Date().toISOString(),
+          dismissed: false
+        }
+      };
+
+      const { error } = await supabase
+        .from("users")
+        .update({ parent_permissions: updatedPermissions })
+        .eq("id", student.id);
+
+      if (error) throw error;
+      setRecSuccess(true);
+      setTimeout(() => {
+        setShowAgeUiInfoModal(false);
+        setRecSuccess(false);
+      }, 1600);
+    } catch (e) {
+      console.error("[Meisterwerk] Could not save teacher recommendation:", e);
+    } finally {
+      setIsSavingRec(false);
+    }
+  };
+
+  const renderAgeUiInfoModal = () => {
+    if (!showAgeUiInfoModal) return null;
+    return (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Altersstufe & Berechtigungen"
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(15, 23, 42, 0.65)",
+          backdropFilter: "blur(6px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 99999,
+          padding: "16px"
+        }}
+        onClick={() => setShowAgeUiInfoModal(false)}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            background: "#ffffff",
+            borderRadius: "24px",
+            width: "100%",
+            maxWidth: "540px",
+            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+            border: "1px solid #e2e8f0",
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+            animation: "fadeIn 0.18s ease-out"
+          }}
+        >
+          {/* Header */}
+          <div style={{
+            padding: "20px 24px 16px 24px",
+            background: uiLevel === "junior"
+              ? "linear-gradient(135deg, #fefce8 0%, #fef08a 100%)"
+              : uiLevel === "teen"
+                ? "linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)"
+                : "linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)",
+            borderBottom: "1px solid #e2e8f0",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <div style={{
+                width: "40px",
+                height: "40px",
+                borderRadius: "12px",
+                background: "#ffffff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
+                fontSize: "1.2rem"
+              }}>
+                {uiLevel === "junior" ? "🧒" : uiLevel === "teen" ? "⚡" : "🎓"}
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 900, color: "#0f172a" }}>
+                  {uiLevel === "junior" ? "Junior-Stufe (6–10 Jahre)" : uiLevel === "teen" ? "Teen-Stufe (11–15 Jahre)" : "Pro-Stufe (ab 16 Jahre)"}
+                </h3>
+                <span style={{ fontSize: "0.74rem", fontWeight: 700, color: "#64748b" }}>
+                  Schüler-Profil von {studentFirstName}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowAgeUiInfoModal(false)}
+              style={{
+                background: "rgba(255,255,255,0.8)",
+                border: "1px solid rgba(0,0,0,0.08)",
+                borderRadius: "50%",
+                width: "32px",
+                height: "32px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer"
+              }}
+              className="hover-scale"
+            >
+              <X size={16} color="#475569" />
+            </button>
+          </div>
+
+          {/* Body */}
+          <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "16px", maxHeight: "70vh", overflowY: "auto" }}>
+            <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "16px", padding: "14px 16px" }}>
+              <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "#0f172a", marginBottom: "6px" }}>
+                Funktionsumfang dieser Altersstufe:
+              </div>
+              <ul style={{ margin: 0, paddingLeft: "18px", fontSize: "0.78rem", color: "#475569", lineHeight: 1.6 }}>
+                {uiLevel === "junior" ? (
+                  <>
+                    <li><strong>5 aktive Module:</strong> Übe-Begleiter, Aufnahmen, Groove-Trainer, Stimmgerät, Klang-Detektiv, Musik-Stern ⭐ & Protokoll.</li>
+                    <li><strong>Kindgerechte Begriffe:</strong> Klang-Detektiv statt EarLab, Sticker-Album statt Meilensteine.</li>
+                    <li><strong>Rechte-Schutz:</strong> Loopstation & Archiv regulär inaktiv (können von Eltern über PIN freigeschaltet werden).</li>
+                    <li><strong>Kinderschutz:</strong> Nachtruhe-Schutz aktiv, kein Schüler-Direktchat ohne Eltern.</li>
+                  </>
+                ) : uiLevel === "teen" ? (
+                  <>
+                    <li><strong>7 aktive Module:</strong> Inklusive Loopstation, Skill-Radar, Chat und Mitteilungen.</li>
+                    <li><strong>Eigenverantwortung:</strong> Stundenplan-Vorschläge & Übe-Timer freigeschaltet.</li>
+                    <li><strong>Archiv:</strong> Regulär inaktiv (über Eltern-Freigabe aktivierbar).</li>
+                  </>
+                ) : (
+                  <>
+                    <li><strong>Volles Studio:</strong> Alle Module inklusive Unterrichts-Archiv voll aktiv.</li>
+                    <li><strong>Autonomie:</strong> Alle Schüler-Werkzeuge ohne Einschränkungen verfügbar.</li>
+                  </>
+                )}
+              </ul>
+            </div>
+
+            {/* Teacher section: Didaktische Empfehlung an Eltern */}
+            {isTeacherMode ? (
+              <div style={{
+                background: "linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)",
+                border: "1.5px solid #bfdbfe",
+                borderRadius: "16px",
+                padding: "16px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "12px"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <Sparkles size={16} color="#2563eb" />
+                  <span style={{ fontSize: "0.86rem", fontWeight: 900, color: "#1e3a8a" }}>
+                    Didaktische Empfehlung an die Eltern
+                  </span>
+                </div>
+                <p style={{ margin: 0, fontSize: "0.74rem", color: "#475569", lineHeight: 1.45 }}>
+                  Die dauerhafte Rechte- und Stufenverwaltung obliegt den Eltern. Du kannst hier eine fachliche Empfehlung hinterlegen, die den Eltern im Elternbereich angezeigt wird.
+                </p>
+
+                {recSuccess ? (
+                  <div style={{
+                    background: "#dcfce7",
+                    border: "1px solid #86efac",
+                    borderRadius: "12px",
+                    padding: "12px",
+                    textAlign: "center",
+                    fontSize: "0.82rem",
+                    fontWeight: 850,
+                    color: "#15803d"
+                  }}>
+                    ✓ Empfehlung erfolgreich an {studentFirstName}s Eltern übermittelt!
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <label style={{ fontSize: "0.74rem", fontWeight: 800, color: "#334155" }}>
+                        Empfohlene Freigabe:
+                      </label>
+                      <select
+                        value={recTargetLevel}
+                        onChange={(e) => setRecTargetLevel(e.target.value as any)}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: "10px",
+                          border: "1px solid #cbd5e1",
+                          background: "#ffffff",
+                          fontSize: "0.80rem",
+                          fontWeight: 700,
+                          color: "#0f172a"
+                        }}
+                      >
+                        <option value="teen">⚡ Wechsel zur Teen-Stufe (11–15 J. / inkl. Loopstation)</option>
+                        <option value="loopstation">🎛️ Loopstation freischalten (im Junior-Profil)</option>
+                        <option value="pro">🎓 Wechsel zur Pro-Stufe (ab 16 J.)</option>
+                      </select>
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <label style={{ fontSize: "0.74rem", fontWeight: 800, color: "#334155" }}>
+                        Hinweis / Begründung für die Eltern:
+                      </label>
+                      <textarea
+                        value={recNote}
+                        onChange={(e) => setRecNote(e.target.value)}
+                        placeholder={`z. B. ${studentFirstName} macht tolle Fortschritte und wir möchten im Unterricht nun die Loopstation einsetzen...`}
+                        rows={3}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: "10px",
+                          border: "1px solid #cbd5e1",
+                          background: "#ffffff",
+                          fontSize: "0.78rem",
+                          color: "#0f172a",
+                          resize: "none",
+                          fontFamily: "inherit"
+                        }}
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={isSavingRec}
+                      onClick={handleSendTeacherRecommendation}
+                      style={{
+                        background: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+                        color: "#ffffff",
+                        border: "none",
+                        borderRadius: "12px",
+                        padding: "10px 16px",
+                        fontSize: "0.82rem",
+                        fontWeight: 900,
+                        cursor: isSavingRec ? "wait" : "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "8px",
+                        boxShadow: "0 2px 8px rgba(37, 99, 235, 0.25)"
+                      }}
+                      className="hover-scale"
+                    >
+                      <Mail size={15} />
+                      <span>{isSavingRec ? "Wird gespeichert..." : "Empfehlung an Eltern senden"}</span>
+                    </button>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div style={{
+                background: "#f8fafc",
+                border: "1px solid #e2e8f0",
+                borderRadius: "16px",
+                padding: "16px",
+                textAlign: "center"
+              }}>
+                <div style={{ fontSize: "0.80rem", color: "#64748b", marginBottom: "12px" }}>
+                  Eltern können die Altersstufe oder einzelne Module (z. B. Loopstation) jederzeit im Elternbereich über den Eltern-PIN anpassen.
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAgeUiInfoModal(false)}
+                  style={{
+                    background: "#0f172a",
+                    color: "#ffffff",
+                    border: "none",
+                    borderRadius: "12px",
+                    padding: "8px 16px",
+                    fontSize: "0.80rem",
+                    fontWeight: 800,
+                    cursor: "pointer"
+                  }}
+                  className="hover-scale"
+                >
+                  Verstanden
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderCloseButton = () => {
     if (isEmbed) return null;
     return (
@@ -9722,6 +10098,39 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   >
                     <Info size={13} color="#ffffff" />
                   </button>
+                  {/* Interaktives Alter-UI Badge */}
+                  <button
+                    type="button"
+                    onClick={() => setShowAgeUiInfoModal(true)}
+                    title="Altersstufe & Berechtigungen anzeigen"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      background: uiLevel === 'junior' 
+                        ? 'rgba(254, 240, 138, 0.22)' 
+                        : uiLevel === 'teen' 
+                          ? 'rgba(199, 210, 254, 0.22)' 
+                          : 'rgba(233, 213, 255, 0.22)',
+                      border: uiLevel === 'junior' 
+                        ? '1px solid rgba(253, 224, 71, 0.55)' 
+                        : uiLevel === 'teen' 
+                          ? '1px solid rgba(165, 180, 252, 0.55)' 
+                          : '1px solid rgba(216, 180, 254, 0.55)',
+                      borderRadius: '100px',
+                      padding: '2px 8px',
+                      color: '#ffffff',
+                      fontSize: '0.70rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 5px rgba(0,0,0,0.12)',
+                      transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                      flexShrink: 0
+                    }}
+                    className="hover-scale"
+                  >
+                    <span>{uiLevel === 'junior' ? '🧒 Junior (6–10 J.)' : uiLevel === 'teen' ? '⚡ Teen (11–15 J.)' : '🎓 Pro (ab 16 J.)'}</span>
+                  </button>
                 </div>
                 {(activeViewMode === 'recordings' || activeModalTab === 'audiobiography') && (
                   <span style={{ fontSize: '0.68rem', fontWeight: 650, color: 'rgba(255, 255, 255, 0.75)', lineHeight: 1, marginTop: '2px' }}>
@@ -9934,6 +10343,59 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             );
           })()}
         </div>
+
+        {/* 🏫 LEHRER-DEMO-BANNER (wenn Modul im Schüler-UI-Level inaktiv ist) */}
+        {isTeacherMode && (() => {
+          const overrides = (student as any)?.parent_permissions?.module_overrides || propParentPermissions?.module_overrides;
+          const isCurrentModuleInactive = (activeViewMode === "loopstation" && uiLevel === "junior" && !overrides?.loopstation)
+            || (activeSubView === "history" && activeViewMode === "document" && uiLevel !== "pro" && !overrides?.archive);
+          if (!isCurrentModuleInactive) return null;
+          return (
+            <div style={{
+              background: "linear-gradient(90deg, #fef3c7 0%, #fffbeb 100%)",
+              borderBottom: "1.5px solid #fde68a",
+              padding: "9px 18px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              fontSize: "0.80rem",
+              fontWeight: 750,
+              color: "#92400e",
+              zIndex: 45,
+              flexShrink: 0,
+              boxShadow: "0 2px 6px rgba(245, 158, 11, 0.10)"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <Info size={16} color="#d97706" style={{ flexShrink: 0 }} />
+                <span>
+                  <strong>Lehrer-Demo-Modus:</strong> Dieses Modul ist für <strong>{studentFirstName}</strong> in der {uiLevel.toUpperCase()}-Stufe regulär ausgeblendet. Du nutzt es zur Unterrichtsvorführung.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveViewMode("document");
+                  setActiveModalTab("document");
+                  setActiveSubView("hub");
+                }}
+                style={{
+                  background: "#ffffff",
+                  border: "1px solid #d97706",
+                  borderRadius: "8px",
+                  padding: "4px 12px",
+                  fontSize: "0.74rem",
+                  fontWeight: 850,
+                  color: "#92400e",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap"
+                }}
+                className="hover-scale"
+              >
+                Zurück zu {studentFirstName}s Modulen
+              </button>
+            </div>
+          );
+        })()}
 
         {/* Modal Content - Side-by-side Columns or Logbook */}
         <div
@@ -11121,6 +11583,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               onExecuteTransfer={handleExecuteBatchTransfer}
             />
           )}
+          {renderAgeUiInfoModal()}
         </>
       );
     }
@@ -11188,6 +11651,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             onExecuteTransfer={handleExecuteBatchTransfer}
           />
         )}
+        {renderAgeUiInfoModal()}
       </>
     );
   };

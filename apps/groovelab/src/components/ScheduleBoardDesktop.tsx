@@ -1125,9 +1125,9 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         // Teacher Profile
         supabase.from('users').select('*').eq('id', selectedTeacherId).maybeSingle(),
 
-        // School Students Catalog (Cached with SWR 60s)
+        // School Students Catalog (Cached with SWR 60s, payload pruned)
         queryCache.fetch(`students_table_${schoolId}`, async () => {
-          const { data } = await supabase.from('students').select('*').eq('school_id', schoolId);
+          const { data } = await supabase.from('students').select('id, first_name, last_name, instrument, lesson_duration, sibling_group_id, group_id, is_campus_active, is_groovelab_active, is_active, teacher_id').eq('school_id', schoolId);
           return data || [];
         }, { ttlMs: 60_000, staleWhileRevalidate: true }),
 
@@ -1337,10 +1337,10 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
           lname,
           instrument: s.instrument || (userMatch ? userMatch.instrument : null) || (pendingMatch ? pendingMatch.instrument : 'Musiker'),
           duration: s.lesson_duration || 30,
-          status: (s.status || 'ausstehend') as any,
+          status: ((s as any).status || 'ausstehend') as any,
           sibling_group_id: s.sibling_group_id,
           group_id: s.group_id,
-          isOnboarded: Boolean(s.is_campus_active || s.is_groovelab_active || s.is_active || s.status === 'aktiv')
+          isOnboarded: Boolean(s.is_campus_active || s.is_groovelab_active || s.is_active || (s as any).status === 'aktiv')
         });
       });
 

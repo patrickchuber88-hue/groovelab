@@ -215,6 +215,65 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* 💡 DIDAKTISCHE EMPFEHLUNG DER LEHRKRAFT */}
+      {(() => {
+        const rec = (studentUser as any)?.parent_permissions?.teacher_recommendation;
+        if (!rec) return null;
+        return (
+          <div style={{
+            background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+            borderRadius: '20px',
+            padding: '16px 20px',
+            border: '1.5px solid #93c5fd',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+            textAlign: 'left',
+            boxShadow: '0 4px 12px rgba(59, 130, 246, 0.10)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: '#2563eb', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Sparkles size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.88rem', fontWeight: 850, color: '#1e3a8a' }}>
+                    Empfehlung von {rec.teacher_name || 'der Lehrkraft'}
+                  </div>
+                  <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                    Empfohlene Freigabe: <strong>{rec.recommended_level === 'teen' ? 'Teen-Stufe (11–15 J.)' : rec.recommended_level === 'loopstation' ? 'Loopstation' : 'Pro-Stufe (ab 16 J.)'}</strong>
+                  </div>
+                </div>
+              </div>
+              {rec.recommended_level && rec.recommended_level !== currentLvlKey && rec.recommended_level !== 'loopstation' && (
+                <button
+                  type="button"
+                  onClick={() => handleSwitchAgeLevelWithStandard(rec.recommended_level as any)}
+                  style={{
+                    background: '#2563eb',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '6px 14px',
+                    fontSize: '0.76rem',
+                    fontWeight: 800,
+                    cursor: 'pointer'
+                  }}
+                  className="hover-scale"
+                >
+                  Jetzt übernehmen
+                </button>
+              )}
+            </div>
+            {rec.note && (
+              <div style={{ fontSize: '0.78rem', color: '#334155', fontStyle: 'italic', background: 'rgba(255,255,255,0.6)', padding: '8px 12px', borderRadius: '10px' }}>
+                „{rec.note}“
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* 🛡️ Anfrage der Lehrkraft für didaktische Audio-Freigabe */}
       {pendingTeacherAudioRequest && !curTeacherAudio && (
         <div style={{

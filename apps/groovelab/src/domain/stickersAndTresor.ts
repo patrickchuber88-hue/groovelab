@@ -26,21 +26,21 @@ export const ALL_STICKERS = [
   { id: 'repertoire-gigant', emoji: '🐉', title: 'Repertoire-Gigant', desc: '10 Songs vollständig gemeistert – ein ganzes Konzertprogramm!', equiv: 'Umfangreiches Repertoire auf Auftritts-Niveau – musikalisch vielseitig und spieltechnisch reif.', color: '#137333', bg: 'rgba(19, 115, 51, 0.15)', auto: true, category: 'songs', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
 
   // Schuljahr-Pioniere (15-Jahre-Zyklus: Zu jedem neuen Campus-Schuljahr ein exklusives Ausbildungs-Wappen)
-  { id: 'schuljahr-1', emoji: '🎒', title: 'Campus-Pionier (1. Campus-Jahr)', desc: 'Dein 1. Schuljahr auf Campus-Groovelab! Dein persönlicher Musiker-Kompass für Ziele, Fokus und Fortschritt.', equiv: 'Pioniergeist: Du machst deine musikalische Entwicklung sichtbar, setzt dir Ziele und startest deine Reise.', color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.12)', auto: true, category: 'schuljahr', rarity: 'common', rarityLabel: 'Standard', multi: false },
-  { id: 'schuljahr-2', emoji: '🚀', title: 'Klang-Navigator (2. Campus-Jahr)', desc: 'Dein 2. Campus-Schuljahr: Die Routine sitzt! Du navigierst zielsicher durch neue Stücke und Übe-Einheiten.', equiv: 'Gefestigte Gewohnheit: Stetigkeit und bewusster Fokus bringen deine Spielfreude auf ein neues Level.', color: '#10b981', bg: 'rgba(16, 185, 129, 0.12)', auto: true, category: 'schuljahr', rarity: 'common', rarityLabel: 'Standard', multi: false },
-  { id: 'schuljahr-3', emoji: '🌟', title: 'Melodie-Gestalter (3. Campus-Jahr)', desc: 'Dein 3. Campus-Schuljahr: Drei Jahre gemeinsame Klangreise – dein persönlicher Ton gewinnt an Tiefe und Glanz!', equiv: 'Klangkultur: Noten werden lebendig. Du phrasierst bewusster und formst Stücke mit echter Ausdruckskraft.', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.12)', auto: true, category: 'schuljahr', rarity: 'common', rarityLabel: 'Standard', multi: false },
-  { id: 'schuljahr-4', emoji: '🎸', title: 'Groove-Kadett (4. Campus-Jahr)', desc: 'Dein 4. Campus-Schuljahr: Vier Jahre Rhythmus und Beständigkeit – dein Timing sitzt felsenfest im Beat!', equiv: 'Puls & Präzision: Du hörst tiefer in den Rhythmus hinein und meisterst anspruchsvolle Songpassagen mit Bravour.', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.12)', auto: true, category: 'schuljahr', rarity: 'rare', rarityLabel: 'Selten', multi: false },
-  { id: 'schuljahr-5', emoji: '⚡', title: 'Jubiläums-Alchemist (5. Campus-Jahr)', desc: 'Dein 5. Campus-Schuljahr: Ein halbes Jahrzehnt musikalische Treue! Du verwandelst Übezeit in pure Magie.', equiv: 'Jubiläums-Meilenstein: 5 Jahre Leidenschaft und Ausdauer – Musik ist ein fester Teil deines Lebens.', color: '#ec4899', bg: 'rgba(236, 72, 153, 0.12)', auto: true, category: 'schuljahr', rarity: 'rare', rarityLabel: 'Selten', multi: false },
-  { id: 'schuljahr-6', emoji: '🔮', title: 'Song-Architekt (6. Campus-Jahr)', desc: 'Dein 6. Campus-Schuljahr: Sechs Jahre Musikreife – du verstehst Stücke bis ins Detail und formst Werke souverän.', equiv: 'Werkverständnis: Du erfasst Harmonien und Songstrukturen intuitiv und interpretierst sie stilsicher.', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.12)', auto: true, category: 'schuljahr', rarity: 'rare', rarityLabel: 'Selten', multi: false },
-  { id: 'schuljahr-7', emoji: '🦅', title: 'Klang-Virtuose (7. Campus-Jahr)', desc: 'Dein 7. Campus-Schuljahr: Sieben Jahre Klangmeisterschaft – anspruchsvolle Literatur meisterst du mit Leichtigkeit!', equiv: 'Souveränität: Technik tritt in den Hintergrund, der pure musikalische Ausdruck übernimmt das Kommando.', color: '#14b8a6', bg: 'rgba(20, 184, 166, 0.12)', auto: true, category: 'schuljahr', rarity: 'epic', rarityLabel: 'Episch', multi: false },
-  { id: 'schuljahr-8', emoji: '🌌', title: 'Meister-Grad (8. Campus-Jahr)', desc: 'Dein 8. Campus-Schuljahr: Höchste Meisterschaft! Acht Jahre Begleitung bis zum vollen Ausbildungs-Abschluss.', equiv: 'Vollendeter Meisterzyklus: Ein Repertoire voller Glanzstücke und musikalische Reife auf Konzertniveau.', color: '#6366f1', bg: 'rgba(99, 102, 241, 0.12)', auto: true, category: 'schuljahr', rarity: 'epic', rarityLabel: 'Episch', multi: false },
-  { id: 'schuljahr-9', emoji: '🛡️', title: 'Harmonie-Wächter (9. Campus-Jahr)', desc: 'Dein 9. Campus-Schuljahr: Willkommen in der Hall of Fame! Neun Jahre Musikerseele – ein Vorbild für alle.', equiv: 'Ensemble-Leader: Dein tiefes Harmonieverständnis inspiriert Mitschüler, Ensembles und Bands.', color: '#3c0d93', bg: 'rgba(60, 13, 147, 0.15)', auto: true, category: 'schuljahr', rarity: 'epic', rarityLabel: 'Episch', multi: false },
-  { id: 'schuljahr-10', emoji: '👑', title: 'Dekaden-König (10. Campus-Jahr)', desc: 'Dein 10. Campus-Schuljahr: EIN VOLLES JAHRZEHNT MUSIKKULTUR! Eine monumentale Leistung vollendeter Meisterschaft.', equiv: 'Ewiger Meilenstein: Zehn Jahre Treue, Disziplin und Liebe zum Klang – absolute musikalische Spitzenklasse.', color: '#eab308', bg: 'rgba(234, 179, 8, 0.18)', auto: true, category: 'schuljahr', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
-  { id: 'schuljahr-11', emoji: '🏛️', title: 'Klang-Architekt (11. Campus-Jahr)', desc: 'Dein 11. Campus-Schuljahr: Elf Jahre Klangästhetik – du erschaffst und interpretierst musikalische Monumente.', equiv: 'Große Interpretation: Reife Werkgestaltung, die auch anspruchsvollste Konzertprogramme trägt.', color: '#0284c7', bg: 'rgba(2, 132, 199, 0.15)', auto: true, category: 'schuljahr', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
-  { id: 'schuljahr-12', emoji: '🎙️', title: 'Bühnen-Virtuose (12. Campus-Jahr)', desc: 'Dein 12. Campus-Schuljahr: Zwölf Jahre Brillanz – das Scheinwerferlicht und die Konzertbühne sind deine Heimat.', equiv: 'Konzertreife Ausstrahlung: Authentische Bühnenpräsenz und Charisma, die jedes Publikum mitreißen.', color: '#d946ef', bg: 'rgba(217, 70, 239, 0.15)', auto: true, category: 'schuljahr', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
-  { id: 'schuljahr-13', emoji: '🌋', title: 'Maestro-Mentor (13. Campus-Jahr)', desc: 'Dein 13. Campus-Schuljahr: Dreizehn Jahre Hingabe – dein Wissen und deine Musikalität inspirieren Generationen.', equiv: 'Mentor-Status: Du gibst Begeisterung weiter und bist eine tragende Säule der gesamten Musikschul-Gemeinschaft.', color: '#f97316', bg: 'rgba(249, 115, 22, 0.15)', auto: true, category: 'schuljahr', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
-  { id: 'schuljahr-14', emoji: '💫', title: 'Kosmischer Solist (14. Campus-Jahr)', desc: 'Dein 14. Campus-Schuljahr: Vierzehn Jahre Meisterschaft – Instrument und Musiker sind zu einer Einheit verschmolzen.', equiv: 'Intuitiver Fluss: Jede Note schwingt im perfekten Puls – meisterhafte Virtuosität ohne Anstrengung.', color: '#84cc16', bg: 'rgba(132, 204, 22, 0.15)', auto: true, category: 'schuljahr', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
-  { id: 'schuljahr-15', emoji: '🏆', title: 'Kaiser der Meisterschaft (15. Campus-Jahr)', desc: 'Dein 15. Campus-Schuljahr: 15 JAHRE AUSNAHMELEISTUNG! Die unübertroffene Höchstkrone deiner musikalischen Reise.', equiv: 'Unsterblicher Goldstandard: Fünfzehn Jahre gelebte Hingabe auf Campus-Groovelab – ein Meilenstein für die Ewigkeit!', color: '#e11d48', bg: 'rgba(225, 29, 72, 0.18)', auto: true, category: 'schuljahr', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
+  { id: 'schuljahr-1', emoji: '🎒', title: 'Campus-Pionier (1. Campus-Jahr)', desc: 'Instrumentenhaltung, Spieltechnik und die Freude am ersten eigenen Ton entdeckt.', equiv: 'Pioniergeist & Grundsteinlegung', color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.12)', auto: true, category: 'schuljahr', rarity: 'common', rarityLabel: 'Standard', multi: false },
+  { id: 'schuljahr-2', emoji: '🚀', title: 'Klang-Navigator (2. Campus-Jahr)', desc: 'Notenlesen gefestigt, rhythmisches Pulsgefühl entwickelt und erste Stücke gemeistert.', equiv: 'Routine & Taktgefühl', color: '#10b981', bg: 'rgba(16, 185, 129, 0.12)', auto: true, category: 'schuljahr', rarity: 'common', rarityLabel: 'Standard', multi: false },
+  { id: 'schuljahr-3', emoji: '🌟', title: 'Melodie-Gestalter (3. Campus-Jahr)', desc: 'Dynamik, Tonbildung und musikalische Phrasierung mit eigenem Ausdruck geformt.', equiv: 'Klangkultur & Phrasierung', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.12)', auto: true, category: 'schuljahr', rarity: 'common', rarityLabel: 'Standard', multi: false },
+  { id: 'schuljahr-4', emoji: '🎸', title: 'Groove-Kadett (4. Campus-Jahr)', desc: 'Stilsicherheit im Groove, flüssige Spieltechnik und präzises Timing im Metronom-Puls.', equiv: 'Rhythmik & Tempo-Präzision', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.12)', auto: true, category: 'schuljahr', rarity: 'rare', rarityLabel: 'Selten', multi: false },
+  { id: 'schuljahr-5', emoji: '⚡', title: 'Jubiläums-Alchemist (5. Campus-Jahr)', desc: 'Ein halbes Jahrzehnt Treue: Musik ist ein fester, selbstverständlicher Teil deines Lebens.', equiv: '5-Jahre-Jubiläums-Meilenstein', color: '#ec4899', bg: 'rgba(236, 72, 153, 0.12)', auto: true, category: 'schuljahr', rarity: 'rare', rarityLabel: 'Selten', multi: false },
+  { id: 'schuljahr-6', emoji: '🔮', title: 'Song-Architekt (6. Campus-Jahr)', desc: 'Harmonien, Songformen und Abläufe intuitiv erfasst und bühnenreif ausgearbeitet.', equiv: 'Repertoire & Abschluss Regelausbildung', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.12)', auto: true, category: 'schuljahr', rarity: 'rare', rarityLabel: 'Selten', multi: false },
+  { id: 'schuljahr-7', emoji: '🦅', title: 'Klang-Virtuose (7. Campus-Jahr)', desc: 'Schwere Passagen mühelos gemeistert – Technik tritt zurück, purer Ausdruck übernimmt.', equiv: 'Virtuosität & Konzertreife', color: '#14b8a6', bg: 'rgba(20, 184, 166, 0.12)', auto: true, category: 'schuljahr', rarity: 'epic', rarityLabel: 'Episch', multi: false },
+  { id: 'schuljahr-8', emoji: '🌌', title: 'Meister-Grad (8. Campus-Jahr)', desc: 'Umfangreiches Konzertrepertoire, stilistische Reife und meisterhafte Instrumentenbeherrschung.', equiv: 'Vollendeter Campus-Diplomzyklus', color: '#6366f1', bg: 'rgba(99, 102, 241, 0.12)', auto: true, category: 'schuljahr', rarity: 'epic', rarityLabel: 'Episch', multi: false },
+  { id: 'schuljahr-9', emoji: '🛡️', title: 'Harmonie-Wächter (9. Campus-Jahr)', desc: 'Gemeinschaftliches Musizieren, feinstes Gehör und musikalische Führung im Ensemble.', equiv: 'Hall of Fame & Ensemble-Leader', color: '#3c0d93', bg: 'rgba(60, 13, 147, 0.15)', auto: true, category: 'schuljahr', rarity: 'epic', rarityLabel: 'Episch', multi: false },
+  { id: 'schuljahr-10', emoji: '👑', title: 'Dekaden-König (10. Campus-Jahr)', desc: 'Ein volles Jahrzehnt Hingabe, Beständigkeit und tiefe Liebe zur Musikkultur.', equiv: 'Ewiger Dekaden-Meilenstein', color: '#eab308', bg: 'rgba(234, 179, 8, 0.18)', auto: true, category: 'schuljahr', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
+  { id: 'schuljahr-11', emoji: '🏛️', title: 'Klang-Architekt (11. Campus-Jahr)', desc: 'Reife Werkgestaltung, die auch anspruchsvollste Konzertprogramme souverän trägt.', equiv: 'Monumentale Klangästhetik', color: '#0284c7', bg: 'rgba(2, 132, 199, 0.15)', auto: true, category: 'schuljahr', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
+  { id: 'schuljahr-12', emoji: '🎙️', title: 'Bühnen-Virtuose (12. Campus-Jahr)', desc: 'Authentische Bühnenpräsenz und Charisma, die jedes Publikum im Konzertsaal mitreißen.', equiv: 'Bühnenreife Perfektion', color: '#d946ef', bg: 'rgba(217, 70, 239, 0.15)', auto: true, category: 'schuljahr', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
+  { id: 'schuljahr-13', emoji: '🌋', title: 'Maestro-Mentor (13. Campus-Jahr)', desc: 'Du gibst musikalische Begeisterung weiter und inspirierst jüngere Musikergenerationen.', equiv: 'Mentor & Gemeinschaftssäule', color: '#f97316', bg: 'rgba(249, 115, 22, 0.15)', auto: true, category: 'schuljahr', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
+  { id: 'schuljahr-14', emoji: '💫', title: 'Kosmischer Solist (14. Campus-Jahr)', desc: 'Jede Note schwingt im perfekten Puls – meisterhafte Virtuosität im intuitiven Fluss.', equiv: 'Vollendete Solistenklasse', color: '#84cc16', bg: 'rgba(132, 204, 22, 0.15)', auto: true, category: 'schuljahr', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
+  { id: 'schuljahr-15', emoji: '🏆', title: 'Kaiser der Meisterschaft (15. Campus-Jahr)', desc: 'Fünfzehn Jahre gelebte Hingabe auf Campus-Groovelab – ein Meilenstein für die Ewigkeit!', equiv: 'Unsterblicher Goldstandard', color: '#e11d48', bg: 'rgba(225, 29, 72, 0.18)', auto: true, category: 'schuljahr', rarity: 'legendary', rarityLabel: 'Legendär', multi: false },
 
   // Spezielle Auszeichnungen (Mehrfach vergebbar)
   { id: 'stage-star', emoji: '🎤', title: 'Bühnen-Star', desc: 'Erfolgreicher Live-Auftritt oder Vorspiel vor Publikum!', equiv: 'Bühnenpräsenz bewiesen: Lampenfieber überwunden und das Publikum mit Musik begeistert.', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.1)', auto: false, category: 'spezial', rarity: 'epic', rarityLabel: 'Episch', multi: true },
@@ -79,6 +79,9 @@ export interface StickerUnlockResult {
   progressText: string;
   count: number;
   details: { topic: string; date: string }[];
+  current?: number;
+  target?: number;
+  progressPercent?: number;
 }
 
 /**
@@ -197,8 +200,13 @@ export const getUnifiedStickerStatus = (
   let progressText = '';
   let autoDetailTopic = '';
 
+  let currentVal: number | undefined = undefined;
+  let targetVal: number | undefined = undefined;
+
   if (sticker.category === 'ueben') {
     const target = sticker.id === 'fleiss-pionier' ? 20 : sticker.id === 'uebe-meister' ? 100 : sticker.id === 'uebe-legende' ? 500 : 1500;
+    currentVal = practiceMinutes;
+    targetVal = target;
     isMilestoneUnlocked = practiceMinutes >= target;
     const remaining = Math.max(1, target - practiceMinutes);
     if (isMilestoneUnlocked) {
@@ -217,6 +225,8 @@ export const getUnifiedStickerStatus = (
     autoDetailTopic = `${target} Min. konzentriert geübt`;
   } else if (sticker.category === 'xp') {
     const target = sticker.id === 'xp-sammler' ? 100 : sticker.id === 'xp-champion' ? 500 : sticker.id === 'xp-meister' ? 1500 : 3500;
+    currentVal = xp;
+    targetVal = target;
     isMilestoneUnlocked = xp >= target;
     const remaining = Math.max(1, target - xp);
     if (isMilestoneUnlocked) {
@@ -235,6 +245,8 @@ export const getUnifiedStickerStatus = (
     autoDetailTopic = `${target} XP Meilenstein erreicht`;
   } else if (sticker.category === 'streaks') {
     const target = sticker.id === 'dranbleiber' ? 3 : sticker.id === 'wochen-held' ? 7 : sticker.id === 'streak-koenig' ? 21 : 30;
+    currentVal = streakDays;
+    targetVal = target;
     isMilestoneUnlocked = streakDays >= target;
     const remaining = Math.max(1, target - streakDays);
     if (isMilestoneUnlocked) {
@@ -249,6 +261,8 @@ export const getUnifiedStickerStatus = (
     autoDetailTopic = `${target} Tage ununterbrochene Streak`;
   } else if (sticker.category === 'songs') {
     const target = sticker.id === 'erster-erfolg' ? 1 : sticker.id === 'song-sammler' ? 3 : sticker.id === 'repertoire-riese' ? 5 : 10;
+    currentVal = effectiveMasteredSongsCount;
+    targetVal = target;
     isMilestoneUnlocked = effectiveMasteredSongsCount >= target;
     const remaining = Math.max(1, target - effectiveMasteredSongsCount);
     if (isMilestoneUnlocked) {
@@ -271,13 +285,12 @@ export const getUnifiedStickerStatus = (
       ? ctx.activeSchoolYearsCount 
       : calculateCampusSchoolYearNumber(regDateStr, ctx.selectedSchoolYear);
 
-    // 15-year cycle modulo logic:
-    // In year Y, student has unlocked all stickers in current cycle where targetYear <= currentCycleYear,
-    // or all 15 if they have already completed a 15-year cycle (completedCycles > 0)
     const currentCycleYear = ((activeYears - 1) % 15) + 1;
     const completedCycles = Math.floor((activeYears - 1) / 15);
 
     isMilestoneUnlocked = completedCycles > 0 || targetYear <= currentCycleYear;
+    currentVal = isMilestoneUnlocked ? 1 : 0;
+    targetVal = 1;
 
     if (isMilestoneUnlocked) {
       progressText = `Im ${targetYear}. Campus-Schuljahr erhalten 🎒`;
@@ -288,6 +301,8 @@ export const getUnifiedStickerStatus = (
   } else {
     // category === 'spezial'
     progressText = 'Von Lehrkraft vergeben 🏆';
+    targetVal = 1;
+    currentVal = explicitAwardCount > 0 ? explicitAwardCount : 0;
   }
 
   const isUnlocked = explicitAwardCount > 0 || isMilestoneUnlocked;
@@ -298,11 +313,18 @@ export const getUnifiedStickerStatus = (
     finalDetails.push({ topic: autoDetailTopic, date: 'Meilenstein erreicht' });
   }
 
+  const progressPercent = targetVal && targetVal > 0 
+    ? Math.min(100, Math.round(((currentVal || 0) / targetVal) * 100))
+    : (isUnlocked ? 100 : 0);
+
   return {
     isUnlocked,
     progressText: isUnlocked ? (progressText || 'Freigeschaltet') : progressText,
     count,
-    details: finalDetails
+    details: finalDetails,
+    current: currentVal,
+    target: targetVal,
+    progressPercent
   };
 };
 

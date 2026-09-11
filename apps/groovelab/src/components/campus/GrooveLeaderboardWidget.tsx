@@ -1,27 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Trophy, 
-  Medal, 
   Flame, 
   Sparkles, 
   Target, 
   Play, 
-  Star, 
-  Award, 
   Layers, 
   Activity, 
   CircleDot,
-  RotateCcw
+  Eye,
+  EyeOff,
+  Pencil,
+  Filter,
+  ShieldCheck,
+  Music,
+  Zap,
+  Shuffle,
+  Dices,
+  Sun,
+  School,
+  Guitar
 } from 'lucide-react';
+import { StudentNicknameSetupModal } from '../student/modals/StudentNicknameSetupModal';
+import { supabase } from '../../lib/supabase';
 
-export type RhythmLevel = 'viertel' | 'achtel' | 'synkopen' | 'shuffle';
+export type RhythmLevel = 'viertel' | 'rock_mix' | 'synkopen' | 'galopp' | 'latin_bossa' | 'funk_master' | 'shuffle' | 'random_groove';
 
 export interface LeaderboardEntry {
   id: string;
   rank: number;
   name: string;
   instrument: string;
-  avatarUrl?: string;
+  score?: number;
   accuracy: number;
   maxStreak: number;
   bpm: number;
@@ -35,6 +45,7 @@ interface GrooveLeaderboardWidgetProps {
   onPlayLevel?: (lvl: RhythmLevel) => void;
   latestScore?: {
     level: RhythmLevel;
+    score?: number;
     accuracy: number;
     streak: number;
     bpm: number;
@@ -42,42 +53,15 @@ interface GrooveLeaderboardWidgetProps {
   useNotebookLayout?: boolean;
 }
 
-const DEFAULT_SEEDS: Record<RhythmLevel, LeaderboardEntry[]> = {
-  viertel: [
-    { id: '1', rank: 1, name: 'Maya S.', instrument: 'Gitarre', accuracy: 99, maxStreak: 36, bpm: 85 },
-    { id: '2', rank: 2, name: 'Felix B.', instrument: 'Drums', accuracy: 97, maxStreak: 32, bpm: 90 },
-    { id: '3', rank: 3, name: 'Sophia K.', instrument: 'Klavier', accuracy: 95, maxStreak: 26, bpm: 80 },
-    { id: '4', rank: 4, name: 'Noah T.', instrument: 'E-Bass', accuracy: 92, maxStreak: 20, bpm: 80 },
-    { id: '5', rank: 5, name: 'Lukas W.', instrument: 'Saxophon', accuracy: 90, maxStreak: 18, bpm: 80 }
-  ],
-  achtel: [
-    { id: '1', rank: 1, name: 'Felix B.', instrument: 'Drums', accuracy: 98, maxStreak: 48, bpm: 95 },
-    { id: '2', rank: 2, name: 'Maya S.', instrument: 'Gitarre', accuracy: 96, maxStreak: 40, bpm: 90 },
-    { id: '3', rank: 3, name: 'Emilia R.', instrument: 'Querflöte', accuracy: 93, maxStreak: 30, bpm: 90 },
-    { id: '4', rank: 4, name: 'Jonas M.', instrument: 'Klavier', accuracy: 89, maxStreak: 22, bpm: 85 },
-    { id: '5', rank: 5, name: 'Leonie H.', instrument: 'Violine', accuracy: 87, maxStreak: 19, bpm: 90 }
-  ],
-  synkopen: [
-    { id: '1', rank: 1, name: 'Noah T.', instrument: 'E-Bass', accuracy: 96, maxStreak: 32, bpm: 95 },
-    { id: '2', rank: 2, name: 'Felix B.', instrument: 'Drums', accuracy: 94, maxStreak: 28, bpm: 95 },
-    { id: '3', rank: 3, name: 'Maya S.', instrument: 'Gitarre', accuracy: 91, maxStreak: 24, bpm: 95 },
-    { id: '4', rank: 4, name: 'David P.', instrument: 'Trompete', accuracy: 88, maxStreak: 18, bpm: 90 },
-    { id: '5', rank: 5, name: 'Sophia K.', instrument: 'Klavier', accuracy: 85, maxStreak: 15, bpm: 95 }
-  ],
-  shuffle: [
-    { id: '1', rank: 1, name: 'Felix B.', instrument: 'Drums', accuracy: 97, maxStreak: 42, bpm: 80 },
-    { id: '2', rank: 2, name: 'Noah T.', instrument: 'E-Bass', accuracy: 93, maxStreak: 36, bpm: 75 },
-    { id: '3', rank: 3, name: 'Maya S.', instrument: 'Gitarre', accuracy: 90, maxStreak: 28, bpm: 75 },
-    { id: '4', rank: 4, name: 'Lukas W.', instrument: 'Saxophon', accuracy: 86, maxStreak: 22, bpm: 75 },
-    { id: '5', rank: 5, name: 'Anna Z.', instrument: 'Gesang', accuracy: 84, maxStreak: 18, bpm: 70 }
-  ]
-};
-
 const LEVEL_TABS: { id: RhythmLevel; label: string; icon: any; color: string }[] = [
-  { id: 'viertel', label: 'Viertel', icon: CircleDot, color: '#f59e0b' },
-  { id: 'achtel', label: 'Achtel', icon: Layers, color: '#10b981' },
-  { id: 'synkopen', label: 'Off-Beat', icon: Activity, color: '#6366f1' },
-  { id: 'shuffle', label: 'Shuffle', icon: Flame, color: '#ec4899' }
+  { id: 'viertel', label: '1. Viertel', icon: CircleDot, color: '#f59e0b' },
+  { id: 'rock_mix', label: '2. Rock', icon: Music, color: '#10b981' },
+  { id: 'synkopen', label: '3. Off-Beat', icon: Activity, color: '#6366f1' },
+  { id: 'galopp', label: '4. Galopp', icon: Zap, color: '#ec4899' },
+  { id: 'latin_bossa', label: '5. Bossa', icon: Sun, color: '#0ea5e9' },
+  { id: 'funk_master', label: '6. Funk', icon: Sparkles, color: '#8b5cf6' },
+  { id: 'shuffle', label: '7. Blues', icon: Shuffle, color: '#b45309' },
+  { id: 'random_groove', label: '8. Mix', icon: Dices, color: '#d97706' }
 ];
 
 export const GrooveLeaderboardWidget: React.FC<GrooveLeaderboardWidgetProps> = ({
@@ -89,16 +73,120 @@ export const GrooveLeaderboardWidget: React.FC<GrooveLeaderboardWidgetProps> = (
   useNotebookLayout = false
 }) => {
   const schoolName = student?.school_name || student?.schools?.name || 'Musikschule';
-  const studentName = student?.first_name ? `${student.first_name}${student.last_name ? ` ${student.last_name[0]}.` : ''}` : 'Du';
-  const studentInstrument = student?.instrument || 'Schüler';
+  const studentInstrument = student?.instrument || 'Gitarre';
+
+  // 🏛️ Filter: 'school' (Gesamte Schule) vs. 'instrument' (Nur eigenes Instrument)
+  const [filterMode, setFilterMode] = useState<'school' | 'instrument'>('school');
+
+  // 🛡️ Privacy by Default: Standardmäßig Ghost-Modus (is_public = false)
+  const [isPublic, setIsPublic] = useState<boolean>(() => {
+    if (typeof localStorage !== 'undefined' && student?.id) {
+      const saved = localStorage.getItem(`cg_student_ranking_public_${student.id}`);
+      if (saved !== null) {
+        try { return JSON.parse(saved); } catch (_) {}
+      }
+    }
+    return false;
+  });
+
+  // Revisionssicherer Musiker-Nickname
+  const [studentNickname, setStudentNickname] = useState<string>(() => {
+    if (student?.nickname && typeof student.nickname === 'string') return student.nickname;
+    if (typeof localStorage !== 'undefined' && student?.id) {
+      const saved = localStorage.getItem(`cg_student_ranking_nickname_${student.id}`);
+      if (saved) return saved;
+    }
+    return '';
+  });
+
+  const [isNicknameModalOpen, setIsNicknameModalOpen] = useState(false);
+  const [dbEntries, setDbEntries] = useState<LeaderboardEntry[]>([]);
+  const [isLoadingScores, setIsLoadingScores] = useState<boolean>(false);
+  const [teacherNames, setTeacherNames] = useState<string[]>([]);
+
+  // Load backend profile & school teacher names if available
+  useEffect(() => {
+    if (!student?.id) return;
+    const fetchProfile = async () => {
+      try {
+        const { data, error } = await supabase.rpc('get_student_ranking_profile', {
+          p_user_id: student.id
+        });
+        if (data && !error) {
+          if (data.nickname) {
+            setStudentNickname(data.nickname);
+            localStorage.setItem(`cg_student_ranking_nickname_${student.id}`, data.nickname);
+          }
+          if (typeof data.is_public === 'boolean') {
+            setIsPublic(data.is_public);
+            localStorage.setItem(`cg_student_ranking_public_${student.id}`, JSON.stringify(data.is_public));
+          }
+        }
+      } catch (e) {
+        // Silent fallback to local storage
+      }
+    };
+    fetchProfile();
+
+    // 🛡️ Lade Lehrkräfte & Verwaltungsmitarbeiter der Schule für den Jugendschutzfilter
+    if (student?.school_id) {
+      (async () => {
+        try {
+          const { data } = await supabase
+            .from('users')
+            .select('last_name, first_name')
+            .eq('school_id', student.school_id)
+            .in('role', ['teacher', 'admin', 'secretary']);
+          if (Array.isArray(data)) {
+            const names = data
+              .flatMap(u => [u.last_name, u.first_name])
+              .filter((n): n is string => Boolean(n && n.trim().length >= 3));
+            setTeacherNames(Array.from(new Set(names)));
+          }
+        } catch (_) {}
+      })();
+    }
+  }, [student?.id, student?.school_id]);
+
+  // 🎯 Zero Dummy Architecture: Lade echte Ranglisten-Einträge aus Supabase
+  const loadLeaderboardData = async () => {
+    setIsLoadingScores(true);
+    try {
+      const instrumentParam = filterMode === 'instrument' ? studentInstrument : null;
+      const { data, error } = await supabase.rpc('get_school_groove_leaderboard', {
+        p_level: selectedLevel,
+        p_instrument: instrumentParam,
+        p_school_id: student?.school_id || null
+      });
+
+      if (!error && Array.isArray(data)) {
+        setDbEntries(data);
+      } else {
+        setDbEntries([]);
+      }
+    } catch (err) {
+      console.warn('[GrooveLeaderboard] Error loading live scores:', err);
+      setDbEntries([]);
+    } finally {
+      setIsLoadingScores(false);
+    }
+  };
+
+  useEffect(() => {
+    loadLeaderboardData();
+  }, [filterMode, selectedLevel, student?.school_id, studentInstrument]);
 
   // Load and merge student personal highscore per level
-  const [personalScores, setPersonalScores] = useState<Record<RhythmLevel, { accuracy: number; streak: number; bpm: number }>>(() => {
-    const initial: Record<RhythmLevel, { accuracy: number; streak: number; bpm: number }> = {
-      viertel: { accuracy: 88, streak: 16, bpm: 80 },
-      achtel: { accuracy: 84, streak: 14, bpm: 90 },
-      synkopen: { accuracy: 78, streak: 10, bpm: 95 },
-      shuffle: { accuracy: 72, streak: 8, bpm: 75 }
+  const [personalScores, setPersonalScores] = useState<Record<RhythmLevel, { accuracy: number; streak: number; bpm: number; score?: number }>>(() => {
+    const initial: Record<RhythmLevel, { accuracy: number; streak: number; bpm: number; score?: number }> = {
+      viertel: { accuracy: 0, streak: 0, bpm: 80, score: 0 },
+      rock_mix: { accuracy: 0, streak: 0, bpm: 85, score: 0 },
+      synkopen: { accuracy: 0, streak: 0, bpm: 90, score: 0 },
+      galopp: { accuracy: 0, streak: 0, bpm: 85, score: 0 },
+      latin_bossa: { accuracy: 0, streak: 0, bpm: 90, score: 0 },
+      funk_master: { accuracy: 0, streak: 0, bpm: 95, score: 0 },
+      shuffle: { accuracy: 0, streak: 0, bpm: 75, score: 0 },
+      random_groove: { accuracy: 0, streak: 0, bpm: 85, score: 0 }
     };
 
     if (typeof localStorage !== 'undefined' && student?.id) {
@@ -107,7 +195,7 @@ export const GrooveLeaderboardWidget: React.FC<GrooveLeaderboardWidgetProps> = (
         if (saved) {
           try {
             const parsed = JSON.parse(saved);
-            if (parsed.accuracy) initial[t.id] = parsed;
+            if (parsed && typeof parsed.accuracy === 'number') initial[t.id] = parsed;
           } catch (_) {}
         }
       });
@@ -115,34 +203,82 @@ export const GrooveLeaderboardWidget: React.FC<GrooveLeaderboardWidgetProps> = (
     return initial;
   });
 
-  // Check if latest score is a new PR
+  // Check if latest score is a new PR & trigger reload
   useEffect(() => {
     if (!latestScore || !student?.id) return;
-    const { level, accuracy, streak, bpm } = latestScore;
+    const { level, accuracy, streak, bpm, score } = latestScore;
     const current = personalScores[level];
 
-    if (!current || accuracy > current.accuracy || (accuracy === current.accuracy && streak > current.streak)) {
-      const updated = { accuracy, streak, bpm };
+    const currentScore = current?.score || current?.accuracy || 0;
+    const newScore = score || accuracy;
+
+    if (!current || newScore > currentScore || (newScore === currentScore && accuracy > current.accuracy)) {
+      const updated = { accuracy, streak, bpm, score: newScore };
       setPersonalScores(prev => ({ ...prev, [level]: updated }));
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(`cg_rhythm_pr_${student.id}_${level}`, JSON.stringify(updated));
       }
+      setTimeout(() => loadLeaderboardData(), 300);
     }
-  }, [latestScore, personalScores, student?.id]);
+  }, [latestScore, student?.id]);
 
   const currentLevelPr = personalScores[selectedLevel];
-  const entries = DEFAULT_SEEDS[selectedLevel] || DEFAULT_SEEDS.viertel;
+
+  // Echte Einträge aus der Datenbank
+  const entries: LeaderboardEntry[] = dbEntries;
 
   // Compute student position
-  let myRank = 6;
-  if (currentLevelPr) {
-    if (currentLevelPr.accuracy >= entries[0].accuracy) myRank = 1;
-    else if (currentLevelPr.accuracy >= entries[1].accuracy) myRank = 2;
-    else if (currentLevelPr.accuracy >= entries[2].accuracy) myRank = 3;
-    else if (currentLevelPr.accuracy >= entries[3].accuracy) myRank = 4;
-    else if (currentLevelPr.accuracy >= entries[4].accuracy) myRank = 5;
-    else myRank = 6;
+  let myRank: number | null = null;
+  const userEntryIndex = entries.findIndex(e => e.isCurrentUser);
+  if (userEntryIndex !== -1) {
+    myRank = userEntryIndex + 1;
   }
+
+  // Umschalten Ghost-Modus <-> Öffentliche Teilnahme
+  const handleTogglePublic = async () => {
+    if (!isPublic) {
+      // Möchte öffentlich teilnehmen: Falls noch kein Nickname gewählt -> Modal öffnen
+      if (!studentNickname) {
+        setIsNicknameModalOpen(true);
+        return;
+      }
+      setIsPublic(true);
+      if (typeof localStorage !== 'undefined' && student?.id) {
+        localStorage.setItem(`cg_student_ranking_public_${student.id}`, 'true');
+      }
+      try {
+        await supabase.rpc('set_student_ranking_nickname', {
+          p_nickname: studentNickname,
+          p_is_public: true
+        });
+      } catch (e) {
+        console.warn('Backend update note:', e);
+      }
+    } else {
+      // Zurück in den Ghost-Modus (Privat)
+      setIsPublic(false);
+      if (typeof localStorage !== 'undefined' && student?.id) {
+        localStorage.setItem(`cg_student_ranking_public_${student.id}`, 'false');
+      }
+      try {
+        await supabase.rpc('set_student_ranking_nickname', {
+          p_nickname: studentNickname || 'GhostMusician',
+          p_is_public: false
+        });
+      } catch (e) {
+        console.warn('Backend update note:', e);
+      }
+    }
+  };
+
+  const handleSaveNicknameSuccess = (savedNickname: string, isPub: boolean) => {
+    setStudentNickname(savedNickname);
+    setIsPublic(isPub);
+    if (typeof localStorage !== 'undefined' && student?.id) {
+      localStorage.setItem(`cg_student_ranking_nickname_${student.id}`, savedNickname);
+      localStorage.setItem(`cg_student_ranking_public_${student.id}`, JSON.stringify(isPub));
+    }
+  };
 
   return (
     <div style={{
@@ -217,7 +353,7 @@ export const GrooveLeaderboardWidget: React.FC<GrooveLeaderboardWidgetProps> = (
           </div>
         </div>
 
-        {/* 2. Kategorie Tabs: 4 Rhythmen */}
+        {/* 2. Kategorie Tabs: 8 Didaktische Rhythmus-Welten (4x2 Raster) */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(4, 1fr)',
@@ -240,8 +376,8 @@ export const GrooveLeaderboardWidget: React.FC<GrooveLeaderboardWidgetProps> = (
                   background: isSel ? '#ffffff' : 'transparent',
                   color: isSel ? '#0f172a' : '#64748b',
                   borderRadius: '10px',
-                  padding: '6px 4px',
-                  fontSize: '0.72rem',
+                  padding: '6px 2px',
+                  fontSize: '0.70rem',
                   fontWeight: isSel ? 950 : 750,
                   cursor: 'pointer',
                   boxShadow: isSel ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
@@ -254,14 +390,77 @@ export const GrooveLeaderboardWidget: React.FC<GrooveLeaderboardWidgetProps> = (
                 className="hover-scale-mini"
               >
                 <TabIcon size={14} color={isSel ? tab.color : '#94a3b8'} strokeWidth={2.4} />
-                <span>{tab.label}</span>
+                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+                  {tab.label}
+                </span>
               </button>
             );
           })}
         </div>
+
+        {/* 2b. 🏛️ Segmented Toggle: Gesamte Musikschule vs. Mein Instrument */}
+        <div style={{
+          display: 'flex',
+          background: '#f1f5f9',
+          borderRadius: '12px',
+          padding: '3px',
+          gap: '3px'
+        }}>
+          <button
+            type="button"
+            onClick={() => setFilterMode('school')}
+            style={{
+              flex: 1,
+              border: 'none',
+              borderRadius: '9px',
+              padding: '6px 8px',
+              fontSize: '0.74rem',
+              fontWeight: filterMode === 'school' ? 950 : 750,
+              background: filterMode === 'school' ? '#ffffff' : 'transparent',
+              color: filterMode === 'school' ? '#0f172a' : '#64748b',
+              boxShadow: filterMode === 'school' ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              transition: 'all 0.12s ease'
+            }}
+          >
+            <School size={14} color={filterMode === 'school' ? '#d97706' : '#64748b'} strokeWidth={2.4} />
+            <span>Gesamte Schule</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setFilterMode('instrument')}
+            style={{
+              flex: 1,
+              border: 'none',
+              borderRadius: '9px',
+              padding: '6px 8px',
+              fontSize: '0.74rem',
+              fontWeight: filterMode === 'instrument' ? 950 : 750,
+              background: filterMode === 'instrument' ? '#ffffff' : 'transparent',
+              color: filterMode === 'instrument' ? '#0f172a' : '#64748b',
+              boxShadow: filterMode === 'instrument' ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              transition: 'all 0.12s ease'
+            }}
+          >
+            <Guitar size={14} color={filterMode === 'instrument' ? '#16a34a' : '#64748b'} strokeWidth={2.4} />
+            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              Mein Instrument ({studentInstrument})
+            </span>
+          </button>
+        </div>
       </div>
 
-      {/* 3. Rangliste: Die Top 5 Schüler */}
+      {/* 3. Rangliste: Zero-Dummy Architecture (Echte User + motivierende freie Plätze) */}
       <div style={{
         display: 'flex',
         flexDirection: 'column',
@@ -269,31 +468,129 @@ export const GrooveLeaderboardWidget: React.FC<GrooveLeaderboardWidgetProps> = (
         flex: 1,
         justifyContent: 'flex-start'
       }}>
-        {entries.map((entry) => {
-          const isGold = entry.rank === 1;
-          const isSilver = entry.rank === 2;
-          const isBronze = entry.rank === 3;
+        {/* Top 5 Slots rendering: echte Einträge + unbesetzte Plätze */}
+        {[1, 2, 3, 4, 5].map((slotRank) => {
+          const entry = entries.find(e => e.rank === slotRank);
+          const isGold = slotRank === 1;
+          const isSilver = slotRank === 2;
+          const isBronze = slotRank === 3;
 
+          if (entry) {
+            return (
+              <div
+                key={entry.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '8px 12px',
+                  borderRadius: '14px',
+                  background: isGold 
+                    ? 'linear-gradient(90deg, #fffbeb 0%, #fef3c7 100%)' 
+                    : (isSilver ? '#f8fafc' : (isBronze ? '#fff7ed' : '#ffffff')),
+                  border: isGold 
+                    ? '1.5px solid #fde68a' 
+                    : (isSilver ? '1px solid #e2e8f0' : (isBronze ? '1px solid #ffedd5' : '1px solid #f1f5f9')),
+                  boxShadow: isGold ? '0 2px 8px rgba(245, 158, 11, 0.12)' : 'none',
+                  transition: 'all 0.10s ease'
+                }}
+              >
+                {/* Rank & Musiker-Nickname */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{
+                    width: '26px',
+                    height: '26px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.80rem',
+                    fontWeight: 950,
+                    background: isGold ? '#f59e0b' : (isSilver ? '#94a3b8' : (isBronze ? '#d97706' : '#f1f5f9')),
+                    color: isGold || isSilver || isBronze ? '#ffffff' : '#64748b'
+                  }}>
+                    {entry.rank}
+                  </span>
+
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#0f172a' }}>
+                        {entry.name}
+                      </span>
+                      {entry.isCurrentUser && (
+                        <span style={{
+                          background: '#dcfce7',
+                          color: '#15803d',
+                          fontSize: '0.62rem',
+                          fontWeight: 900,
+                          padding: '1px 5px',
+                          borderRadius: '6px'
+                        }}>
+                          Du
+                        </span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b' }}>
+                      {entry.instrument} • {entry.bpm} BPM
+                    </span>
+                  </div>
+                </div>
+
+                {/* Score, Accuracy & Streak */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '3px',
+                    fontSize: '0.70rem',
+                    fontWeight: 850,
+                    color: '#b45309',
+                    background: '#fef3c7',
+                    padding: '2px 7px',
+                    borderRadius: '6px'
+                  }} title="Beste Streak">
+                    <Flame size={11} color="#d97706" />
+                    <span>{entry.maxStreak}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                    <span style={{
+                      fontSize: '0.92rem',
+                      fontWeight: 950,
+                      color: '#15803d',
+                      minWidth: '50px',
+                      textAlign: 'right',
+                      lineHeight: 1.1
+                    }}>
+                      {entry.score ? `${entry.score} Pkt` : `${entry.accuracy}%`}
+                    </span>
+                    <span style={{
+                      fontSize: '0.66rem',
+                      fontWeight: 750,
+                      color: '#64748b'
+                    }}>
+                      {entry.accuracy}% • {entry.bpm} BPM
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          // Unbesetzter Platz (Zero Dummy Architecture)
           return (
             <div
-              key={entry.id}
+              key={`empty-${slotRank}`}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 padding: '8px 12px',
                 borderRadius: '14px',
-                background: isGold 
-                  ? 'linear-gradient(90deg, #fffbeb 0%, #fef3c7 100%)' 
-                  : (isSilver ? '#f8fafc' : (isBronze ? '#fff7ed' : '#ffffff')),
-                border: isGold 
-                  ? '1.5px solid #fde68a' 
-                  : (isSilver ? '1px solid #e2e8f0' : (isBronze ? '1px solid #ffedd5' : '1px solid #f1f5f9')),
-                boxShadow: isGold ? '0 2px 8px rgba(245, 158, 11, 0.12)' : 'none',
-                transition: 'all 0.10s ease'
+                background: '#fafafa',
+                border: '1px dashed #e2e8f0'
               }}
             >
-              {/* Rank & Name */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span style={{
                   width: '26px',
@@ -303,129 +600,225 @@ export const GrooveLeaderboardWidget: React.FC<GrooveLeaderboardWidgetProps> = (
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: '0.80rem',
-                  fontWeight: 950,
-                  background: isGold ? '#f59e0b' : (isSilver ? '#94a3b8' : (isBronze ? '#d97706' : '#f1f5f9')),
-                  color: isGold || isSilver || isBronze ? '#ffffff' : '#64748b'
+                  fontWeight: 900,
+                  background: '#f1f5f9',
+                  color: '#94a3b8'
                 }}>
-                  {entry.rank}
+                  {slotRank}
                 </span>
 
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#0f172a' }}>
-                    {entry.name}
-                  </span>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b' }}>
-                    {entry.instrument} • {entry.bpm} BPM
-                  </span>
-                </div>
-              </div>
-
-              {/* Accuracy & Streak */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '3px',
-                  fontSize: '0.70rem',
-                  fontWeight: 850,
-                  color: '#b45309',
-                  background: '#fef3c7',
-                  padding: '2px 7px',
-                  borderRadius: '6px'
-                }}>
-                  <Flame size={11} color="#d97706" />
-                  <span>{entry.maxStreak}</span>
-                </div>
-
-                <span style={{
-                  fontSize: '0.90rem',
-                  fontWeight: 950,
-                  color: '#15803d',
-                  minWidth: '46px',
-                  textAlign: 'right'
-                }}>
-                  {entry.accuracy}%
+                <span style={{ fontSize: '0.78rem', fontWeight: 750, color: '#94a3b8', fontStyle: 'italic' }}>
+                  Noch unbesetzt • Hol dir Platz {slotRank}!
                 </span>
               </div>
+
+              {onPlayLevel && (
+                <button
+                  type="button"
+                  onClick={() => onPlayLevel(selectedLevel)}
+                  style={{
+                    border: 'none',
+                    background: '#fef3c7',
+                    color: '#b45309',
+                    fontSize: '0.70rem',
+                    fontWeight: 900,
+                    padding: '3px 8px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  className="hover-scale-mini"
+                >
+                  <Play size={10} fill="#b45309" />
+                  <span>Jetzt spielen</span>
+                </button>
+              )}
             </div>
           );
         })}
       </div>
 
-      {/* 4. Deine Bestleistung (Sticky My-Record Box) */}
+      {/* 4. Deine Bestleistung (Sticky My-Record Box) mit Ghost-Mode & Nickname-Steuerung */}
       <div style={{
-        background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-        border: '1.5px solid #86efac',
+        background: isPublic 
+          ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' 
+          : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+        border: isPublic ? '1.5px solid #86efac' : '1.5px solid #cbd5e1',
         borderRadius: '18px',
         padding: '12px 14px',
         display: 'flex',
         flexDirection: 'column',
         gap: '8px',
-        boxShadow: '0 4px 14px rgba(22, 101, 52, 0.08)'
+        boxShadow: isPublic 
+          ? '0 4px 14px rgba(22, 101, 52, 0.08)' 
+          : '0 4px 12px rgba(0, 0, 0, 0.04)'
       }}>
+        {/* Status Zeile */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Target size={15} color="#15803d" strokeWidth={2.6} />
-            <span style={{ fontSize: '0.76rem', fontWeight: 950, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+            <Target size={15} color={isPublic ? '#15803d' : '#475569'} strokeWidth={2.6} />
+            <span style={{ 
+              fontSize: '0.76rem', 
+              fontWeight: 950, 
+              color: isPublic ? '#166534' : '#334155', 
+              textTransform: 'uppercase', 
+              letterSpacing: '0.02em' 
+            }}>
               Deine Bestleistung
             </span>
           </div>
-          <span style={{
-            background: '#ffffff',
-            border: '1px solid #bbf7d0',
-            color: '#15803d',
-            fontSize: '0.70rem',
-            fontWeight: 900,
-            padding: '2px 8px',
-            borderRadius: '100px'
-          }}>
-            Platz {myRank} in der Schule
-          </span>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {/* Ghost-Mode / Public Badge */}
+            <span style={{
+              background: isPublic ? '#ffffff' : '#e2e8f0',
+              border: isPublic ? '1px solid #bbf7d0' : '1px solid #cbd5e1',
+              color: isPublic ? '#15803d' : '#475569',
+              fontSize: '0.68rem',
+              fontWeight: 900,
+              padding: '2px 8px',
+              borderRadius: '100px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              {isPublic ? (
+                <>
+                  <Eye size={10} color="#15803d" />
+                  <span>{myRank !== null ? `Platz ${myRank} (${filterMode === 'school' ? 'Schule' : studentInstrument})` : 'Noch nicht in den Top 10'}</span>
+                </>
+              ) : (
+                <>
+                  <ShieldCheck size={10} color="#64748b" />
+                  <span>Privat (Ghost-Modus)</span>
+                </>
+              )}
+            </span>
+          </div>
         </div>
 
+        {/* Nickname & Score Details */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '0.86rem', fontWeight: 950, color: '#0f172a' }}>
-              {studentName} ({studentInstrument})
-            </span>
-            <span style={{ fontSize: '0.70rem', color: '#166534', fontWeight: 750 }}>
-              Streak: {currentLevelPr?.streak || 0} • {currentLevelPr?.bpm || 85} BPM
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '0.88rem', fontWeight: 950, color: '#0f172a' }}>
+                {isPublic && studentNickname ? studentNickname : 'Dein Profil (Privat)'}
+              </span>
+              {studentNickname && (
+                <button
+                  type="button"
+                  onClick={() => setIsNicknameModalOpen(true)}
+                  title="Musiker-Nickname ändern"
+                  aria-label="Musiker-Nickname ändern"
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '2px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    color: '#64748b'
+                  }}
+                >
+                  <Pencil size={12} />
+                </button>
+              )}
+            </div>
+            <span style={{ fontSize: '0.70rem', color: isPublic ? '#166534' : '#64748b', fontWeight: 750 }}>
+              Streak: {currentLevelPr?.streak || 0} • {currentLevelPr?.bpm || 85} BPM ({studentInstrument})
             </span>
           </div>
 
-          <span style={{ fontSize: '1.18rem', fontWeight: 950, color: '#15803d' }}>
-            {currentLevelPr?.accuracy || 0}%
-          </span>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+            <span style={{ fontSize: '1.24rem', fontWeight: 950, color: isPublic ? '#15803d' : '#334155', lineHeight: 1.1 }}>
+              {currentLevelPr?.score ? `${currentLevelPr.score} Pkt` : `${currentLevelPr?.accuracy || 0}%`}
+            </span>
+            {Boolean(currentLevelPr?.score) && (
+              <span style={{ fontSize: '0.66rem', fontWeight: 750, color: isPublic ? '#166534' : '#64748b' }}>
+                {currentLevelPr?.accuracy}% Treffer
+              </span>
+            )}
+          </div>
         </div>
 
-        {onPlayLevel && (
+        {/* 1-Klick Privacy / Leaderboard Toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
           <button
             type="button"
-            onClick={() => onPlayLevel(selectedLevel)}
+            onClick={handleTogglePublic}
             style={{
-              width: '100%',
-              background: '#15803d',
-              border: 'none',
+              flex: 1,
+              background: isPublic ? '#f1f5f9' : '#0284c7',
+              border: isPublic ? '1px solid #cbd5e1' : 'none',
               borderRadius: '10px',
-              padding: '8px 12px',
-              color: '#ffffff',
-              fontSize: '0.78rem',
-              fontWeight: 900,
+              padding: '6px 10px',
+              color: isPublic ? '#475569' : '#ffffff',
+              fontSize: '0.72rem',
+              fontWeight: 850,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px',
-              boxShadow: '0 2px 6px rgba(21, 128, 61, 0.25)',
-              marginTop: '2px'
+              gap: '5px',
+              transition: 'all 0.12s ease'
             }}
-            className="hover-scale-mini"
           >
-            <Play size={13} fill="#ffffff" color="#ffffff" />
-            <span>Eigenen Rekord angreifen</span>
+            {isPublic ? (
+              <>
+                <EyeOff size={12} />
+                <span>Auf Privat schalten (Ghost-Modus)</span>
+              </>
+            ) : (
+              <>
+                <Eye size={12} color="#ffffff" />
+                <span>In Hall of Groove eintragen</span>
+              </>
+            )}
           </button>
-        )}
+
+          {onPlayLevel && (
+            <button
+              type="button"
+              onClick={() => onPlayLevel(selectedLevel)}
+              style={{
+                flex: 1,
+                background: '#15803d',
+                border: 'none',
+                borderRadius: '10px',
+                padding: '6px 10px',
+                color: '#ffffff',
+                fontSize: '0.72rem',
+                fontWeight: 900,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '5px',
+                boxShadow: '0 2px 6px rgba(21, 128, 61, 0.20)'
+              }}
+              className="hover-scale-mini"
+            >
+              <Play size={12} fill="#ffffff" color="#ffffff" />
+              <span>Rekord angreifen</span>
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* 5. Nickname Setup Modal */}
+      <StudentNicknameSetupModal
+        isOpen={isNicknameModalOpen}
+        onClose={() => setIsNicknameModalOpen(false)}
+        currentNickname={studentNickname}
+        isPublic={true}
+        studentFirstName={student?.first_name}
+        studentLastName={student?.last_name}
+        studentId={student?.id}
+        teacherNames={teacherNames}
+        onSaveSuccess={handleSaveNicknameSuccess}
+      />
     </div>
   );
 };

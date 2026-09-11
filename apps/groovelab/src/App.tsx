@@ -2961,36 +2961,79 @@ function App() {
 
   useEffect(() => {
     if (loggedInUserId) {
-      // 1. Dashboard Data Fetch (Interval - Skipped for Master Admin to avoid re-render cascades)
+      // 1. Dashboard Data Fetch (Synthese-Goldstandard: Sync-on-Focus + 3m Fallback-Intervall)
       const isMasterAdmin = Boolean(
         user?.is_master_admin === true || 
         sessionStorage.getItem('groovelab_is_master_admin') === 'true'
       );
-      const dashboardInterval = isMasterAdmin ? null : setInterval(() => {
-        fetchDashboardData(loggedInUserId);
-      }, 45000);
 
-      // 2. Continuous Heartbeat Monitor (Students, Admins, Secretaries - Teachers excluded under TVöD § 26 BDSG)
-      const heartbeatInterval = setInterval(async () => {
+      // A. Sync-on-Focus: Frischer Datenabgleich nur beim Aufwecken / Tab-Fokus (Stale-While-Revalidate)
+      let lastFocusFetch = Date.now();
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+          const now = Date.now();
+          if (now - lastFocusFetch > 15000) {
+            lastFocusFetch = now;
+            fetchDashboardData(loggedInUserId, false);
+          }
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+
+      // B. Intelligenter Fallback-Poller: Läuft nur alle 3 Minuten (180.000 ms) statt 45s
+      const dashboardInterval = isMasterAdmin ? null : setInterval(() => {
+        fetchDashboardData(loggedInUserId, false);
+      }, 180000);
+
+      // 2. Continuous Session Lease & Presence Monitor (5-Minuten-Lease auf sessions statt 30s-Users-Update)
+      const sessionLeaseInterval = setInterval(async () => {
         if (!user) return;
         // 🛡️ TVöD § 26 BDSG / LPVG: Teachers are strictly excluded from periodic surveillance telemetry
         if (user.role === 'teacher') return;
-        // For students, require an active session without checkout
-        if (user.role === 'student' && (!session || session.check_out_time)) return;
 
-        // Update user's last_seen in DB to keep presence active on dashboard and school activity telemetry
-        const now = new Date().toISOString();
-        try {
-          await supabase.from('users').update({ last_seen: now }).eq('id', user.id);
-        } catch (e) {}
-      }, 30000); // Every 30 seconds
+        // A. Für aktive Kiosk-Sessions: 5-Minuten Session-Lease zur Logbuch-Absicherung
+        if (session?.id && !session.check_out_time) {
+          try {
+            await supabase.rpc('report_session_lease', { p_session_id: session.id });
+          } catch (e) {}
+        }
+
+        // B. Flüchtige Anwesenheit in user_presence (Audit-frei & ohne Merkle-Chain)
+        const schoolId = user.school_id || (Array.isArray(user.schools) ? user.schools[0]?.id : user.schools?.id);
+        if (schoolId) {
+          try {
+            await supabase.rpc('update_user_presence', {
+              p_school_id: schoolId,
+              p_station_id: session?.station_id || null
+            });
+          } catch (e) {}
+        }
+      }, 300000); // 5 Minuten Intervall (300.000 ms)
+
+      // C. sendBeacon beim Schließen des Fensters / Tabs (Graceful Session Exit)
+      const handleBeforeUnload = () => {
+        if (session?.id && !session.check_out_time && isKioskMode) {
+          const payload = JSON.stringify({ p_session_id: session.id });
+          const url = `${(supabase as any).supabaseUrl}/rest/v1/rpc/close_kiosk_session`;
+          const headers = {
+            type: 'application/json',
+          };
+          const blob = new Blob([payload], headers);
+          if (navigator.sendBeacon) {
+            navigator.sendBeacon(url, blob);
+          }
+        }
+      };
+      window.addEventListener('beforeunload', handleBeforeUnload);
 
       return () => {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        window.removeEventListener('beforeunload', handleBeforeUnload);
         if (dashboardInterval) clearInterval(dashboardInterval);
-        clearInterval(heartbeatInterval);
+        clearInterval(sessionLeaseInterval);
       };
     }
-  }, [loggedInUserId, user, session]);
+  }, [loggedInUserId, user, session, isKioskMode]);
 
   // Realtime Session Monitor (Single Login Rule - Students only)
   useEffect(() => {
@@ -3506,7 +3549,7 @@ function App() {
 
       // Stage 1 student heavy: Fetch sessions history and band memberships for students
       const [allSessionsRes, membershipsRes] = await Promise.all([
-        supabase.from('sessions').select('check_in_time, check_out_time').eq('user_id', userId),
+        supabase.from('sessions').select('check_in_time, check_out_time, last_active_at').eq('user_id', userId),
         supabase.from('band_members').select('id, instrument, confetti_seen, bands(id, name, school_id, song_id, status, photo_url, songs(*), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url)))))').eq('user_id', userId)
       ]).catch(err => {
         console.error('[Dashboard] Critical Fetch Error Student Stage 1 Heavy:', err);
@@ -3608,7 +3651,11 @@ function App() {
       if (allSessionsRes.data) {
         const totalMins = allSessionsRes.data.reduce((acc: number, s: any) => {
           const start = new Date(s.check_in_time);
-          const end = s.check_out_time ? new Date(s.check_out_time) : new Date();
+          const end = s.check_out_time 
+            ? new Date(s.check_out_time) 
+            : s.last_active_at 
+              ? new Date(Math.min(Date.now(), new Date(s.last_active_at).getTime() + 5 * 60000))
+              : new Date(Math.min(Date.now(), start.getTime() + 60 * 60000));
           return acc + Math.max(0, Math.floor((end.getTime() - start.getTime()) / 60000));
         }, 0);
         setTotalPresenceMins(totalMins);
@@ -4327,7 +4374,11 @@ function App() {
           .filter((s: any) => new Date(s.check_in_time).toDateString() === d.toDateString())
           .reduce((acc: number, s: any) => {
             const start = new Date(s.check_in_time);
-            const end = s.check_out_time ? new Date(s.check_out_time) : new Date();
+            const end = s.check_out_time 
+              ? new Date(s.check_out_time) 
+              : s.last_active_at 
+                ? new Date(Math.min(Date.now(), new Date(s.last_active_at).getTime() + 5 * 60000))
+                : new Date(Math.min(Date.now(), start.getTime() + 60 * 60000));
             return acc + Math.floor((end.getTime() - start.getTime()) / 60000);
           }, 0);
         last7.push({ day: dayStr, mins });

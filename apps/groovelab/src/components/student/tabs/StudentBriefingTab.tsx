@@ -1299,6 +1299,10 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       }
                     });
 
+                    let isBooksCarriedOver = false;
+                    let isSongsCarriedOver = false;
+                    let carriedOverWeekLabel = '';
+
                     // 2b. 📦 Snapshot Hydration: Falls activeJuniorBooks oder activeJuniorSongs leer sind, aus jüngstem SNAPSHOT hydrieren
                     if (activeJuniorBooks.length === 0 || activeJuniorSongs.length === 0) {
                       const allSnapshotCandidates = (progressItems || []).filter((item: any) => item.topic_name?.startsWith('Hausaufgabe KW '));
@@ -1336,6 +1340,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                       formattedPages: pages.length === 1 ? `S. ${pages[0]}` : `S. ${pages[0]}–${pages[pages.length - 1]}`,
                                       notes: Array.isArray(lw.notes) ? lw.notes : []
                                     });
+                                    isBooksCarriedOver = true;
                                   }
                                 });
                               }
@@ -1359,6 +1364,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                       ...song,
                                       topic_name: tName
                                     });
+                                    isSongsCarriedOver = true;
                                   }
                                 });
                               }
@@ -1366,6 +1372,11 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               console.warn('Error hydrating SNAPSHOT_SONGS in Junior:', e);
                             }
                           }
+                        }
+
+                        if ((isBooksCarriedOver || isSongsCarriedOver) && !carriedOverWeekLabel) {
+                          const kwMatch = snapItem.topic_name?.match(/Hausaufgabe KW\s*(\d+)/i);
+                          if (kwMatch) carriedOverWeekLabel = `KW ${kwMatch[1]}`;
                         }
 
                         if (activeJuniorBooks.length > 0 && activeJuniorSongs.length > 0) break;
@@ -1431,7 +1442,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                     });
 
                     // 🌉 Smart Audio Bridge: Bridge active practice tracks from latest past lesson if current week has none
-                    if (audioTracks.length === 0 && (activeJuniorBooks.length > 0 || activeJuniorSongs.length > 0)) {
+                    if (audioTracks.length === 0) {
                       const pastHwSnapshots = (progressItems || []).filter((item: any) => {
                         if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
                         const itWeekIso = getItemWeek(item);
@@ -1440,7 +1451,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       pastHwSnapshots.sort((a: any, b: any) => {
                         const wA = getItemWeek(a);
                         const wB = getItemWeek(b);
-                        if (wA !== wB) return wB.localeCompare(wA);
+                        if (wA !== wB) return (wB || '').localeCompare(wA || '');
                         const tA = new Date(a.updated_at || a.created_at || 0).getTime();
                         const tB = new Date(b.updated_at || b.created_at || 0).getTime();
                         return tB - tA;
@@ -1463,6 +1474,10 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   isCarriedOver: true,
                                   idx: index
                                 });
+                                if (!carriedOverWeekLabel) {
+                                  const kwMatch = latestPast.topic_name?.match(/Hausaufgabe KW\s*(\d+)/i);
+                                  if (kwMatch) carriedOverWeekLabel = `KW ${kwMatch[1]}`;
+                                }
                               }
                             });
                           }
@@ -1494,7 +1509,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
 
                     let isPastNoteCarriedOver = false;
                     let generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
-                    if (!generalNoteRaw && (activeJuniorBooks.length > 0 || activeJuniorSongs.length > 0)) {
+                    if (!generalNoteRaw) {
                       const pastHwSnapshots = (progressItems || []).filter((item: any) => {
                         if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
                         const itWeekIso = getItemWeek(item);
@@ -1503,7 +1518,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       pastHwSnapshots.sort((a: any, b: any) => {
                         const wA = getItemWeek(a);
                         const wB = getItemWeek(b);
-                        if (wA !== wB) return wB.localeCompare(wA);
+                        if (wA !== wB) return (wB || '').localeCompare(wA || '');
                         const tA = new Date(a.updated_at || a.created_at || 0).getTime();
                         const tB = new Date(b.updated_at || b.created_at || 0).getTime();
                         return tB - tA;
@@ -1517,10 +1532,18 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             if (pastNote) {
                               generalNoteRaw = pastNote;
                               isPastNoteCarriedOver = true;
+                              if (!carriedOverWeekLabel) {
+                                const kwMatch = latestPast.topic_name?.match(/Hausaufgabe KW\s*(\d+)/i);
+                                if (kwMatch) carriedOverWeekLabel = `KW ${kwMatch[1]}`;
+                              }
                             }
                           } else if (typeof parsed === 'string') {
                             generalNoteRaw = parsed;
                             isPastNoteCarriedOver = true;
+                            if (!carriedOverWeekLabel) {
+                              const kwMatch = latestPast.topic_name?.match(/Hausaufgabe KW\s*(\d+)/i);
+                              if (kwMatch) carriedOverWeekLabel = `KW ${kwMatch[1]}`;
+                            }
                           }
                         } catch {}
                       }
@@ -1528,7 +1551,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                     const generalNote = generalNoteRaw ? cleanGeneralNote(generalNoteRaw) : '';
 
                     const isAudioCarriedOver = audioTracks.some(t => t.isCarriedOver);
-                    const isCarriedOverPlan = isAudioCarriedOver || isPastNoteCarriedOver;
+                    const isCarriedOverPlan = isAudioCarriedOver || isPastNoteCarriedOver || isBooksCarriedOver || isSongsCarriedOver;
 
                     let studentQuestionRaw = currentWeekNotes.find(n => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
                     if (!studentQuestionRaw) {
@@ -1770,7 +1793,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)'
                                   }}>
                                     <RotateCcw size={10} color="#0284c7" strokeWidth={2.5} />
-                                    <span>Fortlaufender Übeplan • Übertrag aus der Vorwoche</span>
+                                    <span>Fortlaufender Übeplan • Übertrag aus {carriedOverWeekLabel || 'der Vorwoche'}</span>
                                   </div>
                                 )}
                               </div>
@@ -4325,6 +4348,9 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                     {(() => {
                       const currentWeekStr = getISOWeek(getSimulatedNow());
                       const currentWeekNum = currentWeekStr.split('-W')[1] || '';
+                      let isBooksCarriedOver = false;
+                      let isSongsCarriedOver = false;
+                      let carriedOverWeekLabel = '';
 
                       const parseHomeworkNotes = (rawNotes: any): string[] => {
                         if (!rawNotes) return [];
@@ -4417,6 +4443,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         });
                         const latestPast = pastHwSnapshots[0];
                         if (latestPast && latestPast.homework_notes) {
+                          const kwMatch = latestPast.topic_name?.match(/Hausaufgabe KW\s*(\d+)/i);
+                          if (!carriedOverWeekLabel && kwMatch) carriedOverWeekLabel = `KW ${kwMatch[1]}`;
                           try {
                             const parsed = typeof latestPast.homework_notes === 'string' ? JSON.parse(latestPast.homework_notes) : latestPast.homework_notes;
                             if (Array.isArray(parsed)) {
@@ -4480,6 +4508,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         });
                         const latestPast = pastHwSnapshots[0];
                         if (latestPast && latestPast.homework_notes) {
+                          const kwMatch = latestPast.topic_name?.match(/Hausaufgabe KW\s*(\d+)/i);
+                          if (!carriedOverWeekLabel && kwMatch) carriedOverWeekLabel = `KW ${kwMatch[1]}`;
                           try {
                             const parsed = typeof latestPast.homework_notes === 'string' ? JSON.parse(latestPast.homework_notes) : latestPast.homework_notes;
                             if (Array.isArray(parsed)) {
@@ -4498,7 +4528,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       const generalNote = generalNoteRaw ? cleanGeneralNote(generalNoteRaw) : '';
 
                       const isAudioCarriedOver = audioTracks.some(t => t.isCarriedOver);
-                      const isCarriedOverPlan = isAudioCarriedOver || isPastNoteCarriedOver;
+                      let isCarriedOverPlan = isAudioCarriedOver || isPastNoteCarriedOver;
 
                       let studentQuestionEntry = currentWeekNotes.find(n => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
                       if (!studentQuestionEntry) {
@@ -4743,6 +4773,9 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                           status: 'homework'
                                         }))
                                       };
+                                      isBooksCarriedOver = true;
+                                      const kwMatch = snapItem.topic_name?.match(/Hausaufgabe KW\s*(\d+)/i);
+                                      if (!carriedOverWeekLabel && kwMatch) carriedOverWeekLabel = `KW ${kwMatch[1]}`;
                                     }
                                   });
                                 }
@@ -4767,6 +4800,9 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                         topic_name: tName,
                                         title: tName
                                       });
+                                      isSongsCarriedOver = true;
+                                      const kwMatch = snapItem.topic_name?.match(/Hausaufgabe KW\s*(\d+)/i);
+                                      if (!carriedOverWeekLabel && kwMatch) carriedOverWeekLabel = `KW ${kwMatch[1]}`;
                                     }
                                   });
                                 }
@@ -4779,6 +4815,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           if (Object.keys(activeLehrwerkeMap).length > 0 && otherActiveHWItems.length > 0) break;
                         }
                       }
+
+                      isCarriedOverPlan = isAudioCarriedOver || isPastNoteCarriedOver || isBooksCarriedOver || isSongsCarriedOver;
 
                       // Sort pages for all active books
                       Object.keys(activeLehrwerkeMap).forEach(title => {
@@ -4853,7 +4891,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                       marginTop: '4px'
                                     }}>
                                       <RotateCcw size={10} color="#0284c7" strokeWidth={2.5} />
-                                      <span>Fortlaufender Übeplan • Übertrag aus der Vorwoche</span>
+                                      <span>Fortlaufender Übeplan • Übertrag aus {carriedOverWeekLabel || 'der Vorwoche'}</span>
                                     </div>
                                   )}
                                 </div>
@@ -6102,6 +6140,9 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       const prevWeekStr = getPrevWeek(currentWeekStr);
                       const currentWeekNum = currentWeekStr.split('-W')[1] || '';
                       const prevWeekNum = prevWeekStr.split('-W')[1] || '';
+                      let isBooksCarriedOver = false;
+                      let isSongsCarriedOver = false;
+                      let carriedOverWeekLabel = '';
 
                       const parseHomeworkNotes = (rawNotes: any): string[] => {
                         if (!rawNotes) return [];
@@ -6194,6 +6235,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         });
                         const latestPast = pastHwSnapshots[0];
                         if (latestPast && latestPast.homework_notes) {
+                          const kwMatch = latestPast.topic_name?.match(/Hausaufgabe KW\s*(\d+)/i);
+                          if (!carriedOverWeekLabel && kwMatch) carriedOverWeekLabel = `KW ${kwMatch[1]}`;
                           try {
                             const parsed = typeof latestPast.homework_notes === 'string' ? JSON.parse(latestPast.homework_notes) : latestPast.homework_notes;
                             if (Array.isArray(parsed)) {
@@ -6257,6 +6300,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         });
                         const latestPast = pastHwSnapshots[0];
                         if (latestPast && latestPast.homework_notes) {
+                          const kwMatch = latestPast.topic_name?.match(/Hausaufgabe KW\s*(\d+)/i);
+                          if (!carriedOverWeekLabel && kwMatch) carriedOverWeekLabel = `KW ${kwMatch[1]}`;
                           try {
                             const parsed = typeof latestPast.homework_notes === 'string' ? JSON.parse(latestPast.homework_notes) : latestPast.homework_notes;
                             if (Array.isArray(parsed)) {
@@ -6275,7 +6320,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       const generalNote = generalNoteRaw ? cleanGeneralNote(generalNoteRaw) : '';
 
                       const isAudioCarriedOver = audioTracks.some(t => t.isCarriedOver);
-                      const isCarriedOverPlan = isAudioCarriedOver || isPastNoteCarriedOver;
+                      let isCarriedOverPlan = isAudioCarriedOver || isPastNoteCarriedOver;
 
                       let studentQuestionEntry = currentWeekNotes.find(n => typeof n === 'string' && (n.startsWith('STUDENT_QUESTION:') || n.startsWith('❓ Frage für den Unterricht:')));
                       if (!studentQuestionEntry) {
@@ -6524,6 +6569,9 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                           status: 'homework'
                                         }))
                                       };
+                                      isBooksCarriedOver = true;
+                                      const kwMatch = snapItem.topic_name?.match(/Hausaufgabe KW\s*(\d+)/i);
+                                      if (!carriedOverWeekLabel && kwMatch) carriedOverWeekLabel = `KW ${kwMatch[1]}`;
                                     }
                                   });
                                 }
@@ -6548,6 +6596,9 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                         topic_name: tName,
                                         title: tName
                                       });
+                                      isSongsCarriedOver = true;
+                                      const kwMatch = snapItem.topic_name?.match(/Hausaufgabe KW\s*(\d+)/i);
+                                      if (!carriedOverWeekLabel && kwMatch) carriedOverWeekLabel = `KW ${kwMatch[1]}`;
                                     }
                                   });
                                 }
@@ -6560,6 +6611,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           if (Object.keys(activeLehrwerkeMap).length > 0 && otherActiveHWItems.length > 0) break;
                         }
                       }
+
+                      isCarriedOverPlan = isAudioCarriedOver || isPastNoteCarriedOver || isBooksCarriedOver || isSongsCarriedOver;
 
                       // Sort pages for all active books
                       Object.keys(activeLehrwerkeMap).forEach(title => {
@@ -6634,7 +6687,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                       marginTop: '4px'
                                     }}>
                                       <RotateCcw size={10} color="#0284c7" strokeWidth={2.5} />
-                                      <span>Fortlaufender Übeplan • Übertrag aus der Vorwoche</span>
+                                      <span>Fortlaufender Übeplan • Übertrag aus {carriedOverWeekLabel || 'der Vorwoche'}</span>
                                     </div>
                                   )}
                                 </div>

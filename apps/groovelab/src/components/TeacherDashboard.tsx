@@ -4747,7 +4747,7 @@ export function TeacherDashboard({
           targetTeacherId !== 'master-support-id' 
             ? safeQuery(supabase.from('users').select('planned_boards').eq('id', targetTeacherId).maybeSingle(), { data: null })
             : Promise.resolve({ data: null, error: null }),
-          safeQuery(supabase.from('users').select('id, first_name, last_name, instrument, is_app_user, birth_date, avatars(avatar_style, evolution_level, xp, streak_flame)').eq('school_id', teacherProfile.school_id)),
+          safeQuery(supabase.from('users').select('id, first_name, last_name, instrument, is_app_user, birth_date, campus_ui_level, parent_permissions, avatars(avatar_style, evolution_level, xp, streak_flame)').eq('school_id', teacherProfile.school_id)),
           safeQuery(schedQuery),
           safeQuery(occQuery)
         ]);
@@ -5806,7 +5806,7 @@ export function TeacherDashboard({
         // Prepare Student Query: fetch assigned students in the school
         // Tier-1 Query Pruning: Selective column list prevents PostgreSQL from executing PGP decryption subquery on email
         let studentQuery = supabase.from('users')
-          .select('id, school_id, role, roles, first_name, last_name, avatar_url, photo_url, instrument, created_at, coach_notes, birth_date, teacher_id, is_active, is_campus_active, is_groovelab_active, is_app_user, lesson_duration, planned_boards, contract_ends_at, qr_token')
+          .select('id, school_id, role, roles, first_name, last_name, avatar_url, photo_url, instrument, created_at, coach_notes, birth_date, teacher_id, is_active, is_campus_active, is_groovelab_active, is_app_user, lesson_duration, planned_boards, contract_ends_at, qr_token, campus_ui_level, parent_permissions')
           .eq('school_id', tData.school_id)
           .eq('role', 'student');
         if (viewMode !== 'student' && !tData.is_ghost_mode) {
@@ -8034,7 +8034,8 @@ useEffect(() => {
              schoolName={schoolData?.name || ''}
              hasTresorStorage={Number(schoolData?.storage_addon_gb || 0) > 0 || checkIsAudioTresorActive(modalDocStudent)}
              readOnly={teacherDunningStatus?.isTeacherReadOnly || false}
-             uiLevel={modalDocStudent?.campus_ui_level || 'pro'}
+             uiLevel={modalDocStudent?.campus_ui_level || 'junior'}
+             parentPermissions={modalDocStudent?.parent_permissions}
              groupStudents={modalDocStudent?.groupStudents || (modalDocStudent?.students && modalDocStudent.students.length > 1 ? modalDocStudent.students : [])}
              onProfileClick={(student) => {
                setDocStudent(null);
@@ -10225,8 +10226,10 @@ useEffect(() => {
                                              id: activeStudentObj.id,
                                              first_name: activeStudentObj.name.split(' ')[0],
                                              last_name: activeStudentObj.name.split(' ').slice(1).join(' '),
-                                             photo_url: activeStudentObj.photo_url || '/avatar_ghost.jpg',
+                                             photo_url: activeStudentObj.photo_url || foundStud?.photo_url || '/avatar_ghost.jpg',
                                              is_campus_active: foundStud ? foundStud.is_campus_active : activeStudentObj.is_campus_active,
+                                             campus_ui_level: foundStud?.campus_ui_level || (activeStudentObj as any).campus_ui_level,
+                                             parent_permissions: foundStud?.parent_permissions || (activeStudentObj as any).parent_permissions,
                                              groupStudents: groupStudentsList
                                            });
                                          }
@@ -10257,8 +10260,10 @@ useEffect(() => {
                                          id: activeStudentObj.id,
                                          first_name: activeStudentObj.name.split(' ')[0],
                                          last_name: activeStudentObj.name.split(' ').slice(1).join(' '),
-                                         photo_url: activeStudentObj.photo_url || '/avatar_ghost.jpg',
+                                         photo_url: activeStudentObj.photo_url || foundStud?.photo_url || '/avatar_ghost.jpg',
                                          is_campus_active: foundStud ? foundStud.is_campus_active : activeStudentObj.is_campus_active,
+                                         campus_ui_level: foundStud?.campus_ui_level || (activeStudentObj as any).campus_ui_level,
+                                         parent_permissions: foundStud?.parent_permissions || (activeStudentObj as any).parent_permissions,
                                          groupStudents: groupStudentsList
                                        });
                                      }
