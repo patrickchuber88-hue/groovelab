@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   BookOpen, Award, Star, Clock, Music, Users, Calendar, 
-  Smartphone, ShieldCheck, Flame, RefreshCw, QrCode, Copy, Check, Info, Lock
+  Smartphone, ShieldCheck, Flame, RefreshCw, QrCode, Copy, Check, Info, Lock, Ticket
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { StudentModalHeader } from './shared/StudentModalHeader';
@@ -14,6 +14,8 @@ import { SkillRadarPentagon } from '../../common/SkillRadarPentagon';
 import { SKILL_TAGS } from '../meisterwerk.types';
 import QRCode from 'react-qr-code';
 import { formatTeacherFullName } from '../../../utils/nameHelper';
+import { getCanonicalQrLandingUrl } from '../../../utils/tenantUrlHelper';
+import { TeacherMakeupTokenModal } from '../../teacher/TeacherMakeupTokenModal';
 
 const TEACHER_GREEN = '#34a853';
 const TEACHER_YELLOW = '#eab308';
@@ -59,6 +61,11 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
   const [showTageskompassModal, setShowTageskompassModal] = useState(false);
   const [showQrOverlay, setShowQrOverlay] = useState(false);
   const [localQrToken, setLocalQrToken] = useState<string>(student.qr_token || '');
+  const [studentMakeupTokens, setStudentMakeupTokens] = useState<any[]>([]);
+  const [isTokenModalOpen, setIsTokenModalOpen] = useState(false);
+  const [selectedTokenForRedeem, setSelectedTokenForRedeem] = useState<any>(null);
+  const [schoolRooms, setSchoolRooms] = useState<any[]>([]);
+  const [currentTeacherId, setCurrentTeacherId] = useState<string>('');
 
   // 5 Säulen Kompetenz-Stufen & Wochenschwerpunkt (Single Source of Truth)
   const [pillarLevels, setPillarLevels] = useState<Record<string, number>>(() => {
@@ -330,6 +337,24 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
           });
           return combined;
         });
+      } catch (e) {}
+
+      // 7. Teacher ID & Rooms
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        if (authData?.user) setCurrentTeacherId(authData.user.id);
+        const { data: rData } = await supabase.from('rooms').select('id, name');
+        if (rData) setSchoolRooms(rData);
+      } catch (e) {}
+
+      // 8. Lesson make-up tokens (Nachhol-Kontingente)
+      try {
+        const { data: tokenData } = await supabase
+          .from('lesson_makeup_tokens')
+          .select('*')
+          .eq('student_id', student.id)
+          .order('original_date', { ascending: false });
+        setStudentMakeupTokens(tokenData || []);
       } catch (e) {}
     };
 
@@ -852,6 +877,129 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                 mode="teacher"
                 activeColor={activeThemeColor}
               />
+
+              {/* Nachhol-Kontingente (§ 275 BGB / Tier-1 Enterprise) */}
+              <section
+                style={{
+                  background: '#ffffff',
+                  borderRadius: '24px',
+                  padding: '20px 24px',
+                  border: '1.5px solid #f1f5f9',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.02)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '14px'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <h4
+                    style={{
+                      fontSize: '0.86rem',
+                      fontWeight: 900,
+                      textTransform: 'uppercase',
+                      color: '#64748b',
+                      letterSpacing: '0.08em',
+                      margin: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <Ticket size={16} style={{ color: activeThemeColor }} />
+                    Nachhol-Kontingente
+                  </h4>
+
+                  {(() => {
+                    const openTokens = studentMakeupTokens.filter(t => t.status === 'OPEN' || t.status === 'PARTIALLY_REDEEMED');
+                    const openMinutes = openTokens.reduce((acc, t) => acc + (t.remaining_minutes || 0), 0);
+                    return openMinutes > 0 ? (
+                      <span
+                        style={{
+                          background: '#eff6ff',
+                          color: '#1d4ed8',
+                          padding: '3px 10px',
+                          borderRadius: '100px',
+                          fontSize: '0.72rem',
+                          fontWeight: 800
+                        }}
+                      >
+                        {openMinutes} Min. offen
+                      </span>
+                    ) : null;
+                  })()}
+                </div>
+
+                {studentMakeupTokens.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {studentMakeupTokens.map(tok => {
+                      const isOpen = tok.status === 'OPEN' || tok.status === 'PARTIALLY_REDEEMED';
+                      const dateStr = tok.original_date ? new Date(tok.original_date).toLocaleDateString('de-DE') : '–';
+                      return (
+                        <div
+                          key={tok.id}
+                          style={{
+                            background: isOpen ? '#f8fafc' : '#ffffff',
+                            border: isOpen ? '1.5px solid #e2e8f0' : '1px solid #f1f5f9',
+                            borderRadius: '14px',
+                            padding: '10px 14px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '10px'
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a' }}>
+                              Ausfall vom {dateStr}
+                            </div>
+                            <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>
+                              {tok.remaining_minutes} von {tok.total_minutes} Min. • Gültig bis {tok.expires_at ? new Date(tok.expires_at).toLocaleDateString('de-DE') : '–'}
+                            </div>
+                          </div>
+
+                          {isOpen ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedTokenForRedeem(tok);
+                                setIsTokenModalOpen(true);
+                              }}
+                              style={{
+                                background: '#0b57d0',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '10px',
+                                padding: '6px 12px',
+                                fontSize: '0.75rem',
+                                fontWeight: 850,
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 6px rgba(11, 87, 208, 0.2)'
+                              }}
+                            >
+                              Einlösen
+                            </button>
+                          ) : (
+                            <span style={{
+                              fontSize: '0.70rem',
+                              fontWeight: 700,
+                              color: tok.status === 'FULLY_REDEEMED' ? '#15803d' : '#94a3b8',
+                              background: tok.status === 'FULLY_REDEEMED' ? '#dcfce7' : '#f1f5f9',
+                              padding: '2px 8px',
+                              borderRadius: '6px'
+                            }}>
+                              {tok.status === 'FULLY_REDEEMED' ? 'Eingelöst' : 'Storniert'}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '0.80rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                    Keine offenen Nachhol-Kontingente für diesen Schüler.
+                  </div>
+                )}
+              </section>
             </div>
           </div>
         )}
@@ -1420,7 +1568,7 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
             </div>
             <div style={{ background: '#ffffff', padding: '16px', borderRadius: '18px', border: '1.5px solid #e2e8f0' }}>
               <QRCode
-                value={`${window.location.origin}/onboarding/${localQrToken || student.qr_token || student.id}?platform=campus`}
+                value={getCanonicalQrLandingUrl(localQrToken || student.qr_token || student.ausweis_nummer)}
                 size={200}
               />
             </div>
@@ -1453,6 +1601,31 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
           student={student}
           teacherName={formatTeacherFullName(schedulesList?.[0]?.teacher || (student as any)?.teacher_name || (student as any)?.teacher)}
           onClose={() => setShowTageskompassModal(false)}
+        />
+      )}
+
+      {/* 🎟️ Nachhol-Kontingent Modal */}
+      {isTokenModalOpen && (
+        <TeacherMakeupTokenModal
+          isOpen={isTokenModalOpen}
+          mode="redeem"
+          token={selectedTokenForRedeem}
+          rooms={schoolRooms}
+          teacherId={currentTeacherId || schedulesList?.[0]?.teacher_id || ''}
+          onClose={() => {
+            setIsTokenModalOpen(false);
+            setSelectedTokenForRedeem(null);
+          }}
+          onSuccess={async () => {
+            if (student.id) {
+              const { data: tokenData } = await supabase
+                .from('lesson_makeup_tokens')
+                .select('*')
+                .eq('student_id', student.id)
+                .order('original_date', { ascending: false });
+              setStudentMakeupTokens(tokenData || []);
+            }
+          }}
         />
       )}
     </div>

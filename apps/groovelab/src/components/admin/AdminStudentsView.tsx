@@ -497,7 +497,7 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                             </div>
                           ) : (
                             <div style={{ padding: '2px 6px', background: '#f1f3f4', color: '#5f6368', borderRadius: '5px', fontSize: '0.75rem', fontWeight: 900 }}>
-                              Inaktiv
+                              Basis
                             </div>
                           )}
                         </div>

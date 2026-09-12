@@ -646,7 +646,7 @@ Deno.serve(async (req) => {
       }
       descriptionLines.push('Hinweis: Externe Kalender synchronisieren zeitverzögert. Rechtlich verbindlich bei Ausfall oder Raumwechsel ist stets die Campus-Groovelab App.')
       descriptionLines.push('Plattform: Campus-Groovelab')
-      descriptionLines.push('Direktlink: https://app.campus-groovelab.de/campus/homework')
+      descriptionLines.push('Direktlink: https://campus-groovelab.de/campus/homework')
       
       const description = descriptionLines.join('\n')
 

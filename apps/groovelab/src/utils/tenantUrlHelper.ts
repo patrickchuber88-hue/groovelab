@@ -128,3 +128,33 @@ export function isLocalhostEnvironment(): boolean {
 export function isDevEnvironment(): boolean {
   return Boolean(import.meta.env.DEV && isLocalhostEnvironment());
 }
+
+/**
+ * Generates the canonical, Tier-1 SaaS Enterprise+ QR Landing Page URL.
+ * Single source of truth for all QR codes, Ausweise, stickers, and wallet passes.
+ * 
+ * - Production: Always https://campus-groovelab.de/qr/:token
+ * - Localhost / Local Wi-Fi Dev: window.location.origin/qr/:token
+ * - Zero-Trust: Rejects empty tokens
+ */
+export function getCanonicalQrLandingUrl(qrToken?: string | null): string {
+  const cleanToken = (qrToken || '').trim();
+  if (!cleanToken) return '';
+
+  if (typeof window === 'undefined') {
+    return `https://campus-groovelab.de/qr/${cleanToken}`;
+  }
+
+  const hostname = window.location.hostname;
+  const isLocal = hostname === 'localhost' || 
+                  hostname === '127.0.0.1' || 
+                  hostname.startsWith('192.168.') || 
+                  hostname.startsWith('10.') || 
+                  hostname.endsWith('.local');
+
+  if (isLocal) {
+    return `${window.location.origin}/qr/${cleanToken}`;
+  }
+
+  return `https://campus-groovelab.de/qr/${cleanToken}`;
+}

@@ -17,15 +17,29 @@ import {
   Lock, 
   Sparkles, 
   CheckCheck, 
-  ChevronDown,
-  RotateCcw,
-  AlertTriangle,
-  ArrowRight,
-  Music,
-  HeartHandshake,
-  Moon,
-  Phone,
-  Fingerprint
+  ChevronDown, 
+  RotateCcw, 
+  AlertTriangle, 
+  ArrowRight, 
+  Music, 
+  HeartHandshake, 
+  Moon, 
+  Phone, 
+  Fingerprint,
+  Users,
+  Guitar,
+  Mic,
+  Headphones,
+  Radio,
+  Trophy,
+  Flame,
+  Layers,
+  Compass,
+  Info,
+  GraduationCap,
+  Hash,
+  Bell,
+  Trash2
 } from 'lucide-react';
 import { isWebAuthnSupported, authenticateParentBiometricPasskey } from '../utils/webauthn';
 import { formatTeacherFullName, formatSingleStudentAnonymized, formatStudentPureFirstName } from '../utils/nameHelper';
@@ -36,6 +50,27 @@ import {
   ChatRespectValidationResult 
 } from '../utils/chatRespectGuard';
 import { getInstrumentAvatarUrl, resolveCampusStudentAvatar } from './StudioAvatar';
+import { CampusCreateGroupModal } from './CampusCreateGroupModal';
+import { CampusCreateChannelModal } from './CampusCreateChannelModal';
+
+export const getGroupIconComponent = (iconId: string) => {
+  switch (iconId) {
+    case 'users': return Users;
+    case 'guitar': return Guitar;
+    case 'mic': return Mic;
+    case 'headphones': return Headphones;
+    case 'radio': return Radio;
+    case 'sparkles': return Sparkles;
+    case 'trophy': return Trophy;
+    case 'flame': return Flame;
+    case 'layers': return Layers;
+    case 'compass': return Compass;
+    case 'award': return Trophy;
+    case 'music':
+    default:
+      return Music;
+  }
+};
 
 const resolveCampusAvatar = (u: any): string => {
   if (!u) return '/avatar_ghost.jpg';
@@ -569,6 +604,17 @@ export function CampusDirectMessages({
   const [assignedStudents, setAssignedStudents] = useState<any[]>([]);
   const [respectWarning, setRespectWarning] = useState<ChatRespectValidationResult | null>(null);
 
+  // Groups & Channels State
+  const [activeMainTab, setActiveMainTab] = useState<'students' | 'groups'>('students');
+  const [campusGroups, setCampusGroups] = useState<any[]>([]);
+  const [isCreateGroupModalOpen, setIsCreateGroupModalOpen] = useState(false);
+  const [showGroupInfoModal, setShowGroupInfoModal] = useState(false);
+  const [groupMembersDetails, setGroupMembersDetails] = useState<any[]>([]);
+  const [groupMembersLoading, setGroupMembersLoading] = useState(false);
+  const [groupChannels, setGroupChannels] = useState<any[]>([]);
+  const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
+  const [showCreateChannelModal, setShowCreateChannelModal] = useState(false);
+
   const isRecipientInQuietHours = useMemo(() => {
     if (!selectedRecipient) return false;
     const role = (selectedRecipient.role || '').toLowerCase();
@@ -934,6 +980,237 @@ export function CampusDirectMessages({
     return () => clearTimeout(timer);
   }, [user?.id, user?.school_id, user?.schools?.id, isStudent, schoolUsers]);
 
+  const fetchCampusGroups = React.useCallback(async () => {
+    const uid = user?.id || (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null);
+    if (!uid) return;
+    try {
+      // 1. Groups where user is member
+      const { data: memberRows, error: mErr } = await supabase
+        .from('campus_chat_group_members')
+        .select('group_id, role, last_read_at')
+        .eq('user_id', uid);
+
+      if (mErr) {
+        if (mErr.message?.includes('schema cache') || mErr.code === 'PGRST205' || mErr.code === '42P01') {
+          console.warn('[CampusDirectMessages] campus_chat_group_members table not in schema cache yet (Migration 407 pending).');
+          setCampusGroups([]);
+          return;
+        }
+      }
+
+      let groupIds: string[] = [];
+      const membershipMap = new Map<string, any>();
+      if (memberRows && memberRows.length > 0) {
+        memberRows.forEach((r: any) => {
+          if (r.group_id) {
+            groupIds.push(r.group_id);
+            membershipMap.set(r.group_id, r);
+          }
+        });
+      }
+
+      // Also if teacher/admin, check created groups
+      if (!isStudent) {
+        const { data: createdGroups, error: cErr } = await supabase
+          .from('campus_chat_groups')
+          .select('id')
+          .eq('creator_id', uid)
+          .eq('is_archived', false);
+
+        if (cErr) {
+          if (cErr.message?.includes('schema cache') || cErr.code === 'PGRST205' || cErr.code === '42P01') {
+            console.warn('[CampusDirectMessages] campus_chat_groups table not in schema cache yet (Migration 407 pending).');
+            setCampusGroups([]);
+            return;
+          }
+        }
+
+        (createdGroups || []).forEach((g: any) => {
+          if (g.id && !groupIds.includes(g.id)) {
+            groupIds.push(g.id);
+          }
+        });
+      }
+
+      if (groupIds.length === 0) {
+        setCampusGroups([]);
+        return;
+      }
+
+      // 2. Fetch full group details
+      const { data: groupsData, error: gErr } = await supabase
+        .from('campus_chat_groups')
+        .select('*')
+        .in('id', groupIds)
+        .eq('is_archived', false)
+        .order('created_at', { ascending: false });
+
+      if (gErr) {
+        if (gErr.message?.includes('schema cache') || gErr.code === 'PGRST205' || gErr.code === '42P01') {
+          console.warn('[CampusDirectMessages] campus_chat_groups table not in schema cache yet (Migration 407 pending).');
+          setCampusGroups([]);
+          return;
+        }
+        throw gErr;
+      }
+      if (!groupsData) return;
+
+      // 3. Fetch member counts
+      const { data: allMembers } = await supabase
+        .from('campus_chat_group_members')
+        .select('group_id, user_id, role')
+        .in('group_id', groupIds);
+
+      const membersByGroup = new Map<string, any[]>();
+      (allMembers || []).forEach((m: any) => {
+        const list = membersByGroup.get(m.group_id) || [];
+        list.push(m);
+        membersByGroup.set(m.group_id, list);
+      });
+
+      const processed = groupsData.map((g: any) => {
+        const members = membersByGroup.get(g.id) || [];
+        const myMembership = membershipMap.get(g.id);
+        const lastRead = myMembership?.last_read_at ? new Date(myMembership.last_read_at).getTime() : 0;
+
+        const grpMessages = (campusMessages || []).filter((m: any) => m.group_id === g.id);
+        const lastMsg = grpMessages.length > 0 ? grpMessages[grpMessages.length - 1] : null;
+
+        const unreadCount = grpMessages.filter((m: any) =>
+          m.sender_id !== uid &&
+          new Date(m.created_at).getTime() > lastRead
+        ).length;
+
+        return {
+          ...g,
+          is_group: true,
+          members,
+          members_count: members.length,
+          lastMessage: lastMsg,
+          unreadCount,
+          lastMessageTime: lastMsg ? new Date(lastMsg.created_at) : new Date(g.created_at)
+        };
+      });
+
+      setCampusGroups(processed);
+    } catch (err) {
+      console.error('[CampusDirectMessages] Error in fetchCampusGroups:', err);
+    }
+  }, [user?.id, isStudent, campusMessages]);
+
+  useEffect(() => {
+    fetchCampusGroups();
+  }, [fetchCampusGroups]);
+
+  const fetchGroupMembersDetails = async (groupId: string) => {
+    setGroupMembersLoading(true);
+    try {
+      const { data: members } = await supabase
+        .from('campus_chat_group_members')
+        .select('user_id, role, joined_at')
+        .eq('group_id', groupId);
+
+      if (!members || members.length === 0) {
+        setGroupMembersDetails([]);
+        return;
+      }
+
+      const userIds = members.map((m: any) => m.user_id);
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('*')
+        .in('id', userIds);
+
+      const userMap = new Map<string, any>();
+      (usersData || []).forEach((u: any) => userMap.set(u.id, u));
+      (schoolUsers || []).forEach((su: any) => { if (su?.id && !userMap.has(su.id)) userMap.set(su.id, su); });
+      (assignedStudents || []).forEach((s: any) => { if (s?.id && !userMap.has(s.id)) userMap.set(s.id, s); });
+
+      const detailed = members.map((m: any) => {
+        const u = userMap.get(m.user_id) || { id: m.user_id, first_name: 'Mitglied', last_name: '' };
+        return {
+          ...u,
+          member_role: m.role,
+          joined_at: m.joined_at
+        };
+      });
+
+      setGroupMembersDetails(detailed);
+    } catch (err) {
+      console.error('[CampusDirectMessages] Error fetching group members:', err);
+    } finally {
+      setGroupMembersLoading(false);
+    }
+  };
+
+  const fetchGroupChannels = React.useCallback(async (groupId: string) => {
+    if (!groupId) {
+      setGroupChannels([]);
+      setActiveChannelId(null);
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('campus_chat_channels')
+        .select('*')
+        .eq('group_id', groupId)
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        if (error.message?.includes('schema cache') || error.code === 'PGRST205' || error.code === '42P01') {
+          console.warn('[CampusDirectMessages] campus_chat_channels not in schema cache yet.');
+          setGroupChannels([]);
+          return;
+        }
+        throw error;
+      }
+
+      const channels = data || [];
+      setGroupChannels(channels);
+
+      // Set active channel to first channel (or default # allgemein) if none selected or selected not in list
+      setActiveChannelId(prev => {
+        if (prev && channels.some(c => c.id === prev)) {
+          return prev;
+        }
+        const defaultChannel = channels.find(c => c.is_default) || channels[0];
+        return defaultChannel ? defaultChannel.id : null;
+      });
+    } catch (err) {
+      console.error('[CampusDirectMessages] Error fetching group channels:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedRecipient?.is_group && selectedRecipient?.id) {
+      fetchGroupChannels(selectedRecipient.id);
+    } else {
+      setGroupChannels([]);
+      setActiveChannelId(null);
+    }
+  }, [selectedRecipient?.id, selectedRecipient?.is_group, fetchGroupChannels]);
+
+  const handleDeleteChannel = async (channelId: string, channelName: string) => {
+    if (!channelId) return;
+    const confirmDelete = window.confirm(`Möchtest du den Kanal „# ${channelName}“ wirklich unwiderruflich löschen? Alle Nachrichten in diesem Kanal werden entfernt.`);
+    if (!confirmDelete) return;
+
+    try {
+      const { error } = await supabase.rpc('delete_campus_chat_channel', {
+        p_channel_id: channelId
+      });
+      if (error) throw error;
+
+      if (selectedRecipient?.id) {
+        await fetchGroupChannels(selectedRecipient.id);
+      }
+    } catch (err: any) {
+      console.error('[CampusDirectMessages] Error deleting channel:', err);
+      alert('Fehler beim Löschen des Kanals: ' + (err?.message || 'Unbekannt'));
+    }
+  };
+
   const isSystemMessage = (msg: any) => {
     if (!msg) return false;
     if (msg.is_system || msg.message_type === 'reschedule_notification' || msg.message_type === 'cancellation_reset' || msg.message_type === 'system') return true;
@@ -984,6 +1261,15 @@ export function CampusDirectMessages({
     });
     return Array.from(map.values());
   }, [sourceUsers]);
+
+  const allKnownUsersMap = useMemo(() => {
+    const map = new Map<string, any>();
+    (schoolUsers || []).forEach((u: any) => { if (u?.id) map.set(u.id, u); });
+    (assignedStudents || []).forEach((u: any) => { if (u?.id) map.set(u.id, u); });
+    (groupMembersDetails || []).forEach((u: any) => { if (u?.id) map.set(u.id, u); });
+    if (user?.id) map.set(user.id, user);
+    return map;
+  }, [schoolUsers, assignedStudents, groupMembersDetails, user]);
 
   // Get potential chat partners
   const chatPartners = useMemo(() => {
@@ -1055,46 +1341,124 @@ export function CampusDirectMessages({
     });
   }, [partnersWithMetadata, filterType]);
 
+  // Filter and process groups
+  const filteredGroupsList = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    return campusGroups.filter(g => {
+      if (filterType === 'unread' && (g.unreadCount || 0) === 0) return false;
+      if (!q) return true;
+      return (g.name || '').toLowerCase().includes(q) || (g.description || '').toLowerCase().includes(q);
+    }).sort((a, b) => {
+      const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
+      const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
+      if (timeA !== timeB) return timeB - timeA;
+      return (a.name || '').localeCompare(b.name || '', 'de');
+    });
+  }, [campusGroups, searchQuery, filterType]);
+
+  const totalUnreadGroupsCount = useMemo(() => {
+    return campusGroups.reduce((acc, g) => acc + (g.unreadCount || 0), 0);
+  }, [campusGroups]);
+
+  // Combined list for students (teachers + student's groups)
+  const studentCombinedList = useMemo(() => {
+    if (!isStudent) return [];
+    const combined = [
+      ...finalPartnersList.map(p => ({ ...p, is_group: false })),
+      ...filteredGroupsList.map(g => ({ ...g, is_group: true }))
+    ];
+    return combined.sort((a, b) => {
+      const unreadA = a.unreadCount || 0;
+      const unreadB = b.unreadCount || 0;
+      if (unreadA !== unreadB) return unreadB - unreadA;
+      const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
+      const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
+      return timeB - timeA;
+    });
+  }, [isStudent, finalPartnersList, filteredGroupsList]);
+
   // Auto-scroll to bottom of messages
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   useEffect(() => {
-    if (!isMobile && !selectedRecipient && finalPartnersList.length > 0) {
-      const directTeacher = finalPartnersList.find(p => String(p.id) === String(user?.teacher_id));
-      setSelectedRecipient(directTeacher || finalPartnersList[0]);
+    if (!isMobile && !selectedRecipient) {
+      if (isStudent && studentCombinedList.length > 0) {
+        const directTeacher = studentCombinedList.find(p => !p.is_group && String(p.id) === String(user?.teacher_id));
+        setSelectedRecipient(directTeacher || studentCombinedList[0]);
+      } else if (!isStudent) {
+        if (activeMainTab === 'groups' && filteredGroupsList.length > 0) {
+          setSelectedRecipient(filteredGroupsList[0]);
+        } else if (finalPartnersList.length > 0) {
+          setSelectedRecipient(finalPartnersList[0]);
+        }
+      }
     }
-  }, [isMobile, finalPartnersList, selectedRecipient, setSelectedRecipient, user?.teacher_id]);
+  }, [isMobile, finalPartnersList, filteredGroupsList, studentCombinedList, selectedRecipient, setSelectedRecipient, user?.teacher_id, isStudent, activeMainTab]);
 
   useEffect(() => {
-    if (selectedRecipient) {
-      scrollToBottom();
+    if (!selectedRecipient) return;
+    scrollToBottom();
+
+    if (selectedRecipient.is_group && user?.id) {
+      fetchGroupMembersDetails(selectedRecipient.id);
+      if (selectedRecipient.unreadCount > 0) {
+        supabase
+          .from('campus_chat_group_members')
+          .update({ last_read_at: new Date().toISOString() })
+          .eq('group_id', selectedRecipient.id)
+          .eq('user_id', user.id)
+          .then(() => {
+            setCampusGroups(prev => prev.map(g => g.id === selectedRecipient.id ? { ...g, unreadCount: 0 } : g));
+          });
+      }
+    } else {
       const unreadFromRecipient = campusMessages.some(m => 
-        m.sender_id === selectedRecipient.id && m.recipient_id === user.id && !m.is_read
+        !m.group_id && m.sender_id === selectedRecipient.id && m.recipient_id === user.id && !m.is_read
       );
       if (unreadFromRecipient) {
         onMarkAsRead(selectedRecipient.id);
       }
     }
-  }, [selectedRecipient, campusMessages]);
+  }, [selectedRecipient, campusMessages, user?.id]);
 
   // Get active messages in the current thread (sorted chronologically)
   const activeThreadMessages = useMemo(() => {
     if (!selectedRecipient) return [];
+    if (selectedRecipient.is_group) {
+      const defaultChannel = groupChannels.find(c => c.is_default);
+      return [...campusMessages]
+        .filter(m => {
+          if (m.group_id !== selectedRecipient.id) return false;
+          // Channel filtering:
+          if (activeChannelId) {
+            // Match messages with this explicit channel_id OR legacy messages assigned to default channel
+            if (m.channel_id) {
+              return m.channel_id === activeChannelId;
+            }
+            // If message has no channel_id, show it in the default channel (# allgemein)
+            return defaultChannel?.id === activeChannelId;
+          }
+          return true;
+        })
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    }
     return [...campusMessages]
       .filter(m => 
-        (m.sender_id === user.id && m.recipient_id === selectedRecipient.id) ||
-        (m.sender_id === selectedRecipient.id && m.recipient_id === user.id)
+        !m.group_id && (
+          (m.sender_id === user.id && m.recipient_id === selectedRecipient.id) ||
+          (m.sender_id === selectedRecipient.id && m.recipient_id === user.id)
+        )
       )
       .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-  }, [campusMessages, selectedRecipient, user.id]);
+  }, [campusMessages, selectedRecipient, user.id, activeChannelId, groupChannels]);
 
   // 1. Fetch occurrences for selected recipient
   const [studentOccurrences, setStudentOccurrences] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!selectedRecipient?.id) {
+    if (!selectedRecipient?.id || selectedRecipient?.is_group) {
       setStudentOccurrences([]);
       return;
     }
@@ -1438,6 +1802,9 @@ export function CampusDirectMessages({
 
   // 5. Messages displayed in the chat area for currently active sub-tab (Unified Timeline)
   const displayedMessages = useMemo(() => {
+    if (selectedRecipient?.is_group) {
+      return activeThreadMessages;
+    }
     if (activeSubTab === 'all' || activeSubTab === 'general') {
       // Tab "Alle": MUST be clean and strictly contain human dialogues (including appointment-tied human chat messages),
       // filtering out all automated machine system events!
@@ -1501,11 +1868,11 @@ export function CampusDirectMessages({
     }
 
     return rawMsgs;
-  }, [activeSubTab, activeThreadMessages, allOccurrenceTabs, user.role, user.id, selectedRecipient?.id]);
+  }, [activeSubTab, activeThreadMessages, allOccurrenceTabs, user.role, user.id, selectedRecipient?.id, selectedRecipient?.is_group]);
 
   // Asynchronous Self-Healing: Persist missing reactivation audit record to PostgreSQL if absent
   useEffect(() => {
-    if (!selectedRecipient || !user) return;
+    if (!selectedRecipient || !user || selectedRecipient.is_group) return;
     const syntheticMsg = displayedMessages.find((m: any) => m.is_synthetic && m.message_type === 'cancellation_reset');
     if (syntheticMsg) {
       const persistMissingAudit = async () => {
@@ -1546,6 +1913,27 @@ export function CampusDirectMessages({
       return;
     }
     setRespectWarning(null);
+
+    // Group message dispatch
+    if (selectedRecipient.is_group) {
+      try {
+        const payload: any = {
+          group_id: selectedRecipient.id,
+          sender_id: user.id,
+          recipient_id: user.id,
+          content: content.trim()
+        };
+        if (activeChannelId) {
+          payload.channel_id = activeChannelId;
+        }
+        await supabase.from('campus_direct_messages').insert(payload);
+        await onSendMessage(selectedRecipient.id, content.trim());
+      } catch (err) {
+        console.error('[CampusDirectMessages] Error sending group message:', err);
+      }
+      setTimeout(scrollToBottom, 50);
+      return;
+    }
     
     if (activeSubTab !== 'all' && activeSubTab !== 'general' && activeSubTab !== 'system') {
       const targetOccTab = allOccurrenceTabs.find(tab => tab.id === activeSubTab || (tab.allIds && tab.allIds.includes(activeSubTab)));
@@ -1622,19 +2010,94 @@ export function CampusDirectMessages({
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
                 <MessageSquare size={22} color="#1e293b" style={{ flexShrink: 0 }} />
-                <h2 style={{ fontSize: isMobile ? '20px' : '22px', fontWeight: 900, color: '#1e293b', margin: '0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Nachrichten ({assignedStudents.length})</h2>
+                <h2 style={{ fontSize: isMobile ? '20px' : '22px', fontWeight: 900, color: '#1e293b', margin: '0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  Nachrichten {isStudent ? '' : activeMainTab === 'groups' ? `(${campusGroups.length})` : `(${assignedStudents.length})`}
+                </h2>
               </div>
               <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {isStudent ? 'Kommunikation mit deinen Lehrern' : 'Kommunikation mit deinen Schülern'}
+                {isStudent ? 'Kommunikation mit deinen Lehrern & Gruppen' : activeMainTab === 'groups' ? 'Ensembles, Bands & Projektgruppen' : 'Kommunikation mit deinen Schülern'}
               </p>
             </div>
           </div>
+
+          {/* Teacher Main Switch: Schüler vs. Gruppen */}
+          {!isStudent && (
+            <div style={{
+              display: 'flex',
+              background: '#e2e8f0',
+              padding: '3px',
+              borderRadius: '12px',
+              width: '100%',
+              boxSizing: 'border-box'
+            }}>
+              <button
+                type="button"
+                onClick={() => setActiveMainTab('students')}
+                style={{
+                  flex: 1,
+                  padding: '8px 12px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: activeMainTab === 'students' ? '#ffffff' : 'transparent',
+                  color: activeMainTab === 'students' ? '#0f172a' : '#64748b',
+                  fontSize: '0.82rem',
+                  fontWeight: activeMainTab === 'students' ? 800 : 700,
+                  cursor: 'pointer',
+                  boxShadow: activeMainTab === 'students' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  transition: 'all 0.15s'
+                }}
+              >
+                <User size={15} />
+                <span>Schüler ({assignedStudents.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveMainTab('groups')}
+                style={{
+                  flex: 1,
+                  padding: '8px 12px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: activeMainTab === 'groups' ? '#ffffff' : 'transparent',
+                  color: activeMainTab === 'groups' ? '#0f172a' : '#64748b',
+                  fontSize: '0.82rem',
+                  fontWeight: activeMainTab === 'groups' ? 800 : 700,
+                  cursor: 'pointer',
+                  boxShadow: activeMainTab === 'groups' ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  transition: 'all 0.15s'
+                }}
+              >
+                <Users size={15} />
+                <span>Gruppen ({campusGroups.length})</span>
+                {totalUnreadGroupsCount > 0 && (
+                  <span style={{
+                    background: '#34a853',
+                    color: 'white',
+                    borderRadius: '100px',
+                    padding: '1px 6px',
+                    fontSize: '0.68rem',
+                    fontWeight: 900
+                  }}>
+                    {totalUnreadGroupsCount}
+                  </span>
+                )}
+              </button>
+            </div>
+          )}
           
           <div style={{ position: 'relative', width: '100%', boxSizing: 'border-box' }}>
             <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
             <input 
               type="text" 
-              placeholder={isStudent ? "Lehrkraft suchen..." : "Schüler suchen..."}
+              placeholder={isStudent ? "Suchen..." : activeMainTab === 'groups' ? "Gruppe suchen..." : "Schüler suchen..."}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               style={{
@@ -1698,7 +2161,7 @@ export function CampusDirectMessages({
               }}
             >
               <span>Ungelesen</span>
-              {partnersWithMetadata.filter(p => p.unreadCount > 0).length > 0 && (
+              {(isStudent ? studentCombinedList.filter(p => (p.unreadCount || 0) > 0).length : activeMainTab === 'groups' ? filteredGroupsList.filter(g => (g.unreadCount || 0) > 0).length : partnersWithMetadata.filter(p => p.unreadCount > 0).length) > 0 && (
                 <span style={{
                   background: filterType === 'unread' ? 'white' : '#34a853',
                   color: filterType === 'unread' ? '#34a853' : 'white',
@@ -1711,85 +2174,444 @@ export function CampusDirectMessages({
                   fontSize: '0.65rem',
                   fontWeight: 900
                 }}>
-                  {partnersWithMetadata.filter(p => p.unreadCount > 0).length}
+                  {isStudent ? studentCombinedList.filter(p => (p.unreadCount || 0) > 0).length : activeMainTab === 'groups' ? filteredGroupsList.filter(g => (g.unreadCount || 0) > 0).length : partnersWithMetadata.filter(p => p.unreadCount > 0).length}
                 </span>
               )}
             </button>
           </div>
         </div>
 
-        {/* Partners List with 120px Bottom Clearance for Mobile Nav Bar */}
+        {/* Partners & Groups List with 120px Bottom Clearance for Mobile Nav Bar */}
         <div style={{ flex: 1, overflowY: isMobile ? 'visible' : 'auto', padding: isMobile ? '12px 16px 120px 16px' : '12px', boxSizing: 'border-box' }} className={isMobile ? "" : "custom-scrollbar"}>
-          {finalPartnersList.length === 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '200px', color: '#94a3b8', textAlign: 'center', padding: '20px' }}>
-              <User size={36} style={{ color: '#cbd5e1', marginBottom: '8px' }} />
-              <div style={{ fontSize: '0.85rem', fontWeight: 800 }}>Keine Chatpartner gefunden</div>
-            </div>
-          ) : (
-            finalPartnersList.map(partner => {
-              const isSelected = selectedRecipient?.id === partner.id;
-              
-              return (
+          
+          {/* TEACHER GROUPS VIEW */}
+          {!isStudent && activeMainTab === 'groups' && (
+            <div>
+              {/* Gruppe erstellen Button */}
+              <div style={{ marginBottom: '12px' }}>
                 <button
-                  key={partner.id}
-                  onClick={() => setSelectedRecipient(partner)}
-                  className="hover-scale-mini"
+                  type="button"
+                  onClick={() => setIsCreateGroupModalOpen(true)}
                   style={{
                     width: '100%',
-                    padding: isMobile ? '12px 14px' : '14px 16px',
-                    borderRadius: '16px',
-                    background: isSelected ? 'linear-gradient(135deg, #e6f4ea, #e6f4ea)' : 'transparent',
-                    border: '1px solid transparent',
+                    padding: '12px 16px',
+                    borderRadius: '14px',
+                    border: 'none',
+                    background: '#34a853',
+                    color: '#ffffff',
+                    fontSize: '0.88rem',
+                    fontWeight: 900,
                     cursor: 'pointer',
-                    marginBottom: '6px',
-                    transition: 'all 0.2s',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '12px',
-                    textAlign: 'left',
-                    boxSizing: 'border-box'
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 14px rgba(52, 168, 83, 0.25)',
+                    transition: 'all 0.2s',
+                    minHeight: '44px'
                   }}
+                  className="hover-scale"
                 >
-                  <div style={{ position: 'relative', flexShrink: 0 }}>
-                    <img 
-                      src={resolveCampusAvatar(partner)} 
-                      alt=""
-                      style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover', border: '2px solid white', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}
-                    />
-                    {partner.unreadCount > 0 && (
-                      <div style={{
-                        position: 'absolute',
-                        bottom: '-2px',
-                        right: '-2px',
-                        background: '#ea4335',
-                        color: 'white',
-                        borderRadius: '50%',
-                        width: '18px',
-                        height: '18px',
-                        fontSize: '0.65rem',
-                        fontWeight: 900,
+                  <Plus size={18} strokeWidth={3} />
+                  <span>Gruppe erstellen</span>
+                </button>
+              </div>
+
+              {filteredGroupsList.length === 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '220px', color: '#94a3b8', textAlign: 'center', padding: '20px' }}>
+                  <Users size={38} style={{ color: '#cbd5e1', marginBottom: '8px' }} />
+                  <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>Keine Gruppen gefunden</div>
+                  <div style={{ fontSize: '0.78rem', marginTop: '4px', maxWidth: '240px' }}>
+                    Erstelle deine erste Ensemble-, Band- oder Projektgruppe für deine Schüler!
+                  </div>
+                </div>
+              ) : (
+                filteredGroupsList.map(group => {
+                  const isSelected = selectedRecipient?.is_group && selectedRecipient?.id === group.id;
+                  const groupIconKey = group.icon || group.avatar_icon;
+                  const groupColorKey = group.color || group.color_accent || '#34a853';
+                  const GroupIcon = getGroupIconComponent(groupIconKey);
+
+                  return (
+                    <button
+                      key={`grp-${group.id}`}
+                      onClick={() => {
+                        setSelectedRecipient(group);
+                        setActiveSubTab('all');
+                      }}
+                      className="hover-scale-mini"
+                      style={{
+                        width: '100%',
+                        padding: isMobile ? '12px 14px' : '14px 16px',
+                        borderRadius: '16px',
+                        background: isSelected ? 'linear-gradient(135deg, #e6f4ea, #e6f4ea)' : 'transparent',
+                        border: '1px solid transparent',
+                        cursor: 'pointer',
+                        marginBottom: '6px',
+                        transition: 'all 0.2s',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        border: '2px solid white',
-                        boxShadow: '0 2px 6px rgba(234, 67, 53, 0.45)'
-                      }}>
-                        {partner.unreadCount}
+                        gap: '12px',
+                        textAlign: 'left',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <div style={{ position: 'relative', flexShrink: 0 }}>
+                        <div style={{
+                          width: '42px',
+                          height: '42px',
+                          borderRadius: '14px',
+                          background: `${groupColorKey}18`,
+                          border: `1.5px solid ${groupColorKey}40`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          <GroupIcon size={22} color={groupColorKey} strokeWidth={2.4} />
+                        </div>
+                        {(group.unreadCount || 0) > 0 && (
+                          <div style={{
+                            position: 'absolute',
+                            bottom: '-2px',
+                            right: '-2px',
+                            background: '#34a853',
+                            color: 'white',
+                            borderRadius: '50%',
+                            width: '18px',
+                            height: '18px',
+                            fontSize: '0.65rem',
+                            fontWeight: 900,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: '2px solid white',
+                            boxShadow: '0 2px 6px rgba(52, 168, 83, 0.45)'
+                          }}>
+                            {group.unreadCount}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
 
-                  <div style={{ flex: 1, overflow: 'hidden' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                      <span style={{ fontWeight: 800, fontSize: '0.9rem', color: isSelected ? '#34a853' : '#1e293b' }}>
-                        {formatStudentDisplayName(partner)}
-                      </span>
-                      {partner.lastMessage && (
-                        <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#94a3b8' }}>
-                          {new Date(partner.lastMessage.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
-                        </span>
-                      )}
-                    </div>
+                      <div style={{ flex: 1, overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                          <span style={{ fontWeight: 800, fontSize: '0.9rem', color: isSelected ? '#34a853' : '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {group.name}
+                          </span>
+                          {group.lastMessageTime && (
+                            <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#94a3b8', flexShrink: 0, marginLeft: '6px' }}>
+                              {new Date(group.lastMessageTime).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+                            </span>
+                          )}
+                        </div>
+                        
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
+                          <span style={{
+                            fontSize: '0.74rem',
+                            fontWeight: (group.unreadCount || 0) > 0 ? 800 : 500,
+                            color: (group.unreadCount || 0) > 0 ? '#1e293b' : '#64748b',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            flex: 1
+                          }}>
+                            {group.lastMessage?.content ? cleanChatMessageContent(group.lastMessage.content) : `${group.members_count || group.members?.length || 0} Teilnehmer`}
+                          </span>
+                          {group.admin_only_messaging && (
+                            <span style={{
+                              fontSize: '0.6rem',
+                              fontWeight: 800,
+                              background: '#fef3c7',
+                              color: '#92400e',
+                              padding: '1px 5px',
+                              borderRadius: '4px',
+                              flexShrink: 0
+                            }}>
+                              Ankündigung
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* STUDENT COMBINED LIST (TEACHERS + GROUPS) */}
+          {isStudent && (
+            <div>
+              {studentCombinedList.length === 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '200px', color: '#94a3b8', textAlign: 'center', padding: '20px' }}>
+                  <User size={36} style={{ color: '#cbd5e1', marginBottom: '8px' }} />
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800 }}>Keine Chats oder Gruppen gefunden</div>
+                </div>
+              ) : (
+                studentCombinedList.map(item => {
+                  const isSelected = item.is_group 
+                    ? (selectedRecipient?.is_group && selectedRecipient?.id === item.id)
+                    : (!selectedRecipient?.is_group && selectedRecipient?.id === item.id);
+
+                  if (item.is_group) {
+                    const groupIconKey = item.icon || item.avatar_icon;
+                    const groupColorKey = item.color || item.color_accent || '#34a853';
+                    const GroupIcon = getGroupIconComponent(groupIconKey);
+                    return (
+                      <button
+                        key={`std-grp-${item.id}`}
+                        onClick={() => {
+                          setSelectedRecipient(item);
+                          setActiveSubTab('all');
+                        }}
+                        className="hover-scale-mini"
+                        style={{
+                          width: '100%',
+                          padding: isMobile ? '12px 14px' : '14px 16px',
+                          borderRadius: '16px',
+                          background: isSelected ? 'linear-gradient(135deg, #e6f4ea, #e6f4ea)' : 'transparent',
+                          border: '1px solid transparent',
+                          cursor: 'pointer',
+                          marginBottom: '6px',
+                          transition: 'all 0.2s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          textAlign: 'left',
+                          boxSizing: 'border-box'
+                        }}
+                      >
+                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                          <div style={{
+                            width: '42px',
+                            height: '42px',
+                            borderRadius: '14px',
+                            background: `${groupColorKey}18`,
+                            border: `1.5px solid ${groupColorKey}40`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            <GroupIcon size={22} color={groupColorKey} strokeWidth={2.4} />
+                          </div>
+                          {(item.unreadCount || 0) > 0 && (
+                            <div style={{
+                              position: 'absolute',
+                              bottom: '-2px',
+                              right: '-2px',
+                              background: '#34a853',
+                              color: 'white',
+                              borderRadius: '50%',
+                              width: '18px',
+                              height: '18px',
+                              fontSize: '0.65rem',
+                              fontWeight: 900,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              border: '2px solid white',
+                              boxShadow: '0 2px 6px rgba(52, 168, 83, 0.45)'
+                            }}>
+                              {item.unreadCount}
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={{ flex: 1, overflow: 'hidden' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+                              <span style={{ fontWeight: 800, fontSize: '0.9rem', color: isSelected ? '#34a853' : '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {item.name}
+                              </span>
+                              <span style={{
+                                fontSize: '0.62rem',
+                                fontWeight: 850,
+                                background: '#e6f4ea',
+                                color: '#166534',
+                                padding: '1px 6px',
+                                borderRadius: '6px',
+                                flexShrink: 0
+                              }}>
+                                Gruppe
+                              </span>
+                            </div>
+                            {item.lastMessageTime && (
+                              <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#94a3b8', flexShrink: 0, marginLeft: '6px' }}>
+                                {new Date(item.lastMessageTime).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+                              </span>
+                            )}
+                          </div>
+                          
+                          <p style={{
+                            fontSize: '0.74rem',
+                            fontWeight: (item.unreadCount || 0) > 0 ? 800 : 500,
+                            color: (item.unreadCount || 0) > 0 ? '#1e293b' : '#64748b',
+                            margin: '2px 0 0 0',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}>
+                            {item.lastMessage?.content ? cleanChatMessageContent(item.lastMessage.content) : `${item.members_count || 0} Teilnehmer`}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  }
+
+                  // Student 1:1 Teacher Item
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setSelectedRecipient(item)}
+                      className="hover-scale-mini"
+                      style={{
+                        width: '100%',
+                        padding: isMobile ? '12px 14px' : '14px 16px',
+                        borderRadius: '16px',
+                        background: isSelected ? 'linear-gradient(135deg, #e6f4ea, #e6f4ea)' : 'transparent',
+                        border: '1px solid transparent',
+                        cursor: 'pointer',
+                        marginBottom: '6px',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        textAlign: 'left',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <div style={{ position: 'relative', flexShrink: 0 }}>
+                        <img 
+                          src={resolveCampusAvatar(item)} 
+                          alt="" 
+                          style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover', border: '2px solid white', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }} 
+                        />
+                        {(item.unreadCount || 0) > 0 && (
+                          <div style={{
+                            position: 'absolute',
+                            bottom: '-2px',
+                            right: '-2px',
+                            background: '#ea4335',
+                            color: 'white',
+                            borderRadius: '50%',
+                            width: '18px',
+                            height: '18px',
+                            fontSize: '0.65rem',
+                            fontWeight: 900,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: '2px solid white',
+                            boxShadow: '0 2px 6px rgba(234, 67, 53, 0.45)'
+                          }}>
+                            {item.unreadCount}
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ flex: 1, overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                          <span style={{ fontWeight: 800, fontSize: '0.9rem', color: isSelected ? '#34a853' : '#1e293b' }}>
+                            {formatStudentDisplayName(item)}
+                          </span>
+                          {item.lastMessage && (
+                            <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#94a3b8' }}>
+                              {new Date(item.lastMessage.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+                            </span>
+                          )}
+                        </div>
+                        
+                        <p style={{
+                          fontSize: '0.75rem',
+                          fontWeight: (item.unreadCount || 0) > 0 ? 800 : 500,
+                          color: (item.unreadCount || 0) > 0 ? '#1e293b' : '#64748b',
+                          margin: '2px 0 0 0',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}>
+                          {item.lastMessage?.content ? cleanChatMessageContent(item.lastMessage.content) : 'Keine Nachrichten'}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* TEACHER STUDENTS LIST */}
+          {!isStudent && activeMainTab === 'students' && (
+            <div>
+              {finalPartnersList.length === 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '200px', color: '#94a3b8', textAlign: 'center', padding: '20px' }}>
+                  <User size={36} style={{ color: '#cbd5e1', marginBottom: '8px' }} />
+                  <div style={{ fontSize: '0.85rem', fontWeight: 800 }}>Keine Chatpartner gefunden</div>
+                </div>
+              ) : (
+                finalPartnersList.map(partner => {
+                  const isSelected = !selectedRecipient?.is_group && selectedRecipient?.id === partner.id;
+                  
+                  return (
+                    <button
+                      key={partner.id}
+                      onClick={() => setSelectedRecipient(partner)}
+                      className="hover-scale-mini"
+                      style={{
+                        width: '100%',
+                        padding: isMobile ? '12px 14px' : '14px 16px',
+                        borderRadius: '16px',
+                        background: isSelected ? 'linear-gradient(135deg, #e6f4ea, #e6f4ea)' : 'transparent',
+                        border: '1px solid transparent',
+                        cursor: 'pointer',
+                        marginBottom: '6px',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        textAlign: 'left',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <div style={{ position: 'relative', flexShrink: 0 }}>
+                        <img 
+                          src={resolveCampusAvatar(partner)} 
+                          alt="" 
+                          style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover', border: '2px solid white', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }} 
+                        />
+                        {partner.unreadCount > 0 && (
+                          <div style={{
+                            position: 'absolute',
+                            bottom: '-2px',
+                            right: '-2px',
+                            background: '#ea4335',
+                            color: 'white',
+                            borderRadius: '50%',
+                            width: '18px',
+                            height: '18px',
+                            fontSize: '0.65rem',
+                            fontWeight: 900,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: '2px solid white',
+                            boxShadow: '0 2px 6px rgba(234, 67, 53, 0.45)'
+                          }}>
+                            {partner.unreadCount}
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ flex: 1, overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                          <span style={{ fontWeight: 800, fontSize: '0.9rem', color: isSelected ? '#34a853' : '#1e293b' }}>
+                            {formatStudentDisplayName(partner)}
+                          </span>
+                          {partner.lastMessage && (
+                            <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#94a3b8' }}>
+                              {new Date(partner.lastMessage.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+                            </span>
+                          )}
+                        </div>
                     
                     <p style={{
                       fontSize: '0.75rem',
@@ -1830,6 +2652,8 @@ export function CampusDirectMessages({
                 </button>
               );
             })
+          )}
+            </div>
           )}
         </div>
       </div>
@@ -1889,34 +2713,136 @@ export function CampusDirectMessages({
                     <ArrowLeft size={20} />
                   </button>
                 )}
-                <img 
-                  src={resolveCampusAvatar(selectedRecipient)} 
-                  alt=""
-                  style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255, 255, 255, 0.85)', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
-                />
-                <div>
-                  <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>{formatStudentDisplayName(selectedRecipient)}</span>
-                    <span style={{
-                      fontSize: '0.62rem',
-                      fontWeight: 900,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      background: 'rgba(255, 255, 255, 0.25)',
-                      color: '#ffffff',
-                      padding: '2px 8px',
-                      borderRadius: '6px',
-                      display: 'inline-block',
-                      backdropFilter: 'blur(4px)'
-                    }}>
-                      {selectedRecipient.role === 'student' ? 'Schüler' : 'Lehrer'}
-                    </span>
-                  </h4>
-                  <p style={{ margin: '3px 0 0 0', fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <MessageSquare size={12} color="#ffffff" />
-                    <span>Direktnachrichten mit {formatStudentDisplayName(selectedRecipient)}</span>
-                  </p>
-                </div>
+                {selectedRecipient.is_group ? (
+                  <>
+                    {(() => {
+                      const GroupIcon = getGroupIconComponent(selectedRecipient.icon || selectedRecipient.avatar_icon);
+                      return (
+                        <div style={{
+                          width: '46px',
+                          height: '46px',
+                          borderRadius: '16px',
+                          background: 'rgba(255, 255, 255, 0.25)',
+                          border: '2px solid rgba(255, 255, 255, 0.85)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                          flexShrink: 0
+                        }}>
+                          <GroupIcon size={24} color="#ffffff" strokeWidth={2.4} />
+                        </div>
+                      );
+                    })()}
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span>{selectedRecipient.name}</span>
+                        {(() => {
+                          const currChannel = groupChannels.find(c => c.id === activeChannelId);
+                          if (!currChannel) return null;
+                          return (
+                            <span style={{
+                              fontSize: '0.72rem',
+                              fontWeight: 800,
+                              background: 'rgba(255, 255, 255, 0.28)',
+                              color: '#ffffff',
+                              padding: '2px 10px',
+                              borderRadius: '100px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              backdropFilter: 'blur(4px)'
+                            }}>
+                              {currChannel.is_announcement_only ? <Bell size={11} color="#facc15" /> : <Hash size={11} color="#ffffff" />}
+                              <span>{currChannel.name}</span>
+                            </span>
+                          );
+                        })()}
+                        <span style={{
+                          fontSize: '0.62rem',
+                          fontWeight: 900,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          background: 'rgba(255, 255, 255, 0.25)',
+                          color: '#ffffff',
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          display: 'inline-block',
+                          backdropFilter: 'blur(4px)'
+                        }}>
+                          Gruppe
+                        </span>
+                        {selectedRecipient.admin_only_messaging && (
+                          <span style={{
+                            fontSize: '0.62rem',
+                            fontWeight: 900,
+                            background: '#fef3c7',
+                            color: '#92400e',
+                            padding: '2px 8px',
+                            borderRadius: '6px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}>
+                            <Lock size={10} color="#92400e" />
+                            Ankündigungskanal
+                          </span>
+                        )}
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => setShowGroupInfoModal(true)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          padding: '3px 0 0 0',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          color: 'rgba(255, 255, 255, 0.9)',
+                          fontSize: '0.75rem',
+                          fontWeight: 700
+                        }}
+                      >
+                        <Users size={12} color="#ffffff" />
+                        <span>{selectedRecipient.members_count || selectedRecipient.members?.length || 0} Teilnehmer • Details &amp; Mitglieder</span>
+                        <Info size={12} color="#ffffff" style={{ opacity: 0.8 }} />
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <img 
+                      src={resolveCampusAvatar(selectedRecipient)} 
+                      alt="" 
+                      style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255, 255, 255, 0.85)', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }} 
+                    />
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span>{formatStudentDisplayName(selectedRecipient)}</span>
+                        <span style={{
+                          fontSize: '0.62rem',
+                          fontWeight: 900,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          background: 'rgba(255, 255, 255, 0.25)',
+                          color: '#ffffff',
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          display: 'inline-block',
+                          backdropFilter: 'blur(4px)'
+                        }}>
+                          {selectedRecipient.role === 'student' ? 'Schüler' : 'Lehrer'}
+                        </span>
+                      </h4>
+                      <p style={{ margin: '3px 0 0 0', fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.9)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <MessageSquare size={12} color="#ffffff" />
+                        <span>Direktnachrichten mit {formatStudentDisplayName(selectedRecipient)}</span>
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Status Badges */}
@@ -1942,7 +2868,172 @@ export function CampusDirectMessages({
               </div>
             </div>
 
-            {/* Apple Safari/Messages Style Dynamic Date-Based Tab Bar with Archive */}
+            {/* 💬 Teams-Style Channel Tab Bar (Only for Group Chats) */}
+            {selectedRecipient.is_group && (
+              <div 
+                role="tablist"
+                aria-label="Gruppen-Kanäle"
+                style={{
+                  display: 'flex',
+                  gap: '8px',
+                  padding: '10px 16px',
+                  background: '#ffffff',
+                  borderBottom: '1px solid #f1f5f9',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  position: 'relative',
+                  zIndex: 50
+                }}
+              >
+                {/* Scrollable Channel Pills */}
+                <div style={{
+                  display: 'flex',
+                  gap: '6px',
+                  alignItems: 'center',
+                  overflowX: 'auto',
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none',
+                  flex: 1,
+                  minWidth: 0,
+                  paddingRight: '6px'
+                }}>
+                  {groupChannels.map((channel) => {
+                    const isActive = activeChannelId === channel.id;
+                    const isAnnounce = channel.is_announcement_only;
+                    const IconComp = isAnnounce ? Bell : Hash;
+
+                    // Unread count for this channel
+                    const unreadCount = (campusMessages || []).filter((m: any) => {
+                      if (m.group_id !== selectedRecipient.id) return false;
+                      if (m.sender_id === user?.id) return false;
+                      const msgChannelMatches = m.channel_id ? m.channel_id === channel.id : channel.is_default;
+                      if (!msgChannelMatches) return false;
+                      const myMembership = selectedRecipient.members?.find((mb: any) => mb.user_id === user?.id);
+                      const lastRead = myMembership?.last_read_at ? new Date(myMembership.last_read_at).getTime() : 0;
+                      return new Date(m.created_at).getTime() > lastRead;
+                    }).length;
+
+                    const canDelete = !channel.is_default && !isStudent;
+
+                    return (
+                      <div
+                        key={channel.id}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '2px',
+                          background: isActive ? '#34a853' : '#f1f5f9',
+                          borderRadius: '100px',
+                          padding: canDelete ? '2px 4px 2px 10px' : '2px 12px',
+                          boxShadow: isActive ? '0 2px 6px rgba(52, 168, 83, 0.28)' : 'none',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={isActive}
+                          aria-controls={`panel-${channel.id}`}
+                          id={`tab-${channel.id}`}
+                          onClick={() => setActiveChannelId(channel.id)}
+                          style={{
+                            border: 'none',
+                            background: 'transparent',
+                            color: isActive ? '#ffffff' : '#334155',
+                            padding: '4px 0',
+                            fontSize: '0.80rem',
+                            fontWeight: isActive ? 800 : 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            whiteSpace: 'nowrap',
+                            touchAction: 'manipulation'
+                          }}
+                        >
+                          <IconComp size={13} color={isActive ? '#ffffff' : (isAnnounce ? '#eab308' : '#64748b')} strokeWidth={2.4} />
+                          <span>{channel.name}</span>
+                          {unreadCount > 0 && (
+                            <span style={{
+                              marginLeft: '3px',
+                              background: isActive ? '#ffffff' : '#ea4335',
+                              color: isActive ? '#15803d' : '#ffffff',
+                              padding: '1px 6px',
+                              borderRadius: '100px',
+                              fontSize: '0.64rem',
+                              fontWeight: 900
+                            }}>
+                              {unreadCount}
+                            </span>
+                          )}
+                        </button>
+
+                        {canDelete && (
+                          <button
+                            type="button"
+                            title={`Kanal #${channel.name} löschen`}
+                            aria-label={`Kanal #${channel.name} löschen`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteChannel(channel.id, channel.name);
+                            }}
+                            style={{
+                              border: 'none',
+                              background: 'transparent',
+                              color: isActive ? 'rgba(255, 255, 255, 0.8)' : '#94a3b8',
+                              cursor: 'pointer',
+                              padding: '3px 4px',
+                              borderRadius: '50%',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              marginLeft: '2px',
+                              transition: 'color 0.15s'
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.color = '#dc2626'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.color = isActive ? 'rgba(255, 255, 255, 0.8)' : '#94a3b8'; }}
+                          >
+                            <Trash2 size={12} strokeWidth={2.2} />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* + Kanal Button (Teachers / Admins only) */}
+                {!isStudent && (
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateChannelModal(true)}
+                    style={{
+                      padding: '5px 12px',
+                      borderRadius: '100px',
+                      border: '1px dashed #cbd5e1',
+                      background: '#ffffff',
+                      color: '#0f172a',
+                      fontSize: '0.75rem',
+                      fontWeight: 750,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0,
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                      transition: 'all 0.15s ease'
+                    }}
+                    className="hover-scale"
+                  >
+                    <Plus size={13} color="#15803d" strokeWidth={2.6} />
+                    <span>Kanal</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Apple Safari/Messages Style Dynamic Date-Based Tab Bar with Archive (Only for 1:1 Direct Chats) */}
+            {!selectedRecipient.is_group && (
             <div style={{ 
               display: 'flex', 
               gap: '8px', 
@@ -2158,17 +3249,24 @@ export function CampusDirectMessages({
                 );
               })()}
             </div>
+            )}
 
             {/* Message History */}
-            <div style={{ 
-              flex: 1, 
-              padding: isMobile ? '20px 16px' : '28px', 
-              overflowY: 'auto', 
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: '16px',
-              background: '#fafbfc'
-            }} className="custom-scrollbar">
+            <div 
+              role="tabpanel"
+              id={selectedRecipient.is_group ? `panel-${activeChannelId || 'default'}` : `panel-${activeSubTab}`}
+              aria-labelledby={selectedRecipient.is_group ? `tab-${activeChannelId || 'default'}` : undefined}
+              style={{ 
+                flex: 1, 
+                padding: isMobile ? '20px 16px' : '28px', 
+                overflowY: 'auto', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '16px',
+                background: '#fafbfc'
+              }} 
+              className="custom-scrollbar"
+            >
               {/* Apple Senior App Designer - Glassmorphic Calendar Event Card */}
               {activeSubTab !== 'all' && activeSubTab !== 'general' && (() => {
                 const currentTab = activeOccurrenceTabs.find(t => t.id === activeSubTab || (t.allIds && t.allIds.includes(activeSubTab)));
@@ -2457,10 +3555,10 @@ export function CampusDirectMessages({
                     <MessageSquare size={30} strokeWidth={2} />
                   </div>
                   <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
-                    Noch keine Nachrichten mit {formatStudentDisplayName(selectedRecipient)}
+                    {selectedRecipient?.is_group ? `Noch keine Nachrichten in „${selectedRecipient.name}“` : `Noch keine Nachrichten mit ${formatStudentDisplayName(selectedRecipient)}`}
                   </div>
                   <div style={{ fontSize: '0.8rem', color: '#64748b', maxWidth: '320px' }}>
-                    Schreibe eine persönliche Nachricht oder verwalte terminbezogene Shoutbox-Anfragen!
+                    {selectedRecipient?.is_group ? 'Beginne den Austausch mit dieser Gruppe!' : 'Schreibe eine persönliche Nachricht oder verwalte terminbezogene Shoutbox-Anfragen!'}
                   </div>
                 </div>
               ) : (
@@ -2518,6 +3616,14 @@ export function CampusDirectMessages({
 
                   const timeStr = msgDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
+                  // Group Chat: resolve individual sender information
+                  const senderUser = selectedRecipient?.is_group
+                    ? (allKnownUsersMap.get(msg.sender_id) || { id: msg.sender_id, first_name: 'Mitglied', last_name: '', role: 'student' })
+                    : selectedRecipient;
+
+                  const isSenderTeacher = (senderUser?.role || '').toLowerCase() === 'teacher' ||
+                    (Array.isArray(senderUser?.roles) && senderUser.roles.includes('teacher'));
+
                   return (
                     <React.Fragment key={msg.id || `msg-${idx}`}>
                       {/* Natural Date Separator Badge */}
@@ -2554,7 +3660,7 @@ export function CampusDirectMessages({
                         {!isSelf && (
                           !isContinuation ? (
                             <img
-                              src={resolveCampusAvatar(selectedRecipient)}
+                              src={resolveCampusAvatar(senderUser)}
                               alt=""
                               style={{
                                 width: '32px',
@@ -2574,19 +3680,37 @@ export function CampusDirectMessages({
 
                         {/* Chat Bubble with natural sizing, sender name, and inline metadata */}
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: isSelf ? 'flex-end' : 'flex-start', maxWidth: isMobile ? '80%' : '68%' }}>
-                          {/* Sender Name & Parent Badge above incoming bubble */}
+                          {/* Sender Name & Role Badges above incoming bubble */}
                           {!isSelf && (!isContinuation || (msg.sender_role === 'parent' && prevMsg?.sender_role !== 'parent')) && (
                             <div style={{
                               fontSize: '0.72rem',
                               fontWeight: 800,
-                              color: msg.sender_role === 'parent' ? '#1d4ed8' : '#34a853',
+                              color: isSenderTeacher ? '#15803d' : (msg.sender_role === 'parent' ? '#1d4ed8' : '#475569'),
                               marginBottom: '3px',
                               marginLeft: '4px',
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '6px'
                             }}>
-                              <span>{formatStudentDisplayName(selectedRecipient)}</span>
+                              <span>{formatStudentDisplayName(senderUser)}</span>
+                              {isSenderTeacher && (
+                                <span style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  padding: '1px 6px',
+                                  borderRadius: '6px',
+                                  background: '#f0fdf4',
+                                  border: '1px solid #bbf7d0',
+                                  color: '#15803d',
+                                  fontSize: '0.65rem',
+                                  fontWeight: 800,
+                                  lineHeight: 1
+                                }}>
+                                  <GraduationCap size={10} color="#15803d" strokeWidth={2.4} />
+                                  <span>Lehrkraft</span>
+                                </span>
+                              )}
                               {msg.sender_role === 'parent' && (
                                 <span style={{
                                   display: 'inline-flex',
@@ -2682,7 +3806,62 @@ export function CampusDirectMessages({
             </div>
 
             {/* Input Composer with Quick Replies */}
-            {isStudent && (user?.parent_allow_chat === false || (typeof window !== 'undefined' && (localStorage.getItem('campus_allow_chat') === 'false' || localStorage.getItem(`groovelab_parent_allow_chat_${user?.id}`) === 'false'))) && (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_parent_unlocked_global') !== 'true') ? (
+            {(() => {
+              const currentActiveChannel = groupChannels.find(c => c.id === activeChannelId);
+              const isChannelAnnouncementOnly = selectedRecipient?.is_group && (
+                currentActiveChannel?.is_announcement_only ||
+                (!currentActiveChannel && selectedRecipient?.admin_only_messaging)
+              );
+
+              if (isStudent && isChannelAnnouncementOnly) {
+                return (
+                  <div style={{
+                    padding: '14px 20px',
+                    borderTop: '1px solid #e2e8f0',
+                    background: '#f8fafc',
+                    color: '#64748b',
+                    fontSize: '0.84rem',
+                    fontWeight: 700,
+                    display: 'flex',
+                    flexDirection: isMobile ? 'column' : 'row',
+                    alignItems: isMobile ? 'stretch' : 'center',
+                    justifyContent: 'space-between',
+                    gap: '12px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Lock size={16} color="#94a3b8" style={{ flexShrink: 0 }} />
+                      <span>Dies ist ein Ankündigungskanal. Nur die Lehrkraft kann freie Nachrichten verfassen.</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => sendDirectQuickMessage('✓ Gesehen & notiert')}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '100px',
+                        background: '#ffffff',
+                        border: '1px solid #bbf7d0',
+                        color: '#15803d',
+                        fontSize: '0.78rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        boxShadow: '0 1px 3px rgba(52, 168, 83, 0.08)',
+                        whiteSpace: 'nowrap',
+                        touchAction: 'manipulation'
+                      }}
+                      className="hover-scale"
+                    >
+                      <CheckCheck size={14} color="#15803d" strokeWidth={2.4} />
+                      <span>Gesehen &amp; notiert</span>
+                    </button>
+                  </div>
+                );
+              }
+              return null;
+            })() || (isStudent && (user?.parent_allow_chat === false || (typeof window !== 'undefined' && (localStorage.getItem('campus_allow_chat') === 'false' || localStorage.getItem(`groovelab_parent_allow_chat_${user?.id}`) === 'false'))) && (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_parent_unlocked_global') !== 'true') ? (
               <div style={{
                 padding: '14px 20px',
                 borderTop: '1px solid #e2e8f0',
@@ -2837,7 +4016,7 @@ export function CampusDirectMessages({
                 }}>
                   <ShieldCheck size={14} color="#16a34a" style={{ flexShrink: 0 }} />
                   <span style={{ flex: 1, lineHeight: 1.35 }}>
-                    <strong>Didaktischer Schul-Chat (§ 8a SGB VIII):</strong> Nur für Unterrichtszwecke • Für Erziehungsberechtigte transparent einsehbar.
+                    <strong>Didaktischer Schul-Chat:</strong> Nur für Unterrichtszwecke • Für Erziehungsberechtigte transparent einsehbar.
                   </span>
                 </div>
 
@@ -2950,7 +4129,7 @@ export function CampusDirectMessages({
                   </button>
                 </form>
               </div>
-            )}
+            ))}
           </div>
         ) : (
           /* Campus-Hero Empty State */
@@ -3301,6 +4480,308 @@ export function CampusDirectMessages({
             >
               Abbrechen
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 🚀 Modal: Gruppe erstellen Wizard */}
+      <CampusCreateGroupModal
+        isOpen={isCreateGroupModalOpen}
+        onClose={() => setIsCreateGroupModalOpen(false)}
+        assignedStudents={assignedStudents}
+        currentUserId={user?.id || ''}
+        onGroupCreated={(newGroup) => {
+          fetchCampusGroups();
+          if (newGroup) {
+            setSelectedRecipient({ ...newGroup, is_group: true });
+            setActiveMainTab('groups');
+          }
+        }}
+      />
+
+      {/* 📢 Modal: Kanal erstellen Wizard (Microsoft Teams-Style) */}
+      <CampusCreateChannelModal
+        isOpen={showCreateChannelModal}
+        onClose={() => setShowCreateChannelModal(false)}
+        groupId={selectedRecipient?.id || ''}
+        groupName={selectedRecipient?.name || 'Gruppen-Chat'}
+        onChannelCreated={(newChan) => {
+          if (selectedRecipient?.id) {
+            fetchGroupChannels(selectedRecipient.id);
+          }
+          if (newChan?.id) {
+            setActiveChannelId(newChan.id);
+          }
+        }}
+      />
+
+      {/* ℹ️ Modal: Gruppen-Details & Mitgliederliste */}
+      {showGroupInfoModal && selectedRecipient?.is_group && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Gruppen-Details"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '16px'
+          }}
+          onClick={() => setShowGroupInfoModal(false)}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              borderRadius: '28px',
+              maxWidth: '520px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              display: 'flex',
+              flexDirection: 'column',
+              boxSizing: 'border-box'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Banner */}
+            <div style={{
+              padding: '24px',
+              background: 'linear-gradient(135deg, #15803d 0%, #22c55e 100%)',
+              color: '#ffffff',
+              borderRadius: '28px 28px 0 0',
+              position: 'relative'
+            }}>
+              <button
+                type="button"
+                onClick={() => setShowGroupInfoModal(false)}
+                aria-label="Schließen"
+                style={{
+                  position: 'absolute',
+                  top: '18px',
+                  right: '18px',
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '50%',
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  border: 'none',
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  backdropFilter: 'blur(4px)'
+                }}
+              >
+                ✕
+              </button>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div style={{
+                  width: '60px',
+                  height: '60px',
+                  borderRadius: '18px',
+                  background: '#ffffff',
+                  color: selectedRecipient.color || selectedRecipient.color_accent || '#15803d',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 14px rgba(0,0,0,0.1)',
+                  flexShrink: 0
+                }}>
+                  {React.createElement(getGroupIconComponent(selectedRecipient.icon || selectedRecipient.avatar_icon), { size: 30, strokeWidth: 2.3 })}
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#ffffff' }}>
+                    {selectedRecipient.name}
+                  </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                    <span style={{
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      background: 'rgba(255, 255, 255, 0.2)',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      backdropFilter: 'blur(4px)'
+                    }}>
+                      Gruppe • {groupMembersDetails.length} Mitglieder
+                    </span>
+                    {selectedRecipient.admin_only_messaging && (
+                      <span style={{
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        background: 'rgba(255, 255, 255, 0.2)',
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        backdropFilter: 'blur(4px)'
+                      }}>
+                        <Lock size={10} color="#ffffff" />
+                        Ankündigungskanal
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {selectedRecipient.description && (
+                <div style={{
+                  marginTop: '16px',
+                  fontSize: '0.84rem',
+                  color: 'rgba(255, 255, 255, 0.9)',
+                  lineHeight: 1.45,
+                  padding: '10px 14px',
+                  background: 'rgba(0, 0, 0, 0.12)',
+                  borderRadius: '12px'
+                }}>
+                  {selectedRecipient.description}
+                </div>
+              )}
+            </div>
+
+            {/* Member List */}
+            <div style={{ padding: '20px 24px', flex: 1 }}>
+              <div style={{
+                fontSize: '0.78rem',
+                fontWeight: 900,
+                color: '#64748b',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                marginBottom: '12px'
+              }}>
+                Mitglieder ({groupMembersDetails.length})
+              </div>
+
+              {groupMembersLoading ? (
+                <div style={{ textAlign: 'center', padding: '24px', color: '#94a3b8', fontSize: '0.85rem' }}>
+                  Mitglieder laden...
+                </div>
+              ) : groupMembersDetails.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '24px', color: '#94a3b8', fontSize: '0.85rem' }}>
+                  Keine Mitgliederinformationen gefunden.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {groupMembersDetails.map((m: any) => {
+                    const isGroupAdmin = m.member_role === 'admin' || m.id === selectedRecipient.creator_id;
+                    const isSelfMember = m.id === user?.id;
+
+                    return (
+                      <div
+                        key={m.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '10px 14px',
+                          borderRadius: '14px',
+                          background: '#f8fafc',
+                          border: '1px solid #f1f5f9'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                          <img
+                            src={resolveCampusAvatar(m)}
+                            alt=""
+                            style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '50%',
+                              objectFit: 'cover',
+                              border: '1.5px solid #e2e8f0',
+                              flexShrink: 0
+                            }}
+                          />
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{
+                              fontSize: '0.88rem',
+                              fontWeight: 800,
+                              color: '#0f172a',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px'
+                            }}>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {formatStudentDisplayName(m)}
+                              </span>
+                              {isSelfMember && (
+                                <span style={{
+                                  fontSize: '0.68rem',
+                                  color: '#64748b',
+                                  fontWeight: 600
+                                }}>
+                                  (Du)
+                                </span>
+                              )}
+                            </div>
+                            {m.instrument && (
+                              <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
+                                {m.instrument}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div>
+                          {isGroupAdmin ? (
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '3px 9px',
+                              borderRadius: '100px',
+                              background: '#f0fdf4',
+                              border: '1px solid #bbf7d0',
+                              color: '#15803d',
+                              fontSize: '0.70rem',
+                              fontWeight: 800
+                            }}>
+                              <GraduationCap size={11} color="#15803d" />
+                              <span>Gruppenleitung</span>
+                            </span>
+                          ) : (
+                            <span style={{
+                              padding: '3px 9px',
+                              borderRadius: '100px',
+                              background: '#f1f5f9',
+                              color: '#64748b',
+                              fontSize: '0.70rem',
+                              fontWeight: 700
+                            }}>
+                              Mitglied
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Footer Notice */}
+            <div style={{
+              padding: '14px 24px',
+              borderTop: '1px solid #f1f5f9',
+              background: '#fafbfc',
+              borderRadius: '0 0 28px 28px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '0.72rem',
+              color: '#64748b',
+              fontWeight: 600
+            }}>
+              <ShieldCheck size={14} color="#15803d" style={{ flexShrink: 0 }} />
+              <span>Didaktischer Schul-Chat • Für Erziehungsberechtigte transparent einsehbar</span>
+            </div>
           </div>
         </div>
       )}

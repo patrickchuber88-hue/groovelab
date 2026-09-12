@@ -70,7 +70,7 @@ export function TrustSafetyTab() {
         schoolName: 'Musäk Bad Säckingen',
         playlistId: 'pl_sommer_2026',
         playlistTitle: 'Mein Sommerkonzert 2026',
-        reportedUrl: 'https://app.campus-groovelab.de/bio/demo_student?pl=pl_sommer_2026&anon=1',
+        reportedUrl: 'https://campus-groovelab.de/bio/demo_student?pl=pl_sommer_2026&anon=1',
         reason: 'Unbefugte Verlinkung in Social Media (Instagram Story)',
         timestamp: '15.08.2026, 14:22:08 MESZ',
         active: true,
@@ -99,7 +99,7 @@ export function TrustSafetyTab() {
             schoolName: d.school_name || 'Unbekannt',
             playlistId: d.playlist_id,
             playlistTitle: undefined,
-            reportedUrl: d.reported_url || `https://app.campus-groovelab.de/bio/${d.target_id}`,
+            reportedUrl: d.reported_url || `https://campus-groovelab.de/bio/${d.target_id}`,
             reason: d.reason,
             timestamp: new Date(d.blocked_at).toLocaleString('de-DE', { timeZone: 'Europe/Berlin' }) + ' MESZ',
             active: d.is_active,
@@ -285,7 +285,7 @@ export function TrustSafetyTab() {
       schoolName: resolvedResult.schoolName,
       playlistId: resolvedResult.playlistId,
       playlistTitle: resolvedResult.playlistTitle,
-      reportedUrl: inputUrl || `https://app.campus-groovelab.de/bio/${resolvedResult.studentId}`,
+      reportedUrl: inputUrl || `https://campus-groovelab.de/bio/${resolvedResult.studentId}`,
       reason: selectedReason,
       timestamp: timestamp,
       active: true,
@@ -301,7 +301,7 @@ export function TrustSafetyTab() {
         p_school_name: resolvedResult.schoolName,
         p_playlist_id: resolvedResult.playlistId || 'all',
         p_playlist_title: resolvedResult.playlistTitle || null,
-        p_reported_url: inputUrl || `https://app.campus-groovelab.de/bio/${resolvedResult.studentId}`,
+        p_reported_url: inputUrl || `https://campus-groovelab.de/bio/${resolvedResult.studentId}`,
         p_reason: selectedReason,
         p_sha256: hash
       });
@@ -552,7 +552,7 @@ export function TrustSafetyTab() {
               value={inputUrl}
               onChange={(e) => setInputUrl(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleResolveUrl(inputUrl)}
-              placeholder="z. B. https://app.campus-groovelab.de/bio/6cd49c91-4b87-4519-94d5?anon=1&pl=sommer..."
+              placeholder="z. B. https://campus-groovelab.de/bio/6cd49c91-4b87-4519-94d5?anon=1&pl=sommer..."
               style={{
                 width: '100%',
                 padding: '13px 14px 13px 44px',

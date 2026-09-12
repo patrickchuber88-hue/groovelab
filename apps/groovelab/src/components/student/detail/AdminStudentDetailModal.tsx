@@ -13,6 +13,7 @@ import { IDBadgeCard } from '../../IDBadgeCard';
 import { formatTeacherFullName } from '../../../utils/nameHelper';
 import { getInstrumentAvatarUrl, resolveCampusStudentAvatar } from '../../StudioAvatar';
 import QRCode from 'react-qr-code';
+import { getCanonicalQrLandingUrl } from '../../../utils/tenantUrlHelper';
 
 const ADMIN_PRIMARY = '#ea4335';
 const ADMIN_BG = '#fef2f2';
@@ -718,8 +719,8 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
           <div class="row"><span class="label">Hauptfach / Instrument:</span><span class="val">${instrument}</span></div>
           <div class="row"><span class="label">Schüler-ID:</span><span class="val">${activeStudent.id}</span></div>
           <div class="row"><span class="label">Volljährigkeit:</span><span class="val">${isAdult ? 'Ja (18+)' : 'Minderjährig'}</span></div>
-          <div class="row"><span class="label">Campus-Modul:</span><span class="val">${isCampusActive ? 'Aktiv' : 'Inaktiv'}</span></div>
-          <div class="row"><span class="label">GrooveLab-Modul:</span><span class="val">${isGroovelabActive ? 'Aktiv' : 'Inaktiv'}</span></div>
+          <div class="row"><span class="label">Campus-Modul:</span><span class="val">${isCampusActive ? 'Aktiv' : 'Basis'}</span></div>
+          <div class="row"><span class="label">GrooveLab-Modul:</span><span class="val">${isGroovelabActive ? 'Aktiv' : 'Basis'}</span></div>
           <div class="row"><span class="label">Unterrichtsdauer:</span><span class="val">${lessonDuration} Minuten</span></div>
         </div>
         <div class="section">
@@ -1193,7 +1194,7 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
                   <div style={{ display: 'flex', background: '#f1f5f9', padding: '2px', borderRadius: '10px' }}>
                     <button
                       type="button"
-                      aria-label="Campus-Modul inaktivieren"
+                      aria-label="Campus-Modul auf Basis setzen"
                       aria-pressed={!isCampusActive}
                       onClick={() => handleToggleCampus(false)}
                       style={{
@@ -1207,7 +1208,7 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
                         cursor: 'pointer'
                       }}
                     >
-                      Inaktiv
+                      Basis
                     </button>
                     <button
                       type="button"
@@ -1243,7 +1244,7 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
                   <div style={{ display: 'flex', background: '#f1f5f9', padding: '2px', borderRadius: '10px' }}>
                     <button
                       type="button"
-                      aria-label="GrooveLab-Modul inaktivieren"
+                      aria-label="GrooveLab-Modul auf Basis setzen"
                       aria-pressed={!isGroovelabActive}
                       onClick={() => handleToggleGroovelab(false)}
                       style={{
@@ -1257,7 +1258,7 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
                         cursor: 'pointer'
                       }}
                     >
-                      Inaktiv
+                      Basis
                     </button>
                     <button
                       type="button"
@@ -2038,7 +2039,7 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
             </div>
             <div style={{ background: '#ffffff', padding: '16px', borderRadius: '18px', border: '1.5px solid #e2e8f0' }}>
               <QRCode
-                value={`${window.location.origin}/onboarding/${localQrToken || student.qr_token || student.id}?platform=campus`}
+                value={getCanonicalQrLandingUrl(localQrToken || student.qr_token || student.ausweis_nummer)}
                 size={200}
               />
             </div>

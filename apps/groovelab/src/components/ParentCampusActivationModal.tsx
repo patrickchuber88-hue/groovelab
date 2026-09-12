@@ -1519,7 +1519,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                     Audio-Tresor &amp; Loopstation
                   </span>
                   <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#15803d', background: '#dcfce7', padding: '2px 6px', borderRadius: '4px' }}>
-                    § 73 UrhG konform
+                    Geschützter Audio-Tresor
                   </span>
                 </div>
                 <p style={{ margin: '3px 0 0 0', fontSize: '0.76rem', color: '#64748b', lineHeight: 1.35 }}>
@@ -1590,7 +1590,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                     1:1 Schüler-Lehrer-Chat
                   </span>
                   <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#1d4ed8', background: '#dbeafe', padding: '2px 6px', borderRadius: '4px' }}>
-                    § 8a SGB VIII
+                    Geprüfter Kinderschutz
                   </span>
                 </div>
                 <p style={{ margin: '3px 0 0 0', fontSize: '0.76rem', color: '#64748b', lineHeight: 1.35 }}>

@@ -478,7 +478,13 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
     }
     return '';
   });
-  
+
+  // Pool Auto-Collapse & Tip banner states
+  const [showTipBanner, setShowTipBanner] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    return localStorage.getItem('groovelab_hide_designer_tip') !== 'true';
+  });
+
   // Create Board form state
   const [newBoardDay, setNewBoardDay] = useState(1);
   const [newBoardStart, setNewBoardStart] = useState('14:00');
@@ -2642,20 +2648,37 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
         }
         prevEndMin = sEnd;
 
-        // Check Wunsch hit matching card UI logic (any overlap with Wunschzeit window)
+        // Check Wunsch hit matching card UI logic (exact complete containment in Wunschzeit window)
         const gMemberIds = s.isGroup && s.groupStudents ? s.groupStudents.map(gs => gs.id) : [];
-        const studPrefs = s.isGroup
-          ? gMemberIds.flatMap(mId => allStudentPrefsMap[mId] || [])
-          : (allStudentPrefsMap[s.id] || []);
-        const hasWunschPref = studPrefs.some(p => p.preference_type === 'wunsch');
-        if (hasWunschPref) {
-          studentsWithWunsch++;
-          const wunschPrefs = studPrefs.filter(p => p.preference_type === 'wunsch' && parseDayNumber(p.day_of_week) === parseDayNumber(b.dayOfWeek));
-          for (const pref of wunschPrefs) {
-            const { startMin: prefStart, endMin: prefEnd } = getPrefStartEndMinutes(pref);
-            if (sStart < prefEnd && sEnd > prefStart) {
+        if (s.isGroup && gMemberIds.length > 1) {
+          const allHavePrefs = gMemberIds.every(mId => (allStudentPrefsMap[mId] || []).some(p => p.preference_type === 'wunsch'));
+          if (allHavePrefs) {
+            studentsWithWunsch++;
+            let matchedCount = 0;
+            gMemberIds.forEach(mId => {
+              const mPrefs = (allStudentPrefsMap[mId] || []).filter(p => p.preference_type === 'wunsch' && parseDayNumber(p.day_of_week) === parseDayNumber(b.dayOfWeek));
+              const matches = mPrefs.some(pref => {
+                const { startMin: prefStart, endMin: prefEnd } = getPrefStartEndMinutes(pref);
+                return sStart >= prefStart && sEnd <= prefEnd;
+              });
+              if (matches) matchedCount++;
+            });
+            if (matchedCount === gMemberIds.length && matchedCount > 0) {
               wunschHits++;
-              break;
+            }
+          }
+        } else {
+          const studPrefs = allStudentPrefsMap[s.id] || [];
+          const hasWunschPref = studPrefs.some(p => p.preference_type === 'wunsch');
+          if (hasWunschPref) {
+            studentsWithWunsch++;
+            const wunschPrefs = studPrefs.filter(p => p.preference_type === 'wunsch' && parseDayNumber(p.day_of_week) === parseDayNumber(b.dayOfWeek));
+            for (const pref of wunschPrefs) {
+              const { startMin: prefStart, endMin: prefEnd } = getPrefStartEndMinutes(pref);
+              if (sStart >= prefStart && sEnd <= prefEnd) {
+                wunschHits++;
+                break;
+              }
             }
           }
         }
@@ -4871,10 +4894,10 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
           {onboardingSubmitting ? 'Wird gespeichert...' : 'Verfügbarkeit speichern & Stundenplan freischalten'}
         </button>
 
-        {/* ⚖️ Gesetzlicher Hinweis gem. § 16 Abs. 2 ArbZG / BAG-Rechtsprechung */}
+        {/* Hinweis didaktisches Koordinierungsinstrument */}
         <div style={{ marginTop: '12px', textAlign: 'center', fontSize: '0.70rem', color: '#64748b', lineHeight: '1.4', background: 'rgba(0,0,0,0.02)', padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
           <Scale size={13} strokeWidth={2.4} color="#64748b" aria-hidden="true" />
-          <span><strong>Hinweis gem. § 16 Abs. 2 ArbZG:</strong> Der Stundenplan-Designer ist ein didaktisches Koordinierungsinstrument und ersetzt kein betriebliches Zeiterfassungssystem.</span>
+          <span><strong>Hinweis:</strong> Der Stundenplan-Designer ist ein didaktisches Koordinierungsinstrument und ersetzt kein betriebliches Zeiterfassungssystem.</span>
         </div>
       </div>
     );
@@ -5352,22 +5375,34 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
           {/* Draft Management Toolbar (Desktop Only) */}
           {!isMobilePortrait && (
             <div style={{ 
-              background: 'rgba(255, 255, 255, 0.55)', 
+              background: 'rgba(255, 255, 255, 0.75)', 
               backdropFilter: 'blur(20px) saturate(190%)', 
               WebkitBackdropFilter: 'blur(20px) saturate(190%)',
               borderRadius: '16px', 
-              padding: '10px 16px', 
-              border: '1px solid rgba(255, 255, 255, 0.5)', 
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.02)',
+              padding: '8px 16px', 
+              border: '1px solid rgba(255, 255, 255, 0.8)', 
+              boxShadow: '0 2px 12px rgba(0, 0, 0, 0.03)',
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: 'space-between',
               gap: '12px',
-              marginTop: '-4px'
+              marginTop: '-4px',
+              flexWrap: 'wrap'
             }}>
+              {/* Left: Apple Segmented Control for Drafts + Integrated Add Button */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#86868b', marginRight: '4px' }}>Entwürfe:</span>
-                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', fontFamily: 'Urbanist, sans-serif' }}>
+                  Entwürfe:
+                </span>
+                <div style={{ 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  background: 'rgba(0, 0, 0, 0.04)', 
+                  borderRadius: '10px', 
+                  padding: '2px', 
+                  border: '1px solid rgba(0, 0, 0, 0.05)',
+                  gap: '2px'
+                }}>
                   {drafts.map(d => {
                     const isActive = d.id === activeDraftId;
                     const totalLessons = d.boards?.reduce((acc, b) => acc + (b.students?.length || 0), 0) || 0;
@@ -5377,162 +5412,255 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                         type="button"
                         onClick={() => handleSwitchDraft(d.id)}
                         style={{
-                          background: isActive 
-                            ? 'linear-gradient(135deg, #eab308 0%, #d97706 100%)' 
-                            : 'rgba(255, 255, 255, 0.65)',
-                          color: isActive ? 'white' : '#1d1d1f',
-                          border: '1px solid rgba(0, 0, 0, 0.08)',
+                          background: isActive ? '#ffffff' : 'transparent',
+                          color: isActive ? '#0f172a' : '#64748b',
+                          border: 'none',
                           borderRadius: '8px',
-                          padding: '6px 12px',
-                          fontSize: '0.76rem',
-                          fontWeight: 700,
+                          padding: '5px 10px',
+                          fontSize: '0.75rem',
+                          fontWeight: isActive ? 800 : 600,
                           cursor: 'pointer',
-                          transition: 'all 0.2s',
-                          boxShadow: isActive ? '0 4px 12px rgba(217, 119, 6, 0.15)' : '0 2px 4px rgba(0,0,0,0.01)',
-                          display: 'flex',
+                          display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '6px'
+                          gap: '6px',
+                          boxShadow: isActive ? '0 1px 4px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.1)' : 'none',
+                          transition: 'all 0.16s cubic-bezier(0.16, 1, 0.3, 1)',
                         }}
                         onMouseOver={e => {
-                          if (!isActive) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
+                          if (!isActive) {
+                            e.currentTarget.style.color = '#0f172a';
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.5)';
+                          }
                         }}
                         onMouseOut={e => {
-                          if (!isActive) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.65)';
+                          if (!isActive) {
+                            e.currentTarget.style.color = '#64748b';
+                            e.currentTarget.style.background = 'transparent';
+                          }
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span>{d.name}</span>
-                          {d.id === submittedDraftId && (
-                            <span style={{
-                              background: isActive ? 'rgba(255, 255, 255, 0.3)' : 'rgba(52, 168, 83, 0.15)',
-                              color: isActive ? '#ffffff' : '#15803d',
-                              padding: '1px 5px',
-                              borderRadius: '4px',
-                              fontSize: '0.62rem',
-                              fontWeight: 800,
-                              letterSpacing: '0.02em'
-                            }}>
-                              Eingereicht
-                            </span>
-                          )}
-                        </div>
-                        <span style={{ 
-                          background: isActive ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.05)', 
-                          padding: '1px 5px', 
-                          borderRadius: '4px', 
-                          fontSize: '0.65rem',
-                          color: isActive ? 'white' : '#86868b'
+                        <span>{d.name}</span>
+                        {d.id === submittedDraftId && (
+                          <span 
+                            title="Eingereichter Entwurf"
+                            style={{
+                              width: '6px',
+                              height: '6px',
+                              borderRadius: '50%',
+                              background: '#22c55e',
+                              display: 'inline-block',
+                              boxShadow: '0 0 4px rgba(34, 197, 94, 0.5)'
+                            }}
+                          />
+                        )}
+                        <span style={{
+                          background: isActive ? 'rgba(0, 0, 0, 0.06)' : 'rgba(0, 0, 0, 0.04)',
+                          borderRadius: '6px',
+                          padding: '1px 5px',
+                          fontSize: '0.64rem',
+                          fontWeight: 700,
+                          color: isActive ? '#0f172a' : '#94a3b8'
                         }}>
                           {totalLessons}
                         </span>
                       </button>
                     );
                   })}
+                  {/* Adjacent Apple "+" Icon Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleCreateDraft()}
+                    title="Neuen leeren Entwurf anlegen"
+                    aria-label="Neuen leeren Entwurf anlegen"
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '5px 8px',
+                      color: '#64748b',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.16s ease'
+                    }}
+                    onMouseOver={e => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.65)';
+                      e.currentTarget.style.color = '#0f172a';
+                    }}
+                    onMouseOut={e => {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.color = '#64748b';
+                    }}
+                  >
+                    <Plus size={14} strokeWidth={2.4} />
+                  </button>
                 </div>
               </div>
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={handleUndo}
-                  disabled={undoStack.length === 0}
-                  style={{
-                    background: undoStack.length > 0 ? 'rgba(0, 122, 255, 0.08)' : 'rgba(0, 0, 0, 0.04)',
-                    color: undoStack.length > 0 ? '#007aff' : '#94a3b8',
-                    border: undoStack.length > 0 ? '1px solid rgba(0, 122, 255, 0.2)' : '1px solid rgba(0, 0, 0, 0.08)',
-                    fontWeight: 600,
-                    padding: '5px 12px',
-                    borderRadius: '8px',
-                    fontSize: '0.75rem',
-                    cursor: undoStack.length > 0 ? 'pointer' : 'not-allowed',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    transition: 'all 0.15s',
-                    opacity: undoStack.length > 0 ? 1 : 0.5
-                  }}
-                  onMouseOver={e => { if (undoStack.length > 0) e.currentTarget.style.background = 'rgba(0, 122, 255, 0.15)'; }}
-                  onMouseOut={e => { if (undoStack.length > 0) e.currentTarget.style.background = 'rgba(0, 122, 255, 0.08)'; }}
-                  title={undoStack.length > 0 ? `Letzte Verschiebung rückgängig machen (⌘Z) – ${undoStack.length} im Speicher` : "Keine Änderungen zum Rückgängig machen"}
-                >
-                  <RotateCcw size={12} />
-                  <span>Rückgängig{undoStack.length > 0 ? ` (${undoStack.length})` : ''}</span>
-                </button>
+              {/* Center: Didactic Purpose & Secretariat Approval Disclaimer Badge */}
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'rgba(255, 255, 255, 0.85)',
+                border: '1px solid rgba(0, 0, 0, 0.06)',
+                borderRadius: '100px',
+                padding: '4px 14px',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
+                fontSize: '0.70rem',
+                fontWeight: 700,
+                color: '#475569',
+                letterSpacing: '0.01em',
+                whiteSpace: 'nowrap'
+              }}>
+                <span style={{ fontSize: '0.78rem' }}>⚖️</span>
+                <span>Didaktische Entwurfsplanung • Genehmigungsvorbehalt durch Schulsekretariat</span>
+              </div>
 
+              {/* Right: Flagship Action (Hero) + Apple Toolbar Group */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {/* 🌟 HERO FLAGGSCHIFF: Automatisch zuteilen */}
                 <button
                   type="button"
                   onClick={handleAutoAssign}
                   disabled={students.filter(s => !s.assignedDay && !s.isBreak).length === 0}
+                  title="Flaggschiff-Algorithmus: Universitäre 4-Phasen-Auto-Zuteilung starten"
                   style={{
-                    background: 'rgba(52, 168, 83, 0.1)',
-                    color: '#34a853',
-                    border: '1px solid rgba(52, 168, 83, 0.15)',
-                    fontWeight: 600,
-                    padding: '5px 12px',
-                    borderRadius: '8px',
-                    fontSize: '0.75rem',
-                    cursor: 'pointer',
-                    display: 'flex',
+                    background: students.filter(s => !s.assignedDay && !s.isBreak).length === 0
+                      ? 'rgba(0, 0, 0, 0.04)'
+                      : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                    color: students.filter(s => !s.assignedDay && !s.isBreak).length === 0 ? '#94a3b8' : '#ffffff',
+                    border: students.filter(s => !s.assignedDay && !s.isBreak).length === 0 ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid rgba(22, 163, 74, 0.4)',
+                    fontWeight: 800,
+                    padding: '7px 16px',
+                    borderRadius: '10px',
+                    fontSize: '0.78rem',
+                    cursor: students.filter(s => !s.assignedDay && !s.isBreak).length === 0 ? 'not-allowed' : 'pointer',
+                    display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '5px',
-                    transition: 'all 0.15s',
-                    opacity: students.filter(s => !s.assignedDay && !s.isBreak).length === 0 ? 0.5 : 1,
+                    gap: '7px',
+                    boxShadow: students.filter(s => !s.assignedDay && !s.isBreak).length === 0
+                      ? 'none'
+                      : '0 4px 14px rgba(22, 163, 74, 0.32), 0 1px 3px rgba(0, 0, 0, 0.08)',
+                    transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                    letterSpacing: '-0.01em',
                     pointerEvents: students.filter(s => !s.assignedDay && !s.isBreak).length === 0 ? 'none' : 'auto'
                   }}
-                  onMouseOver={e => e.currentTarget.style.background = 'rgba(52, 168, 83, 0.15)'}
-                  onMouseOut={e => e.currentTarget.style.background = 'rgba(52, 168, 83, 0.1)'}
+                  onMouseOver={e => {
+                    if (students.filter(s => !s.assignedDay && !s.isBreak).length > 0) {
+                      e.currentTarget.style.transform = 'translateY(-1px) scale(1.02)';
+                      e.currentTarget.style.boxShadow = '0 6px 18px rgba(22, 163, 74, 0.42), 0 2px 5px rgba(0, 0, 0, 0.1)';
+                    }
+                  }}
+                  onMouseOut={e => {
+                    if (students.filter(s => !s.assignedDay && !s.isBreak).length > 0) {
+                      e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                      e.currentTarget.style.boxShadow = '0 4px 14px rgba(22, 163, 74, 0.32), 0 1px 3px rgba(0, 0, 0, 0.08)';
+                    }
+                  }}
                 >
-                  <Sparkles size={12} />
-                  Automatisch zuteilen
+                  <Sparkles size={14} color="currentColor" strokeWidth={2.4} />
+                  <span>Automatisch zuteilen</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={handleResetAllAssignments}
-                  disabled={students.filter(s => !!s.assignedDay).length === 0}
-                  style={{
-                    background: 'rgba(239, 68, 68, 0.1)',
-                    color: '#ef4444',
-                    border: '1px solid rgba(239, 68, 68, 0.15)',
-                    fontWeight: 600,
-                    padding: '5px 12px',
-                    borderRadius: '8px',
-                    fontSize: '0.75rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    transition: 'all 0.15s',
-                    opacity: students.filter(s => !!s.assignedDay).length === 0 ? 0.5 : 1,
-                    pointerEvents: students.filter(s => !!s.assignedDay).length === 0 ? 'none' : 'auto'
-                  }}
-                  onMouseOver={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
-                  onMouseOut={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
-                >
-                  <Trash2 size={12} />
-                  Zuteilung zurücksetzen
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleCreateDraft()}
-                  style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#2563eb', border: '1px solid rgba(59, 130, 246, 0.15)', fontWeight: 600, padding: '5px 12px', borderRadius: '8px', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', transition: 'all 0.15s' }}
-                  onMouseOver={e => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'}
-                  onMouseOut={e => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)'}
-                >
-                  <Plus size={12} />
-                  Neuer leerer Entwurf
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteDraft(activeDraftId)}
-                  disabled={drafts.length <= 1}
-                  style={{ background: 'rgba(239, 68, 68, 0.08)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.12)', fontWeight: 600, padding: '5px 12px', borderRadius: '8px', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', transition: 'all 0.15s', opacity: drafts.length <= 1 ? 0.5 : 1, pointerEvents: drafts.length <= 1 ? 'none' : 'auto' }}
-                  onMouseOver={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
-                  onMouseOut={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
-                >
-                  <Trash2 size={12} />
-                  Löschen
-                </button>
+                {/* 🛠️ Apple HIG Button Group (Rückgängig | Zurücksetzen | Löschen) */}
+                <div className="apple-btn-group" style={{ height: '36px' }}>
+                  {/* Rückgängig */}
+                  <button
+                    type="button"
+                    onClick={handleUndo}
+                    disabled={undoStack.length === 0}
+                    className="apple-btn"
+                    style={{
+                      opacity: undoStack.length > 0 ? 1 : 0.45,
+                      cursor: undoStack.length > 0 ? 'pointer' : 'not-allowed',
+                      color: undoStack.length > 0 ? '#0f172a' : '#94a3b8',
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      padding: '0 10px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                    title={undoStack.length > 0 ? `Letzte Verschiebung rückgängig machen (⌘Z) – ${undoStack.length} im Speicher` : "Keine Änderungen zum Rückgängig machen"}
+                  >
+                    <RotateCcw size={12} strokeWidth={2.4} />
+                    <span>Rückgängig{undoStack.length > 0 ? ` (${undoStack.length})` : ''}</span>
+                  </button>
+
+                  <div style={{ width: '1px', height: '16px', background: 'rgba(0,0,0,0.08)', margin: '0 2px' }} />
+
+                  {/* Zuteilung zurücksetzen */}
+                  <button
+                    type="button"
+                    onClick={handleResetAllAssignments}
+                    disabled={students.filter(s => !!s.assignedDay).length === 0}
+                    className="apple-btn"
+                    style={{
+                      opacity: students.filter(s => !!s.assignedDay).length === 0 ? 0.4 : 1,
+                      cursor: students.filter(s => !!s.assignedDay).length === 0 ? 'not-allowed' : 'pointer',
+                      color: '#64748b',
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      padding: '0 10px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseOver={e => {
+                      if (students.filter(s => !!s.assignedDay).length > 0) {
+                        e.currentTarget.style.color = '#dc2626';
+                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
+                      }
+                    }}
+                    onMouseOut={e => {
+                      e.currentTarget.style.color = '#64748b';
+                      e.currentTarget.style.background = 'transparent';
+                    }}
+                    title="Zuteilung aller Schüler in diesem Entwurf zurücksetzen"
+                  >
+                    <RotateCcw size={12} strokeWidth={2.4} />
+                    <span>Zurücksetzen</span>
+                  </button>
+
+                  <div style={{ width: '1px', height: '16px', background: 'rgba(0,0,0,0.08)', margin: '0 2px' }} />
+
+                  {/* Entwurf löschen */}
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteDraft(activeDraftId)}
+                    disabled={drafts.length <= 1}
+                    className="apple-btn"
+                    style={{
+                      opacity: drafts.length <= 1 ? 0.35 : 1,
+                      cursor: drafts.length <= 1 ? 'not-allowed' : 'pointer',
+                      color: '#64748b',
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      padding: '0 10px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseOver={e => {
+                      if (drafts.length > 1) {
+                        e.currentTarget.style.color = '#dc2626';
+                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
+                      }
+                    }}
+                    onMouseOut={e => {
+                      e.currentTarget.style.color = '#64748b';
+                      e.currentTarget.style.background = 'transparent';
+                    }}
+                    title={drafts.length <= 1 ? "Der letzte verbleibende Entwurf kann nicht gelöscht werden" : "Diesen Entwurf löschen"}
+                  >
+                    <Trash2 size={12} strokeWidth={2.4} />
+                    <span>Löschen</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -5624,23 +5752,68 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
             );
           })()}
 
-          {/* Info/Guide banner beneath header (Desktop Only) */}
-          {!isMobilePortrait && (
+          {/* Apple Pro Tip Showcase Callout (Desktop Only) */}
+          {!isMobilePortrait && showTipBanner && (
             <div style={{
-              background: 'rgba(37, 99, 235, 0.06)',
-              border: '1px solid rgba(37, 99, 235, 0.12)',
-              borderRadius: '12px',
-              padding: '10px 14px',
-              fontSize: '0.78rem',
-              color: '#1d4ed8',
+              background: 'rgba(255, 255, 255, 0.85)',
+              backdropFilter: 'blur(20px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+              border: '1px solid rgba(22, 163, 74, 0.2)',
+              borderLeft: '4px solid #16a34a',
+              borderRadius: '14px',
+              padding: '8px 14px',
+              fontSize: '0.77rem',
+              color: '#334155',
               fontWeight: 500,
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
-              marginBottom: '4px'
+              justifyContent: 'space-between',
+              gap: '12px',
+              marginBottom: '6px',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
             }}>
-              <Lightbulb size={16} strokeWidth={2.4} color="#1d4ed8" aria-hidden="true" style={{ flexShrink: 0 }} />
-              <span>Nutze <strong>Automatisch zuteilen</strong> für die universitäre 4-Phasen-Zuteilung (18 Optimierungsstufen) oder ziehe Schüler per Drag & Drop flexibel in deine Unterrichtstage. <strong>Tipp: Karten rasten magnetisch im {gridSnapMinutes || 15}-Min-Raster ein und verdrängen nachfolgende Termine automatisch.</strong></span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+                <div style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '7px',
+                  background: 'rgba(22, 163, 74, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  color: '#16a34a'
+                }}>
+                  <Sparkles size={13} strokeWidth={2.2} />
+                </div>
+                <span style={{ lineHeight: 1.45 }}>
+                  Nutze <strong style={{ color: '#15803d', fontWeight: 800 }}>Automatisch zuteilen</strong> für die universitäre 4-Phasen-Zuteilung (18 Optimierungsstufen) oder ziehe Schüler per Drag &amp; Drop flexibel in deine Unterrichtstage. <strong style={{ color: '#0f172a' }}>Tipp: Karten rasten magnetisch im {gridSnapMinutes || 15}-Min-Raster ein und verdrängen nachfolgende Termine automatisch.</strong>
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowTipBanner(false);
+                  try { localStorage.setItem('groovelab_hide_designer_tip', 'true'); } catch (_) {}
+                }}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  borderRadius: '6px',
+                  transition: 'all 0.15s ease'
+                }}
+                onMouseOver={e => { e.currentTarget.style.color = '#0f172a'; e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)'; }}
+                onMouseOut={e => { e.currentTarget.style.color = '#94a3b8'; e.currentTarget.style.background = 'transparent'; }}
+                title="Hinweis ausblenden"
+                aria-label="Hinweis ausblenden"
+              >
+                <X size={13} strokeWidth={2.5} />
+              </button>
             </div>
           )}
 
@@ -6668,7 +6841,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                               const mPrefs = (allStudentPrefsMap[mId] || []).filter(p => p.preference_type === 'wunsch' && parseDayNumber(p.day_of_week) === parseDayNumber(board.dayOfWeek));
                               const matches = mPrefs.some(pref => {
                                 const { startMin: prefStart, endMin: prefEnd } = getPrefStartEndMinutes(pref);
-                                return startMin < prefEnd && endMin > prefStart;
+                                return startMin >= prefStart && endMin <= prefEnd;
                               });
                               if (matches) matchedCount++;
                             });
@@ -6685,7 +6858,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                             for (const pref of wunschPrefs) {
                               const { startMin: prefStart, endMin: prefEnd } = getPrefStartEndMinutes(pref);
 
-                              if (startMin < prefEnd && endMin > prefStart) {
+                              if (startMin >= prefStart && endMin <= prefEnd) {
                                 isInsideWunsch = true;
                                 break;
                               }
@@ -9487,11 +9660,11 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
 
       {activeTab === 'calendar' ? <CalendarTourComponent /> : <DesignerTourComponent />}
 
-      {/* ⚖️ Gesetzlicher Hinweis gem. § 16 Abs. 2 ArbZG / BAG-Rechtsprechung */}
+      {/* Hinweis didaktisches Koordinierungsinstrument */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px 16px', margin: '14px auto 4px auto', background: 'rgba(255, 255, 255, 0.7)', border: '1px solid rgba(0, 0, 0, 0.05)', borderRadius: '12px', maxWidth: '780px', width: '100%', boxSizing: 'border-box' }}>
         <Scale size={13} strokeWidth={2.4} color="#64748b" aria-hidden="true" />
         <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, textAlign: 'center', lineHeight: 1.4 }}>
-          <strong>Hinweis gem. § 16 Abs. 2 ArbZG:</strong> Der Stundenplan-Designer ist ein pädagogisches Koordinierungsinstrument zur Abstimmung von Unterrichtseinheiten und ersetzt kein betriebliches Arbeitszeiterfassungssystem.
+          <strong>Hinweis:</strong> Der Stundenplan-Designer ist ein pädagogisches Koordinierungsinstrument zur Abstimmung von Unterrichtseinheiten und ersetzt kein betriebliches Arbeitszeiterfassungssystem.
         </span>
       </div>
     </div>

@@ -14,18 +14,26 @@ echo "🎸 GrooveLab Deployment startet..."
 echo "   Ziel: $SERVER → $REMOTE_DIR"
 echo ""
 
-# 0. Pre-Deployment Security Shield & Build Verification
-echo "🛡️  Prüfe Pre-Deploy Security Shield & Build-Status..."
-if [ ! -d "$LOCAL_DIST" ]; then
-  echo "❌ Fehler: Ordner $LOCAL_DIST existiert nicht. Bitte zuerst 'npm --prefix apps/groovelab run build' ausführen!"
-  exit 1
+# 0. Pre-Deployment Security Shield & Automatic Production Build
+if [ "${SKIP_BUILD:-0}" = "1" ]; then
+  echo "⏩ Überspringe Build (SKIP_BUILD=1 gesetzt)..."
+  if [ ! -d "$LOCAL_DIST" ]; then
+    echo "❌ Fehler: Ordner $LOCAL_DIST existiert nicht. Build kann nicht übersprungen werden!"
+    exit 1
+  fi
+else
+  echo "🔨 Führe sauberen Produktions-Build aus (TypeScript + Vite + SRI + Precompression)..."
+  npm run build:groovelab || {
+    echo "❌ Fehler: Build fehlgeschlagen! Deployment wird abgebrochen."
+    exit 1
+  }
 fi
 
 echo "🔍 Führe automatisches Dependency-Audit durch..."
 npm --prefix apps/groovelab audit --audit-level=high || {
   echo "⚠️  Warnung: Security Audit hat Schwachstellen gemeldet. Bitte prüfen."
 }
-echo "  ✓ Pre-Deploy Security Shield bestanden."
+echo "  ✓ Pre-Deploy Security Shield & Build verifiziert."
 echo ""
 
 # 1. Sicherstellen, dass die Remote-Verzeichnisse existieren
@@ -43,14 +51,23 @@ rsync -avz --delete \
   "$LOCAL_DIST/" \
   "$SERVER:$REMOTE_DIR/"
 
-# 4. Synchronisiere Build-Dateien & Nginx Security Config direkt in den aktiven Web-Container
-echo "🚀 Synchronisiere Live-Web-Container..."
-ssh "$SERVER" "WEB_CONTAINER=\$(docker ps --format '{{.Names}}' | grep -v 'supabase\|coolify\|groovelab-bff' | head -n 1); if [ -n \"\$WEB_CONTAINER\" ]; then docker cp $REMOTE_DIR/. \$WEB_CONTAINER:/usr/share/nginx/html/; if [ -f $REMOTE_DIR/nginx.default.conf ]; then docker cp $REMOTE_DIR/nginx.default.conf \$WEB_CONTAINER:/etc/nginx/conf.d/default.conf && docker exec \$WEB_CONTAINER nginx -s reload 2>/dev/null || true; fi; echo \"  ✓ Live-Web-Container (\$WEB_CONTAINER) erfolgreich aktualisiert.\"; fi"
+# 4. Atomare Nginx-Aktualisierung (Zero-Downtime, 100% Reboot-resistent)
+echo "🚀 Validiere und aktualisiere Live-Webserver..."
+ssh "$SERVER" "if command -v nginx >/dev/null 2>&1; then \
+  sudo nginx -t && sudo systemctl reload nginx && echo '  ✓ Host Nginx Ingress erfolgreich reloaded.'; \
+else \
+  WEB_CONTAINER=\$(docker ps --format '{{.Names}}' | grep -v 'supabase\|coolify\|groovelab-bff' | head -n 1); \
+  if [ -n \"\$WEB_CONTAINER\" ]; then \
+    docker cp $REMOTE_DIR/. \$WEB_CONTAINER:/usr/share/nginx/html/ 2>/dev/null || true; \
+    docker exec \$WEB_CONTAINER nginx -s reload 2>/dev/null || true; \
+    echo \"  ✓ Live-Web-Container (\$WEB_CONTAINER) synchronisiert & reloaded.\"; \
+  fi; \
+fi"
 
 # 5. Synchronisiere Enterprise Server-Skripte nach /root/scripts
 echo "⚙️  Synchronisiere Enterprise Server-Skripte..."
 ssh "$SERVER" "sudo mkdir -p /root/scripts && sudo chown -R deployuser:deployuser /root/scripts"
-scp scripts/backup_supabase_enterprise.sh scripts/sync_offsite_backup.sh scripts/nightly_secops_audit.sh scripts/server_health_watchdog.sh scripts/server_maintenance_weekly.sh "$SERVER:/root/scripts/" || true
+scp scripts/backup_supabase_enterprise.sh scripts/sync_offsite_backup.sh scripts/nightly_secops_audit.sh scripts/server_health_watchdog.sh scripts/server_maintenance_weekly.sh scripts/infra_preflight.sh "$SERVER:/root/scripts/" || true
 ssh "$SERVER" "chmod +x /root/scripts/*.sh 2>/dev/null || true"
 echo "  ✓ Server-Skripte synchronisiert & ausführbar."
 

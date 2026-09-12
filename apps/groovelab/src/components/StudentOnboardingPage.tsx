@@ -10,6 +10,7 @@ import QRCode from 'react-qr-code';
 import { getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, resolveCampusStudentAvatar } from './StudioAvatar';
 import { StudentMobileScheduleWizard } from './StudentMobileScheduleWizard';
 import { IDBadgeCard } from './IDBadgeCard';
+import { getCanonicalQrLandingUrl } from '../utils/tenantUrlHelper';
 import { downloadAppleWalletPass } from '../utils/walletPassGenerator';
 import { isWebAuthnSupported, registerBiometrics } from '../utils/webauthn';
 import { SmartAppInstallPrompt } from './ui/SmartAppInstallPrompt';
@@ -904,7 +905,7 @@ Deine Vorteile auf einen Blick:
       <IDBadgeCard 
         user={student} 
         activePlatform={isCampus ? 'campus' : 'groovelab'} 
-        qrValue={`${window.location.origin}/qr/${student.qr_token || student.id}`} 
+        qrValue={getCanonicalQrLandingUrl(student.qr_token || student.ausweis_nummer)} 
         cardRef={passCardRef} 
         isLocked={!consentSaved}
         lockMessage="Elterliche Freigabe erforderlich"

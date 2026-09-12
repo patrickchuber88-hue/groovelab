@@ -600,6 +600,9 @@ export interface TeacherTagesplanWidgetProps {
   showRealNames: boolean;
   toggleRealNames: () => void;
   userId?: string;
+  urgentCancellations?: any[];
+  onOpenUrgentModal?: () => void;
+  onOpenMakeupModal?: (params: { mode: 'create' | 'redeem', slot: any }) => void;
 }
 
 export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
@@ -618,7 +621,7 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
   quickAudioStudent,
   setQuickAudioStudent,
   loadingPrepMirror,
-  windowWidth = 1024,
+  windowWidth,
   isMobileDevice,
   activeTimelineSlotRef,
   briefingData,
@@ -638,7 +641,10 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
   isTourDemoScheduleActive,
   showRealNames,
   toggleRealNames,
+  urgentCancellations = [],
   userId,
+  onOpenUrgentModal,
+  onOpenMakeupModal,
 }) => (
     isTourDemoScheduleActive ? (
       <TeacherTourDemoSchedule isFreeDay={isFreeDay} getSimulatedNow={getSimulatedNow} windowWidth={windowWidth} showRealNames={showRealNames} toggleRealNames={toggleRealNames} />
@@ -1498,52 +1504,230 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                        </span>
                                      )}
 
-                                     {isCanceled || isRescheduledAway ? (() => {
-                                       const isAcked = activeSlots.every((s: any) => s.student_acknowledged === true || s.teacher_acknowledged === true || s.status === 'cancelled_acknowledged' || s.status === 'rescheduled_confirmed');
-                                       return (
-                                         <>
-                                           {isRescheduledAway ? (
-                                             <span style={{ 
-                                               color: '#000000', 
-                                               fontWeight: 850, 
-                                               fontSize: '0.68rem', 
-                                               background: '#facc15', 
-                                               border: '1px solid #000000',
-                                               padding: '2px 8px', 
-                                               borderRadius: '6px', 
-                                               fontFamily: 'Inter',
-                                               display: 'inline-flex',
-                                               alignItems: 'center',
-                                               gap: '4px'
-                                             }}>
-                                               Termin verschoben
-                                               {isAcked && <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853', display: 'inline-block' }} />}
-                                             </span>
-                                           ) : (
-                                             <span style={{ 
-                                               color: '#ef4444', 
-                                               fontWeight: 700, 
-                                               fontSize: '0.68rem', 
-                                               background: 'rgba(239, 68, 68, 0.08)', 
-                                               padding: '2px 8px', 
-                                               borderRadius: '6px', 
-                                               fontFamily: 'Inter',
-                                               display: 'inline-flex',
-                                               alignItems: 'center',
-                                               gap: '4px'
-                                             }}>
-                                               Heute abgesagt
-                                               {isAcked && <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853', display: 'inline-block' }} />}
-                                             </span>
-                                           )}
-                                         </>
-                                       );
-                                     })() : (
+                                      {isCanceled || isRescheduledAway ? (() => {
+                                        const isAcked = activeSlots.every((s: any) => s.student_acknowledged === true || s.teacher_acknowledged === true || s.status === 'cancelled_acknowledged' || s.status === 'rescheduled_confirmed');
+
+                                        // Matching urgent radar item
+                                        const urgentItem = (urgentCancellations || []).find((u: any) => 
+                                          activeSlots.some((s: any) => 
+                                            (u.occurrence_id && (u.occurrence_id === s.id || u.occurrence_id === s.occurrenceId)) ||
+                                            (u.student_id && (u.student_id === s.student?.id || u.student_id === s.studentId) && u.start_time?.startsWith(slot.timeSlot))
+                                          )
+                                        );
+
+                                        return (
+                                          <>
+                                            {isRescheduledAway ? (
+                                              <span style={{ 
+                                                color: '#000000', 
+                                                fontWeight: 850, 
+                                                fontSize: '0.68rem', 
+                                                background: '#facc15', 
+                                                border: '1px solid #000000',
+                                                padding: '2px 8px', 
+                                                borderRadius: '6px', 
+                                                fontFamily: 'Inter',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                              }}>
+                                                Termin verschoben
+                                                {isAcked && <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853', display: 'inline-block' }} />}
+                                              </span>
+                                            ) : urgentItem?.teacher_contact_status === 'reached' ? (
+                                              <span style={{ 
+                                                color: '#15803d', 
+                                                fontWeight: 800, 
+                                                fontSize: '0.68rem', 
+                                                background: '#dcfce7', 
+                                                border: '1px solid #bbf7d0',
+                                                padding: '2px 8px', 
+                                                borderRadius: '6px', 
+                                                fontFamily: 'Inter',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                              }}>
+                                                📞 Telefonisch informiert
+                                              </span>
+                                            ) : urgentItem?.teacher_contact_status === 'voicemail' ? (
+                                              <span style={{ 
+                                                color: '#b45309', 
+                                                fontWeight: 800, 
+                                                fontSize: '0.68rem', 
+                                                background: '#fef3c7', 
+                                                border: '1px solid #fde68a',
+                                                padding: '2px 8px', 
+                                                borderRadius: '6px', 
+                                                fontFamily: 'Inter',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                              }}>
+                                                📼 Mailbox besprochen
+                                              </span>
+                                            ) : urgentItem?.teacher_contact_status === 'delegated_to_secretariat' ? (
+                                              <span style={{ 
+                                                color: '#1d4ed8', 
+                                                fontWeight: 800, 
+                                                fontSize: '0.68rem', 
+                                                background: '#dbeafe', 
+                                                border: '1px solid #bfdbfe',
+                                                padding: '2px 8px', 
+                                                borderRadius: '6px', 
+                                                fontFamily: 'Inter',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                              }}>
+                                                🏢 An Sekretariat übergeben
+                                              </span>
+                                            ) : urgentItem && !urgentItem.student_acknowledged ? (
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  onOpenUrgentModal?.();
+                                                }}
+                                                title="Kurzfristiger Ausfall noch digital unbestätigt – Bitte telefonisch kontaktieren"
+                                                style={{ 
+                                                  color: '#dc2626', 
+                                                  fontWeight: 850, 
+                                                  fontSize: '0.68rem', 
+                                                  background: '#fee2e2', 
+                                                  border: '1px solid #fca5a5',
+                                                  padding: '2px 8px', 
+                                                  borderRadius: '6px', 
+                                                  fontFamily: 'Inter',
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  gap: '4px',
+                                                  cursor: 'pointer',
+                                                  animation: 'pulse 1.8s infinite'
+                                                }}
+                                              >
+                                                ⚠️ Ungelesen – Bitte kontaktieren
+                                              </button>
+                                            ) : (
+                                              <span style={{ 
+                                                color: '#ef4444', 
+                                                fontWeight: 700, 
+                                                fontSize: '0.68rem', 
+                                                background: 'rgba(239, 68, 68, 0.08)', 
+                                                padding: '2px 8px', 
+                                                borderRadius: '6px', 
+                                                fontFamily: 'Inter',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                              }}>
+                                                Heute abgesagt
+                                                {isAcked && <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853', display: 'inline-block' }} />}
+                                              </span>
+                                            )}
+
+                                            {/* 🎟️ Nachhol-Kontingent Button / Badge (100% Lehrkraft-Souveränität) */}
+                                            {!isRescheduledAway && onOpenMakeupModal && (
+                                              slot.makeup_token_id ? (
+                                                <button
+                                                  type="button"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onOpenMakeupModal({ mode: 'redeem', slot });
+                                                  }}
+                                                  title="Nachhol-Kontingent verwalten & einlösen"
+                                                  style={{
+                                                    background: '#eff6ff',
+                                                    color: '#1d4ed8',
+                                                    border: '1px solid #bfdbfe',
+                                                    borderRadius: '6px',
+                                                    padding: '2px 8px',
+                                                    fontSize: '0.68rem',
+                                                    fontWeight: 850,
+                                                    fontFamily: 'Inter',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '4px',
+                                                    cursor: 'pointer'
+                                                  }}
+                                                >
+                                                  🎟️ Nachhol-Kontingent aktiv
+                                                </button>
+                                              ) : (
+                                                <button
+                                                  type="button"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onOpenMakeupModal({ mode: 'create', slot });
+                                                  }}
+                                                  title="100% Lehrkraft-Souveränität: Nachhol-Kontingent für diesen Ausfall anlegen"
+                                                  style={{
+                                                    background: '#f8fafc',
+                                                    color: '#0f172a',
+                                                    border: '1px solid #cbd5e1',
+                                                    borderRadius: '6px',
+                                                    padding: '2px 8px',
+                                                    fontSize: '0.68rem',
+                                                    fontWeight: 850,
+                                                    fontFamily: 'Inter',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '4px',
+                                                    cursor: 'pointer'
+                                                  }}
+                                                >
+                                                  🎟️ Nachhol-Kontingent
+                                                </button>
+                                              )
+                                            )}
+                                          </>
+                                        );
+                                      })() : (
                                        <>
                                          {resolveStudentInstrument(slot.instrument, slot.students?.[0]?.instrument || slot.student?.instrument, teacher?.instrument) && (
                                            <span style={{ color: '#334155', fontWeight: 600 }}>• {resolveStudentInstrument(slot.instrument, slot.students?.[0]?.instrument || slot.student?.instrument, teacher?.instrument)}</span>
                                          )}
                                          {slot.room && <span style={{ color: '#334155', fontWeight: 600 }}>• {cleanRoomName(slot.room)}</span>}
+                                         {slot.makeup_extension_minutes > 0 && (
+                                           <span 
+                                             title={`Dieser Termin wurde um +${slot.makeup_extension_minutes} Min. aus einem Nachhol-Kontingent verlängert`}
+                                             style={{
+                                               color: '#15803d',
+                                               background: '#dcfce7',
+                                               border: '1px solid #86efac',
+                                               padding: '2px 8px',
+                                               borderRadius: '6px',
+                                               fontSize: '0.68rem',
+                                               fontWeight: 850,
+                                               fontFamily: 'Inter',
+                                               display: 'inline-flex',
+                                               alignItems: 'center',
+                                               gap: '4px'
+                                             }}
+                                           >
+                                             ⏱️ +{slot.makeup_extension_minutes} Min. Nachholung
+                                           </span>
+                                         )}
+                                         {slot.is_makeup_lesson && (
+                                           <span 
+                                             title="Revisionssicherer Ersatztermin aus einem Nachhol-Kontingent"
+                                             style={{
+                                               color: '#1d4ed8',
+                                               background: '#eff6ff',
+                                               border: '1px solid #bfdbfe',
+                                               padding: '2px 8px',
+                                               borderRadius: '6px',
+                                               fontSize: '0.68rem',
+                                               fontWeight: 850,
+                                               fontFamily: 'Inter',
+                                               display: 'inline-flex',
+                                               alignItems: 'center',
+                                               gap: '4px'
+                                             }}
+                                           >
+                                             🎟️ Nachholtermin
+                                           </span>
+                                         )}
                                        </>
                                      )}
                                      {!slot.isGroup && isRescheduledPending && (

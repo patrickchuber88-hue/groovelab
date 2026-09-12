@@ -288,7 +288,7 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                                 </span>
                               ) : (
                                 <span style={{ background: '#f1f5f9', color: '#64748b', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', display: 'inline-block' }}>
-                                  Inaktiv
+                                  Basis
                                 </span>
                               )}
                             </div>

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { generateMessengerSafetyCertificatePDF } from '../../utils/messengerSafetyCertificateGenerator';
 import { copyMessengerClauseToClipboard } from '../../utils/messengerClauseTemplate';
+import { getCanonicalQrLandingUrl } from '../../utils/tenantUrlHelper';
 
 export interface SecretarySetupViewProps {
   schoolId: string;
@@ -25,6 +26,8 @@ export interface SecretarySetupViewProps {
   setSchoolPhoneNumber: (val: string) => void;
   schoolEmail: string;
   setSchoolEmail: (val: string) => void;
+  absenceEmail?: string;
+  setAbsenceEmail?: (val: string) => void;
   logoUrl: string;
   setLogoUrl: (val: string) => void;
   kioskPinLength: number;
@@ -113,6 +116,8 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
     setSchoolPhoneNumber,
     schoolEmail,
     setSchoolEmail,
+    absenceEmail = '',
+    setAbsenceEmail = () => {},
     logoUrl,
     setLogoUrl,
     kioskPinLength,
@@ -603,7 +608,24 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                             </div>
                           </div>
 
-                          <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '16px', marginTop: '4px' }}>
+                          <div style={{ marginTop: '14px' }}>
+                            <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                              <span>E-Mail für Ausfallmeldungen (optional)</span>
+                              <span style={{ fontSize: '0.68rem', fontWeight: 600, color: '#64748b' }}>• Standard: allgemeine E-Mail-Adresse</span>
+                            </label>
+                            <input
+                              type="email"
+                              placeholder="z.B. ausfall@musikschule-stadt.de"
+                              value={absenceEmail}
+                              onChange={(e) => setAbsenceEmail(e.target.value)}
+                              style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#ffffff' }}
+                            />
+                            <span style={{ fontSize: '0.70rem', color: '#64748b', display: 'block', marginTop: '4px', lineHeight: 1.35 }}>
+                              Lehrkräfte können an diese Adresse offizielle Abwesenheitsmeldungen und Terminausfälle mit 1-Klick vorbefüllt senden.
+                            </span>
+                          </div>
+
+                          <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '16px', marginTop: '16px' }}>
                             <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>Logo URL</label>
                             <input
                               type="text"
@@ -851,12 +873,12 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                               <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', display: 'block', textTransform: 'uppercase' }}>Direkt-Login URL</span>
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
                                 <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>
-                                  {window.location.origin}/qr/{currentUserProfile?.qr_token || 'token'}
+                                  {getCanonicalQrLandingUrl(currentUserProfile?.qr_token || currentUserProfile?.teacher_qr_token)}
                                 </span>
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    navigator.clipboard.writeText(`${window.location.origin}/qr/${currentUserProfile?.qr_token || ''}`);
+                                    navigator.clipboard.writeText(getCanonicalQrLandingUrl(currentUserProfile?.qr_token || currentUserProfile?.teacher_qr_token));
                                     setCopiedSettingsLink(true);
                                     setTimeout(() => setCopiedSettingsLink(false), 2000);
                                   }}

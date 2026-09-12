@@ -1,4 +1,4 @@
-import { getParentOnboardingUrl, getTeacherLoginUrl } from './tenantUrlHelper';
+import { getParentOnboardingUrl, getTeacherLoginUrl, getCanonicalQrLandingUrl } from './tenantUrlHelper';
 import { capitalizeFirstLetter, formatSongTitleCase } from './nameHelper';
 import { generateLocalQrDataUrl } from './localQrGenerator';
 
@@ -2131,7 +2131,7 @@ export const generateStudentHomeworkPrintoutPDF = async (params: StudentHomework
   const schoolClean = params.schoolName || 'Campus-Groovelab';
   const dateStr = params.date || new Date().toLocaleDateString('de-DE');
   const targetToken = params.qrToken || 'schueler';
-  const targetAppUrl = `https://app.campus-groovelab.de/qr/${targetToken}`;
+  const targetAppUrl = getCanonicalQrLandingUrl(targetToken);
 
   doc.setProperties({
     title: `Hausaufgabe - ${studentClean}`,
@@ -2425,7 +2425,7 @@ export const generateStudentHomeworkPrintoutPDF = async (params: StudentHomework
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(6.5);
   doc.setTextColor(greenPrimary[0], greenPrimary[1], greenPrimary[2]);
-  doc.text('App öffnen: app.campus-groovelab.de', 18, y + 35);
+  doc.text('App öffnen: campus-groovelab.de', 18, y + 35);
 
   // Right QR Code Inlay
   const qrX = 106;

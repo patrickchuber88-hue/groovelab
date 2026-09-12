@@ -897,7 +897,7 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
         iterationScore += SOLVER_TIERS.ASSIGNMENT_PRIORITY;
 
         const wBonus = calculateWunschBonus(s.id, b.dayOfWeek, startMin, endMin);
-        if (wBonus > 0) wunschHits++;
+        if (wBonus >= SOLVER_TIERS.WUNSCHZEIT_HIT * 2) wunschHits++;
         iterationScore += wBonus;
 
         iterationScore += calculateSlotFitness(b, startMin, endMin);
@@ -1545,7 +1545,7 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
                   const [tsh, tsm] = parseTime(st.assignedTime!);
                   const stStart = tsh * 60 + tsm;
                   const stEnd = stStart + st.duration;
-                  if (calculateWunschBonus(st.id, bToEval.dayOfWeek, stStart, stEnd) > 0) {
+                  if (calculateWunschBonus(st.id, bToEval.dayOfWeek, stStart, stEnd) >= SOLVER_TIERS.WUNSCHZEIT_HIT * 2) {
                     newWunschHits++;
                   }
                   if (k > 0) {
@@ -1834,7 +1834,7 @@ export async function run15StageSolver(params: SolverParams): Promise<SolverResu
       const startMin = sh * 60 + sm;
       const endMin = startMin + st.duration;
 
-      if (calculateWunschBonus(st.id, b.dayOfWeek, startMin, endMin) > 0) {
+      if (calculateWunschBonus(st.id, b.dayOfWeek, startMin, endMin) >= SOLVER_TIERS.WUNSCHZEIT_HIT * 2) {
         finalWunschHits++;
       }
 

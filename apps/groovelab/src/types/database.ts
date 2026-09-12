@@ -11,6 +11,8 @@ export interface DbSchool {
   max_students?: number;
   groovelab_kiosk_token?: string;
   groovelab_kiosk_pin?: string;
+  email?: string;
+  absence_email?: string;
 }
 
 export interface DbUser {
@@ -112,3 +114,40 @@ export interface DbSession {
   gps_verified?: boolean;
   users?: DbUser;
 }
+
+export interface DbMakeupToken {
+  id: string;
+  school_id: string;
+  teacher_id: string;
+  student_id: string;
+  original_occurrence_id?: string;
+  original_date: string;
+  total_minutes: number;
+  remaining_minutes: number;
+  status: 'OPEN' | 'PARTIALLY_REDEEMED' | 'FULLY_REDEEMED' | 'CANCELLED_BY_TEACHER' | 'EXPIRED';
+  notes?: string;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
+  student?: DbUser;
+}
+
+export interface DbScheduleOccurrence {
+  id: string;
+  school_id: string;
+  teacher_id: string;
+  student_id: string;
+  room_id?: string;
+  date: string;
+  start_time: string;
+  duration: number;
+  status: string;
+  is_makeup_lesson?: boolean;
+  makeup_token_id?: string;
+  makeup_extension_minutes?: number;
+  teacher_acknowledged?: boolean;
+  student_acknowledged?: boolean;
+  teacher_contact_status?: string;
+  handling_owner?: 'secretariat' | 'teacher';
+}
+

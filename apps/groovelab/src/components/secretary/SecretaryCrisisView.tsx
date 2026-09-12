@@ -1,10 +1,21 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ShieldAlert, UserX, UserCheck, Clock, CheckCircle, CheckCircle2, 
   Archive, Calendar, Sparkles, ChevronRight, BookOpen, Check, X, 
   ClipboardList, AlertCircle 
 } from 'lucide-react';
 import { formatTeacherFullName } from '../../utils/nameHelper';
+import { supabase } from '../../lib/supabase';
+
+interface SchoolMakeupToken {
+  id: string;
+  teacher_id: string;
+  student_id: string;
+  total_minutes: number;
+  remaining_minutes: number;
+  status: string;
+  original_date?: string;
+}
 
 interface CrisisNotificationItem {
   id: string;
@@ -12,6 +23,7 @@ interface CrisisNotificationItem {
   status: 'UNREAD' | 'READ' | 'ARCHIVED';
   notified_at?: string;
   teacher_id?: string;
+  handling_owner?: 'secretariat' | 'teacher';
   student?: {
     id: string;
     first_name: string;
@@ -33,6 +45,7 @@ interface SecretaryCrisisViewProps {
   selectedCrisisTeacherId: string | null;
   setSelectedCrisisTeacherId: (id: string | null) => void;
   handleMarkAsNotified: (id: string) => Promise<void> | void;
+  handleClaimTicket?: (id: string) => Promise<void> | void;
   handleArchiveCrisisTicket: (id: string) => Promise<void> | void;
   handleArchiveAllResolvedTickets: (ids: string[]) => Promise<void> | void;
   handleEndAbsenceOnBehalf?: (teacherId: string, teacherName: string) => Promise<void> | void;
@@ -49,6 +62,7 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
   selectedCrisisTeacherId,
   setSelectedCrisisTeacherId,
   handleMarkAsNotified,
+  handleClaimTicket,
   handleArchiveCrisisTicket,
   handleArchiveAllResolvedTickets,
   handleEndAbsenceOnBehalf,
@@ -61,6 +75,24 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
   const now = new Date();
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
+
+  const [schoolMakeupTokens, setSchoolMakeupTokens] = useState<SchoolMakeupToken[]>([]);
+
+  useEffect(() => {
+    const fetchSchoolTokens = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('lesson_makeup_tokens')
+          .select('id, teacher_id, student_id, total_minutes, remaining_minutes, status, original_date');
+        if (!error && data) {
+          setSchoolMakeupTokens(data);
+        }
+      } catch (err) {
+        console.warn('Error fetching makeup tokens for crisis view:', err);
+      }
+    };
+    fetchSchoolTokens();
+  }, []);
 
   // ── Derived data ──
   const absentTeachersMap = new Map<string, any>();
@@ -209,6 +241,67 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
             <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
               Lehrkraft: <strong style={{ color: '#0f172a', fontWeight: 700 }}>{teacherName}</strong>
             </span>
+            {/* Zuständigkeits-Kennzeichnung zur Vermeidung von Doppel-Anrufen */}
+            {t.handling_owner === 'teacher' ? (
+              <span style={{
+                fontSize: '0.72rem',
+                fontWeight: 800,
+                background: '#f1f5f9',
+                color: '#475569',
+                border: '1px solid #cbd5e1',
+                padding: '2px 8px',
+                borderRadius: '100px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }} title="Lehrkraft übernimmt die Schüler-Kontaktaufnahme eigenständig">
+                <span>👤</span>
+                <span>In Bearbeitung durch Lehrkraft</span>
+              </span>
+            ) : (
+              <span style={{
+                fontSize: '0.72rem',
+                fontWeight: 800,
+                background: '#fee2e2',
+                color: '#dc2626',
+                border: '1px solid #fca5a5',
+                padding: '2px 8px',
+                borderRadius: '100px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }} title="Sekretariat ist für die Benachrichtigung der Schüler verantwortlich">
+                <span>🏢</span>
+                <span>Handlungsbedarf Sekretariat</span>
+              </span>
+            )}
+
+            {/* Passive Kontingent-Übersicht für das Sekretariat */}
+            {(() => {
+              const matchingToken = schoolMakeupTokens.find(tok => 
+                tok.teacher_id === t.teacher_id && 
+                tok.student_id === t.student_id && 
+                tok.status !== 'CANCELLED_BY_TEACHER'
+              );
+              if (!matchingToken) return null;
+              return (
+                <span style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  background: matchingToken.status === 'FULLY_REDEEMED' ? '#dcfce7' : '#eff6ff',
+                  color: matchingToken.status === 'FULLY_REDEEMED' ? '#15803d' : '#1d4ed8',
+                  border: matchingToken.status === 'FULLY_REDEEMED' ? '1px solid #86efac' : '1px solid #bfdbfe',
+                  padding: '2px 8px',
+                  borderRadius: '100px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }} title={`Lehrkraft hat Nachhol-Kontingent angelegt (${matchingToken.remaining_minutes}/${matchingToken.total_minutes} Min.)`}>
+                  <span>🎟️</span>
+                  <span>{matchingToken.status === 'FULLY_REDEEMED' ? 'Bereits nachgeholt' : `Nachhol-Kontingent (${matchingToken.remaining_minutes} Min.)`}</span>
+                </span>
+              );
+            })()}
           </div>
           {urgency === 'RED' && (
             <div style={{ marginTop: '8px', fontSize: '0.72rem', fontWeight: 900, color: '#ef4444', background: '#fee2e2', padding: '6px 12px', borderRadius: '8px', width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -232,7 +325,29 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
 
         {/* Action buttons – only in live mode */}
         {crisisTabMode === 'live' && (
-          <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: '8px', flexShrink: 0, alignItems: 'center' }}>
+            {/* Falls Lehrkraft-Ticket: Button um Zuständigkeit aufs Sekretariat zu ziehen */}
+            {t.handling_owner === 'teacher' && urgency !== 'GREEN' && handleClaimTicket && (
+              <button
+                type="button"
+                onClick={() => handleClaimTicket(t.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '5px',
+                  background: '#f8fafc',
+                  border: '1.5px solid #cbd5e1',
+                  color: '#1e293b', borderRadius: '12px', padding: '8px 12px',
+                  fontSize: '0.74rem', fontWeight: 800, cursor: 'pointer',
+                  transition: 'all 0.15s', fontFamily: "'Plus Jakarta Sans', sans-serif",
+                }}
+                title="Sekretariat übernimmt die Kontaktaufnahme der Schüler"
+                onMouseEnter={e => { e.currentTarget.style.borderColor = '#94a3b8'; e.currentTarget.style.background = '#f1f5f9'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.background = '#f8fafc'; }}
+              >
+                <span>🏢</span>
+                <span>Übernehmen</span>
+              </button>
+            )}
+
             {urgency !== 'GREEN' && (
               <button
                 onClick={() => handleMarkAsNotified(t.id)}

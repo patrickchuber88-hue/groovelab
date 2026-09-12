@@ -106,8 +106,8 @@ export const LEGAL_MASTER_WORDING = {
   din66398Retention: {
     title: 'Kommunales Löschkonzept nach DIN 66398 & Art. 17 DSGVO',
     stage1Active: 'Aktiv (0,49 € / Mo.): Vollständiges Schüler-Dashboard, Fokus-Timer, Meisterwerk-Protokoll, Audio-Loopstation & Schulkommunikation.',
-    stage2Passive: 'Passiv / Basis-Bereitstellung (0,09 € / Mo.): Minimaler Zugriff auf Stundenplan, Raumzuweisung und QR-Landingpage. Identität & Daten bleiben 100% erhalten.',
-    fairPlayInactivityRule: 'Bei mehr als 60 Tagen Inaktivität ohne Login wird das Profil fair-play-konform auf Basis-Bereitstellung (0,09 €) umgestellt (automatischer Kostenschutz für Musikschulen).',
+    stage2Passive: 'Basis-Bereitstellung (0,09 € / Mo.): Zugriff auf Stundenplan, Raumzuweisung und QR-Landingpage. Identität & Daten bleiben 100% erhalten.',
+    fairPlayInactivityRule: 'Bei mehr als 60 Tagen ohne Login wird das Profil fair-play-konform auf Basis-Bereitstellung (0,09 €) umgestellt (automatischer Kostenschutz für Musikschulen).',
     educationalPortfolioRule: 'Didaktische Bildungsbiografie & Meisterwerk-Dokumentation (reine Metadaten gem. Art. 6 Abs. 1 lit. b DSGVO) bleiben über Schuljahre hinweg (mehrjährig) kumulativ erhalten. Physische Datenlöschung erfolgt erst 30 Tage nach formeller Exmatrikulation.',
     audioSchoolYearRetention: 'Didaktische Audio-Aufnahmen (Hausaufgaben, Übe-Studio & Loopstation) dienen der Dokumentation des individuellen Lernfortschritts über das Ausbildungsjahr (pädagogisches Jahres-Portfolio). Sie verbleiben bis zum Ende des jeweiligen Schuljahres (30. September inklusive Karenzzeit) im geschützten deutschen Cloud-Speicher. Eltern und Lehrkräfte besitzen jederzeitige 1-Klick-Selbstlöschautonomie.'
   }

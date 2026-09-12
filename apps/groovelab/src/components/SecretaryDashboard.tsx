@@ -821,7 +821,7 @@ function TeacherCard({
             gap: '4px'
           }}>
             <Clock size={12} style={{ color: '#64748b' }} />
-            Inaktiv
+            Basis
           </span>
         )}
         {contractEndsAt && (
@@ -2429,6 +2429,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [schoolHouseNumber, setSchoolHouseNumber] = useState<string>('');
   const [schoolPhoneNumber, setSchoolPhoneNumber] = useState<string>('');
   const [schoolEmail, setSchoolEmail] = useState<string>('');
+  const [absenceEmail, setAbsenceEmail] = useState<string>('');
   const [editColor, setEditColor] = useState<string>('#1a73e8'); // Google Blue
   const [hasCampusSub, setHasCampusSub] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
@@ -3411,6 +3412,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       schoolHouseNumber !== initialSettings.schoolHouseNumber ||
       schoolPhoneNumber !== initialSettings.schoolPhoneNumber ||
       schoolEmail !== initialSettings.schoolEmail ||
+      absenceEmail !== initialSettings.absenceEmail ||
       logoUrl !== initialSettings.logoUrl ||
       JSON.stringify(calendarUrls) !== JSON.stringify(initialSettings.calendarUrls) ||
       kioskPinLength !== initialSettings.kioskPinLength ||
@@ -3423,7 +3425,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     );
   }, [
     initialSettings,
-    schoolName, schoolSubdomain, schoolZipCode, schoolCity, schoolStreet, schoolHouseNumber, schoolPhoneNumber, schoolEmail,
+    schoolName, schoolSubdomain, schoolZipCode, schoolCity, schoolStreet, schoolHouseNumber, schoolPhoneNumber, schoolEmail, absenceEmail,
     logoUrl, calendarUrls, kioskPinLength, bypassPin, logRetention, syncInterval,
     schoolYearStartMonth, schoolYearStartDay, autoDeleteExpiredUsers
   ]);
@@ -3788,6 +3790,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           slot_start_datetime,
           status,
           notified_at,
+          handling_owner,
           student:users!crisis_notifications_student_id_fkey (first_name, last_name, instrument),
           teacher:users!crisis_notifications_teacher_id_fkey (id, first_name, last_name, sick_until)
         `)
@@ -4009,7 +4012,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       if (key.startsWith('is_') && key.endsWith('_active')) {
         return val ? 'Freigeschaltet' : 'Gesperrt';
       }
-      if (key === 'is_campus_active' || key === 'is_groovelab_active' || key === 'has_campus_subscription' || key === 'has_groovelab_subscription') {
+      if (key === 'is_campus_active' || key === 'is_groovelab_active') {
+        return val ? 'Aktiv' : 'Basis';
+      }
+      if (key === 'has_campus_subscription' || key === 'has_groovelab_subscription') {
         return val ? 'Aktiv' : 'Inaktiv';
       }
       return val ? 'Aktiv' : 'Inaktiv';
@@ -4636,6 +4642,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         setSchoolCity(schoolData.city || 'Rheinfelden');
         setSchoolPhoneNumber(schoolData.phone || '');
         setSchoolEmail(schoolData.email || schoolData.contact_email || '');
+        setAbsenceEmail(schoolData.absence_email || '');
         setSchoolSubdomain(schoolData.subdomain || '');
         setOpeningHours(schoolData.opening_hours);
         const op = schoolData.opening_hours || {};
@@ -4746,6 +4753,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           schoolHouseNumber: schoolData.house_number || '',
           schoolPhoneNumber: schoolData.phone_number || '',
           schoolEmail: schoolData.email || '',
+          absenceEmail: schoolData.absence_email || '',
           logoUrl: schoolData.logo_url || '',
           calendarUrls: parsedUrls,
           kioskPinLength: loadedKioskPinLength,
@@ -6200,9 +6208,31 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         .update({ status: 'ARCHIVED' })
         .in('id', ticketIds);
     } catch (err: any) {
-      console.error('Error bulk archiving resolved tickets:', err);
+      console.error('Error archiving crisis tickets:', err);
     }
   };
+
+  const handleClaimTicket = async (ticketId: string) => {
+    // Optimistic UI update
+    setCrisisNotifications(prev =>
+      prev.map(n => n.id === ticketId ? { ...n, handling_owner: 'secretariat' } : n)
+    );
+    try {
+      const { error } = await supabase.rpc('claim_crisis_ticket_by_secretariat', {
+        p_ticket_id: ticketId
+      });
+      if (error) {
+        // Fallback falls RPC nicht deployt
+        await supabase
+          .from('crisis_notifications')
+          .update({ handling_owner: 'secretariat' })
+          .eq('id', ticketId);
+      }
+    } catch (err: any) {
+      console.error('Error claiming crisis ticket:', err);
+    }
+  };
+
 
   const handleEndAbsenceOnBehalf = async (teacherId: string, teacherName: string) => {
     try {
@@ -6739,6 +6769,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         city: schoolCity || null,
         phone_number: schoolPhoneNumber || null,
         email: schoolEmail || null,
+        absence_email: absenceEmail || null,
         logo_url: logoUrl || null,
         calendar_url: serializedUrls || null,
         opening_hours: updatedOp,
@@ -6765,6 +6796,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             city: schoolCity || null,
             phone_number: schoolPhoneNumber || null,
             email: schoolEmail || null,
+            absence_email: absenceEmail || null,
             logo_url: logoUrl || null,
             calendar_url: serializedUrls || null,
             opening_hours: updatedOp
@@ -6791,6 +6823,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         schoolHouseNumber: schoolHouseNumber || '',
         schoolPhoneNumber: schoolPhoneNumber || '',
         schoolEmail: schoolEmail || '',
+        absenceEmail: absenceEmail || '',
         logoUrl: logoUrl || '',
         calendarUrls: calendarUrls,
         kioskPinLength: effKioskPinLength,
@@ -7978,7 +8011,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   };
 
   const handleDeactivateStudentTrial = async (studentId: string) => {
-    if (!window.confirm("Möchtest du die Probezeit dieses Schülers sofort beenden und den Account inaktivieren?")) return;
+    if (!window.confirm("Möchtest du die Probezeit dieses Schülers sofort beenden und das Profil auf Basis umstellen?")) return;
     try {
       const { error } = await supabase
         .from('users')
@@ -7989,10 +8022,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         })
         .eq('id', studentId);
       if (error) throw error;
-      alert("Probezeit beendet. Schülerprofil ist nun inaktiv.");
+      alert("Probezeit beendet. Schülerprofil ist nun im Basis-Status.");
       fetchDashboardData();
     } catch (err: any) {
-      alert("Fehler beim Inaktivieren: " + err.message);
+      alert("Fehler beim Umstellen auf Basis: " + err.message);
     }
   };
 
@@ -12438,6 +12471,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               selectedCrisisTeacherId={selectedCrisisTeacherId}
               setSelectedCrisisTeacherId={setSelectedCrisisTeacherId}
               handleMarkAsNotified={handleMarkAsNotified}
+              handleClaimTicket={handleClaimTicket}
               handleArchiveCrisisTicket={handleArchiveCrisisTicket}
               handleArchiveAllResolvedTickets={handleArchiveAllResolvedTickets}
               handleEndAbsenceOnBehalf={handleEndAbsenceOnBehalf}
@@ -19998,6 +20032,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               setSchoolPhoneNumber={setSchoolPhoneNumber}
               schoolEmail={schoolEmail}
               setSchoolEmail={setSchoolEmail}
+              absenceEmail={absenceEmail}
+              setAbsenceEmail={setAbsenceEmail}
               logoUrl={logoUrl}
               setLogoUrl={setLogoUrl}
               kioskPinLength={kioskPinLength}

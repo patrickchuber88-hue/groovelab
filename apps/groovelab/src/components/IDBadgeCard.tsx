@@ -2,6 +2,7 @@ import React from 'react';
 import QRCode from 'react-qr-code';
 import { Check } from 'lucide-react';
 import { formatTeacherFullName } from '../utils/nameHelper';
+import { getCanonicalQrLandingUrl } from '../utils/tenantUrlHelper';
 
 export const urlToDataUrl = async (url: string): Promise<string> => {
   if (!url) return '';
@@ -81,6 +82,8 @@ export interface IDBadgeCardProps {
     photo_url?: string;
     instrument?: string;
     qr_token?: string;
+    teacher_qr_token?: string;
+    ausweis_nummer?: string;
     is_campus_active?: boolean;
     is_groovelab_active?: boolean;
   };
@@ -140,7 +143,8 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
     spectrumGradient = '#eab308'; // Gelber Balken
   }
 
-  const effectiveQrValue = qrValue || (typeof window !== 'undefined' ? `${window.location.origin}/qr/${user.qr_token || user.id || ''}` : '');
+  const tokenToUse = user.qr_token || user.teacher_qr_token || user.ausweis_nummer || '';
+  const effectiveQrValue = qrValue || getCanonicalQrLandingUrl(tokenToUse);
   
   const isTeacherRole = user.role === 'teacher' || userRolesList.includes('teacher') || user.role === 'admin' || userRolesList.includes('admin') || user.role === 'secretary' || userRolesList.includes('secretary');
   const isStudentRole = (user.role === 'student' || userRolesList.includes('student')) && !isTeacherRole;

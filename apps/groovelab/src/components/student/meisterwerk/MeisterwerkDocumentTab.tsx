@@ -123,6 +123,7 @@ export interface MeisterwerkDocumentTabProps {
   homeworkNotesList: any[];
   hubTab: any;
   insertOrToggleTagInText: (...args: any[]) => any;
+  isCampusActive?: boolean;
   isCountInEnabled: boolean;
   isCurrentHomework: boolean;
   isFullscreen: boolean;
@@ -351,6 +352,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     homeworkNotesList,
     hubTab,
     insertOrToggleTagInText,
+    isCampusActive = true,
     isCountInEnabled,
     isCurrentHomework,
     isFullscreen,
@@ -2453,7 +2455,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               const mod = moduleDefinitions[moduleKey];
                               if (!mod) return null;
 
-                              const isGhosted = !mod.isUnlocked;
+                              const isGhosted = !isCampusActive ? (moduleKey !== 'protocol') : !mod.isUnlocked;
                               const isDraggingCurrent = draggedModuleKey === moduleKey;
 
                               return (
@@ -2498,7 +2500,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     transition: isModuleEditMode ? 'transform 0.15s ease' : 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                                   }}
                                   className={`${isModuleEditMode ? 'campus-jiggle-tile' : 'hover-scale'}`}
-                                  title={isGhosted ? `In ${uiLevel === 'junior' ? 'Junior' : 'Teen'} inaktiv – Klick für Lehrer-Demo-Modus` : undefined}
+                                  title={isGhosted ? (!isCampusActive ? 'Im Basis-Status inaktiv – Klick für Lehrer-Demo-Modus' : `In ${uiLevel === 'junior' ? 'Junior' : 'Teen'} inaktiv – Klick für Lehrer-Demo-Modus`) : undefined}
                                 >
                                   {/* ❌ AUSBLENDEN-BADGE IM EDIT-MODUS */}
                                   {isModuleEditMode && !readOnly && (
@@ -2532,7 +2534,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     </button>
                                   )}
 
-                                  {/* 🔒 INAKTIV-BADGE FÜR LEHRER-GHOSTING */}
+                                  {/* 🔒 BASIS-BADGE FÜR LEHRER-GHOSTING */}
                                   {isGhosted && !isModuleEditMode && (
                                     <div style={{
                                       position: 'absolute',
@@ -2549,7 +2551,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       gap: '3px'
                                     }}>
                                       <Lock size={10} />
-                                      <span>Inaktiv</span>
+                                      <span>Basis</span>
                                     </div>
                                   )}
 

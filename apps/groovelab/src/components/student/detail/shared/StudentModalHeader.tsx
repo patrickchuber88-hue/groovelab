@@ -314,15 +314,15 @@ export const StudentModalHeader: React.FC<StudentModalHeaderProps> = ({
             {mode === 'admin' && (
               <span
                 style={{
-                  background: student?.status === 'pausiert' ? '#fef3c7' : student?.status === 'inaktiv' ? '#fee2e2' : '#e6f4ea',
-                  color: student?.status === 'pausiert' ? '#b45309' : student?.status === 'inaktiv' ? '#dc2626' : '#15803d',
+                  background: student?.status === 'pausiert' ? '#fef3c7' : student?.status === 'inaktiv' ? '#f1f5f9' : '#e6f4ea',
+                  color: student?.status === 'pausiert' ? '#b45309' : student?.status === 'inaktiv' ? '#475569' : '#15803d',
                   padding: '3px 10px',
                   borderRadius: '100px',
                   fontSize: '0.72rem',
                   fontWeight: 900
                 }}
               >
-                {student?.status === 'pausiert' ? '⏸️ Vertrag pausiert' : student?.status === 'inaktiv' ? '🛑 Vertrag inaktiv' : '✓ Vertrag aktiv'}
+                {student?.status === 'pausiert' ? '⏸️ Vertrag pausiert' : student?.status === 'inaktiv' ? '📁 Basis-Bereitstellung' : '✓ Vertrag aktiv'}
               </span>
             )}
           </div>

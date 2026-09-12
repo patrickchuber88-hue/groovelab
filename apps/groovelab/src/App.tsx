@@ -4776,10 +4776,26 @@ function App() {
     if (!uid) return;
     setCampusMessagesLoading(true);
     try {
+      let groupFilter = '';
+      try {
+        const { data: memberGroups } = await supabase
+          .from('campus_chat_group_members')
+          .select('group_id')
+          .eq('user_id', uid);
+        if (memberGroups && memberGroups.length > 0) {
+          const gIds = memberGroups.map((g: any) => g.group_id).filter(Boolean);
+          if (gIds.length > 0) {
+            groupFilter = `,group_id.in.(${gIds.join(',')})`;
+          }
+        }
+      } catch (grpErr) {
+        // fail-safe fallback if table not yet migrated
+      }
+
       const { data, error } = await supabase
         .from('campus_direct_messages')
         .select('*')
-        .or(`sender_id.eq.${uid},recipient_id.eq.${uid}`)
+        .or(`sender_id.eq.${uid},recipient_id.eq.${uid}${groupFilter}`)
         .order('created_at', { ascending: true });
       if (error) throw error;
       if (data) {
@@ -4794,15 +4810,22 @@ function App() {
     }
   }, [user?.id]);
 
-  const handleSendCampusMessage = async (recipientId: string, content: string) => {
+  const handleSendCampusMessage = async (recipientId: string, content: string, groupId?: string) => {
     const uid = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_user_id') || (user?.id)) : user?.id;
     if (!uid) return;
     try {
-      const { error } = await supabase.from('campus_direct_messages').insert({
+      const payload: any = {
         sender_id: uid,
-        recipient_id: recipientId,
         content
-      });
+      };
+      if (groupId) {
+        payload.group_id = groupId;
+        payload.recipient_id = uid;
+      } else {
+        payload.recipient_id = recipientId;
+      }
+
+      const { error } = await supabase.from('campus_direct_messages').insert(payload);
       if (error) throw error;
 
       // Group lesson message replication: Check if recipient has a group_id

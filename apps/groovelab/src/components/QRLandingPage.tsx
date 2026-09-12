@@ -326,8 +326,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      if (params.get('notice') === 'inactive_landing') {
-        showToastMsg('Willkommen auf deiner Schüler-Landingpage. Für das interaktive Dashboard ist eine Aktivierung erforderlich.', 'success');
+      if (params.get('notice') === 'inactive_landing' || params.get('notice') === 'basis_landing') {
+        showToastMsg('Willkommen auf deiner Schüler-Landingpage (Basis-Modus). Für das interaktive Dashboard ist eine Aktivierung erforderlich.', 'success');
         const newUrl = window.location.pathname;
         window.history.replaceState({}, '', newUrl);
       }
@@ -8384,7 +8384,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 </div>
               </div>
               <div style={{display: 'inline-flex', alignSelf: 'flex-start', background: 'rgba(255,255,255,0.2)', padding: '4px 12px', borderRadius: '100px', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em'}}>
-                Profil Inaktiv
+                Profil: Basis
               </div>
             </div>
 

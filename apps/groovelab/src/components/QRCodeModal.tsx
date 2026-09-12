@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 import { StudioAvatar, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, resolveCampusStudentAvatar } from './StudioAvatar';
 import { StudentMobileScheduleWizard } from './StudentMobileScheduleWizard';
 import { IDBadgeCard, inlineAllImagesInElement } from './IDBadgeCard';
-import { isDevEnvironment } from '../utils/tenantUrlHelper';
+import { isDevEnvironment, getCanonicalQrLandingUrl } from '../utils/tenantUrlHelper';
 import { getSchoolProfileDTO } from '../api/bffClient';
 import { formatUserDisplayName } from '../utils/userDisplayName';
 
@@ -31,9 +31,6 @@ interface QRCodeModalProps {
 export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps) {
   const brandColor = 'var(--primary-color)';
   const cardRef = useRef<HTMLDivElement>(null);
-  const qrOrigin = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
-    ? 'https://app.campus-groovelab.de'
-    : window.location.origin;
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
   const [schoolNameAndCity, setSchoolNameAndCity] = useState<string>('Campus Musikschule');
   const [localQrToken, setLocalQrToken] = useState<string>(user.qr_token || '');
@@ -350,7 +347,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
         ],
         barcode: {
           format: "PKBarcodeFormatQR",
-          message: user.qr_token || user.teacher_qr_token || user.id,
+          message: getCanonicalQrLandingUrl(user.qr_token || user.teacher_qr_token || user.ausweis_nummer),
           messageEncoding: "iso-8859-1"
         }
       }
@@ -463,8 +460,9 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
           const isStudentUser = (user.role || '').toLowerCase() === 'student';
           const isCampus = activePlatform === 'campus';
           const effectiveToken = isStudentUser
-            ? (localQrToken || user.qr_token || user.ausweis_nummer || user.id || '')
-            : (localTeacherQrToken || user.teacher_qr_token || localQrToken || user.qr_token || user.id || '');
+            ? (localQrToken || user.qr_token || user.ausweis_nummer || '')
+            : (localTeacherQrToken || user.teacher_qr_token || localQrToken || user.qr_token || '');
+          const canonicalQrLandingUrl = getCanonicalQrLandingUrl(effectiveToken);
 
           return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', gap: '20px' }}>
@@ -472,7 +470,7 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
               <IDBadgeCard 
                 user={user} 
                 activePlatform={activePlatform} 
-                qrValue={`${qrOrigin}/qr/${effectiveToken}`} 
+                qrValue={canonicalQrLandingUrl} 
                 cardRef={cardRef} 
               />
 
@@ -701,11 +699,10 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                 {/* 5. Share Button */}
                 <button 
                   onClick={() => {
-                    const link = `${window.location.origin}/onboarding/${effectiveToken}?platform=${isCampus ? 'campus' : 'groovelab'}`;
                     const formattedText = `Hallo ${user.first_name}! 🎶
 
 Hier ist dein persönlicher Campus-Groovelab Zugang:
-${link}`;
+${canonicalQrLandingUrl}`;
 
                     navigator.clipboard.writeText(formattedText);
                     setCopied(true);
@@ -735,8 +732,7 @@ ${link}`;
                 {isDevEnvironment() && (
                   <button
                     onClick={() => {
-                      const qrUrl = `${window.location.origin}/qr/${effectiveToken}`;
-                      window.open(qrUrl, '_blank');
+                      window.open(canonicalQrLandingUrl, '_blank');
                     }}
                     style={{
                       width: '100%',

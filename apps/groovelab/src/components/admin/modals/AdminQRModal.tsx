@@ -3,6 +3,7 @@ import { ExternalLink, RefreshCw, Download, X } from 'lucide-react';
 import { IDBadgeCard, inlineAllImagesInElement } from '../../IDBadgeCard';
 import { revokeStudentToken } from '../../../utils/tokenSigner';
 import { maskLastName } from '../../../utils/nameHelper';
+import { getCanonicalQrLandingUrl } from '../../../utils/tenantUrlHelper';
 
 export interface AdminQRModalProps {
   user: any;
@@ -269,7 +270,7 @@ export const AdminQRModal: React.FC<AdminQRModalProps> = ({
           <IDBadgeCard 
             user={selectedQRUser} 
             activePlatform={activePlatform} 
-            qrValue={`${window.location.origin}/qr/${(selectedQRUser.role === 'teacher' || selectedQRUser.role === 'admin') ? (selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || selectedQRUser.id || '') : (selectedQRUser.qr_token || selectedQRUser.ausweis_nummer || selectedQRUser.id || '')}`} 
+            qrValue={getCanonicalQrLandingUrl((selectedQRUser.role === 'teacher' || selectedQRUser.role === 'admin' || selectedQRUser.role === 'secretary') ? (selectedQRUser.teacher_qr_token || selectedQRUser.qr_token) : (selectedQRUser.qr_token || selectedQRUser.ausweis_nummer))} 
             cardRef={qrCardRef}
           />
 
@@ -368,10 +369,10 @@ export const AdminQRModal: React.FC<AdminQRModalProps> = ({
           <button
             type="button"
             onClick={() => {
-              const effectiveToken = (selectedQRUser.role === 'teacher' || selectedQRUser.role === 'admin')
-                ? (selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || selectedQRUser.id || '')
-                : (selectedQRUser.qr_token || selectedQRUser.ausweis_nummer || selectedQRUser.id || '');
-              const qrUrl = `${window.location.origin}/qr/${effectiveToken}`;
+              const effectiveToken = (selectedQRUser.role === 'teacher' || selectedQRUser.role === 'admin' || selectedQRUser.role === 'secretary')
+                ? (selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || '')
+                : (selectedQRUser.qr_token || selectedQRUser.ausweis_nummer || '');
+              const qrUrl = getCanonicalQrLandingUrl(effectiveToken);
               window.open(qrUrl, '_blank');
             }}
             style={{

@@ -18,7 +18,7 @@ const EarLabStudioModal = React.lazy(() => import('./campus/EarLabStudioModal').
 const AudioBiographyView = React.lazy(() => import('./campus/AudioBiographyView').then(m => ({ default: m.AudioBiographyView })));
 const MeisterwerkCertificateModal = React.lazy(() => import('./ui/MeisterwerkCertificateModal').then(m => ({ default: m.MeisterwerkCertificateModal })));
 import { synthesizeNeuralSpeech, playAudioBlob, stopNeuralSpeech, buildContinuousHomeworkNarrative, cleanTextForTts, formatPageNumbersGerman } from '../services/neuralTtsService';
-import { isDevEnvironment } from '../utils/tenantUrlHelper';
+import { isDevEnvironment, getCanonicalQrLandingUrl } from '../utils/tenantUrlHelper';
 import { generateStudentHomeworkPrintoutPDF } from '../utils/pdfGenerator';
 import { formatTeacherFullName, capitalizeFirstLetter, formatSongTitleCase, copyTextToClipboard, maskLastName } from '../utils/nameHelper';
 import { AudioWaveformVisualizer } from './ui/AudioWaveformVisualizer';
@@ -226,7 +226,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const isInsideSim = isInsideSimMobile || isInsideSimTabletLandscape;
   const isMobileView = (windowWidth <= 768 && !isInsideSimTabletLandscape) || isInsideSimMobile;
   const [mobileProtokollTab, setMobileProtokollTab] = useState<'repertoire' | 'homework'>(readOnly ? 'homework' : 'repertoire');
-  const [hubTab, setHubTab] = useState<'modules' | 'protocol'>('modules');
+  const [hubTab, setHubTab] = useState<'modules' | 'protocol'>((student?.is_campus_active === false) ? 'protocol' : 'modules');
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
   const modalContainerRef = useRef<HTMLDivElement>(null);
@@ -292,6 +292,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     if (!student.id) return;
     if (typeof student.is_campus_active === 'boolean') {
       setIsCampusActive(student.is_campus_active);
+      if (student.is_campus_active === false) {
+        setHubTab('protocol');
+      }
       return;
     }
     supabase
@@ -302,6 +305,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       .then(({ data }) => {
         if (data && typeof data.is_campus_active === 'boolean') {
           setIsCampusActive(data.is_campus_active);
+          if (data.is_campus_active === false) {
+            setHubTab('protocol');
+          }
         }
       });
   }, [student.id, student.is_campus_active]);
@@ -8970,6 +8976,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       >
         <History size={14} />
         <span>Archiv</span>
+        {!isCampusActive && (
+          <span style={{ fontSize: '0.60rem', background: 'rgba(255, 255, 255, 0.22)', padding: '1px 5px', borderRadius: '4px', fontWeight: 800 }}>Basis</span>
+        )}
       </button>
     );
   };
@@ -8981,7 +8990,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       <button
         type="button"
         onClick={() => { setActiveModalTab('skillradar'); setActiveSubView('hub'); }}
-        title={radarTitle}
+        title={!isCampusActive ? `${radarTitle} (Lehrer-Demo • Schüler im Basis-Status)` : radarTitle}
         aria-label={radarTitle}
         style={{
           background: activeModalTab === 'skillradar' ? '#34a853' : 'rgba(255,255,255,0.15)',
@@ -9005,6 +9014,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       >
         {uiLevel === 'junior' ? <Star size={isMobile ? 12 : 13} /> : <Activity size={isMobile ? 12 : 13} />}
         <span>{radarTitle}</span>
+        {!isCampusActive && (
+          <span style={{ fontSize: '0.60rem', background: 'rgba(255, 255, 255, 0.22)', padding: '1px 5px', borderRadius: '4px', fontWeight: 800 }}>Basis</span>
+        )}
       </button>
     );
   };
@@ -9163,8 +9175,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       ? (student.first_name || 'Schüler/in').trim()
       : `${student.first_name || ''} ${student.last_name ? student.last_name.trim().charAt(0) + '.' : ''}`.trim() || 'Schüler/in';
     const stFirstName = (student.first_name || (student as any)?.name?.split(' ')[0] || 'Schüler').trim();
-    const targetToken = (student as any)?.qr_token || (student as any)?.ausweis_nummer || student?.id;
-    const appUrl = `https://app.campus-groovelab.de/qr/${targetToken}`;
+    const targetToken = (student as any)?.qr_token || (student as any)?.ausweis_nummer || '';
+    const appUrl = getCanonicalQrLandingUrl(targetToken);
     const weekNum = getISOWeek().split('-W')[1] || '';
 
     // 2. Build 1:1 Structured Items
@@ -10421,6 +10433,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           }}
           style={{
             display: 'flex',
+            flexDirection: 'column',
             flex: 1,
             overflowY: (isMobileOrSim || activeViewMode !== 'document' || activeModalTab !== 'document') ? 'auto' : 'hidden',
             overflowX: 'hidden',
@@ -10434,6 +10447,26 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             padding: '0',
             position: 'relative'
           }} className="modal-content-container">
+          {!isCampusActive && (activeModalTab !== 'document' || activeViewMode !== 'document') && (
+            <div style={{
+              width: '100%',
+              background: '#f8fafc',
+              borderBottom: '1.5px solid #e2e8f0',
+              color: '#475569',
+              padding: '8px 16px',
+              fontSize: '0.78rem',
+              fontWeight: 750,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              flexShrink: 0,
+              boxSizing: 'border-box'
+            }}>
+              <Lock size={13} color="#64748b" />
+              <span>Lehrer-Demo-Modus • Dieses Modul ist für Schüler im Basis-Status inaktiv. Hausaufgaben im Protokoll werden direkt synchronisiert.</span>
+            </div>
+          )}
           {activeModalTab === 'skillradar' ? (
             <div style={{
               width: '100%',
@@ -10748,6 +10781,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               homeworkNotesList={homeworkNotesList}
               hubTab={hubTab}
               insertOrToggleTagInText={insertOrToggleTagInText}
+              isCampusActive={isCampusActive}
               isCountInEnabled={isCountInEnabled}
               isCurrentHomework={isCurrentHomework}
               isFullscreen={isFullscreen}

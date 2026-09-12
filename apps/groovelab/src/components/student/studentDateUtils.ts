@@ -71,11 +71,10 @@ export const getISOWeek = (dateInput?: string | Date): string => {
 
 export const getItemWeek = (item: { topic_name: string; updated_at?: string }): string => {
   if (item.topic_name.startsWith('Hausaufgabe KW ')) {
-    const parts = item.topic_name.split('Hausaufgabe KW ');
-    const kwNum = parts[1]?.trim();
-    if (kwNum) {
+    const match = item.topic_name.match(/Hausaufgabe KW\s*(\d+)/i);
+    if (match && match[1]) {
       const year = item.updated_at ? new Date(item.updated_at).getFullYear() : getSimulatedNow().getFullYear();
-      return `${year}-W${kwNum.padStart(2, '0')}`;
+      return `${year}-W${match[1].padStart(2, '0')}`;
     }
   }
   return item.updated_at ? getISOWeek(item.updated_at) : '';

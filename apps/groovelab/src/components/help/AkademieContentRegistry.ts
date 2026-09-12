@@ -293,7 +293,7 @@ export const AKADEMIE_GUIDES_DATABASE: AkademieBoardGuide[] = [
     ],
     proTips: [
       '🛡️ Automatische Namensmaskierung: Zum Schutz von Minderjährigen werden Schülernamen im System als "Vorname + Nachname-Initial" (z. B. "Max M.") geführt.',
-      '🆓 100% kostenlose Karteileichen: Inaktive Schüler in der Kartei verursachen 0,00 € Kosten – abgerechnet werden nur aktiv genutzte Profile.',
+      '📁 Basis-Bereitstellung: Profile im Basis-Status verbleiben bei günstigen 0,09 € Bereitstellung – abgerechnet werden aktiv genutzte Module (0,49 €).',
       '📲 Apple Wallet Pass: Schüler und Eltern können den Campus-Pass mit 1 Fingertipp direkt in die Apple/Google Wallet auf dem Smartphone laden.'
     ],
     invariants: [
@@ -320,8 +320,8 @@ export const AKADEMIE_GUIDES_DATABASE: AkademieBoardGuide[] = [
         actionTarget: 'billing'
       },
       {
-        title: '2. Inaktive Schülerkarteien kostenfrei halten',
-        desc: 'Nur Schüler, die sich aktiv einloggen und Hausaufgaben nutzen, lösen eine Aktivierungsgebühr aus. Inaktive Profile in der Datenbank kosten 0,00 €.',
+        title: '2. Schüler-Profile im Basis-Status halten',
+        desc: 'Schüler im Basis-Status nutzen QR-Landingpages und Notizen (0,09 € Bereitstellung). Nur aktivierte Campus- oder GrooveLab-Profile lösen die Modul-Bereitstellung (0,49 €) aus.',
         actionLabel: 'Schülerstatus prüfen',
         actionTarget: 'students'
       },
@@ -632,7 +632,7 @@ export const AKADEMIE_GUIDES_DATABASE: AkademieBoardGuide[] = [
     id: 'teacher-shouts',
     tier: 'teacher',
     boardId: 'shouts',
-    title: 'Notfall-Chat & Shouts (§ 8a SGB VIII Kinderschutz)',
+    title: 'Notfall-Chat & Shouts (Kinderschutz & Transparenz)',
     subtitle: 'Rechtssichere 1:1 Kurzmitteilungen direkt am Termin – ohne WhatsApp und ohne private Telefonnummern',
     badge: 'Shouts',
     category: 'core_boards',
@@ -663,7 +663,7 @@ export const AKADEMIE_GUIDES_DATABASE: AkademieBoardGuide[] = [
       '📋 Lesebestätigung: Du siehst mit einem dezenten Häkchen, ob die Eltern oder der Schüler die Notiz geöffnet haben.'
     ],
     invariants: [
-      'Kinderschutz nach § 8a SGB VIII: Alle Nachrichten werden revisionssicher im pädagogischen Kontext der Musikschule archiviert.',
+      'Geprüfter Kinderschutz: Alle Nachrichten werden revisionssicher im pädagogischen Kontext der Musikschule archiviert.',
       'Zero-Secret-Leakage: Weder Telefonnummern noch private E-Mail-Adressen werden im Chat-Header übertragen.'
     ],
     tags: ['shouts', 'chat', 'kinderschutz', 'sgb viii', 'nachrichten', 'termine', 'dsgvo', 'notfall']

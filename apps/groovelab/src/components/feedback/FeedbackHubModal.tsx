@@ -924,7 +924,7 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
                   </span>
                 </div>
                 <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b', lineHeight: 1.4 }}>
-                  ⚖️ <strong>Rechtskonform nach § 5 Abs. 1 Nr. 2 DDG (BGH I ZR 238/14):</strong> Deine Anfrage wird direkt im Master-Admin Cockpit priorisiert. Du erhältst die Rückmeldung hier im App-Dashboard sowie per In-App Mitteilung.
+                  <strong>Schnelle Rückmeldung:</strong> Deine Anfrage wird direkt im Support priorisiert. Du erhältst die Rückmeldung hier im App-Dashboard sowie per In-App Mitteilung.
                 </p>
               </div>
 
@@ -1095,7 +1095,7 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
                     <span style={{ fontSize: '1.1rem' }}>⚡</span>
                     <div>
                       <div style={{ fontSize: '0.78rem', fontWeight: 850, color: '#15803d' }}>
-                        60-Minuten Express-SLA (BGH § 5 DDG konform)
+                        60-Minuten Express-Rückmeldung
                       </div>
                       <div style={{ fontSize: '0.70rem', color: '#166534', marginTop: '1px' }}>
                         Garantierte qualifizierte Erst-Rückmeldung an Werktagen (Mo–Fr 09:00–17:00 Uhr) innerhalb von 60 Min.

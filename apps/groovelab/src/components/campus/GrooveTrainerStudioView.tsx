@@ -1388,9 +1388,11 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
     const ctx = getAudioContext();
     if (!ctx) return;
     isRunningRef.current = true;
-    const startAnchor = anchorTime || (ctx.currentTime + 0.08);
-    playbackStartTimeRef.current = startAnchor;
-    nextBeatTimeRef.current = startAnchor;
+    // 🛡️ PWA / Mobile Fix: Verhindere Vergangenheits-Anchors durch setTimeout-Jitter auf Mobilgeräten!
+    // Liegt anchorTime hinter ctx.currentTime, schützt safeAnchor vor einem 16-Takt-Instant-Flush.
+    const safeAnchor = Math.max(ctx.currentTime + 0.05, anchorTime || (ctx.currentTime + 0.08));
+    playbackStartTimeRef.current = safeAnchor;
+    nextBeatTimeRef.current = safeAnchor;
     currentStepRef.current = 0;
     barCountRef.current = 0;
     setPocketStreak(0);
@@ -1460,6 +1462,16 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
   const handleUserTap = useCallback(() => {
     const ctx = getAudioContext();
     if (!ctx) return;
+
+    // 🛡️ PWA / Mobile Fix: Wenn der Einzähler läuft, darf ein Tap den Trainer NIEMALS abbrechen!
+    // Schüler tippen im Vorzähler oft mit oder antizipieren Schlag 1. Wir geben taktiles & auditives
+    // Feedback, brechen den Einzähler aber keinesfalls ab!
+    if (isCountingIn) {
+      playDrumSound('snare', ctx.currentTime, false);
+      setIsPadPressed(true);
+      setTimeout(() => setIsPadPressed(false), 80);
+      return;
+    }
 
     // 🎯 Unblocked Start: Wenn das Spiel nicht läuft (z.B. nach Rundenende),
     // startet ein Tap SOFORT eine neue Runde mit Einzähler 1-2-3-4!

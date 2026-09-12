@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import QRCode from 'react-qr-code';
 import { X, Check, Copy, Share2, QrCode as QrCodeIcon, ShieldCheck, Sparkles, MessageCircle, ExternalLink, Calendar } from 'lucide-react';
 import { formatSingleStudentAnonymized, useRealNamesVisibility } from '../utils/nameHelper';
+import { getCanonicalQrLandingUrl } from '../utils/tenantUrlHelper';
 
 interface StudentPinResetModalProps {
   student: {
@@ -34,9 +35,9 @@ export function StudentPinResetModal({
     isPrivacyMode
   );
 
-  const effectiveToken = student.qr_token || student.ausweis_nummer || student.id;
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://app.campus-groovelab.de';
-  const onboardingUrl = `${baseUrl}/qr/${effectiveToken}?onboarding=true`;
+  const effectiveToken = student.qr_token || student.ausweis_nummer || '';
+  const canonicalBase = getCanonicalQrLandingUrl(effectiveToken);
+  const onboardingUrl = canonicalBase ? `${canonicalBase}?onboarding=true` : '';
 
   const handleCopyLink = async () => {
     try {

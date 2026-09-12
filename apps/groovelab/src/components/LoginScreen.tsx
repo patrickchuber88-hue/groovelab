@@ -16,6 +16,7 @@ import { setVaultItem } from '../utils/aesStorageVault';
 import { scrubSensitiveUrlParams } from '../utils/urlSecurityScrubber';
 import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from './CampusGroovelabBrand';
 import { getInstrumentAvatarUrl, resolveCampusStudentAvatar } from './StudioAvatar';
+import { getCanonicalQrLandingUrl } from '../utils/tenantUrlHelper';
 
 
 
@@ -1917,7 +1918,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             if (user.role === 'student') {
               const tokenToUse = user.qr_token || user.ausweis_nummer || user.id;
               sessionStorage.setItem('groovelab_user_id', user.id);
-              window.location.replace(`${window.location.origin}/qr/${tokenToUse}?notice=inactive_landing`);
+              window.location.replace(`${window.location.origin}/qr/${tokenToUse}?notice=basis_landing`);
               setLoading(false);
               return;
             } else {
@@ -3139,7 +3140,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
   const downloadParentQrCode = async () => {
     try {
-      const qrData = `${window.location.origin}/qr/${verifiedStudentDetails?.qr_token || verifiedStudentId}`;
+      const qrData = getCanonicalQrLandingUrl(verifiedStudentDetails?.qr_token || verifiedStudentDetails?.ausweis_nummer);
       await downloadLocalQrCodePng(
         qrData,
         `campus-groovelab-login-${verifiedStudentDetails?.first_name || 'schueler'}.png`,
@@ -6766,7 +6767,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               <span style={{ fontSize: '9px', color: '#64748b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Dein persönlicher Login-Code</span>
               <div style={{ background: '#ffffff', padding: '10px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 20px rgba(0,0,0,0.03)', border: '1px solid #f1f5f9' }}>
                 <QRCode
-                  value={`${window.location.origin}/qr/${verifiedStudentDetails.qr_token || verifiedStudentDetails.id}`}
+                  value={getCanonicalQrLandingUrl(verifiedStudentDetails.qr_token || verifiedStudentDetails.ausweis_nummer)}
                   size={130}
                   style={{ width: '130px', height: '130px', display: 'block' }}
                 />

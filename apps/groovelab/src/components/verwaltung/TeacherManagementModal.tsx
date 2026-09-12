@@ -25,6 +25,7 @@ import {
   Info
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { getCanonicalQrLandingUrl } from '../../utils/tenantUrlHelper';
 
 // ─── APPLE STYLE TOKEN FIELD ──────────────────────────────────────────────────
 interface AppleStyleTokenFieldProps {
@@ -361,8 +362,8 @@ export const TeacherManagementModal: React.FC<TeacherManagementModalProps> = ({
       b.genre !== 'System'
   ).length;
 
-  const token = formData.teacherQrToken || formData.ausweisNummer || teacher.id || '';
-  const qrLoginUrl = token.startsWith('http') ? token : `${window.location.origin}/qr/${token}`;
+  const token = formData.teacherQrToken || formData.ausweisNummer || teacher.teacher_qr_token || teacher.qr_token || '';
+  const qrLoginUrl = token.startsWith('http') ? token : getCanonicalQrLandingUrl(token);
 
   // Revoke Passkeys handler
   const handleRevokePasskeys = async () => {

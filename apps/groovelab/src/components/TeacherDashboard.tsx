@@ -31,6 +31,9 @@ import { GlobalNotesDrawer } from './notes/GlobalNotesDrawer';
 import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from './CampusGroovelabBrand';
 import { CampusAppointmentShoutboxModal } from './CampusAppointmentShoutboxModal';
 import { isTeacherCurrentlyAbsent, formatAbsenceEndDate, isSlotCancelledByAbsence, ABSENCE_RESET_SENTINEL } from '../utils/teacherAbsenceHelper';
+import { TeacherUrgentCancellationsModal, UrgentCancellationItem } from './teacher/TeacherUrgentCancellationsModal';
+import { TeacherMakeupRadarWidget, ActiveMakeupTokenItem } from './teacher/TeacherMakeupRadarWidget';
+import { TeacherMakeupTokenModal } from './teacher/TeacherMakeupTokenModal';
 
 // Lazy load heavy auxiliary modals on demand for sub-second dashboard initial load & reduced memory footprint
 const TeacherDetailModal = lazy(() => import('./TeacherDetailModal').then(m => ({ default: m.TeacherDetailModal })));
@@ -1510,6 +1513,10 @@ export function TeacherDashboard({
       alert('Bitte wähle ein von-Datum aus.');
       return;
     }
+    if (!absenceHandlingOwner) {
+      alert('Bitte wähle aus, wer die Schüler telefonisch kontaktiert (Sekretariat beauftragen oder Ich übernehme selbst).');
+      return;
+    }
 
     // Check if absence period exceeds 4 weeks
     const startD = new Date(absenceStartDate);
@@ -1548,7 +1555,8 @@ export function TeacherDashboard({
         const { data: rpcRes, error: rpcErr } = await supabase.rpc('report_teacher_absence', {
           p_teacher_id: userId,
           p_start_date: absenceStartVal,
-          p_until_date: absenceUntilVal
+          p_until_date: absenceUntilVal,
+          p_handling_owner: absenceHandlingOwner || 'secretariat'
         });
 
         if (!rpcErr && rpcRes && rpcRes.success) {
@@ -1640,7 +1648,8 @@ export function TeacherDashboard({
                       slot_start_datetime: startDateTime.toISOString(),
                       status: 'UNREAD',
                       duration: sched.duration || 30,
-                      student_name: studentName
+                      student_name: studentName,
+                      handling_owner: absenceHandlingOwner || 'secretariat'
                     });
                   }
 
@@ -1694,7 +1703,8 @@ export function TeacherDashboard({
                     slot_start_datetime: startDateTime.toISOString(),
                     status: 'UNREAD',
                     duration: occ.duration || 30,
-                    student_name: studentName
+                    student_name: studentName,
+                    handling_owner: absenceHandlingOwner || 'secretariat'
                   });
                 }
 
@@ -1723,7 +1733,7 @@ export function TeacherDashboard({
         // Parallel mutations
         await Promise.all([
           scheduleIdsToCancel.size > 0 ? supabase.from('schedules').update({ status: 'canceled_by_teacher_sick' }).in('id', Array.from(scheduleIdsToCancel)) : Promise.resolve(),
-          occurrenceIdsToCancel.size > 0 ? supabase.from('schedule_occurrences').update({ status: 'cancelled', canceled_by_role: 'teacher', teacher_acknowledged: true }).in('id', Array.from(occurrenceIdsToCancel)) : Promise.resolve(),
+          occurrenceIdsToCancel.size > 0 ? supabase.from('schedule_occurrences').update({ status: 'cancelled', canceled_by_role: 'teacher', teacher_acknowledged: true, handling_owner: absenceHandlingOwner || 'secretariat' }).in('id', Array.from(occurrenceIdsToCancel)) : Promise.resolve(),
           notificationsToInsert.length > 0 ? supabase.from('crisis_notifications').insert(notificationsToInsert) : Promise.resolve(),
           shoutboxMessagesToInsert.length > 0 ? supabase.from('campus_direct_messages').insert(shoutboxMessagesToInsert) : Promise.resolve(),
           datesToDeleteNotifs.length > 0 ? supabase.from('crisis_notifications').delete().eq('teacher_id', userId).in('slot_start_datetime', datesToDeleteNotifs) : Promise.resolve(),
@@ -1773,6 +1783,9 @@ export function TeacherDashboard({
           slot_start_datetime: `${s.date_str}T${s.time_str}:00`
         })),
         absenceUntilDateStr: absenceUntilDate,
+        absenceStartDateStr: absenceStartDate,
+        handlingOwner: absenceHandlingOwner,
+        officialNote: absenceOfficialNote
       });
 
       setAbsenceSuccessShown(true);
@@ -3184,8 +3197,23 @@ export function TeacherDashboard({
   const [submittingAbsence, setSubmittingAbsence] = useState(false);
   const [bypassAbsenceView, setBypassAbsenceView] = useState(false);
   const [absenceSuccessShown, setAbsenceSuccessShown] = useState(false);
-  const [absenceNotifModal, setAbsenceNotifModal] = useState<{ notifs: any[]; absenceUntilDateStr?: string } | null>(null);
+  const [absenceHandlingOwner, setAbsenceHandlingOwner] = useState<'secretariat' | 'teacher' | null>(null);
+  const [absenceOfficialNote, setAbsenceOfficialNote] = useState<string>('');
+  const [absenceNotifModal, setAbsenceNotifModal] = useState<{ 
+    notifs: any[]; 
+    absenceUntilDateStr?: string;
+    absenceStartDateStr?: string;
+    handlingOwner?: 'secretariat' | 'teacher' | null;
+    officialNote?: string;
+  } | null>(null);
   const [showAbsenceEndedModal, setShowAbsenceEndedModal] = useState(false);
+
+  useEffect(() => {
+    if (showAbsenceModal) {
+      setAbsenceHandlingOwner(null);
+      setAbsenceOfficialNote('');
+    }
+  }, [showAbsenceModal]);
 
   const [openAnnouncementDetailModal, setOpenAnnouncementDetailModal] = useState<any>(null);
   const [dismissedAnnouncementBannerIds, setDismissedAnnouncementBannerIds] = useState<string[]>([]);
@@ -3207,6 +3235,118 @@ export function TeacherDashboard({
 
   const [crisisNotifications, setCrisisNotifications] = useState<any[]>([]);
   const [isCrisisWidgetExpanded, setIsCrisisWidgetExpanded] = useState(false);
+
+  // ── 🚨 Notfall-Krisenradar bei kurzfristigen Unterrichtsausfällen (< 2h) ──
+  const [urgentCancellations, setUrgentCancellations] = useState<UrgentCancellationItem[]>([]);
+  const [isUrgentModalOpen, setIsUrgentModalOpen] = useState(false);
+  const [urgentSnoozeUntil, setUrgentSnoozeUntil] = useState<number | null>(null);
+
+  const fetchUrgentCancellations = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const { data, error } = await supabase.rpc('get_urgent_unacknowledged_cancellations', {
+        p_teacher_id: userId
+      });
+      if (error) {
+        console.warn('Error fetching urgent cancellations:', error);
+        return;
+      }
+      const list = (data || []) as UrgentCancellationItem[];
+      setUrgentCancellations(list);
+
+      if (list.length > 0) {
+        const nowMs = Date.now();
+        const isSnoozed = urgentSnoozeUntil && urgentSnoozeUntil > nowMs;
+        const hasUnresolved = list.some(i => !i.student_acknowledged && !i.teacher_contact_status);
+        if (hasUnresolved && !isSnoozed) {
+          setIsUrgentModalOpen(true);
+        }
+      } else {
+        setIsUrgentModalOpen(false);
+      }
+    } catch (err) {
+      console.warn('Exception in fetchUrgentCancellations:', err);
+    }
+  }, [userId, urgentSnoozeUntil]);
+
+  // Deep-Link Parameter (?urgent_radar=true) von PWA-Push beim App-Start auswerten
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('urgent_radar') === 'true') {
+        setIsUrgentModalOpen(true);
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+      }
+    }
+  }, []);
+
+  // Lifecycle & Realtime Listener für den Krisenradar
+  useEffect(() => {
+    fetchUrgentCancellations();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchUrgentCancellations();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    const occChannel = supabase
+      .channel(`realtime_teacher_urgent_radar_${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_occurrences', filter: `teacher_id=eq.${userId}` }, () => {
+        fetchUrgentCancellations();
+      })
+      .subscribe();
+
+    const makeupChannel = supabase
+      .channel(`realtime_teacher_makeup_tokens_${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lesson_makeup_tokens', filter: `teacher_id=eq.${userId}` }, () => {
+        fetchActiveMakeupTokens();
+      })
+      .subscribe();
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      supabase.removeChannel(occChannel);
+      supabase.removeChannel(makeupChannel);
+    };
+  }, [fetchUrgentCancellations, userId]);
+
+  // ── 🎟️ Revisionssicheres Nachhol-Kontingent (§ 275 BGB / 100% Lehrkraft-Souveränität) ──
+  const [activeMakeupTokens, setActiveMakeupTokens] = useState<ActiveMakeupTokenItem[]>([]);
+  const [isMakeupModalOpen, setIsMakeupModalOpen] = useState(false);
+  const [makeupModalMode, setMakeupModalMode] = useState<'create' | 'redeem' | 'cancel'>('create');
+  const [selectedMakeupSlot, setSelectedMakeupSlot] = useState<any>(null);
+  const [selectedMakeupToken, setSelectedMakeupToken] = useState<any>(null);
+
+  const fetchActiveMakeupTokens = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const { data, error } = await supabase.rpc('get_teacher_active_makeup_tokens', {
+        p_teacher_id: userId
+      });
+      if (!error && data) {
+        setActiveMakeupTokens(data as ActiveMakeupTokenItem[]);
+      }
+    } catch (err) {
+      console.warn('Exception in fetchActiveMakeupTokens:', err);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    fetchActiveMakeupTokens();
+  }, [fetchActiveMakeupTokens]);
+
+  const handleUrgentSnooze = useCallback((minutes: number) => {
+    const snoozeTime = Date.now() + minutes * 60 * 1000;
+    setUrgentSnoozeUntil(snoozeTime);
+    setIsUrgentModalOpen(false);
+  }, []);
+
+  const unresolvedUrgentCount = useMemo(() => {
+    return urgentCancellations.filter(i => !i.student_acknowledged && !i.teacher_contact_status).length;
+  }, [urgentCancellations]);
 
   // Volljuristische Ausfall- und Kenntnisnahme-Erfassung (§ 130 BGB) für den gesamten Abwesenheitszeitraum
   const activeAbsenceCancellations = useMemo(() => {
@@ -4724,11 +4864,15 @@ export function TeacherDashboard({
             date,
             original_date,
             start_time,
+            duration,
             status,
             schedule_id,
             student_id,
             student_acknowledged,
             room_id,
+            makeup_token_id,
+            makeup_extension_minutes,
+            is_makeup_lesson,
             schedules (
               duration,
               instrument,
@@ -5108,6 +5252,9 @@ export function TeacherDashboard({
                instrument: resolvedInstrument,
                student_acknowledged: slot.student_acknowledged ?? (slot.status?.includes('cancel') || slot.status?.includes('sick') ? false : true),
                original_date: null,
+               makeup_token_id: slot.makeup_token_id || null,
+               makeup_extension_minutes: slot.makeup_extension_minutes || 0,
+               is_makeup_lesson: slot.is_makeup_lesson || false,
                student: student ? {
                  id: student.id,
                  name: student.name || `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim(),
@@ -5170,7 +5317,7 @@ export function TeacherDashboard({
                    scheduleId: occ.schedule_id || occ.id,
                    date: todayStr,
                    timeSlot: formattedTime,
-                   duration: occ.schedules?.duration || existingItem?.duration || 30,
+                   duration: occ.duration || occ.schedules?.duration || existingItem?.duration || 30,
                    status: occStatus,
                    isGroup: Boolean(existingItem?.isGroup),
                    groupStudents: existingItem?.groupStudents || [],
@@ -5180,6 +5327,9 @@ export function TeacherDashboard({
                    instrument: resolvedInstrument,
                    student_acknowledged: occ.student_acknowledged ?? (occStatus?.includes('cancel') || occStatus?.includes('sick') ? false : true),
                    original_date: (occ.original_date || null) as null,
+                   makeup_token_id: occ.makeup_token_id || existingItem?.makeup_token_id || null,
+                   makeup_extension_minutes: occ.makeup_extension_minutes || existingItem?.makeup_extension_minutes || 0,
+                   is_makeup_lesson: Boolean(occ.is_makeup_lesson ?? existingItem?.is_makeup_lesson),
                    student: student ? {
                      id: student.id,
                      name: `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim(),
@@ -7746,44 +7896,77 @@ useEffect(() => {
 
   const renderTagesplanWidget = () => (
     <Suspense fallback={<div style={{ padding: "20px", textAlign: "center", color: "#64748b" }}>Tagesplan wird geladen...</div>}>
-      <TeacherTagesplanWidget
-        teacher={teacher}
-        activeChatOcc={activeChatOcc}
-        setActiveChatOcc={setActiveChatOcc}
-        docStudent={docStudent}
-        setDocStudent={setDocStudent}
-        allStudents={allStudents}
-        isAbsenceWidgetExpanded={isAbsenceWidgetExpanded}
-        setIsAbsenceWidgetExpanded={setIsAbsenceWidgetExpanded}
-        absenceUntilDate={absenceUntilDate}
-        setAbsenceUntilDate={setAbsenceUntilDate}
-        bypassAbsenceView={bypassAbsenceView}
-        currentTimeStr={currentTimeStr}
-        quickAudioStudent={quickAudioStudent}
-        setQuickAudioStudent={setQuickAudioStudent}
-        loadingPrepMirror={loadingPrepMirror}
-        windowWidth={windowWidth}
-        isMobileDevice={isMobileDevice}
-        activeTimelineSlotRef={activeTimelineSlotRef}
-        briefingData={briefingData}
-        checkHasStudentQuestion={checkHasStudentQuestion}
-        checkHasTodayAudio={checkHasTodayAudio}
-        cleanRoomName={cleanRoomName}
-        getIssueRoomLabel={getIssueRoomLabel}
-        handleResolveRoomIssueInTagesplan={handleResolveRoomIssueInTagesplan}
-        isStudentBirthdayToday={isStudentBirthdayToday}
-        resolveStudentInstrument={resolveStudentInstrument}
-        splitAndNormalizeStudents={splitAndNormalizeStudents}
-        getSimulatedNow={getSimulatedNow}
-        relevantRoomIssuesToday={relevantRoomIssuesToday}
-        teacherTodayRooms={teacherTodayRooms}
-        isFreeDay={isFreeDay}
-        isWeekend={isWeekend}
-        isTourDemoScheduleActive={isTourDemoScheduleActive}
-        showRealNames={showRealNames}
-        toggleRealNames={toggleRealNames}
-        userId={userId}
-      />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+        {activeMakeupTokens.length > 0 && (!isTeacherCurrentlyAbsent(teacher) || bypassAbsenceView) && (
+          <TeacherMakeupRadarWidget
+            tokens={activeMakeupTokens}
+            showRealNames={showRealNames}
+            onOpenRedeemModal={(token) => {
+              setSelectedMakeupToken(token);
+              setSelectedMakeupSlot(null);
+              setMakeupModalMode('redeem');
+              setIsMakeupModalOpen(true);
+            }}
+            onOpenCancelModal={(token) => {
+              setSelectedMakeupToken(token);
+              setSelectedMakeupSlot(null);
+              setMakeupModalMode('cancel');
+              setIsMakeupModalOpen(true);
+            }}
+          />
+        )}
+        <TeacherTagesplanWidget
+          teacher={teacher}
+          activeChatOcc={activeChatOcc}
+          setActiveChatOcc={setActiveChatOcc}
+          docStudent={docStudent}
+          setDocStudent={setDocStudent}
+          allStudents={allStudents}
+          isAbsenceWidgetExpanded={isAbsenceWidgetExpanded}
+          setIsAbsenceWidgetExpanded={setIsAbsenceWidgetExpanded}
+          absenceUntilDate={absenceUntilDate}
+          setAbsenceUntilDate={setAbsenceUntilDate}
+          bypassAbsenceView={bypassAbsenceView}
+          currentTimeStr={currentTimeStr}
+          quickAudioStudent={quickAudioStudent}
+          setQuickAudioStudent={setQuickAudioStudent}
+          loadingPrepMirror={loadingPrepMirror}
+          windowWidth={windowWidth}
+          isMobileDevice={isMobileDevice}
+          activeTimelineSlotRef={activeTimelineSlotRef}
+          briefingData={briefingData}
+          checkHasStudentQuestion={checkHasStudentQuestion}
+          checkHasTodayAudio={checkHasTodayAudio}
+          cleanRoomName={cleanRoomName}
+          getIssueRoomLabel={getIssueRoomLabel}
+          handleResolveRoomIssueInTagesplan={handleResolveRoomIssueInTagesplan}
+          isStudentBirthdayToday={isStudentBirthdayToday}
+          resolveStudentInstrument={resolveStudentInstrument}
+          splitAndNormalizeStudents={splitAndNormalizeStudents}
+          getSimulatedNow={getSimulatedNow}
+          relevantRoomIssuesToday={relevantRoomIssuesToday}
+          teacherTodayRooms={teacherTodayRooms}
+          isFreeDay={isFreeDay}
+          isWeekend={isWeekend}
+          isTourDemoScheduleActive={isTourDemoScheduleActive}
+          showRealNames={showRealNames}
+          toggleRealNames={toggleRealNames}
+          userId={userId}
+          urgentCancellations={urgentCancellations}
+          onOpenUrgentModal={() => setIsUrgentModalOpen(true)}
+          onOpenMakeupModal={({ mode, slot }) => {
+            setSelectedMakeupSlot(slot);
+            if (slot.makeup_token_id) {
+              const matchingToken = activeMakeupTokens.find(t => t.token_id === slot.makeup_token_id);
+              setSelectedMakeupToken(matchingToken || { id: slot.makeup_token_id, student_id: slot.student?.id, total_minutes: slot.duration, remaining_minutes: slot.duration });
+            } else {
+              setSelectedMakeupToken(null);
+            }
+            setMakeupModalMode(mode);
+            setIsMakeupModalOpen(true);
+          }}
+        />
+      </div>
     </Suspense>
   );
   const renderFeedWidget = () => (
@@ -8197,6 +8380,39 @@ useEffect(() => {
         </div>
       )}
 
+      {/* 🚨 Krisen-Radar: Notfall-Achtung-Maske bei unbestätigten Ausfällen < 2h */}
+      {isUrgentModalOpen && urgentCancellations.length > 0 && (
+        <TeacherUrgentCancellationsModal
+          isOpen={isUrgentModalOpen}
+          teacherId={userId}
+          items={urgentCancellations}
+          onClose={() => setIsUrgentModalOpen(false)}
+          onRefresh={fetchUrgentCancellations}
+          onSnooze={handleUrgentSnooze}
+        />
+      )}
+
+      {/* 🎟️ Revisionssicheres Nachhol-Kontingent Modal (§ 275 BGB / 100% Lehrkraft-Souveränität) */}
+      {isMakeupModalOpen && (
+        <TeacherMakeupTokenModal
+          isOpen={isMakeupModalOpen}
+          mode={makeupModalMode}
+          occurrence={selectedMakeupSlot}
+          token={selectedMakeupToken}
+          rooms={rooms || []}
+          teacherId={userId}
+          onClose={() => {
+            setIsMakeupModalOpen(false);
+            setSelectedMakeupSlot(null);
+            setSelectedMakeupToken(null);
+          }}
+          onSuccess={async () => {
+            await fetchActiveMakeupTokens();
+            await fetchData();
+          }}
+        />
+      )}
+
       {/* Sidebar - only render if hideHeader is false AND hideSidebar is false */}
       {!hideHeader && !hideSidebar && (
         <div style={{
@@ -8380,6 +8596,94 @@ useEffect(() => {
               )}
             </div>
           </header>
+        )}
+
+        {/* 🚨 AMBIENT SAFETY RADAR BANNER: KRISEN-WARNUNG BEI UNBESTÄTIGTEN AUSFÄLLEN (< 2h) */}
+        {unresolvedUrgentCount > 0 && !isUrgentModalOpen && (
+          <div 
+            role="button"
+            tabIndex={0}
+            onClick={() => setIsUrgentModalOpen(true)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setIsUrgentModalOpen(true); }}
+            style={{
+              width: '100%',
+              marginBottom: '16px',
+              background: 'linear-gradient(135deg, #fff1f2 0%, #fee2e2 100%)',
+              border: '1.5px solid #f87171',
+              borderRadius: '20px',
+              padding: isMobileDevice ? '14px 16px' : '16px 22px',
+              boxShadow: '0 8px 24px -4px rgba(239, 68, 68, 0.18), 0 2px 6px rgba(0,0,0,0.04)',
+              display: 'flex',
+              alignItems: isMobileDevice ? 'flex-start' : 'center',
+              justifyContent: 'space-between',
+              gap: '16px',
+              flexDirection: isMobileDevice ? 'column' : 'row',
+              cursor: 'pointer',
+              animation: 'fadeIn 0.25s ease',
+              textAlign: 'left'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: 0 }}>
+              <div style={{
+                background: '#ef4444',
+                color: '#ffffff',
+                padding: '10px',
+                borderRadius: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <AlertTriangle size={22} strokeWidth={2.4} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0, flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span style={{
+                    fontSize: '0.66rem',
+                    fontWeight: 900,
+                    background: '#ef4444',
+                    color: '#ffffff',
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em'
+                  }}>
+                    Sicherheits-Radar (&lt; 2 Std.)
+                  </span>
+                  <span style={{ fontSize: '0.70rem', fontWeight: 700, color: '#dc2626', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Clock size={11} /> {unresolvedUrgentCount} {unresolvedUrgentCount === 1 ? 'Schüler hat' : 'Schüler haben'} noch nicht bestätigt
+                  </span>
+                </div>
+                <div style={{
+                  fontSize: '0.96rem',
+                  fontWeight: 850,
+                  color: '#0f172a',
+                  lineHeight: 1.3
+                }}>
+                  {unresolvedUrgentCount === 1 
+                    ? '1 kurzfristiger Unterrichtsausfall heute ist noch digital unbestätigt – Bitte telefonisch kontaktieren!'
+                    : `${unresolvedUrgentCount} kurzfristige Unterrichtsausfälle heute sind noch digital unbestätigt – Bitte telefonisch kontaktieren!`}
+                </div>
+              </div>
+            </div>
+
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: '#ef4444',
+              color: '#ffffff',
+              padding: '8px 16px',
+              borderRadius: '12px',
+              fontSize: '0.82rem',
+              fontWeight: 850,
+              flexShrink: 0,
+              boxShadow: '0 2px 8px rgba(239, 68, 68, 0.25)'
+            }}>
+              <span>Krisen-Radar öffnen</span>
+              <ChevronRight size={15} />
+            </div>
+          </div>
         )}
 
         {/* 📢 APPLE-STYLE HERO NOTIFICATION BANNER: WICHTIGE SCHULMITTEILUNG (NON-BLOCKING) */}
@@ -11858,7 +12162,7 @@ useEffect(() => {
             display: 'flex',
             alignItems: windowWidth <= 768 ? 'flex-end' : 'center',
             justifyContent: 'center',
-            padding: windowWidth <= 768 ? '0px' : '20px',
+            padding: windowWidth <= 768 ? '0px' : '16px',
             animation: 'fadeIn 0.2s ease-out'
           }}
           onClick={() => setShowAbsenceModal(false)}
@@ -11870,10 +12174,10 @@ useEffect(() => {
             onClick={(e) => e.stopPropagation()}
             style={{
               background: '#ffffff',
-              borderRadius: windowWidth <= 768 ? '28px 28px 0 0' : '28px',
+              borderRadius: windowWidth <= 768 ? '24px 24px 0 0' : '24px',
               width: '100%',
-              maxWidth: '520px',
-              maxHeight: windowWidth <= 768 ? '90vh' : '85vh',
+              maxWidth: '490px',
+              maxHeight: windowWidth <= 768 ? '94vh' : '92vh',
               display: 'flex',
               flexDirection: 'column',
               boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.3)',
@@ -11883,23 +12187,23 @@ useEffect(() => {
           >
             {/* Apple Drag Indicator for Mobile Viewports */}
             {windowWidth <= 768 && (
-              <div style={{ width: '40px', height: '5px', background: '#cbd5e1', borderRadius: '100px', margin: '12px auto 4px auto' }} />
+              <div style={{ width: '36px', height: '4px', background: '#cbd5e1', borderRadius: '100px', margin: '10px auto 2px auto' }} />
             )}
 
             {/* Header */}
             <div style={{
-              padding: '20px 24px 16px 24px',
+              padding: '14px 20px 12px 20px',
               borderBottom: '1px solid #f1f5f9',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              gap: '12px'
+              gap: '10px'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{
-                  width: '42px',
-                  height: '42px',
-                  borderRadius: '14px',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '12px',
                   background: isTeacherCurrentlyAbsent(teacher)
                     ? 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)'
                     : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
@@ -11908,16 +12212,16 @@ useEffect(() => {
                   alignItems: 'center',
                   justifyContent: 'center',
                   boxShadow: isTeacherCurrentlyAbsent(teacher)
-                    ? '0 4px 14px rgba(14, 165, 233, 0.3)'
-                    : '0 4px 14px rgba(239, 68, 68, 0.3)'
+                    ? '0 4px 12px rgba(14, 165, 233, 0.25)'
+                    : '0 4px 12px rgba(239, 68, 68, 0.25)'
                 }}>
-                  {isTeacherCurrentlyAbsent(teacher) ? <Calendar size={22} /> : <AlertTriangle size={22} />}
+                  {isTeacherCurrentlyAbsent(teacher) ? <Calendar size={19} /> : <AlertTriangle size={19} />}
                 </div>
                 <div>
-                  <h2 id="absence-modal-title" style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  <h2 id="absence-modal-title" style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                     {isTeacherCurrentlyAbsent(teacher) ? 'Abwesenheit verwalten' : 'Abwesenheit / Ausfall melden'}
                   </h2>
-                  <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }}>
+                  <p style={{ margin: '1px 0 0 0', fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
                     {isTeacherCurrentlyAbsent(teacher) ? 'Verfügbarkeit wiederherstellen oder Zeitraum korrigieren' : 'Sagt Termine ab & alarmiert das Sekretariat zur Schülerbetreuung'}
                   </p>
                 </div>
@@ -11928,8 +12232,8 @@ useEffect(() => {
                 style={{
                   background: '#f1f5f9',
                   border: 'none',
-                  borderRadius: '12px',
-                  padding: '8px',
+                  borderRadius: '10px',
+                  padding: '6px',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -11938,31 +12242,31 @@ useEffect(() => {
                   transition: 'all 0.15s'
                 }}
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
             {/* Scrollable Body Content */}
-            <div style={{ padding: '20px 24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '18px', flex: 1 }}>
+            <div style={{ padding: '12px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
               
               {/* Notice Banner */}
               {isTeacherCurrentlyAbsent(teacher) ? (
                 <div style={{
                   background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                  border: '1.5px solid #86efac',
-                  borderRadius: '16px',
-                  padding: '14px 16px',
+                  border: '1px solid #86efac',
+                  borderRadius: '12px',
+                  padding: '8px 12px',
                   display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '12px',
-                  boxShadow: '0 2px 8px rgba(34, 197, 94, 0.08)'
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 2px 6px rgba(34, 197, 94, 0.06)'
                 }}>
-                  <span style={{ fontSize: '1.25rem', lineHeight: 1 }}>🟢</span>
+                  <span style={{ fontSize: '1rem', lineHeight: 1 }}>🟢</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <strong style={{ fontSize: '0.84rem', color: '#166534', display: 'block', fontWeight: 800 }}>
+                    <strong style={{ fontSize: '0.78rem', color: '#166534', display: 'block', fontWeight: 800 }}>
                       Aktuell als abwesend gemeldet
                     </strong>
-                    <span style={{ fontSize: '0.76rem', color: '#15803d', lineHeight: 1.45, fontWeight: 600 }}>
+                    <span style={{ fontSize: '0.70rem', color: '#15803d', lineHeight: 1.35, fontWeight: 600 }}>
                       Bis einschließlich {teacher.sick_until ? new Date(teacher.sick_until.substring(0, 10) + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'auf Weiteres'}. Du kannst dich jederzeit vorzeitig wieder verfügbar melden.
                     </span>
                   </div>
@@ -11970,15 +12274,15 @@ useEffect(() => {
               ) : (
                 <div style={{
                   background: '#fff5f5',
-                  border: '1.5px solid #fecaca',
-                  borderRadius: '16px',
-                  padding: '12px 16px',
+                  border: '1px solid #fecaca',
+                  borderRadius: '12px',
+                  padding: '7px 11px',
                   display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '10px'
+                  alignItems: 'center',
+                  gap: '8px'
                 }}>
-                  <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>ℹ️</span>
-                  <span style={{ fontSize: '0.78rem', color: '#991b1b', lineHeight: 1.45, fontWeight: 550 }}>
+                  <span style={{ fontSize: '1rem', lineHeight: 1 }}>ℹ️</span>
+                  <span style={{ fontSize: '0.72rem', color: '#991b1b', lineHeight: 1.35, fontWeight: 550 }}>
                     Alle betroffenen Stundenplandaten im Zeitraum werden storniert. Das Sekretariat erhält ein Ticket zur Betreuung der Schüler.
                   </span>
                 </div>
@@ -11986,10 +12290,10 @@ useEffect(() => {
 
               {/* 1-Tap Quick-Selection Chips */}
               <div>
-                <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '8px' }}>
+                <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '5px' }}>
                   Schnell-Auswahl (1-Tap):
                 </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
                   <button
                     type="button"
                     onClick={() => {
@@ -12000,16 +12304,16 @@ useEffect(() => {
                       setShowCustomStart(false);
                     }}
                     style={{
-                      padding: '12px 14px',
-                      borderRadius: '14px',
+                      padding: '7px 10px',
+                      borderRadius: '10px',
                       border: quickAbsencePreset === 'today' ? '2px solid #ef4444' : '1.5px solid #e2e8f0',
                       background: quickAbsencePreset === 'today' ? '#fee2e2' : '#f8fafc',
                       color: quickAbsencePreset === 'today' ? '#b91c1c' : '#334155',
                       fontWeight: quickAbsencePreset === 'today' ? 800 : 600,
-                      fontSize: '0.82rem',
+                      fontSize: '0.78rem',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '8px',
+                      gap: '6px',
                       cursor: 'pointer',
                       transition: 'all 0.15s'
                     }}
@@ -12035,16 +12339,16 @@ useEffect(() => {
                       setShowCustomStart(false);
                     }}
                     style={{
-                      padding: '12px 14px',
-                      borderRadius: '14px',
+                      padding: '7px 10px',
+                      borderRadius: '10px',
                       border: quickAbsencePreset === 'friday' ? '2px solid #ef4444' : '1.5px solid #e2e8f0',
                       background: quickAbsencePreset === 'friday' ? '#fee2e2' : '#f8fafc',
                       color: quickAbsencePreset === 'friday' ? '#b91c1c' : '#334155',
                       fontWeight: quickAbsencePreset === 'friday' ? 800 : 600,
-                      fontSize: '0.82rem',
+                      fontSize: '0.78rem',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '8px',
+                      gap: '6px',
                       cursor: 'pointer',
                       transition: 'all 0.15s'
                     }}
@@ -12070,16 +12374,16 @@ useEffect(() => {
                       setShowCustomStart(false);
                     }}
                     style={{
-                      padding: '12px 14px',
-                      borderRadius: '14px',
+                      padding: '7px 10px',
+                      borderRadius: '10px',
                       border: quickAbsencePreset === 'next_friday' ? '2px solid #ef4444' : '1.5px solid #e2e8f0',
                       background: quickAbsencePreset === 'next_friday' ? '#fee2e2' : '#f8fafc',
                       color: quickAbsencePreset === 'next_friday' ? '#b91c1c' : '#334155',
                       fontWeight: quickAbsencePreset === 'next_friday' ? 800 : 600,
-                      fontSize: '0.82rem',
+                      fontSize: '0.78rem',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '8px',
+                      gap: '6px',
                       cursor: 'pointer',
                       transition: 'all 0.15s'
                     }}
@@ -12095,16 +12399,16 @@ useEffect(() => {
                       setShowCustomStart(true);
                     }}
                     style={{
-                      padding: '12px 14px',
-                      borderRadius: '14px',
+                      padding: '7px 10px',
+                      borderRadius: '10px',
                       border: quickAbsencePreset === 'custom' ? '2px solid #ef4444' : '1.5px solid #e2e8f0',
                       background: quickAbsencePreset === 'custom' ? '#fee2e2' : '#f8fafc',
                       color: quickAbsencePreset === 'custom' ? '#b91c1c' : '#334155',
                       fontWeight: quickAbsencePreset === 'custom' ? 800 : 600,
-                      fontSize: '0.82rem',
+                      fontSize: '0.78rem',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '8px',
+                      gap: '6px',
                       cursor: 'pointer',
                       transition: 'all 0.15s'
                     }}
@@ -12119,17 +12423,17 @@ useEffect(() => {
               <div style={{
                 background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
                 border: '1.5px solid #e2e8f0',
-                borderRadius: '18px',
-                padding: '16px',
+                borderRadius: '14px',
+                padding: '10px 14px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '10px'
+                gap: '6px'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Gewählter Zeitraum
                   </span>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#ef4444', background: '#fee2e2', padding: '2px 8px', borderRadius: '100px' }}>
+                  <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#ef4444', background: '#fee2e2', padding: '1px 7px', borderRadius: '100px' }}>
                     {(() => {
                       if (!absenceStartDate || !absenceUntilDate) return '1 Tag';
                       const s = new Date(absenceStartDate + 'T00:00:00');
@@ -12144,15 +12448,15 @@ useEffect(() => {
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Von</span>
-                    <strong style={{ fontSize: '0.92rem', color: '#0f172a', fontWeight: 800 }}>
+                    <span style={{ fontSize: '0.64rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Von</span>
+                    <strong style={{ fontSize: '0.84rem', color: '#0f172a', fontWeight: 800 }}>
                       {absenceStartDate ? new Date(absenceStartDate + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Sofort'}
                     </strong>
                   </div>
-                  <div style={{ color: '#cbd5e1' }}>➔</div>
+                  <div style={{ color: '#cbd5e1', fontSize: '0.82rem' }}>➔</div>
                   <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'right' }}>
-                    <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Bis einschließlich</span>
-                    <strong style={{ fontSize: '0.92rem', color: '#b91c1c', fontWeight: 800 }}>
+                    <span style={{ fontSize: '0.64rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Bis einschließlich</span>
+                    <strong style={{ fontSize: '0.84rem', color: '#b91c1c', fontWeight: 800 }}>
                       {absenceUntilDate ? new Date(absenceUntilDate + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Nicht gewählt'}
                     </strong>
                   </div>
@@ -12160,9 +12464,9 @@ useEffect(() => {
 
                 {/* Custom Date Pickers */}
                 {(quickAbsencePreset === 'custom' || showCustomStart) && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', paddingTop: '10px', borderTop: '1px solid #e2e8f0', marginTop: '4px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', paddingTop: '8px', borderTop: '1px solid #e2e8f0', marginTop: '2px' }}>
                     <div>
-                      <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '4px' }}>Startdatum:</label>
+                      <label style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '2px' }}>Startdatum:</label>
                       <input 
                         type="date"
                         value={absenceStartDate}
@@ -12172,11 +12476,11 @@ useEffect(() => {
                         }}
                         style={{
                           width: '100%',
-                          padding: '10px 12px',
-                          borderRadius: '12px',
+                          padding: '6px 8px',
+                          borderRadius: '10px',
                           border: '1.5px solid #cbd5e1',
                           background: '#ffffff',
-                          fontSize: '0.85rem',
+                          fontSize: '0.78rem',
                           color: '#0f172a',
                           fontWeight: 700,
                           outline: 'none',
@@ -12185,7 +12489,7 @@ useEffect(() => {
                       />
                     </div>
                     <div>
-                      <label style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '4px' }}>Enddatum:</label>
+                      <label style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '2px' }}>Enddatum:</label>
                       <input 
                         type="date"
                         value={absenceUntilDate}
@@ -12195,11 +12499,11 @@ useEffect(() => {
                         }}
                         style={{
                           width: '100%',
-                          padding: '10px 12px',
-                          borderRadius: '12px',
+                          padding: '6px 8px',
+                          borderRadius: '10px',
                           border: '1.5px solid #cbd5e1',
                           background: '#ffffff',
-                          fontSize: '0.85rem',
+                          fontSize: '0.78rem',
                           color: '#0f172a',
                           fontWeight: 700,
                           outline: 'none',
@@ -12215,30 +12519,186 @@ useEffect(() => {
               <div style={{
                 background: '#f8fafc',
                 border: '1px solid #e2e8f0',
-                borderRadius: '14px',
-                padding: '10px 14px',
+                borderRadius: '10px',
+                padding: '6px 10px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '10px'
+                gap: '8px'
               }}>
-                <Clock size={16} color="#64748b" />
-                <span style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 600 }}>
+                <Clock size={14} color="#64748b" />
+                <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>
                   {cancellationsCount > 0 
                     ? `Heute sind ${cancellationsCount} Unterrichtseinheiten betroffen.` 
                     : 'Alle geplanten Termine im Zeitraum werden storniert.'}
+                </span>
+              </div>
+
+              {/* ── ZUSTÄNDIGKEIT FÜR SCHÜLER-BENACHRICHTIGUNG (PFLICHTAUSWAHL) ── */}
+              <div>
+                <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <span>Wer informiert die Schüler telefonisch?</span>
+                  <span style={{ 
+                    fontSize: '0.62rem', 
+                    fontWeight: 800, 
+                    color: absenceHandlingOwner ? '#15803d' : '#ef4444',
+                    background: absenceHandlingOwner ? '#dcfce7' : '#fee2e2',
+                    padding: '2px 8px',
+                    borderRadius: '100px',
+                    border: `1px solid ${absenceHandlingOwner ? '#bbf7d0' : '#fecaca'}`
+                  }}>
+                    {absenceHandlingOwner ? '✓ Ausgewählt' : 'Pflichtfeld'}
+                  </span>
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                  {/* Option 1: Sekretariat beauftragen */}
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Sekretariat beauftragen: Die Verwaltung übernimmt die telefonische Kontaktaufnahme im Ausfall-Cockpit"
+                    onClick={() => setAbsenceHandlingOwner('secretariat')}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setAbsenceHandlingOwner('secretariat');
+                      }
+                    }}
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: '14px',
+                      border: absenceHandlingOwner === 'secretariat' ? '2px solid #ef4444' : '1.5px solid #cbd5e1',
+                      background: absenceHandlingOwner === 'secretariat' ? '#fef2f2' : '#ffffff',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                      boxShadow: absenceHandlingOwner === 'secretariat' ? '0 4px 12px rgba(239, 68, 68, 0.12)' : 'none'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '1.05rem' }}>🏢</span>
+                      <div style={{
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '50%',
+                        border: absenceHandlingOwner === 'secretariat' ? '5px solid #ef4444' : '1.5px solid #cbd5e1',
+                        background: '#ffffff',
+                        boxSizing: 'border-box',
+                        transition: 'all 0.15s'
+                      }} />
+                    </div>
+                    <strong style={{ fontSize: '0.80rem', color: absenceHandlingOwner === 'secretariat' ? '#991b1b' : '#0f172a', fontWeight: 850 }}>
+                      Sekretariat beauftragen
+                    </strong>
+                    <span style={{ fontSize: '0.66rem', color: '#64748b', lineHeight: 1.25 }}>
+                      Die Verwaltung übernimmt die telefonische Kontaktaufnahme im Ausfall-Cockpit
+                    </span>
+                  </div>
+
+                  {/* Option 2: Lehrkraft informiert selbst */}
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Ich übernehme selbst: Ich kontaktiere meine Schüler eigenständig"
+                    onClick={() => setAbsenceHandlingOwner('teacher')}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setAbsenceHandlingOwner('teacher');
+                      }
+                    }}
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: '14px',
+                      border: absenceHandlingOwner === 'teacher' ? '2px solid #ef4444' : '1.5px solid #cbd5e1',
+                      background: absenceHandlingOwner === 'teacher' ? '#fef2f2' : '#ffffff',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                      boxShadow: absenceHandlingOwner === 'teacher' ? '0 4px 12px rgba(239, 68, 68, 0.12)' : 'none'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '1.05rem' }}>👤</span>
+                      <div style={{
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '50%',
+                        border: absenceHandlingOwner === 'teacher' ? '5px solid #ef4444' : '1.5px solid #cbd5e1',
+                        background: '#ffffff',
+                        boxSizing: 'border-box',
+                        transition: 'all 0.15s'
+                      }} />
+                    </div>
+                    <strong style={{ fontSize: '0.80rem', color: absenceHandlingOwner === 'teacher' ? '#991b1b' : '#0f172a', fontWeight: 850 }}>
+                      Ich übernehme selbst
+                    </strong>
+                    <span style={{ fontSize: '0.66rem', color: '#64748b', lineHeight: 1.25 }}>
+                      Ich kontaktiere meine Schüler eigenständig (telefonisch / persönlich)
+                    </span>
+                  </div>
+                </div>
+
+                {!absenceHandlingOwner && (
+                  <div style={{
+                    marginTop: '6px',
+                    padding: '6px 10px',
+                    borderRadius: '10px',
+                    background: '#fff1f2',
+                    border: '1px solid #fecdd3',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '0.68rem',
+                    color: '#e11d48',
+                    fontWeight: 700
+                  }}>
+                    <span>⚠️</span>
+                    <span>Bitte triff eine Auswahl, wer die Schüler kontaktiert.</span>
+                  </div>
+                )}
+              </div>
+
+              {/* ── FLÜCHTIGE ANMERKUNG FÜR DIE E-MAIL AN DIE SCHULLEITUNG (ZERO-STORAGE PRIVACY) ── */}
+              <div>
+                <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span>Anmerkung / Grund (optional für E-Mail)</span>
+                  <span style={{ fontSize: '0.64rem', fontWeight: 600, color: '#94a3b8' }}>🔒 Flüchtig / Nicht gespeichert</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="z.B. Konzertreise / Tournee (abgesprochen), Notizen für Vertretung..."
+                  value={absenceOfficialNote}
+                  onChange={(e) => setAbsenceOfficialNote(e.target.value)}
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: '7px 11px',
+                    borderRadius: '10px',
+                    border: '1.5px solid #cbd5e1',
+                    background: '#ffffff',
+                    fontSize: '0.78rem',
+                    color: '#0f172a',
+                    outline: 'none'
+                  }}
+                />
+                <span style={{ fontSize: '0.64rem', color: '#94a3b8', display: 'block', marginTop: '3px', lineHeight: 1.25 }}>
+                  Wird ausschließlich lokal für deinen E-Mail-Entwurf an die Schulleitung verwendet und nicht auf dem Server gespeichert.
                 </span>
               </div>
             </div>
 
             {/* Sticky Bottom Action Footer */}
             <div style={{
-              padding: '16px 24px',
-              paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))',
+              padding: '12px 20px',
+              paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))',
               borderTop: '1px solid #f1f5f9',
               background: '#ffffff',
               display: 'flex',
               flexDirection: 'column',
-              gap: '10px'
+              gap: '6px'
             }}>
               {isTeacherCurrentlyAbsent(teacher) ? (
                 <>
@@ -12253,22 +12713,22 @@ useEffect(() => {
                       background: 'linear-gradient(135deg, #34a853 0%, #2e8b57 100%)',
                       color: '#ffffff',
                       border: 'none',
-                      padding: '14px',
-                      borderRadius: '16px',
+                      padding: '11px 16px',
+                      borderRadius: '12px',
                       fontWeight: 900,
-                      fontSize: '0.94rem',
+                      fontSize: '0.88rem',
                       cursor: submittingAbsence ? 'not-allowed' : 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '8px',
-                      boxShadow: '0 4px 18px rgba(52, 168, 83, 0.35)',
+                      boxShadow: '0 4px 14px rgba(52, 168, 83, 0.3)',
                       letterSpacing: '-0.01em',
                       transition: 'all 0.15s'
                     }}
                     className="hover-scale"
                   >
-                    <Check size={18} strokeWidth={3} />
+                    <Check size={16} strokeWidth={3} />
                     <span>{submittingAbsence ? 'Wird aktualisiert...' : 'Wieder verfügbar melden'}</span>
                   </button>
 
@@ -12280,10 +12740,10 @@ useEffect(() => {
                       background: '#f8fafc',
                       color: '#334155',
                       border: '1.5px solid #cbd5e1',
-                      padding: '11px',
-                      borderRadius: '14px',
+                      padding: '9px 12px',
+                      borderRadius: '11px',
                       fontWeight: 800,
-                      fontSize: '0.84rem',
+                      fontSize: '0.80rem',
                       cursor: submittingAbsence ? 'not-allowed' : 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -12293,7 +12753,7 @@ useEffect(() => {
                     }}
                     className="hover-scale"
                   >
-                    <CalendarX size={15} color="#64748b" />
+                    <CalendarX size={14} color="#64748b" />
                     <span>{submittingAbsence ? 'Wird übermittelt...' : 'Neuen Zeitraum speichern'}</span>
                   </button>
 
@@ -12305,9 +12765,9 @@ useEffect(() => {
                       background: 'none',
                       border: 'none',
                       color: '#64748b',
-                      fontSize: '0.82rem',
+                      fontSize: '0.78rem',
                       fontWeight: 700,
-                      padding: '4px',
+                      padding: '3px',
                       cursor: 'pointer'
                     }}
                   >
@@ -12319,29 +12779,42 @@ useEffect(() => {
                   {/* Regulärer Erst-Absage Flow */}
                   <button
                     onClick={handleReportAbsence}
-                    disabled={submittingAbsence}
+                    disabled={submittingAbsence || !absenceHandlingOwner}
+                    title={!absenceHandlingOwner ? 'Bitte wähle zuerst aus, wer die Schüler telefonisch kontaktiert' : undefined}
                     style={{
-                      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                      color: '#ffffff',
+                      background: (!absenceHandlingOwner || submittingAbsence)
+                        ? '#cbd5e1'
+                        : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                      color: (!absenceHandlingOwner || submittingAbsence)
+                        ? '#64748b'
+                        : '#ffffff',
                       border: 'none',
-                      padding: '14px',
-                      borderRadius: '16px',
+                      padding: '11px 16px',
+                      borderRadius: '12px',
                       fontWeight: 900,
-                      fontSize: '0.92rem',
-                      cursor: submittingAbsence ? 'not-allowed' : 'pointer',
+                      fontSize: '0.88rem',
+                      cursor: (submittingAbsence || !absenceHandlingOwner) ? 'not-allowed' : 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '8px',
-                      boxShadow: '0 4px 18px rgba(239, 68, 68, 0.35)',
+                      boxShadow: (!absenceHandlingOwner || submittingAbsence)
+                        ? 'none'
+                        : '0 4px 14px rgba(239, 68, 68, 0.3)',
                       opacity: submittingAbsence ? 0.7 : 1,
                       letterSpacing: '-0.01em',
                       transition: 'all 0.15s'
                     }}
-                    className="hover-scale"
+                    className={absenceHandlingOwner && !submittingAbsence ? 'hover-scale' : undefined}
                   >
-                    <CalendarX size={18} />
-                    <span>{submittingAbsence ? 'Wird übermittelt...' : 'Terminabsage jetzt einreichen'}</span>
+                    <CalendarX size={16} />
+                    <span>
+                      {submittingAbsence
+                        ? 'Wird übermittelt...'
+                        : !absenceHandlingOwner
+                        ? 'Zuständigkeit oben auswählen...'
+                        : 'Terminabsage jetzt einreichen'}
+                    </span>
                   </button>
 
                   <button
@@ -12351,9 +12824,9 @@ useEffect(() => {
                       background: 'none',
                       border: 'none',
                       color: '#64748b',
-                      fontSize: '0.82rem',
+                      fontSize: '0.78rem',
                       fontWeight: 700,
-                      padding: '4px',
+                      padding: '3px',
                       cursor: 'pointer'
                     }}
                   >
@@ -12436,14 +12909,27 @@ useEffect(() => {
               <div>
                 <strong style={{ fontSize: '0.85rem', color: '#0f172a', display: 'block', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                   {absenceNotifModal.notifs.length > 0
-                    ? `${absenceNotifModal.notifs.length} Schüler werden benachrichtigt`
+                    ? `${absenceNotifModal.notifs.length} Unterrichtseinheiten disponiert`
                     : 'Keine Stunden betroffen'}
                 </strong>
-                <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                  {absenceNotifModal.notifs.length > 0
-                    ? 'Die Verwaltung sieht alle Fälle im Ausfall-Cockpit und informiert die Schüler.'
-                    : 'Für diesen Zeitraum gibt es keine geplanten Stunden.'}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
+                  <span style={{
+                    fontSize: '0.68rem',
+                    fontWeight: 800,
+                    padding: '2px 8px',
+                    borderRadius: '100px',
+                    background: absenceNotifModal.handlingOwner === 'teacher' ? '#eff6ff' : '#fef2f2',
+                    color: absenceNotifModal.handlingOwner === 'teacher' ? '#1d4ed8' : '#dc2626',
+                    border: `1px solid ${absenceNotifModal.handlingOwner === 'teacher' ? '#bfdbfe' : '#fecaca'}`
+                  }}>
+                    {absenceNotifModal.handlingOwner === 'teacher' ? '👤 Ich informiere selbst' : '🏢 Sekretariat beauftragt'}
+                  </span>
+                  <span style={{ fontSize: '0.74rem', color: '#475569' }}>
+                    {absenceNotifModal.handlingOwner === 'teacher'
+                      ? 'Du kontaktierst deine Schüler eigenständig (Push-Meldung ist bereits raus).'
+                      : 'Das Schulsekretariat wurde im Ausfall-Cockpit beauftragt, deine Schüler anzurufen.'}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -12514,15 +13000,76 @@ useEffect(() => {
               </div>
             )}
 
-            {/* Info + close button */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {/* Juristischer Hinweis & Offizielle E-Mail-Vorlage (Tier-1 SaaS Enterprise+ Goldstandard) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{
-                background: '#eff6ff', border: '1px solid #bfdbfe',
-                borderRadius: '12px', padding: '10px 14px',
-                fontSize: '0.72rem', color: '#3b82f6', lineHeight: 1.5,
+                background: '#f8fafc', border: '1px solid #cbd5e1',
+                borderRadius: '14px', padding: '12px 16px',
+                fontSize: '0.74rem', color: '#475569', lineHeight: 1.45,
               }}>
-                ℹ️ Die <strong>Verwaltung</strong> wurde automatisch alarmiert. Im Ausfall-Cockpit können alle Fälle eingesehen und als <em>"Informiert"</em> markiert werden.
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 800, color: '#0f172a', marginBottom: '4px' }}>
+                  <span>⚖️</span>
+                  <span>Organisatorischer Hinweis für Lehrkräfte</span>
+                </div>
+                Die Erfassung in Campus-Groovelab dient der didaktischen Unterrichtsorganisation und Schülerinformation. Bitte informiere deine Musikschulleitung bei Bedarf auch auf dem offiziellen Dienstweg.
               </div>
+
+              {/* 1-Klick Offizielle E-Mail an Musikschule */}
+              {(() => {
+                const targetSchoolEmail = schoolData?.absence_email || schoolData?.email || '';
+                const teacherName = formatTeacherFullName(teacher) || 'Lehrkraft';
+                const startStr = absenceNotifModal.absenceStartDateStr
+                  ? new Date(absenceNotifModal.absenceStartDateStr + 'T00:00:00').toLocaleDateString('de-DE')
+                  : new Date().toLocaleDateString('de-DE');
+                const untilStr = absenceNotifModal.absenceUntilDateStr
+                  ? new Date(absenceNotifModal.absenceUntilDateStr + 'T00:00:00').toLocaleDateString('de-DE')
+                  : 'auf Weiteres';
+
+                const subject = encodeURIComponent(`Abwesenheitsmitteilung: ${teacherName} (${startStr} – ${untilStr})`);
+                
+                const studentHandlingText = absenceNotifModal.handlingOwner === 'teacher'
+                  ? 'Ich informiere meine Schüler selbst.'
+                  : 'Das Sekretariat übernimmt bitte die telefonische Information der Schüler.';
+
+                const noteBlock = absenceNotifModal.officialNote && absenceNotifModal.officialNote.trim().length > 0
+                  ? `\n• Grund / Anmerkung: ${absenceNotifModal.officialNote.trim()}`
+                  : '';
+
+                const bodyText = `Sehr geehrte Schulleitung, liebes Musikschul-Team,\n\nich melde mich für den Zeitraum von ${startStr} bis voraussichtlich ${untilStr} abwesend.\n\nOrganisatorischer Status (Campus-Groovelab):\n• Schüler-Information: ${studentHandlingText}${noteBlock}\n• Betroffene Stunden: ${absenceNotifModal.notifs.length} Termine disponiert.\n\nSobald ich wieder einsatzbereit bin, gebe ich Bescheid.\n\nMit freundlichen Grüßen,\n${teacherName}`;
+                const mailtoUrl = `mailto:${encodeURIComponent(targetSchoolEmail)}?subject=${subject}&body=${encodeURIComponent(bodyText)}`;
+
+                return (
+                  <a
+                    href={mailtoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      background: '#ffffff',
+                      color: '#0f172a',
+                      border: '1.5px solid #cbd5e1',
+                      borderRadius: '14px',
+                      padding: '12px 16px',
+                      fontSize: '0.82rem',
+                      fontWeight: 800,
+                      textDecoration: 'none',
+                      fontFamily: "'Plus Jakarta Sans', sans-serif",
+                      transition: 'all 0.15s',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = '#94a3b8'; e.currentTarget.style.background = '#f8fafc'; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.background = '#ffffff'; }}
+                  >
+                    <span>✉️</span>
+                    <span>Offizielle Dienstmeldung per E-Mail vorbereiten</span>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>({targetSchoolEmail || 'Musikschule'})</span>
+                  </a>
+                );
+              })()}
+
               <button
                 onClick={() => setAbsenceNotifModal(null)}
                 style={{
@@ -12531,6 +13078,7 @@ useEffect(() => {
                   padding: '14px', fontWeight: 900, fontSize: '0.85rem',
                   cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif",
                   boxShadow: '0 4px 16px rgba(15,23,42,0.2)',
+                  transition: 'all 0.15s'
                 }}
               >
                 ✓ Verstanden — Zurück zum Briefing
