@@ -64,11 +64,11 @@ else \
   fi; \
 fi"
 
-# 5. Synchronisiere Enterprise Server-Skripte nach /root/scripts
+# 5. Synchronisiere Enterprise Server-Skripte nach ~/scripts
 echo "⚙️  Synchronisiere Enterprise Server-Skripte..."
-ssh "$SERVER" "sudo mkdir -p /root/scripts && sudo chown -R deployuser:deployuser /root/scripts"
-scp scripts/backup_supabase_enterprise.sh scripts/sync_offsite_backup.sh scripts/nightly_secops_audit.sh scripts/server_health_watchdog.sh scripts/server_maintenance_weekly.sh scripts/infra_preflight.sh "$SERVER:/root/scripts/" || true
-ssh "$SERVER" "chmod +x /root/scripts/*.sh 2>/dev/null || true"
+ssh "$SERVER" "mkdir -p ~/scripts"
+scp scripts/backup_supabase_enterprise.sh scripts/sync_offsite_backup.sh scripts/nightly_secops_audit.sh scripts/server_health_watchdog.sh scripts/server_maintenance_weekly.sh scripts/infra_preflight.sh "$SERVER:~/scripts/" || true
+ssh "$SERVER" "chmod +x ~/scripts/*.sh 2>/dev/null || true; sudo mkdir -p /root/scripts 2>/dev/null && sudo cp ~/scripts/*.sh /root/scripts/ 2>/dev/null || true"
 echo "  ✓ Server-Skripte synchronisiert & ausführbar."
 
 echo ""
