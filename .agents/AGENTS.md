@@ -70,6 +70,31 @@
 - **Erklärungs-Schutz (Rechtskonformität nach BFSG 2025 & BITV 2.0)**:
   - Die in `LegalTextModal.tsx` verankerte *Erklärung zur digitalen Barrierefreiheit* darf NIEMALS auf abmahnfähige Phrasen (wie „vollständig barrierefrei“ oder „größtenteils vereinbar“) zurückgesetzt werden. Der verbindliche juristische Status bleibt **„teilweise vereinbar“** mit den deklarierten Ausnahmen nach § 12a Abs. 6 BGG / § 16 BFSG (auditive Live-Inhalte und nutzergenerierte Uploads) und präziser Nennung der Landes-Schlichtungsstellen (L-BGG) und Marktüberwachungsbehörden.
 
+## 📱 Mobile- & PWA-Goldstandard Guardian & Master-Prompt Governance
+- **Verbindlicher Master-Prompt**: Für alle mobilen Refactorings, Screen-Optimierungen und PWA-Arbeiten gilt zwingend die Vorlage `.agents/prompts/MOBILE_UI_MASTER_PROMPT.md`.
+- **Desktop Layout Immunity**: Sämtliche mobilen Optimierungen und Transformationen sind strikt auf Bildschirme `<= 768px` beschränkt. Desktop-Grid-Layouts (`>= 769px`) bleiben zu 100 % unberührt.
+- **Hardware- & Viewport-Axiome**:
+  - `env(safe-area-inset-*)` für Notch, Dynamic Island und Home-Bar auf allen Headern und Bottom-Bars.
+  - **Zero Content Occlusion & Scroll Clearance**: Feste Header und die Menu Bottom Tab-Bar dürfen NIEMALS Inhalte verdecken. Jeder scrollbare Hauptcontainer MUSS zwingend ein `padding-bottom: calc(var(--bottom-bar-height, 68px) + env(safe-area-inset-bottom) + 32px)` (und optional `+ var(--player-height)`) besitzen, damit jedes letzte Element, jeder Button und jeder Text zu 100% über die Leiste hinaus voll scroll- und sichtbar ist.
+  - Dynamische Viewport-Höhe `100dvh` (mit `100vh` Fallback).
+  - Wackelschutz: `overflow-x: clip` und `overscroll-behavior-x: none` auf Root/Body.
+  - Reload-Schutz: `overscroll-behavior-y: contain` gegen versehentlichen Pull-to-Refresh.
+- **Ergonomie & Native Touch**:
+  - Reale Trefferzonen von mindestens `44×44px` (Apple/Material Standard).
+  - `touch-action: manipulation` (0ms Klick-Delay), `-webkit-tap-highlight-color: transparent`, `user-select: none` auf Buttons.
+  - Basisschriftgröße in allen Inputs von mindestens `16px` (Anti-Auto-Zoom auf iOS Safari).
+  - PIN- und Code-Felder mit `inputMode="numeric"` und `pattern="[0-9]*"`.
+- **Hybride Icon-First Reduktion & IT-Volljurist Prüfung**:
+  - Platzgewinn durch Icon-First: Werkzeugleisten, Zeilen-Aktionen und Tab-Bars nutzen selbsterklärende Monochrome-Icons ohne störenden Textballast gegen Überlappen und Quetschen.
+  - Zwingendes `aria-label` & `title` an JEDEM Icon-Only Element (BFSG § 14 & WCAG 4.1.2 konform).
+  - Pflicht zur Textbeschriftung (§ 312j BGB): Zahlungspflichtige und juristisch bindende Primäraktionen behalten zwingend ausgeschriebenen Klartext (kein reines Icon).
+  - Teilen ausschließlich via Zwischenablage (Clipboard) und `mailto:`.
+- **Audio- & Media-Stabilität**:
+  - Automatischer AudioContext-Unlock beim ersten Tap und Medienkategorie-Bypass gegen iOS-Stummschaltung.
+  - `navigator.wakeLock` während aktiver Übesessions und Notenansicht.
+  - Universeller `MediaRecorder` (`audio/mp4` für iOS Safari, `audio/webm` für Chrome).
+  - State-Preservation: Formular- und Übezustände überstehen App-Wechsel verlustfrei.
+
 ## Platform Naming
 - Always refer to the platform as **Campus-Groovelab** in all UI elements, user communications, messages, and document descriptions.
 - Ensure the spelling is precisely "Campus-Groovelab" (with a double 'o' in "Groovelab").
