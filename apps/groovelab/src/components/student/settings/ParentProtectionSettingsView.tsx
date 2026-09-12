@@ -802,8 +802,11 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
           />
         </label>
 
-        {/* End-of-List Safe Area Spacer */}
-        <div style={{ height: 'calc(40px + env(safe-area-inset-bottom, 20px))', width: '100%', flexShrink: 0 }} />
+        {/* End-of-List Safe Area Spacer (Zero Occlusion) */}
+        <div
+          style={{ height: 'calc(80px + env(safe-area-inset-bottom, 24px))', width: '100%', flexShrink: 0 }}
+          className="mobile-bottom-clearance-spacer"
+        />
       </div>
     </div>
   );

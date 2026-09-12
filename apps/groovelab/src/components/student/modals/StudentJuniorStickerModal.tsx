@@ -50,22 +50,23 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: isMobile ? '8px' : '16px'
+      padding: isMobile ? '0' : '16px'
     }}>
       <div style={{
         background: '#ffffff',
-        borderRadius: isMobile ? '28px' : '36px',
-        maxWidth: '920px',
+        borderRadius: isMobile ? '0' : '36px',
+        maxWidth: isMobile ? '100vw' : '920px',
         width: '100%',
-        height: isMobile ? '96vh' : '92vh',
+        height: isMobile ? '100dvh' : '92vh',
+        maxHeight: isMobile ? '100dvh' : '92vh',
         display: 'flex',
         flexDirection: 'column',
-        padding: isMobile ? '20px 14px 14px 14px' : '28px 28px 20px 28px',
-        boxShadow: '0 35px 80px rgba(0, 0, 0, 0.35)',
+        padding: isMobile ? 'max(16px, env(safe-area-inset-top, 16px)) 14px 14px 14px' : '28px 28px 20px 28px',
+        boxShadow: isMobile ? 'none' : '0 35px 80px rgba(0, 0, 0, 0.35)',
         position: 'relative',
         boxSizing: 'border-box',
         overflow: 'hidden'
-      }}>
+      }} className={isMobile ? "mobile-modal-shell" : ""}>
 
         {/* CLOSE BUTTON */}
         <button
@@ -181,12 +182,19 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
         </div>
 
         {/* SCROLLABLE 3D COLLECTOR STICKER CONTENT */}
-        <div style={{
-          overflowY: 'auto',
-          flex: 1,
-          padding: '6px 4px 16px 4px',
-          WebkitOverflowScrolling: 'touch'
-        }}>
+        <div
+          style={{
+            overflowY: 'auto',
+            overscrollBehaviorY: 'contain',
+            WebkitOverflowScrolling: 'touch',
+            touchAction: 'pan-y',
+            flex: isMobile ? '1 1 0%' : 1,
+            minHeight: 0,
+            maxHeight: '100%',
+            padding: isMobile ? '6px 4px calc(80px + env(safe-area-inset-bottom, 24px)) 4px' : '6px 4px 16px 4px'
+          }}
+          className={isMobile ? "mobile-scroll-container" : ""}
+        >
           {(() => {
             const categories = [
               { id: 'schuljahr', title: '🎒 Schuljahr-Wappen & Ausbildungs-Reise', icon: Award, iconColor: '#0284c7' },
@@ -467,7 +475,18 @@ export const StudentJuniorStickerModal: React.FC<StudentJuniorStickerModalProps>
         </div>
 
         {/* BOTTOM ACTION BAR */}
-        <div style={{ flexShrink: 0, paddingTop: '14px', borderTop: '1px solid #f1f5f9' }}>
+        <div
+          style={{
+            flexShrink: 0,
+            paddingTop: '12px',
+            paddingBottom: isMobile ? 'calc(max(10px, env(safe-area-inset-bottom, 10px)) + 2px)' : '4px',
+            borderTop: '1px solid #f1f5f9',
+            background: '#ffffff',
+            position: 'relative',
+            zIndex: 20
+          }}
+          className={isMobile ? "mobile-modal-footer" : ""}
+        >
           <button
             onClick={() => {
               onClose();

@@ -1,49 +1,81 @@
-import React, { useEffect } from "react";
-import { CalendarX, CheckCircle2 } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { CalendarX, CheckCircle2, Loader2 } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
 import { formatTeacherFullName } from "../../../utils/nameHelper";
 
 export interface StudentCrisisNotifsModalProps {
   unreadCrisisNotifs: any[];
   onDismiss: () => void;
+  onAcknowledgeSuccess?: (acknowledgedIds: string[]) => void;
 }
 
 export const StudentCrisisNotifsModal: React.FC<StudentCrisisNotifsModalProps> = ({
   unreadCrisisNotifs,
   onDismiss,
+  onAcknowledgeSuccess,
 }) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   if (!unreadCrisisNotifs || unreadCrisisNotifs.length === 0) return null;
 
   const isReinstated = unreadCrisisNotifs.some(n => n.is_reinstated);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && !isSubmitting) {
         handleConfirm();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [unreadCrisisNotifs]);
+  }, [unreadCrisisNotifs, isSubmitting]);
 
-  const handleConfirm = () => {
-    // ⚡ Instant Optimistic Close: Sofort schließen ohne Latenz
-    onDismiss();
+  const handleConfirm = async () => {
+    if (isSubmitting) return;
+    const ids = unreadCrisisNotifs.map(n => n.id).filter(Boolean);
+    if (ids.length === 0) {
+      onDismiss();
+      return;
+    }
 
-    // Revisionssichere Quittierung im Hintergrund
+    setIsSubmitting(true);
+
+    // ⚡ Sofortiger Sitzungsschutz: Markiere IDs im SessionStorage, damit Realtime-Events
+    // oder parallele Refetches die Benachrichtigung in dieser Sitzung nicht wieder reinflackern
     try {
-      const ids = unreadCrisisNotifs.map(n => n.id).filter(Boolean);
-      if (ids.length > 0) {
-        supabase
+      ids.forEach(id => {
+        sessionStorage.setItem(`gl_crisis_ack_${id}`, 'true');
+      });
+    } catch {
+      // Quota- oder Storage-Sperre ignorieren
+    }
+
+    try {
+      // 🛡️ Autoritativer Revisionssicherer RPC mit Audit-Log gem. § 130 BGB / GoBD
+      const { error } = await supabase.rpc('acknowledge_crisis_notifications', {
+        p_notification_ids: ids
+      });
+
+      if (error) {
+        console.warn('[CrisisNotification] RPC acknowledgement error, fallback to direct update:', error);
+        await supabase
           .from('crisis_notifications')
-          .update({ status: 'READ' })
-          .in('id', ids)
-          .then(({ error }) => {
-            if (error) console.error('Error confirming notifications in background:', error);
-          });
+          .update({ 
+            status: 'READ', 
+            read_at: new Date().toISOString(),
+            acknowledged_at: new Date().toISOString()
+          })
+          .in('id', ids);
       }
+
+      onAcknowledgeSuccess?.(ids);
+      onDismiss();
     } catch (err) {
-      console.error('Error confirming notifications:', err);
+      console.error('[CrisisNotification] Error confirming notifications:', err);
+      // Dennoch schließen, da der Session-Schutz aktiv ist
+      onDismiss();
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -66,7 +98,7 @@ export const StudentCrisisNotifsModal: React.FC<StudentCrisisNotifsModalProps> =
         display: 'flex', flexDirection: 'column', gap: '20px',
         boxSizing: 'border-box', textAlign: 'center'
       }}>
-        {/* Apple Squircle Icon Badge - Kein Fieber-Icon */}
+        {/* Apple Squircle Icon Badge */}
         <div style={{
           background: isReinstated 
             ? 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)'
@@ -90,12 +122,12 @@ export const StudentCrisisNotifsModal: React.FC<StudentCrisisNotifsModalProps> =
             margin: 0, 
             fontSize: '1.25rem', 
             fontWeight: 900, 
-            color: isReinstated ? '#34a853' : '#9f1239', 
+            color: isReinstated ? '#15803d' : '#9f1239', 
             fontFamily: '"Outfit", "Inter", sans-serif' 
           }}>
             {isReinstated ? 'Gute Neuigkeiten: Unterricht findet statt!' : 'Wichtige Mitteilung: Unterrichtsausfall'}
           </h3>
-          <p style={{ margin: '8px 0 0 0', fontSize: '0.85rem', color: '#64748b', fontWeight: 600, lineHeight: 1.4 }}>
+          <p style={{ margin: '8px 0 0 0', fontSize: '0.85rem', color: '#475569', fontWeight: 600, lineHeight: 1.4 }}>
             {isReinstated 
               ? 'Deine Lehrkraft steht wieder zur Verfügung. Dein Unterricht findet wie gewohnt statt:'
               : 'Deine Lehrkraft ist verhindert. Daher müssen die folgenden Termine leider entfallen:'}
@@ -115,20 +147,20 @@ export const StudentCrisisNotifsModal: React.FC<StudentCrisisNotifsModalProps> =
             return (
               <div key={n.id || idx} style={{
                 background: isReinstated ? '#e6f4ea' : '#fff5f5', 
-                border: isReinstated ? '1.5px solid #e6f4ea' : '1.5px solid #fecaca',
+                border: isReinstated ? '1.5px solid #bbf7d0' : '1.5px solid #fecaca',
                 borderRadius: '16px', padding: '12px 16px', textAlign: 'left',
                 display: 'flex', flexDirection: 'column', gap: '4px'
               }}>
                 <div style={{ 
                   fontSize: '0.82rem', 
                   fontWeight: 800, 
-                  color: isReinstated ? '#34a853' : '#991b1b' 
+                  color: isReinstated ? '#166534' : '#991b1b' 
                 }}>
                   {isReinstated ? `☀️ Findet statt: ${dateStr}` : `🚫 Ausfall: ${dateStr}`}
                 </div>
                 <div style={{ 
                   fontSize: '0.75rem', 
-                  color: isReinstated ? '#34a853' : '#7f1d1d', 
+                  color: isReinstated ? '#15803d' : '#7f1d1d', 
                   fontWeight: 600, 
                   display: 'flex', 
                   gap: '8px', 
@@ -145,21 +177,33 @@ export const StudentCrisisNotifsModal: React.FC<StudentCrisisNotifsModalProps> =
 
         <button
           onClick={handleConfirm}
+          disabled={isSubmitting}
+          aria-label={isReinstated ? "Unterrichtsteilnahme bestätigen" : "Ausfall zur Kenntnis nehmen"}
           style={{
             background: isReinstated
-              ? 'linear-gradient(135deg, #34a853 0%, #34a853 100%)'
+              ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'
               : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
             color: 'white', border: 'none', borderRadius: '16px',
             padding: '16px', fontWeight: 900, fontSize: '0.88rem',
-            cursor: 'pointer', fontFamily: '"Outfit", "Inter", sans-serif',
+            cursor: isSubmitting ? 'not-allowed' : 'pointer',
+            fontFamily: '"Outfit", "Inter", sans-serif',
             boxShadow: isReinstated
-              ? '0 6px 20px rgba(52, 168, 83, 0.25)'
+              ? '0 6px 20px rgba(34, 197, 94, 0.3)'
               : '0 6px 20px rgba(239, 68, 68, 0.25)',
-            transition: 'transform 0.2s, box-shadow 0.2s'
+            transition: 'transform 0.2s, box-shadow 0.2s, opacity 0.2s',
+            opacity: isSubmitting ? 0.75 : 1,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
           }}
           className="hover-scale"
         >
-          {isReinstated ? 'Super, ich bin dabei! 👍' : 'Ich habe den Ausfall zur Kenntnis genommen'}
+          {isSubmitting ? (
+            <>
+              <Loader2 size={18} className="animate-spin" />
+              <span>Wird quittiert...</span>
+            </>
+          ) : (
+            <span>{isReinstated ? 'Super, ich bin dabei! 👍' : 'Ich habe den Ausfall zur Kenntnis genommen'}</span>
+          )}
         </button>
       </div>
     </div>

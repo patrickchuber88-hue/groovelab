@@ -1645,7 +1645,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                     border: isMobile ? 'none' : '1px solid #e2e8f0',
                     overflow: 'hidden'
                   }}
-                  className={isMobile ? "" : "animation-slide-up"}
+                  className={isMobile ? "mobile-modal-shell" : "animation-slide-up"}
                   onClick={(e) => e.stopPropagation()}
                 >
                   {/* Modal Header */}
@@ -1845,14 +1845,20 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                   </div>
 
                   {/* Modal Body */}
-                  <div style={{
-                    padding: isMobile ? '16px 14px calc(88px + env(safe-area-inset-bottom, 24px)) 14px' : '24px',
-                    overflowY: 'auto',
-                    overscrollBehaviorY: 'contain',
-                    WebkitOverflowScrolling: 'touch',
-                    flex: 1,
-                    textAlign: 'left'
-                  }}>
+                  <div
+                    style={{
+                      padding: isMobile ? '16px 14px calc(88px + env(safe-area-inset-bottom, 24px)) 14px' : '24px',
+                      overflowY: 'auto',
+                      overscrollBehaviorY: 'contain',
+                      WebkitOverflowScrolling: 'touch',
+                      touchAction: 'pan-y',
+                      flex: isMobile ? '1 1 0%' : 1,
+                      minHeight: 0,
+                      maxHeight: '100%',
+                      textAlign: 'left'
+                    }}
+                    className={isMobile ? "mobile-scroll-container" : ""}
+                  >
                     {activeStudentSettingsModal === 'parent_controls' && (
                       <ParentProtectionSettingsView
                         studentUser={studentUser}
@@ -3130,19 +3136,21 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                   </div>
 
                   {/* Modal Footer */}
-                  <div style={{
-                    padding: isMobile ? '10px 16px calc(max(10px, env(safe-area-inset-bottom, 10px)) + 4px) 16px' : '16px 24px',
-                    borderTop: '1px solid #f1f5f9',
-                    background: '#f8fafc',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: isMobile ? 'stretch' : 'flex-end',
-                    gap: '10px',
-                    position: isMobile ? 'sticky' : 'static',
-                    bottom: 0,
-                    zIndex: 20,
-                    flexShrink: 0
-                  }}>
+                  <div
+                    style={{
+                      padding: isMobile ? '10px 16px calc(max(10px, env(safe-area-inset-bottom, 10px)) + 4px) 16px' : '16px 24px',
+                      borderTop: '1px solid #f1f5f9',
+                      background: '#f8fafc',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: isMobile ? 'stretch' : 'flex-end',
+                      gap: '10px',
+                      position: 'relative',
+                      zIndex: 20,
+                      flexShrink: 0
+                    }}
+                    className={isMobile ? "mobile-modal-footer" : ""}
+                  >
                     <button
                       type="button"
                       onClick={handleCloseSettingsModal}

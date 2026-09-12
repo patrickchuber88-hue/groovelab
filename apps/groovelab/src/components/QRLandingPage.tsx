@@ -3817,7 +3817,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       if (profile?.id && occ.date) {
         await supabase
           .from('crisis_notifications')
-          .update({ status: 'READ' })
+          .update({ 
+            status: 'READ',
+            read_at: new Date().toISOString(),
+            acknowledged_at: new Date().toISOString()
+          })
           .eq('student_id', profile.id)
           .gte('slot_start_datetime', `${occ.date}T00:00:00`)
           .lte('slot_start_datetime', `${occ.date}T23:59:59`);

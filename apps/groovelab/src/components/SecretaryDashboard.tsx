@@ -6333,13 +6333,14 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           .eq('status', 'cancelled');
       }
 
-      // Re-enable and mark future notifications as reinstated for students instead of deleting them
+      // Re-enable and mark future notifications as reinstated for students instead of deleting them (nur wenn nicht bereits als stattfindend quittiert)
       if (datesToDeleteNotifs.length > 0) {
         await supabase
           .from('crisis_notifications')
           .update({ is_reinstated: true, status: 'UNREAD' })
           .eq('teacher_id', teacherId)
-          .in('slot_start_datetime', datesToDeleteNotifs);
+          .in('slot_start_datetime', datesToDeleteNotifs)
+          .or('is_reinstated.eq.false,status.neq.READ');
       }
 
       // Add healthy alert

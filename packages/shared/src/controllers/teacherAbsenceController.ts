@@ -160,12 +160,13 @@ export async function reportAbsenceHandler(req: Request, res: Response): Promise
     // Delete/update future crisis notifications if absence shortened or ended
     if (datesToDeleteNotifs.length > 0) {
       if (!resolvedUntilDate) {
-        // Update matching notifications to is_reinstated = true and status = 'UNREAD'
+        // Update matching notifications to is_reinstated = true and status = 'UNREAD' (nur wenn nicht bereits als stattfindend quittiert)
         await supabase
           .from('crisis_notifications')
           .update({ is_reinstated: true, status: 'UNREAD' })
           .eq('teacher_id', teacherId)
-          .in('slot_start_datetime', datesToDeleteNotifs);
+          .in('slot_start_datetime', datesToDeleteNotifs)
+          .or('is_reinstated.eq.false,status.neq.READ');
       } else {
         await supabase
           .from('crisis_notifications')
@@ -223,14 +224,24 @@ export async function confirmCrisisNotificationHandler(req: Request, res: Respon
       return;
     }
 
-    const { error } = await supabase
-      .from('crisis_notifications')
-      .update({ status: 'READ' })
-      .eq('id', resolvedId);
+    const { error: rpcError } = await supabase.rpc('acknowledge_crisis_notifications', {
+      p_notification_ids: [resolvedId]
+    });
 
-    if (error) {
-      res.status(550).json({ error: 'Failed to confirm notification.', details: error.message });
-      return;
+    if (rpcError) {
+      const { error } = await supabase
+        .from('crisis_notifications')
+        .update({ 
+          status: 'READ',
+          read_at: new Date().toISOString(),
+          acknowledged_at: new Date().toISOString()
+        })
+        .eq('id', resolvedId);
+
+      if (error) {
+        res.status(550).json({ error: 'Failed to confirm notification.', details: error.message });
+        return;
+      }
     }
 
     res.status(200).json({

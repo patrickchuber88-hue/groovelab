@@ -10,7 +10,9 @@ import {
   Layers, 
   ShieldAlert, 
   Sparkles,
-  Check
+  Check,
+  MessageSquare,
+  MessageCircle
 } from 'lucide-react';
 
 export interface CampusCreateChannelModalProps {
@@ -65,6 +67,8 @@ export const CampusCreateChannelModal: React.FC<CampusCreateChannelModalProps> =
 }) => {
   const [channelName, setChannelName] = useState('');
   const [channelDescription, setChannelDescription] = useState('');
+  const [channelType, setChannelType] = useState<'threads' | 'chat'>('threads');
+  const [allowStudentTopics, setAllowStudentTopics] = useState(false);
   const [selectedIcon, setSelectedIcon] = useState('hash');
   const [isAnnouncementOnly, setIsAnnouncementOnly] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -74,6 +78,8 @@ export const CampusCreateChannelModal: React.FC<CampusCreateChannelModalProps> =
     if (isOpen) {
       setChannelName('');
       setChannelDescription('');
+      setChannelType('threads');
+      setAllowStudentTopics(false);
       setSelectedIcon('hash');
       setIsAnnouncementOnly(false);
       setErrorMessage('');
@@ -120,7 +126,9 @@ export const CampusCreateChannelModal: React.FC<CampusCreateChannelModalProps> =
         p_name: cleanName,
         p_description: channelDescription.trim() || null,
         p_icon: selectedIcon,
-        p_is_announcement_only: isAnnouncementOnly
+        p_is_announcement_only: isAnnouncementOnly,
+        p_channel_type: channelType,
+        p_allow_student_topics: allowStudentTopics
       });
 
       if (!rpcError && rpcData?.success) {
@@ -131,6 +139,8 @@ export const CampusCreateChannelModal: React.FC<CampusCreateChannelModalProps> =
           description: channelDescription.trim() || null,
           icon: selectedIcon,
           is_announcement_only: rpcData.is_announcement_only,
+          channel_type: rpcData.channel_type || channelType,
+          allow_student_topics: rpcData.allow_student_topics || allowStudentTopics,
           is_default: false,
           created_at: new Date().toISOString()
         });
@@ -163,6 +173,8 @@ export const CampusCreateChannelModal: React.FC<CampusCreateChannelModalProps> =
           description: channelDescription.trim() || null,
           icon: selectedIcon,
           is_announcement_only: isAnnouncementOnly,
+          channel_type: channelType,
+          allow_student_topics: allowStudentTopics,
           is_default: false
         })
         .select()
@@ -251,7 +263,7 @@ export const CampusCreateChannelModal: React.FC<CampusCreateChannelModalProps> =
               </h2>
             </div>
             <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
-              Strukturiere Themen, Noten & Absprachen wie in Microsoft Teams
+              Strukturiere Themen, Noten &amp; Absprachen übersichtlich in Kanälen
             </p>
           </div>
 
@@ -291,6 +303,164 @@ export const CampusCreateChannelModal: React.FC<CampusCreateChannelModalProps> =
               marginBottom: '16px'
             }}>
               {errorMessage}
+            </div>
+          )}
+
+          {/* Kanal-Format Auswahl (Themen-Kanal vs. Klassischer Chat) */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ 
+              display: 'block', 
+              fontSize: '0.78rem', 
+              fontWeight: 800, 
+              color: '#64748b', 
+              textTransform: 'uppercase', 
+              letterSpacing: '0.04em',
+              marginBottom: '10px'
+            }}>
+              Kanal-Format wählen
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+              {/* Option 1: Themen- & Beitrags-Kanal */}
+              <button
+                type="button"
+                onClick={() => setChannelType('threads')}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                  padding: '12px 14px',
+                  borderRadius: '14px',
+                  border: channelType === 'threads' ? '2px solid #16a34a' : '1px solid #e2e8f0',
+                  background: channelType === 'threads' ? '#f0fdf4' : '#ffffff',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    background: channelType === 'threads' ? '#dcfce7' : '#f1f5f9',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <MessageSquare size={16} style={{ color: channelType === 'threads' ? '#16a34a' : '#64748b' }} />
+                  </div>
+                  {channelType === 'threads' && (
+                    <span style={{
+                      background: '#16a34a',
+                      color: '#ffffff',
+                      fontSize: '0.62rem',
+                      fontWeight: 900,
+                      padding: '2px 6px',
+                      borderRadius: '100px'
+                    }}>
+                      EMPFOHLEN
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.86rem', fontWeight: 800, color: channelType === 'threads' ? '#166534' : '#0f172a' }}>
+                    Themen &amp; Beiträge
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginTop: '2px', lineHeight: 1.3 }}>
+                    Themen mit Betreff, Antworten &amp; Emojis übersichtlich gebündelt
+                  </div>
+                </div>
+              </button>
+
+              {/* Option 2: Klassischer Chat */}
+              <button
+                type="button"
+                onClick={() => setChannelType('chat')}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                  padding: '12px 14px',
+                  borderRadius: '14px',
+                  border: channelType === 'chat' ? '2px solid #16a34a' : '1px solid #e2e8f0',
+                  background: channelType === 'chat' ? '#f0fdf4' : '#ffffff',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    background: channelType === 'chat' ? '#dcfce7' : '#f1f5f9',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <MessageCircle size={16} style={{ color: channelType === 'chat' ? '#16a34a' : '#64748b' }} />
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.86rem', fontWeight: 800, color: channelType === 'chat' ? '#166534' : '#0f172a' }}>
+                    Klassischer Chat
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginTop: '2px', lineHeight: 1.3 }}>
+                    Fortlaufender Chatverlauf für schnelle spontane Absprachen
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* Schüler-Berechtigung für Themen (nur bei Threads) */}
+          {channelType === 'threads' && !isAnnouncementOnly && (
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => setAllowStudentTopics(!allowStudentTopics)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setAllowStudentTopics(!allowStudentTopics);
+                }
+              }}
+              style={{
+                padding: '12px 14px',
+                borderRadius: '14px',
+                border: allowStudentTopics ? '1.5px solid #16a34a' : '1px solid #e2e8f0',
+                background: allowStudentTopics ? '#f0fdf4' : '#fafbfc',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                marginBottom: '20px',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <div>
+                <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
+                  Schülern erlauben, neue Themen zu eröffnen
+                </div>
+                <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginTop: '1px' }}>
+                  Standard: Aus (nur Lehrkräfte eröffnen Themen, Kinder antworten darauf)
+                </div>
+              </div>
+
+              <div style={{
+                width: '20px',
+                height: '20px',
+                borderRadius: '6px',
+                border: allowStudentTopics ? '2px solid #16a34a' : '2px solid #cbd5e1',
+                background: allowStudentTopics ? '#16a34a' : '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                {allowStudentTopics && <Check size={13} color="#ffffff" strokeWidth={3} />}
+              </div>
             </div>
           )}
 

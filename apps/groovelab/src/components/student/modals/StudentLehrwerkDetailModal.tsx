@@ -87,27 +87,29 @@ return (
           }}>
             <div style={{
               background: '#ffffff',
-              borderRadius: '28px',
+              borderRadius: isMobile ? '0' : '28px',
               width: '100%',
-              maxWidth: '880px',
-              maxHeight: '90vh',
-              boxShadow: '0 24px 60px -12px rgba(0, 0, 0, 0.20)',
+              maxWidth: isMobile ? '100vw' : '880px',
+              height: isMobile ? '100dvh' : 'auto',
+              maxHeight: isMobile ? '100dvh' : '90vh',
+              boxShadow: isMobile ? 'none' : '0 24px 60px -12px rgba(0, 0, 0, 0.20)',
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
-              border: '1px solid #f1f5f9',
+              border: isMobile ? 'none' : '1px solid #f1f5f9',
               position: 'relative'
-            }} className="animation-slide-up">
+            }} className={isMobile ? "mobile-modal-shell" : "animation-slide-up"}>
               
               {/* Header - Clean Apple Style */}
               <div style={{
-                padding: '18px 24px',
+                padding: isMobile ? 'max(12px, env(safe-area-inset-top, 12px)) 16px 12px 16px' : '18px 24px',
                 background: '#ffffff',
                 borderBottom: '1px solid #f1f5f9',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                zIndex: 50
+                zIndex: 50,
+                flexShrink: 0
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div style={{
@@ -123,7 +125,7 @@ return (
                     <BookOpen size={18} />
                   </div>
                   <div>
-                    <h2 style={{ margin: 0, fontSize: '1.18rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                    <h2 style={{ margin: 0, fontSize: isMobile ? '1.05rem' : '1.18rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em' }}>
                       {book.title}
                     </h2>
                     <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
@@ -138,8 +140,8 @@ return (
                     background: '#f8fafc',
                     border: '1px solid #e2e8f0',
                     borderRadius: '50%',
-                    width: '32px',
-                    height: '32px',
+                    width: '36px',
+                    height: '36px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -149,19 +151,27 @@ return (
                   }}
                   className="hover-scale-subtle"
                 >
-                  <X size={15} />
+                  <X size={16} />
                 </button>
               </div>
 
               {/* Inside Content: Left Stage + Right Pages Flow */}
-              <div style={{
-                display: 'flex',
-                flex: 1,
-                overflowY: 'auto',
-                padding: '24px',
-                gap: '24px',
-                flexDirection: isMobile ? 'column' : 'row'
-              }}>
+              <div
+                style={{
+                  display: 'flex',
+                  flex: isMobile ? '1 1 0%' : 1,
+                  minHeight: 0,
+                  maxHeight: '100%',
+                  overflowY: 'auto',
+                  overscrollBehaviorY: 'contain',
+                  WebkitOverflowScrolling: 'touch',
+                  touchAction: 'pan-y',
+                  padding: isMobile ? '16px 14px calc(80px + env(safe-area-inset-bottom, 24px)) 14px' : '24px',
+                  gap: '24px',
+                  flexDirection: isMobile ? 'column' : 'row'
+                }}
+                className={isMobile ? "mobile-scroll-container" : ""}
+              >
                 
                 {/* Left Column (Stage & Progress Card) */}
                 <div style={{
@@ -422,6 +432,13 @@ return (
                   </div>
                 </div>
 
+                {/* Mobile Bottom Clearance Spacer */}
+                {isMobile && (
+                  <div
+                    style={{ height: 'calc(60px + env(safe-area-inset-bottom, 24px))', width: '100%', flexShrink: 0 }}
+                    className="mobile-bottom-clearance-spacer"
+                  />
+                )}
               </div>
             </div>
           </div>

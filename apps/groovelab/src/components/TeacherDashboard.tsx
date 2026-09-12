@@ -1938,13 +1938,14 @@ export function TeacherDashboard({
             .eq('status', 'cancelled');
         }
 
-        // Mark future notifications as reinstated so students get notified
+        // Mark future notifications as reinstated so students get notified (nur wenn nicht bereits als stattfindend quittiert)
         if (datesToDeleteNotifs.length > 0) {
           await supabase
             .from('crisis_notifications')
             .update({ is_reinstated: true, status: 'UNREAD' })
             .eq('teacher_id', userId)
-            .in('slot_start_datetime', datesToDeleteNotifs);
+            .in('slot_start_datetime', datesToDeleteNotifs)
+            .or('is_reinstated.eq.false,status.neq.READ');
         }
 
         // Collect all affected student IDs to send reinstatement direct messages

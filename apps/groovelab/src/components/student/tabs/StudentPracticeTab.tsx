@@ -29,7 +29,7 @@ export interface StudentPracticeTabProps {
   handleEmergencyExitJuniorMission: () => void;
   handleCloseJuniorCelebration: () => void;
   handleStartPracticeSession: () => Promise<void>;
-  finishPracticeSession: () => Promise<void>;
+  finishPracticeSession: (explicitXpGained?: number) => Promise<void>;
   logParentGuidedPractice: (minutes: number) => Promise<void>;
   handleOpenHomeworkBookWithView: (targetTab?: any, targetViewMode?: any) => void;
   playMilestoneSound: (tier: 1 | 2 | 3) => void;
@@ -379,39 +379,6 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                       borderRadius: '50%',
                       pointerEvents: 'none'
                     }} />
-
-                    {/* Gear / Settings Button in top right (Cosmic Glass) */}
-                    <button
-                      type="button"
-                      onClick={() => setShowJuniorPracticeSettingsModal(true)}
-                      style={{
-                        position: 'absolute',
-                        top: isMobile ? '12px' : '18px',
-                        right: isMobile ? '12px' : '18px',
-                        background: 'rgba(255, 255, 255, 0.12)',
-                        backdropFilter: 'blur(10px)',
-                        border: '1px solid rgba(199, 210, 254, 0.25)',
-                        borderRadius: '14px',
-                        padding: isMobile ? '10px 14px' : '8px 14px',
-                        minHeight: isMobile ? '44px' : 'auto',
-                        touchAction: 'manipulation',
-                        color: '#c7d2fe',
-                        fontSize: isMusicStandMode ? '0.88rem' : '0.80rem',
-                        fontWeight: 750,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s ease',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-                        zIndex: 2
-                      }}
-                      className="hover-scale"
-                      title="Zaubertöne & Anker anpassen"
-                    >
-                      <Settings size={14} color="#c7d2fe" />
-                      <span>Einstellungen</span>
-                    </button>
 
                     {/* Schwebende Vektor-Rakete Illustration */}
                     <div style={{
@@ -2321,7 +2288,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                   gap: '6px'
                                 }}>
                                   <Star size={15} fill="#4338ca" />
-                                  <span>+{juniorCelebrationSummary?.xpGained || 50} XP gesichert</span>
+                                  <span>+{juniorCelebrationSummary?.xpGained ?? 50} XP gesichert</span>
                                 </span>
 
                                 {juniorMissionTier >= 2 && (

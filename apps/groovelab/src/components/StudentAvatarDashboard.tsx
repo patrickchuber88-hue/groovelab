@@ -3004,8 +3004,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
       if (!error && data) {
         // Filtere alle unquittierten Ausfälle, die heute oder in der Zukunft liegen (bzw. max. 24h vergangen)
+        // und in der aktuellen Browser-Sitzung nicht bereits revisionssicher quittiert wurden
         const nowThreshold = Date.now() - 24 * 60 * 60 * 1000;
         const validNotifs = data.filter(n => {
+          if (!n.id) return false;
+          if (typeof window !== 'undefined' && sessionStorage.getItem(`gl_crisis_ack_${n.id}`) === 'true') {
+            return false;
+          }
           const dt = new Date(n.slot_start_datetime);
           return !isNaN(dt.getTime()) && dt.getTime() >= nowThreshold;
         });
@@ -3045,11 +3050,26 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const handleConfirmCrisisNotification = async (notifId: string) => {
     setConfirmingCrisisId(notifId);
     try {
-      const { error } = await supabase
-        .from('crisis_notifications')
-        .update({ status: 'READ' })
-        .eq('id', notifId);
-      if (error) throw error;
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(`gl_crisis_ack_${notifId}`, 'true');
+      }
+
+      const { error: rpcError } = await supabase.rpc('acknowledge_crisis_notifications', {
+        p_notification_ids: [notifId]
+      });
+
+      if (rpcError) {
+        const { error } = await supabase
+          .from('crisis_notifications')
+          .update({ 
+            status: 'READ',
+            read_at: new Date().toISOString(),
+            acknowledged_at: new Date().toISOString()
+          })
+          .eq('id', notifId);
+        if (error) throw error;
+      }
+
       setUnreadCrisisNotifs(prev => prev.filter(n => n.id !== notifId));
     } catch (err) {
       console.error('Error confirming crisis notification:', err);
@@ -6827,36 +6847,62 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         // 🛡️ Cold Cache / PWA: Unpack SNAPSHOT_SONGS into loadedProgress so assigned songs are never lost on empty localStorage
         ((matrixRes.value as any).data || []).forEach((item: any) => {
           if (item.topic_name && item.topic_name.startsWith('Hausaufgabe KW ')) {
-            const rawSnap = (item.teacher_notes || '') + '\n' + (item.homework_notes || '');
-            if (rawSnap.includes('SNAPSHOT_SONGS:')) {
-              try {
-                const sIdx = rawSnap.indexOf('SNAPSHOT_SONGS:');
-                const after = rawSnap.slice(sIdx + 'SNAPSHOT_SONGS:'.length);
-                const endIdx = after.search(/\n\n--- [A-Z_]+ ---|\n\nSNAPSHOT_/);
-                const jsonStr = (endIdx !== -1 ? after.slice(0, endIdx) : after).trim();
-                const parsedSongs = JSON.parse(jsonStr);
-                if (Array.isArray(parsedSongs)) {
-                  parsedSongs.forEach((song: any) => {
-                    const sTitle = (song.title || song.topic_name || '').trim();
-                    if (sTitle && !loadedProgress.some((p: any) => (p.topic_name || p.title || '').toLowerCase() === sTitle.toLowerCase())) {
-                      loadedProgress.push({
-                        id: song.id || `snapshot-song-${Date.now()}-${Math.random()}`,
-                        student_id: targetId,
-                        topic_name: sTitle,
-                        title: sTitle,
-                        is_current_homework: true,
-                        status: song.status || 'IN_PROGRESS',
-                        homework_notes: song.homework_notes || song.notes || song.note || '',
-                        teacher_notes: song.teacher_notes || '',
-                        updated_at: item.updated_at || item.created_at
-                      });
+            const extractSongsFromSnapshot = (raw: any) => {
+              if (!raw) return;
+              let songList: any[] = [];
+              if (Array.isArray(raw)) {
+                const sEntry = raw.find((entry: any) => typeof entry === 'string' && entry.startsWith('SNAPSHOT_SONGS:'));
+                if (sEntry) {
+                  try {
+                    const parsed = JSON.parse(sEntry.substring('SNAPSHOT_SONGS:'.length));
+                    if (Array.isArray(parsed)) songList = parsed;
+                  } catch {}
+                }
+              } else if (typeof raw === 'string') {
+                if (raw.startsWith('[') || raw.startsWith('{')) {
+                  try {
+                    const parsedArr = JSON.parse(raw);
+                    if (Array.isArray(parsedArr)) {
+                      const sEntry = parsedArr.find((entry: any) => typeof entry === 'string' && entry.startsWith('SNAPSHOT_SONGS:'));
+                      if (sEntry) {
+                        const parsed = JSON.parse(sEntry.substring('SNAPSHOT_SONGS:'.length));
+                        if (Array.isArray(parsed)) songList = parsed;
+                      }
                     }
+                  } catch {}
+                }
+                if (songList.length === 0 && raw.includes('SNAPSHOT_SONGS:')) {
+                  try {
+                    const sIdx = raw.indexOf('SNAPSHOT_SONGS:');
+                    const after = raw.slice(sIdx + 'SNAPSHOT_SONGS:'.length);
+                    const endIdx = after.search(/\n\n--- [A-Z_]+ ---|\n\nSNAPSHOT_/);
+                    const jsonStr = (endIdx !== -1 ? after.slice(0, endIdx) : after).trim();
+                    const parsed = JSON.parse(jsonStr);
+                    if (Array.isArray(parsed)) songList = parsed;
+                  } catch {}
+                }
+              }
+
+              songList.forEach((song: any) => {
+                const sTitle = (song.title || song.topic_name || '').trim();
+                if (sTitle && !loadedProgress.some((p: any) => (p.topic_name || p.title || '').toLowerCase() === sTitle.toLowerCase())) {
+                  loadedProgress.push({
+                    id: song.id || `snapshot-song-${Date.now()}-${Math.random()}`,
+                    student_id: targetId,
+                    topic_name: sTitle,
+                    title: sTitle,
+                    is_current_homework: true,
+                    status: song.status || 'IN_PROGRESS',
+                    homework_notes: song.homework_notes || song.notes || song.note || '',
+                    teacher_notes: song.teacher_notes || '',
+                    updated_at: item.updated_at || item.created_at
                   });
                 }
-              } catch (err) {
-                console.warn('Could not parse SNAPSHOT_SONGS in fetchStudentProgress:', err);
-              }
-            }
+              });
+            };
+
+            extractSongsFromSnapshot(item.homework_notes);
+            extractSongsFromSnapshot(item.teacher_notes);
           }
         });
 
@@ -7710,7 +7756,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       });
   };
 
-  const finishPracticeSession = async () => {
+  const finishPracticeSession = async (explicitXpGained?: number) => {
     if (isFinishingSessionRef.current) return;
     isFinishingSessionRef.current = true;
 
@@ -7811,7 +7857,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
       const remainingXpEligibleExtraMins = Math.max(0, 60 - todayExtraMinsLogged);
       const xpEligibleExtraMins = Math.min(effectiveExtraMinutes, remainingXpEligibleExtraMins);
-      const xpGained = effectiveFocusMinutes + xpEligibleExtraMins;
+      const xpGained = typeof explicitXpGained === 'number'
+        ? explicitXpGained
+        : (effectiveFocusMinutes + xpEligibleExtraMins);
 
       let baseTotalFocus = 0;
       let baseMonthlyFocus = 0;
@@ -9418,14 +9466,36 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     const missionInfo = getJuniorMissionDetails();
 
     let tier: 1 | 2 | 3 = 1;
-    let xpBonus = 10;
+    let xpBonus = 0;
     let msg = '';
 
+    const simNow = getSimulatedNow();
+    const todayStr = toLocalYYYYMMDD(simNow);
+    const abortBonusKey = `cg_abort_bonus_claimed_${studentId}_${todayStr}`;
+    let alreadyClaimedAbortBonusToday = false;
+    try {
+      alreadyClaimedAbortBonusToday = localStorage.getItem(abortBonusKey) === 'true';
+    } catch (e) {}
+
     if (elapsedSecs < targetSeconds) {
-      // Stufe 1: Abbruch vor Zielzeit (pädagogisch verzeihend ohne Scham)
+      // Stufe 1: Abbruch vor Zielzeit (< targetSeconds)
       tier = 1;
-      xpBonus = Math.max(5, Math.floor(elapsedSecs / 60) * 5);
-      msg = `Toller Einsatz! ${Math.floor(elapsedSecs / 60)} Min. geübt – beim nächsten Flug holst du den Stern! 🚀`;
+      if (elapsedSecs < 30) {
+        // Unter 30 Sekunden: Klickschutz / versehentlicher Start (0 XP)
+        xpBonus = 0;
+        msg = 'Guter Start! Spiele mindestens 30 Sekunden, um deinen ersten Flugversuch zu werten! 🚀';
+      } else if (!alreadyClaimedAbortBonusToday) {
+        // Erster Abbruch heute (>= 30 Sek.): Einmaliger 5 XP Start-/Trost-Bonus
+        xpBonus = 5;
+        msg = 'Toller Einsatz! Du hast fleißig geübt – beim nächsten Flug holst du den Stern! 🚀';
+        try {
+          localStorage.setItem(abortBonusKey, 'true');
+        } catch (e) {}
+      } else {
+        // Wiederholter Abbruch am selben Tag: 0 XP, pädagogisch ermutigende Botschaft
+        xpBonus = 0;
+        msg = 'Toller Versuch! Du hast heute schon deinen Start-Bonus erhalten. Halte beim nächsten Flug 3 Min. durch für deinen Tages-Stern & 50 XP! 🚀';
+      }
       playRocketSputterSound();
     } else if (bonusSecs < 120) {
       // Stufe 2: Zielzeit erreicht (bis +2 Min)
@@ -9474,9 +9544,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
     // Nach Flugzeit + 1.2s persistieren
     setTimeout(async () => {
-      await finishPracticeSession();
+      await finishPracticeSession(xpBonus);
     }, flightDurationMs + 1200);
-  }, [avatar?.streak_flame, finishPracticeSession, secondsElapsed]);
+  }, [avatar?.streak_flame, finishPracticeSession, secondsElapsed, studentId, getJuniorMissionDetails]);
 
   const handleCloseJuniorCelebration = () => {
     setJuniorMissionPhase('idle');
@@ -13429,6 +13499,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       <StudentCrisisNotifsModal
         unreadCrisisNotifs={unreadCrisisNotifs}
         onDismiss={() => setUnreadCrisisNotifs([])}
+        onAcknowledgeSuccess={(acknowledgedIds) => {
+          setUnreadCrisisNotifs(prev => prev.filter(n => !acknowledgedIds.includes(n.id)));
+        }}
       />
       {/* Live Match Celebration Modal Portal */}
       <StudentMatchCelebrationModal

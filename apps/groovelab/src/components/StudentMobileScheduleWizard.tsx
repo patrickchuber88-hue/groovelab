@@ -342,11 +342,14 @@ export const StudentMobileScheduleWizard: React.FC<StudentMobileScheduleWizardPr
         if (insertErr) throw insertErr;
       }
 
-      // 3. Mark timetable_assigned_at timestamp
+      // 3. Mark timetable_assigned_at timestamp and provenance source
       const nowIso = new Date().toISOString();
       await supabase
         .from('students')
-        .update({ timetable_assigned_at: nowIso })
+        .update({ 
+          timetable_assigned_at: nowIso,
+          timetable_source: 'student'
+        })
         .eq('id', student.id);
 
       showToast("Wunschzeiten erfolgreich gespeichert!");

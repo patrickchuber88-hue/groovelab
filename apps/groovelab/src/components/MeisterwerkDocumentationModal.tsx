@@ -871,7 +871,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     setActiveLehrwerkId(null);
     setActivePageNumber(null);
     setSelectedActiveSongId('');
-  }, [student.id]);
+    if (readOnly || initialModalTab === 'document') {
+      setMobileProtokollTab('homework');
+    }
+  }, [student.id, readOnly, initialModalTab]);
 
   // Load existing feedback when a week is selected in the archive
   useEffect(() => {
@@ -9858,7 +9861,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       padding: useNotebookLayout ? '6px' : '0',
       position: 'relative',
       transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
-    }} className="animation-slide-up">
+    }} className={isMobileOrSim ? "mobile-modal-shell" : "animation-slide-up"}>
                 {/* Embedded Style Block - Universal for ALL Tabs */}
         <style dangerouslySetInnerHTML={{__html: `
           .hide-scrollbar::-webkit-scrollbar {

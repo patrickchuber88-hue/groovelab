@@ -2831,6 +2831,22 @@ function App() {
       )
       .on(
         'postgres_changes',
+        { event: '*', schema: 'public', table: 'campus_chat_channel_reads', filter: `user_id=eq.${user.id}` },
+        () => {
+          console.log('[Realtime] campus_chat_channel_reads update detected');
+          fetchCampusMessages();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'campus_chat_group_members', filter: `user_id=eq.${user.id}` },
+        () => {
+          console.log('[Realtime] campus_chat_group_members update detected');
+          fetchCampusMessages();
+        }
+      )
+      .on(
+        'postgres_changes',
         { event: '*', schema: 'public', table: 'band_members', filter: `user_id=eq.${user.id}` },
         () => {
           console.log('[Realtime] band_members update detected, refetching dashboard...');
@@ -4777,16 +4793,57 @@ function App() {
     setCampusMessagesLoading(true);
     try {
       let groupFilter = '';
+      const groupLastReadMap = new Map<string, number>();
+      const channelLastReadMap = new Map<string, number>();
+
       try {
-        const { data: memberGroups } = await supabase
-          .from('campus_chat_group_members')
-          .select('group_id')
-          .eq('user_id', uid);
-        if (memberGroups && memberGroups.length > 0) {
-          const gIds = memberGroups.map((g: any) => g.group_id).filter(Boolean);
-          if (gIds.length > 0) {
-            groupFilter = `,group_id.in.(${gIds.join(',')})`;
-          }
+        const [memberGroupsRes, createdGroupsRes, channelReadsRes] = await Promise.all([
+          supabase
+            .from('campus_chat_group_members')
+            .select('group_id, last_read_at')
+            .eq('user_id', uid),
+          supabase
+            .from('campus_chat_groups')
+            .select('id')
+            .eq('creator_id', uid)
+            .eq('is_archived', false),
+          supabase
+            .from('campus_chat_channel_reads')
+            .select('channel_id, last_read_at')
+            .eq('user_id', uid)
+        ]);
+
+        const allGIds = new Set<string>();
+
+        if (memberGroupsRes.data && memberGroupsRes.data.length > 0) {
+          memberGroupsRes.data.forEach((gm: any) => {
+            if (gm.group_id) {
+              allGIds.add(gm.group_id);
+              if (gm.last_read_at) {
+                groupLastReadMap.set(gm.group_id, new Date(gm.last_read_at).getTime());
+              }
+            }
+          });
+        }
+
+        if (createdGroupsRes.data && createdGroupsRes.data.length > 0) {
+          createdGroupsRes.data.forEach((cg: any) => {
+            if (cg.id) {
+              allGIds.add(cg.id);
+            }
+          });
+        }
+
+        if (allGIds.size > 0) {
+          groupFilter = `,group_id.in.(${Array.from(allGIds).join(',')})`;
+        }
+
+        if (channelReadsRes.data && channelReadsRes.data.length > 0) {
+          channelReadsRes.data.forEach((cr: any) => {
+            if (cr.channel_id && cr.last_read_at) {
+              channelLastReadMap.set(cr.channel_id, new Date(cr.last_read_at).getTime());
+            }
+          });
         }
       } catch (grpErr) {
         // fail-safe fallback if table not yet migrated
@@ -4800,8 +4857,22 @@ function App() {
       if (error) throw error;
       if (data) {
         setCampusMessages(data);
-        const unread = data.filter((m: any) => m.recipient_id === uid && !m.is_read).length;
-        setCampusUnreadCount(unread);
+        
+        // 1. Unread direct (1:1) messages
+        const directUnread = data.filter((m: any) => !m.group_id && m.recipient_id === uid && !m.is_read).length;
+
+        // 2. Unread group channel messages (Goldstandard: channel_reads prioritized, fallback to group last_read)
+        const groupUnread = data.filter((m: any) => {
+          if (!m.group_id || m.sender_id === uid) return false;
+          const msgTime = new Date(m.created_at).getTime();
+          if (m.channel_id && channelLastReadMap.has(m.channel_id)) {
+            return msgTime > (channelLastReadMap.get(m.channel_id) || 0);
+          }
+          const groupLastRead = groupLastReadMap.get(m.group_id) || 0;
+          return msgTime > groupLastRead;
+        }).length;
+
+        setCampusUnreadCount(directUnread + groupUnread);
       }
     } catch (err) {
       console.error('Error fetching campus messages:', err);
@@ -4810,9 +4881,40 @@ function App() {
     }
   }, [user?.id]);
 
-  const handleSendCampusMessage = async (recipientId: string, content: string, groupId?: string) => {
+  const handleSendCampusMessage = async (
+    recipientId: string, 
+    content: string, 
+    groupId?: string, 
+    channelId?: string, 
+    parentMessageId?: string, 
+    subject?: string
+  ) => {
     const uid = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_user_id') || (user?.id)) : user?.id;
     if (!uid) return;
+
+    // 0ms Optimistic UI update: immediately display message in UI
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const optimisticMessage: any = {
+      id: tempId,
+      sender_id: uid,
+      content,
+      created_at: new Date().toISOString(),
+      is_read: false
+    };
+    if (groupId) {
+      optimisticMessage.group_id = groupId;
+      optimisticMessage.recipient_id = uid;
+      if (channelId) optimisticMessage.channel_id = channelId;
+      if (parentMessageId) optimisticMessage.parent_message_id = parentMessageId;
+      if (subject) optimisticMessage.subject = subject;
+    } else {
+      optimisticMessage.recipient_id = recipientId;
+      if (parentMessageId) optimisticMessage.parent_message_id = parentMessageId;
+      if (subject) optimisticMessage.subject = subject;
+    }
+
+    setCampusMessages(prev => [...prev, optimisticMessage]);
+
     try {
       const payload: any = {
         sender_id: uid,
@@ -4821,41 +4923,57 @@ function App() {
       if (groupId) {
         payload.group_id = groupId;
         payload.recipient_id = uid;
+        if (channelId) payload.channel_id = channelId;
+        if (parentMessageId) payload.parent_message_id = parentMessageId;
+        if (subject) payload.subject = subject;
       } else {
         payload.recipient_id = recipientId;
+        if (parentMessageId) payload.parent_message_id = parentMessageId;
+        if (subject) payload.subject = subject;
       }
 
-      const { error } = await supabase.from('campus_direct_messages').insert(payload);
-      if (error) throw error;
+      const { data: insertedMsg, error } = await supabase.from('campus_direct_messages').insert(payload).select().single();
+      if (error) {
+        // Rollback optimistic update on error
+        setCampusMessages(prev => prev.filter(m => m.id !== tempId));
+        throw error;
+      }
 
-      // Group lesson message replication: Check if recipient has a group_id
-      try {
-        let recipientGroupId: string | null = null;
-        const { data: recUser } = await supabase.from('users').select('group_id').eq('id', recipientId).maybeSingle();
-        if (recUser?.group_id) recipientGroupId = recUser.group_id;
-        else {
-          const { data: recPending } = await supabase.from('pending_students_decrypted').select('group_id').eq('id', recipientId).maybeSingle();
-          if (recPending?.group_id) recipientGroupId = recPending.group_id;
-        }
+      // Replace optimistic message with actual persisted message
+      if (insertedMsg) {
+        setCampusMessages(prev => prev.map(m => m.id === tempId ? insertedMsg : m));
+      }
 
-        if (recipientGroupId) {
-          const { data: groupUsers } = await supabase.from('users').select('id').eq('group_id', recipientGroupId).neq('id', recipientId);
-          const { data: groupPending } = await supabase.from('pending_students_decrypted').select('id').eq('group_id', recipientGroupId).neq('id', recipientId);
-          
-          const partnerIds = new Set<string>();
-          (groupUsers || []).forEach((u: any) => { if (u?.id && u.id !== uid) partnerIds.add(u.id); });
-          (groupPending || []).forEach((p: any) => { if (p?.id && p.id !== uid) partnerIds.add(p.id); });
-
-          for (const partnerId of Array.from(partnerIds)) {
-            await supabase.from('campus_direct_messages').insert({
-              sender_id: uid,
-              recipient_id: partnerId,
-              content
-            });
+      // Group lesson message replication: Check if recipient has a group_id (only for 1:1 direct messages)
+      if (!groupId) {
+        try {
+          let recipientGroupId: string | null = null;
+          const { data: recUser } = await supabase.from('users').select('group_id').eq('id', recipientId).maybeSingle();
+          if (recUser?.group_id) recipientGroupId = recUser.group_id;
+          else {
+            const { data: recPending } = await supabase.from('pending_students_decrypted').select('group_id').eq('id', recipientId).maybeSingle();
+            if (recPending?.group_id) recipientGroupId = recPending.group_id;
           }
+
+          if (recipientGroupId) {
+            const { data: groupUsers } = await supabase.from('users').select('id').eq('group_id', recipientGroupId).neq('id', recipientId);
+            const { data: groupPending } = await supabase.from('pending_students_decrypted').select('id').eq('group_id', recipientGroupId).neq('id', recipientId);
+            
+            const partnerIds = new Set<string>();
+            (groupUsers || []).forEach((u: any) => { if (u?.id && u.id !== uid) partnerIds.add(u.id); });
+            (groupPending || []).forEach((p: any) => { if (p?.id && p.id !== uid) partnerIds.add(p.id); });
+
+            for (const partnerId of Array.from(partnerIds)) {
+              await supabase.from('campus_direct_messages').insert({
+                sender_id: uid,
+                recipient_id: partnerId,
+                content
+              });
+            }
+          }
+        } catch (grpErr) {
+          console.error('Error replicating group lesson message:', grpErr);
         }
-      } catch (grpErr) {
-        console.error('Error replicating group lesson message:', grpErr);
       }
 
       fetchCampusMessages();
@@ -4867,6 +4985,16 @@ function App() {
   const handleMarkCampusMessagesAsRead = async (senderId: string) => {
     const uid = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_user_id') || (user?.id)) : user?.id;
     if (!uid) return;
+
+    // Optimistic 0ms update: mark direct messages locally as read
+    setCampusMessages(prev => prev.map(m => {
+      if (!m.group_id && m.sender_id === senderId && m.recipient_id === uid) {
+        return { ...m, is_read: true };
+      }
+      return m;
+    }));
+    setCampusUnreadCount(prev => Math.max(0, prev - 1));
+
     try {
       const { error } = await supabase
         .from('campus_direct_messages')

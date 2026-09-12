@@ -39,7 +39,9 @@ import {
   GraduationCap,
   Hash,
   Bell,
-  Trash2
+  Trash2,
+  Sliders,
+  MessageCircle
 } from 'lucide-react';
 import { isWebAuthnSupported, authenticateParentBiometricPasskey } from '../utils/webauthn';
 import { formatTeacherFullName, formatSingleStudentAnonymized, formatStudentPureFirstName } from '../utils/nameHelper';
@@ -52,6 +54,8 @@ import {
 import { getInstrumentAvatarUrl, resolveCampusStudentAvatar } from './StudioAvatar';
 import { CampusCreateGroupModal } from './CampusCreateGroupModal';
 import { CampusCreateChannelModal } from './CampusCreateChannelModal';
+import { CampusTopicCard, CampusTopicReaction } from './CampusTopicCard';
+import { CampusTopicComposer } from './CampusTopicComposer';
 
 export const getGroupIconComponent = (iconId: string) => {
   switch (iconId) {
@@ -570,7 +574,14 @@ interface CampusDirectMessagesProps {
   user: any;
   schoolUsers: any[];
   campusMessages: any[];
-  onSendMessage: (recipientId: string, content: string) => Promise<void>;
+  onSendMessage: (
+    recipientId: string, 
+    content: string, 
+    groupId?: string, 
+    channelId?: string, 
+    parentMessageId?: string, 
+    subject?: string
+  ) => Promise<void>;
   onMarkAsRead: (senderId: string) => Promise<void>;
   selectedRecipient: any;
   setSelectedRecipient: (recipient: any) => void;
@@ -613,7 +624,10 @@ export function CampusDirectMessages({
   const [groupMembersLoading, setGroupMembersLoading] = useState(false);
   const [groupChannels, setGroupChannels] = useState<any[]>([]);
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
+  const [channelViewModeOverrides, setChannelViewModeOverrides] = useState<Record<string, 'chat' | 'threads'>>({});
+  const [oneOnOneMode, setOneOnOneMode] = useState<'chat' | 'threads'>('chat');
   const [showCreateChannelModal, setShowCreateChannelModal] = useState(false);
+  const [messageReactions, setMessageReactions] = useState<CampusTopicReaction[]>([]);
 
   const isRecipientInQuietHours = useMemo(() => {
     if (!selectedRecipient) return false;
@@ -980,15 +994,26 @@ export function CampusDirectMessages({
     return () => clearTimeout(timer);
   }, [user?.id, user?.school_id, user?.schools?.id, isStudent, schoolUsers]);
 
+  const [channelReads, setChannelReads] = useState<Map<string, number>>(new Map());
+
   const fetchCampusGroups = React.useCallback(async () => {
     const uid = user?.id || (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null);
     if (!uid) return;
     try {
-      // 1. Groups where user is member
-      const { data: memberRows, error: mErr } = await supabase
-        .from('campus_chat_group_members')
-        .select('group_id, role, last_read_at')
-        .eq('user_id', uid);
+      // 1. Groups where user is member & channel reads
+      const [memberRes, channelReadsRes] = await Promise.all([
+        supabase
+          .from('campus_chat_group_members')
+          .select('group_id, role, last_read_at')
+          .eq('user_id', uid),
+        supabase
+          .from('campus_chat_channel_reads')
+          .select('channel_id, last_read_at')
+          .eq('user_id', uid)
+      ]);
+
+      const memberRows = memberRes.data;
+      const mErr = memberRes.error;
 
       if (mErr) {
         if (mErr.message?.includes('schema cache') || mErr.code === 'PGRST205' || mErr.code === '42P01') {
@@ -997,6 +1022,16 @@ export function CampusDirectMessages({
           return;
         }
       }
+
+      const chReadMap = new Map<string, number>();
+      if (channelReadsRes.data) {
+        channelReadsRes.data.forEach((cr: any) => {
+          if (cr.channel_id && cr.last_read_at) {
+            chReadMap.set(cr.channel_id, new Date(cr.last_read_at).getTime());
+          }
+        });
+      }
+      setChannelReads(chReadMap);
 
       let groupIds: string[] = [];
       const membershipMap = new Map<string, any>();
@@ -1071,15 +1106,20 @@ export function CampusDirectMessages({
       const processed = groupsData.map((g: any) => {
         const members = membersByGroup.get(g.id) || [];
         const myMembership = membershipMap.get(g.id);
-        const lastRead = myMembership?.last_read_at ? new Date(myMembership.last_read_at).getTime() : 0;
+        const groupLastRead = myMembership?.last_read_at ? new Date(myMembership.last_read_at).getTime() : 0;
 
         const grpMessages = (campusMessages || []).filter((m: any) => m.group_id === g.id);
         const lastMsg = grpMessages.length > 0 ? grpMessages[grpMessages.length - 1] : null;
 
-        const unreadCount = grpMessages.filter((m: any) =>
-          m.sender_id !== uid &&
-          new Date(m.created_at).getTime() > lastRead
-        ).length;
+        // Channel-level accurate unread calculation
+        const unreadCount = grpMessages.filter((m: any) => {
+          if (m.sender_id === uid) return false;
+          const msgTime = new Date(m.created_at).getTime();
+          if (m.channel_id && chReadMap.has(m.channel_id)) {
+            return msgTime > (chReadMap.get(m.channel_id) || 0);
+          }
+          return msgTime > groupLastRead;
+        }).length;
 
         return {
           ...g,
@@ -1208,6 +1248,176 @@ export function CampusDirectMessages({
     } catch (err: any) {
       console.error('[CampusDirectMessages] Error deleting channel:', err);
       alert('Fehler beim Löschen des Kanals: ' + (err?.message || 'Unbekannt'));
+    }
+  };
+
+  const handleToggleChannelType = async (channelId: string, targetType: 'chat' | 'threads') => {
+    try {
+      const ch = groupChannels.find(c => c.id === channelId);
+      const allowStudents = ch?.allow_student_topics || false;
+      const { error } = await supabase.rpc('update_campus_chat_channel_settings', {
+        p_channel_id: channelId,
+        p_channel_type: targetType,
+        p_allow_student_topics: allowStudents
+      });
+      if (error) {
+        await supabase
+          .from('campus_chat_channels')
+          .update({ channel_type: targetType })
+          .eq('id', channelId);
+      }
+      setGroupChannels(prev => prev.map(c => c.id === channelId ? { ...c, channel_type: targetType } : c));
+    } catch (err) {
+      console.error('[CampusDirectMessages] Error switching channel type:', err);
+    }
+  };
+
+  // Load reactions for active conversation (group or 1:1) and subscribe to realtime updates
+  useEffect(() => {
+    if (!selectedRecipient?.id) {
+      setMessageReactions([]);
+      return;
+    }
+
+    let isMounted = true;
+    const loadReactions = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('campus_message_reactions')
+          .select('*');
+        if (!error && data && isMounted) {
+          setMessageReactions(data);
+        }
+      } catch (e) {
+        // fail-soft
+      }
+    };
+
+    loadReactions();
+
+    const channel = supabase
+      .channel(`reactions-${selectedRecipient.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'campus_message_reactions' },
+        () => {
+          loadReactions();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, [selectedRecipient?.id]);
+
+  const handlePublishTopic = async (subject: string, content: string) => {
+    if (!selectedRecipient) return;
+    const isGroup = Boolean(selectedRecipient.is_group);
+    if (isGroup && !activeChannelId) return;
+
+    const validation = validateChatMessageContent(`${subject} ${content}`);
+    if (!validation.isValid) {
+      setRespectWarning(validation);
+      return;
+    }
+    setRespectWarning(null);
+
+    if (isGroup) {
+      await onSendMessage(
+        user.id,
+        content.trim(),
+        selectedRecipient.id,
+        activeChannelId || undefined,
+        undefined,
+        subject.trim()
+      );
+    } else {
+      await onSendMessage(
+        selectedRecipient.id,
+        content.trim(),
+        undefined,
+        undefined,
+        undefined,
+        subject.trim()
+      );
+    }
+    setTimeout(scrollToBottom, 50);
+  };
+
+  const handleSendTopicReply = async (topicId: string, content: string) => {
+    if (!selectedRecipient) return;
+    const isGroup = Boolean(selectedRecipient.is_group);
+    if (isGroup && !activeChannelId) return;
+
+    const validation = validateChatMessageContent(content);
+    if (!validation.isValid) {
+      setRespectWarning(validation);
+      return;
+    }
+    setRespectWarning(null);
+
+    if (isGroup) {
+      await onSendMessage(
+        user.id,
+        content.trim(),
+        selectedRecipient.id,
+        activeChannelId || undefined,
+        topicId,
+        undefined
+      );
+    } else {
+      await onSendMessage(
+        selectedRecipient.id,
+        content.trim(),
+        undefined,
+        undefined,
+        topicId,
+        undefined
+      );
+    }
+    setTimeout(scrollToBottom, 50);
+  };
+
+  const handleToggleReaction = async (messageId: string, emoji: string) => {
+    try {
+      const { data, error } = await supabase.rpc('toggle_campus_message_reaction', {
+        p_message_id: messageId,
+        p_emoji: emoji
+      });
+      if (error) {
+        // Fallback: direct table toggle
+        const existing = messageReactions.find(r => r.message_id === messageId && r.user_id === user.id && r.emoji === emoji);
+        if (existing) {
+          await supabase.from('campus_message_reactions').delete().eq('id', existing.id);
+          setMessageReactions(prev => prev.filter(r => r.id !== existing.id));
+        } else {
+          const schoolId = selectedRecipient.school_id || (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_school_id') : null);
+          if (schoolId) {
+            const { data: ins } = await supabase.from('campus_message_reactions').insert({
+              school_id: schoolId,
+              message_id: messageId,
+              user_id: user.id,
+              emoji: emoji
+            }).select().single();
+            if (ins) setMessageReactions(prev => [...prev, ins]);
+          }
+        }
+        return;
+      }
+      if (data?.action === 'added') {
+        setMessageReactions(prev => [...prev, {
+          id: `tmp-${Date.now()}`,
+          message_id: messageId,
+          user_id: user.id,
+          emoji: emoji
+        }]);
+      } else if (data?.action === 'removed') {
+        setMessageReactions(prev => prev.filter(r => !(r.message_id === messageId && r.user_id === user.id && r.emoji === emoji)));
+      }
+    } catch (err) {
+      console.error('[CampusDirectMessages] Error toggling reaction:', err);
     }
   };
 
@@ -1403,15 +1613,42 @@ export function CampusDirectMessages({
 
     if (selectedRecipient.is_group && user?.id) {
       fetchGroupMembersDetails(selectedRecipient.id);
-      if (selectedRecipient.unreadCount > 0) {
-        supabase
-          .from('campus_chat_group_members')
-          .update({ last_read_at: new Date().toISOString() })
-          .eq('group_id', selectedRecipient.id)
-          .eq('user_id', user.id)
-          .then(() => {
-            setCampusGroups(prev => prev.map(g => g.id === selectedRecipient.id ? { ...g, unreadCount: 0 } : g));
-          });
+
+      // Channel-specific mark-as-read: only mark the active channel as read!
+      if (activeChannelId) {
+        const activeChan = groupChannels.find(c => c.id === activeChannelId);
+        const hasUnreadInChannel = (campusMessages || []).some((m: any) => {
+          if (m.group_id !== selectedRecipient.id || m.sender_id === user.id) return false;
+          const matches = m.channel_id ? m.channel_id === activeChannelId : activeChan?.is_default;
+          if (!matches) return false;
+          const lastRead = channelReads.get(activeChannelId) || 0;
+          return new Date(m.created_at).getTime() > lastRead;
+        });
+
+        if (hasUnreadInChannel) {
+          const nowTime = Date.now();
+          // Optimistic local update
+          setChannelReads(prev => new Map(prev).set(activeChannelId, nowTime));
+
+          // Serverseitiger, atomarer RPC nach OWASP ASVS Level 3
+          supabase.rpc('mark_campus_channel_as_read', { p_channel_id: activeChannelId })
+            .then(({ error }: any) => {
+              if (error) {
+                // Fallback direct table upsert
+                supabase
+                  .from('campus_chat_channel_reads')
+                  .upsert({
+                    channel_id: activeChannelId,
+                    user_id: user.id,
+                    school_id: user.school_id,
+                    last_read_at: new Date(nowTime).toISOString()
+                  }, { onConflict: 'channel_id,user_id' })
+                  .then(() => fetchCampusGroups());
+              } else {
+                fetchCampusGroups();
+              }
+            });
+        }
       }
     } else {
       const unreadFromRecipient = campusMessages.some(m => 
@@ -1421,7 +1658,7 @@ export function CampusDirectMessages({
         onMarkAsRead(selectedRecipient.id);
       }
     }
-  }, [selectedRecipient, campusMessages, user?.id]);
+  }, [selectedRecipient, activeChannelId, groupChannels, campusMessages, user?.id, channelReads]);
 
   // Get active messages in the current thread (sorted chronologically)
   const activeThreadMessages = useMemo(() => {
@@ -1453,6 +1690,21 @@ export function CampusDirectMessages({
       )
       .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
   }, [campusMessages, selectedRecipient, user.id, activeChannelId, groupChannels]);
+
+  const findUserById = React.useCallback((userId: string) => {
+    if (!userId) return null;
+    if (user?.id === userId) return user;
+    if (selectedRecipient && selectedRecipient.id === userId) return selectedRecipient;
+    if (selectedRecipient?.members) {
+      const foundMember = selectedRecipient.members.find((m: any) => m.user_id === userId);
+      if (foundMember?.user) return foundMember.user;
+    }
+    const known = allKnownUsersMap.get(userId);
+    if (known) return known;
+    const partner = (assignedStudents || []).find((s: any) => s.id === userId);
+    if (partner) return partner;
+    return { id: userId, first_name: 'Mitglied', role: 'student' };
+  }, [user, selectedRecipient, allKnownUsersMap, assignedStudents]);
 
   // 1. Fetch occurrences for selected recipient
   const [studentOccurrences, setStudentOccurrences] = useState<any[]>([]);
@@ -1781,10 +2033,11 @@ export function CampusDirectMessages({
     return activeThreadMessages.filter(m => !isSystemMessage(m)).length;
   }, [activeThreadMessages]);
 
-  // 4. Smart Auto-Tab Selection when switching students: Always default to 'all' (Unified Feed)
+  // 4. Smart Auto-Tab Selection when switching students: Always default to 'all' (Unified Feed) & 'chat' mode
   useEffect(() => {
     if (!selectedRecipient) return;
     setActiveSubTab('all');
+    setOneOnOneMode('chat');
   }, [selectedRecipient?.id]);
 
   // 4b. Graceful fallback if selected subtab no longer exists (e.g. empty tab was filtered out)
@@ -1805,70 +2058,18 @@ export function CampusDirectMessages({
     if (selectedRecipient?.is_group) {
       return activeThreadMessages;
     }
-    if (activeSubTab === 'all' || activeSubTab === 'general') {
-      // Tab "Alle": MUST be clean and strictly contain human dialogues (including appointment-tied human chat messages),
-      // filtering out all automated machine system events!
-      return activeThreadMessages.filter(m => !isSystemMessage(m));
+    // Tab "Alle" (Unified Timeline for 1:1 chat):
+    // strictly human dialogues, excluding replies inside topics (which belong in the topic thread)
+    return activeThreadMessages.filter(m => !isSystemMessage(m) && !m.parent_message_id);
+  }, [activeThreadMessages, selectedRecipient?.is_group]);
+
+  const activeRootTopics = useMemo(() => {
+    if (selectedRecipient?.is_group) {
+      return activeThreadMessages.filter(m => !m.parent_message_id);
     }
-    const selectedOccTab = allOccurrenceTabs.find(tab => 
-      tab.id === activeSubTab || 
-      (tab.allIds && tab.allIds.includes(activeSubTab)) ||
-      tab.date === activeSubTab
-    );
-    if (!selectedOccTab) return activeThreadMessages.filter(m => !isSystemMessage(m));
-
-    const rawMsgs = selectedOccTab.messages || [];
-    const occObj = selectedOccTab.occurrence || selectedOccTab;
-    const occStatus = String(occObj?.status || 'scheduled').toLowerCase();
-    const isOccCancelled = ['cancelled', 'canceled_by_student', 'canceled', 'teacher_sick', 'canceled_by_teacher_sick'].includes(occStatus);
-
-    // Check for cancellations and reactivations
-    const lastCancelIdx = rawMsgs.reduce((lastIdx: number, m: any, idx: number) => {
-      const isCancel = m.message_type === 'reschedule_notification' ||
-        (m.content && (m.content.includes('❌') || m.content.includes('Termin abgesagt') || m.content.includes('fällt aus') || m.content.includes('abgesagt') || m.content.includes('storniert') || m.content.includes('wurde abgesagt')));
-      return isCancel ? idx : lastIdx;
-    }, -1);
-
-    const hasReactivationAfterCancel = lastCancelIdx !== -1 && rawMsgs.slice(lastCancelIdx + 1).some((m: any) => {
-      return m.message_type === 'cancellation_reset' ||
-        (m.content && (m.content.includes('🔄') || m.content.includes('reaktiviert') || m.content.includes('zurückgenommen') || m.content.includes('regulär statt') || m.content.includes('zurückgesetzt')));
-    });
-
-    // If appointment is active (!isOccCancelled) but has an unresolved cancellation in history:
-    if (!isOccCancelled && lastCancelIdx !== -1 && !hasReactivationAfterCancel) {
-      const cancelMsg = rawMsgs[lastCancelIdx];
-      const cancelTime = new Date(cancelMsg.created_at).getTime();
-
-      let reactivateIso = occObj?.updated_at || occObj?.created_at;
-      if (reactivateIso) {
-        const occTime = new Date(reactivateIso).getTime();
-        if (isNaN(occTime) || occTime <= cancelTime) {
-          reactivateIso = new Date(cancelTime + 30 * 1000).toISOString();
-        }
-      } else {
-        reactivateIso = new Date(cancelTime + 30 * 1000).toISOString();
-      }
-
-      const syntheticReactivationMsg = {
-        id: `synthetic-reactivate-${selectedOccTab.id}`,
-        sender_id: user.role === 'teacher' ? user.id : (selectedRecipient?.id || user.id),
-        recipient_id: user.role === 'teacher' ? (selectedRecipient?.id || user.id) : user.id,
-        content: `[Termin ${selectedOccTab.label}] Termin reaktiviert: Der Unterricht findet planmäßig statt.`,
-        message_type: 'cancellation_reset',
-        created_at: reactivateIso,
-        occurrence_id: selectedOccTab.id,
-        is_read: true,
-        is_system: true,
-        is_synthetic: true
-      };
-
-      const listCopy = [...rawMsgs];
-      listCopy.splice(lastCancelIdx + 1, 0, syntheticReactivationMsg);
-      return listCopy.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-    }
-
-    return rawMsgs;
-  }, [activeSubTab, activeThreadMessages, allOccurrenceTabs, user.role, user.id, selectedRecipient?.id, selectedRecipient?.is_group]);
+    // For 1:1 direct chats: topics are messages created with a subject or topic type
+    return activeThreadMessages.filter(m => !m.parent_message_id && (Boolean(m.subject) || m.message_type === 'topic'));
+  }, [selectedRecipient?.is_group, activeThreadMessages]);
 
   // Asynchronous Self-Healing: Persist missing reactivation audit record to PostgreSQL if absent
   useEffect(() => {
@@ -1916,21 +2117,12 @@ export function CampusDirectMessages({
 
     // Group message dispatch
     if (selectedRecipient.is_group) {
-      try {
-        const payload: any = {
-          group_id: selectedRecipient.id,
-          sender_id: user.id,
-          recipient_id: user.id,
-          content: content.trim()
-        };
-        if (activeChannelId) {
-          payload.channel_id = activeChannelId;
-        }
-        await supabase.from('campus_direct_messages').insert(payload);
-        await onSendMessage(selectedRecipient.id, content.trim());
-      } catch (err) {
-        console.error('[CampusDirectMessages] Error sending group message:', err);
-      }
+      await onSendMessage(
+        user.id, 
+        content.trim(), 
+        selectedRecipient.id, 
+        activeChannelId || undefined
+      );
       setTimeout(scrollToBottom, 50);
       return;
     }
@@ -2735,43 +2927,8 @@ export function CampusDirectMessages({
                       );
                     })()}
                     <div>
-                      <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span>{selectedRecipient.name}</span>
-                        {(() => {
-                          const currChannel = groupChannels.find(c => c.id === activeChannelId);
-                          if (!currChannel) return null;
-                          return (
-                            <span style={{
-                              fontSize: '0.72rem',
-                              fontWeight: 800,
-                              background: 'rgba(255, 255, 255, 0.28)',
-                              color: '#ffffff',
-                              padding: '2px 10px',
-                              borderRadius: '100px',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              backdropFilter: 'blur(4px)'
-                            }}>
-                              {currChannel.is_announcement_only ? <Bell size={11} color="#facc15" /> : <Hash size={11} color="#ffffff" />}
-                              <span>{currChannel.name}</span>
-                            </span>
-                          );
-                        })()}
-                        <span style={{
-                          fontSize: '0.62rem',
-                          fontWeight: 900,
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          background: 'rgba(255, 255, 255, 0.25)',
-                          color: '#ffffff',
-                          padding: '2px 8px',
-                          borderRadius: '6px',
-                          display: 'inline-block',
-                          backdropFilter: 'blur(4px)'
-                        }}>
-                          Gruppe
-                        </span>
                         {selectedRecipient.admin_only_messaging && (
                           <span style={{
                             fontSize: '0.62rem',
@@ -2802,12 +2959,12 @@ export function CampusDirectMessages({
                           gap: '5px',
                           color: 'rgba(255, 255, 255, 0.9)',
                           fontSize: '0.75rem',
-                          fontWeight: 700
+                          fontWeight: 750
                         }}
                       >
-                        <Users size={12} color="#ffffff" />
+                        <Users size={13} color="#ffffff" />
                         <span>{selectedRecipient.members_count || selectedRecipient.members?.length || 0} Teilnehmer • Details &amp; Mitglieder</span>
-                        <Info size={12} color="#ffffff" style={{ opacity: 0.8 }} />
+                        <Info size={12} color="#ffffff" style={{ opacity: 0.85 }} />
                       </button>
                     </div>
                   </>
@@ -2847,23 +3004,27 @@ export function CampusDirectMessages({
 
               {/* Status Badges */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap' }}>
-                <span style={{
-                  padding: isMobile ? '4px 10px' : '6px 14px',
-                  borderRadius: '10px',
-                  background: 'rgba(255, 255, 255, 0.22)',
-                  color: '#ffffff',
-                  fontSize: isMobile ? '0.64rem' : '0.72rem',
-                  fontWeight: 800,
-                  border: '1px solid rgba(255, 255, 255, 0.38)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  backdropFilter: 'blur(4px)',
-                  whiteSpace: 'nowrap',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
-                }}>
+                <span 
+                  title="DSGVO-konform: Transportverschlüsselung via TLS 1.3, Datenbank im Ruhezustand AES-256 geschützt (Art. 32 DSGVO)"
+                  style={{
+                    padding: isMobile ? '4px 10px' : '6px 14px',
+                    borderRadius: '10px',
+                    background: 'rgba(255, 255, 255, 0.22)',
+                    color: '#ffffff',
+                    fontSize: isMobile ? '0.64rem' : '0.72rem',
+                    fontWeight: 800,
+                    border: '1px solid rgba(255, 255, 255, 0.38)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    backdropFilter: 'blur(4px)',
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                    cursor: 'help'
+                  }}
+                >
                   <ShieldCheck size={14} color="#ffffff" style={{ flexShrink: 0 }} />
-                  <span>{isMobile ? 'DSGVO • Verschlüsselt' : 'DSGVO-konform • TLS 1.3 & AES-256 verschlüsselt'}</span>
+                  <span>DSGVO-konform</span>
                 </span>
               </div>
             </div>
@@ -2900,7 +3061,8 @@ export function CampusDirectMessages({
                   {groupChannels.map((channel) => {
                     const isActive = activeChannelId === channel.id;
                     const isAnnounce = channel.is_announcement_only;
-                    const IconComp = isAnnounce ? Bell : Hash;
+                    const isThreads = channel.channel_type === 'threads';
+                    const IconComp = isAnnounce ? Bell : (isThreads ? MessageSquare : Hash);
 
                     // Unread count for this channel
                     const unreadCount = (campusMessages || []).filter((m: any) => {
@@ -2909,7 +3071,8 @@ export function CampusDirectMessages({
                       const msgChannelMatches = m.channel_id ? m.channel_id === channel.id : channel.is_default;
                       if (!msgChannelMatches) return false;
                       const myMembership = selectedRecipient.members?.find((mb: any) => mb.user_id === user?.id);
-                      const lastRead = myMembership?.last_read_at ? new Date(myMembership.last_read_at).getTime() : 0;
+                      const groupLastRead = myMembership?.last_read_at ? new Date(myMembership.last_read_at).getTime() : 0;
+                      const lastRead = channelReads.has(channel.id) ? (channelReads.get(channel.id) || 0) : groupLastRead;
                       return new Date(m.created_at).getTime() > lastRead;
                     }).length;
 
@@ -3001,254 +3164,272 @@ export function CampusDirectMessages({
                   })}
                 </div>
 
-                {/* + Kanal Button (Teachers / Admins only) */}
-                {!isStudent && (
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateChannelModal(true)}
-                    style={{
-                      padding: '5px 12px',
-                      borderRadius: '100px',
-                      border: '1px dashed #cbd5e1',
-                      background: '#ffffff',
-                      color: '#0f172a',
-                      fontSize: '0.75rem',
-                      fontWeight: 750,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      whiteSpace: 'nowrap',
-                      flexShrink: 0,
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                      transition: 'all 0.15s ease'
-                    }}
-                    className="hover-scale"
-                  >
-                    <Plus size={13} color="#15803d" strokeWidth={2.6} />
-                    <span>Kanal</span>
-                  </button>
-                )}
+                {/* Channel Actions: Segmented Mode Switch [ Chat | Themen ] & + Kanal */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                  {(() => {
+                    const currentChannel = groupChannels.find(c => c.id === activeChannelId) || groupChannels.find(c => c.is_default) || groupChannels[0];
+                    if (!currentChannel) return null;
+                    const effectiveMode = (channelViewModeOverrides[currentChannel.id]) || currentChannel.channel_type || 'chat';
+                    const isChat = effectiveMode === 'chat';
+                    const isThreads = effectiveMode === 'threads';
+
+                    return (
+                      <div 
+                        role="group"
+                        aria-label="Kanalansicht umschalten"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          background: '#f1f5f9',
+                          padding: '3px',
+                          borderRadius: '100px',
+                          border: '1px solid #e2e8f0',
+                          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.04)'
+                        }}
+                      >
+                        <button
+                          type="button"
+                          role="button"
+                          tabIndex={0}
+                          aria-pressed={isChat}
+                          onClick={() => {
+                            setChannelViewModeOverrides(prev => ({ ...prev, [currentChannel.id]: 'chat' }));
+                            if (!isStudent && currentChannel.channel_type !== 'chat') {
+                              handleToggleChannelType(currentChannel.id, 'chat');
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setChannelViewModeOverrides(prev => ({ ...prev, [currentChannel.id]: 'chat' }));
+                              if (!isStudent && currentChannel.channel_type !== 'chat') {
+                                handleToggleChannelType(currentChannel.id, 'chat');
+                              }
+                            }
+                          }}
+                          style={{
+                            border: 'none',
+                            background: isChat ? '#ffffff' : 'transparent',
+                            color: isChat ? '#0f172a' : '#64748b',
+                            borderRadius: '100px',
+                            padding: isMobile ? '5px 10px' : '5px 14px',
+                            fontSize: '0.74rem',
+                            fontWeight: isChat ? 850 : 650,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            boxShadow: isChat ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
+                            transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+                            minHeight: '30px',
+                            touchAction: 'manipulation'
+                          }}
+                        >
+                          <MessageCircle size={13} color={isChat ? '#15803d' : '#64748b'} strokeWidth={2.4} />
+                          <span>Chat</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          role="button"
+                          tabIndex={0}
+                          aria-pressed={isThreads}
+                          onClick={() => {
+                            setChannelViewModeOverrides(prev => ({ ...prev, [currentChannel.id]: 'threads' }));
+                            if (!isStudent && currentChannel.channel_type !== 'threads') {
+                              handleToggleChannelType(currentChannel.id, 'threads');
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setChannelViewModeOverrides(prev => ({ ...prev, [currentChannel.id]: 'threads' }));
+                              if (!isStudent && currentChannel.channel_type !== 'threads') {
+                                handleToggleChannelType(currentChannel.id, 'threads');
+                              }
+                            }
+                          }}
+                          style={{
+                            border: 'none',
+                            background: isThreads ? '#ffffff' : 'transparent',
+                            color: isThreads ? '#0f172a' : '#64748b',
+                            borderRadius: '100px',
+                            padding: isMobile ? '5px 10px' : '5px 14px',
+                            fontSize: '0.74rem',
+                            fontWeight: isThreads ? 850 : 650,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            boxShadow: isThreads ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
+                            transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+                            minHeight: '30px',
+                            touchAction: 'manipulation'
+                          }}
+                        >
+                          <Layers size={13} color={isThreads ? '#15803d' : '#64748b'} strokeWidth={2.4} />
+                          <span>Themen</span>
+                        </button>
+                      </div>
+                    );
+                  })()}
+
+                  {/* + Kanal Button (Teachers / Admins only) */}
+                  {!isStudent && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateChannelModal(true)}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '100px',
+                        border: '1.5px dashed #cbd5e1',
+                        background: '#ffffff',
+                        color: '#0f172a',
+                        fontSize: '0.75rem',
+                        fontWeight: 750,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                        transition: 'all 0.15s ease',
+                        minHeight: '32px'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Plus size={14} color="#15803d" strokeWidth={2.6} />
+                      <span>Kanal</span>
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 
-            {/* Apple Safari/Messages Style Dynamic Date-Based Tab Bar with Archive (Only for 1:1 Direct Chats) */}
+            {/* Apple/Teams-Style Segmented Mode Switcher (Only for 1:1 Direct Chats) */}
             {!selectedRecipient.is_group && (
-            <div style={{ 
-              display: 'flex', 
-              gap: '8px', 
-              padding: '10px 16px', 
-              background: '#ffffff', 
-              borderBottom: '1px solid #f1f5f9',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              position: 'relative',
-              zIndex: 50
-            }}>
-              {/* Scrollable Tabs on the Left */}
-              <div style={{
-                display: 'flex',
-                gap: '6px',
+              <div style={{ 
+                display: 'flex', 
+                gap: '8px', 
+                padding: '8px 16px', 
+                background: '#ffffff', 
+                borderBottom: '1px solid #f1f5f9',
                 alignItems: 'center',
-                overflowX: 'auto',
-                scrollbarWidth: 'none',
-                msOverflowStyle: 'none',
-                flex: 1,
-                minWidth: 0,
-                paddingRight: '6px'
+                justifyContent: 'space-between',
+                position: 'relative',
+                zIndex: 40
               }}>
-                {/* Tab 1: Alle (Vollständige chronologische Hybrid-Timeline) */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveSubTab('all');
-                    setIsArchiveOpen(false);
-                  }}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: '100px',
-                    border: 'none',
-                    background: (activeSubTab === 'all' || activeSubTab === 'general') ? '#34a853' : '#f1f5f9',
-                    color: (activeSubTab === 'all' || activeSubTab === 'general') ? 'white' : '#64748b',
-                    fontSize: '0.78rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.2s',
-                    flexShrink: 0,
-                    boxShadow: (activeSubTab === 'all' || activeSubTab === 'general') ? '0 2px 6px rgba(52,168,83,0.2)' : 'none'
-                  }}
-                  className="hover-scale"
-                >
-                  <MessageSquare size={13} />
-                  <span>Alle ({humanMessagesCount})</span>
-                </button>
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  background: '#f1f5f9',
+                  padding: '3px',
+                  borderRadius: '100px',
+                  border: '1px solid #e2e8f0',
+                  gap: '2px'
+                }}>
+                  <button
+                    type="button"
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={oneOnOneMode === 'chat'}
+                    onClick={() => setOneOnOneMode('chat')}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setOneOnOneMode('chat');
+                      }
+                    }}
+                    style={{
+                      border: 'none',
+                      background: oneOnOneMode === 'chat' ? '#ffffff' : 'transparent',
+                      color: oneOnOneMode === 'chat' ? '#0f172a' : '#64748b',
+                      borderRadius: '100px',
+                      padding: isMobile ? '5px 12px' : '5px 16px',
+                      fontSize: '0.76rem',
+                      fontWeight: oneOnOneMode === 'chat' ? 850 : 650,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: oneOnOneMode === 'chat' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
+                      transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+                      minHeight: '30px',
+                      touchAction: 'manipulation'
+                    }}
+                  >
+                    <MessageCircle size={13} color={oneOnOneMode === 'chat' ? '#15803d' : '#64748b'} strokeWidth={2.4} />
+                    <span>Chat</span>
+                    <span style={{
+                      fontSize: '0.7rem',
+                      opacity: 0.75,
+                      fontWeight: 700
+                    }}>
+                      ({humanMessagesCount})
+                    </span>
+                  </button>
 
-                {/* Dynamic Date-Based Upcoming Appointment Tabs */}
-                {upcomingOccurrenceTabs.map(tab => {
-                  const isActive = activeSubTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => {
-                        setActiveSubTab(tab.id);
-                        setIsArchiveOpen(false);
-                      }}
-                      style={{
-                        padding: '7px 16px',
+                  <button
+                    type="button"
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={oneOnOneMode === 'threads'}
+                    onClick={() => setOneOnOneMode('threads')}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setOneOnOneMode('threads');
+                      }
+                    }}
+                    style={{
+                      border: 'none',
+                      background: oneOnOneMode === 'threads' ? '#ffffff' : 'transparent',
+                      color: oneOnOneMode === 'threads' ? '#0f172a' : '#64748b',
+                      borderRadius: '100px',
+                      padding: isMobile ? '5px 12px' : '5px 16px',
+                      fontSize: '0.76rem',
+                      fontWeight: oneOnOneMode === 'threads' ? 850 : 650,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: oneOnOneMode === 'threads' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
+                      transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+                      minHeight: '30px',
+                      touchAction: 'manipulation'
+                    }}
+                  >
+                    <Layers size={13} color={oneOnOneMode === 'threads' ? '#15803d' : '#64748b'} strokeWidth={2.4} />
+                    <span>Themen</span>
+                    {activeRootTopics.length > 0 && (
+                      <span style={{
+                        background: oneOnOneMode === 'threads' ? '#e6f4ea' : '#e2e8f0',
+                        color: oneOnOneMode === 'threads' ? '#15803d' : '#475569',
                         borderRadius: '100px',
-                        border: isActive ? 'none' : '1px solid #bbf7d0',
-                        background: isActive ? '#34a853' : '#e6f4ea',
-                        color: isActive ? 'white' : '#15803d',
-                        fontSize: '0.78rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        whiteSpace: 'nowrap',
-                        transition: 'all 0.2s',
-                        position: 'relative',
-                        flexShrink: 0,
-                        boxShadow: isActive ? '0 3px 10px rgba(52, 168, 83, 0.22)' : 'none'
-                      }}
-                      className="hover-scale"
-                    >
-                      <Calendar size={13} color={isActive ? '#ffffff' : '#34a853'} />
-                      <span>{tab.label}</span>
-                      {tab.unreadCount > 0 ? (
-                        <span style={{
-                          background: isActive ? '#ffffff' : '#ea4335',
-                          color: isActive ? '#ea4335' : '#ffffff',
-                          borderRadius: '100px',
-                          padding: '1px 6px',
-                          minWidth: '16px',
-                          height: '16px',
-                          fontSize: '0.62rem',
-                          fontWeight: 900,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          boxShadow: '0 2px 4px rgba(234, 67, 53, 0.35)'
-                        }}>
-                          {tab.unreadCount}
-                        </span>
-                      ) : tab.isShiftOrChanged ? (
-                        <span style={{
-                          width: '8px',
-                          height: '8px',
-                          borderRadius: '50%',
-                          background: isActive ? '#ffffff' : '#ea4335',
-                          boxShadow: '0 0 6px rgba(234, 67, 53, 0.6)',
-                          display: 'inline-block'
-                        }} />
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Tab Archiv Dropdown Button for Past Appointments (Pinned & Unclipped on Right) */}
-              {archivedOccurrenceTabs.length > 0 && (() => {
-                const isArchivedActive = archivedOccurrenceTabs.some(t => t.id === activeSubTab || (t.allIds && t.allIds.includes(activeSubTab)));
-                const activeArchivedTab = archivedOccurrenceTabs.find(t => t.id === activeSubTab || (t.allIds && t.allIds.includes(activeSubTab)));
-
-                return (
-                  <div ref={archiveDropdownRef} style={{ position: 'relative', flexShrink: 0 }}>
-                    <button
-                      type="button"
-                      onClick={() => setIsArchiveOpen(prev => !prev)}
-                      style={{
-                        padding: '7px 14px',
-                        borderRadius: '100px',
-                        border: isArchivedActive ? 'none' : '1px solid #e2e8f0',
-                        background: isArchivedActive ? '#34a853' : '#f8fafc',
-                        color: isArchivedActive ? 'white' : '#64748b',
-                        fontSize: '0.78rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        whiteSpace: 'nowrap',
-                        transition: 'all 0.2s',
-                        boxShadow: isArchivedActive ? '0 3px 10px rgba(52, 168, 83, 0.22)' : 'none'
-                      }}
-                      className="hover-scale"
-                    >
-                      <Inbox size={13} color={isArchivedActive ? '#ffffff' : '#64748b'} />
-                      <span>{isArchivedActive && activeArchivedTab ? `Archiv: ${activeArchivedTab.label}` : `Archiv (${archivedOccurrenceTabs.length})`}</span>
-                      <ChevronDown size={12} style={{ transform: isArchiveOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
-                    </button>
-
-                    {/* Archiv Dropdown Popover */}
-                    {isArchiveOpen && (
-                      <div style={{
-                        position: 'absolute',
-                        top: 'calc(100% + 8px)',
-                        right: 0,
-                        background: '#ffffff',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '16px',
-                        padding: '6px',
-                        boxShadow: '0 12px 30px -4px rgba(0,0,0,0.18), 0 6px 12px -2px rgba(0,0,0,0.08)',
-                        zIndex: 9999,
-                        minWidth: '240px',
-                        maxWidth: 'calc(100vw - 32px)',
-                        boxSizing: 'border-box',
-                        maxHeight: '280px',
-                        overflowY: 'auto'
-                      }} className="custom-scrollbar">
-                        <div style={{ padding: '6px 10px 4px 10px', fontSize: '0.68rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                          Vergangene Termine
-                        </div>
-                        {archivedOccurrenceTabs.map(archTab => {
-                          const isCurrent = activeSubTab === archTab.id || (archTab.allIds && archTab.allIds.includes(activeSubTab));
-                          return (
-                            <button
-                              key={archTab.id}
-                              type="button"
-                              onClick={() => {
-                                setActiveSubTab(archTab.id);
-                                setIsArchiveOpen(false);
-                              }}
-                              style={{
-                                width: '100%',
-                                padding: '8px 12px',
-                                borderRadius: '10px',
-                                border: 'none',
-                                background: isCurrent ? '#e6f4ea' : 'transparent',
-                                color: isCurrent ? '#15803d' : '#334155',
-                                fontSize: '0.78rem',
-                                fontWeight: isCurrent ? 800 : 600,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                textAlign: 'left',
-                                transition: 'all 0.15s'
-                              }}
-                              onMouseEnter={(e) => { if (!isCurrent) e.currentTarget.style.background = '#f1f5f9'; }}
-                              onMouseLeave={(e) => { if (!isCurrent) e.currentTarget.style.background = 'transparent'; }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <Clock size={12} color={isCurrent ? '#34a853' : '#94a3b8'} />
-                                <span>{archTab.label}</span>
-                              </div>
-                              {isCurrent && <Check size={13} color="#15803d" />}
-                            </button>
-                          );
-                        })}
-                      </div>
+                        padding: '1px 6px',
+                        fontSize: '0.65rem',
+                        fontWeight: 800
+                      }}>
+                        {activeRootTopics.length}
+                      </span>
                     )}
-                  </div>
-                );
-              })()}
-            </div>
+                  </button>
+                </div>
+
+                {/* Right Context Hint */}
+                <div style={{
+                  display: isMobile ? 'none' : 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '0.74rem',
+                  color: '#94a3b8',
+                  fontWeight: 650
+                }}>
+                  <ShieldCheck size={12} color="#15803d" />
+                  <span>Direktchat</span>
+                </div>
+              </div>
             )}
 
             {/* Message History */}
@@ -3540,29 +3721,114 @@ export function CampusDirectMessages({
                 );
               })()}
 
-              {displayedMessages.length === 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: '#94a3b8', gap: '12px', padding: '40px 20px', textAlign: 'center' }}>
-                  <div style={{
-                    width: '64px',
-                    height: '64px',
-                    borderRadius: '50%',
-                    background: '#e6f4ea',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#34a853'
-                  }}>
-                    <MessageSquare size={30} strokeWidth={2} />
-                  </div>
-                  <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
-                    {selectedRecipient?.is_group ? `Noch keine Nachrichten in „${selectedRecipient.name}“` : `Noch keine Nachrichten mit ${formatStudentDisplayName(selectedRecipient)}`}
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b', maxWidth: '320px' }}>
-                    {selectedRecipient?.is_group ? 'Beginne den Austausch mit dieser Gruppe!' : 'Schreibe eine persönliche Nachricht oder verwalte terminbezogene Shoutbox-Anfragen!'}
-                  </div>
-                </div>
-              ) : (
-                displayedMessages.map((msg, idx) => {
+              {(() => {
+                const isGroupActive = Boolean(selectedRecipient?.is_group);
+                const currentActiveChannel = isGroupActive
+                  ? (groupChannels.find(c => c.id === activeChannelId) || groupChannels.find(c => c.is_default) || groupChannels[0])
+                  : null;
+                const isThreadsMode = isGroupActive
+                  ? ((channelViewModeOverrides[currentActiveChannel?.id || '']) 
+                      ? channelViewModeOverrides[currentActiveChannel?.id || ''] === 'threads' 
+                      : currentActiveChannel?.channel_type === 'threads')
+                  : oneOnOneMode === 'threads';
+
+                if (isThreadsMode) {
+                  if (activeRootTopics.length === 0) {
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: '#94a3b8', gap: '12px', padding: '40px 20px', textAlign: 'center' }}>
+                        <div style={{
+                          width: '56px',
+                          height: '56px',
+                          borderRadius: '16px',
+                          background: '#f0fdf4',
+                          border: '1.5px solid #bbf7d0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#16a34a'
+                        }}>
+                          <Sparkles size={28} />
+                        </div>
+                        <div style={{ fontSize: '0.98rem', fontWeight: 800, color: '#0f172a' }}>
+                          {isGroupActive ? `Noch keine Themen in #${currentActiveChannel?.name || 'Kanal'}` : 'Noch keine strukturierten Themen'}
+                        </div>
+                        <div style={{ fontSize: '0.82rem', color: '#64748b', maxWidth: '340px', lineHeight: 1.45 }}>
+                          {isGroupActive ? (
+                            (!isStudent || currentActiveChannel?.allow_student_topics
+                              ? 'Eröffne das erste Thema mit Betreff und starte die Diskussion für deine Gruppe!'
+                              : 'Sobald deine Lehrkraft ein Thema eröffnet, kannst du hier direkt antworten und mit Emojis reagieren.')
+                          ) : (
+                            'Eröffne ein Thema mit Betreff (z. B. Kaufempfehlungen, Übestrategien oder Notenfragen), um wichtige Absprachen übersichtlich im Thread festzuhalten.'
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  const myMembership = isGroupActive ? selectedRecipient.members?.find((mb: any) => mb.user_id === user?.id) : null;
+                  const groupLastRead = myMembership?.last_read_at ? new Date(myMembership.last_read_at).getTime() : 0;
+                  const lastRead = isGroupActive
+                    ? (activeChannelId && channelReads.has(activeChannelId) 
+                        ? (channelReads.get(activeChannelId) || 0) 
+                        : groupLastRead)
+                    : 0;
+
+                  return activeRootTopics.map(topic => {
+                    const replies = activeThreadMessages.filter(m => m.parent_message_id === topic.id);
+                    const isUnread = Boolean(
+                      user?.id && topic.sender_id !== user.id && (
+                        (isGroupActive ? new Date(topic.created_at).getTime() > lastRead : !topic.is_read) ||
+                        replies.some(r => r.sender_id !== user.id && (isGroupActive ? new Date(r.created_at).getTime() > lastRead : !r.is_read))
+                      )
+                    );
+
+                    return (
+                      <CampusTopicCard
+                        key={topic.id}
+                        topic={topic}
+                        replies={replies}
+                        currentUserId={user?.id}
+                        isStudent={isStudent}
+                        canReply={isGroupActive ? (!currentActiveChannel?.is_announcement_only || !isStudent) : true}
+                        onSendReply={handleSendTopicReply}
+                        onToggleReaction={handleToggleReaction}
+                        reactions={messageReactions}
+                        resolveUserDisplayName={formatStudentDisplayName}
+                        resolveUserAvatar={resolveCampusAvatar}
+                        findUserById={findUserById}
+                        isMobile={isMobile}
+                        isUnread={isUnread}
+                      />
+                    );
+                  });
+                }
+
+                if (displayedMessages.length === 0) {
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: '#94a3b8', gap: '12px', padding: '40px 20px', textAlign: 'center' }}>
+                      <div style={{
+                        width: '64px',
+                        height: '64px',
+                        borderRadius: '50%',
+                        background: '#e6f4ea',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#34a853'
+                      }}>
+                        <MessageSquare size={30} strokeWidth={2} />
+                      </div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#1e293b' }}>
+                        {selectedRecipient?.is_group ? `Noch keine Nachrichten in „${selectedRecipient.name}“` : `Noch keine Nachrichten mit ${formatStudentDisplayName(selectedRecipient)}`}
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: '#64748b', maxWidth: '320px' }}>
+                        {selectedRecipient?.is_group ? 'Beginne den Austausch mit dieser Gruppe!' : 'Schreibe eine persönliche Nachricht oder verwalte terminbezogene Shoutbox-Anfragen!'}
+                      </div>
+                    </div>
+                  );
+                }
+
+                return displayedMessages.map((msg, idx) => {
                   const isSelf = msg.sender_id === user.id;
                   const isSys = isSystemMessage(msg);
 
@@ -3800,18 +4066,35 @@ export function CampusDirectMessages({
                       </div>
                     </React.Fragment>
                   );
-                })
-              )}
+                });
+              })()}
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input Composer with Quick Replies */}
+            {/* Input Composer with Quick Replies or Topic Composer */}
             {(() => {
-              const currentActiveChannel = groupChannels.find(c => c.id === activeChannelId);
-              const isChannelAnnouncementOnly = selectedRecipient?.is_group && (
+              const currentActiveChannel = groupChannels.find(c => c.id === activeChannelId) || groupChannels.find(c => c.is_default);
+              const isGroupActive = Boolean(selectedRecipient?.is_group);
+              const isThreadsMode = isGroupActive
+                ? ((channelViewModeOverrides[currentActiveChannel?.id || '']) 
+                    ? channelViewModeOverrides[currentActiveChannel?.id || ''] === 'threads' 
+                    : currentActiveChannel?.channel_type === 'threads')
+                : oneOnOneMode === 'threads';
+              const isChannelAnnouncementOnly = isGroupActive && (
                 currentActiveChannel?.is_announcement_only ||
                 (!currentActiveChannel && selectedRecipient?.admin_only_messaging)
               );
+
+              if (isThreadsMode) {
+                return (
+                  <CampusTopicComposer
+                    channelName={isGroupActive ? (currentActiveChannel?.name || 'allgemein') : (selectedRecipient?.first_name || 'Direkt')}
+                    canCreateTopic={isGroupActive ? (!isStudent || Boolean(currentActiveChannel?.allow_student_topics)) : true}
+                    onPublishTopic={handlePublishTopic}
+                    isMobile={isMobile}
+                  />
+                );
+              }
 
               if (isStudent && isChannelAnnouncementOnly) {
                 return (
@@ -4162,7 +4445,7 @@ export function CampusDirectMessages({
                     <CampusGroovelabText campusColor="#ffffff" groovelabColor="#fde047" /> Nachrichten & Shoutbox ({assignedStudents.length})
                   </h3>
                   <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>
-                    DSGVO-konform • TLS 1.3 &amp; AES-256 verschlüsselte Direktnachrichten &amp; termingekoppelte Abstimmungen
+                    DSGVO-konforme Direktnachrichten &amp; termingekoppelte Abstimmungen
                   </p>
                 </div>
               </div>

@@ -4865,30 +4865,28 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             }
                           }
 
-                          if (otherActiveHWItems.length === 0) {
-                            const snapSongEntry = parsedSnapNotes.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_SONGS:'));
-                            if (snapSongEntry) {
-                              try {
-                                const rawJson = snapSongEntry.substring('SNAPSHOT_SONGS:'.length);
-                                const parsedSongs = JSON.parse(rawJson);
-                                if (Array.isArray(parsedSongs) && parsedSongs.length > 0) {
-                                  parsedSongs.forEach((song: any) => {
-                                    const tName = cleanTitle(song.topic_name || song.title || '');
-                                    if (tName && !otherActiveHWItems.some(s => cleanTitle(s.topic_name || s.title || '').toLowerCase() === tName.toLowerCase())) {
-                                      otherActiveHWItems.push({
-                                        ...song,
-                                        topic_name: tName,
-                                        title: tName
-                                      });
-                                      isSongsCarriedOver = true;
-                                      const kwMatch = snapItem.topic_name?.match(/Hausaufgabe KW\s*(\d+)/i);
-                                      if (!carriedOverWeekLabel && kwMatch) carriedOverWeekLabel = `KW ${kwMatch[1]}`;
-                                    }
-                                  });
-                                }
-                              } catch (e) {
-                                console.warn('Error hydrating SNAPSHOT_SONGS in Teen:', e);
+                          const snapSongEntry = parsedSnapNotes.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_SONGS:'));
+                          if (snapSongEntry) {
+                            try {
+                              const rawJson = snapSongEntry.substring('SNAPSHOT_SONGS:'.length);
+                              const parsedSongs = JSON.parse(rawJson);
+                              if (Array.isArray(parsedSongs) && parsedSongs.length > 0) {
+                                parsedSongs.forEach((song: any) => {
+                                  const tName = cleanTitle(song.topic_name || song.title || '');
+                                  if (tName && !otherActiveHWItems.some(s => cleanTitle(s.topic_name || s.title || '').toLowerCase() === tName.toLowerCase())) {
+                                    otherActiveHWItems.push({
+                                      ...song,
+                                      topic_name: tName,
+                                      title: tName
+                                    });
+                                    isSongsCarriedOver = true;
+                                    const kwMatch = snapItem.topic_name?.match(/Hausaufgabe KW\s*(\d+)/i);
+                                    if (!carriedOverWeekLabel && kwMatch) carriedOverWeekLabel = `KW ${kwMatch[1]}`;
+                                  }
+                                });
                               }
+                            } catch (e) {
+                              console.warn('Error hydrating SNAPSHOT_SONGS in Teen:', e);
                             }
                           }
 
@@ -4918,7 +4916,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         };
                       });
 
-                      const hasActiveHomework = formattedActiveBooks.length > 0 || otherActiveHWItems.length > 0 || currentWeekNotes.length > 0;
+                      const hasActiveHomework = formattedActiveBooks.length > 0 || otherActiveHWItems.length > 0 || currentWeekNotes.length > 0 || audioTracks.length > 0;
 
                       return (
                         <div style={{ 
