@@ -10,13 +10,9 @@ import { formatTeacherFullName, maskLastName } from "../../utils/nameHelper";
 import { renderInstrumentIcon } from "../../utils/instruments";
 import { AvatarImage } from "../common/AvatarImage";
 
-const TEACHER_INSTRUMENT_ICONS: Record<string, any> = { 
-  Guitar: renderInstrumentIcon("Guitar"), 
-  Bass: renderInstrumentIcon("Bass"), 
-  Drums: renderInstrumentIcon("Drums"), 
-  Keys: renderInstrumentIcon("Keys"), 
-  Vocals: renderInstrumentIcon("Vocals") 
-};
+const TEACHER_INSTRUMENT_ICONS: Record<string, any> = new Proxy({}, {
+  get: (_, prop: string) => renderInstrumentIcon(prop)
+});
 const INSTRUMENT_COLORS: Record<string, string> = { 
   Guitar: "#ef4444", 
   Bass: "#eab308", 

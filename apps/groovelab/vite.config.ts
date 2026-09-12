@@ -92,7 +92,7 @@ export default defineConfig({
             return 'domain-pricing-suite';
           }
           // Shared identity, user name formatting and badge helpers (prevents cycles between admin, secretary, and master-admin)
-          if (id.includes('utils/userDisplayName') || id.includes('utils/nameHelper') || id.includes('utils/adminColorHelpers')) {
+          if (id.includes('utils/userDisplayName') || id.includes('utils/nameHelper') || id.includes('utils/adminColorHelpers') || id.includes('utils/instruments') || id.includes('constants/instruments')) {
             return 'shared-identity-utils';
           }
           if (id.includes('components/IDBadgeCard')) {

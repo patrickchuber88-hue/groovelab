@@ -1,21 +1,16 @@
 import { renderInstrumentIcon } from '../utils/instruments';
 
-export const APP_INSTRUMENT_ICONS: Record<string, any> = { 
-  "Gitarre": renderInstrumentIcon("Gitarre"), 
-  "Guitar": renderInstrumentIcon("Guitar"), 
-  "E-Gitarre": renderInstrumentIcon("E-Gitarre"),
-  "Bass": renderInstrumentIcon("Bass"), 
-  "E-Bass": renderInstrumentIcon("E-Bass"), 
-  "Drums": renderInstrumentIcon("Drums"), 
-  "E-Drums": renderInstrumentIcon("E-Drums"), 
-  "Vocals": renderInstrumentIcon("Vocals"), 
-  "Gesang": renderInstrumentIcon("Gesang"),
-  "Piano / Keys": renderInstrumentIcon("Keys"), 
-  "Piano": renderInstrumentIcon("Piano"), 
-  "E-Piano": renderInstrumentIcon("E-Piano"), 
-  "Keys": renderInstrumentIcon("Keys"),
+export const APP_INSTRUMENT_ICONS: Record<string, any> = new Proxy({
   "Musik": "🎼"
-};
+} as Record<string, any>, {
+  get: (target, prop: string) => {
+    if (prop === "Musik") return "🎼";
+    if (typeof prop === "string") {
+      return renderInstrumentIcon(prop);
+    }
+    return target[prop];
+  }
+});
 
 export const APP_INSTRUMENT_COLORS: Record<string, string> = { 
   "Guitar": "#ef4444", 
