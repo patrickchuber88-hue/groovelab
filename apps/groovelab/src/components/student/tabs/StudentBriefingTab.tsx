@@ -11,6 +11,7 @@ import { UpdateAnnouncementHero } from '../../common/UpdateAnnouncementHero';
 import { AudioTrackCarousel, AudioTrackItem } from '../../AudioTrackCarousel';
 import { DEFAULT_FOKUS_LEVELS } from '../../../utils/studentProgressEngine';
 import { buildContinuousHomeworkNarrative } from '../../../services/neuralTtsService';
+import { formatTeacherFullName } from '../../../utils/nameHelper';
 import { Avatar, getInstrumentAvatarUrl, resolveCampusStudentAvatar } from '../studentAvatars.constants';
 import { getSimulatedNow, toLocalYYYYMMDD, getISOWeekRaw, getISOWeek, getItemWeek, getLehrwerkColor } from '../studentDateUtils';
 
@@ -920,7 +921,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             lineHeight: 1.45, 
                             maxWidth: '95%' 
                           }}>
-                            Schnapp dir {pronoun} und hol dir deine Flamme! ✨
+                            Schön, dass du da bist! Lass uns Musik machen! 🎵
                           </p>
 
                           {(() => {
@@ -1588,8 +1589,11 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                     };
 
                     let isPastNoteCarriedOver = false;
-                    let generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
-                    if (!generalNoteRaw) {
+                    const isDidacticNote = (n: any) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:') && !n.startsWith('❓ Frage für den Unterricht:');
+
+                    let generalNotesList: string[] = currentWeekNotes.filter(isDidacticNote).map(cleanGeneralNote).filter(Boolean);
+
+                    if (generalNotesList.length === 0) {
                       const pastHwSnapshots = (progressItems || []).filter((item: any) => {
                         if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
                         const itWeekIso = getItemWeek(item);
@@ -1608,9 +1612,9 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         try {
                           const parsed = typeof latestPast.homework_notes === 'string' ? JSON.parse(latestPast.homework_notes) : latestPast.homework_notes;
                           if (Array.isArray(parsed)) {
-                            const pastNote = parsed.find((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
-                            if (pastNote) {
-                              generalNoteRaw = pastNote;
+                            const pastNotes = parsed.filter(isDidacticNote).map(cleanGeneralNote).filter(Boolean);
+                            if (pastNotes.length > 0) {
+                              generalNotesList = pastNotes;
                               isPastNoteCarriedOver = true;
                               if (!carriedOverWeekLabel) {
                                 const kwMatch = latestPast.topic_name?.match(/Hausaufgabe KW\s*(\d+)/i);
@@ -1618,17 +1622,20 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               }
                             }
                           } else if (typeof parsed === 'string') {
-                            generalNoteRaw = parsed;
-                            isPastNoteCarriedOver = true;
-                            if (!carriedOverWeekLabel) {
-                              const kwMatch = latestPast.topic_name?.match(/Hausaufgabe KW\s*(\d+)/i);
-                              if (kwMatch) carriedOverWeekLabel = `KW ${kwMatch[1]}`;
+                            const cleanP = cleanGeneralNote(parsed);
+                            if (cleanP) {
+                              generalNotesList = [cleanP];
+                              isPastNoteCarriedOver = true;
+                              if (!carriedOverWeekLabel) {
+                                const kwMatch = latestPast.topic_name?.match(/Hausaufgabe KW\s*(\d+)/i);
+                                if (kwMatch) carriedOverWeekLabel = `KW ${kwMatch[1]}`;
+                              }
                             }
                           }
                         } catch {}
                       }
                     }
-                    const generalNote = generalNoteRaw ? cleanGeneralNote(generalNoteRaw) : '';
+                    const generalNote = generalNotesList[0] || '';
 
                     const isAudioCarriedOver = audioTracks.some(t => t.isCarriedOver);
                     const isCarriedOverPlan = isAudioCarriedOver || isPastNoteCarriedOver || isBooksCarriedOver || isSongsCarriedOver;
@@ -1736,7 +1743,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       const narrative = buildContinuousHomeworkNarrative({
-                                        teacherName: briefingData?.todayLesson?.teacher_name || (studentUser as any)?.teacher_name,
+                                        teacherName: formatTeacherFullName(studentUser?.teacher_name || studentUser?.teacher || briefingData?.todayLesson?.teacher_name || briefingData?.todayLesson?.teacher),
                                         instrument: studentUser?.instrument_type || (studentUser as any)?.instrument || avatar?.instrument_type,
                                         books: activeJuniorBooks.map(b => ({ 
                                           title: b.title, 
@@ -1872,7 +1879,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     letterSpacing: '0.01em',
                                     boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)'
                                   }}>
-                                    <RotateCcw size={10} color="#0284c7" strokeWidth={2.5} />
+                                    <RotateCcw size={10} color="#64748b" strokeWidth={2.5} />
                                     <span>Fortlaufender Übeplan • Übertrag aus {carriedOverWeekLabel || 'der Vorwoche'}</span>
                                   </div>
                                 )}
@@ -1994,12 +2001,23 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 );
                               })}
 
-                              {/* Zusätzliche Bemerkung */}
-                              {generalNote && (
-                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.88rem', color: '#334155', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
-                                  <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
-                                  <strong style={{ color: '#15803d', fontWeight: 850, flexShrink: 0 }}>Zusätzliche Bemerkung:</strong>
-                                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{generalNote}</span>
+                              {/* Zusätzliche Bemerkung / Notizen */}
+                              {generalNotesList && generalNotesList.length > 0 && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.86rem', color: '#15803d', fontWeight: 850 }}>
+                                    <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
+                                    <span>
+                                      {isPastNoteCarriedOver ? `Hinweise aus Vorwoche (${carriedOverWeekLabel || 'KW'}):` : 'Hinweise deiner Lehrkraft:'}
+                                    </span>
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '20px' }}>
+                                    {generalNotesList.map((noteItem: string, nIdx: number) => (
+                                      <div key={`gn-${nIdx}`} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '0.86rem', color: '#334155', fontWeight: 600, lineHeight: 1.4 }}>
+                                        {generalNotesList.length > 1 && <span style={{ color: '#16a34a', fontWeight: 800 }}>•</span>}
+                                        <span>{noteItem}</span>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
                               )}
 
@@ -2012,23 +2030,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 </div>
                               )}
 
-                              {/* Audio-Karussell direkt in der Heldenkarte (Volle Parität mit Desktop-Schülervorschau) */}
-                              {audioTracks.length > 0 && (
-                                <div style={{ paddingTop: '4px' }}>
-                                  <AudioTrackCarousel
-                                    tracks={audioTracks}
-                                    readOnly={true}
-                                    isTeacher={false}
-                                    activeTopicContext="Hausaufgabe"
-                                    defaultExpanded={true}
-                                    isCarriedOver={isAudioCarriedOver}
-                                    hideCarriedOverBadge={true}
-                                  />
-                                </div>
-                              )}
-
                               {/* Wenn weder noch */}
-                              {activeJuniorBooks.length === 0 && activeJuniorSongs.length === 0 && (
+                              {activeJuniorBooks.length === 0 && activeJuniorSongs.length === 0 && (!generalNotesList || generalNotesList.length === 0) && (
                                 <div style={{ fontSize: '0.82rem', color: '#94a3b8', fontStyle: 'italic' }}>
                                   Keine offenen Aufgaben für diese Woche erfasst
                                 </div>
@@ -2536,7 +2539,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         </div>
 
                         {(() => {
-                          const { formattedJuniorBooks, otherActiveSongs, audioTracks, generalNote, studentQuestionText, hasAnyHomework } = getJuniorWeeklyHomeworkSummary();
+                          const { formattedJuniorBooks, otherActiveSongs, audioTracks, generalNote, allTeacherNotes, studentQuestionText, hasAnyHomework } = getJuniorWeeklyHomeworkSummary() as any;
                           const cleanTitle = (t: string) => (t || '').replace(/linken park/gi, 'Linkin Park').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
 
                           return (
@@ -2600,14 +2603,14 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                           handleStopSpeaking();
                                         } else {
                                           const narrative = buildContinuousHomeworkNarrative({
-                                            teacherName: briefingData?.todayLesson?.teacher_name || (studentUser as any)?.teacher_name,
+                                            teacherName: formatTeacherFullName(studentUser?.teacher_name || studentUser?.teacher || briefingData?.todayLesson?.teacher_name || briefingData?.todayLesson?.teacher),
                                             instrument: studentUser?.instrument_type || (studentUser as any)?.instrument || avatar?.instrument_type,
-                                            books: formattedJuniorBooks.map(b => ({
+                                            books: formattedJuniorBooks.map((b: any) => ({
                                               title: b.title,
                                               pageNums: b.pageNums,
                                               notes: b.notesList ? b.notesList.map((n: any) => n.text) : []
                                             })),
-                                            songs: otherActiveSongs.map(s => ({
+                                            songs: otherActiveSongs.map((s: any) => ({
                                               title: cleanTitle(s.topic_name || s.title),
                                               note: s.homework_notes
                                             })),
@@ -2684,7 +2687,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     gap: '16px'
                                   }}>
                                     {/* Lehrwerke / Bücher Liste */}
-                                    {formattedJuniorBooks.map((bookItem, idx) => (
+                                    {formattedJuniorBooks.map((bookItem: any, idx: number) => (
                                       <div key={`j-modal-book-${idx}`} style={{
                                         display: 'flex',
                                         flexDirection: 'column',
@@ -2795,7 +2798,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     ))}
 
                                     {/* Songs Liste */}
-                                    {otherActiveSongs.map((item, idx) => {
+                                    {otherActiveSongs.map((item: any, idx: number) => {
                                       const songTitle = cleanTitle(item.topic_name || item.title);
                                       const taskId = `song-${item.id || item.topic_name || item.title || idx}`;
                                       const refl = taskReflections[taskId]?.status;
@@ -2873,31 +2876,45 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                           <Headphones size={13} />
                                           <span>Unterrichtsaufnahmen ({audioTracks.length})</span>
                                         </div>
-                                        <AudioTrackCarousel tracks={audioTracks} isTeacher={true} readOnly={true} />
+                                        <AudioTrackCarousel tracks={audioTracks} isTeacher={false} readOnly={true} />
                                       </div>
                                     )}
 
-                                    {/* General Note */}
-                                    {generalNote && (
-                                      <div style={{
-                                        marginTop: '4px',
-                                        padding: '12px 14px',
-                                        background: '#f8fafc',
-                                        borderRadius: '14px',
-                                        border: '1px solid #e2e8f0',
-                                        display: 'flex',
-                                        alignItems: 'flex-start',
-                                        gap: '8px',
-                                        fontSize: '0.86rem',
-                                        color: '#334155',
-                                        fontWeight: 600
-                                      }}>
-                                        <FileText size={16} color="#15803d" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                        <div>
-                                          <strong style={{ color: '#15803d', fontWeight: 850 }}>Hinweis:</strong> {generalNote}
-                                        </div>
-                                      </div>
-                                    )}
+                                     {/* General Notes */}
+                                     {((allTeacherNotes && allTeacherNotes.length > 0) || generalNote) && (
+                                       <div style={{
+                                         marginTop: '4px',
+                                         padding: '12px 14px',
+                                         background: '#f8fafc',
+                                         borderRadius: '14px',
+                                         border: '1px solid #e2e8f0',
+                                         display: 'flex',
+                                         alignItems: 'flex-start',
+                                         gap: '8px',
+                                         fontSize: '0.86rem',
+                                         color: '#334155',
+                                         fontWeight: 600
+                                       }}>
+                                         <FileText size={16} color="#15803d" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%' }}>
+                                           <strong style={{ color: '#15803d', fontWeight: 850 }}>
+                                             {allTeacherNotes && allTeacherNotes.length > 1 ? 'Hinweise deiner Lehrkraft:' : 'Hinweis:'}
+                                           </strong>
+                                           {allTeacherNotes && allTeacherNotes.length > 0 ? (
+                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px' }}>
+                                               {allTeacherNotes.map((noteItem: string, nIdx: number) => (
+                                                 <div key={nIdx} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                                                   {allTeacherNotes.length > 1 && <span style={{ color: '#15803d', fontWeight: 900 }}>•</span>}
+                                                   <span>{noteItem}</span>
+                                                 </div>
+                                               ))}
+                                             </div>
+                                           ) : (
+                                             <div>{generalNote}</div>
+                                           )}
+                                         </div>
+                                       </div>
+                                     )}
 
                                     {/* Student Question */}
                                     {studentQuestionText && (
@@ -3726,7 +3743,10 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               Alle Lehrer-Aufnahmen 🎧
                             </h2>
                             <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 700 }}>
-                              {briefingData?.todayLesson?.teacher_name ? `Eingespielt von ${briefingData.todayLesson.teacher_name}` : 'Hörbeispiele & Play-Alongs aus deinem Unterricht'}
+                              {(() => {
+                                const tName = formatTeacherFullName(briefingData?.todayLesson?.teacher_name || briefingData?.todayLesson?.teacher || studentUser?.teacher_name || studentUser?.teacher);
+                                return (tName && tName !== 'Lehrkraft') ? `Eingespielt von ${tName}` : 'Hörbeispiele & Play-Alongs aus deinem Unterricht';
+                              })()}
                             </p>
                           </div>
                         </div>
@@ -4224,7 +4244,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             lineHeight: 1.45, 
                             maxWidth: '95%' 
                           }}>
-                            Track deine Songs, halte deinen Streak &amp; hol dir XP! 🎸
+                            Bereit für deine Session? Bleib am Ball und leg direkt los! 🎧
                           </p>
                         );
                       })()}
@@ -4571,8 +4591,11 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       };
 
                       let isPastNoteCarriedOver = false;
-                      let generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
-                      if (!generalNoteRaw) {
+                      const isDidacticNote = (n: any) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:') && !n.startsWith('❓ Frage für den Unterricht:');
+
+                      let generalNotesList: string[] = currentWeekNotes.filter(isDidacticNote).map(cleanGeneralNote).filter(Boolean);
+
+                      if (generalNotesList.length === 0) {
                         const pastHwSnapshots = (progressItems || []).filter((item: any) => {
                           if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
                           const itWeekIso = getItemWeek(item);
@@ -4593,19 +4616,22 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           try {
                             const parsed = typeof latestPast.homework_notes === 'string' ? JSON.parse(latestPast.homework_notes) : latestPast.homework_notes;
                             if (Array.isArray(parsed)) {
-                              const pastNote = parsed.find((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
-                              if (pastNote) {
-                                generalNoteRaw = pastNote;
+                              const pastNotes = parsed.filter(isDidacticNote).map(cleanGeneralNote).filter(Boolean);
+                              if (pastNotes.length > 0) {
+                                generalNotesList = pastNotes;
                                 isPastNoteCarriedOver = true;
                               }
                             } else if (typeof parsed === 'string') {
-                              generalNoteRaw = parsed;
-                              isPastNoteCarriedOver = true;
+                              const cleanP = cleanGeneralNote(parsed);
+                              if (cleanP) {
+                                generalNotesList = [cleanP];
+                                isPastNoteCarriedOver = true;
+                              }
                             }
                           } catch {}
                         }
                       }
-                      const generalNote = generalNoteRaw ? cleanGeneralNote(generalNoteRaw) : '';
+                      const generalNote = generalNotesList[0] || '';
 
                       const isAudioCarriedOver = audioTracks.some(t => t.isCarriedOver);
                       let isCarriedOverPlan = isAudioCarriedOver || isPastNoteCarriedOver;
@@ -4916,7 +4942,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         };
                       });
 
-                      const hasActiveHomework = formattedActiveBooks.length > 0 || otherActiveHWItems.length > 0 || currentWeekNotes.length > 0 || audioTracks.length > 0;
+                      const hasActiveHomework = formattedActiveBooks.length > 0 || otherActiveHWItems.length > 0 || currentWeekNotes.length > 0 || !!generalNote || !!studentQuestionText;
 
                       return (
                         <div style={{ 
@@ -4931,76 +4957,97 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           gap: '16px'
                         }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                                 <div style={{ 
-                                  background: 'rgba(52, 168, 83, 0.08)', 
-                                  color: '#34a853', 
-                                  width: '34px', 
-                                  height: '34px', 
-                                  borderRadius: '10px', 
+                                  background: '#f1f5f9', 
+                                  color: '#475569', 
+                                  width: '32px', 
+                                  height: '32px', 
+                                  borderRadius: '9px', 
                                   display: 'flex', 
                                   alignItems: 'center', 
-                                  justifyContent: 'center' 
+                                  justifyContent: 'center',
+                                  flexShrink: 0
                                 }}>
-                                  <BookOpen size={17} />
+                                  <BookOpen size={16} strokeWidth={2.2} />
                                 </div>
-                                <div>
-                                  <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 950, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                                  <h4 style={{ margin: 0, fontSize: '1.0rem', fontWeight: 950, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif", lineHeight: 1.2 }}>
                                     Hausaufgaben
                                   </h4>
-                                  <span style={{ fontSize: isMusicStandMode ? '0.80rem' : '0.72rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                    Diese Woche · Deine Aufgaben
-                                  </span>
-                                  {isCarriedOverPlan && (
-                                    <div style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '5px',
-                                      background: '#f8fafc',
-                                      border: '1px solid #cbd5e1',
-                                      color: '#475569',
-                                      borderRadius: '100px',
-                                      padding: '2px 10px',
-                                      fontSize: '0.72rem',
-                                      fontWeight: 850,
-                                      letterSpacing: '0.01em',
-                                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                                      marginTop: '4px'
-                                    }}>
-                                      <RotateCcw size={10} color="#0284c7" strokeWidth={2.5} />
-                                      <span>Fortlaufender Übeplan • Übertrag aus {carriedOverWeekLabel || 'der Vorwoche'}</span>
-                                    </div>
-                                  )}
+                                  <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    fontSize: isMusicStandMode ? '0.78rem' : '0.72rem',
+                                    fontWeight: 750,
+                                    color: '#64748b',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis'
+                                  }}>
+                                    <span>Diese Woche</span>
+                                    {isCarriedOverPlan && (
+                                      <>
+                                        <span style={{ opacity: 0.4 }}>•</span>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#475569' }}>
+                                          <RotateCcw size={10} color="#64748b" strokeWidth={2.5} />
+                                          <span>Übertrag aus {carriedOverWeekLabel || 'der Vorwoche'}</span>
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                               
                               {/* Audio Indicator Pill beside Title */}
                               {audioTracks.length > 0 ? (
                                 <div
-                                  onClick={() => handleTabChangeLocal('homework_book')}
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => {
+                                    if (handleOpenHomeworkBookWithView) {
+                                      handleOpenHomeworkBookWithView('document', 'recordings');
+                                    } else {
+                                      handleTabChangeLocal('homework_book');
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      if (handleOpenHomeworkBookWithView) {
+                                        handleOpenHomeworkBookWithView('document', 'recordings');
+                                      } else {
+                                        handleTabChangeLocal('homework_book');
+                                      }
+                                    }
+                                  }}
                                   style={{
-                                    background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
-                                    border: '1px solid #bbf7d0',
+                                    background: '#f8fafc',
+                                    border: '1px solid #e2e8f0',
                                     borderRadius: '100px',
                                     padding: '4px 10px',
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '6px',
                                     cursor: 'pointer',
-                                    boxShadow: '0 2px 6px rgba(34, 197, 94, 0.08)',
-                                    transition: 'all 0.15s ease'
+                                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+                                    transition: 'all 0.15s ease',
+                                    whiteSpace: 'nowrap',
+                                    flexShrink: 0
                                   }}
                                   className="hover-scale"
                                   title="Unterrichtsaufnahmen im Aufgabenheft anhören"
+                                  aria-label="Unterrichtsaufnahmen im Aufgabenheft anhören"
                                 >
-                                  <Headphones size={13} color="#15803d" />
-                                  <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#15803d' }}>
+                                  <Headphones size={12} color="#475569" strokeWidth={2.2} />
+                                  <span style={{ fontSize: '0.72rem', fontWeight: 850, color: '#334155' }}>
                                     {audioTracks.length === 1 ? '1 Aufnahme' : `${audioTracks.length} Aufnahmen`}
                                   </span>
                                 </div>
                               ) : (
-                                <span style={{ background: '#ecfdf5', color: '#059669', fontSize: '0.6rem', fontWeight: 900, padding: '3px 9px', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
+                                <span style={{ background: '#f8fafc', color: '#64748b', fontSize: '0.62rem', fontWeight: 850, padding: '3px 8px', borderRadius: '6px', border: '1px solid #e2e8f0', whiteSpace: 'nowrap', flexShrink: 0 }}>
                                   Aktiv
                                 </span>
                               )}
@@ -5091,12 +5138,23 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     </div>
                                   ))}
 
-                                  {/* Zusätzliche Bemerkung */}
-                                  {generalNote && (
-                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.88rem', color: '#334155', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
-                                      <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
-                                      <strong style={{ color: '#15803d', fontWeight: 850, flexShrink: 0 }}>Zusätzliche Bemerkung:</strong>
-                                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{generalNote}</span>
+                                  {/* Zusätzliche Bemerkung / Notizen */}
+                                  {generalNotesList && generalNotesList.length > 0 && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.86rem', color: '#15803d', fontWeight: 850 }}>
+                                        <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
+                                        <span>
+                                          {isPastNoteCarriedOver ? `Hinweise aus Vorwoche (${carriedOverWeekLabel || 'KW'}):` : 'Hinweise deiner Lehrkraft:'}
+                                        </span>
+                                      </div>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '20px' }}>
+                                        {generalNotesList.map((noteItem: string, nIdx: number) => (
+                                          <div key={`teen-gn-${nIdx}`} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '0.86rem', color: '#334155', fontWeight: 600, lineHeight: 1.4 }}>
+                                            {generalNotesList.length > 1 && <span style={{ color: '#16a34a', fontWeight: 800 }}>•</span>}
+                                            <span>{noteItem}</span>
+                                          </div>
+                                        ))}
+                                      </div>
                                     </div>
                                   )}
 
@@ -5108,42 +5166,11 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{studentQuestionText}</span>
                                     </div>
                                   )}
-
-                                  {/* Audio-Karussell direkt in der Teen-Karte (Volle Parität mit Desktop-Schülervorschau) */}
-                                  {audioTracks.length > 0 && (
-                                    <div style={{ paddingTop: '4px' }}>
-                                      <AudioTrackCarousel
-                                        tracks={audioTracks}
-                                        readOnly={true}
-                                        isTeacher={false}
-                                        activeTopicContext="Hausaufgabe"
-                                        defaultExpanded={true}
-                                        isCarriedOver={isAudioCarriedOver}
-                                        hideCarriedOverBadge={true}
-                                      />
-                                    </div>
-                                  )}
                                 </>
                               ) : (
-                                <>
-                                  {/* Auch bei keinen Text-Aufgaben Aufnahmen anzeigen, falls vorhanden */}
-                                  {audioTracks.length > 0 && (
-                                    <div style={{ paddingTop: '4px' }}>
-                                      <AudioTrackCarousel
-                                        tracks={audioTracks}
-                                        readOnly={true}
-                                        isTeacher={false}
-                                        activeTopicContext="Hausaufgabe"
-                                        defaultExpanded={true}
-                                        isCarriedOver={isAudioCarriedOver}
-                                        hideCarriedOverBadge={true}
-                                      />
-                                    </div>
-                                  )}
-                                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                                    Keine offenen Aufgaben für diese Woche erfasst
-                                  </div>
-                                </>
+                                <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                                  Keine offenen Aufgaben für diese Woche erfasst
+                                </div>
                               )}
                             </div>
                           </div>
@@ -5286,38 +5313,121 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         ? `am ${instName}`
                         : `an deinem Instrument`;
 
+                      const todayStr = toLocalYYYYMMDD(new Date());
+                      const todayLogs = (fokusLogs || []).filter((log: any) => log.created_at && toLocalYYYYMMDD(new Date(log.created_at)) === todayStr);
+                      const dbTodaySecs = todayLogs.reduce((sum: number, log: any) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0);
+                      const liveTodaySecs = sessionActive ? secondsElapsed : 0;
+                      const totalTodaySecs = dbTodaySecs + liveTodaySecs;
+                      const todayMins = Math.floor(totalTodaySecs / 60);
+                      const isGoalAchieved = totalTodaySecs >= (requiredMins * 60);
+                      const progressPercent = Math.min(100, Math.round((totalTodaySecs / (requiredMins * 60)) * 100));
+
                       return (
                         <div style={{ 
                           background: '#ffffff', 
                           borderRadius: '24px', 
                           padding: '24px', 
                           boxShadow: '0 10px 30px rgba(15, 23, 42, 0.03)',
-                          border: '1px solid rgba(0, 0, 0, 0.04)',
+                          border: isGoalAchieved ? '1px solid rgba(52, 168, 83, 0.25)' : '1px solid rgba(0, 0, 0, 0.04)',
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'space-between',
                           gap: '16px'
                         }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <div style={{ background: 'rgba(251, 188, 5, 0.12)', color: '#d97706', width: '32px', height: '32px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <Zap size={16} fill="currentColor" />
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                            {/* Header: Icon + Title + Status Pill */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{ 
+                                  background: isGoalAchieved ? 'rgba(52, 168, 83, 0.12)' : 'rgba(251, 188, 5, 0.14)', 
+                                  color: isGoalAchieved ? '#16a34a' : '#d97706', 
+                                  width: '34px', 
+                                  height: '34px', 
+                                  borderRadius: '11px', 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'center',
+                                  flexShrink: 0
+                                }}>
+                                  {isGoalAchieved ? <Check size={18} /> : <Timer size={17} />}
+                                </div>
+                                <h4 style={{ margin: 0, fontSize: isMusicStandMode ? '1.18rem' : '1.05rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                  Tägliche Übezeit
+                                </h4>
                               </div>
-                              <h4 style={{ margin: 0, fontSize: isMusicStandMode ? '1.18rem' : '1.05rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                Tägliche Übezeit ⚡
-                              </h4>
+
+                              <div style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                background: isGoalAchieved ? '#dcfce7' : '#f8fafc',
+                                color: isGoalAchieved ? '#15803d' : '#475569',
+                                border: isGoalAchieved ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                                padding: '4px 10px',
+                                borderRadius: '100px',
+                                fontSize: '0.72rem',
+                                fontWeight: 800,
+                                letterSpacing: '0.02em',
+                                flexShrink: 0
+                              }}>
+                                <span>{isGoalAchieved ? 'Erledigt ✨' : `Ziel: ${requiredMins} Min.`}</span>
+                              </div>
                             </div>
-                            <div>
-                              <p style={{ margin: 0, fontSize: isMusicStandMode ? '0.96rem' : '0.86rem', color: '#475569', lineHeight: 1.45, fontWeight: 600 }}>
-                                Kurze Session, maximaler Groove: Schon {requiredMins} Minuten {instPrep} sichern heute deinen Flammen-Streak. ⚡
-                              </p>
+
+                            {/* Smart-Gauge: Kompakter horizontaler Fortschrittsbalken */}
+                            <div style={{
+                              background: '#f8fafc',
+                              border: '1px solid #f1f5f9',
+                              borderRadius: '14px',
+                              padding: '10px 14px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '6px'
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', fontWeight: 750 }}>
+                                <span style={{ color: '#475569' }}>
+                                  Heute: <strong style={{ color: isGoalAchieved ? '#15803d' : '#0f172a' }}>{todayMins} von {requiredMins} Min.</strong>
+                                </span>
+                                <span style={{ color: isGoalAchieved ? '#15803d' : '#4f46e5', fontWeight: 900 }}>
+                                  {progressPercent}%
+                                </span>
+                              </div>
+                              <div style={{
+                                width: '100%',
+                                height: '7px',
+                                background: '#e2e8f0',
+                                borderRadius: '100px',
+                                overflow: 'hidden',
+                                position: 'relative'
+                              }}>
+                                <div style={{
+                                  width: `${progressPercent}%`,
+                                  height: '100%',
+                                  background: isGoalAchieved 
+                                    ? 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)' 
+                                    : 'linear-gradient(90deg, #6366f1 0%, #4f46e5 100%)',
+                                  borderRadius: '100px',
+                                  transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+                                }} />
+                              </div>
                             </div>
+
+                            {/* Motivations-Text */}
+                            <p style={{ margin: 0, fontSize: isMusicStandMode ? '0.96rem' : '0.84rem', color: '#475569', lineHeight: 1.45, fontWeight: 600 }}>
+                              {isGoalAchieved 
+                                ? `Starke Leistung! Du hast deine ${requiredMins} Minuten für heute gemeistert und deinen Flammen-Streak gesichert. 🔥`
+                                : `Kurze Session, maximaler Fokus: Schon ${requiredMins} Minuten ${instPrep} sichern heute deinen Flammen-Streak. ⚡`}
+                            </p>
                           </div>
 
+                          {/* CTA Button */}
                           <button 
+                            type="button"
                             onClick={() => setActiveTab('practice_board')}
                             style={{ 
-                              background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', 
+                              background: isGoalAchieved 
+                                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
+                                : 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', 
                               color: 'white', 
                               border: 'none', 
                               borderRadius: '14px', 
@@ -5331,14 +5441,16 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               justifyContent: 'center', 
                               alignItems: 'center', 
                               gap: '8px', 
-                              boxShadow: '0 8px 20px rgba(79, 70, 229, 0.28)', 
+                              boxShadow: isGoalAchieved 
+                                ? '0 8px 20px rgba(16, 185, 129, 0.25)' 
+                                : '0 8px 20px rgba(79, 70, 229, 0.28)', 
                               transition: 'all 0.2s', 
                               width: '100%' 
                             }}
                             className="hover-scale"
                           >
-                            <Play size={16} fill="white" />
-                            <span>{requiredMins} Min. Übe-Timer starten</span>
+                            {isGoalAchieved ? <Check size={16} /> : <Play size={16} fill="white" />}
+                            <span>{isGoalAchieved ? 'Tagesziel erreicht • Session starten' : `${requiredMins} Min. Übe-Timer starten`}</span>
                           </button>
                         </div>
                       );
@@ -5958,9 +6070,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         lineHeight: 1.45, 
                         maxWidth: '95%' 
                       }}>
-                        {flamesActive 
-                          ? 'Fokus auf dein Repertoire: Kurze, regelmäßige Sessions festigen deine Songs & sichern deinen Streak. ⚡'
-                          : 'Fokus auf dein Repertoire: Kurze, regelmäßige Sessions festigen deine Songs. 🎵'}
+                        Zeit für dein Repertoire und deinen musikalischen Fokus. 🎯
                       </p>
 
                       {(() => {
@@ -6361,8 +6471,11 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       };
 
                       let isPastNoteCarriedOver = false;
-                      let generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
-                      if (!generalNoteRaw) {
+                      const isDidacticNote = (n: any) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:') && !n.startsWith('❓ Frage für den Unterricht:');
+
+                      let generalNotesList: string[] = currentWeekNotes.filter(isDidacticNote).map(cleanGeneralNote).filter(Boolean);
+
+                      if (generalNotesList.length === 0) {
                         const pastHwSnapshots = (progressItems || []).filter((item: any) => {
                           if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
                           const itWeekIso = getItemWeek(item);
@@ -6383,19 +6496,22 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           try {
                             const parsed = typeof latestPast.homework_notes === 'string' ? JSON.parse(latestPast.homework_notes) : latestPast.homework_notes;
                             if (Array.isArray(parsed)) {
-                              const pastNote = parsed.find((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
-                              if (pastNote) {
-                                generalNoteRaw = pastNote;
+                              const pastNotes = parsed.filter(isDidacticNote).map(cleanGeneralNote).filter(Boolean);
+                              if (pastNotes.length > 0) {
+                                generalNotesList = pastNotes;
                                 isPastNoteCarriedOver = true;
                               }
                             } else if (typeof parsed === 'string') {
-                              generalNoteRaw = parsed;
-                              isPastNoteCarriedOver = true;
+                              const cleanP = cleanGeneralNote(parsed);
+                              if (cleanP) {
+                                generalNotesList = [cleanP];
+                                isPastNoteCarriedOver = true;
+                              }
                             }
                           } catch {}
                         }
                       }
-                      const generalNote = generalNoteRaw ? cleanGeneralNote(generalNoteRaw) : '';
+                      const generalNote = generalNotesList[0] || '';
 
                       const isAudioCarriedOver = audioTracks.some(t => t.isCarriedOver);
                       let isCarriedOverPlan = isAudioCarriedOver || isPastNoteCarriedOver;
@@ -6712,7 +6828,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         };
                       });
 
-                      const hasActiveHomework = formattedActiveBooks.length > 0 || otherActiveHWItems.length > 0 || currentWeekNotes.length > 0;
+                      const hasActiveHomework = formattedActiveBooks.length > 0 || otherActiveHWItems.length > 0 || currentWeekNotes.length > 0 || !!generalNote || !!studentQuestionText;
 
                       return (
                         <div style={{ 
@@ -6727,76 +6843,97 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           gap: '16px'
                         }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                                 <div style={{ 
-                                  background: 'rgba(52, 168, 83, 0.08)', 
-                                  color: '#34a853', 
-                                  width: '34px', 
-                                  height: '34px', 
-                                  borderRadius: '10px', 
+                                  background: '#f1f5f9', 
+                                  color: '#475569', 
+                                  width: '32px', 
+                                  height: '32px', 
+                                  borderRadius: '9px', 
                                   display: 'flex', 
                                   alignItems: 'center', 
-                                  justifyContent: 'center' 
+                                  justifyContent: 'center',
+                                  flexShrink: 0
                                 }}>
-                                  <BookOpen size={17} />
+                                  <BookOpen size={16} strokeWidth={2.2} />
                                 </div>
-                                <div>
-                                  <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 950, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                                  <h4 style={{ margin: 0, fontSize: '1.0rem', fontWeight: 950, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif", lineHeight: 1.2 }}>
                                     Hausaufgaben
                                   </h4>
-                                  <span style={{ fontSize: isMusicStandMode ? '0.80rem' : '0.72rem', fontWeight: 850, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                    Diese Woche · Deine Aufgaben
-                                  </span>
-                                  {isCarriedOverPlan && (
-                                    <div style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '5px',
-                                      background: '#f8fafc',
-                                      border: '1px solid #cbd5e1',
-                                      color: '#475569',
-                                      borderRadius: '100px',
-                                      padding: '2px 10px',
-                                      fontSize: '0.72rem',
-                                      fontWeight: 850,
-                                      letterSpacing: '0.01em',
-                                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                                      marginTop: '4px'
-                                    }}>
-                                      <RotateCcw size={10} color="#0284c7" strokeWidth={2.5} />
-                                      <span>Fortlaufender Übeplan • Übertrag aus {carriedOverWeekLabel || 'der Vorwoche'}</span>
-                                    </div>
-                                  )}
+                                  <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    fontSize: isMusicStandMode ? '0.78rem' : '0.72rem',
+                                    fontWeight: 750,
+                                    color: '#64748b',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis'
+                                  }}>
+                                    <span>Diese Woche</span>
+                                    {isCarriedOverPlan && (
+                                      <>
+                                        <span style={{ opacity: 0.4 }}>•</span>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#475569' }}>
+                                          <RotateCcw size={10} color="#64748b" strokeWidth={2.5} />
+                                          <span>Übertrag aus {carriedOverWeekLabel || 'der Vorwoche'}</span>
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                               
                               {/* Audio Indicator Pill beside Title */}
                               {audioTracks.length > 0 ? (
                                 <div
-                                  onClick={() => handleTabChangeLocal('homework_book')}
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => {
+                                    if (handleOpenHomeworkBookWithView) {
+                                      handleOpenHomeworkBookWithView('document', 'recordings');
+                                    } else {
+                                      handleTabChangeLocal('homework_book');
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      if (handleOpenHomeworkBookWithView) {
+                                        handleOpenHomeworkBookWithView('document', 'recordings');
+                                      } else {
+                                        handleTabChangeLocal('homework_book');
+                                      }
+                                    }
+                                  }}
                                   style={{
-                                    background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
-                                    border: '1px solid #bbf7d0',
+                                    background: '#f8fafc',
+                                    border: '1px solid #e2e8f0',
                                     borderRadius: '100px',
                                     padding: '4px 10px',
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '6px',
                                     cursor: 'pointer',
-                                    boxShadow: '0 2px 6px rgba(34, 197, 94, 0.08)',
-                                    transition: 'all 0.15s ease'
+                                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+                                    transition: 'all 0.15s ease',
+                                    whiteSpace: 'nowrap',
+                                    flexShrink: 0
                                   }}
                                   className="hover-scale"
                                   title="Unterrichtsaufnahmen im Aufgabenheft anhören"
+                                  aria-label="Unterrichtsaufnahmen im Aufgabenheft anhören"
                                 >
-                                  <Headphones size={13} color="#15803d" />
-                                  <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#15803d' }}>
+                                  <Headphones size={12} color="#475569" strokeWidth={2.2} />
+                                  <span style={{ fontSize: '0.72rem', fontWeight: 850, color: '#334155' }}>
                                     {audioTracks.length === 1 ? '1 Aufnahme' : `${audioTracks.length} Aufnahmen`}
                                   </span>
                                 </div>
                               ) : (
-                                <span style={{ background: '#ecfdf5', color: '#059669', fontSize: '0.6rem', fontWeight: 900, padding: '3px 9px', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
+                                <span style={{ background: '#f8fafc', color: '#64748b', fontSize: '0.62rem', fontWeight: 850, padding: '3px 8px', borderRadius: '6px', border: '1px solid #e2e8f0', whiteSpace: 'nowrap', flexShrink: 0 }}>
                                   Aktiv
                                 </span>
                               )}
@@ -6887,12 +7024,23 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     </div>
                                   ))}
 
-                                  {/* Zusätzliche Bemerkung */}
-                                  {generalNote && (
-                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', fontSize: '0.88rem', color: '#334155', fontWeight: 600, paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
-                                      <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
-                                      <strong style={{ color: '#15803d', fontWeight: 850, flexShrink: 0 }}>Zusätzliche Bemerkung:</strong>
-                                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{generalNote}</span>
+                                  {/* Zusätzliche Bemerkung / Notizen */}
+                                  {generalNotesList && generalNotesList.length > 0 && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.86rem', color: '#15803d', fontWeight: 850 }}>
+                                        <FileText size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
+                                        <span>
+                                          {isPastNoteCarriedOver ? `Hinweise aus Vorwoche (${carriedOverWeekLabel || 'KW'}):` : 'Hinweise deiner Lehrkraft:'}
+                                        </span>
+                                      </div>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingLeft: '20px' }}>
+                                        {generalNotesList.map((noteItem: string, nIdx: number) => (
+                                          <div key={`pro-gn-${nIdx}`} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '0.86rem', color: '#334155', fontWeight: 600, lineHeight: 1.4 }}>
+                                            {generalNotesList.length > 1 && <span style={{ color: '#16a34a', fontWeight: 800 }}>•</span>}
+                                            <span>{noteItem}</span>
+                                          </div>
+                                        ))}
+                                      </div>
                                     </div>
                                   )}
 
@@ -6904,42 +7052,11 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{studentQuestionText}</span>
                                     </div>
                                   )}
-
-                                  {/* Audio-Karussell direkt in der Pro-Karte (Volle Parität mit Desktop-Schülervorschau) */}
-                                  {audioTracks.length > 0 && (
-                                    <div style={{ paddingTop: '4px' }}>
-                                      <AudioTrackCarousel
-                                        tracks={audioTracks}
-                                        readOnly={true}
-                                        isTeacher={false}
-                                        activeTopicContext="Hausaufgabe"
-                                        defaultExpanded={true}
-                                        isCarriedOver={isAudioCarriedOver}
-                                        hideCarriedOverBadge={true}
-                                      />
-                                    </div>
-                                  )}
                                 </>
                               ) : (
-                                <>
-                                  {/* Auch bei keinen Text-Aufgaben Aufnahmen anzeigen, falls vorhanden */}
-                                  {audioTracks.length > 0 && (
-                                    <div style={{ paddingTop: '4px' }}>
-                                      <AudioTrackCarousel
-                                        tracks={audioTracks}
-                                        readOnly={true}
-                                        isTeacher={false}
-                                        activeTopicContext="Hausaufgabe"
-                                        defaultExpanded={true}
-                                        isCarriedOver={isAudioCarriedOver}
-                                        hideCarriedOverBadge={true}
-                                      />
-                                    </div>
-                                  )}
-                                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                                    Keine offenen Aufgaben für diese Woche erfasst
-                                  </div>
-                                </>
+                                <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                                  Keine offenen Aufgaben für diese Woche erfasst
+                                </div>
                               )}
                             </div>
                           </div>
@@ -6981,38 +7098,128 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       const heldenMins = schoolConfig.helden || DEFAULT_FOKUS_LEVELS[levelKey].helden;
                       const requiredMins = streak >= 9 ? heldenMins : streak >= 4 ? mittlereMins : kleineMins;
 
+                      const instName = studentInstrumentName || 'an deinem Instrument';
+                      const instPrep = ['Gitarre', 'Blockflöte', 'Querflöte', 'Violine', 'Geige', 'Bratsche', 'Posaune', 'Trompete', 'Harfe', 'Ukulele'].some(w => instName.toLowerCase().includes(w.toLowerCase()))
+                        ? `an der ${instName}`
+                        : ['Klavier', 'Schlagzeug', 'Cello', 'Saxophon', 'Akkordeon', 'Keyboard', 'Horn', 'Fagott'].some(w => instName.toLowerCase().includes(w.toLowerCase()))
+                        ? `am ${instName}`
+                        : `an deinem Instrument`;
+
+                      const todayStr = toLocalYYYYMMDD(new Date());
+                      const todayLogs = (fokusLogs || []).filter((log: any) => log.created_at && toLocalYYYYMMDD(new Date(log.created_at)) === todayStr);
+                      const dbTodaySecs = todayLogs.reduce((sum: number, log: any) => sum + (log.duration_seconds || ((log.duration_minutes || 0) * 60)), 0);
+                      const liveTodaySecs = sessionActive ? secondsElapsed : 0;
+                      const totalTodaySecs = dbTodaySecs + liveTodaySecs;
+                      const todayMins = Math.floor(totalTodaySecs / 60);
+                      const isGoalAchieved = totalTodaySecs >= (requiredMins * 60);
+                      const progressPercent = Math.min(100, Math.round((totalTodaySecs / (requiredMins * 60)) * 100));
+
                       return (
                         <div style={{ 
                           background: '#ffffff', 
                           borderRadius: '24px', 
                           padding: '24px', 
                           boxShadow: '0 10px 30px rgba(15, 23, 42, 0.03)',
-                          border: '1px solid rgba(0, 0, 0, 0.04)',
+                          border: isGoalAchieved ? '1px solid rgba(52, 168, 83, 0.25)' : '1px solid rgba(0, 0, 0, 0.04)',
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'space-between',
                           gap: '16px'
                         }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <div style={{ background: 'rgba(251, 188, 5, 0.12)', color: '#d97706', width: '32px', height: '32px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <Zap size={16} fill="currentColor" />
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                            {/* Header: Icon + Title + Status Pill */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{ 
+                                  background: isGoalAchieved ? 'rgba(52, 168, 83, 0.12)' : 'rgba(251, 188, 5, 0.14)', 
+                                  color: isGoalAchieved ? '#16a34a' : '#d97706', 
+                                  width: '34px', 
+                                  height: '34px', 
+                                  borderRadius: '11px', 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'center',
+                                  flexShrink: 0
+                                }}>
+                                  {isGoalAchieved ? <Check size={18} /> : <Timer size={17} />}
+                                </div>
+                                <h4 style={{ margin: 0, fontSize: isMusicStandMode ? '1.18rem' : '1.05rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                  Fokus-Session
+                                </h4>
                               </div>
-                              <h4 style={{ margin: 0, fontSize: isMusicStandMode ? '1.18rem' : '1.05rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                Fokus-Session ⚡
-                              </h4>
+
+                              <div style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                background: isGoalAchieved ? '#dcfce7' : '#f8fafc',
+                                color: isGoalAchieved ? '#15803d' : '#475569',
+                                border: isGoalAchieved ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                                padding: '4px 10px',
+                                borderRadius: '100px',
+                                fontSize: '0.72rem',
+                                fontWeight: 800,
+                                letterSpacing: '0.02em',
+                                flexShrink: 0
+                              }}>
+                                <span>{isGoalAchieved ? 'Erledigt ✨' : `Ziel: ${requiredMins} Min.`}</span>
+                              </div>
                             </div>
-                            <div>
-                              <p style={{ margin: 0, fontSize: isMusicStandMode ? '0.96rem' : '0.86rem', color: '#475569', lineHeight: 1.45, fontWeight: 600 }}>
-                                Kurze Intervalle, maximale Präzision: Schon {requiredMins} Minuten sichern heute deinen Fortschritt. ⚡
-                              </p>
+
+                            {/* Smart-Gauge: Kompakter horizontaler Fortschrittsbalken */}
+                            <div style={{
+                              background: '#f8fafc',
+                              border: '1px solid #f1f5f9',
+                              borderRadius: '14px',
+                              padding: '10px 14px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '6px'
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', fontWeight: 750 }}>
+                                <span style={{ color: '#475569' }}>
+                                  Heute: <strong style={{ color: isGoalAchieved ? '#15803d' : '#0f172a' }}>{todayMins} von {requiredMins} Min.</strong>
+                                </span>
+                                <span style={{ color: isGoalAchieved ? '#15803d' : '#4f46e5', fontWeight: 900 }}>
+                                  {progressPercent}%
+                                </span>
+                              </div>
+                              <div style={{
+                                width: '100%',
+                                height: '7px',
+                                background: '#e2e8f0',
+                                borderRadius: '100px',
+                                overflow: 'hidden',
+                                position: 'relative'
+                              }}>
+                                <div style={{
+                                  width: `${progressPercent}%`,
+                                  height: '100%',
+                                  background: isGoalAchieved 
+                                    ? 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)' 
+                                    : 'linear-gradient(90deg, #6366f1 0%, #4f46e5 100%)',
+                                  borderRadius: '100px',
+                                  transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+                                }} />
+                              </div>
                             </div>
+
+                            {/* Motivations-Text */}
+                            <p style={{ margin: 0, fontSize: isMusicStandMode ? '0.96rem' : '0.84rem', color: '#475569', lineHeight: 1.45, fontWeight: 600 }}>
+                              {isGoalAchieved 
+                                ? `Exzellent! Dein heutiges Übeziel von ${requiredMins} Minuten ist abgeschlossen. 🎯`
+                                : `Gezielte Übeeinheit: Schon ${requiredMins} Minuten ${instPrep} halten deinen Fortschritt im Fluss. 🎯`}
+                            </p>
                           </div>
 
+                          {/* CTA Button */}
                           <button 
+                            type="button"
                             onClick={() => handleTabChangeLocal('practice_board')}
                             style={{ 
-                              background: 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', 
+                              background: isGoalAchieved 
+                                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
+                                : 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', 
                               color: 'white', 
                               border: 'none', 
                               borderRadius: '14px', 
@@ -7026,14 +7233,16 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               justifyContent: 'center', 
                               alignItems: 'center', 
                               gap: '8px', 
-                              boxShadow: '0 8px 20px rgba(79, 70, 229, 0.28)', 
+                              boxShadow: isGoalAchieved 
+                                ? '0 8px 20px rgba(16, 185, 129, 0.25)' 
+                                : '0 8px 20px rgba(79, 70, 229, 0.28)', 
                               transition: 'all 0.2s', 
                               width: '100%' 
                             }}
                             className="hover-scale"
                           >
-                            <Play size={16} fill="white" />
-                            <span>▶ Übe-Session starten</span>
+                            {isGoalAchieved ? <Check size={16} /> : <Play size={16} fill="white" />}
+                            <span>{isGoalAchieved ? 'Tagesziel erreicht • Session starten' : `${requiredMins} Min. Übe-Timer starten`}</span>
                           </button>
                         </div>
                       );

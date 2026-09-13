@@ -47,6 +47,7 @@ Denkweise & Handlungsmaxime:
 - Schrittweisen Umsetzungsplan aufstellen.
 - Typdefinitionen, Ein-/Ausgaben und Nebenwirkungen festlegen.
 - Verifikations- und Testkriterien definieren.
+- 🛑 GATE: Implementierungsplan dem Benutzer vorlegen und STOPPEN. NIEMALS automatisch mit Phase 3 beginnen! Auf explizite Nutzerfreigabe warten.
 
 ## PHASE 3: PRÄZISE IMPLEMENTIERUNG
 - Änderungen modular und hierarchisch (Core/Typen -> Logik -> UI/Endpunkte) umsetzen.

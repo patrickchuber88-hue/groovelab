@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Download, BookOpen, Music, Loader2 } from "lucide-react";
+import { Download, BookOpen, Music, Loader2, X } from "lucide-react";
 import { getSchoolYearString } from "../studentDateUtils";
 
 const Confetti = lazy(() => import("react-confetti"));
@@ -12,6 +12,7 @@ export interface StudentStickerAwardCelebrationModalProps {
   schoolName?: string;
   selectedSchoolYear?: string;
   topicName?: string;
+  isAlreadyCollected?: boolean;
   onDownloadJpg: (sticker: any, topicOverride?: string) => void;
   onStickInAlbum: () => void;
 }
@@ -23,10 +24,10 @@ export const StudentStickerAwardCelebrationModal: React.FC<StudentStickerAwardCe
   schoolName,
   selectedSchoolYear,
   topicName,
+  isAlreadyCollected = false,
   onDownloadJpg,
   onStickInAlbum,
 }) => {
-  const [tilt, setTilt] = useState<{ rx: number; ry: number; active: boolean }>({ rx: 0, ry: 0, active: false });
   const [isDownloading, setIsDownloading] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -92,20 +93,6 @@ export const StudentStickerAwardCelebrationModal: React.FC<StudentStickerAwardCe
 
   const cleanStickerId = String(sticker.id || 'STICKER').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
-  // 3D Pointer Move Handler
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!cardRef.current) return;
-    const rect = cardRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const px = (x / rect.width - 0.5) * 2; // -1 to 1
-    const py = (y / rect.height - 0.5) * 2; // -1 to 1
-    setTilt({ rx: -py * 14, ry: px * 14, active: true });
-  };
-
-  const handlePointerLeave = () => {
-    setTilt({ rx: 0, ry: 0, active: false });
-  };
 
   const cleanTopicName = (topicName && topicName !== 'Simulation' && topicName !== 'Allgemein') ? topicName : undefined;
   const isSongSticker = sticker.category === 'songs' || sticker.id === 'song-master' || Boolean(cleanTopicName);
@@ -227,6 +214,11 @@ export const StudentStickerAwardCelebrationModal: React.FC<StudentStickerAwardCe
       role="dialog"
       aria-modal="true"
       aria-label="Sticker freigeschaltet"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onStickInAlbum();
+        }
+      }}
       style={{
         position: 'fixed',
         inset: 0,
@@ -242,6 +234,33 @@ export const StudentStickerAwardCelebrationModal: React.FC<StudentStickerAwardCe
         animation: 'fadeInOverlay 0.3s ease-out'
       }}
     >
+      {/* ✕ CLOSE BUTTON */}
+      <button
+        type="button"
+        onClick={onStickInAlbum}
+        aria-label="Schließen"
+        style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          background: 'rgba(255, 255, 255, 0.1)',
+          border: '1px solid rgba(255, 255, 255, 0.18)',
+          borderRadius: '50%',
+          width: '44px',
+          height: '44px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          color: '#cbd5e1',
+          zIndex: 100005,
+          transition: 'all 0.15s ease'
+        }}
+        className="hover-scale"
+      >
+        <X size={22} />
+      </button>
+
       <Suspense fallback={null}>
         <Confetti recycle={false} numberOfPieces={350} gravity={0.22} />
       </Suspense>
@@ -277,21 +296,22 @@ export const StudentStickerAwardCelebrationModal: React.FC<StudentStickerAwardCe
 
       {/* 3D PERSPECTIVE STAGE */}
       <div
+        className="sticker-animated-stage"
         style={{
           perspective: '1200px',
+          perspectiveOrigin: 'center center',
           zIndex: 1,
           width: '100%',
           maxWidth: '430px',
           display: 'flex',
-          justifyContent: 'center'
+          justifyContent: 'center',
+          pointerEvents: 'none'
         }}
       >
         {/* 🏆 DIE ECHTE SAMMLER-KARTE (HERO 3D COLLECTOR PLAQUE) */}
         <div
           ref={cardRef}
-          onPointerMove={handlePointerMove}
-          onPointerLeave={handlePointerLeave}
-          className="sticker-animated-card"
+          className="collector-prize-card"
           style={{
             position: 'relative',
             width: '100%',
@@ -305,13 +325,10 @@ export const StudentStickerAwardCelebrationModal: React.FC<StudentStickerAwardCe
             alignItems: 'center',
             textAlign: 'center',
             overflow: 'hidden',
-            cursor: 'grab',
+            cursor: 'default',
             userSelect: 'none',
-            transform: tilt.active
-              ? `perspective(1200px) rotateX(${tilt.rx}deg) rotateY(${tilt.ry}deg) scale(1.02)`
-              : 'perspective(1200px) rotateX(0deg) rotateY(0deg)',
-            transition: tilt.active ? 'transform 0.08s ease-out' : 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
-            transformStyle: 'preserve-3d'
+            transformStyle: 'preserve-3d',
+            pointerEvents: 'none'
           }}
         >
           {/* HOLOGRAPHIC FOIL SHINE OVERLAY */}
@@ -634,12 +651,13 @@ export const StudentStickerAwardCelebrationModal: React.FC<StudentStickerAwardCe
             alignItems: 'center',
             justifyContent: 'center',
             gap: '10px',
+            minHeight: '44px',
             transition: 'transform 0.15s ease, box-shadow 0.15s ease'
           }}
           className="hover-scale"
         >
           <BookOpen size={20} />
-          <span>In mein Album kleben</span>
+          <span>{isAlreadyCollected ? 'Zurück zum Album' : 'In mein Album kleben'}</span>
         </button>
       </div>
 
@@ -660,41 +678,64 @@ export const StudentStickerAwardCelebrationModal: React.FC<StudentStickerAwardCe
           30%, 100% { transform: translateX(250%) rotate(35deg); }
         }
 
-        .sticker-animated-card {
-          animation: cardHeroEntrance 0.85s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, cardAmbientFloat 4s ease-in-out 0.85s infinite alternate;
+        .sticker-animated-stage {
+          perspective: 1200px;
+          perspective-origin: center center;
         }
 
-        @keyframes cardHeroEntrance {
+        /* 🏆 ECHTE SELBSTSTÄNDIGE 3D TROPHÄEN- & PREIS-ANIMATION (KEINE MAUSREAKTION) */
+        .collector-prize-card {
+          animation: prizeCardEntrance 0.85s cubic-bezier(0.22, 1.25, 0.36, 1) forwards,
+                     prizeCardAutonomousFloat 5.8s ease-in-out 0.85s infinite;
+          transform-style: preserve-3d;
+          will-change: transform, box-shadow;
+        }
+
+        @keyframes prizeCardEntrance {
           0% {
             opacity: 0;
-            transform: perspective(1200px) scale(0.25) rotateY(540deg) translateY(40px);
+            transform: scale(0.32) translateY(70px) rotateY(180deg) rotateX(20deg);
           }
           65% {
             opacity: 1;
-            transform: perspective(1200px) scale(1.05) rotateY(-6deg) translateY(-8px);
+            transform: scale(1.04) translateY(-14px) rotateY(-8deg) rotateX(2deg);
           }
           85% {
-            transform: perspective(1200px) scale(0.98) rotateY(3deg) translateY(2px);
+            transform: scale(0.99) translateY(2px) rotateY(2deg) rotateX(-1deg);
           }
           100% {
             opacity: 1;
-            transform: perspective(1200px) scale(1) rotateY(0deg) translateY(0);
+            transform: scale(1) translateY(0px) rotateY(-4.5deg) rotateX(3deg) rotateZ(-0.6deg);
           }
         }
 
-        @keyframes cardAmbientFloat {
+        @keyframes prizeCardAutonomousFloat {
           0% {
-            transform: perspective(1200px) translateY(0px) rotateY(-2deg) rotateX(1.5deg);
+            transform: translateY(0px) rotateY(-4.5deg) rotateX(3deg) rotateZ(-0.6deg);
+            box-shadow: 0 25px 65px -10px rgba(0, 0, 0, 0.9), 0 0 32px ${cardGlow};
+          }
+          25% {
+            transform: translateY(-8px) rotateY(0deg) rotateX(1deg) rotateZ(0.3deg);
+            box-shadow: 0 32px 75px -10px rgba(0, 0, 0, 0.92), 0 0 42px ${cardGlow};
+          }
+          50% {
+            transform: translateY(-14px) rotateY(4.5deg) rotateX(-3deg) rotateZ(0.8deg);
+            box-shadow: 0 38px 85px -8px rgba(0, 0, 0, 0.95), 0 0 50px ${cardGlow};
+          }
+          75% {
+            transform: translateY(-6px) rotateY(1deg) rotateX(1deg) rotateZ(-0.3deg);
+            box-shadow: 0 28px 70px -10px rgba(0, 0, 0, 0.9), 0 0 36px ${cardGlow};
           }
           100% {
-            transform: perspective(1200px) translateY(-8px) rotateY(2deg) rotateX(-1.5deg);
+            transform: translateY(0px) rotateY(-4.5deg) rotateX(3deg) rotateZ(-0.6deg);
+            box-shadow: 0 25px 65px -10px rgba(0, 0, 0, 0.9), 0 0 32px ${cardGlow};
           }
         }
 
         @media (prefers-reduced-motion: reduce) {
           .sunburst-aura,
           .holo-glint,
-          .sticker-animated-card,
+          .collector-prize-card,
           .sticker-spinning-asset {
             animation: none !important;
             transform: none !important;

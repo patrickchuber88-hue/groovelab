@@ -22,9 +22,33 @@
     }
   ],
   "start_url": "/?platform=groovelab",
+  "id": "/?platform=groovelab",
   "scope": "/",
   "background_color": "#0c0f12",
   "theme_color": "#eab308",
   "display": "standalone",
-  "orientation": "any"
+  "orientation": "any",
+  "shortcuts": [
+    {
+      "name": "Übe-Timer starten",
+      "short_name": "Übe-Timer",
+      "description": "Öffnet direkt den interaktiven Übe-Timer",
+      "url": "/?platform=groovelab&shortcut=practice_timer",
+      "icons": [{ "src": "/pwa-icon-groovelab.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Hausaufgabenheft",
+      "short_name": "Aufgaben",
+      "description": "Aktuelle Aufgaben und Notizen einsehen",
+      "url": "/?platform=groovelab&shortcut=homework",
+      "icons": [{ "src": "/pwa-icon-groovelab.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Audio Studio",
+      "short_name": "Studio",
+      "description": "Loopstation und Audiorekorder öffnen",
+      "url": "/?platform=groovelab&shortcut=studio",
+      "icons": [{ "src": "/pwa-icon-groovelab.png", "sizes": "192x192" }]
+    }
+  ]
 }

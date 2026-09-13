@@ -2,6 +2,29 @@
 <html lang="de">
   <head>
     <meta charset="UTF-8" />
+    <!-- 🛡️ Zero-Freeze Localhost Shield: Purge Service Worker & CacheStorage before module load -->
+    <script>
+      (function() {
+        var h = window.location.hostname;
+        var isLocal = h === 'localhost' || h === '127.0.0.1' || h.endsWith('.localhost') || h.endsWith('.local');
+        if (isLocal) {
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+              for (var i = 0; i < regs.length; i++) {
+                regs[i].unregister();
+              }
+            }).catch(function() {});
+          }
+          if ('caches' in window) {
+            caches.keys().then(function(keys) {
+              for (var j = 0; j < keys.length; j++) {
+                caches.delete(keys[j]);
+              }
+            }).catch(function() {});
+          }
+        }
+      })();
+    </script>
     <script src="/pwa-boot.js"></script>
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, viewport-fit=cover" />

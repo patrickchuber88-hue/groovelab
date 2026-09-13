@@ -1190,11 +1190,37 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                               color: '#0f172a', 
                               whiteSpace: 'nowrap', 
                               overflow: 'hidden', 
-                              textOverflow: 'ellipsis'
+                              textOverflow: 'ellipsis',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px'
                             }}
                             className="student-title-text"
                           >
-                            {student.first_name} {maskLastName(student.last_name, showRealNames)}
+                            <span>{student.first_name} {maskLastName(student.last_name, showRealNames)}</span>
+                            {/* Subtle matter yellow dot for inactive students > 21 days (strictly informative, no tooltip per F65) */}
+                            {(() => {
+                              const lastActive = student.last_sign_in_at || student.updated_at || student.created_at;
+                              if (!lastActive) return null;
+                              const diffDays = (Date.now() - new Date(lastActive).getTime()) / (1000 * 60 * 60 * 24);
+                              if (diffDays > 21) {
+                                return (
+                                  <span 
+                                    aria-hidden="true"
+                                    style={{
+                                      width: '7px',
+                                      height: '7px',
+                                      borderRadius: '50%',
+                                      background: '#f59e0b',
+                                      opacity: 0.85,
+                                      display: 'inline-block',
+                                      flexShrink: 0
+                                    }} 
+                                  />
+                                );
+                              }
+                              return null;
+                            })()}
                           </span>
                           {student.nickname && (
                             <span style={{ fontSize: '0.74rem', color: '#64748b', fontStyle: 'italic', whiteSpace: 'nowrap' }}>

@@ -109,6 +109,7 @@ Deine Handlungsweise ist chirurgisch präzise, pixelgenau auf mobilen Geräten (
 - Touch-Target-Matrix und Icon-First Transformationen definieren (wo fällt Text weg, wo bleibt er zwingend).
 - Safe-Area- und 100dvh-Kapselung planen.
 - Barrierefreiheits- und BFSG-Checkliste erstellen.
+- 🛑 GATE: Implementierungsplan dem Benutzer vorlegen und STOPPEN. NIEMALS automatisch mit Phase 3 beginnen! Auf explizite Nutzerfreigabe warten.
 
 #### PHASE 3: CHIRURGISCHE IMPLEMENTIERUNG
 - Mobile CSS-Klassen (`max-md:*`), Container-Wrapper und Touch-Handler typ-sicher einpflegen.

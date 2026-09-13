@@ -1,7 +1,7 @@
 /**
  * ==============================================================================
- * CAMPUS-GROOVELAB UNIVERSAL 45-MINUTE INACTIVITY IDLE PRIVACY-LOCK HOOK
- * Standard: NIST SP 800-63B / BSI IT-Grundschutz (APP.3.1) / Hiscox CyberSafe 05/2026
+ * CAMPUS-GROOVELAB UNIVERSAL 45-MINUTE INACTIVITY IDLE SCREEN-LOCK HOOK
+ * Standard: NIST SP 800-63B / BSI IT-Grundschutz (APP.3.1) / Enterprise Goldstandard
  * ==============================================================================
  */
 
@@ -40,7 +40,17 @@ export function useInactivityTimeout(options: InactivityOptions = {}): void {
       }
     };
 
-    const resetTimer = () => {
+    let lastResetTime = 0;
+    const THROTTLE_MS = 1000;
+
+    const resetTimer = (force = false) => {
+      const now = Date.now();
+      // Throttle high-frequency events (e.g. 120Hz mousemove/scroll) to at most once per second
+      if (!force && now - lastResetTime < THROTTLE_MS) {
+        return;
+      }
+      lastResetTime = now;
+
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
@@ -48,7 +58,7 @@ export function useInactivityTimeout(options: InactivityOptions = {}): void {
       timerRef.current = setTimeout(() => {
         // If media is actively playing (audio loopstation, video tutorial, practice track), postpone lock
         if (isMediaActive()) {
-          resetTimer();
+          resetTimer(true);
           return;
         }
 
@@ -61,22 +71,24 @@ export function useInactivityTimeout(options: InactivityOptions = {}): void {
       }, timeoutMs);
     };
 
+    const handleActivity = () => resetTimer(false);
+
     // User interaction events that reset the activity timer
     const activityEvents = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll', 'click'];
 
     activityEvents.forEach((eventName) => {
-      window.addEventListener(eventName, resetTimer, { passive: true });
+      window.addEventListener(eventName, handleActivity, { passive: true });
     });
 
     // Start initial timer
-    resetTimer();
+    resetTimer(true);
 
     return () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
       activityEvents.forEach((eventName) => {
-        window.removeEventListener(eventName, resetTimer);
+        window.removeEventListener(eventName, handleActivity);
       });
     };
   }, [enabled, timeoutMs, onTimeout, checkMediaActive]);

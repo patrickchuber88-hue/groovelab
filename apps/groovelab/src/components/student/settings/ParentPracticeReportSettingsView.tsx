@@ -20,6 +20,19 @@ export const ParentPracticeReportSettingsView: React.FC<ParentPracticeReportSett
   studentUser,
   getTargetMinutes,
 }) => {
+  const studentId = studentUser?.id;
+  const [parentMaxMinutes, setParentMaxMinutes] = React.useState<number>(() => {
+    if (typeof window === 'undefined' || !studentId) return 45;
+    return Number(localStorage.getItem(`cg_parent_max_screen_minutes_${studentId}`) || 45);
+  });
+
+  const handleSetMaxMinutes = (mins: number) => {
+    setParentMaxMinutes(mins);
+    if (studentId) {
+      localStorage.setItem(`cg_parent_max_screen_minutes_${studentId}`, String(mins));
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* 📊 Eltern-Wochenreport & Übe-Insights */}
@@ -150,6 +163,63 @@ export const ParentPracticeReportSettingsView: React.FC<ParentPracticeReportSett
             : currentLvlKey === 'teen'
             ? 'Im Teen-Modus stärkt der Fokus-Timer die Selbstorganisation. Kontinuierliche Einheiten von 20 bis 30 Minuten fördern die Repertoire-Festigung vor der nächsten Musikstunde.'
             : 'Pro-Modus: Vertiefung von Phrasierung, Technik und Repertoire. Zielgerichtete Sessions ab 30 bis 45 Minuten für fortgeschrittene Musiker.'}
+        </div>
+      </div>
+
+      {/* ⏱️ F18: Screen-Time & Pausen-Richtzeit für Eltern */}
+      <div style={{
+        padding: '20px 22px',
+        borderRadius: '24px',
+        background: '#ffffff',
+        border: '1.5px solid #e2e8f0',
+        boxShadow: '0 4px 16px -2px rgba(15, 23, 42, 0.04)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px',
+        textAlign: 'left'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Clock size={18} color="#0f172a" />
+            <div style={{ fontSize: '0.94rem', fontWeight: 850, color: '#0f172a' }}>
+              Pausen-Erinnerung &amp; App-Nutzungszeit
+            </div>
+          </div>
+          <span style={{
+            fontSize: '0.74rem',
+            fontWeight: 800,
+            padding: '3px 10px',
+            borderRadius: '8px',
+            background: '#f1f5f9',
+            color: '#334155'
+          }}>
+            {parentMaxMinutes === 0 ? 'Ohne Limit' : `Nach ${parentMaxMinutes} Min`}
+          </span>
+        </div>
+        <p style={{ margin: 0, fontSize: '0.76rem', color: '#64748b', lineHeight: 1.4 }}>
+          Legt fest, nach wie vielen Minuten kontinuierlicher Nutzung euer Kind an eine Pause erinnert wird. Es erfolgt keine Zwangssperre, sondern ein freundlicher Pausenhinweis.
+        </p>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+          {[30, 45, 60, 0].map(mins => (
+            <button
+              key={mins}
+              type="button"
+              onClick={() => handleSetMaxMinutes(mins)}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '10px',
+                border: parentMaxMinutes === mins ? '1.5px solid #0f172a' : '1px solid #e2e8f0',
+                background: parentMaxMinutes === mins ? '#0f172a' : '#f8fafc',
+                color: parentMaxMinutes === mins ? '#ffffff' : '#475569',
+                fontSize: '0.76rem',
+                fontWeight: 750,
+                cursor: 'pointer',
+                transition: 'all 0.15s'
+              }}
+            >
+              {mins === 0 ? 'Kein Hinweis' : `${mins} Minuten`}
+            </button>
+          ))}
         </div>
       </div>
 

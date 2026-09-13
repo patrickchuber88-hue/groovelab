@@ -670,7 +670,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                               {DAYS_DE[sch.day_of_week]}s, {sch.time_slot} Uhr
                             </div>
                             <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
-                              {sch.teacher ? `Coach: ${formatTeacherFullName(sch.teacher)}` : 'Patrick Huber'} • {sch.rooms?.name || 'Raum 1'} ({sch.duration || 45} Min)
+                              Coach: {formatTeacherFullName(sch.teacher || studentUser?.teacher_name || studentUser?.teacher || 'Lehrkraft')} • {sch.rooms?.name || 'Raum 1'} ({sch.duration || 45} Min)
                             </div>
                           </div>
                         </div>

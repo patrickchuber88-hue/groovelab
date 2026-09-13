@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Mic, Square, Play, Pause, Trash2, Check, Lock, AlertCircle, Volume2 } from 'lucide-react';
 import { checkIsAudioTresorActive } from '../../domain/stickersAndTresor';
 import { supabase } from '../../lib/supabase';
-import { acquireAudioStream } from '../../services/audioPermissionService';
+import { acquireAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
+import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RAW_LIMITER_GR_DB } from '../../utils/audioMasteringEngine';
 
 interface AudioMemoRecorderProps {
   user: any;
@@ -53,19 +54,17 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
   const startRecording = async () => {
     const isStudent = user?.role?.toLowerCase() === 'student';
     if (isStudent) {
-      const studentId = user?.id;
-      const isAllowed = user?.parent_allow_audio === true && 
-        ((user as any)?.parent_permissions?.allow_student_audio === true ||
-        (studentId && typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_student_audio_${studentId}`) === 'true' : false));
-      if (!isAllowed) {
-        setErrorMsg('Sprachaufnahmen wurden von den Erziehungsberechtigten noch nicht freigegeben (Privacy by Default).');
+      const isDenied = user?.parent_allow_audio === false || 
+        ((user as any)?.parent_permissions?.allow_student_audio === false);
+      if (isDenied) {
+        setErrorMsg('Sprachaufnahmen wurden von den Erziehungsberechtigten pausiert.');
         return;
       }
     }
     if (!hasTresor) return;
     setErrorMsg(null);
     try {
-      const stream = await acquireAudioStream({ audio: true });
+      const stream = await acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS });
       streamRef.current = stream;
 
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
@@ -84,10 +83,28 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
         }
       };
 
-      mediaRecorder.onstop = () => {
-        const finalBlob = new Blob(audioChunksRef.current, { type: mimeType });
+      mediaRecorder.onstop = async () => {
+        const rawBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        let finalBlob = rawBlob;
+        let url = URL.createObjectURL(rawBlob);
+
+        // 🌟 100% Pure Raw Universal Limiter Normalization (-14.5 LUFS / max 3.0 dB GR)
+        try {
+          const pureRawRes = await processPureRawBlob(rawBlob, {
+            targetLufs: TARGET_PURE_RAW_LUFS,
+            maxLimiterGrDb: MAX_PURE_RAW_LIMITER_GR_DB,
+            targetPeakDb: TARGET_PEAK_DBTP
+          });
+          finalBlob = pureRawRes.processedBlob;
+          url = pureRawRes.processedUrl;
+          if (pureRawRes.durationSec) {
+            setRecordSeconds(Math.round(pureRawRes.durationSec));
+          }
+        } catch (dspErr) {
+          console.warn('[AudioMemoRecorder] Pure RAW Limiter fallback:', dspErr);
+        }
+
         setAudioBlob(finalBlob);
-        const url = URL.createObjectURL(finalBlob);
         setAudioUrl(url);
         stopHardwareStream();
       };
@@ -114,7 +131,10 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
   };
 
   const stopRecording = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
     const rec = mediaRecorderRef.current;
     if (rec && rec.state !== 'inactive') {
       try { rec.requestData(); } catch (e) {}

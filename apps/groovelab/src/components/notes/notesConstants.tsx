@@ -32,6 +32,7 @@ export const STUDENT_SKILL_TAGS: TagDefinition[] = [
   { key: 'klang', tag: '#Klang', label: 'Klang', desc: 'Intonation & Tonkultur', color: '#166534', bg: '#e6f4ea', border: '#bbf7d0', iconName: 'volume' },
   { key: 'ausdruck', tag: '#Ausdruck', label: 'Ausdruck', desc: 'Dynamik & Phrasierung', color: '#6b21a8', bg: '#f3e8ff', border: '#e9d5ff', iconName: 'sparkles' },
   { key: 'repertoire', tag: '#Repertoire', label: 'Repertoire', desc: 'Songs & Stücke', color: '#854d0e', bg: '#fef9c3', border: '#fef08a', iconName: 'music' },
+  { key: 'noten', tag: '#Noten', label: 'Noten / Lehrwerk', desc: 'Lehrwerk & Seitenzahlen', color: '#0369a1', bg: '#e0f2fe', border: '#bae6fd', iconName: 'book' },
   { key: 'hausaufgabe', tag: '#Hausaufgabe', label: 'Hausaufgabe', desc: 'Wochenauftrag', color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0', iconName: 'book' },
 ];
 

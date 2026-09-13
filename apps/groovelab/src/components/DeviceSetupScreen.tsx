@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Music, Tablet, X, ShieldCheck, FileText, Lock } from 'lucide-react';
 import { generateConsentPDF } from '../utils/pdfGenerator';
+import { isUUID } from '../utils/uuidValidator';
 
 interface DeviceSetupScreenProps {
   school?: any;
@@ -340,10 +341,9 @@ export function DeviceSetupScreen({
     
     // Ensure kiosk record and groovelab_kiosk_token are linked
     try {
-      const isUuid = (str: any) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
       const generatedSecretToken = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-0000-4000-8000-' + Math.floor(Math.random()*1e12).toString(16).padStart(12, '0'));
 
-      const { data: existingKiosk } = isUuid(stationId) ? await supabase
+      const { data: existingKiosk } = isUUID(stationId) ? await supabase
         .from('kiosks')
         .select('*')
         .eq('station_id', stationId)
@@ -351,14 +351,14 @@ export function DeviceSetupScreen({
         .maybeSingle() : { data: null };
 
       let kioskRecord = existingKiosk;
-      if (!kioskRecord && isUuid(stationId)) {
+      if (!kioskRecord && isUUID(stationId)) {
         const { data: insertedRows } = await supabase
           .from('kiosks')
           .insert({
             school_id: targetSchoolIdState || '11111111-1111-1111-1111-111111111111',
             name: targetStation?.name || 'iPad Kiosk',
             secret_token: generatedSecretToken,
-            room_id: isUuid(targetRoomId) ? targetRoomId : null,
+            room_id: isUUID(targetRoomId) ? targetRoomId : null,
             station_id: stationId
           })
           .select();

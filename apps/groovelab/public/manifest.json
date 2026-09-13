@@ -22,9 +22,33 @@
     }
   ],
   "start_url": "/",
+  "id": "/",
   "scope": "/",
   "background_color": "#0c0f12",
   "theme_color": "#34a853",
   "display": "standalone",
-  "orientation": "any"
+  "orientation": "any",
+  "shortcuts": [
+    {
+      "name": "Übe-Timer starten",
+      "short_name": "Übe-Timer",
+      "description": "Öffnet direkt den interaktiven Übe-Timer",
+      "url": "/?shortcut=practice_timer",
+      "icons": [{ "src": "/pwa-icon.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Hausaufgabenheft",
+      "short_name": "Aufgaben",
+      "description": "Aktuelle Aufgaben und Notizen einsehen",
+      "url": "/?shortcut=homework",
+      "icons": [{ "src": "/pwa-icon.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Audio Studio",
+      "short_name": "Studio",
+      "description": "Loopstation und Audiorekorder öffnen",
+      "url": "/?shortcut=studio",
+      "icons": [{ "src": "/pwa-icon.png", "sizes": "192x192" }]
+    }
+  ]
 }

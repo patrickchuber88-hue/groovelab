@@ -3,8 +3,8 @@ import {
   X, Mic, Square, Play, Pause, RotateCcw, Check, Loader2, Send, FileText, Plus, ChevronRight, Trash2, Zap, Sparkles, ArrowLeft, Music, Sliders, Volume2, VolumeX, Activity, Tag, Clock
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { acquireAudioStream, releaseAudioStream, requestMicrophonePermissionOnce } from '../../services/audioPermissionService';
-import { processPureRawBlob } from '../../utils/audioMasteringEngine';
+import { acquireAudioStream, releaseAudioStream, requestMicrophonePermissionOnce, PURE_RAW_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
+import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RAW_LIMITER_GR_DB } from '../../utils/audioMasteringEngine';
 import { capitalizeFirstLetter, formatSingleStudentAnonymized } from '../../utils/nameHelper';
 import { saveOfflineAudioRecord } from '../../utils/offlineAudioVault';
 import { checkIsAudioTresorActive, isInternalMetadataNote } from '../../domain/stickersAndTresor';
@@ -274,9 +274,17 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
         .map(s => s.trim())
         .filter(Boolean);
 
+      // Check for offline draft first
+      const draftKey = `cgl_draft_hw_${effectiveStudentId}`;
+      const savedDraft = localStorage.getItem(draftKey);
+
       setRecordedClips(loadedClips);
-      setDictatedText(textNotes.join('\n\n'));
-      const hasContent = loadedClips.length > 0 || textNotes.length > 0;
+      if (savedDraft && savedDraft.trim()) {
+        setDictatedText(savedDraft);
+      } else {
+        setDictatedText(textNotes.join('\n\n'));
+      }
+      const hasContent = loadedClips.length > 0 || textNotes.length > 0 || Boolean(savedDraft && savedDraft.trim());
       setHasExistingHomework(hasContent);
 
       // If localStorage had nothing and student ID is a valid UUID, fetch from Supabase
@@ -592,7 +600,7 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
       audioChunksRef.current = [];
       hasStoppedCurrentRecordingRef.current = false;
       
-      const stream = await acquireAudioStream({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1, sampleRate: 48000 } as any });
+      const stream = await acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS });
       streamRef.current = stream;
       startLevelMeter(stream);
 
@@ -615,7 +623,11 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
         let finalBlob = rawBlob;
         let finalUrl = URL.createObjectURL(rawBlob);
         try {
-          const mastered = await processPureRawBlob(rawBlob);
+          const mastered = await processPureRawBlob(rawBlob, {
+            targetLufs: TARGET_PURE_RAW_LUFS,
+            maxLimiterGrDb: MAX_PURE_RAW_LIMITER_GR_DB,
+            targetPeakDb: TARGET_PEAK_DBTP
+          });
           finalBlob = mastered.processedBlob;
           finalUrl = mastered.processedUrl || URL.createObjectURL(mastered.processedBlob);
         } catch {
@@ -984,6 +996,10 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
       }
 
       setSaveSuccess(true);
+      // Clear offline draft on successful save
+      try {
+        localStorage.removeItem(`cgl_draft_hw_${studentIdToUse}`);
+      } catch {}
       if (onSaved) onSaved(firstSavedUrl || dictatedText.trim());
       setTimeout(() => {
         stopHardware();
@@ -1509,7 +1525,17 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
                 <div style={{ position: 'relative', marginTop: '2px' }}>
                   <textarea 
                     value={dictatedText} 
-                    onChange={(e) => setDictatedText(e.target.value)} 
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setDictatedText(val);
+                      try {
+                        if (val.trim()) {
+                          localStorage.setItem(`cgl_draft_hw_${effectiveStudentId}`, val);
+                        } else {
+                          localStorage.removeItem(`cgl_draft_hw_${effectiveStudentId}`);
+                        }
+                      } catch {}
+                    }} 
                     placeholder="Notiz ergänzen, oben antippen oder diktieren..." 
                     rows={2} 
                     style={{ 

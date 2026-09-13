@@ -56,12 +56,35 @@ export const getLehrwerkColor = (title: string, lehrwerkeList: any[] = []) => {
   };
 };
 
-export const getSongColor = (title: string) => {
-  const trimmed = (title || '').trim();
+/**
+ * Berechnet einen deterministischen HSL-Farbton (0-360) anhand des ersten Buchstabens.
+ */
+export const getAlphabeticalHue = (str: string): number => {
+  const trimmed = (str || '').trim();
   const firstChar = trimmed.charAt(0).toUpperCase();
   const charCode = firstChar.charCodeAt(0) || 65;
   const clampedCode = Math.max(65, Math.min(90, charCode));
-  const hue = Math.round(((clampedCode - 65) / 25) * 360);
+  return Math.round(((clampedCode - 65) / 25) * 360);
+};
+
+export const getAlphabeticalUniColor = (name: string) => {
+  const trimmed = (name || '').trim();
+  if (trimmed.toLowerCase() === 'ohne zuweisung') {
+    return {
+      avatarBg: '#f1f5f9',
+      avatarColor: '#475569'
+    };
+  }
+  const hue = getAlphabeticalHue(trimmed);
+  return {
+    avatarBg: `hsl(${hue}, 80%, 93%)`,
+    avatarColor: `hsl(${hue}, 90%, 25%)`
+  };
+};
+
+export const getSongColor = (title: string) => {
+  const trimmed = (title || '').trim();
+  const hue = getAlphabeticalHue(trimmed);
   return {
     from: `hsl(${hue}, 85%, 92%)`,
     to: `hsl(${hue}, 80%, 82%)`,

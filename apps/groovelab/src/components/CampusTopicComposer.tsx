@@ -10,24 +10,49 @@ import {
 } from 'lucide-react';
 
 export interface CampusTopicComposerProps {
-  onPublishTopic: (subject: string, content: string) => Promise<void>;
+  onPublishTopic: (subject: string, content?: string) => Promise<any>;
   canCreateTopic: boolean;
   isMobile: boolean;
   channelName: string;
+  isGroup?: boolean;
+  recipientDisplayName?: string;
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export const CampusTopicComposer: React.FC<CampusTopicComposerProps> = ({
   onPublishTopic,
   canCreateTopic,
   isMobile,
-  channelName
+  channelName,
+  isGroup = false,
+  recipientDisplayName,
+  isOpen: propIsOpen,
+  onOpenChange
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+  const isOpen = propIsOpen !== undefined ? propIsOpen : internalIsOpen;
+
+  const setIsOpen = (open: boolean) => {
+    if (onOpenChange) {
+      onOpenChange(open);
+    }
+    setInternalIsOpen(open);
+  };
+
   const [subject, setSubject] = useState('');
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const subjectInputRef = useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => {
+        subjectInputRef.current?.focus();
+      }, 100);
+    }
+  }, [isOpen]);
 
   const handleOpen = () => {
     setIsOpen(true);
@@ -50,13 +75,8 @@ export const CampusTopicComposer: React.FC<CampusTopicComposerProps> = ({
     const cleanContent = content.trim();
 
     if (!cleanSubject) {
-      setErrorMsg('Bitte gib einen aussagekräftigen Betreff für das Thema ein.');
+      setErrorMsg('Bitte gib einen Betreff für das Thema ein.');
       subjectInputRef.current?.focus();
-      return;
-    }
-
-    if (!cleanContent) {
-      setErrorMsg('Bitte gib eine Nachricht oder Beschreibung für das Thema ein.');
       return;
     }
 
@@ -64,7 +84,7 @@ export const CampusTopicComposer: React.FC<CampusTopicComposerProps> = ({
     setErrorMsg('');
 
     try {
-      await onPublishTopic(cleanSubject, cleanContent);
+      await onPublishTopic(cleanSubject, cleanContent || cleanSubject);
       handleClose();
     } catch (err: any) {
       console.error('[CampusTopicComposer] Error publishing topic:', err);
@@ -94,8 +114,12 @@ export const CampusTopicComposer: React.FC<CampusTopicComposerProps> = ({
     );
   }
 
-  // COLLAPSED SLIM BAR (High Density: 38px height, preserves 95% mobile screen)
+  // DIRECT INLINE INPUT BAR (Enter creates the thread directly, Plus button expands for optional message)
   if (!isOpen) {
+    const placeholderText = isGroup
+      ? `Neues Thema in #${channelName} starten (Enter)...`
+      : `Neues Thema starten (Enter zum Eröffnen)...`;
+
     return (
       <div style={{
         padding: isMobile ? '8px 12px' : '10px 16px',
@@ -103,47 +127,131 @@ export const CampusTopicComposer: React.FC<CampusTopicComposerProps> = ({
         borderTop: '1px solid #f1f5f9',
         boxShadow: '0 -2px 10px rgba(0, 0, 0, 0.03)'
       }}>
-        <button
-          type="button"
-          onClick={handleOpen}
-          aria-expanded="false"
-          style={{
-            width: '100%',
-            height: isMobile ? '38px' : '42px',
-            borderRadius: '12px',
-            border: '1px solid #e2e8f0',
-            background: '#f8fafc',
-            color: '#475569',
-            fontSize: '0.84rem',
+        {errorMsg && (
+          <div style={{
+            background: '#fef2f2',
+            border: '1px solid #fecaca',
+            color: '#dc2626',
+            borderRadius: '8px',
+            padding: '6px 10px',
+            fontSize: '0.78rem',
             fontWeight: 700,
+            marginBottom: '8px'
+          }}>
+            {errorMsg}
+          </div>
+        )}
+        <form 
+          onSubmit={handleSubmit}
+          style={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '0 14px',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease',
-            boxSizing: 'border-box'
+            gap: '8px',
+            width: '100%'
           }}
-          className="hover-scale-mini"
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <PenLine size={15} style={{ color: '#16a34a' }} />
-            <span>Neues Thema in #{channelName} starten...</span>
+          <div style={{
+            position: 'relative',
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center'
+          }}>
+            <PenLine 
+              size={16} 
+              style={{ 
+                position: 'absolute', 
+                left: '12px', 
+                color: subject ? '#16a34a' : '#94a3b8',
+                pointerEvents: 'none'
+              }} 
+            />
+            <input
+              ref={subjectInputRef}
+              type="text"
+              placeholder={placeholderText}
+              value={subject}
+              onChange={e => {
+                setSubject(e.target.value);
+                if (errorMsg) setErrorMsg('');
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleSubmit();
+                }
+              }}
+              disabled={isSubmitting}
+              aria-label={placeholderText}
+              style={{
+                width: '100%',
+                height: isMobile ? '44px' : '42px',
+                borderRadius: '12px',
+                border: '1.5px solid #cbd5e1',
+                background: '#f8fafc',
+                color: '#0f172a',
+                fontSize: isMobile ? '16px' : '0.88rem',
+                fontWeight: 650,
+                paddingLeft: '38px',
+                paddingRight: '12px',
+                outline: 'none',
+                boxSizing: 'border-box',
+                transition: 'border-color 0.15s ease'
+              }}
+            />
           </div>
 
-          <div style={{
-            width: '24px',
-            height: '24px',
-            borderRadius: '6px',
-            background: '#e6f4ea',
-            color: '#16a34a',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            <Plus size={15} strokeWidth={2.8} />
-          </div>
-        </button>
+          {/* Details / Erweitern Button */}
+          <button
+            type="button"
+            onClick={handleOpen}
+            aria-label="Beschreibung oder Details zum Thema hinzufügen"
+            title="Beschreibung / Details hinzufügen"
+            style={{
+              width: isMobile ? '44px' : '42px',
+              height: isMobile ? '44px' : '42px',
+              borderRadius: '12px',
+              border: '1px solid #e2e8f0',
+              background: '#f1f5f9',
+              color: '#475569',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              flexShrink: 0,
+              touchAction: 'manipulation'
+            }}
+            className="hover-scale-mini"
+          >
+            <Plus size={18} strokeWidth={2.4} />
+          </button>
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={isSubmitting || !subject.trim()}
+            aria-label="Thema eröffnen"
+            title="Thema eröffnen"
+            style={{
+              width: isMobile ? '44px' : '42px',
+              height: isMobile ? '44px' : '42px',
+              borderRadius: '12px',
+              border: 'none',
+              background: isSubmitting || !subject.trim() ? '#cbd5e1' : '#16a34a',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: isSubmitting || !subject.trim() ? 'not-allowed' : 'pointer',
+              flexShrink: 0,
+              boxShadow: subject.trim() ? '0 2px 6px rgba(22, 163, 74, 0.25)' : 'none',
+              touchAction: 'manipulation',
+              transition: 'all 0.15s ease'
+            }}
+            className={subject.trim() ? 'hover-scale-mini' : undefined}
+          >
+            <Send size={16} />
+          </button>
+        </form>
       </div>
     );
   }
@@ -157,7 +265,7 @@ export const CampusTopicComposer: React.FC<CampusTopicComposerProps> = ({
       boxShadow: '0 -6px 20px rgba(0, 0, 0, 0.08)',
       animation: 'fadeInScale 0.15s ease'
     }}>
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} onKeyDown={e => { if (e.key === 'Escape') handleClose(); }}>
         {/* Header with Close */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -198,14 +306,23 @@ export const CampusTopicComposer: React.FC<CampusTopicComposerProps> = ({
           </div>
         )}
 
-        {/* BETREFF / THEMENTITEL (Pflichtfeld gem. Grill-Me) */}
+        {/* BETREFF / THEMENTITEL (Enter zum sofortigen Veröffentlichen) */}
         <div style={{ marginBottom: '8px' }}>
           <input
             ref={subjectInputRef}
             type="text"
-            placeholder="Betreff / Thementitel (z. B. Probe am Samstag, Noten Schulfest) *"
+            placeholder="Betreff / Thementitel (Enter zum Eröffnen) *"
             value={subject}
-            onChange={e => setSubject(e.target.value)}
+            onChange={e => {
+              setSubject(e.target.value);
+              if (errorMsg) setErrorMsg('');
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSubmit();
+              }
+            }}
             disabled={isSubmitting}
             style={{
               width: '100%',
@@ -221,11 +338,13 @@ export const CampusTopicComposer: React.FC<CampusTopicComposerProps> = ({
           />
         </div>
 
-        {/* NACHRICHTENTEXT */}
+        {/* NACHRICHTENTEXT (OPTIONAL) */}
         <div style={{ marginBottom: '10px' }}>
           <textarea
             rows={isMobile ? 3 : 4}
-            placeholder="Nachricht eingeben... Beschreibe das Thema, Aufgaben oder Details für die Gruppe."
+            placeholder={isGroup 
+              ? "Optionale Nachricht eingeben... Details oder Absprachen für die Gruppe (optional)." 
+              : `Optionale Nachricht eingeben... Details oder Absprachen für ${recipientDisplayName || 'den Empfänger'} (optional).`}
             value={content}
             onChange={e => setContent(e.target.value)}
             onKeyDown={e => {
@@ -273,24 +392,24 @@ export const CampusTopicComposer: React.FC<CampusTopicComposerProps> = ({
 
           <button
             type="submit"
-            disabled={isSubmitting || !subject.trim() || !content.trim()}
+            disabled={isSubmitting || !subject.trim()}
             style={{
               padding: '8px 18px',
               borderRadius: '8px',
               border: 'none',
-              background: isSubmitting || !subject.trim() || !content.trim() ? '#94a3b8' : '#16a34a',
+              background: isSubmitting || !subject.trim() ? '#cbd5e1' : '#16a34a',
               color: '#ffffff',
               fontSize: '0.82rem',
               fontWeight: 900,
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              cursor: isSubmitting || !subject.trim() || !content.trim() ? 'not-allowed' : 'pointer',
-              boxShadow: '0 2px 4px rgba(22, 163, 74, 0.2)'
+              cursor: isSubmitting || !subject.trim() ? 'not-allowed' : 'pointer',
+              boxShadow: subject.trim() ? '0 2px 4px rgba(22, 163, 74, 0.2)' : 'none'
             }}
           >
             <Send size={13} />
-            <span>{isSubmitting ? 'Wird veröffentlicht...' : 'Thema veröffentlichen'}</span>
+            <span>{isSubmitting ? 'Wird veröffentlicht...' : 'Thema eröffnen'}</span>
           </button>
         </div>
       </form>

@@ -80,11 +80,7 @@ export async function requestMicrophonePermissionOnce(): Promise<boolean> {
   // 3. Pre-flight authorization request via user gesture
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ 
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true
-      } 
+      audio: PURE_RAW_AUDIO_CONSTRAINTS
     });
 
     // Immediately stop hardware tracks to ensure privacy & turn off camera/mic light
@@ -113,7 +109,7 @@ export function isMicrophonePermissionCached(): boolean {
 /**
  * Studio-Grade High-Fidelity Audio Constraints (Zero Compression, Zero Filter DSP Artifacts)
  */
-export const STUDIO_AUDIO_CONSTRAINTS: MediaTrackConstraints = {
+export const PURE_RAW_AUDIO_CONSTRAINTS: MediaTrackConstraints = {
   echoCancellation: { ideal: false },
   noiseSuppression: { ideal: false },
   autoGainControl: { ideal: false },
@@ -130,9 +126,15 @@ export const STUDIO_AUDIO_CONSTRAINTS: MediaTrackConstraints = {
 } as any;
 
 /**
+ * Studio-Grade High-Fidelity Audio Constraints (Zero Compression, Zero Filter DSP Artifacts)
+ * Backward-compatibility alias for PURE_RAW_AUDIO_CONSTRAINTS
+ */
+export const STUDIO_AUDIO_CONSTRAINTS = PURE_RAW_AUDIO_CONSTRAINTS;
+
+/**
  * Seamlessly acquires an active audio stream for recording, tuner, or loopstation.
  */
-export async function acquireAudioStream(constraints: MediaStreamConstraints = { audio: STUDIO_AUDIO_CONSTRAINTS }): Promise<MediaStream> {
+export async function acquireAudioStream(constraints: MediaStreamConstraints = { audio: PURE_RAW_AUDIO_CONSTRAINTS }): Promise<MediaStream> {
   if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     throw new Error('Mikrofon-Zugriff wird von diesem Browser nicht unterstützt.');
   }

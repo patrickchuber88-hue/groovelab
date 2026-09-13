@@ -7,6 +7,7 @@
 
 import { removeSecureCookie } from './cookieAuthBridge';
 import { broadcastLogoutToPeerTabs } from './authBroadcastSync';
+import { safeReplaceUrl } from './urlSecurityScrubber';
 
 /**
  * Performs complete cryptographic memory wipe and storage zeroization upon logout or tenant switch.
@@ -55,10 +56,7 @@ export function executeSessionZeroize(options: { preserveDeviceKey?: boolean; re
 
     // 5. Navigate to clean destination if requested and not already there
     if (redirectUrl && typeof window !== 'undefined') {
-      const current = window.location.pathname + window.location.search;
-      if (current !== redirectUrl) {
-        window.history.replaceState(null, '', redirectUrl);
-      }
+      safeReplaceUrl(redirectUrl);
     }
   } catch (err) {
     console.error('[Security] Error during session zeroization:', err);

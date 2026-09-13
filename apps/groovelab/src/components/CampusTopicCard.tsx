@@ -12,7 +12,7 @@ import {
   Sparkles,
   Music
 } from 'lucide-react';
-import { cleanChatMessageContent } from './CampusDirectMessages';
+import { cleanChatMessageContent } from '../utils/chatRespectGuard';
 
 export const ALLOWED_TOPIC_EMOJIS = ['👍', '❤️', '🎵', '👏', '🔥', '🚀'] as const;
 export type TopicEmojiType = typeof ALLOWED_TOPIC_EMOJIS[number];
@@ -38,6 +38,7 @@ export interface CampusTopicCardProps {
   findUserById: (userId: string) => any;
   isMobile: boolean;
   isUnread?: boolean;
+  autoFocusReply?: boolean;
 }
 
 export const CampusTopicCard: React.FC<CampusTopicCardProps> = ({
@@ -53,7 +54,8 @@ export const CampusTopicCard: React.FC<CampusTopicCardProps> = ({
   resolveUserAvatar,
   findUserById,
   isMobile,
-  isUnread = false
+  isUnread = false,
+  autoFocusReply = false
 }) => {
   const [replyText, setReplyText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -62,10 +64,36 @@ export const CampusTopicCard: React.FC<CampusTopicCardProps> = ({
   const [isReplyInputFocused, setIsReplyInputFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  React.useEffect(() => {
+    if (autoFocusReply) {
+      setIsExpanded(true);
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 150);
+    }
+  }, [autoFocusReply]);
+
   const author = findUserById(topic.sender_id);
   const authorName = resolveUserDisplayName(author || { id: topic.sender_id });
   const authorAvatar = resolveUserAvatar(author);
   const isTeacherAuthor = author?.role === 'teacher' || (Array.isArray(author?.roles) && author.roles.includes('teacher'));
+
+  const extractedSubject = useMemo(() => {
+    if (topic.subject) return topic.subject;
+    if (topic.content && String(topic.content).startsWith('📌 [')) {
+      const match = String(topic.content).match(/^📌 \[(.*?)\]/);
+      if (match) return match[1];
+    }
+    return 'Thema ohne Betreff';
+  }, [topic.subject, topic.content]);
+
+  const cleanDisplayContent = useMemo(() => {
+    let raw = String(topic.content || '');
+    if (!topic.subject && raw.startsWith('📌 [')) {
+      raw = raw.replace(/^📌 \[.*?\]\s*/, '');
+    }
+    return cleanChatMessageContent(raw);
+  }, [topic.subject, topic.content]);
 
   // Reactions for the root topic
   const topicReactions = useMemo(() => {
@@ -101,19 +129,28 @@ export const CampusTopicCard: React.FC<CampusTopicCardProps> = ({
     }
   };
 
-  const handleQuickChip = (chipText: string) => {
-    setReplyText(chipText);
+  const studentTopicQuickChips = useMemo(() => [
+    { label: '✓ Gesehen & danke!', text: 'Gesehen und vielen Dank für die Information!' },
+    { label: '👍 Passt für mich!', text: 'Das passt perfekt für mich!' },
+    { label: '🎵 Wird geübt & vorbereitet!', text: 'Wird geübt und für die nächste Stunde vorbereitet!' },
+    { label: '💚 Danke für die Hilfe!', text: 'Vielen Dank für die Unterstützung und Hilfe!' }
+  ], []);
+
+  const teacherTopicQuickChips = useMemo(() => [
+    { label: '✓ Gesehen & notiert', text: 'Gesehen und notiert, vielen Dank für die Rückmeldung!' },
+    { label: '👍 Super, machen wir so!', text: 'Alles klar, machen wir genau so!' },
+    { label: '🎹 Klären wir in der Stunde', text: 'Das schauen wir uns direkt in der nächsten Stunde gemeinsam an.' },
+    { label: '👏 Sehr schön, weiter so!', text: 'Super Fortschritt, weiter so!' }
+  ], []);
+
+  const quickChips = isStudent ? studentTopicQuickChips : teacherTopicQuickChips;
+
+  const handleQuickChip = (chip: { label: string; text: string }) => {
+    setReplyText(chip.text);
     setTimeout(() => {
       inputRef.current?.focus();
     }, 50);
   };
-
-  const quickChips = [
-    '✓ Gesehen & danke!',
-    '⏱️ Bin ca. 5 Min. später da',
-    '🎵 Noten & Instrument dabei',
-    '💚 Danke für das Verständnis!'
-  ];
 
   const formatTime = (dateStr: string) => {
     if (!dateStr) return '';
@@ -229,21 +266,23 @@ export const CampusTopicCard: React.FC<CampusTopicCardProps> = ({
             wordBreak: 'break-word'
           }}
         >
-          {topic.subject || 'Thema ohne Betreff'}
+          {extractedSubject}
         </h3>
       </div>
 
-      {/* TOPIC CONTENT */}
-      <div style={{
-        fontSize: '0.85rem',
-        lineHeight: 1.45,
-        color: '#334155',
-        wordBreak: 'break-word',
-        whiteSpace: 'pre-wrap',
-        marginBottom: '10px'
-      }}>
-        {cleanChatMessageContent(topic.content)}
-      </div>
+      {/* TOPIC CONTENT (only rendered if non-empty and not identical to subject) */}
+      {Boolean(cleanDisplayContent && cleanDisplayContent !== extractedSubject) && (
+        <div style={{
+          fontSize: '0.85rem',
+          lineHeight: 1.45,
+          color: '#334155',
+          wordBreak: 'break-word',
+          whiteSpace: 'pre-wrap',
+          marginBottom: '10px'
+        }}>
+          {cleanDisplayContent}
+        </div>
+      )}
 
       {/* EMOJI BAR & REACTION PILLS FOR ROOT TOPIC */}
       <div style={{
@@ -593,9 +632,17 @@ export const CampusTopicCard: React.FC<CampusTopicCardProps> = ({
             }}>
               {quickChips.map(chip => (
                 <button
-                  key={chip}
+                  key={chip.label}
                   type="button"
                   onClick={() => handleQuickChip(chip)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleQuickChip(chip);
+                    }
+                  }}
+                  aria-label={`Schnellantwort: ${chip.label}`}
+                  title={chip.text}
                   style={{
                     background: '#f0fdf4',
                     border: '1px solid #bbf7d0',
@@ -606,11 +653,12 @@ export const CampusTopicCard: React.FC<CampusTopicCardProps> = ({
                     fontWeight: 800,
                     whiteSpace: 'nowrap',
                     cursor: 'pointer',
-                    flexShrink: 0
+                    flexShrink: 0,
+                    touchAction: 'manipulation'
                   }}
                   className="hover-scale-mini"
                 >
-                  {chip}
+                  {chip.label}
                 </button>
               ))}
             </div>

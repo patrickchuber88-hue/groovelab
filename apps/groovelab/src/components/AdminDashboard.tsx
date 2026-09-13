@@ -2197,6 +2197,17 @@ export function AdminDashboard({
               totalPages: item.total_pages || 50
             }));
             setLehrwerke(mappedLw);
+            try {
+              const storedCustom = localStorage.getItem('custom_lehrwerke');
+              const parsedCustom = storedCustom ? JSON.parse(storedCustom) : [];
+              const merged = [...parsedCustom];
+              mappedLw.forEach((item: any) => {
+                if (!merged.some((m: any) => String(m.id) === String(item.id) || (m.title || '').trim().toLowerCase() === (item.title || '').trim().toLowerCase())) {
+                  merged.push(item);
+                }
+              });
+              localStorage.setItem('custom_lehrwerke', JSON.stringify(merged));
+            } catch {}
           }
         } else {
           setLehrwerke([]);
@@ -3325,7 +3336,6 @@ export function AdminDashboard({
     const { error } = await supabase.from('users').update({
       first_name: editingTeacher.first_name,
       last_name: editingTeacher.last_name,
-      role: editingTeacher.role,
       groovelab_instrument: editingTeacher.groovelab_instrument,
       photo_url: isAdmOrSec ? '/campus_login_hero.png' : editingTeacher.photo_url,
       bio: editingTeacher.bio,
@@ -4163,6 +4173,7 @@ export function AdminDashboard({
       <TeacherDashboard 
         key={`teacher-dashboard-view-${activePlatform}`}
         userId={userId} 
+        initialTeacher={admin}
         hideHeader={activePlatform === 'campus' ? false : true} 
         hideSidebar={true}
         viewMode="admin" 
@@ -5579,7 +5590,9 @@ export function AdminDashboard({
               last_name: selectedStudentForTageskompass.last_name,
               photo_url: selectedStudentForTageskompass.photo_url || '/avatar_ghost.jpg',
               is_campus_active: selectedStudentForTageskompass.is_campus_active,
-              school_id: selectedStudentForTageskompass.school_id || admin?.school_id
+              school_id: selectedStudentForTageskompass.school_id || admin?.school_id,
+              campus_ui_level: selectedStudentForTageskompass.campus_ui_level,
+              parent_permissions: selectedStudentForTageskompass.parent_permissions
             }}
             onClose={() => {
               setShowTageskompassModal(false);
@@ -5588,7 +5601,11 @@ export function AdminDashboard({
             }}
             teacherId={userId}
             teacherName={formatTeacherFullName(admin)}
+            schoolId={admin?.school_id || selectedStudentForTageskompass.school_id}
+            initialLehrwerke={lehrwerke}
             initialLehrwerkId={initialLehrwerkIdForTageskompass || undefined}
+            uiLevel={selectedStudentForTageskompass.campus_ui_level || undefined}
+            parentPermissions={selectedStudentForTageskompass.parent_permissions}
             hasTresorStorage={checkIsAudioTresorActive(selectedStudentForTageskompass) || checkIsAudioTresorActive(admin)}
             onProfileClick={(student) => {
               setShowTageskompassModal(false);
@@ -5607,14 +5624,22 @@ export function AdminDashboard({
               id: 'teacher-self',
               first_name: admin?.first_name || 'Lehrer',
               last_name: admin?.last_name || '',
+              name: formatTeacherFullName(admin),
               photo_url: admin?.photo_url || '/campus_login_hero.png',
               is_campus_active: true,
-              school_id: admin?.school_id
+              school_id: admin?.school_id,
+              role: 'teacher',
+              is_teacher: true,
+              campus_ui_level: 'pro'
             }}
             onClose={() => setShowTeacherToolsModal(false)}
             teacherId={userId}
             teacherName={formatTeacherFullName(admin)}
+            schoolId={admin?.school_id}
+            initialLehrwerke={lehrwerke}
             isTeacherTools={true}
+            isTeacherSandbox={true}
+            uiLevel="pro"
             hasTresorStorage={checkIsAudioTresorActive(admin)}
           />
         </Suspense>

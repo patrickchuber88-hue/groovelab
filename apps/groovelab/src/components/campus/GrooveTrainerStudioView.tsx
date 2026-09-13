@@ -416,7 +416,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
   homeworkNotesList
 }) => {
   const [selectedLevel, setSelectedLevel] = useState<RhythmLevel>('viertel');
-  const [trainingMode, setTrainingMode] = useState<TrainingMode>('call_response');
+  const [trainingMode, setTrainingMode] = useState<TrainingMode>('continuous');
   const [soundKit, setSoundKit] = useState<SoundKitType>('acoustic');
   const [bpm, setBpm] = useState<number>(initialBpm);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -528,6 +528,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const isRunningRef = useRef<boolean>(false);
+  const trainerStateRef = useRef<'idle' | 'counting_in' | 'playing' | 'finishing'>('idle');
   const playbackStartTimeRef = useRef<number>(0);
   const nextBeatTimeRef = useRef<number>(0);
   const currentStepRef = useRef<number>(0);
@@ -535,6 +536,18 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
   const timerIntervalRef = useRef<number | null>(null);
   const completionCooldownRef = useRef<number>(0);
   const autoOffsetBufferRef = useRef<number[]>([]);
+
+  // 🛡️ Stabile Refs für Score & Stats, damit der Audio-Scheduler niemals mitten in der Session neu instanziiert wird
+  const totalHitsRef = useRef<number>(0);
+  const scoreSumRef = useRef<number>(0);
+  const bestStreakRef = useRef<number>(0);
+  const currentStreakRef = useRef<number>(0);
+
+  // 🛡️ Stabile Refs für Callbacks, um unnötige Neuinstanziierungen und Lifecycle-Cleanups abzuwehren
+  const onRewardXpRef = useRef(onRewardXp);
+  useEffect(() => {
+    onRewardXpRef.current = onRewardXp;
+  }, [onRewardXp]);
 
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [anticipatingStep, setAnticipatingStep] = useState<number | null>(null);
@@ -632,19 +645,22 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
     const ctx = getAudioContext();
     if (!ctx) return;
 
+    // 🛡️ Safari WebKit Hardening: AudioParam Zeitstempel dürfen niemals in der Vergangenheit liegen
+    const safeTime = Math.max(ctx.currentTime + 0.005, time);
+
     try {
       if (soundKit === 'acoustic') {
         if (type === 'kick') {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
-          osc.frequency.setValueAtTime(accent ? 150 : 120, time);
-          osc.frequency.exponentialRampToValueAtTime(36, time + 0.13);
-          gain.gain.setValueAtTime(0.95, time);
-          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
+          osc.frequency.setValueAtTime(accent ? 150 : 120, safeTime);
+          osc.frequency.exponentialRampToValueAtTime(36, safeTime + 0.13);
+          gain.gain.setValueAtTime(0.95, safeTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, safeTime + 0.15);
           osc.connect(gain);
           gain.connect(ctx.destination);
-          osc.start(time);
-          osc.stop(time + 0.16);
+          osc.start(safeTime);
+          osc.stop(safeTime + 0.16);
         } else if (type === 'snare') {
           const bufferSize = Math.max(1, Math.floor(ctx.sampleRate * 0.13));
           const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
@@ -656,52 +672,52 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
           filter.type = 'highpass';
           filter.frequency.value = 900;
           const gain = ctx.createGain();
-          gain.gain.setValueAtTime(accent ? 0.78 : 0.55, time);
-          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.12);
+          gain.gain.setValueAtTime(accent ? 0.78 : 0.55, safeTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, safeTime + 0.12);
           noise.connect(filter);
           filter.connect(gain);
           gain.connect(ctx.destination);
-          noise.start(time);
-          noise.stop(time + 0.13);
+          noise.start(safeTime);
+          noise.stop(safeTime + 0.13);
         } else if (type === 'hihat') {
           const osc = ctx.createOscillator();
           osc.type = 'square';
-          osc.frequency.setValueAtTime(8400, time);
+          osc.frequency.setValueAtTime(8400, safeTime);
           const filter = ctx.createBiquadFilter();
           filter.type = 'highpass';
           filter.frequency.value = 7600;
           const gain = ctx.createGain();
-          gain.gain.setValueAtTime(accent ? 0.38 : 0.20, time);
-          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.045);
+          gain.gain.setValueAtTime(accent ? 0.38 : 0.20, safeTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, safeTime + 0.045);
           osc.connect(filter);
           filter.connect(gain);
           gain.connect(ctx.destination);
-          osc.start(time);
-          osc.stop(time + 0.05);
+          osc.start(safeTime);
+          osc.stop(safeTime + 0.05);
         } else {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.type = 'triangle';
-          osc.frequency.setValueAtTime(accent ? 1760 : 880, time);
-          gain.gain.setValueAtTime(accent ? 0.65 : 0.4, time);
-          gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.03);
+          osc.frequency.setValueAtTime(accent ? 1760 : 880, safeTime);
+          gain.gain.setValueAtTime(accent ? 0.65 : 0.4, safeTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, safeTime + 0.03);
           osc.connect(gain);
           gain.connect(ctx.destination);
-          osc.start(time);
-          osc.stop(time + 0.035);
+          osc.start(safeTime);
+          osc.stop(safeTime + 0.035);
         }
       } else if (soundKit === 'body_percussion') {
         if (type === 'kick') {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
-          osc.frequency.setValueAtTime(95, time);
-          osc.frequency.exponentialRampToValueAtTime(28, time + 0.14);
-          gain.gain.setValueAtTime(0.9, time);
-          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
+          osc.frequency.setValueAtTime(95, safeTime);
+          osc.frequency.exponentialRampToValueAtTime(28, safeTime + 0.14);
+          gain.gain.setValueAtTime(0.9, safeTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, safeTime + 0.15);
           osc.connect(gain);
           gain.connect(ctx.destination);
-          osc.start(time);
-          osc.stop(time + 0.16);
+          osc.start(safeTime);
+          osc.stop(safeTime + 0.16);
         } else if (type === 'snare') {
           const bufferSize = Math.max(1, Math.floor(ctx.sampleRate * 0.09));
           const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
@@ -714,111 +730,111 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
           filter.frequency.value = 1400;
           filter.Q.value = 2.5;
           const gain = ctx.createGain();
-          gain.gain.setValueAtTime(accent ? 0.85 : 0.6, time);
-          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
+          gain.gain.setValueAtTime(accent ? 0.85 : 0.6, safeTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, safeTime + 0.08);
           noise.connect(filter);
           filter.connect(gain);
           gain.connect(ctx.destination);
-          noise.start(time);
-          noise.stop(time + 0.09);
+          noise.start(safeTime);
+          noise.stop(safeTime + 0.09);
         } else if (type === 'hihat') {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.type = 'triangle';
-          osc.frequency.setValueAtTime(2500, time);
-          gain.gain.setValueAtTime(0.35, time);
-          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.025);
+          osc.frequency.setValueAtTime(2500, safeTime);
+          gain.gain.setValueAtTime(0.35, safeTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, safeTime + 0.025);
           osc.connect(gain);
           gain.connect(ctx.destination);
-          osc.start(time);
-          osc.stop(time + 0.03);
+          osc.start(safeTime);
+          osc.stop(safeTime + 0.03);
         } else {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.type = 'triangle';
-          osc.frequency.setValueAtTime(1200, time);
-          gain.gain.setValueAtTime(0.5, time);
-          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.03);
+          osc.frequency.setValueAtTime(1200, safeTime);
+          gain.gain.setValueAtTime(0.5, safeTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, safeTime + 0.03);
           osc.connect(gain);
           gain.connect(ctx.destination);
-          osc.start(time);
-          osc.stop(time + 0.035);
+          osc.start(safeTime);
+          osc.stop(safeTime + 0.035);
         }
       } else if (soundKit === 'urban_808') {
         if (type === 'kick') {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
-          osc.frequency.setValueAtTime(accent ? 130 : 100, time);
-          osc.frequency.exponentialRampToValueAtTime(38, time + 0.24);
-          gain.gain.setValueAtTime(1.0, time);
-          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.26);
+          osc.frequency.setValueAtTime(accent ? 130 : 100, safeTime);
+          osc.frequency.exponentialRampToValueAtTime(38, safeTime + 0.24);
+          gain.gain.setValueAtTime(1.0, safeTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, safeTime + 0.26);
           osc.connect(gain);
           gain.connect(ctx.destination);
-          osc.start(time);
-          osc.stop(time + 0.28);
+          osc.start(safeTime);
+          osc.stop(safeTime + 0.28);
         } else if (type === 'snare') {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.type = 'triangle';
-          osc.frequency.setValueAtTime(280, time);
-          gain.gain.setValueAtTime(0.7, time);
-          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
+          osc.frequency.setValueAtTime(280, safeTime);
+          gain.gain.setValueAtTime(0.7, safeTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, safeTime + 0.08);
           osc.connect(gain);
           gain.connect(ctx.destination);
-          osc.start(time);
-          osc.stop(time + 0.09);
+          osc.start(safeTime);
+          osc.stop(safeTime + 0.09);
         } else if (type === 'hihat') {
           const osc = ctx.createOscillator();
           osc.type = 'square';
-          osc.frequency.setValueAtTime(9500, time);
+          osc.frequency.setValueAtTime(9500, safeTime);
           const filter = ctx.createBiquadFilter();
           filter.type = 'highpass';
           filter.frequency.value = 8500;
           const gain = ctx.createGain();
-          gain.gain.setValueAtTime(0.3, time);
-          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.025);
+          gain.gain.setValueAtTime(0.3, safeTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, safeTime + 0.025);
           osc.connect(filter);
           filter.connect(gain);
           gain.connect(ctx.destination);
-          osc.start(time);
-          osc.stop(time + 0.03);
+          osc.start(safeTime);
+          osc.stop(safeTime + 0.03);
         } else {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.type = 'triangle';
-          osc.frequency.setValueAtTime(1200, time);
-          gain.gain.setValueAtTime(0.5, time);
-          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.03);
+          osc.frequency.setValueAtTime(1200, safeTime);
+          gain.gain.setValueAtTime(0.5, safeTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, safeTime + 0.03);
           osc.connect(gain);
           gain.connect(ctx.destination);
-          osc.start(time);
-          osc.stop(time + 0.035);
+          osc.start(safeTime);
+          osc.stop(safeTime + 0.035);
         }
       } else {
         if (type === 'kick') {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.type = 'sine';
-          osc.frequency.setValueAtTime(180, time);
-          osc.frequency.exponentialRampToValueAtTime(90, time + 0.16);
-          gain.gain.setValueAtTime(0.85, time);
-          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.18);
+          osc.frequency.setValueAtTime(180, safeTime);
+          osc.frequency.exponentialRampToValueAtTime(90, safeTime + 0.16);
+          gain.gain.setValueAtTime(0.85, safeTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, safeTime + 0.18);
           osc.connect(gain);
           gain.connect(ctx.destination);
-          osc.start(time);
-          osc.stop(time + 0.2);
+          osc.start(safeTime);
+          osc.stop(safeTime + 0.2);
         } else if (type === 'snare') {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.type = 'triangle';
-          osc.frequency.setValueAtTime(460, time);
-          osc.frequency.exponentialRampToValueAtTime(210, time + 0.09);
-          gain.gain.setValueAtTime(0.8, time);
-          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+          osc.frequency.setValueAtTime(460, safeTime);
+          osc.frequency.exponentialRampToValueAtTime(210, safeTime + 0.09);
+          gain.gain.setValueAtTime(0.8, safeTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, safeTime + 0.1);
           osc.connect(gain);
           gain.connect(ctx.destination);
-          osc.start(time);
-          osc.stop(time + 0.11);
+          osc.start(safeTime);
+          osc.stop(safeTime + 0.11);
         } else if (type === 'hihat') {
           const bufferSize = Math.max(1, Math.floor(ctx.sampleRate * 0.05));
           const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
@@ -830,24 +846,24 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
           filter.type = 'bandpass';
           filter.frequency.value = 5200;
           const gain = ctx.createGain();
-          gain.gain.setValueAtTime(0.3, time);
-          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.045);
+          gain.gain.setValueAtTime(0.3, safeTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, safeTime + 0.045);
           noise.connect(filter);
           filter.connect(gain);
           gain.connect(ctx.destination);
-          noise.start(time);
-          noise.stop(time + 0.05);
+          noise.start(safeTime);
+          noise.stop(safeTime + 0.05);
         } else {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.type = 'triangle';
-          osc.frequency.setValueAtTime(1200, time);
-          gain.gain.setValueAtTime(0.5, time);
-          gain.gain.exponentialRampToValueAtTime(0.001, time + 0.03);
+          osc.frequency.setValueAtTime(1200, safeTime);
+          gain.gain.setValueAtTime(0.5, safeTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, safeTime + 0.03);
           osc.connect(gain);
           gain.connect(ctx.destination);
-          osc.start(time);
-          osc.stop(time + 0.035);
+          osc.start(safeTime);
+          osc.stop(safeTime + 0.035);
         }
       }
     } catch (_) {}
@@ -859,46 +875,57 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
     const ctx = getAudioContext();
     if (!ctx) return;
 
+    const safeTime = Math.max(ctx.currentTime + 0.005, time);
+
     try {
       const osc = ctx.createOscillator();
       const filter = ctx.createBiquadFilter();
       const gain = ctx.createGain();
 
       osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(pitchHz, time);
+      osc.frequency.setValueAtTime(pitchHz, safeTime);
 
       filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(800, time);
-      filter.frequency.exponentialRampToValueAtTime(220, time + duration);
+      filter.frequency.setValueAtTime(800, safeTime);
+      filter.frequency.exponentialRampToValueAtTime(220, safeTime + duration);
       filter.Q.value = 4.0;
 
-      gain.gain.setValueAtTime(0.32, time);
-      gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+      gain.gain.setValueAtTime(0.32, safeTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, safeTime + duration);
 
       osc.connect(filter);
       filter.connect(gain);
       gain.connect(ctx.destination);
 
-      osc.start(time);
-      osc.stop(time + duration + 0.05);
+      osc.start(safeTime);
+      osc.stop(safeTime + duration + 0.05);
     } catch (_) {}
   }, [getAudioContext, isBassEnabled, isMuted]);
 
   // Round completion: Accumulate into Session Vault & engage 1.2s restart protection cooldown
   const handleFinishSession = useCallback(() => {
     isRunningRef.current = false;
+    trainerStateRef.current = 'finishing';
     setIsPlaying(false);
     setIsCountingIn(false);
     setSessionCompleted(true);
     completionCooldownRef.current = Date.now() + 1200; // 🛡️ 1.2s Cooldown-Schutz vor Reflex-Taps
+    setTimeout(() => {
+      if (trainerStateRef.current === 'finishing') {
+        trainerStateRef.current = 'idle';
+      }
+    }, 1200);
     
-    const accuracy = totalHits > 0 ? Math.round(scoreSum / totalHits) : 0;
+    const hitsCount = totalHitsRef.current;
+    const sum = scoreSumRef.current;
+    const streak = bestStreakRef.current;
+    const accuracy = hitsCount > 0 ? Math.round(sum / hitsCount) : 0;
     
     // 1. Stufen-Basis nach Genauigkeit
     let baseRoundXp = accuracy >= 90 ? 50 : (accuracy >= 75 ? 35 : (accuracy >= 50 ? 20 : 5));
 
     // 2. Makelloser Pocket-Streak Bonus (+10 XP bei hoher Trefferserie)
-    const streakBonus = (bestStreak >= 10 && totalHits >= 10) ? 10 : 0;
+    const streakBonus = (streak >= 10 && hitsCount >= 10) ? 10 : 0;
 
     // 3. Gestaffelter Schwierigkeits-Multiplikator
     const multiplier = activeLevelConfig.multiplier || 1.0;
@@ -940,7 +967,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
       level: selectedLevel,
       score: speedWeightedScore,
       accuracy,
-      streak: bestStreak,
+      streak,
       bpm
     });
 
@@ -978,7 +1005,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
 
           const highAccuracyLevels = scoresList.filter(s => s.accuracy >= 80);
           const topAccuracyLevels = scoresList.filter(s => s.accuracy >= 85);
-          const maxAnyStreak = Math.max(...scoresList.map(s => s.max_streak || 0), bestStreak);
+          const maxAnyStreak = Math.max(...scoresList.map(s => s.max_streak || 0), streak);
 
           let targetPromotionLevel = currentRhythmusLevel;
 
@@ -1130,8 +1157,8 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
         }
       })();
 
-      if (onRewardXp) {
-        onRewardXp(finalEarned, expectedSongDurationSec);
+      if (onRewardXpRef.current) {
+        onRewardXpRef.current(finalEarned, expectedSongDurationSec);
       }
 
       // Event für Briefing-Board & Header
@@ -1144,7 +1171,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
         }));
       }
     }
-  }, [activeLevelConfig.defaultBpm, activeLevelConfig.multiplier, bestStreak, bpm, onRewardXp, scoreSum, selectedLevel, student?.id, student?.instrument, totalHits]);
+  }, [activeLevelConfig.defaultBpm, activeLevelConfig.multiplier, bpm, selectedLevel, student?.id, student?.instrument]);
 
   // Centralized Atomic Session Commit: Syncs XP and Practice Time to DB and Parent Callbacks
   const commitSessionData = useCallback(() => {
@@ -1261,8 +1288,8 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
       })();
     }
 
-    if (onRewardXp) {
-      onRewardXp(xpToCommit, secondsToCommit);
+    if (onRewardXpRef.current) {
+      onRewardXpRef.current(xpToCommit, secondsToCommit);
     }
 
     // Broadcast standardized events across the entire platform for Briefing Board KPI live sync
@@ -1274,7 +1301,13 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
         detail: { studentId: student.id, minutes: Math.max(1, Math.round(secondsToCommit / 60)), seconds: secondsToCommit }
       }));
     }
-  }, [onRewardXp, student?.id]);
+  }, [student?.id]);
+
+  // 🛡️ Stabile Ref für commitSessionData, damit der Unmount-Hook niemals während Re-Rendern feuert
+  const commitSessionDataRef = useRef(commitSessionData);
+  useEffect(() => {
+    commitSessionDataRef.current = commitSessionData;
+  }, [commitSessionData]);
 
   // Safe Exit with Atomic Batch Commit to persistent storage
   const handleSafeClose = useCallback(() => {
@@ -1287,20 +1320,37 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
   // 🛡️ Fail-Safe Auto-Commit on Unmount (e.g. modal closed via outer button or tab switch)
   useEffect(() => {
     return () => {
-      commitSessionData();
+      isRunningRef.current = false;
+      trainerStateRef.current = 'idle';
+      if (countInTimerRef.current) {
+        clearTimeout(countInTimerRef.current);
+        countInTimerRef.current = null;
+      }
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+      commitSessionDataRef.current?.();
     };
-  }, [commitSessionData]);
+  }, []); // 🛡️ CRITICAL: Leeres Dependency-Array garantiert Ausführung NUR beim echten Unmounten!
 
   // Audio Scheduler Loop
   const scheduleAudioEvents = useCallback(() => {
     const ctx = getAudioContext();
-    if (!ctx || !isRunningRef.current) return;
+    if (!ctx || !isRunningRef.current || trainerStateRef.current !== 'playing') return;
 
     const scheduleAheadTime = 0.15;
     const subCount = activeLevelConfig.subdivisions;
     const secondsPerSub = (60 / bpm) / (subCount / 4);
 
-    while (nextBeatTimeRef.current < ctx.currentTime + scheduleAheadTime) {
+    // 🛡️ Anti-Instant-Flush Guard: Verhindere 16-Takt-Schleifendurchlauf bei Tab-Wechsel oder CPU-Jitter
+    if (nextBeatTimeRef.current < ctx.currentTime - 0.4) {
+      nextBeatTimeRef.current = ctx.currentTime + 0.02;
+    }
+
+    let loopGuard = 0;
+    while (nextBeatTimeRef.current < ctx.currentTime + scheduleAheadTime && loopGuard < subCount * 2) {
+      loopGuard++;
       const scheduledTime = nextBeatTimeRef.current;
       const stepIdx = currentStepRef.current;
       const barIdx = barCountRef.current;
@@ -1372,29 +1422,36 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
         }
         if (barCountRef.current >= 16) {
           setTimeout(() => handleFinishSession(), 600);
+          break;
         }
       }
     }
   }, [activeLevelConfig, activeTargetPattern, bpm, getAudioContext, handleFinishSession, isBassEnabled, playBassNote, playDrumSound, rollNewRandomGroove, selectedLevel, trainingMode]);
 
+  // 🎯 Stabile Ref für scheduleAudioEvents, damit der Scheduler ohne Drift und ohne Re-Creation der Intervalle läuft
+  const scheduleAudioEventsRef = useRef(scheduleAudioEvents);
   useEffect(() => {
-    if (!isPlaying) return;
-    const interval = window.setInterval(scheduleAudioEvents, 25);
-    timerIntervalRef.current = interval;
-    return () => clearInterval(interval);
-  }, [isPlaying, scheduleAudioEvents]);
+    scheduleAudioEventsRef.current = scheduleAudioEvents;
+  }, [scheduleAudioEvents]);
 
   const startActualPlayback = useCallback((anchorTime?: number) => {
     const ctx = getAudioContext();
     if (!ctx) return;
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
     isRunningRef.current = true;
+    trainerStateRef.current = 'playing';
     // 🛡️ PWA / Mobile Fix: Verhindere Vergangenheits-Anchors durch setTimeout-Jitter auf Mobilgeräten!
-    // Liegt anchorTime hinter ctx.currentTime, schützt safeAnchor vor einem 16-Takt-Instant-Flush.
-    const safeAnchor = Math.max(ctx.currentTime + 0.05, anchorTime || (ctx.currentTime + 0.08));
+    const safeAnchor = Math.max(ctx.currentTime + 0.02, anchorTime || (ctx.currentTime + 0.03));
     playbackStartTimeRef.current = safeAnchor;
     nextBeatTimeRef.current = safeAnchor;
     currentStepRef.current = 0;
     barCountRef.current = 0;
+    totalHitsRef.current = 0;
+    scoreSumRef.current = 0;
+    bestStreakRef.current = 0;
+    currentStreakRef.current = 0;
     setPocketStreak(0);
     setTotalHits(0);
     setScoreSum(0);
@@ -1406,13 +1463,63 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
     setLastRating(null);
     setIsCountingIn(false);
     setIsPlaying(true);
+
+    // 🚀 Direct Synchronous Engine Kickoff: Sofort die ersten Audio-Events in den Web Audio Graph einphasen!
+    if (scheduleAudioEventsRef.current) {
+      scheduleAudioEventsRef.current();
+    }
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+    }
+    timerIntervalRef.current = window.setInterval(() => {
+      if (scheduleAudioEventsRef.current) {
+        scheduleAudioEventsRef.current();
+      }
+    }, 25);
   }, [getAudioContext]);
+
+  useEffect(() => {
+    if (!isPlaying) {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+      return;
+    }
+    // Fallback: If not already active, ensure interval is running
+    if (!timerIntervalRef.current) {
+      timerIntervalRef.current = window.setInterval(() => {
+        if (scheduleAudioEventsRef.current) {
+          scheduleAudioEventsRef.current();
+        }
+      }, 25);
+    }
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+    };
+  }, [isPlaying]);
 
   const startCountIn = useCallback(() => {
     const ctx = getAudioContext();
     if (!ctx) return;
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+
+    if (countInTimerRef.current) {
+      clearTimeout(countInTimerRef.current);
+      countInTimerRef.current = null;
+    }
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
 
     isRunningRef.current = true;
+    trainerStateRef.current = 'counting_in';
     setIsCountingIn(true);
     setCountInBeat(1);
     setSessionCompleted(false);
@@ -1427,23 +1534,33 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
       const beatTime = startTime + b * secPerBeat;
       playDrumSound('click', beatTime, b === 0);
       setTimeout(() => {
-        if (!isRunningRef.current) return;
+        if (!isRunningRef.current || trainerStateRef.current !== 'counting_in') return;
         setCountInBeat(b + 1);
       }, Math.max(0, (beatTime - ctx.currentTime) * 1000));
     }
 
+    // Audio-Clock-synchroner Übergang: Starte exakt 30ms vor Schlag 1 von Takt 1
+    const targetTransitionTime = startTime + 4 * secPerBeat;
+    const transitionDelayMs = Math.max(20, (targetTransitionTime - ctx.currentTime - 0.03) * 1000);
+
     countInTimerRef.current = setTimeout(() => {
-      if (!isRunningRef.current) return;
-      startActualPlayback(startTime + 4 * secPerBeat);
-    }, 4 * secPerBeat * 1000);
+      countInTimerRef.current = null;
+      if (!isRunningRef.current || trainerStateRef.current !== 'counting_in') return;
+      startActualPlayback(targetTransitionTime);
+    }, transitionDelayMs);
   }, [bpm, getAudioContext, playDrumSound, startActualPlayback]);
 
   const handleTogglePlay = useCallback(() => {
-    if (isPlaying || isCountingIn) {
+    if (isPlaying || isCountingIn || trainerStateRef.current === 'playing' || trainerStateRef.current === 'counting_in') {
       isRunningRef.current = false;
+      trainerStateRef.current = 'idle';
       if (countInTimerRef.current) {
         clearTimeout(countInTimerRef.current);
         countInTimerRef.current = null;
+      }
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
       }
       setIsCountingIn(false);
       setIsPlaying(false);
@@ -1463,27 +1580,25 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
     const ctx = getAudioContext();
     if (!ctx) return;
 
+    // 🎯 Unblocked Start: Wenn der Trainer noch idle ist, startet ein Tap sofort den Einzähler
+    if (trainerStateRef.current === 'idle' && !isPlaying && !isCountingIn) {
+      setSessionCompleted(false);
+      setShowCelebrationModal(false);
+      startCountIn();
+      return;
+    }
+
     // 🛡️ PWA / Mobile Fix: Wenn der Einzähler läuft, darf ein Tap den Trainer NIEMALS abbrechen!
-    // Schüler tippen im Vorzähler oft mit oder antizipieren Schlag 1. Wir geben taktiles & auditives
-    // Feedback, brechen den Einzähler aber keinesfalls ab!
-    if (isCountingIn) {
+    // Schüler tippen im Vorzähler oft mit oder antizipieren Schlag 1. Wir geben taktiles & auditives Feedback!
+    if (trainerStateRef.current === 'counting_in' || isCountingIn) {
       playDrumSound('snare', ctx.currentTime, false);
       setIsPadPressed(true);
       setTimeout(() => setIsPadPressed(false), 80);
       return;
     }
 
-    // 🎯 Unblocked Start: Wenn das Spiel nicht läuft (z.B. nach Rundenende),
-    // startet ein Tap SOFORT eine neue Runde mit Einzähler 1-2-3-4!
-    if (!isPlaying) {
-      setSessionCompleted(false);
-      setShowCelebrationModal(false);
-      handleTogglePlay();
-      return;
-    }
-
     // 🛡️ Wenn während des Spiels der 1.2s Cooldown aktiv ist -> ignorieren
-    if (Date.now() < completionCooldownRef.current) {
+    if (trainerStateRef.current === 'finishing' || Date.now() < completionCooldownRef.current) {
       return;
     }
 
@@ -1506,7 +1621,8 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
     const effectiveTapTime = now - latencySec;
     const elapsedSinceStart = effectiveTapTime - playbackStartTimeRef.current;
 
-    if (elapsedSinceStart < -0.1) return;
+    // Musikalische Vorwegnahme von Schlag 1 tolerant zulassen (bis zu einer halben Subdivision vor Taktbeginn)
+    if (elapsedSinceStart < -secondsPerSub * 0.6) return;
 
     // Mathematical Quantizer
     const nearestStepIndex = Math.max(0, Math.round(elapsedSinceStart / secondsPerSub));
@@ -1536,6 +1652,9 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
 
     const diffMs = rawDiffMs;
     setTimingOffsetMs(diffMs);
+    
+    // 🛡️ Stat-Refs synchron halten
+    totalHitsRef.current += 1;
     setTotalHits(prev => prev + 1);
 
     // Smart Adaptive Instrument Mapping on Tap
@@ -1581,7 +1700,12 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
       currentRating = 'pocket';
       setLastRating('pocket');
       setPerfectHits(prev => prev + 1);
+      scoreSumRef.current += 100;
       setScoreSum(prev => prev + 100);
+      currentStreakRef.current += 1;
+      if (currentStreakRef.current > bestStreakRef.current) {
+        bestStreakRef.current = currentStreakRef.current;
+      }
       setPocketStreak(prev => {
         const next = prev + 1;
         setBestStreak(b => Math.max(b, next));
@@ -1591,7 +1715,12 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
       // 🌟 Gut im Puls (Sehr solides Timing)
       currentRating = 'good';
       setLastRating('good');
+      scoreSumRef.current += 85;
       setScoreSum(prev => prev + 85);
+      currentStreakRef.current += 1;
+      if (currentStreakRef.current > bestStreakRef.current) {
+        bestStreakRef.current = currentStreakRef.current;
+      }
       setPocketStreak(prev => {
         const next = prev + 1;
         setBestStreak(b => Math.max(b, next));
@@ -1601,19 +1730,25 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
       // ⏩ Leicht vor dem Schlag (Rush)
       currentRating = 'rush';
       setLastRating('rush');
+      scoreSumRef.current += 55;
       setScoreSum(prev => prev + 55);
+      currentStreakRef.current = 0;
       setPocketStreak(0);
     } else if (diffMs > 72 && diffMs <= 135) {
       // ⏪ Leicht nach dem Schlag (Drag)
       currentRating = 'drag';
       setLastRating('drag');
+      scoreSumRef.current += 55;
       setScoreSum(prev => prev + 55);
+      currentStreakRef.current = 0;
       setPocketStreak(0);
     } else {
       // 💨 Daneben
       currentRating = 'miss';
       setLastRating('miss');
+      scoreSumRef.current += 0;
       setScoreSum(prev => prev + 0);
+      currentStreakRef.current = 0;
       setPocketStreak(0);
     }
 
@@ -1629,7 +1764,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
       }
     ]);
 
-  }, [activeLevelConfig, activeTargetPattern, bpm, getAudioContext, isCallPhase, isPlaying, latencyOffsetMs, playDrumSound, trainingMode]);
+  }, [activeLevelConfig.subdivisions, activeTargetPattern, bpm, getAudioContext, isCallPhase, isCountingIn, isPlaying, latencyOffsetMs, playDrumSound, startCountIn, trainingMode]);
 
   // Spacebar Keyboard Listener (mit Isolation für Texteingaben wie z.B. Nickname-Modal)
   useEffect(() => {
@@ -2247,6 +2382,106 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
           </div>
         </div>
 
+        {/* 🎛️ Direkte Modus-Schnellwahl (1-Click Switch: Dauer-Groove, Echo, Geister-Beat) */}
+        <div style={{
+          display: 'flex',
+          gap: '6px',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexWrap: 'wrap',
+          padding: '2px 0'
+        }}>
+          <button
+            type="button"
+            onClick={() => {
+              if (!isPlaying && !isCountingIn) setTrainingMode('continuous');
+            }}
+            disabled={isPlaying || isCountingIn}
+            style={{
+              flex: '1 1 120px',
+              maxWidth: '180px',
+              minHeight: '34px',
+              borderRadius: '10px',
+              border: trainingMode === 'continuous' ? '1.5px solid #16a34a' : '1px solid #e2e8f0',
+              background: trainingMode === 'continuous' ? '#dcfce7' : '#ffffff',
+              color: trainingMode === 'continuous' ? '#15803d' : '#64748b',
+              fontSize: isNotebook ? '0.78rem' : '0.72rem',
+              fontWeight: trainingMode === 'continuous' ? 950 : 700,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              cursor: isPlaying || isCountingIn ? 'default' : 'pointer',
+              boxShadow: trainingMode === 'continuous' ? '0 2px 6px rgba(22, 163, 74, 0.18)' : 'none',
+              transition: 'all 0.15s ease'
+            }}
+            title="Dauer-Groove: 16 Takte unterbrechungsfreier Beat-Flow (Standard & Empfohlen)"
+          >
+            <Activity size={13} color={trainingMode === 'continuous' ? '#15803d' : '#64748b'} />
+            <span>Dauer-Groove</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (!isPlaying && !isCountingIn) setTrainingMode('call_response');
+            }}
+            disabled={isPlaying || isCountingIn}
+            style={{
+              flex: '1 1 120px',
+              maxWidth: '180px',
+              minHeight: '34px',
+              borderRadius: '10px',
+              border: trainingMode === 'call_response' ? '1.5px solid #f59e0b' : '1px solid #e2e8f0',
+              background: trainingMode === 'call_response' ? '#fef3c7' : '#ffffff',
+              color: trainingMode === 'call_response' ? '#92400e' : '#64748b',
+              fontSize: isNotebook ? '0.78rem' : '0.72rem',
+              fontWeight: trainingMode === 'call_response' ? 950 : 700,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              cursor: isPlaying || isCountingIn ? 'default' : 'pointer',
+              boxShadow: trainingMode === 'call_response' ? '0 2px 6px rgba(217, 119, 6, 0.18)' : 'none',
+              transition: 'all 0.15s ease'
+            }}
+            title="Echo-Modus: 2 Takte aufmerksam zuhören, danach 2 Takte im Beat nachspielen"
+          >
+            <Headphones size={13} color={trainingMode === 'call_response' ? '#92400e' : '#64748b'} />
+            <span>Echo (Call &amp; Resp.)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (!isPlaying && !isCountingIn) setTrainingMode('disappearing_beat');
+            }}
+            disabled={isPlaying || isCountingIn}
+            style={{
+              flex: '1 1 120px',
+              maxWidth: '180px',
+              minHeight: '34px',
+              borderRadius: '10px',
+              border: trainingMode === 'disappearing_beat' ? '1.5px solid #6366f1' : '1px solid #e2e8f0',
+              background: trainingMode === 'disappearing_beat' ? '#e0e7ff' : '#ffffff',
+              color: trainingMode === 'disappearing_beat' ? '#4338ca' : '#64748b',
+              fontSize: isNotebook ? '0.78rem' : '0.72rem',
+              fontWeight: trainingMode === 'disappearing_beat' ? 950 : 700,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              cursor: isPlaying || isCountingIn ? 'default' : 'pointer',
+              boxShadow: trainingMode === 'disappearing_beat' ? '0 2px 6px rgba(99, 102, 241, 0.18)' : 'none',
+              transition: 'all 0.15s ease'
+            }}
+            title="Geister-Beat: Der Beat blendet sich phasenweise aus – teste dein inneres Metronom!"
+          >
+            <Clock size={13} color={trainingMode === 'disappearing_beat' ? '#4338ca' : '#64748b'} />
+            <span>Geister-Beat</span>
+          </button>
+        </div>
+
         {/* Die Magische Beat-Bühne (Visual Metronome Pulse) */}
         <div style={{
           background: isNotebook 
@@ -2267,9 +2502,25 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
           {/* Signal-Pill & Streak */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: '34px', gap: '8px' }}>
             <span style={{
-              background: isCallPhase ? '#fef3c7' : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-              color: isCallPhase ? '#92400e' : '#ffffff',
-              border: isCallPhase ? '1.5px solid #fde68a' : 'none',
+              background: isCountingIn
+                ? 'linear-gradient(135deg, #d97706 0%, #b45309 100%)'
+                : (!isPlaying
+                  ? '#f8fafc'
+                  : (trainingMode === 'call_response'
+                    ? (isCallPhase ? '#fef3c7' : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)')
+                    : (trainingMode === 'continuous'
+                      ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)'
+                      : (isDisappeared ? '#f1f5f9' : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)')))),
+              color: isCountingIn
+                ? '#ffffff'
+                : (!isPlaying
+                  ? '#64748b'
+                  : (trainingMode === 'call_response' && isCallPhase ? '#92400e' : (isDisappeared ? '#64748b' : '#ffffff'))),
+              border: isCountingIn
+                ? 'none'
+                : (!isPlaying
+                  ? '1px solid #e2e8f0'
+                  : (trainingMode === 'call_response' && isCallPhase ? '1.5px solid #fde68a' : 'none')),
               fontSize: isNotebook ? '0.84rem' : '0.78rem',
               fontWeight: 950,
               padding: isNotebook ? '6px 16px' : '5px 13px',
@@ -2277,18 +2528,34 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '7px',
-              boxShadow: isCallPhase ? '0 2px 8px rgba(217, 119, 6, 0.15)' : '0 2px 10px rgba(22, 163, 74, 0.30)',
+              boxShadow: isCountingIn
+                ? '0 2px 10px rgba(217, 119, 6, 0.35)'
+                : (!isPlaying
+                  ? 'none'
+                  : (trainingMode === 'call_response' && isCallPhase
+                    ? '0 2px 8px rgba(217, 119, 6, 0.15)'
+                    : '0 2px 10px rgba(22, 163, 74, 0.30)')),
               transition: 'all 0.15s ease'
             }}>
-              {trainingMode === 'call_response' 
-                ? (isCallPhase 
+              {isCountingIn ? (
+                <><Activity size={14} color="#ffffff" className="animate-pulse" /> Einzähler läuft • Schlag {countInBeat > 0 ? countInBeat : 1} von 4</>
+              ) : !isPlaying ? (
+                trainingMode === 'continuous'
+                  ? <><Activity size={14} color="#16a34a" /> Dauer-Groove bereit (16 Takte Flow)</>
+                  : (trainingMode === 'call_response'
+                    ? <><Headphones size={14} color="#d97706" strokeWidth={2.5} /> Echo-Modus bereit (2 Takte Vor- &amp; Nachspiel)</>
+                    : <><Clock size={14} color="#6366f1" /> Geister-Beat bereit (Innerer Puls)</>)
+              ) : trainingMode === 'call_response' ? (
+                isCallPhase 
                   ? <><Headphones size={14} color="#92400e" strokeWidth={2.5} /> HÖR GUT ZU! (Noch {2 - (currentBar % 4)} {2 - (currentBar % 4) === 1 ? 'Takt' : 'Takte'})</> 
-                  : <><Target size={14} color="#ffffff" strokeWidth={2.4} /> JETZT DU! (Spiele im Beat)</>)
-                : (trainingMode === 'continuous'
-                  ? <><Activity size={14} color="#ffffff" /> Dauer-Groove (16 Takte Flow)</>
-                  : (isDisappeared 
-                    ? <><Clock size={14} color="#64748b" /> Geister-Beat – Zähle innerlich!</> 
-                    : <><Activity size={14} color="#ffffff" /> Der Beat groovt</>))}
+                  : <><Target size={14} color="#ffffff" strokeWidth={2.4} /> JETZT DU! (Spiele im Beat)</>
+              ) : trainingMode === 'continuous' ? (
+                <><Activity size={14} color="#ffffff" /> Dauer-Groove (16 Takte Flow)</>
+              ) : (
+                isDisappeared 
+                  ? <><Clock size={14} color="#64748b" /> Geister-Beat – Zähle innerlich!</> 
+                  : <><Activity size={14} color="#ffffff" /> Der Beat groovt</>
+              )}
             </span>
 
             {/* Streak & Combo Badge */}
@@ -2356,7 +2623,13 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
             }}
           >
             {activeSyllables.map((syl, sIdx) => {
-              const isCurrent = isPlaying && currentStep === sIdx;
+              // 🛡️ Visuelle Synchronisation: Im Einzähler leuchten die Viertel-Zählzeiten 1-2-3-4 synchron mit den Klicks auf!
+              const isCountInStep = isCountingIn && (
+                activeLevelConfig.subdivisions === 4 
+                  ? sIdx === (countInBeat - 1)
+                  : Math.floor(sIdx / (activeLevelConfig.subdivisions / 4)) === (countInBeat - 1)
+              );
+              const isCurrent = (isPlaying && currentStep === sIdx) || isCountInStep;
               const isAnticipating = isPlaying && anticipatingStep === sIdx;
               const isTarget = activeTargetPattern[sIdx];
 
@@ -2685,7 +2958,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
 
         {/* Rechter Status / Stop Button */}
         <div>
-          {isPlaying ? (
+          {(isPlaying || isCountingIn) ? (
             <button
               type="button"
               onClick={handleTogglePlay}

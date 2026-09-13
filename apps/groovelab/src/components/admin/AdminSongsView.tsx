@@ -328,6 +328,12 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
             totalPages: d.total_pages || 50
           }));
           setLehrwerke(prev => [...prev, ...mapped]);
+          try {
+            const storedCustom = localStorage.getItem('custom_lehrwerke');
+            const parsedCustom = storedCustom ? JSON.parse(storedCustom) : [];
+            const updatedCustom = [...parsedCustom, ...mapped];
+            localStorage.setItem('custom_lehrwerke', JSON.stringify(updatedCustom));
+          } catch {}
           setShowAddLehrwerk(false);
           setBulkModeLehrwerke(false);
           setBulkTextLehrwerke('');
@@ -362,6 +368,12 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
           totalPages: data.total_pages || 50
         };
         setLehrwerke(prev => [...prev, created]);
+        try {
+          const storedCustom = localStorage.getItem('custom_lehrwerke');
+          const parsedCustom = storedCustom ? JSON.parse(storedCustom) : [];
+          const updatedCustom = [...parsedCustom.filter((b: any) => b.id !== created.id), created];
+          localStorage.setItem('custom_lehrwerke', JSON.stringify(updatedCustom));
+        } catch {}
         setShowAddLehrwerk(false);
         setNewLehrwerk({ title: '', author: '', totalPages: 50 });
       }
@@ -388,6 +400,14 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
       }
 
       setLehrwerke(prev => prev.map(item => item.id === editingLehrwerk.id ? { ...item, ...updatePayload, totalPages: updatePayload.total_pages } : item));
+      try {
+        const storedCustom = localStorage.getItem('custom_lehrwerke');
+        if (storedCustom) {
+          const parsedCustom = JSON.parse(storedCustom);
+          const updatedCustom = parsedCustom.map((item: any) => item.id === editingLehrwerk.id ? { ...item, ...updatePayload, totalPages: updatePayload.total_pages } : item);
+          localStorage.setItem('custom_lehrwerke', JSON.stringify(updatedCustom));
+        }
+      } catch {}
       setEditingLehrwerk(null);
     };
 
@@ -403,6 +423,14 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
       }
 
       setLehrwerke(prev => prev.filter(item => item.id !== id));
+      try {
+        const storedCustom = localStorage.getItem('custom_lehrwerke');
+        if (storedCustom) {
+          const parsedCustom = JSON.parse(storedCustom);
+          const updatedCustom = parsedCustom.filter((item: any) => item.id !== id);
+          localStorage.setItem('custom_lehrwerke', JSON.stringify(updatedCustom));
+        }
+      } catch {}
       if (editingLehrwerk?.id === id) setEditingLehrwerk(null);
     };
 
@@ -443,41 +471,45 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
               <button
                 type="button"
                 onClick={() => setShowTeacherToolsModal(true)}
+                aria-label="Aufgaben-Studio und Übe-Tools öffnen"
+                title="Aufgaben-Studio & Übe-Tools öffnen"
                 style={{
-                  background: 'rgba(52, 168, 83, 0.09)',
-                  color: '#2e7d32',
+                  background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
+                  color: '#ffffff',
                   border: 'none',
-                  padding: '7px 18px',
+                  padding: '8px 20px',
                   borderRadius: '9999px',
-                  fontSize: '0.82rem',
-                  fontWeight: 800,
+                  fontSize: '0.84rem',
+                  fontWeight: 850,
                   cursor: 'pointer',
-                  display: 'flex',
+                  display: 'inline-flex',
                   alignItems: 'center',
                   gap: '8px',
-                  transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
                   fontFamily: 'Inter, sans-serif',
-                  boxShadow: 'none'
+                  boxShadow: '0 4px 14px rgba(52, 168, 83, 0.28)',
+                  letterSpacing: '-0.01em',
+                  userSelect: 'none'
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.background = 'rgba(52, 168, 83, 0.15)';
-                  e.currentTarget.style.transform = 'scale(1.02)';
+                  e.currentTarget.style.transform = 'translateY(-1px) scale(1.02)';
+                  e.currentTarget.style.boxShadow = '0 6px 18px rgba(52, 168, 83, 0.38)';
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.background = 'rgba(52, 168, 83, 0.09)';
-                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                  e.currentTarget.style.boxShadow = '0 4px 14px rgba(52, 168, 83, 0.28)';
                 }}
                 onMouseDown={e => {
-                  e.currentTarget.style.transform = 'scale(0.96)';
-                  e.currentTarget.style.background = 'rgba(52, 168, 83, 0.22)';
+                  e.currentTarget.style.transform = 'translateY(1px) scale(0.97)';
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(52, 168, 83, 0.22)';
                 }}
                 onMouseUp={e => {
-                  e.currentTarget.style.transform = 'scale(1.02)';
-                  e.currentTarget.style.background = 'rgba(52, 168, 83, 0.15)';
+                  e.currentTarget.style.transform = 'translateY(-1px) scale(1.02)';
+                  e.currentTarget.style.boxShadow = '0 6px 18px rgba(52, 168, 83, 0.38)';
                 }}
               >
-                <Sliders size={15} />
-                <span>Aufgabenheft / Tools</span>
+                <Sliders size={15} strokeWidth={2.4} color="#ffffff" />
+                <span>Aufgaben-Studio & Tools</span>
               </button>
             )}
           </div>

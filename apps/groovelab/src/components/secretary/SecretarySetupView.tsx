@@ -191,13 +191,100 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
 
   return (
           <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div>
-              <h2 style={{ fontSize: '1.8rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', textAlign: 'left' }}>
-                ⚙️ Einstellungen
-              </h2>
-              <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 600, textAlign: 'left' }}>
-                Wähle ein Modul aus, um Stammdaten, Kalender-Sync, Sicherheit, Datensicherung und Betriebszeiten für deine Schule zu konfigurieren.
-              </p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+              <div>
+                <h2 style={{ fontSize: '1.8rem', fontWeight: 1000, color: '#0f172a', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', textAlign: 'left' }}>
+                  ⚙️ Einstellungen
+                </h2>
+                <p style={{ margin: '6px 0 0 0', fontSize: '0.9rem', color: '#64748b', fontWeight: 600, textAlign: 'left' }}>
+                  Wähle ein Modul aus, um Stammdaten, Kalender-Sync, Sicherheit, Datensicherung und Betriebszeiten für deine Schule zu konfigurieren.
+                </p>
+              </div>
+
+              {/* iOS-Style 3-Way Segmented Control */}
+              <div 
+                role="tablist" 
+                aria-label="Modulbereich filtern" 
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  background: '#f1f5f9',
+                  padding: '4px',
+                  borderRadius: '14px',
+                  border: '1px solid #e2e8f0',
+                  gap: '4px'
+                }}
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={true}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: '#ffffff',
+                    color: '#dc2626',
+                    fontSize: '0.78rem',
+                    fontWeight: 850,
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(220, 38, 38, 0.12)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <span>🏛️ Verwaltung</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={false}
+                  onClick={() => {
+                    if (props.setSettingsTab) props.setSettingsTab('general');
+                    props.setActiveSecretarySettingsModal('general');
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#16a34a',
+                    fontSize: '0.78rem',
+                    fontWeight: 750,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <span>🎓 Campus</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={false}
+                  onClick={() => {
+                    if (props.setSettingsTab) props.setSettingsTab('general');
+                    props.setActiveSecretarySettingsModal('general');
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#b45309',
+                    fontSize: '0.78rem',
+                    fontWeight: 750,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <span>⚡ GrooveLab</span>
+                </button>
+              </div>
             </div>
 
             {/* MODULAR COVER CARDS GRID */}
@@ -634,6 +721,63 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                               onChange={(e) => setLogoUrl(e.target.value)}
                               style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#ffffff' }}
                             />
+                          </div>
+
+                          {/* Unterrichts-Pufferzeiten (Standard: 15 Min Vor-/Nachbereitung) */}
+                          <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '16px', marginTop: '16px' }}>
+                            <strong style={{ fontSize: '0.84rem', display: 'block', color: '#1e293b', marginBottom: '4px' }}>
+                              ⏱️ Unterrichts-Pufferzeiten & Rhythmus
+                            </strong>
+                            <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginBottom: '12px', lineHeight: 1.35 }}>
+                              Festlegung der standardmäßigen Pufferzeiten vor und nach dem Unterricht (z.&nbsp;B. für Raumwechsel, Instrumentenaufbau und Vorbereitung).
+                            </span>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                              <div>
+                                <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>
+                                  Puffer vor Unterricht (Minuten)
+                                </label>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={60}
+                                  step={5}
+                                  defaultValue={(() => {
+                                    try {
+                                      return localStorage.getItem(`groovelab_buffer_before_${schoolId}`) || '15';
+                                    } catch { return '15'; }
+                                  })()}
+                                  onChange={(e) => {
+                                    try {
+                                      localStorage.setItem(`groovelab_buffer_before_${schoolId}`, e.target.value);
+                                    } catch {}
+                                  }}
+                                  style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#ffffff' }}
+                                />
+                              </div>
+                              <div>
+                                <label style={{ fontSize: '0.74rem', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '6px' }}>
+                                  Puffer nach Unterricht (Minuten)
+                                </label>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={60}
+                                  step={5}
+                                  defaultValue={(() => {
+                                    try {
+                                      return localStorage.getItem(`groovelab_buffer_after_${schoolId}`) || '15';
+                                    } catch { return '15'; }
+                                  })()}
+                                  onChange={(e) => {
+                                    try {
+                                      localStorage.setItem(`groovelab_buffer_after_${schoolId}`, e.target.value);
+                                    } catch {}
+                                  }}
+                                  style={{ width: '100%', boxSizing: 'border-box', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.84rem', background: '#ffffff' }}
+                                />
+                              </div>
+                            </div>
                           </div>
                         </div>
 

@@ -71,6 +71,8 @@ export const useVoiceToText = (options: UseVoiceToTextOptions = {}) => {
     };
   }, []);
 
+  const wakeLockRef = useRef<any>(null);
+
   const startListening = useCallback(async () => {
     if (typeof window === 'undefined') return;
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -86,6 +88,13 @@ export const useVoiceToText = (options: UseVoiceToTextOptions = {}) => {
       setError('Mikrofon-Freigabe wurde nicht erteilt.');
       if (onError) onError('Microphone permission denied');
       return;
+    }
+
+    // 📱 Screen WakeLock (Prevent tablet sleep during dictation)
+    if ('wakeLock' in navigator && !wakeLockRef.current) {
+      try {
+        wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+      } catch (e) {}
     }
 
     try {
@@ -143,6 +152,10 @@ export const useVoiceToText = (options: UseVoiceToTextOptions = {}) => {
 
       recognition.onend = () => {
         setIsListening(false);
+        if (wakeLockRef.current) {
+          try { wakeLockRef.current.release(); } catch (e) {}
+          wakeLockRef.current = null;
+        }
       };
 
       recognitionRef.current = recognition;
@@ -151,6 +164,10 @@ export const useVoiceToText = (options: UseVoiceToTextOptions = {}) => {
       console.error('Failed to start speech recognition:', err);
       setError('Mikrofon konnte nicht gestartet werden.');
       setIsListening(false);
+      if (wakeLockRef.current) {
+        try { wakeLockRef.current.release(); } catch (e) {}
+        wakeLockRef.current = null;
+      }
     }
   }, [lang, onResult, onError]);
 
@@ -160,6 +177,10 @@ export const useVoiceToText = (options: UseVoiceToTextOptions = {}) => {
         recognitionRef.current.stop();
       } catch (e) {}
       recognitionRef.current = null;
+    }
+    if (wakeLockRef.current) {
+      try { wakeLockRef.current.release(); } catch (e) {}
+      wakeLockRef.current = null;
     }
     setIsListening(false);
   }, []);

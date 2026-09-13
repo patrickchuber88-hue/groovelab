@@ -231,3 +231,11 @@ export function isQuietHoursActive(
 
   return false;
 }
+
+/**
+ * Bereinigt Chat-Nachrichteninhalte von System-Präfixen wie `[Termin...]`.
+ */
+export const cleanChatMessageContent = (content: string | null | undefined): string => {
+  if (!content) return '';
+  return String(content).replace(/^\[Termin[^\]]+\]\s*/i, '').trim();
+};

@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, Square, Play, Pause, RotateCcw, Check, Loader2, Volume2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP } from '../../utils/audioMasteringEngine';
-import { acquireAudioStream, releaseAudioStream } from '../../services/audioPermissionService';
+import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RAW_LIMITER_GR_DB } from '../../utils/audioMasteringEngine';
+import { acquireAudioStream, releaseAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
 
 interface SimpleVoiceRecorderProps {
   studentId: string;
@@ -61,20 +61,7 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
       audioChunksRef.current = [];
 
       // 🌟 1. Pure Raw Studio Sound Microphone Stream
-      const stream = await acquireAudioStream({
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          googEchoCancellation: false,
-          googAutoGainControl: false,
-          googNoiseSuppression: false,
-          googHighpassFilter: false,
-          googTypingNoiseDetection: false,
-          channelCount: 1,
-          sampleRate: 48000
-        } as any
-      });
+      const stream = await acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS });
       audioStreamRef.current = stream;
 
       // 🌟 2. WebAudio Dual-Channel Center Bridge
@@ -109,11 +96,15 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
       mediaRecorder.onstop = async () => {
         const rawBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType || 'audio/webm' });
         
-        // 🌟 3. Universal EBU R128 Pure RAW Loudness Calibration (-14.5 LUFS / -1.0 dBTP True-Peak Guard)
+        // 🌟 3. Universal EBU R128 Pure RAW Loudness Calibration (-14.5 LUFS / -1.0 dBTP / max 3.0 dB GR)
         let finalBlob = rawBlob;
         let localUrl = '';
         try {
-          const pureRawRes = await processPureRawBlob(rawBlob, { targetLufs: TARGET_PURE_RAW_LUFS, targetPeakDb: TARGET_PEAK_DBTP });
+          const pureRawRes = await processPureRawBlob(rawBlob, { 
+            targetLufs: TARGET_PURE_RAW_LUFS, 
+            targetPeakDb: TARGET_PEAK_DBTP,
+            maxLimiterGrDb: MAX_PURE_RAW_LIMITER_GR_DB
+          });
           finalBlob = pureRawRes.processedBlob;
           localUrl = pureRawRes.processedUrl;
           if (pureRawRes.durationSec) {

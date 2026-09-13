@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Play, 
   Pause, 
@@ -10,10 +10,20 @@ import {
   X, 
   Sliders, 
   Layers, 
-  Sparkles
+  Sparkles,
+  Download
 } from 'lucide-react';
 import { getBlob, storeBlob } from '../../../utils/blobStorage';
-import { playCountInBeep } from './MeisterwerkAudioPlayers';
+import { acquireAudioStream, releaseAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../../services/audioPermissionService';
+import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RAW_LIMITER_GR_DB } from '../../../utils/audioMasteringEngine';
+import { 
+  getSharedAudioContext, 
+  decodeAudioSource, 
+  scheduleCountInBeeps, 
+  playDualTrackSynchronous, 
+  renderDuettMixdown,
+  DualTrackPlaybackSession 
+} from '../../../utils/dualTrackAudioEngine';
 
 export interface DuettDeckModalProps {
   isOpen: boolean;
@@ -34,8 +44,13 @@ export interface DuettDeckModalProps {
     songTag?: string;
     isDuettTake?: boolean;
     latencyOffsetMs?: number;
+    teacherAudioUrl?: string;
+    teacherTitle?: string;
+    teacherBpm?: number;
   }) => void;
 }
+
+const DEFAULT_SMART_LATENCY_MS = 60; // 🌟 Tier-1 SaaS Enterprise+ Smart Pre-Shift
 
 export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
   isOpen,
@@ -61,14 +76,20 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
 
   // Master Playback State
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
+  const [currentPlayheadTime, setCurrentPlayheadTime] = useState(0);
 
-  // Resolved URLs
-  const [resolvedTeacherUrl, setResolvedTeacherUrl] = useState<string>(teacherAudioUrl);
+  // Audio Buffers & Engine State
+  const [isLoadingTeacher, setIsLoadingTeacher] = useState(true);
+  const [teacherDuration, setTeacherDuration] = useState<number>(0);
+  const [studentDuration, setStudentDuration] = useState<number>(0);
+
+  const teacherBufferRef = useRef<AudioBuffer | null>(null);
+  const studentBufferRef = useRef<AudioBuffer | null>(null);
+  const playbackSessionRef = useRef<DualTrackPlaybackSession | null>(null);
+
+  // Student Audio State
   const [studentAudioBlob, setStudentAudioBlob] = useState<Blob | null>(null);
   const [studentAudioUrl, setStudentAudioUrl] = useState<string | null>(null);
-  const [studentDuration, setStudentDuration] = useState<number>(0);
-  const [teacherDuration, setTeacherDuration] = useState<number>(0);
 
   // Recording State
   const [isRecording, setIsRecording] = useState(false);
@@ -78,47 +99,86 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
   // Audio Controls & Mix
   const [teacherVolume, setTeacherVolume] = useState<number>(1.0);
   const [studentVolume, setStudentVolume] = useState<number>(1.0);
-  const [latencyOffsetMs, setLatencyOffsetMs] = useState<number>(0); // -300ms to +300ms
+  const [latencyOffsetMs, setLatencyOffsetMs] = useState<number>(DEFAULT_SMART_LATENCY_MS);
   const [activeMixPreset, setActiveMixPreset] = useState<'100_teacher' | '50_50' | '100_student' | 'custom'>('50_50');
 
-  // Saving State
+  // Saving & Exporting State
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isExportingMix, setIsExportingMix] = useState(false);
 
-  // Audio Element & WebAudio Refs
-  const teacherAudioRef = useRef<HTMLAudioElement | null>(null);
-  const studentAudioRef = useRef<HTMLAudioElement | null>(null);
+  // Internal Execution Refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const activeStreamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordStartTimeRef = useRef<number>(0);
-  const recordIntervalRef = useRef<any>(null);
-  const countInTimerRef = useRef<any>(null);
+  const recordIntervalRef = useRef<number | null>(null);
+  const autoStopTimeoutRef = useRef<number | null>(null);
+  const countInCancelRef = useRef<(() => void) | null>(null);
   const animFrameRef = useRef<number | null>(null);
 
-  // 1. Resolve Teacher Audio Blob / URL
+  // Direct DOM Refs for Zero-Re-Render 120 FPS Playhead
+  const teacherProgressRef = useRef<HTMLDivElement | null>(null);
+  const studentProgressRef = useRef<HTMLDivElement | null>(null);
+  const timeDisplayRef = useRef<HTMLSpanElement | null>(null);
+  const track1TimeRef = useRef<HTMLSpanElement | null>(null);
+  const track2TimeRef = useRef<HTMLSpanElement | null>(null);
+
+  const formatSecs = (s: number) => {
+    const mins = Math.floor(s / 60);
+    const secs = Math.floor(s % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  // 1. Resolve and Decode Teacher Audio Buffer via Web Audio API
   useEffect(() => {
     let active = true;
-    let createdBlobUrl: string | null = null;
+    setIsLoadingTeacher(true);
 
-    if (teacherAudioUrl.startsWith('campus_blob_') || teacherAudioUrl.startsWith('campus_audio_') || teacherAudioUrl.startsWith('offline://')) {
-      getBlob(teacherAudioUrl).then(raw => {
-        if (active && raw) {
-          const finalBlob = raw instanceof Blob ? raw : new Blob([raw], { type: 'audio/webm' });
-          createdBlobUrl = URL.createObjectURL(finalBlob);
-          setResolvedTeacherUrl(createdBlobUrl);
+    const loadTeacherAudio = async () => {
+      try {
+        let rawSource: Blob | string = teacherAudioUrl;
+        if (teacherAudioUrl.startsWith('campus_blob_') || teacherAudioUrl.startsWith('campus_audio_') || teacherAudioUrl.startsWith('offline://')) {
+          const stored = await getBlob(teacherAudioUrl);
+          if (stored) {
+            rawSource = stored instanceof Blob ? stored : new Blob([stored], { type: 'audio/webm' });
+          }
         }
-      }).catch(err => console.warn('[DuettDeckModal] Failed to load teacher blob:', err));
-    } else {
-      setResolvedTeacherUrl(teacherAudioUrl);
-    }
+
+        const audioCtx = getSharedAudioContext();
+        const decodedBuffer = await decodeAudioSource(rawSource, audioCtx);
+
+        if (active) {
+          teacherBufferRef.current = decodedBuffer;
+          setTeacherDuration(decodedBuffer.duration);
+          setIsLoadingTeacher(false);
+        }
+      } catch (err) {
+        console.error('[DuettDeckModal] Error decoding teacher audio buffer:', err);
+        if (active) setIsLoadingTeacher(false);
+      }
+    };
+
+    loadTeacherAudio();
 
     return () => {
       active = false;
-      if (createdBlobUrl) URL.revokeObjectURL(createdBlobUrl);
+      if (playbackSessionRef.current) {
+        playbackSessionRef.current.stop();
+        playbackSessionRef.current = null;
+      }
+      if (countInCancelRef.current) {
+        countInCancelRef.current();
+        countInCancelRef.current = null;
+      }
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
     };
   }, [teacherAudioUrl]);
 
-  // Clean up student blob URL on unmount or reset
+  // Clean up student blob URL
   useEffect(() => {
     return () => {
       if (studentAudioUrl && studentAudioUrl.startsWith('blob:')) {
@@ -127,113 +187,195 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
     };
   }, [studentAudioUrl]);
 
-  // Synchronous Playback Animation Loop
-  const updatePlaybackProgress = () => {
-    if (teacherAudioRef.current && !teacherAudioRef.current.paused) {
-      const t = teacherAudioRef.current.currentTime;
-      setCurrentTime(t);
+  // 2. Direct DOM Playhead Update Loop (Zero-Re-Render Performance)
+  const updatePlayheadDOM = useCallback((t: number) => {
+    const tDur = teacherBufferRef.current ? teacherBufferRef.current.duration : (teacherDuration || 1);
+    const sDur = studentBufferRef.current ? studentBufferRef.current.duration : (studentDuration || 1);
 
-      // Also ensure student audio follows with latency offset
-      if (studentAudioRef.current && !studentAudioRef.current.paused) {
-        const expectedStudentTime = Math.max(0, t - (latencyOffsetMs / 1000));
-        // Soft sync if drift exceeds 40ms
-        if (Math.abs(studentAudioRef.current.currentTime - expectedStudentTime) > 0.04) {
-          studentAudioRef.current.currentTime = expectedStudentTime;
-        }
-      }
-      animFrameRef.current = requestAnimationFrame(updatePlaybackProgress);
-    } else {
-      setIsPlaying(false);
+    const tRatio = Math.max(0, Math.min(1, t / tDur));
+    const effectiveStudentT = Math.max(0, t - (latencyOffsetMs / 1000));
+    const sRatio = Math.max(0, Math.min(1, effectiveStudentT / sDur));
+
+    if (teacherProgressRef.current) {
+      teacherProgressRef.current.style.width = `${tRatio * 100}%`;
     }
-  };
+    if (studentProgressRef.current) {
+      studentProgressRef.current.style.width = `${sRatio * 100}%`;
+    }
+    if (timeDisplayRef.current) {
+      timeDisplayRef.current.textContent = formatSecs(t);
+    }
+    if (track1TimeRef.current) {
+      track1TimeRef.current.textContent = `${formatSecs(t)} / ${formatSecs(tDur)}`;
+    }
+    if (track2TimeRef.current) {
+      track2TimeRef.current.textContent = `${formatSecs(effectiveStudentT)} / ${formatSecs(sDur)}`;
+    }
+  }, [teacherDuration, studentDuration, latencyOffsetMs]);
 
+  // Master Playback Loop
+  const startPlaybackLoop = useCallback(() => {
+    const tick = () => {
+      if (playbackSessionRef.current) {
+        const t = playbackSessionRef.current.getCurrentPlaybackTime();
+        updatePlayheadDOM(t);
+
+        const tDur = teacherBufferRef.current ? teacherBufferRef.current.duration : teacherDuration;
+        if (t >= tDur) {
+          setIsPlaying(false);
+          setCurrentPlayheadTime(0);
+          updatePlayheadDOM(0);
+          if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+          return;
+        }
+
+        animFrameRef.current = requestAnimationFrame(tick);
+      } else {
+        setIsPlaying(false);
+      }
+    };
+    animFrameRef.current = requestAnimationFrame(tick);
+  }, [teacherDuration, updatePlayheadDOM]);
+
+  // Handle Stop and Reset
+  const handleStopAndReset = useCallback(() => {
+    if (playbackSessionRef.current) {
+      playbackSessionRef.current.stop();
+      playbackSessionRef.current = null;
+    }
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    setIsPlaying(false);
+    setCurrentPlayheadTime(0);
+    updatePlayheadDOM(0);
+  }, [updatePlayheadDOM]);
+
+  // Master Play/Pause Toggle
   const handleMasterTogglePlay = () => {
+    if (!teacherBufferRef.current) return;
+
     if (isPlaying) {
-      // Pause both
-      if (teacherAudioRef.current) teacherAudioRef.current.pause();
-      if (studentAudioRef.current) studentAudioRef.current.pause();
+      // Pause
+      if (playbackSessionRef.current) {
+        const pausedTime = playbackSessionRef.current.getCurrentPlaybackTime();
+        playbackSessionRef.current.pause();
+        playbackSessionRef.current = null;
+        setCurrentPlayheadTime(pausedTime);
+        updatePlayheadDOM(pausedTime);
+      }
       setIsPlaying(false);
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     } else {
-      // Play both synchronously
-      const tAudio = teacherAudioRef.current;
-      const sAudio = studentAudioRef.current;
-      if (!tAudio) return;
-
-      if (tAudio.ended || tAudio.currentTime >= tAudio.duration) {
-        tAudio.currentTime = 0;
-        setCurrentTime(0);
-      }
-
-      tAudio.volume = teacherVolume;
-      tAudio.play().then(() => {
-        setIsPlaying(true);
-        if (sAudio && studentAudioUrl) {
-          sAudio.volume = studentVolume;
-          sAudio.currentTime = Math.max(0, tAudio.currentTime - (latencyOffsetMs / 1000));
-          sAudio.play().catch(e => console.warn('[DuettDeckModal] Student play error:', e));
-        }
-        animFrameRef.current = requestAnimationFrame(updatePlaybackProgress);
-      }).catch(err => console.warn('[DuettDeckModal] Teacher play error:', err));
-    }
-  };
-
-  const handleStopAndReset = () => {
-    if (teacherAudioRef.current) {
-      teacherAudioRef.current.pause();
-      teacherAudioRef.current.currentTime = 0;
-    }
-    if (studentAudioRef.current) {
-      studentAudioRef.current.pause();
-      studentAudioRef.current.currentTime = 0;
-    }
-    setIsPlaying(false);
-    setCurrentTime(0);
-    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-  };
-
-  // Mix Presets Handler
-  const handleApplyPreset = (preset: '100_teacher' | '50_50' | '100_student') => {
-    setActiveMixPreset(preset);
-    if (preset === '100_teacher') {
-      setTeacherVolume(1.0);
-      setStudentVolume(0.0);
-      if (teacherAudioRef.current) teacherAudioRef.current.volume = 1.0;
-      if (studentAudioRef.current) studentAudioRef.current.volume = 0.0;
-    } else if (preset === '50_50') {
-      setTeacherVolume(1.0);
-      setStudentVolume(1.0);
-      if (teacherAudioRef.current) teacherAudioRef.current.volume = 1.0;
-      if (studentAudioRef.current) studentAudioRef.current.volume = 1.0;
-    } else if (preset === '100_student') {
-      setTeacherVolume(0.0);
-      setStudentVolume(1.0);
-      if (teacherAudioRef.current) teacherAudioRef.current.volume = 0.0;
-      if (studentAudioRef.current) studentAudioRef.current.volume = 1.0;
-    }
-  };
-
-  // 2. Start Synchronous Recording with 1-Measure Count-In
-  const handleStartRecording = async () => {
-    try {
-      handleStopAndReset();
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: false,
-          autoGainControl: true
+      // Play
+      const startOffset = currentPlayheadTime >= teacherDuration ? 0 : currentPlayheadTime;
+      const session = playDualTrackSynchronous({
+        teacherBuffer: teacherBufferRef.current,
+        studentBuffer: studentBufferRef.current,
+        offsetSec: startOffset,
+        latencyOffsetMs: latencyOffsetMs,
+        teacherVolume: teacherVolume,
+        studentVolume: studentVolume,
+        onEnded: () => {
+          setIsPlaying(false);
+          setCurrentPlayheadTime(0);
+          updatePlayheadDOM(0);
         }
       });
 
-      // Prepare MediaRecorder
+      playbackSessionRef.current = session;
+      setIsPlaying(true);
+      startPlaybackLoop();
+    }
+  };
+
+  // 3. Preset Volume Handlers
+  const handleApplyPreset = (preset: '100_teacher' | '50_50' | '100_student') => {
+    setActiveMixPreset(preset);
+    let tVol = 1.0;
+    let sVol = 1.0;
+
+    if (preset === '100_teacher') {
+      tVol = 1.0;
+      sVol = 0.0;
+    } else if (preset === '50_50') {
+      tVol = 1.0;
+      sVol = 1.0;
+    } else if (preset === '100_student') {
+      tVol = 0.0;
+      sVol = 1.0;
+    }
+
+    setTeacherVolume(tVol);
+    setStudentVolume(sVol);
+
+    if (playbackSessionRef.current) {
+      playbackSessionRef.current.setTeacherVolume(tVol);
+      playbackSessionRef.current.setStudentVolume(sVol);
+    }
+  };
+
+  // 4. Stop Recording Method (Callable manually OR automatically when Track A ends)
+  const handleStopRecording = useCallback(() => {
+    if (countInCancelRef.current) {
+      countInCancelRef.current();
+      countInCancelRef.current = null;
+      setCountInStep(null);
+    }
+
+    if (autoStopTimeoutRef.current) {
+      clearTimeout(autoStopTimeoutRef.current);
+      autoStopTimeoutRef.current = null;
+    }
+
+    if (playbackSessionRef.current) {
+      playbackSessionRef.current.stop();
+      playbackSessionRef.current = null;
+    }
+
+    if (recordIntervalRef.current) {
+      clearInterval(recordIntervalRef.current);
+      recordIntervalRef.current = null;
+    }
+
+    const rec = mediaRecorderRef.current;
+    if (rec && rec.state !== 'inactive') {
+      try { rec.requestData(); } catch (e) {}
+      // 300ms Safety Buffer for natural room decay
+      setTimeout(() => {
+        try {
+          if (rec.state !== 'inactive') {
+            rec.stop();
+          }
+        } catch (e) {}
+      }, 300);
+    }
+
+    setIsRecording(false);
+  }, []);
+
+  // 5. Synchronous Recording with 1-Measure Web Audio Count-In & Auto-Stop
+  const handleStartRecording = async () => {
+    try {
+      if (!teacherBufferRef.current) return;
+      handleStopAndReset();
+
+      const audioCtx = getSharedAudioContext();
+      if (audioCtx.state === 'suspended') {
+        await audioCtx.resume();
+      }
+
+      const stream = await acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS });
+      activeStreamRef.current = stream;
+
       audioChunksRef.current = [];
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
         ? 'audio/webm;codecs=opus' 
         : MediaRecorder.isTypeSupported('audio/mp4') 
           ? 'audio/mp4' 
           : 'audio/webm';
-      
+
       const recorder = new MediaRecorder(stream, { mimeType });
       recorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) {
@@ -241,58 +383,95 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
         }
       };
 
-      recorder.onstop = () => {
-        stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(audioChunksRef.current, { type: mimeType });
-        setStudentAudioBlob(blob);
-        const newUrl = URL.createObjectURL(blob);
-        setStudentAudioUrl(newUrl);
-        setIsRecording(false);
-        if (recordIntervalRef.current) {
-          clearInterval(recordIntervalRef.current);
-          recordIntervalRef.current = null;
+      recorder.onstop = async () => {
+        if (activeStreamRef.current) {
+          releaseAudioStream(activeStreamRef.current);
+          activeStreamRef.current = null;
         }
+
+        const rawBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        let finalBlob = rawBlob;
+        let newUrl = URL.createObjectURL(rawBlob);
+
+        // 🌟 Pure Raw Universal Limiter Normalization (-14.5 LUFS)
+        try {
+          const pureRawRes = await processPureRawBlob(rawBlob, {
+            targetLufs: TARGET_PURE_RAW_LUFS,
+            maxLimiterGrDb: MAX_PURE_RAW_LIMITER_GR_DB,
+            targetPeakDb: TARGET_PEAK_DBTP
+          });
+          finalBlob = pureRawRes.processedBlob;
+          newUrl = pureRawRes.processedUrl;
+          if (pureRawRes.durationSec) {
+            setRecordDuration(Math.round(pureRawRes.durationSec));
+          }
+        } catch (dspErr) {
+          console.warn('[DuettDeckModal] Limiter fallback:', dspErr);
+        }
+
+        // Decode Student Buffer into Web Audio Engine
+        try {
+          const decodedStudent = await decodeAudioSource(finalBlob, audioCtx);
+          studentBufferRef.current = decodedStudent;
+          setStudentDuration(decodedStudent.duration);
+        } catch (decodeErr) {
+          console.warn('[DuettDeckModal] Failed to decode student audio:', decodeErr);
+        }
+
+        setStudentAudioBlob(finalBlob);
+        setStudentAudioUrl(newUrl);
+        setLatencyOffsetMs(DEFAULT_SMART_LATENCY_MS);
+        setIsRecording(false);
       };
 
       mediaRecorderRef.current = recorder;
 
-      // 1-Bar Count-in (4 clicks based on teacherBpm)
+      // 4-Beat Sample-Accurate Count-In via Web Audio Synthesizer
       const effectiveBpm = Math.max(40, Math.min(220, teacherBpm || 100));
-      const intervalMs = (60 / effectiveBpm) * 1000;
-      let count = 4;
-      setCountInStep(count);
-      playCountInBeep(true);
+      const { songStartTime, cancel } = scheduleCountInBeeps(
+        effectiveBpm,
+        4,
+        audioCtx,
+        (beatNumber) => setCountInStep(beatNumber)
+      );
+      countInCancelRef.current = cancel;
 
-      countInTimerRef.current = setInterval(() => {
-        count -= 1;
-        if (count > 0) {
-          setCountInStep(count);
-          playCountInBeep(false);
-        } else {
-          if (countInTimerRef.current) {
-            clearInterval(countInTimerRef.current);
-            countInTimerRef.current = null;
+      // Calculate time until Beat 1
+      const delayUntilBeat1 = Math.max(0, (songStartTime - audioCtx.currentTime) * 1000);
+
+      window.setTimeout(() => {
+        setCountInStep(null);
+        countInCancelRef.current = null;
+
+        // 🎯 SYNCHRONOUS START: Beat 1 starts Track A and Student Recording AT THE IDENTICAL INSTANT!
+        recorder.start(500); // Efficient 500ms chunking
+        setIsRecording(true);
+        recordStartTimeRef.current = Date.now();
+        setRecordDuration(0);
+
+        recordIntervalRef.current = window.setInterval(() => {
+          const elapsed = Math.floor((Date.now() - recordStartTimeRef.current) / 1000);
+          setRecordDuration(elapsed);
+        }, 1000);
+
+        // Start Track A playback through the Web Audio Engine
+        playbackSessionRef.current = playDualTrackSynchronous({
+          teacherBuffer: teacherBufferRef.current!,
+          offsetSec: 0,
+          teacherVolume: teacherVolume,
+          onEnded: () => {
+            // 🎯 SYNCHRONOUS AUTO-STOP: When teacher track reaches its end, auto-stop student recording!
+            handleStopRecording();
           }
-          setCountInStep(null);
+        });
 
-          // Count-in finished: Start Track A & Recording B simultaneously!
-          if (teacherAudioRef.current) {
-            teacherAudioRef.current.currentTime = 0;
-            teacherAudioRef.current.volume = teacherVolume;
-            teacherAudioRef.current.play().catch(err => console.warn('Teacher playback err:', err));
-          }
+        // Hard safety timeout: if teacher buffer finishes + 400ms margin, auto-stop
+        const tDurationSec = teacherBufferRef.current?.duration || teacherDuration || 10;
+        autoStopTimeoutRef.current = window.setTimeout(() => {
+          handleStopRecording();
+        }, (tDurationSec + 0.4) * 1000);
 
-          recorder.start(100);
-          setIsRecording(true);
-          recordStartTimeRef.current = Date.now();
-          setRecordDuration(0);
-
-          recordIntervalRef.current = setInterval(() => {
-            const elapsed = Math.floor((Date.now() - recordStartTimeRef.current) / 1000);
-            setRecordDuration(elapsed);
-          }, 1000);
-        }
-      }, intervalMs);
+      }, delayUntilBeat1);
 
     } catch (err) {
       console.error('[DuettDeckModal] Failed to start recording:', err);
@@ -300,26 +479,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
     }
   };
 
-  const handleStopRecording = () => {
-    if (countInTimerRef.current) {
-      clearInterval(countInTimerRef.current);
-      countInTimerRef.current = null;
-      setCountInStep(null);
-    }
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-    }
-    if (teacherAudioRef.current) {
-      teacherAudioRef.current.pause();
-    }
-    if (recordIntervalRef.current) {
-      clearInterval(recordIntervalRef.current);
-      recordIntervalRef.current = null;
-    }
-    setIsRecording(false);
-  };
-
-  // 3. Save Student Take to Practice Studio
+  // 6. Save Student Take with Rich Metadata to Junior Recordings
   const handleSaveTake = async () => {
     if (!studentAudioBlob || isSaving) return;
     setIsSaving(true);
@@ -328,7 +488,6 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
       const takeId = `duett_take_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       const storageKey = `campus_blob_${takeId}`;
 
-      // Save blob in IndexedDB
       await storeBlob(storageKey, studentAudioBlob);
 
       const dur = studentDuration || recordDuration || 1;
@@ -344,16 +503,19 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
         created_at: nowIso,
         songTag: songTag || teacherTitle,
         isDuettTake: true,
-        latencyOffsetMs: latencyOffsetMs
+        latencyOffsetMs: latencyOffsetMs,
+        teacherAudioUrl: teacherAudioUrl,
+        teacherTitle: teacherTitle,
+        teacherBpm: teacherBpm
       };
 
-      // Append to LocalStorage junior recordings
       const juniorKey = `campus_junior_recordings_${studentId}`;
       const stored = localStorage.getItem(juniorKey);
       let list = stored ? JSON.parse(stored) : [];
       if (!Array.isArray(list)) list = [];
       list.unshift(newTake);
       localStorage.setItem(juniorKey, JSON.stringify(list));
+      window.dispatchEvent(new Event('campus_junior_recordings_updated'));
 
       if (onSaveStudentTake) {
         onSaveStudentTake(newTake);
@@ -366,28 +528,49 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
       }, 1200);
 
     } catch (err) {
-      console.error('[DuettDeckModal] Failed to save student take:', err);
+      console.error('[DuettDeckModal] Failed to save take:', err);
       alert('Speichern fehlgeschlagen.');
     } finally {
       setIsSaving(false);
     }
   };
 
-  if (!isOpen) return null;
+  // 7. 1-Click Stereo Mixdown Export
+  const handleExportMixdown = async () => {
+    if (!teacherBufferRef.current || !studentBufferRef.current || isExportingMix) return;
+    setIsExportingMix(true);
 
-  const formatSecs = (s: number) => {
-    const mins = Math.floor(s / 60);
-    const secs = Math.floor(s % 60);
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    try {
+      const mixBlob = await renderDuettMixdown({
+        teacherBuffer: teacherBufferRef.current,
+        studentBuffer: studentBufferRef.current,
+        latencyOffsetMs: latencyOffsetMs,
+        teacherVolume: teacherVolume,
+        studentVolume: studentVolume
+      });
+
+      const exportUrl = URL.createObjectURL(mixBlob);
+      const a = document.createElement('a');
+      a.href = exportUrl;
+      const safeTitle = teacherTitle.replace(/[^a-zA-Z0-9_-]/g, '_');
+      a.download = `Duett_${safeTitle}_${studentFirstName}.wav`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(exportUrl);
+    } catch (err) {
+      console.error('[DuettDeckModal] Failed to export mixdown:', err);
+      alert('Mixdown-Export fehlgeschlagen.');
+    } finally {
+      setIsExportingMix(false);
+    }
   };
+
+  if (!isOpen) return null;
 
   // Waveform visualization mockup bars (40 bars)
   const teacherWaveform = [30, 45, 70, 50, 80, 95, 65, 40, 85, 90, 60, 45, 80, 100, 75, 55, 70, 85, 60, 40, 50, 75, 90, 65, 80, 95, 70, 45, 60, 85, 90, 65, 50, 70, 85, 60, 45, 35, 25, 20];
   const studentWaveform = [25, 40, 60, 45, 75, 90, 70, 45, 80, 85, 65, 50, 85, 95, 70, 50, 65, 80, 65, 45, 55, 70, 85, 60, 75, 90, 65, 50, 65, 80, 85, 60, 45, 65, 80, 55, 40, 30, 20, 15];
-
-  const teacherProgressRatio = teacherDuration > 0 ? currentTime / teacherDuration : 0;
-  const effectiveStudentTime = Math.max(0, currentTime - (latencyOffsetMs / 1000));
-  const studentProgressRatio = studentDuration > 0 ? effectiveStudentTime / studentDuration : 0;
 
   return (
     <div
@@ -407,45 +590,11 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
       aria-modal="true"
       aria-label="Duett-Deck"
     >
-      {/* Hidden Audio Elements for Playback */}
-      <audio 
-        ref={teacherAudioRef} 
-        src={resolvedTeacherUrl} 
-        preload="auto"
-        onLoadedMetadata={() => {
-          if (teacherAudioRef.current?.duration) {
-            setTeacherDuration(teacherAudioRef.current.duration);
-          }
-        }}
-        onEnded={() => {
-          if (!studentAudioRef.current || studentAudioRef.current.ended) {
-            setIsPlaying(false);
-          }
-        }}
-      />
-      {studentAudioUrl && (
-        <audio 
-          ref={studentAudioRef} 
-          src={studentAudioUrl} 
-          preload="auto"
-          onLoadedMetadata={() => {
-            if (studentAudioRef.current?.duration) {
-              setStudentDuration(studentAudioRef.current.duration);
-            }
-          }}
-          onEnded={() => {
-            if (!teacherAudioRef.current || teacherAudioRef.current.ended) {
-              setIsPlaying(false);
-            }
-          }}
-        />
-      )}
-
       <div
         style={{
           width: '100%',
           maxWidth: isTablet ? '720px' : '680px',
-          maxHeight: isMobile ? '92vh' : '90vh',
+          maxHeight: isMobile ? '94vh' : '90vh',
           background: '#ffffff',
           borderRadius: isMobile ? '24px 24px 0 0' : '28px',
           boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.5)',
@@ -487,7 +636,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
             </div>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: '0.66rem', fontWeight: 900, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                Synchrones Duett-Deck
+                Synchrones Duett-Deck • Web Audio Clock
               </div>
               <h3 style={{ margin: 0, fontSize: isMobile ? '0.96rem' : '1.08rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {teacherTitle}
@@ -522,7 +671,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
           </button>
         </div>
 
-        {/* Workstation Body (Scrollable on small mobile displays) */}
+        {/* Workstation Body */}
         <div style={{ padding: isMobile ? '14px 16px' : '20px', display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '16px', overflowY: 'auto' }}>
 
           {/* ══════════════════════════════════════════════════════════════════
@@ -556,8 +705,8 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                 >
                   Spur 1: Lehrkraft (Fixiert)
                 </span>
-                <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>
-                  {formatSecs(currentTime)} / {formatSecs(teacherDuration)}
+                <span ref={track1TimeRef} style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700 }}>
+                  {isLoadingTeacher ? 'Lädt...' : `${formatSecs(currentPlayheadTime)} / ${formatSecs(teacherDuration)}`}
                 </span>
               </div>
 
@@ -573,7 +722,9 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                   onChange={(e) => {
                     const v = parseFloat(e.target.value);
                     setTeacherVolume(v);
-                    if (teacherAudioRef.current) teacherAudioRef.current.volume = v;
+                    if (playbackSessionRef.current) {
+                      playbackSessionRef.current.setTeacherVolume(v);
+                    }
                     setActiveMixPreset('custom');
                   }}
                   style={{ width: isMobile ? '65px' : '80px', height: '28px', accentColor: '#15803d', cursor: 'pointer' }}
@@ -585,7 +736,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
               </div>
             </div>
 
-            {/* Waveform Teacher */}
+            {/* Zero-Re-Render Waveform Reveal Container (Teacher) */}
             <div
               onClick={(e) => {
                 if (!teacherDuration) return;
@@ -593,11 +744,29 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                 const clickX = e.clientX - rect.left;
                 const newRatio = Math.max(0, Math.min(1, clickX / rect.width));
                 const newT = newRatio * teacherDuration;
-                setCurrentTime(newT);
-                if (teacherAudioRef.current) teacherAudioRef.current.currentTime = newT;
-                if (studentAudioRef.current) studentAudioRef.current.currentTime = Math.max(0, newT - (latencyOffsetMs / 1000));
+                setCurrentPlayheadTime(newT);
+                updatePlayheadDOM(newT);
+
+                if (isPlaying) {
+                  // Restart from click position seamlessly
+                  if (playbackSessionRef.current) playbackSessionRef.current.stop();
+                  playbackSessionRef.current = playDualTrackSynchronous({
+                    teacherBuffer: teacherBufferRef.current!,
+                    studentBuffer: studentBufferRef.current,
+                    offsetSec: newT,
+                    latencyOffsetMs: latencyOffsetMs,
+                    teacherVolume: teacherVolume,
+                    studentVolume: studentVolume,
+                    onEnded: () => {
+                      setIsPlaying(false);
+                      setCurrentPlayheadTime(0);
+                      updatePlayheadDOM(0);
+                    }
+                  });
+                }
               }}
               style={{
+                position: 'relative',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '3px',
@@ -606,25 +775,54 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                 background: '#ffffff',
                 padding: '4px 10px',
                 borderRadius: '12px',
-                border: '1px solid #e2e8f0'
+                border: '1px solid #e2e8f0',
+                overflow: 'hidden'
               }}
             >
-              {teacherWaveform.map((h, idx) => {
-                const barRatio = idx / teacherWaveform.length;
-                const isPast = barRatio <= teacherProgressRatio;
-                return (
+              {/* Background Gray Bars */}
+              {teacherWaveform.map((h, idx) => (
+                <div
+                  key={`tw_bg_${idx}`}
+                  style={{
+                    flex: 1,
+                    height: `${h}%`,
+                    background: '#cbd5e1',
+                    borderRadius: '4px'
+                  }}
+                />
+              ))}
+
+              {/* Foreground Green Active Reveal Overlay */}
+              <div
+                ref={teacherProgressRef}
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: '0%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '3px',
+                  padding: '4px 10px',
+                  overflow: 'hidden',
+                  pointerEvents: 'none',
+                  borderRight: '2.5px solid #15803d',
+                  boxShadow: '2px 0 8px rgba(21, 128, 61, 0.4)'
+                }}
+              >
+                {teacherWaveform.map((h, idx) => (
                   <div
-                    key={`tw_${idx}`}
+                    key={`tw_fg_${idx}`}
                     style={{
                       flex: 1,
                       height: `${h}%`,
-                      background: isPast ? '#16a34a' : '#cbd5e1',
-                      borderRadius: '4px',
-                      transition: 'background 0.1s ease'
+                      background: '#16a34a',
+                      borderRadius: '4px'
                     }}
                   />
-                );
-              })}
+                ))}
+              </div>
             </div>
           </div>
 
@@ -661,13 +859,13 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                   Spur 2: {studentFirstName} (Schüler)
                 </span>
                 {studentAudioUrl && (
-                  <span style={{ fontSize: '0.74rem', color: '#6d28d9', fontWeight: 700 }}>
-                    {formatSecs(Math.max(0, currentTime - (latencyOffsetMs / 1000)))} / {formatSecs(studentDuration)}
+                  <span ref={track2TimeRef} style={{ fontSize: '0.74rem', color: '#6d28d9', fontWeight: 700 }}>
+                    {formatSecs(Math.max(0, currentPlayheadTime - (latencyOffsetMs / 1000)))} / {formatSecs(studentDuration)}
                   </span>
                 )}
               </div>
 
-              {/* Volume Slider Student (if audio exists) */}
+              {/* Volume Slider Student */}
               {studentAudioUrl && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minHeight: '36px' }}>
                   {studentVolume === 0 ? <VolumeX size={16} color="#94a3b8" /> : <Volume2 size={16} color="#7c3aed" />}
@@ -680,7 +878,9 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                     onChange={(e) => {
                       const v = parseFloat(e.target.value);
                       setStudentVolume(v);
-                      if (studentAudioRef.current) studentAudioRef.current.volume = v;
+                      if (playbackSessionRef.current) {
+                        playbackSessionRef.current.setStudentVolume(v);
+                      }
                       setActiveMixPreset('custom');
                     }}
                     style={{ width: isMobile ? '65px' : '80px', height: '28px', accentColor: '#7c3aed', cursor: 'pointer' }}
@@ -709,6 +909,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                 <button
                   type="button"
                   onClick={handleStartRecording}
+                  disabled={isLoadingTeacher}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -717,12 +918,14 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                     padding: isMobile ? '12px 20px' : '14px 26px',
                     minHeight: '48px',
                     borderRadius: '16px',
-                    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                    background: isLoadingTeacher 
+                      ? '#94a3b8' 
+                      : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
                     color: '#ffffff',
                     fontSize: isMobile ? '0.88rem' : '0.96rem',
                     fontWeight: 950,
                     border: 'none',
-                    cursor: 'pointer',
+                    cursor: isLoadingTeacher ? 'wait' : 'pointer',
                     boxShadow: '0 6px 18px rgba(220, 38, 38, 0.35)',
                     transition: 'all 0.18s ease',
                     width: isMobile ? '100%' : 'auto'
@@ -730,10 +933,10 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                   className="hover-scale"
                 >
                   <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#ffffff', animation: 'pulse 1.5s infinite', flexShrink: 0 }} />
-                  <span>Aufnahme starten (mit 1 Takt Einzähler)</span>
+                  <span>{isLoadingTeacher ? 'Lehrerspur lädt...' : 'Aufnahme starten (1 Takt Klick)'}</span>
                 </button>
                 <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 650, lineHeight: 1.35 }}>
-                  🎧 Tipp: Spiele am besten mit Kopfhörern mit, um den Klick sauber zu hören!
+                  🎧 <strong>Auto-Sync:</strong> Aufnahme startet auf Beat 1 synchron mit Spur 1 und <strong>stoppt automatisch</strong> am Song-Ende!
                 </div>
               </div>
             )}
@@ -751,7 +954,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                 }}
               >
                 <div style={{ fontSize: '0.78rem', fontWeight: 900, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  Bereit machen...
+                  Einzähler ({teacherBpm || 100} BPM)
                 </div>
                 <div
                   style={{
@@ -790,9 +993,14 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
                   <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#ef4444', animation: 'pulse 1s infinite', flexShrink: 0 }} />
-                  <span style={{ fontSize: isMobile ? '0.78rem' : '0.86rem', fontWeight: 900, color: '#991b1b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    Aufnahme läuft ({formatSecs(recordDuration)})
-                  </span>
+                  <div>
+                    <div style={{ fontSize: isMobile ? '0.78rem' : '0.86rem', fontWeight: 900, color: '#991b1b' }}>
+                      Synchron-Aufnahme läuft ({formatSecs(recordDuration)})
+                    </div>
+                    <div style={{ fontSize: '0.66rem', color: '#b91c1c', fontWeight: 700 }}>
+                      Stoppt automatisch bei {formatSecs(teacherDuration)}
+                    </div>
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -816,7 +1024,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                   className="hover-scale-mini"
                 >
                   <Square size={14} fill="#ffffff" />
-                  <span>Stopp</span>
+                  <span>Jetzt Stoppen</span>
                 </button>
               </div>
             )}
@@ -825,47 +1033,90 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
             {studentAudioUrl && !isRecording && countInStep === null && (
               <>
                 <div
+                  onClick={(e) => {
+                    if (!teacherDuration) return;
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const clickX = e.clientX - rect.left;
+                    const newRatio = Math.max(0, Math.min(1, clickX / rect.width));
+                    const newT = newRatio * teacherDuration;
+                    setCurrentPlayheadTime(newT);
+                    updatePlayheadDOM(newT);
+
+                    if (isPlaying) {
+                      if (playbackSessionRef.current) playbackSessionRef.current.stop();
+                      playbackSessionRef.current = playDualTrackSynchronous({
+                        teacherBuffer: teacherBufferRef.current!,
+                        studentBuffer: studentBufferRef.current,
+                        offsetSec: newT,
+                        latencyOffsetMs: latencyOffsetMs,
+                        teacherVolume: teacherVolume,
+                        studentVolume: studentVolume,
+                        onEnded: () => {
+                          setIsPlaying(false);
+                          setCurrentPlayheadTime(0);
+                          updatePlayheadDOM(0);
+                        }
+                      });
+                    }
+                  }}
                   style={{
+                    position: 'relative',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '3px',
                     height: isMobile ? '38px' : '42px',
+                    cursor: 'pointer',
                     background: '#ffffff',
                     padding: '4px 10px',
                     borderRadius: '12px',
                     border: '1px solid #ddd6fe',
-                    position: 'relative',
                     overflow: 'hidden'
                   }}
                 >
-                  {/* Visual Latency Offset Overlay */}
+                  {/* Background Gray Bars */}
+                  {studentWaveform.map((h, idx) => (
+                    <div
+                      key={`sw_bg_${idx}`}
+                      style={{
+                        flex: 1,
+                        height: `${h}%`,
+                        background: '#e2e8f0',
+                        borderRadius: '4px'
+                      }}
+                    />
+                  ))}
+
+                  {/* Foreground Purple Active Reveal Overlay */}
                   <div
+                    ref={studentProgressRef}
                     style={{
                       position: 'absolute',
                       left: 0,
                       top: 0,
                       bottom: 0,
-                      width: `${Math.max(0, (latencyOffsetMs / 300) * 15)}%`,
-                      background: latencyOffsetMs > 0 ? 'rgba(124, 58, 237, 0.12)' : 'transparent',
-                      pointerEvents: 'none'
+                      width: '0%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '3px',
+                      padding: '4px 10px',
+                      overflow: 'hidden',
+                      pointerEvents: 'none',
+                      borderRight: '2.5px solid #7c3aed',
+                      boxShadow: '2px 0 8px rgba(124, 58, 237, 0.4)'
                     }}
-                  />
-                  {studentWaveform.map((h, idx) => {
-                    const barRatio = idx / studentWaveform.length;
-                    const isPast = barRatio <= studentProgressRatio;
-                    return (
+                  >
+                    {studentWaveform.map((h, idx) => (
                       <div
-                        key={`sw_${idx}`}
+                        key={`sw_fg_${idx}`}
                         style={{
                           flex: 1,
                           height: `${h}%`,
-                          background: isPast ? '#7c3aed' : '#e9d5ff',
-                          borderRadius: '4px',
-                          transition: 'background 0.1s ease'
+                          background: '#7c3aed',
+                          borderRadius: '4px'
                         }}
                       />
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
 
                 {/* Retake Button */}
@@ -933,36 +1184,79 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                   >
                     {latencyOffsetMs > 0 ? `+${latencyOffsetMs} ms` : `${latencyOffsetMs} ms`}
                   </span>
-                  {latencyOffsetMs !== 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setLatencyOffsetMs(0)}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#64748b',
-                        fontSize: '0.70rem',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        textDecoration: 'underline',
-                        padding: '4px'
-                      }}
-                    >
-                      Reset (0 ms)
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLatencyOffsetMs(DEFAULT_SMART_LATENCY_MS);
+                      updatePlayheadDOM(currentPlayheadTime);
+                    }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#64748b',
+                      fontSize: '0.70rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                      padding: '4px'
+                    }}
+                  >
+                    Auto-Smart (+60 ms)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLatencyOffsetMs(0);
+                      updatePlayheadDOM(currentPlayheadTime);
+                    }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#94a3b8',
+                      fontSize: '0.70rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                      padding: '4px'
+                    }}
+                  >
+                    0 ms
+                  </button>
                 </div>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minHeight: '36px' }}>
                 <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700 }}>-300 ms</span>
                 <input 
-                  type="range"
-                  min="-300"
-                  max="300"
+                  type="range" 
+                  min="-300" 
+                  max="300" 
                   step="5"
                   value={latencyOffsetMs}
-                  onChange={(e) => setLatencyOffsetMs(parseInt(e.target.value, 10))}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    setLatencyOffsetMs(val);
+                    updatePlayheadDOM(currentPlayheadTime);
+
+                    if (isPlaying && playbackSessionRef.current) {
+                      // Seamless on-the-fly offset readjustment
+                      const currentT = playbackSessionRef.current.getCurrentPlaybackTime();
+                      playbackSessionRef.current.stop();
+                      playbackSessionRef.current = playDualTrackSynchronous({
+                        teacherBuffer: teacherBufferRef.current!,
+                        studentBuffer: studentBufferRef.current,
+                        offsetSec: currentT,
+                        latencyOffsetMs: val,
+                        teacherVolume: teacherVolume,
+                        studentVolume: studentVolume,
+                        onEnded: () => {
+                          setIsPlaying(false);
+                          setCurrentPlayheadTime(0);
+                          updatePlayheadDOM(0);
+                        }
+                      });
+                    }
+                  }}
                   style={{ flex: 1, height: '28px', accentColor: '#7c3aed', cursor: 'pointer' }}
                   title="Schiebe nach links/rechts um Latenzen auszugleichen"
                 />
@@ -1039,7 +1333,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
             <button
               type="button"
               onClick={handleMasterTogglePlay}
-              disabled={isRecording || countInStep !== null}
+              disabled={isRecording || countInStep !== null || isLoadingTeacher}
               style={{
                 width: isMobile ? '44px' : '48px',
                 height: isMobile ? '44px' : '48px',
@@ -1051,7 +1345,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                   : 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)',
                 color: '#ffffff',
                 border: 'none',
-                cursor: 'pointer',
+                cursor: isLoadingTeacher ? 'wait' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -1089,50 +1383,79 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
               <RotateCcw size={16} />
             </button>
 
-            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#334155', marginLeft: '2px' }}>
-              {formatSecs(currentTime)}
+            <span ref={timeDisplayRef} style={{ fontSize: '0.78rem', fontWeight: 800, color: '#334155', marginLeft: '2px' }}>
+              {formatSecs(currentPlayheadTime)}
             </span>
           </div>
 
-          {/* Right Action: Save Take */}
+          {/* Right Action: Save Take & Mixdown Export */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {studentAudioUrl && (
-              <button
-                type="button"
-                onClick={handleSaveTake}
-                disabled={isSaving || saveSuccess}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: isMobile ? '10px 14px' : '10px 20px',
-                  minHeight: '44px',
-                  borderRadius: '14px',
-                  background: saveSuccess 
-                    ? '#15803d' 
-                    : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                  color: '#ffffff',
-                  fontSize: isMobile ? '0.78rem' : '0.86rem',
-                  fontWeight: 950,
-                  border: 'none',
-                  cursor: isSaving ? 'wait' : 'pointer',
-                  boxShadow: '0 4px 12px rgba(21, 128, 61, 0.28)',
-                  transition: 'all 0.15s ease'
-                }}
-                className="hover-scale"
-              >
-                {saveSuccess ? (
-                  <>
-                    <Check size={16} strokeWidth={2.8} />
-                    <span>Gespeichert!</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles size={16} />
-                    <span>{isSaving ? 'Speichern...' : (isMobile ? 'Speichern' : 'Take im Studio speichern')}</span>
-                  </>
-                )}
-              </button>
+              <>
+                {/* 1-Click Mixdown Export */}
+                <button
+                  type="button"
+                  onClick={handleExportMixdown}
+                  disabled={isExportingMix}
+                  style={{
+                    padding: isMobile ? '10px 12px' : '10px 14px',
+                    minHeight: '44px',
+                    borderRadius: '14px',
+                    background: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    color: '#475569',
+                    fontSize: isMobile ? '0.74rem' : '0.80rem',
+                    fontWeight: 800,
+                    cursor: isExportingMix ? 'wait' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                  className="hover-scale-mini"
+                  title="Gemastertes Duett als WAV-Audiodatei herunterladen"
+                >
+                  <Download size={15} />
+                  <span>{isExportingMix ? 'Rendert...' : 'WAV-Mix'}</span>
+                </button>
+
+                {/* Save Take */}
+                <button
+                  type="button"
+                  onClick={handleSaveTake}
+                  disabled={isSaving || saveSuccess}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: isMobile ? '10px 14px' : '10px 18px',
+                    minHeight: '44px',
+                    borderRadius: '14px',
+                    background: saveSuccess 
+                      ? '#15803d' 
+                      : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                    color: '#ffffff',
+                    fontSize: isMobile ? '0.78rem' : '0.86rem',
+                    fontWeight: 950,
+                    border: 'none',
+                    cursor: isSaving ? 'wait' : 'pointer',
+                    boxShadow: '0 4px 12px rgba(21, 128, 61, 0.28)',
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover-scale"
+                >
+                  {saveSuccess ? (
+                    <>
+                      <Check size={16} strokeWidth={2.8} />
+                      <span>Gespeichert!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={16} />
+                      <span>{isSaving ? 'Speichern...' : (isMobile ? 'Speichern' : 'Take im Studio speichern')}</span>
+                    </>
+                  )}
+                </button>
+              </>
             )}
 
             <button

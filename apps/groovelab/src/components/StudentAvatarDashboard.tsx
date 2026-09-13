@@ -27,8 +27,9 @@ import { AudioTrackCarousel, AudioTrackItem } from './AudioTrackCarousel';
 import { ZenPlayAlongDock, PreFlightAudioPreviewButton, PreFlightAudioPlayerSection, getTrackPedagogicalType, playCountInBeep } from './campus/ZenPlayAlongDock';
 import { MeisterOhrSticker } from './MeisterOhrSticker';
 import { getAvatarLevelFrameStyle, resolveCampusStudentAvatar } from './StudioAvatar';
-import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP } from '../utils/audioMasteringEngine';
+import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RAW_LIMITER_GR_DB } from '../utils/audioMasteringEngine';
 import { computeGroundTruthMetrics, broadcastPracticeUpdate, DEFAULT_FOKUS_LEVELS, getEngineEffectiveLevel } from '../utils/studentProgressEngine';
+import { SharedAudioEngine } from '../utils/sharedAudioEngine';
 import { synthesizeNeuralSpeech, playAudioBlob, stopNeuralSpeech, buildContinuousHomeworkNarrative, cleanTextForTts } from '../services/neuralTtsService';
 import { fetchHolidaysCached } from '../utils/holidayHelper';
 import { useParentSessionLock } from '../hooks/useParentSessionLock';
@@ -53,6 +54,9 @@ import { StudentHeroTab } from './student/tabs/StudentHeroTab';
 import { CampusAppointmentShoutboxModal } from './CampusAppointmentShoutboxModal';
 import { StudentRescheduleBottomSheetModal } from './student/modals/StudentRescheduleBottomSheetModal';
 import { getSanitizedRpId, registerBiometrics, isWebAuthnSupported, authenticateParentBiometricPasskey } from '../utils/webauthn';
+import { useFocusInterruptionGuard, FocusAbortReason } from '../hooks/useFocusInterruptionGuard';
+import { FocusInterruptionBanner } from './focus/FocusInterruptionBanner';
+import { FocusAbortedModal } from './focus/FocusAbortedModal';
 
 // 🚀 High-Performance Lazy Loaded Sub-Suites & Heavy Modals
 const StudentPracticeTab = lazy(() => import('./student/tabs/StudentPracticeTab').then(m => ({ default: m.StudentPracticeTab })));
@@ -328,6 +332,26 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     });
   };
 
+  // ⏱️ F18: Pädagogischer Screen-Time Tracker (Monochrome Pause-Hinweispille nach 45 Min)
+  const [showScreenTimeToast, setShowScreenTimeToast] = useState<boolean>(false);
+  const activeScreenTimeSecondsRef = useRef<number>(0);
+
+  useEffect(() => {
+    const parentMaxMinutes = Number(localStorage.getItem(`cg_parent_max_screen_minutes_${studentId}`) || 45);
+
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        activeScreenTimeSecondsRef.current += 1;
+        if (activeScreenTimeSecondsRef.current >= parentMaxMinutes * 60) {
+          setShowScreenTimeToast(true);
+          activeScreenTimeSecondsRef.current = 0;
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [studentId]);
+
   const [certificateSong, setCertificateSong] = useState<any | null>(null);
   const [resolvedSchoolName, setResolvedSchoolName] = useState<string>(() => {
     return (initialUser as any)?.schools?.name || (initialUser as any)?.school_name || (typeof window !== 'undefined' ? (localStorage.getItem('groovelab_school_name') || localStorage.getItem('campus_school_name')) : '') || 'Campus-Groovelab Musikschule';
@@ -342,6 +366,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       last_name: '', // 🛡️ Zero-Knowledge: 100% last_name exclusion in student view
       photo_url: studentUser.photo_url || '/avatar_ghost.jpg',
       is_campus_active: studentUser.is_campus_active ?? false,
+      campus_ui_level: studentUiLevel || studentUser?.campus_ui_level,
+      parent_permissions: (studentUser as any)?.parent_permissions,
       school_id: studentUser?.school_id,
       schoolId: studentUser?.school_id,
       schools: studentUser?.schools,
@@ -351,7 +377,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       created_at: studentUser?.created_at,
       activated_at: studentUser?.activated_at
     };
-  }, [studentUser, studentId, resolvedSchoolName]);
+  }, [studentUser, studentId, studentUiLevel, resolvedSchoolName]);
 
   useEffect(() => {
     const sId = studentUser?.school_id || (typeof window !== 'undefined' ? (localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id')) : null);
@@ -1091,7 +1117,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       allowTimer: true,
       allowLeaderboard: false,
       allowProposals: true,
-      allowAudio: false, // 🛡️ Privacy by Default (Art. 25 Abs. 2 DSGVO)
+      allowAudio: true, // 🎵 Aufgabenheft & didaktische Übe-Aufnahmen standardmäßig freigegeben
       allowTts: true,
       bedtimeEnabled: true,
       bedtimeStart: '20:00',
@@ -1099,7 +1125,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       boardOverrides: {
         practice_board: true,
         mediathek: true,
-        recordings: false, // 🛡️ Privacy by Default
+        recordings: true, // 🎵 Aufgabenheft-Aufnahmen aktiv
         events: true,
         campus_cup: false,
         messages: false
@@ -1114,7 +1140,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       allowTimer: true,
       allowLeaderboard: true,
       allowProposals: true,
-      allowAudio: false, // 🛡️ Privacy by Default (Art. 25 Abs. 2 DSGVO)
+      allowAudio: true, // 🎵 Aufgabenheft & didaktische Übe-Aufnahmen standardmäßig freigegeben
       allowTts: false,
       bedtimeEnabled: true,
       bedtimeStart: '21:30',
@@ -1122,7 +1148,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       boardOverrides: {
         practice_board: true,
         mediathek: true,
-        recordings: false, // 🛡️ Privacy by Default
+        recordings: true, // 🎵 Aufgabenheft-Aufnahmen aktiv
         events: true,
         campus_cup: true,
         messages: true
@@ -1922,8 +1948,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       const teacherObj = (studentUser as any)?.teachers || (studentUser as any)?.teacher;
       if (teacherObj) {
         resolvedTeacherName = formatTeacherFullName(teacherObj);
-      } else if (briefingData?.todayLesson?.teacher_name) {
-        resolvedTeacherName = briefingData.todayLesson.teacher_name;
+      } else if (briefingData?.todayLesson?.teacher_name || briefingData?.todayLesson?.teacher) {
+        resolvedTeacherName = formatTeacherFullName(briefingData.todayLesson.teacher_name || briefingData.todayLesson.teacher);
       } else if (studentUser?.teacher_id) {
         try {
           const { data: tData } = await supabase.from('users').select('first_name, last_name').eq('id', studentUser.teacher_id).maybeSingle();
@@ -2550,7 +2576,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       const [{ data: occurrences }, { data: schedules }] = await Promise.all([
         supabase
           .from('schedule_occurrences')
-          .select('*, schedule:schedule_id(*, rooms(name))')
+          .select('*, teacher:users!schedule_occurrences_teacher_id_fkey(id, first_name, last_name, avatar_url, photo_url), schedule:schedule_id(*, teacher:users!schedules_teacher_id_fkey(first_name, last_name), rooms(name))')
           .eq('student_id', studentId)
           .gte('date', todayStr)
           .order('date', { ascending: true })
@@ -2839,7 +2865,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       const [{ data: occurrences, error: occErr }, { data: schedules, error: schErr }] = await Promise.all([
         supabase
           .from('schedule_occurrences')
-          .select('*, schedule:schedule_id(*, rooms(name))')
+          .select('*, teacher:users!schedule_occurrences_teacher_id_fkey(id, first_name, last_name, avatar_url, photo_url), schedule:schedule_id(*, teacher:users!schedules_teacher_id_fkey(first_name, last_name), rooms(name))')
           .eq('student_id', studentId)
           .gte('date', startStr)
           .lte('date', endStr)
@@ -4746,13 +4772,27 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
   useEffect(() => {
     if (!studentId) return;
-    try {
-      const localKey = `campus_junior_recordings_${studentId}`;
-      const stored = localStorage.getItem(localKey);
-      if (stored) {
-        setJuniorLocalRecordings(JSON.parse(stored));
-      }
-    } catch {}
+    const reloadLocalRecordings = () => {
+      try {
+        const localKey = `campus_junior_recordings_${studentId}`;
+        const stored = localStorage.getItem(localKey);
+        if (stored) {
+          setJuniorLocalRecordings(JSON.parse(stored));
+        } else {
+          setJuniorLocalRecordings([]);
+        }
+      } catch {}
+    };
+
+    reloadLocalRecordings();
+
+    window.addEventListener('campus_junior_recordings_updated', reloadLocalRecordings);
+    window.addEventListener('storage', reloadLocalRecordings);
+
+    return () => {
+      window.removeEventListener('campus_junior_recordings_updated', reloadLocalRecordings);
+      window.removeEventListener('storage', reloadLocalRecordings);
+    };
   }, [studentId]);
 
   // High-End Studio Preview Player State
@@ -4861,13 +4901,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     setJuniorCountdown(null);
 
     const isStudentActor = !isTeacherSession;
-    const isStudentAudioPermitted = (studentUser as any)?.parent_permissions?.allow_student_audio === true ||
-      (typeof window !== 'undefined' && studentId ? localStorage.getItem(`groovelab_parent_allow_student_audio_${studentId}`) === 'true' : false);
-    const isAudioGloballyAllowed = (draftAllowAudio === true || (studentUser as any)?.parent_allow_audio === true || (typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_audio_${studentId}`) === 'true'));
-
     if (isStudentActor) {
-      if (!isStudentAudioPermitted || !isAudioGloballyAllowed) {
-        alert('Die Aufnahme-Funktion für Schüler ist im Eltern-Kontrollzentrum aktuell noch nicht freigegeben (Privacy by Default). Bitte deine Eltern, sie im Eltern-Bereich zu aktivieren.');
+      const isAudioDenied = (studentUser as any)?.parent_allow_audio === false ||
+        ((studentUser as any)?.parent_permissions?.allow_student_audio === false);
+      if (isAudioDenied) {
+        alert('Die Aufnahme-Funktion für Schüler ist im Eltern-Kontrollzentrum aktuell pausiert. Bitte deine Eltern, sie im Eltern-Bereich zu aktivieren.');
         setShowJuniorRecordModal(false);
         return;
       }
@@ -4966,9 +5004,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       };
 
       // 2. Pre-warm and ensure AudioContext is active for instantaneous latency-free beeps
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
+      audioContextRef.current = SharedAudioEngine.getContext();
       if (audioContextRef.current.state === 'suspended') {
         await audioContextRef.current.resume().catch(() => {});
       }
@@ -5112,8 +5148,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
       let saveBlob = juniorRecordedBlob;
       try {
-        // 🌟 Universal EBU R128 Pure RAW Loudness Calibration (-14.5 LUFS / -1.0 dBTP True-Peak Guard)
-        const pureRawResult = await processPureRawBlob(juniorRecordedBlob, { targetLufs: TARGET_PURE_RAW_LUFS, targetPeakDb: TARGET_PEAK_DBTP });
+        // 🌟 Universal EBU R128 Pure RAW Loudness Calibration (-14.5 LUFS / -1.0 dBTP / max 3.0 dB GR)
+        const pureRawResult = await processPureRawBlob(juniorRecordedBlob, { 
+          targetLufs: TARGET_PURE_RAW_LUFS, 
+          targetPeakDb: TARGET_PEAK_DBTP,
+          maxLimiterGrDb: MAX_PURE_RAW_LIMITER_GR_DB
+        });
         saveBlob = pureRawResult.processedBlob;
       } catch (dspErr) {
         console.warn('[saveJuniorRecording] Pure RAW DSP note:', dspErr);
@@ -5544,6 +5584,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         }
         setJuniorActivePlayingAudioId(null);
       }
+      window.dispatchEvent(new Event('campus_junior_recordings_updated'));
+      window.dispatchEvent(new Event('storage'));
       await fetchStudentProgress(true);
     } catch (err) {
       console.error('Error deleting recording:', err);
@@ -5676,7 +5718,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       return () => clearTimeout(timer);
     } else {
       setPreStartCountdown(null);
-      setIsPhoneFlat(true); // default to flat/focused when starting
+      const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const usesSensorsNow = isMobileDevice && typeof window !== 'undefined' && 'DeviceOrientationEvent' in window;
+      setIsPhoneFlat(!usesSensorsNow);
     }
   }, [preStartCountdown]);
 
@@ -5724,13 +5768,16 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
     if (isWakeLockNeeded) {
       acquireWakeLock();
+      SharedAudioEngine.startSessionAudioBypass();
       document.addEventListener('visibilitychange', handleVisibility);
     } else {
       releaseWakeLock();
+      SharedAudioEngine.stopSessionAudioBypass();
     }
 
     return () => {
       releaseWakeLock();
+      SharedAudioEngine.stopSessionAudioBypass();
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [sessionActive, isMusicStandMode]);
@@ -6491,7 +6538,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const [wrappedLoading, setWrappedLoading] = useState(false);
 
   const timerRef = useRef<any>(null);
+  // Shared WebAudio context singleton proxy (immune against iOS 4-6 hardware limit)
   const audioContextRef = useRef<AudioContext | null>(null);
+  const getDashboardAudioContext = useCallback(() => {
+    return SharedAudioEngine.getContext();
+  }, []);
   const lastHighlightsFetchRef = useRef<number>(0);
   const highlightsLoadedRef = useRef<boolean>(false);
 
@@ -6511,10 +6562,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
   useEffect(() => {
     return () => {
-      if (audioContextRef.current) {
-        audioContextRef.current.close().catch(err => console.warn('Error closing AudioContext:', err));
-        audioContextRef.current = null;
-      }
+      // Do not hard-close the shared singleton AudioContext, just detach local reference
+      audioContextRef.current = null;
     };
   }, []);
 
@@ -6778,9 +6827,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
     // ⚡ 1. Ultra-Fast Parallel SWR Supabase Queries (including global items)
     try {
-      const lehrwerkePromise = schoolId 
-        ? supabase.from('lehrwerke').select('*').or(`school_id.eq.${schoolId},school_id.is.null`).order('title')
-        : supabase.from('lehrwerke').select('*').order('title');
+      const teacherId = studentUser?.teacher_id || (studentUser as any)?.teacherId;
+      let lehrwerkeQuery = supabase.from('lehrwerke').select('*');
+      const orParts: string[] = ['school_id.is.null'];
+      if (schoolId) orParts.push(`school_id.eq.${schoolId}`);
+      if (teacherId) orParts.push(`teacher_id.eq.${teacherId}`);
+      const lehrwerkePromise = lehrwerkeQuery.or(orParts.join(',')).order('title');
 
       const songsPromise = schoolId
         ? supabase.from('songs').select('*').or(`school_id.eq.${schoolId},school_id.is.null`).order('title')
@@ -6814,6 +6866,32 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           ...item,
           totalPages: item.total_pages || 50
         }));
+
+        // Merge locally cached custom Lehrwerke (strictly deduplicated by ID and Title)
+        try {
+          const storedCustom = localStorage.getItem('custom_lehrwerke');
+          if (storedCustom) {
+            const parsedCustom = JSON.parse(storedCustom);
+            if (Array.isArray(parsedCustom)) {
+              parsedCustom.forEach(c => {
+                if (c && c.id) {
+                  const normCustomTitle = (c.title || '').trim().toLowerCase();
+                  const alreadyExists = loadedLehrwerke.some(m => 
+                    String(m.id) === String(c.id) || 
+                    (m.title || '').trim().toLowerCase() === normCustomTitle
+                  );
+                  if (!alreadyExists) {
+                    loadedLehrwerke.push({
+                      ...c,
+                      totalPages: c.totalPages || c.total_pages || 50
+                    });
+                  }
+                }
+              });
+            }
+          }
+        } catch {}
+
         if (loadedLehrwerke.length > 0) {
           setLehrwerke(loadedLehrwerke);
         }
@@ -7003,6 +7081,66 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           });
           return combined;
         });
+
+        // 🛡️ Cold Cache / Online Auto-Healing for campus_homework_notes_${targetId}:
+        // Extracts all active didactic homework notes and audio tokens from loadedProgress
+        // so that modal dialogs and child tabs reading localStorage get instant parity with the DB.
+        try {
+          const hwStorageKey = `campus_homework_notes_${targetId}`;
+          const existingLocal = localStorage.getItem(hwStorageKey);
+          let localList: string[] = [];
+          try {
+            if (existingLocal) {
+              localList = JSON.parse(existingLocal);
+              if (!Array.isArray(localList)) localList = [existingLocal];
+            }
+          } catch {
+            localList = existingLocal ? [existingLocal] : [];
+          }
+
+          const dbNotesToSync: string[] = [];
+          loadedProgress.forEach((pItem: any) => {
+            if (pItem.is_current_homework || (pItem.topic_name && pItem.topic_name.startsWith('Hausaufgabe KW '))) {
+              [pItem.homework_notes, pItem.teacher_notes].forEach((rawField: any) => {
+                if (rawField && typeof rawField === 'string' && rawField.trim()) {
+                  try {
+                    const parsed = JSON.parse(rawField);
+                    if (Array.isArray(parsed)) {
+                      parsed.forEach((n: any) => {
+                        if (typeof n === 'string' && n.trim() && !dbNotesToSync.includes(n.trim())) {
+                          dbNotesToSync.push(n.trim());
+                        }
+                      });
+                    } else if (typeof parsed === 'string' && parsed.trim() && !dbNotesToSync.includes(parsed.trim())) {
+                      dbNotesToSync.push(parsed.trim());
+                    }
+                  } catch {
+                    if (!dbNotesToSync.includes(rawField.trim())) {
+                      dbNotesToSync.push(rawField.trim());
+                    }
+                  }
+                }
+              });
+            }
+          });
+
+          // If dbNotesToSync has items and localList is empty or missing items, merge and persist
+          if (dbNotesToSync.length > 0) {
+            const mergedHwList = [...localList];
+            let hasNewEntries = false;
+            dbNotesToSync.forEach(entry => {
+              if (!mergedHwList.includes(entry)) {
+                mergedHwList.push(entry);
+                hasNewEntries = true;
+              }
+            });
+            if (hasNewEntries) {
+              localStorage.setItem(hwStorageKey, JSON.stringify(mergedHwList));
+            }
+          }
+        } catch (hwHealErr) {
+          console.warn('[Auto-heal campus_homework_notes] notice:', hwHealErr);
+        }
       }
 
       // Persist cache snapshot for instant 0ms loads
@@ -7072,7 +7210,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     if (!studentId) return;
     const playMatchChime = () => {
       try {
-        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const audioCtx = SharedAudioEngine.getContext();
         const now = audioCtx.currentTime;
         const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6 (Happy Major Chime)
         notes.forEach((freq, i) => {
@@ -7087,12 +7225,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           osc.start(now + i * 0.11);
           osc.stop(now + i * 0.11 + 0.7);
         });
-        setTimeout(() => {
-          if (audioCtx.state !== 'closed') {
-            audioCtx.close().catch(() => {});
-          }
-        }, 1200);
-      } catch (e) {}
+      } catch (e) {
+        console.warn('Match chime audio fallback:', e);
+      }
     };
 
     const channel = supabase.channel(`realtime_student_progress_${studentId}`);
@@ -7706,9 +7841,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         return;
       }
     }
+    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const usesSensorsNow = isMobileDevice && typeof window !== 'undefined' && 'DeviceOrientationEvent' in window;
     setSelectedTopic('Allgemeines Üben');
     setSecondsElapsed(0);
-    setIsPhoneFlat(true);
+    setIsPhoneFlat(!usesSensorsNow);
     setIsExtraTime(false);
     setPreStartCountdown(studentUiLevel === 'junior' ? null : 3);
     setSessionActive(true);
@@ -7755,6 +7892,73 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           });
       });
   };
+
+  // 🛡️ Enterprise Anti-Ablenkungs- & Fokus-Wächter: Abbruch & Fail-Closed Reset
+  const [focusWarningToast, setFocusWarningToast] = useState<string | null>(null);
+
+  const abortPracticeSession = useCallback((reason: FocusAbortReason) => {
+    setSessionActive(false);
+    SharedAudioEngine.stopSessionAudioBypass();
+
+    // Heartbeat-Logs restlos bereinigen (Fail-Closed: Keine Teilanrechnung)
+    if (currentLogIdRef.current) {
+      const logId = currentLogIdRef.current;
+      currentLogIdRef.current = null;
+      supabase.from('fokus_logs').delete().eq('id', logId).then(() => {});
+    }
+    if (currentExtraLogIdRef.current) {
+      const extraId = currentExtraLogIdRef.current;
+      currentExtraLogIdRef.current = null;
+      supabase.from('fokus_logs').delete().eq('id', extraId).then(() => {});
+    }
+
+    setSecondsElapsed(0);
+    secondsElapsedRef.current = 0;
+    setIsExtraTime(false);
+    setIsGraceActive(false);
+    isFinishingSessionRef.current = false;
+    setJuniorMissionPhase('idle');
+    setJuniorMissionCountdown(null);
+
+    // Laufende Junior-Aufnahme abbrechen und verwerfen
+    if (juniorMediaRecorderRef.current && juniorMediaRecorderRef.current.state !== 'inactive') {
+      try {
+        juniorMediaRecorderRef.current.onstop = null;
+        juniorMediaRecorderRef.current.stop();
+      } catch (e) {}
+    }
+    if (juniorAudioStreamRef.current) {
+      juniorAudioStreamRef.current.getTracks().forEach(t => t.stop());
+      juniorAudioStreamRef.current = null;
+    }
+    setJuniorIsRecording(false);
+    setJuniorRecordedBlob(null);
+    setJuniorRecordedUrl(null);
+  }, []);
+
+  const isLeavingPracticeTool = useMemo(() => {
+    if (!sessionActive) return false;
+    // 1. In-App Tab-Wechsel weg vom Practice Board
+    if (activeTab !== 'practice_board') return true;
+    // 2. Handy hochgehoben (Gyro Detox: nicht flach hingelegt) nachdem der 3-2-1 Vorstart-Countdown vorbei ist
+    if (!isPhoneFlat && preStartCountdown === null) return true;
+    return false;
+  }, [sessionActive, activeTab, isPhoneFlat, preStartCountdown]);
+
+  const focusGuard = useFocusInterruptionGuard({
+    isActive: sessionActive,
+    toolName: 'Fokus-Übetimer',
+    isLeavingTool: isLeavingPracticeTool,
+    onAbort: (reason) => {
+      abortPracticeSession(reason);
+    },
+    onRecovered: () => {
+      setFocusWarningToast('⚠️ Verwarnung 1/1 aktiv: Du hast das Übe-Tool verlassen. Beim nächsten Verlassen bricht die Session sofort ab!');
+      setTimeout(() => {
+        setFocusWarningToast(null);
+      }, 6000);
+    }
+  });
 
   const finishPracticeSession = async (explicitXpGained?: number) => {
     if (isFinishingSessionRef.current) return;
@@ -8429,10 +8633,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
   const playBeep = (freq: number, duration: number) => {
     try {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-      const ctx = audioContextRef.current;
+      const ctx = SharedAudioEngine.getContext();
+      audioContextRef.current = ctx;
       if (ctx.state === 'suspended') {
         ctx.resume();
       }
@@ -8454,10 +8656,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
   const playSuccessChime = () => {
     try {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-      const ctx = audioContextRef.current;
+      const ctx = SharedAudioEngine.getContext();
+      audioContextRef.current = ctx;
       const now = ctx.currentTime;
       const notes = [261.63, 329.63, 392.00, 523.25]; // C4, E4, G4, C5
       notes.forEach((freq, index) => {
@@ -8482,10 +8682,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
   const playMilestoneSound = (tier: 1 | 2 | 3) => {
     try {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-      const ctx = audioContextRef.current;
+      const ctx = SharedAudioEngine.getContext();
+      audioContextRef.current = ctx;
       const now = ctx.currentTime;
 
       if (tier === 1) {
@@ -8541,10 +8739,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
   const playSpaceLaunchSound = () => {
     try {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-      const ctx = audioContextRef.current;
+      const ctx = SharedAudioEngine.getContext();
+      audioContextRef.current = ctx;
       if (ctx.state === 'suspended') {
         ctx.resume();
       }
@@ -8607,10 +8803,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
   const playStarChimeSound = () => {
     try {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-      const ctx = audioContextRef.current;
+      const ctx = SharedAudioEngine.getContext();
+      audioContextRef.current = ctx;
       if (ctx.state === 'suspended') {
         ctx.resume();
       }
@@ -8638,10 +8832,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   // 💨 Stufe 1: Sputter-Sound bei Treibstoff-Mangel (Cartooniges Husten / Puffs)
   const playRocketSputterSound = () => {
     try {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-      const ctx = audioContextRef.current;
+      const ctx = SharedAudioEngine.getContext();
+      audioContextRef.current = ctx;
       if (ctx.state === 'suspended') ctx.resume();
       const now = ctx.currentTime;
 
@@ -8667,10 +8859,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   // 🚀 Stufe 2: Resonanter Orbit-Raketenstart (120Hz -> 620Hz mit Sub-Bass)
   const playOrbitLaunchSound = () => {
     try {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-      const ctx = audioContextRef.current;
+      const ctx = SharedAudioEngine.getContext();
+      audioContextRef.current = ctx;
       if (ctx.state === 'suspended') ctx.resume();
       const now = ctx.currentTime;
 
@@ -8716,10 +8906,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   // ✨ Stufe 2 Belohnung: Polyphones Himmels-Glockenspiel (C5, E5, G5, B5, D6)
   const playCelestialVictoryChime = () => {
     try {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-      const ctx = audioContextRef.current;
+      const ctx = SharedAudioEngine.getContext();
+      audioContextRef.current = ctx;
       if (ctx.state === 'suspended') ctx.resume();
       const now = ctx.currentTime;
 
@@ -8745,10 +8933,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   // 🌌 Stufe 3: Hyperraum-Warp Sound (Sci-Fi Sweep + C6-D7 Sternenstaub-Schimmer)
   const playHyperspaceWarpSound = () => {
     try {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-      const ctx = audioContextRef.current;
+      const ctx = SharedAudioEngine.getContext();
+      audioContextRef.current = ctx;
       if (ctx.state === 'suspended') ctx.resume();
       const now = ctx.currentTime;
 
@@ -9238,6 +9424,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       }
     }
 
+    const isPlaceholderNote = (t: string) => {
+      if (!t) return true;
+      const lower = t.trim().toLowerCase();
+      return lower === 'keine' || lower === 'keine hausaufgabe' || lower === 'keine hausaufgaben';
+    };
+
     const cleanGeneralNote = (text: string) => {
       if (!text) return '';
       let clean = text;
@@ -9261,8 +9453,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     };
 
     let isPastNoteCarriedOver = false;
-    let generalNoteRaw = currentWeekNotes.find(n => !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
-    if (!generalNoteRaw) {
+    let carriedOverWeekLabel = '';
+    const isDidacticNote = (n: any) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:') && !n.startsWith('❓ Frage für den Unterricht:');
+
+    let allTeacherNotes: string[] = currentWeekNotes.filter(isDidacticNote).map(cleanGeneralNote).filter(n => !isPlaceholderNote(n));
+
+    if (allTeacherNotes.length === 0) {
       const pastHwSnapshots = (progressItems || []).filter((item: any) => {
         if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
         const itWeekIso = getItemWeek(item);
@@ -9281,19 +9477,26 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         try {
           const parsed = typeof latestPast.homework_notes === 'string' ? JSON.parse(latestPast.homework_notes) : latestPast.homework_notes;
           if (Array.isArray(parsed)) {
-            const pastNote = parsed.find((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.startsWith('LATENCY:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('SNAPSHOT_') && !n.startsWith('FEEDBACK:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:') && !n.startsWith('STUDENT_QUESTION:'));
-            if (pastNote) {
-              generalNoteRaw = pastNote;
+            const pastNotes = parsed.filter(isDidacticNote).map(cleanGeneralNote).filter(n => !isPlaceholderNote(n));
+            if (pastNotes.length > 0) {
+              allTeacherNotes = pastNotes;
               isPastNoteCarriedOver = true;
+              const kwMatch = latestPast.topic_name?.match(/Hausaufgabe KW\s*(\d+)/i);
+              if (kwMatch) carriedOverWeekLabel = `KW ${kwMatch[1]}`;
             }
           } else if (typeof parsed === 'string') {
-            generalNoteRaw = parsed;
-            isPastNoteCarriedOver = true;
+            const cleanP = cleanGeneralNote(parsed);
+            if (cleanP && !isPlaceholderNote(cleanP)) {
+              allTeacherNotes = [cleanP];
+              isPastNoteCarriedOver = true;
+              const kwMatch = latestPast.topic_name?.match(/Hausaufgabe KW\s*(\d+)/i);
+              if (kwMatch) carriedOverWeekLabel = `KW ${kwMatch[1]}`;
+            }
           }
         } catch {}
       }
     }
-    const generalNote = generalNoteRaw ? cleanGeneralNote(generalNoteRaw) : '';
+    const generalNote = allTeacherNotes[0] || '';
 
     const isAudioCarriedOver = audioTracks.some(t => t.isCarriedOver);
     const isCarriedOverPlan = isAudioCarriedOver || isPastNoteCarriedOver;
@@ -9336,11 +9539,6 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       }
     }
 
-    const isPlaceholderNote = (t: string) => {
-      if (!t) return true;
-      const lower = t.trim().toLowerCase();
-      return lower === 'keine' || lower === 'keine hausaufgabe' || lower === 'keine hausaufgaben';
-    };
     const validGeneralNote = isPlaceholderNote(generalNote) ? '' : generalNote;
 
     let specificTeacherNote = validGeneralNote;
@@ -9369,6 +9567,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       audioTracks,
       generalNote: validGeneralNote,
       specificTeacherNote,
+      allTeacherNotes,
+      carriedOverWeek: carriedOverWeekLabel,
       studentQuestionText,
       hasAnyHomework,
       isCarriedOverPlan
@@ -9383,6 +9583,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     const audioTracks = summary.audioTracks;
     const teacherNote = summary.specificTeacherNote || 'Spiele die ersten Takte ganz ruhig & entspannt!';
     const hasSpecificNote = Boolean(summary.specificTeacherNote);
+    const teacherNotes = summary.allTeacherNotes && summary.allTeacherNotes.length > 0
+      ? summary.allTeacherNotes
+      : (summary.specificTeacherNote ? [summary.specificTeacherNote] : []);
+    const isCarriedOver = Boolean(summary.isCarriedOverPlan);
+    const carriedOverWeek = summary.carriedOverWeek;
 
     if (books.length > 0 && songs.length > 0) {
       const b0 = books[0];
@@ -9395,7 +9600,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         shortTitle: `${b0.title} & ${songTitle}`,
         badge: `📖 ${b0.title} (${bPages}) + 🎵 ${songTitle}`,
         teacherNote,
+        teacherNotes,
         hasSpecificNote,
+        isCarriedOver,
+        carriedOverWeek,
         books,
         songs,
         audioTracks
@@ -9413,7 +9621,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         shortTitle: `${b0.title} ${bPages}`,
         badge: `📖 ${b0.title} (${bPages})${extraLabel}`,
         teacherNote,
+        teacherNotes,
         hasSpecificNote,
+        isCarriedOver,
+        carriedOverWeek,
         books,
         songs,
         audioTracks
@@ -9431,23 +9642,34 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         shortTitle: songTitle,
         badge: `🎵 ${songTitle}${extraLabel}`,
         teacherNote,
+        teacherNotes,
         hasSpecificNote,
+        isCarriedOver,
+        carriedOverWeek,
         books,
         songs,
         audioTracks
       };
     }
 
+    const hasNotes = Boolean(summary.specificTeacherNote);
     return {
-      type: 'free',
-      title: 'Freies Üben',
-      shortTitle: 'Freies Üben',
-      badge: '🎵 Freies Üben',
-      teacherNote: 'Spiele deine Lieblingsmelodie und sammle Sterne!',
-      hasSpecificNote: false,
+      type: hasNotes ? 'notes_focus' : 'free',
+      title: hasNotes 
+        ? (isCarriedOver && carriedOverWeek ? `Wochen-Fokus (${carriedOverWeek})` : 'Wochen-Fokus')
+        : 'Freies Üben',
+      shortTitle: hasNotes ? 'Wochen-Fokus' : 'Freies Üben',
+      badge: hasNotes 
+        ? (isCarriedOver && carriedOverWeek ? `📌 Fokus aus Vorwoche (${carriedOverWeek})` : '📝 Wochen-Fokus')
+        : '🎵 Freies Üben',
+      teacherNote: summary.specificTeacherNote || 'Spiele deine Lieblingsmelodie und sammle Sterne!',
+      teacherNotes: teacherNotes.length > 0 ? teacherNotes : ['Spiele deine Lieblingsmelodie und sammle Sterne!'],
+      hasSpecificNote: hasNotes,
+      isCarriedOver,
+      carriedOverWeek,
       books: [],
       songs: [],
-      audioTracks: []
+      audioTracks
     };
   }, [getJuniorWeeklyHomeworkSummary]);
 
@@ -10303,9 +10525,22 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       }
 
       user.resolved_instrument = resolvedInst;
-      user.instrument = resolvedInst;
-
-
+      // Authoritative Teacher Profile & Full Name Resolution (Vorname + Nachname)
+      if (!user.teacher_name && user.teacher_id) {
+        try {
+          const { data: tProfile } = await supabase
+            .from('users')
+            .select('id, first_name, last_name, avatar_url, photo_url')
+            .eq('id', user.teacher_id)
+            .maybeSingle();
+          if (tProfile) {
+            user.teacher = tProfile;
+            user.teacher_name = formatTeacherFullName(tProfile);
+          }
+        } catch (e) {}
+      } else if (user.teacher && !user.teacher_name) {
+        user.teacher_name = formatTeacherFullName(user.teacher);
+      }
 
       setStudentUser(user);
       if (onProfileUpdate) {
@@ -10859,6 +11094,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                 time: todaySchedules.time_slot,
                 room: resolvedRoom,
                 teacher: teacherName,
+                teacher_name: teacherName,
                 teacher_id: todaySchedules.teacher_id,
                 status: todaySchedules.status,
                 displayString: `Heute ${todaySchedules.time_slot} Uhr, ${resolvedRoom} bei ${teacherName}`
@@ -11693,7 +11929,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   Empfehlung der Lehrkraft
                 </h3>
                 <span style={{ fontSize: "0.74rem", fontWeight: 700, color: "#64748b" }}>
-                  von {teacherRecommendation.teacher_name || "Fachlehrkraft"}
+                  von {formatTeacherFullName(teacherRecommendation.teacher_name || teacherRecommendation.teacher || studentUser?.teacher_name || studentUser?.teacher || "Fachlehrkraft")}
                 </span>
               </div>
             </div>
@@ -12425,7 +12661,52 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         } : {})
       }}
     >
+      {/* 🛡️ Enterprise Anti-Ablenkungs- & Fokus-Wächter Banner & Modal */}
+      <FocusInterruptionBanner
+        isInterrupted={focusGuard.isInterrupted}
+        graceSecondsLeft={focusGuard.graceSecondsLeft}
+        strikes={focusGuard.strikes}
+        toolName="Fokus-Übetimer"
+        onReturn={() => {
+          setActiveTab('practice_board');
+        }}
+      />
 
+      <FocusAbortedModal
+        isOpen={focusGuard.isAborted}
+        reason={focusGuard.abortReason}
+        toolName="Fokus-Übetimer"
+        onClose={() => {
+          focusGuard.acknowledgeAbort();
+        }}
+      />
+
+      {focusWarningToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed',
+            top: 'calc(env(safe-area-inset-top, 0px) + 16px)',
+            right: '16px',
+            zIndex: 99999,
+            background: '#0f172a',
+            color: '#facc15',
+            padding: '12px 18px',
+            borderRadius: '14px',
+            fontSize: '13px',
+            fontWeight: 750,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+            border: '1px solid #facc15',
+            maxWidth: '380px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <span>{focusWarningToast}</span>
+        </div>
+      )}
 
       {/* ⏱️ Floating Übungs-Pufferzeit Countdown Widget (5 Min. Toleranz bei aktiver Übung) */}
       {activePracticeGrace && (
@@ -12514,6 +12795,52 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           >
             <Check size={15} strokeWidth={2.5} />
             <span>Jetzt sichern &amp; beenden</span>
+          </button>
+        </div>
+      )}
+
+      {/* ⏱️ F18: Monochrome Pause & Gesunderhaltung Hinweispille */}
+      {showScreenTimeToast && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 1400,
+          background: '#0f172a',
+          color: '#ffffff',
+          borderRadius: '100px',
+          padding: '10px 20px',
+          boxShadow: '0 12px 32px -4px rgba(0, 0, 0, 0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          maxWidth: '90vw',
+          animation: 'fadeIn 0.2s ease',
+          boxSizing: 'border-box'
+        }}>
+          <Clock size={16} color="#cbd5e1" style={{ flexShrink: 0 }} />
+          <span style={{ fontSize: '0.82rem', fontWeight: 650, color: '#f8fafc' }}>
+            Zeit für eine kurze Pause: Hände ausschütteln, durchatmen &amp; etwas trinken!
+          </span>
+          <button
+            onClick={() => setShowScreenTimeToast(false)}
+            aria-label="Hinweis schließen"
+            style={{
+              background: 'rgba(255,255,255,0.15)',
+              border: 'none',
+              borderRadius: '50%',
+              width: '24px',
+              height: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: '#ffffff',
+              marginLeft: '4px'
+            }}
+          >
+            <X size={12} strokeWidth={2.5} />
           </button>
         </div>
       )}
@@ -12810,6 +13137,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             getJuniorMissionDetails={getJuniorMissionDetails}
             getTargetMinutes={getTargetMinutes}
             sessionActive={sessionActive}
+            isPhoneFlat={isPhoneFlat}
             secondsElapsed={secondsElapsed}
             isMobile={isMobile}
             isMusicStandMode={isMusicStandMode}
@@ -12920,13 +13248,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                 schoolName={resolvedSchoolName}
                 onClose={() => handleTabChangeLocal('briefing')}
                 teacherId={studentUser ? studentUser.teacher_id : null}
-                teacherName={formatTeacherFullName(briefingData?.todayLesson?.teacher_name || (studentUser as any)?.teacher_name || briefingData?.teacherName || (studentUser as any)?.teacher)}
+                teacherName={formatTeacherFullName(studentUser?.teacher_name || studentUser?.teacher || briefingData?.todayLesson?.teacher_name || briefingData?.todayLesson?.teacher || briefingData?.teacherName)}
+                schoolId={studentUser?.school_id || (studentUser as any)?.schools?.id}
                 readOnly={!isTeacherSession}
                 isTeacherTools={isTeacherSession}
                 isEmbed={true}
                 initialModalTab={homeworkBookTab}
                 initialViewMode={homeworkBookViewMode}
-                uiLevel={studentUiLevel || 'junior'}
+                uiLevel={studentUiLevel || studentUser?.campus_ui_level || undefined}
                 initialXp={avatar?.xp || 0}
                 initialStreak={avatar?.streak_flame || 0}
                 initialPracticeMinutes={totalFocusMinutes || 0}
@@ -13303,7 +13632,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             songTitle={certificateSong.title || 'Meisterwerk'}
             instrument={studentUser?.instrument || 'Instrument'}
             schoolName={resolvedSchoolName}
-            teacherName={studentUser?.teacher_name ? formatTeacherFullName(studentUser.teacher_name) : 'Deine Lehrkraft'}
+            teacherName={formatTeacherFullName(studentUser?.teacher_name || studentUser?.teacher || briefingData?.todayLesson?.teacher_name || briefingData?.todayLesson?.teacher || 'Deine Lehrkraft')}
             masteredDate={certificateSong.masteredDate}
             certificateId={certificateSong.certificateId}
             onClose={() => setCertificateSong(null)}
@@ -13405,7 +13734,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           start_time: appointmentChatData.start_time,
           status: appointmentChatData.status || (appointmentChatData.isCancelled ? "canceled_by_student" : "scheduled"),
           teacher_id: appointmentChatData.teacherId,
-          teacher: studentUser?.teacher_name ? { name: studentUser.teacher_name } : null,
+          teacher: foundOcc?.teacher || studentUser?.teacher || (studentUser?.teacher_name ? { name: studentUser.teacher_name } : null),
           student_id: studentId,
           student: studentUser || { id: studentId }
         };
@@ -13418,7 +13747,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             }}
             occurrence={{
               ...targetOcc,
-              teacher: targetOcc.teacher || (studentUser?.teacher_name ? { name: studentUser.teacher_name } : null),
+              teacher: targetOcc.teacher || studentUser?.teacher || (studentUser?.teacher_name ? { name: studentUser.teacher_name } : null),
               student: targetOcc.student || studentUser || { id: studentId }
             }}
             currentUserId={studentId}
@@ -13473,7 +13802,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             closeRescheduleBottomSheet();
           }}
           onVerifyParentPin={handleVerifyGlobalParentPinAsync}
-          teacherName={studentUser?.teacher_name || activeRescheduleBottomSheetOcc?.teacher?.first_name}
+          teacherName={formatTeacherFullName(activeRescheduleBottomSheetOcc?.teacher || studentUser?.teacher || studentUser?.teacher_name || activeRescheduleBottomSheetOcc?.teacher_name)}
           teacherAvatarUrl={activeRescheduleBottomSheetOcc?.teacher?.avatar_url || activeRescheduleBottomSheetOcc?.teacher?.photo_url}
         />
       )}

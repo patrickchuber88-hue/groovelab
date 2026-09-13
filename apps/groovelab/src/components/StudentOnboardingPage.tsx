@@ -71,15 +71,14 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
     }
   }, []);
 
-  // 🛡️ Granulare Kinderschutz-Freigaben (100% Privacy by Default / Opt-In gem. Art. 25 Abs. 2 DSGVO)
-  // CLUSTER 1: Pädagogik & Unterricht (Didaktik)
-  const [parentAllowTeacherAudio, setParentAllowTeacherAudio] = useState(false); // Didaktik im Unterricht (§ 201 StGB)
+  // 🎵 Aufgabenheft & Didaktik (Privacy by Default gem. § 73 UrhG)
+  const [parentAllowTeacherAudio, setParentAllowTeacherAudio] = useState(false); // Didaktik im Unterricht (§ 73 UrhG) - Standardmäßig deaktiviert
   const [parentAllowTimer, setParentAllowTimer] = useState(false); // Übe-Timer & Lern-Meilensteine
   const [parentAllowTts, setParentAllowTts] = useState(false); // Audio-Vorleseassistent für Leseanfänger
 
-  // CLUSTER 2: Kommunikation & Medien (Kinderschutz)
+  // CLUSTER 2: Kommunikation & Medien (Kinderschutz & Art. 8 DSGVO)
   const [parentAllowChat, setParentAllowChat] = useState(false); // Direkt-Chat gem. § 8a SGB VIII
-  const [parentAllowAudio, setParentAllowAudio] = useState(false); // Eigene Mikrofonaufnahmen gem. Art. 8 DSGVO
+  const [parentAllowAudio, setParentAllowAudio] = useState(false); // Eigene Schüler-Aufnahmen (Privacy by Default)
 
   // CLUSTER 3: Termine & Vertragsschutz (§§ 106, 615 BGB)
   const [parentAllowAbsences, setParentAllowAbsences] = useState(false); // Kind darf Termine selbstständig absagen

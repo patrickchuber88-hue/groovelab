@@ -8,6 +8,8 @@ export interface CampusAgeStandard {
   allowLeaderboard: boolean;
   allowProposals: boolean;
   allowAudio: boolean;
+  allowStudentAudio: boolean;
+  allowTeacherAudio: boolean;
   allowTts: boolean;
   bedtimeEnabled: boolean;
   bedtimeStart: string;
@@ -25,7 +27,9 @@ export const CAMPUS_AGE_STANDARDS: Record<string, CampusAgeStandard> = {
     allowTimer: true,
     allowLeaderboard: false,
     allowProposals: true,
-    allowAudio: false, // 🛡️ Privacy by Default (Art. 25 Abs. 2 DSGVO): Audio standardmäßig deaktiviert
+    allowAudio: false, // 🛡️ Privacy by Default (Art. 25 Abs. 2 / Art. 8 DSGVO): Standardmäßig immer deaktiviert
+    allowStudentAudio: false,
+    allowTeacherAudio: false,
     allowTts: true,
     bedtimeEnabled: true,
     bedtimeStart: '20:00',
@@ -33,7 +37,7 @@ export const CAMPUS_AGE_STANDARDS: Record<string, CampusAgeStandard> = {
     boardOverrides: {
       practice_board: true,
       mediathek: true, // 🎵 Schulische Mediathek (reine Metadaten, Play-Alongs & Übe-Fahrpläne) für alle Altersstufen aktiv
-      recordings: false, // 🛡️ Privacy by Default
+      recordings: false, // 🛡️ Privacy by Default: Standardmäßig deaktiviert
       events: true,
       campus_cup: false,
       messages: false
@@ -48,7 +52,9 @@ export const CAMPUS_AGE_STANDARDS: Record<string, CampusAgeStandard> = {
     allowTimer: true,
     allowLeaderboard: true,
     allowProposals: true,
-    allowAudio: false, // 🛡️ Privacy by Default (Art. 25 Abs. 2 DSGVO): Audio standardmäßig deaktiviert
+    allowAudio: false, // 🛡️ Privacy by Default (Art. 25 Abs. 2 / Art. 8 DSGVO): Standardmäßig immer deaktiviert
+    allowStudentAudio: false,
+    allowTeacherAudio: false,
     allowTts: false,
     bedtimeEnabled: true,
     bedtimeStart: '21:30',
@@ -56,7 +62,7 @@ export const CAMPUS_AGE_STANDARDS: Record<string, CampusAgeStandard> = {
     boardOverrides: {
       practice_board: true,
       mediathek: true,
-      recordings: false, // 🛡️ Privacy by Default
+      recordings: false, // 🛡️ Privacy by Default: Standardmäßig deaktiviert
       events: true,
       campus_cup: true,
       messages: true
@@ -71,7 +77,9 @@ export const CAMPUS_AGE_STANDARDS: Record<string, CampusAgeStandard> = {
     allowTimer: true,
     allowLeaderboard: true,
     allowProposals: true,
-    allowAudio: true,
+    allowAudio: false, // 🛡️ Privacy by Default (Art. 25 Abs. 2 / Art. 8 DSGVO): Standardmäßig immer deaktiviert
+    allowStudentAudio: false,
+    allowTeacherAudio: false,
     allowTts: false,
     bedtimeEnabled: false,
     bedtimeStart: '22:30',
@@ -79,7 +87,7 @@ export const CAMPUS_AGE_STANDARDS: Record<string, CampusAgeStandard> = {
     boardOverrides: {
       practice_board: true,
       mediathek: true,
-      recordings: true,
+      recordings: false, // 🛡️ Privacy by Default: Standardmäßig deaktiviert
       events: true,
       campus_cup: true,
       messages: true

@@ -67,7 +67,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
   const [isVerifyingPin, setIsVerifyingPin] = useState<boolean>(false);
   const [showParentPinMask, setShowParentPinMask] = useState<boolean>(false);
   const [allowStudentAudio, setAllowStudentAudio] = useState<boolean>(() => {
-    return (student as any)?.parent_allow_audio !== false;
+    return Boolean((student as any)?.parent_allow_audio === true);
   });
   const [allowStudentChat, setAllowStudentChat] = useState<boolean>(true);
   const [allowStudentAbsences, setAllowStudentAbsences] = useState<boolean>(false);

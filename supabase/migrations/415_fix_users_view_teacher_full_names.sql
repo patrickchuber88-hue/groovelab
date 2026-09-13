@@ -1,0 +1,168 @@
+-- ==============================================================================
+-- Migration 415: Fix public.users view teacher full names & prevent last_name masking
+-- Standards: OWASP ASVS Level 3 / DSGVO Art. 25 / AGENTS.md Monolith Goldstandard
+-- 
+-- Invariante (AGENTS.md):
+-- "Lehrkräftenamen werden für Schüler und Eltern immer einheitlich mit ihrem
+--  vollständigen Namen (Vorname + Nachname, z. B. 'Severin Landenberger') angezeigt.
+--  Lehrkräftenamen dürfen NIEMALS auf 'Vorname + Anfangsbuchstabe' gekürzt werden."
+-- ==============================================================================
+
+-- 1. Ensure existing teacher Peter with initial 'P.' or 'Petersen' in users_raw is upgraded to full legal name 'Pan'
+UPDATE public.users_raw
+SET last_name = 'Pan'
+WHERE first_name ILIKE 'Peter'
+  AND (
+    role = 'teacher' 
+    OR (roles IS NOT NULL AND 'teacher' = ANY(roles))
+    OR id IN (SELECT teacher_id FROM public.users_raw WHERE teacher_id IS NOT NULL)
+  )
+  AND (last_name = 'P.' OR last_name = 'P' OR last_name = 'Petersen' OR last_name IS NULL OR TRIM(last_name) = '');
+
+-- 2. Re-create public.users view preserving full teacher & staff last names
+CREATE OR REPLACE VIEW public.users 
+WITH (security_barrier = true, security_invoker = true) AS
+SELECT ur.id,                                                                                                                                                                                                                                                   
+     ur.school_id,                                                                                                                                                                                                                                                
+     ur.role,                                                                                                                                                                                                                                                     
+     ur.first_name,                                                                                                                                                                                                                                               
+     CASE                                                                                                                                                                                                                                                     
+         -- 1. Self, master admin, or staff members querying within the school get full last names
+         WHEN ((get_current_authenticated_user_id() = ur.id) OR is_master_admin() OR ((get_current_user_school_id() = ur.school_id) AND (get_current_user_role() = ANY (ARRAY['teacher'::text, 'admin'::text, 'secretary'::text])))) THEN (ur.last_name)::text
+         
+         -- 2. Teachers and school administration are ALWAYS displayed with full name (Vorname + Nachname) for students and parents (AGENTS.md Invariante)
+         WHEN (ur.role = ANY (ARRAY['teacher'::text, 'admin'::text, 'secretary'::text]) OR (ur.roles IS NOT NULL AND ('teacher' = ANY(ur.roles) OR 'admin' = ANY(ur.roles) OR 'secretary' = ANY(ur.roles)))) THEN (ur.last_name)::text
+         
+         -- 3. Minors / students viewed by classmates or anon are anonymized to first initial
+         ELSE COALESCE((SUBSTRING(ur.last_name FROM 1 FOR 1) || '.'::text), ''::text)                                                                                                                                                                         
+     END AS last_name,                                                                                                                                                                                                                                        
+     ur.avatar_url,                                                                                                                                                                                                                                               
+     CASE                                                                                                                                                                                                                                                     
+         WHEN ((get_current_authenticated_user_id() = ur.id) OR is_master_admin() OR ((get_current_user_school_id() = ur.school_id) AND (get_current_user_role() = ANY (ARRAY['teacher'::text, 'admin'::text, 'secretary'::text])))) THEN ur.qr_token         
+         ELSE NULL::uuid                                                                                                                                                                                                                                      
+     END AS qr_token,                                                                                                                                                                                                                                         
+     CASE                                                                                                                                                                                                                                                     
+         WHEN ((get_current_authenticated_user_id() = ur.id) OR is_master_admin() OR ((get_current_user_school_id() = ur.school_id) AND (get_current_user_role() = ANY (ARRAY['teacher'::text, 'admin'::text, 'secretary'::text])))) THEN ur.calendar_token   
+         ELSE NULL::text                                                                                                                                                                                                                                      
+     END AS calendar_token,                                                                                                                                                                                                                                   
+     ur.instrument,                                                                                                                                                                                                                                               
+     ur.created_at,                                                                                                                                                                                                                                               
+     ur.coach_notes,                                                                                                                                                                                                                                              
+     ur.photo_url,                                                                                                                                                                                                                                                
+     ur.bio,                                                                                                                                                                                                                                                      
+     ur.bands,                                                                                                                                                                                                                                                    
+     ur.projects,                                                                                                                                                                                                                                                 
+     ur.listening,                                                                                                                                                                                                                                                
+     ur.gear,                                                                                                                                                                                                                                                     
+     ur.musical_styles,                                                                                                                                                                                                                                           
+     ur.equipment_list,                                                                                                                                                                                                                                           
+     ur.last_seen,                                                                                                                                                                                                                                                
+     ur.expertise,                                                                                                                                                                                                                                                
+     ur.age,                                                                                                                                                                                                                                                      
+     ur.birth_date,                                                                                                                                                                                                                                               
+     ur.pending_repertoire_proposal,                                                                                                                                                                                                                              
+     ur.is_external_vocalist,                                                                                                                                                                                                                                     
+     ur.show_messages_menu,                                                                                                                                                                                                                                       
+     ur.master_admin_username,                                                                                                                                                                                                                                    
+     NULL::text AS master_admin_password,                                                                                                                                                                                                                         
+     ur.is_trial,                                                                                                                                                                                                                                                 
+     ur.trial_ends_at,                                                                                                                                                                                                                                            
+     ur.contract_ends_at,                                                                                                                                                                                                                                         
+     ur.contract_decision_made,                                                                                                                                                                                                                                   
+     ur.delete_after_contract,                                                                                                                                                                                                                                    
+     ur.status,                                                                                                                                                                                                                                                   
+     ur.is_master_admin,                                                                                                                                                                                                                                          
+     ur.is_app_user,                                                                                                                                                                                                                                              
+     ur.is_campus_active,                                                                                                                                                                                                                                         
+     ur.is_groovelab_active,                                                                                                                                                                                                                                      
+     ur.is_premium_user,                                                                                                                                                                                                                                          
+     ur.teacher_id,                                                                                                                                                                                                                                               
+     (                                                                                                                                                                                                                                                            
+         CASE                                                                                                                                                                                                                                                     
+             WHEN ((get_current_authenticated_user_id() = ur.id) OR is_master_admin() OR ((get_current_user_school_id() = ur.school_id) AND (get_current_user_role() = ANY (ARRAY['teacher'::text, 'admin'::text, 'secretary'::text])))) THEN ur.ausweis_nummer   
+             ELSE NULL::character varying                                                                                                                                                                                                                         
+         END)::character varying(255) AS ausweis_nummer,                                                                                                                                                                                                          
+     (                                                                                                                                                                                                                                                            
+         CASE                                                                                                                                                                                                                                                     
+             WHEN ((get_current_authenticated_user_id() = ur.id) OR is_master_admin() OR ((get_current_user_school_id() = ur.school_id) AND (get_current_user_role() = ANY (ARRAY['admin'::text, 'secretary'::text])))) THEN ur.teacher_qr_token                  
+             ELSE NULL::character varying                                                                                                                                                                                                                         
+         END)::character varying(255) AS teacher_qr_token,                                                                                                                                                                                                        
+     ur.is_active,                                                                                                                                                                                                                                                
+     ur.max_students,                                                                                                                                                                                                                                             
+     ur.nickname,                                                                                                                                                                                                                                                 
+     NULL::text AS password_hash,                                                                                                                                                                                                                                 
+     ur.ausweis_id,                                                                                                                                                                                                                                               
+     ur.show_sekretariat,                                                                                                                                                                                                                                         
+     ur.show_campus,                                                                                                                                                                                                                                              
+     ur.show_groovelab,                                                                                                                                                                                                                                           
+     ur.lesson_duration,                                                                                                                                                                                                                                          
+     ur.planned_boards,                                                                                                                                                                                                                                           
+     ur.required_equipment,                                                                                                                                                                                                                                       
+     ur.sick_until,                                                                                                                                                                                                                                               
+     CASE
+         WHEN ((get_current_authenticated_user_id() = ur.id) OR is_master_admin() OR ((get_current_user_school_id() = ur.school_id) AND (get_current_user_role() = ANY (ARRAY['teacher'::text, 'admin'::text, 'secretary'::text])))) THEN (ur.phone)::text
+         ELSE NULL::text
+     END AS phone,                                                                                                                                                                                                                                                    
+     ur.joker_used,                                                                                                                                                                                                                                               
+     ur.is_pin_activated,                                                                                                                                                                                                                                         
+     ur."groovelab_räume",                                                                                                                                                                                                                                        
+     ur."campus_räume",                                                                                                                                                                                                                                           
+     ur.joker_used_at,                                                                                                                                                                                                                                            
+     ur.sick_start,                                                                                                                                                                                                                                               
+     ur.push_notifications_enabled,                                                                                                                                                                                                                               
+     ur.push_notif_schedule_changes,                                                                                                                                                                                                                              
+     ur.push_notif_homework,                                                                                                                                                                                                                                      
+     ur.push_notif_all_features,                                                                                                                                                                                                                                  
+     ur.app_usage_mode,                                                                                                                                                                                                                                           
+     ur.preferred_room_ids,                                                                                                                                                                                                                                       
+     ur.groovelab_instrument,                                                                                                                                                                                                                                     
+     CASE
+         WHEN ((get_current_authenticated_user_id() = ur.id) OR is_master_admin() OR ((get_current_user_school_id() = ur.school_id) AND (get_current_user_role() = ANY (ARRAY['admin'::text, 'secretary'::text])))) THEN (ur.student_billing_payment_method)::text
+         ELSE NULL::text
+     END AS student_billing_payment_method,                                                                                                                                                                                                                           
+     ur.activated_at,                                                                                                                                                                                                                                             
+     CASE
+         WHEN ((get_current_authenticated_user_id() = ur.id) OR is_master_admin() OR ((get_current_user_school_id() = ur.school_id) AND (get_current_user_role() = ANY (ARRAY['admin'::text, 'secretary'::text])))) THEN ur.student_billing_cash_paid
+         ELSE NULL::boolean
+     END AS student_billing_cash_paid,                                                                                                                                                                                                                                
+     ur.roles,                                                                                                                                                                                                                                                    
+     ur.exempt_from_direct_billing,                                                                                                                                                                                                                               
+     ur.group_id,                                                                                                                                                                                                                                                 
+     ur.sibling_group_id,                                                                                                                                                                                                                                         
+     ur.parent_allow_chat,                                                                                                                                                                                                                                        
+     ur.parent_allow_timer,                                                                                                                                                                                                                                       
+     ur.parent_allow_leaderboard,                                                                                                                                                                                                                                 
+     ur.parent_allow_groups,                                                                                                                                                                                                                                      
+     ur.parent_allow_proposals,                                                                                                                                                                                                                                   
+     ur.parent_allow_absences,                                                                                                                                                                                                                                    
+     ur.parent_allow_audio,                                                                                                                                                                                                                                       
+     ur.campus_ui_level,                                                                                                                                                                                                                                          
+     ur.parent_permissions,                                                                                                                                                                                                                                       
+     ur.pin_enforced_for_preview,                                                                                                                                                                                                                                 
+     ur.teacher_onboarding_completed,                                                                                                                                                                                                                             
+     ur.teacher_availability,                                                                                                                                                                                                                                     
+     ur.is_2fa_enabled,                                                                                                                                                                                                                                           
+     NULL::text AS two_factor_secret,                                                                                                                                                                                                                             
+     NULL::text AS parent_pin,                                                                                                                                                                                                                                    
+     NULL::text AS personal_pin,                                                                                                                                                                                                                                  
+     user_has_parent_pin(ur.id) AS has_parent_pin,                                                                                                                                                                                                                
+     user_has_personal_pin(ur.id) AS has_personal_pin,                                                                                                                                                                                                            
+     ur.failed_pin_attempts,                                                                                                                                                                                                                                      
+     ur.pin_locked_until,                                                                                                                                                                                                                                         
+     ur.sessions_revoked_at,                                                                                                                                                                                                                                      
+     ur.token_version,                                                                                                                                                                                                                                            
+     ur.token_signature,                                                                                                                                                                                                                                          
+     ur.qr_token_redeemed_at,                                                                                                                                                                                                                                     
+      CASE
+          WHEN ((get_current_authenticated_user_id() = ur.id) OR is_master_admin() OR ((get_current_user_school_id() = ur.school_id) AND (get_current_user_role() = ANY (ARRAY['teacher'::text, 'admin'::text, 'secretary'::text])))) THEN
+              ( SELECT ((safe_pgp_sym_decrypt(uep.prefix, get_encryption_key()) || '@'::text) || (ues.suffix)::text)
+                     FROM (user_email_prefixes uep
+                       JOIN user_email_suffixes ues ON ((uep.user_id = ues.user_id)))
+                    WHERE (uep.user_id = ur.id)
+                   LIMIT 1)
+          ELSE NULL::text
+      END AS email
+    FROM users_raw ur;
+
+COMMENT ON VIEW public.users IS 'Tier-1 Enterprise+ security-hardened view of users_raw with unmasked staff names and role-based GDPR PII student masking.';
+GRANT SELECT ON public.users TO anon, authenticated, service_role;

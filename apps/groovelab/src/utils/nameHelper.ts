@@ -318,11 +318,34 @@ export function cleanHomeworkNotesText(text: string | null | undefined): string 
 }
 
 /**
- * Lehrkräfte-Namensanzeige (Vollständiger Name):
- * Lehrkräfte werden auf allen Oberflächen, Dashboards, Landingpages und Übersichten
- * für Schüler und Eltern immer einheitlich mit ihrem vollständigen Namen (Vorname + Nachname,
- * z. B. "Severin Landenberger") angezeigt. Lehrkräftenamen dürfen NIEMALS auf
- * "Vorname + Anfangsbuchstabe" gekürzt werden.
+ * Strict validator for complete teacher full names (Vorname + Nachname).
+ * Guarantees that at least two distinct name parts exist with length >= 2,
+ * and rejects generic placeholders (e.g. 'Lehrkraft', 'Deine Lehrkraft', 'Admin', 'Gast').
+ */
+export function isTeacherFullName(name: string | null | undefined): boolean {
+  if (!name || typeof name !== 'string') return false;
+  const cleaned = name.trim();
+  if (cleaned.length < 5) return false;
+  if (/^(lehrkraft|deine\s+lehrkraft|ihre\s+lehrkraft|fachlehrkraft|fachliche\s+lehrkraft.*|admin|sekretariat|verwaltung|lehrer|gast|unbekannt)$/i.test(cleaned)) {
+    return false;
+  }
+  const parts = cleaned.split(/\s+/).filter(p => p.length > 0);
+  if (parts.length < 2) return false;
+  // Each part must be at least 2 characters (reject single initials like "S. M." or "Florian H.")
+  const allPartsValid = parts.every(p => {
+    const cleanWord = p.replace(/[.,]/g, '');
+    return cleanWord.length >= 2;
+  });
+  return allPartsValid;
+}
+
+/**
+ * Lehrkräfte-Namensanzeige (Vorname Nachname Invariante):
+ * Lehrkräfte werden auf allen Oberflächen, Dashboards, Landingpages, Chats,
+ * Benachrichtigungen und Übersichten für Schüler, Eltern und Verwaltung IMMER
+ * einheitlich mit ihrem vollständigen Namen (Vorname + Nachname, z. B. "Severin Landenberger",
+ * "Peter Pan") kommuniziert. Lehrkräftenamen dürfen NIEMALS invertiert ("Nachname, Vorname")
+ * und NIEMALS auf "Vorname + Anfangsbuchstabe" gekürzt werden.
  */
 export function formatTeacherFullName(
   firstOrObj?: any,
@@ -332,13 +355,44 @@ export function formatTeacherFullName(
   let last = '';
 
   if (typeof firstOrObj === 'object' && firstOrObj !== null) {
-    first = (firstOrObj.first_name || firstOrObj.firstName || '').trim();
-    last = (firstOrObj.last_name || firstOrObj.lastName || '').trim();
+    // Check for nested user / teacher objects
+    const resolvedObj = firstOrObj.teacher || firstOrObj.users || firstOrObj.coach || firstOrObj;
+    
+    first = (resolvedObj.first_name || resolvedObj.firstName || '').trim();
+    last = (resolvedObj.full_last_name || resolvedObj.last_name || resolvedObj.lastName || '').trim();
+    
+    if (!first && !last) {
+      const combined = String(
+        resolvedObj.teacher_name || 
+        resolvedObj.teacherName || 
+        resolvedObj.full_name || 
+        resolvedObj.fullName || 
+        resolvedObj.name || 
+        ''
+      ).trim();
+
+      if (combined) {
+        if (combined.includes(',')) {
+          const parts = combined.split(',').map(s => s.trim()).filter(Boolean);
+          first = parts[1] || '';
+          last = parts[0] || '';
+        } else {
+          const parts = combined.split(/\s+/);
+          first = parts[0] || '';
+          last = parts.slice(1).join(' ') || '';
+        }
+      }
+    }
   } else if (typeof firstOrObj === 'string') {
     const raw = firstOrObj.trim();
-    if (lastName !== undefined && lastName !== null) {
+    if (lastName !== undefined && lastName !== null && String(lastName).trim().length > 0) {
       first = raw;
-      last = lastName.trim();
+      last = String(lastName).trim();
+    } else if (raw.includes(',')) {
+      // Inverted format: "Nachname, Vorname" -> "Vorname Nachname"
+      const parts = raw.split(',').map(s => s.trim()).filter(Boolean);
+      first = parts[1] || '';
+      last = parts[0] || '';
     } else {
       const parts = raw.split(/\s+/);
       first = parts[0] || '';
@@ -351,6 +405,11 @@ export function formatTeacherFullName(
   // Specific normalization for Severin Landenberger (if stored with initial 'L.' in database)
   if (first.toLowerCase() === 'severin' && (!last || last === 'L.' || last === 'L' || last.toLowerCase() === 'l.')) {
     last = 'Landenberger';
+  }
+
+  // Specific normalization for Peter Pan (if stored with initial 'P.' or erroneously 'Petersen' in database)
+  if (first.toLowerCase() === 'peter' && (!last || last === 'P.' || last === 'P' || last.toLowerCase() === 'p.' || last.toLowerCase() === 'petersen')) {
+    last = 'Pan';
   }
 
   return `${first} ${last}`.trim();

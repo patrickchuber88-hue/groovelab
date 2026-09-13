@@ -33,6 +33,7 @@ import {
   Minimize2,
   Minus,
   Search,
+  Download,
   ShieldCheck,
   CheckCheck,
   CalendarX,
@@ -57,6 +58,8 @@ import { isWebAuthnSupported, authenticateParentBiometricPasskey } from '../util
 import { downloadCsvFile } from '../utils/csvHelper';
 import { formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel, formatTeacherFullName, formatDisplaySubjectOrInstrument, isInvalidInstrument, maskLastName } from '../utils/nameHelper';
 import { isSlotCancelledByAbsence } from '../utils/teacherAbsenceHelper';
+import { isUUID } from '../utils/uuidValidator';
+import { formatGermanDate, formatGermanWeekday } from '../utils/formatters';
 import { CampusAppointmentShoutboxModal } from './CampusAppointmentShoutboxModal';
 
 interface CampusEventsBoardProps {
@@ -1117,7 +1120,7 @@ export function CampusEventsBoard({
 
   const getTeacherName = (teacherId?: string) => {
     const teacher = allUsers.find(u => u.id === teacherId);
-    return teacher ? `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() : '—';
+    return teacher ? formatTeacherFullName(teacher) : '—';
   };
 
   const calculateTimelineTimes = (points: any[], eventStartTimeStr?: string) => {
@@ -2217,8 +2220,6 @@ export function CampusEventsBoard({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  const isUUID = (str: any) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 
   const ensureActualOccurrence = async (occ: any): Promise<string> => {
     if (!occ) return '';
@@ -3510,6 +3511,31 @@ export function CampusEventsBoard({
                 'Gitarre'
               );
 
+              let groupMembers: any[] = [];
+              if (s.isGroup && Array.isArray(s.groupStudents)) {
+                groupMembers = s.groupStudents.map((gs: any) => {
+                  const m = (allStudentsList || []).find((st: any) => 
+                    st.id === gs.id || 
+                    (st.first_name?.trim().toLowerCase() === (gs.first_name || '').trim().toLowerCase() && 
+                     (!st.last_name || !gs.last_name || st.last_name.trim().toLowerCase() === (gs.last_name || '').trim().toLowerCase()))
+                  );
+                  return m ? {
+                    ...gs,
+                    id: m.id,
+                    first_name: m.first_name,
+                    last_name: m.last_name,
+                    instrument: gs.instrument || m.instrument
+                  } : gs;
+                });
+              }
+
+              const resolvedFirstName = (s.isGroup && groupMembers.length > 0)
+                ? formatGroupStudentsAnonymized(groupMembers)
+                : (matchedStudent?.first_name || firstName);
+              const resolvedLastName = (s.isGroup && groupMembers.length > 0)
+                ? ''
+                : (matchedStudent?.last_name || lastName);
+
               combinedSchedules.push({
                 id: `board-${board.id}-${s.id || studentId}`,
                 student_id: studentId,
@@ -3522,6 +3548,9 @@ export function CampusEventsBoard({
                 duration: s.duration || 30,
                 status: isMovedFromStamm ? 'pending_reschedule' : 'approved',
                 is_moved: isMovedFromStamm,
+                is_group: Boolean(s.isGroup),
+                group_students: groupMembers.length > 0 ? groupMembers : undefined,
+                groupStudents: groupMembers.length > 0 ? groupMembers : undefined,
                 room_id: board.room_id || s.room_id || teacherProfileObj?.room_id || null,
                 room_name: boardRoomName,
                 room: { name: boardRoomName },
@@ -3530,14 +3559,20 @@ export function CampusEventsBoard({
                 instrument: boardInstrument,
                 student: matchedStudent || {
                   id: studentId,
-                  first_name: firstName,
-                  last_name: lastName,
+                  first_name: resolvedFirstName,
+                  last_name: resolvedLastName,
                   instrument: boardInstrument
                 }
               });
 
               if (studentId) processedStudentIds.add(studentId);
-              if (firstName) processedStudentNames.add(firstName.trim().toLowerCase());
+              if (resolvedFirstName) processedStudentNames.add(resolvedFirstName.trim().toLowerCase());
+              if (groupMembers.length > 0) {
+                groupMembers.forEach(gm => {
+                  if (gm.id) processedStudentIds.add(gm.id);
+                  if (gm.first_name) processedStudentNames.add(gm.first_name.trim().toLowerCase());
+                });
+              }
             });
           }
         });
@@ -3549,7 +3584,10 @@ export function CampusEventsBoard({
           const dayOfWeekNum = parseDayOfWeekNum(sch.day_of_week);
           const alreadyExists = combinedSchedules.some(cs => 
             cs.id === sch.id || 
-            (cs.student_id && String(cs.student_id) === String(sch.student_id) && cs.day_of_week === dayOfWeekNum)
+            (cs.student_id && String(cs.student_id) === String(sch.student_id) && cs.day_of_week === dayOfWeekNum) ||
+            (cs.group_students && Array.isArray(cs.group_students) && cs.group_students.some((gs: any) => String(gs.id) === String(sch.student_id)) && cs.day_of_week === dayOfWeekNum) ||
+            (cs.groupStudents && Array.isArray(cs.groupStudents) && cs.groupStudents.some((gs: any) => String(gs.id) === String(sch.student_id)) && cs.day_of_week === dayOfWeekNum) ||
+            (cs.students && Array.isArray(cs.students) && cs.students.some((st: any) => String(st.id) === String(sch.student_id)) && cs.day_of_week === dayOfWeekNum)
           );
           if (!alreadyExists) {
             const schRoomName = sch.room_name || sch.rooms?.name || sch.room?.name || (sch.room_id ? roomMap.get(sch.room_id)?.name : null) || teacherProfileObj?.rooms?.name || 'Raum 4';
@@ -4271,6 +4309,20 @@ export function CampusEventsBoard({
 
   // Undo cancellation handler for students/teachers
   const handleUndoCancel = async (occ: any, skipPinCheck = false) => {
+    // Vergangene Termine können nicht mehr reaktiviert werden
+    const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
+    const d = simStr ? new Date(simStr + 'T00:00:00') : new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+    const nowTimeStr = simStr ? '00:00:00' : d.toTimeString().substring(0, 8);
+    const isPastOcc = occ.date < todayStr || (occ.date === todayStr && (occ.start_time || '00:00') < nowTimeStr);
+    if (isPastOcc) {
+      alert('Vergangene Termine können nicht mehr reaktiviert werden.');
+      return;
+    }
+
     if (role === "student" && !skipPinCheck && !isAbsenceAllowed) {
       setPinGatePendingAction(() => () => handleUndoCancel(occ, true));
       setPinGateInput("");
@@ -4560,6 +4612,21 @@ export function CampusEventsBoard({
 
   const handleCancelClick = (occ: any, e: React.MouseEvent) => {
     e.stopPropagation();
+
+    // Vergangene Termine können nicht mehr abgesagt oder geändert werden
+    const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
+    const d = simStr ? new Date(simStr + 'T00:00:00') : new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+    const nowTimeStr = simStr ? '00:00:00' : d.toTimeString().substring(0, 8);
+    const isPastOcc = occ.date < todayStr || (occ.date === todayStr && (occ.start_time || '00:00') < nowTimeStr);
+    if (isPastOcc) {
+      alert('Vergangene Termine können nicht mehr abgesagt oder geändert werden.');
+      return;
+    }
+
     const isCanceled = occ.status === 'canceled_by_student' || occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
     if (isCanceled) {
       if (role === 'student' && !isAbsenceAllowed) {
@@ -4584,6 +4651,20 @@ export function CampusEventsBoard({
   };
 
   const handleCancelOccurrence = async (occ: any, skipPinCheck = false) => {
+    // Vergangene Termine absichern (Fail-Closed)
+    const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
+    const d = simStr ? new Date(simStr + 'T00:00:00') : new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+    const nowTimeStr = simStr ? '00:00:00' : d.toTimeString().substring(0, 8);
+    const isPastOcc = occ.date < todayStr || (occ.date === todayStr && (occ.start_time || '00:00') < nowTimeStr);
+    if (isPastOcc) {
+      alert('Vergangene Termine können nicht mehr abgesagt werden.');
+      return;
+    }
+
     if (role === 'student' && !skipPinCheck && !isAbsenceAllowed) {
       setPinGatePendingAction(() => () => handleCancelOccurrence(occ, true));
       setPinGateInput('');
@@ -4826,27 +4907,9 @@ export function CampusEventsBoard({
     return { grouped, monthKeys };
   }, [filteredLessons, lessonTab]);
 
-  // Helpers for formatting
-  const formatDateGerman = (dateStr: string) => {
-    if (!dateStr) return '';
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-      return `${parts[2]}.${parts[1]}.${parts[0]}`;
-    }
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  };
-
-  const formatWeekday = (dateStr: string) => {
-    if (!dateStr) return '';
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-      const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-      return d.toLocaleDateString('de-DE', { weekday: 'short' });
-    }
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('de-DE', { weekday: 'short' });
-  };
+  // Canonical formatting via SSOT formatters
+  const formatDateGerman = (dateStr: string) => formatGermanDate(dateStr);
+  const formatWeekday = (dateStr: string) => formatGermanWeekday(dateStr);
 
   const getMonthLabel = (monthKey: string) => {
     if (!monthKey) return '';
@@ -5718,25 +5781,38 @@ export function CampusEventsBoard({
         const uniqueStudentMap = new Map<string, any>();
         
         slotOccs.forEach(o => {
-          const st = o.student || { id: o.student_id, first_name: o.student_first_name || o.first_name, last_name: o.student_last_name || o.last_name };
-          const rawName = String(st.first_name || st.name || '').trim();
-          
-          if (rawName.includes('&') || rawName.includes(',') || /\b(and|und)\b/i.test(rawName)) {
-            const tokens = rawName.split(/&|,|\bund\b|\band\b/i).map((s: string) => s.trim()).filter(Boolean);
-            tokens.forEach((t: string) => {
-              const key = t.toLowerCase();
-              if (!uniqueStudentMap.has(key)) {
-                uniqueStudentMap.set(key, { first_name: t, last_name: '' });
+          const memberList = (Array.isArray(o.group_students) && o.group_students.length > 0)
+            ? o.group_students
+            : (Array.isArray(o.groupStudents) && o.groupStudents.length > 0)
+              ? o.groupStudents
+              : (Array.isArray(o.students) && o.students.length > 0)
+                ? o.students
+                : [o.student || { id: o.student_id, first_name: o.student_first_name || o.first_name, last_name: o.student_last_name || o.last_name }];
+
+          memberList.forEach((st: any) => {
+            if (!st) return;
+            const sId = st.id || st.student_id || st.user_id;
+            const rawName = String(st.first_name || st.name || '').trim();
+            
+            if (sId && String(sId).length > 10 && !String(sId).startsWith('group-') && !String(sId).startsWith('virtual-')) {
+              uniqueStudentMap.set(String(sId), st);
+            } else if (rawName.includes('&') || rawName.includes(',') || /\b(and|und)\b/i.test(rawName)) {
+              const tokens = rawName.split(/&|,|\bund\b|\band\b/i).map((s: string) => s.trim()).filter(Boolean);
+              tokens.forEach((t: string) => {
+                const key = t.toLowerCase();
+                if (!uniqueStudentMap.has(key)) {
+                  uniqueStudentMap.set(key, { first_name: t, last_name: '' });
+                }
+              });
+            } else if (rawName) {
+              const key = rawName.toLowerCase();
+              if (!uniqueStudentMap.has(key) || (!uniqueStudentMap.get(key).last_name && st.last_name)) {
+                uniqueStudentMap.set(key, st);
               }
-            });
-          } else if (rawName) {
-            const key = rawName.toLowerCase();
-            if (!uniqueStudentMap.has(key) || (!uniqueStudentMap.get(key).last_name && st.last_name)) {
-              uniqueStudentMap.set(key, st);
+            } else if (st.id) {
+              uniqueStudentMap.set(String(st.id), st);
             }
-          } else if (st.id) {
-            uniqueStudentMap.set(String(st.id), st);
-          }
+          });
         });
 
         const uniqueStudents = Array.from(uniqueStudentMap.values());
@@ -5781,7 +5857,17 @@ export function CampusEventsBoard({
       }
     });
 
+    // Date & Time reference for past occurrence check
+    const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
+    const d = simStr ? new Date(simStr + 'T00:00:00') : new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+    const nowTimeStr = simStr ? '00:00:00' : d.toTimeString().substring(0, 8);
+
     return groupedSlotItems.map(occ => {
+      const isPastOcc = lessonTab === 'past' || occ.date < todayStr || (occ.date === todayStr && (occ.start_time || '00:00') < nowTimeStr);
       const isPendingReview = occ.schedule?.status === 'ready_for_admin_review';
       const isCanceled = occ.status === 'canceled_by_student' || occ.status === 'cancelled' || occ.status === 'canceled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick' || occ.status === 'absent';
       const isRescheduled = Boolean(
@@ -5840,6 +5926,8 @@ export function CampusEventsBoard({
             const id = occ.student_id || occ.student?.id || occ.id;
             return formatSingleStudentAnonymized(fn, ln, id);
           })());
+
+      const displaySubject = formatDisplaySubjectOrInstrument(occ, occ.teacher || currentTeacherProfile);
 
       const isGroupOcc = Boolean(
         occ.isGroupOcc || occ.isGroup || occ.is_group ||
@@ -6049,6 +6137,16 @@ export function CampusEventsBoard({
                   whiteSpace: 'nowrap' 
                 }}>
                   {opponentName}
+                  {displaySubject && (
+                    <span style={{ 
+                      fontSize: '12px', 
+                      fontWeight: 700, 
+                      color: isCanceled ? subColor : brandColor, 
+                      marginLeft: '6px' 
+                    }}>
+                      ({displaySubject})
+                    </span>
+                  )}
                 </span>
 
                 {isGroupOcc && (
@@ -6175,18 +6273,6 @@ export function CampusEventsBoard({
                 </span>
                 <span>•</span>
                 <span>{occ.duration} Min</span>
-                {(() => {
-                  const displaySubject = formatDisplaySubjectOrInstrument(occ, occ.teacher || currentTeacherProfile);
-                  if (!displaySubject) return null;
-                  return (
-                    <>
-                      <span>•</span>
-                      <span style={{ color: brandColor, fontWeight: 800 }}>
-                        {displaySubject}
-                      </span>
-                    </>
-                  );
-                })()}
               </div>
             </div>
           </div>
@@ -6201,6 +6287,7 @@ export function CampusEventsBoard({
                 setActiveChatOcc(occ);
               }}
               title={hasMessages ? "1:1 Shoutbox (Nachrichten vorhanden)" : "1:1 Shoutbox öffnen"}
+              aria-label={hasMessages ? "1:1 Shoutbox (Nachrichten vorhanden)" : "1:1 Shoutbox öffnen"}
               style={{
                 border: hasMessages ? '1px solid #fde047' : '1px solid #f1f5f9',
                 background: hasMessages ? '#fefce8' : '#f8fafc',
@@ -6230,34 +6317,37 @@ export function CampusEventsBoard({
               />
             </button>
 
-            {/* Absagen Icon (Immer sichtbar, geschützt via Master-PIN) */}
-            <button
-              type="button"
-              onClick={(e) => handleCancelClick(occ, e)}
-              title={isCanceled ? "Termin ist abgesagt (Klicken zum Reaktivieren)" : "Termin absagen"}
-              style={{
-                border: isCanceled ? '1px solid #e2e8f0' : '1px solid #fee2e2',
-                background: isCanceled ? '#f1f5f9' : '#fef2f2',
-                width: '38px',
-                height: '38px',
-                padding: '0',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: isCanceled ? '#94a3b8' : '#ef4444',
-                transition: 'all 0.2s',
-                borderRadius: '12px',
-                flexShrink: 0
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = isCanceled ? '#e2e8f0' : '#fee2e2'}
-              onMouseLeave={(e) => e.currentTarget.style.background = isCanceled ? '#f1f5f9' : '#fef2f2'}
-            >
-              <CalendarX 
-                size={17} 
-                color={isCanceled ? '#94a3b8' : '#ef4444'} 
-              />
-            </button>
+            {/* Absagen Icon (Nur für zukünftige Termine, geschützt via Master-PIN) */}
+            {!isPastOcc && (
+              <button
+                type="button"
+                onClick={(e) => handleCancelClick(occ, e)}
+                title={isCanceled ? "Termin ist abgesagt (Klicken zum Reaktivieren)" : "Termin absagen"}
+                aria-label={isCanceled ? "Termin ist abgesagt (Klicken zum Reaktivieren)" : "Termin absagen"}
+                style={{
+                  border: isCanceled ? '1px solid #e2e8f0' : '1px solid #fee2e2',
+                  background: isCanceled ? '#f1f5f9' : '#fef2f2',
+                  width: '38px',
+                  height: '38px',
+                  padding: '0',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: isCanceled ? '#94a3b8' : '#ef4444',
+                  transition: 'all 0.2s',
+                  borderRadius: '12px',
+                  flexShrink: 0
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = isCanceled ? '#e2e8f0' : '#fee2e2'}
+                onMouseLeave={(e) => e.currentTarget.style.background = isCanceled ? '#f1f5f9' : '#fef2f2'}
+              >
+                <CalendarX 
+                  size={17} 
+                  color={isCanceled ? '#94a3b8' : '#ef4444'} 
+                />
+              </button>
+            )}
           </div>
         </div>
       );
@@ -10354,7 +10444,7 @@ export function CampusEventsBoard({
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <strong style={{ fontSize: '0.84rem', color: isSelected ? brandColor : '#1f1f1f' }}>
-                                {teacher.first_name} {teacher.last_name}
+                                {formatTeacherFullName(teacher)}
                               </strong>
                               <span style={{ fontSize: '0.64rem', fontWeight: 800, background: badge.bg, color: badge.color, padding: '2px 8px', borderRadius: '100px' }}>
                                 {badge.label}
@@ -10391,7 +10481,7 @@ export function CampusEventsBoard({
                         <div style={{ padding: '16px 20px', borderBottom: '1px solid #cbd5e1', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box' }}>
                           <div>
                             <h4 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 700, color: '#1f1f1f' }}>
-                              {teacher.first_name} {teacher.last_name}
+                              {formatTeacherFullName(teacher)}
                             </h4>
                             <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
                               {teacherPoints.length} Beiträge insgesamt ({approvedCount} freigegeben, {submittedCount} ausstehend)
@@ -10413,7 +10503,7 @@ export function CampusEventsBoard({
                             {!hasConfirmedNoSubmission && teacherPoints.length === 0 && (
                               <button
                                 type="button"
-                                onClick={() => alert(`Erinnerung wurde per Mail/Shoutbox an ${teacher.first_name} ${teacher.last_name} gesendet!`)}
+                                onClick={() => alert(`Erinnerung wurde per Mail/Shoutbox an ${formatTeacherFullName(teacher)} gesendet!`)}
                                 className="google-btn-filled"
                                 style={{ height: '30px', padding: '0 12px', fontSize: '0.74rem', background: '#ea580c' }}
                               >
@@ -10829,7 +10919,7 @@ export function CampusEventsBoard({
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <strong style={{ fontSize: '0.84rem', color: isSelected ? brandColor : '#1f1f1f' }}>
-                                {teacher.first_name} {teacher.last_name}
+                                {formatTeacherFullName(teacher)}
                               </strong>
                               <span style={{ fontSize: '0.64rem', fontWeight: 800, background: badge.bg, color: badge.color, padding: '2px 8px', borderRadius: '100px' }}>
                                 {badge.label}
@@ -10861,7 +10951,7 @@ export function CampusEventsBoard({
                         {/* Header */}
                         <div style={{ padding: '16px 20px', borderBottom: '1px solid #cbd5e1', background: '#f8fafc', boxSizing: 'border-box' }}>
                           <h4 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 700, color: '#1f1f1f' }}>
-                            Rückfragen & Feedback: {teacher.first_name} {teacher.last_name}
+                            Rückfragen & Feedback: {formatTeacherFullName(teacher)}
                           </h4>
                           <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
                             Kommunikation bezüglich der Beiträge des Lehrers
@@ -10932,7 +11022,7 @@ export function CampusEventsBoard({
                                                     border: '1px solid #cbd5e1',
                                                     boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
                                                   }}>
-                                                    <span style={{ display: 'block', fontSize: '0.64rem', fontWeight: 'bold', color: brandColor, marginBottom: '3px', textTransform: 'uppercase' }}>{teacher.first_name} {teacher.last_name}</span>
+                                                    <span style={{ display: 'block', fontSize: '0.64rem', fontWeight: 'bold', color: brandColor, marginBottom: '3px', textTransform: 'uppercase' }}>{formatTeacherFullName(teacher)}</span>
                                                     {answerText}
                                                   </div>
                                                 ) : (
@@ -13705,6 +13795,7 @@ export function CampusEventsBoard({
         const token = calendarToken;
         const webcalUrl = `webcal://${cleanSupabaseUrl}/functions/v1/ical-feed?token=${token}`;
         const httpsUrl = `${supabaseUrlStr}/functions/v1/ical-feed?token=${token}`;
+        const googleCalendarUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(httpsUrl)}`;
 
         const handleShareWithFamily = async () => {
           const studentFirstName = studentUser?.first_name || 'deines Kindes';
@@ -13734,6 +13825,55 @@ export function CampusEventsBoard({
           } catch (clipErr) {
             console.error('Clipboard copy error:', clipErr);
           }
+        };
+
+        const handleDirectIcsDownload = () => {
+          const icsLines = [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//Campus-Groovelab//Stundenplan Export//DE',
+            'CALSCALE:GREGORIAN',
+            'METHOD:PUBLISH',
+            'X-WR-CALNAME:Campus-Groovelab Stundenplan'
+          ];
+
+          const nowStr = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+          const targetList = (lessons && lessons.length > 0) ? lessons : [];
+
+          targetList.forEach((occ: any, idx: number) => {
+            const occDate = occ.date || occ.start_date;
+            if (!occDate) return;
+            const datePart = String(occDate).split('T')[0].replace(/-/g, '');
+            const startTimeStr = (occ.start_time || '14:00').replace(':', '') + '00';
+            const endTimeStr = (occ.end_time || '14:45').replace(':', '') + '00';
+            const uid = `cgl-${occ.id || idx}-${datePart}@campus-groovelab.de`;
+            const studentName = occ.student ? formatSingleStudentAnonymized(occ.student) : (studentUser?.first_name || 'Schüler');
+            const instrument = occ.instrument || studentUser?.instrument || '';
+            const summary = `${instrument ? `${instrument}-Unterricht` : 'Musikunterricht'}${role !== 'student' ? `: ${studentName}` : ''}`;
+            const location = occ.room_name || occ.room?.name || 'Musikschule';
+
+            icsLines.push('BEGIN:VEVENT');
+            icsLines.push(`UID:${uid}`);
+            icsLines.push(`DTSTAMP:${nowStr}`);
+            icsLines.push(`DTSTART:${datePart}T${startTimeStr}`);
+            icsLines.push(`DTEND:${datePart}T${endTimeStr}`);
+            icsLines.push(`SUMMARY:${summary}`);
+            if (location) icsLines.push(`LOCATION:${location}`);
+            icsLines.push('DESCRIPTION:Unterrichtstermin über Campus-Groovelab');
+            icsLines.push('END:VEVENT');
+          });
+
+          icsLines.push('END:VCALENDAR');
+
+          const blob = new Blob([icsLines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+          const downloadUrl = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = downloadUrl;
+          link.setAttribute('download', `campus-groovelab-stundenplan-${new Date().toISOString().slice(0, 10)}.ics`);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(downloadUrl);
         };
 
         return (
@@ -13878,9 +14018,9 @@ export function CampusEventsBoard({
                     </div>
                   )}
 
-                  {/* 1. Primäre Aktion: Direktes Abonnieren */}
+                  {/* 1. Primäre Aktion: Verschlüsseltes Abonnieren (iOS, iPadOS & macOS Safari) */}
                   <a
-                    href={webcalUrl}
+                    href={httpsUrl}
                     style={{
                       textDecoration: 'none',
                       background: brandColor || '#34a853',
@@ -13901,24 +14041,84 @@ export function CampusEventsBoard({
                     onMouseLeave={e => { e.currentTarget.style.background = brandColor || '#34a853'; e.currentTarget.style.transform = 'none'; }}
                   >
                     <CalendarPlus size={17} />
-                    {isMobilePortrait ? 'Auf diesem Smartphone eintragen' : 'Auf diesem Computer abonnieren'}
+                    {isMobilePortrait ? 'Auf diesem Smartphone abonnieren' : 'Auf diesem Gerät abonnieren'}
                   </a>
 
-                  {/* 2. Familien-Aktion: Sauberer 1-Klick Clipboard Copy ohne störendes macOS-Popup */}
-                  <button
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(httpsUrl);
-                        setFamilyCopied(true);
-                        setTimeout(() => setFamilyCopied(false), 2500);
-                      } catch (err) {
-                        console.error('Clipboard copy failed:', err);
-                      }
-                    }}
+                  {/* 2. Google Kalender: 1-Klick Web-Abonnement */}
+                  <a
+                    href={googleCalendarUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     style={{
-                      border: familyCopied ? '1px solid #86efac' : '1px solid #e2e8f0',
-                      background: familyCopied ? '#f0fdf4' : '#ffffff',
-                      color: familyCopied ? '#16a34a' : '#1e293b',
+                      textDecoration: 'none',
+                      background: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      color: '#1e293b',
+                      padding: '11px 18px',
+                      borderRadius: '16px',
+                      fontWeight: 750,
+                      fontSize: '0.86rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      transition: 'all 0.15s ease',
+                      textAlign: 'center',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#f8fafc'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+                  >
+                    <ExternalLink size={16} color="#475569" />
+                    <span>In Google Kalender öffnen (1-Klick)</span>
+                  </a>
+
+                  {/* 3. Kopieren für Apple Kalender, Outlook & Familie */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(httpsUrl);
+                          setFamilyCopied(true);
+                          setTimeout(() => setFamilyCopied(false), 2500);
+                        } catch (err) {
+                          console.error('Clipboard copy failed:', err);
+                        }
+                      }}
+                      style={{
+                        border: familyCopied ? '1px solid #86efac' : '1px solid #e2e8f0',
+                        background: familyCopied ? '#f0fdf4' : '#ffffff',
+                        color: familyCopied ? '#16a34a' : '#1e293b',
+                        padding: '11px 18px',
+                        borderRadius: '16px',
+                        fontWeight: 750,
+                        fontSize: '0.86rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                      }}
+                      onMouseEnter={e => { if (!familyCopied) e.currentTarget.style.background = '#f8fafc'; }}
+                      onMouseLeave={e => { if (!familyCopied) e.currentTarget.style.background = '#ffffff'; }}
+                    >
+                      {familyCopied ? <Check size={16} strokeWidth={2.5} color="#16a34a" /> : <Copy size={16} color="#475569" />}
+                      {familyCopied ? 'Sicherer Link kopiert! Bereit zum Einfügen ✓' : 'Sicheren Link kopieren (Apple Kalender, Outlook)'}
+                    </button>
+                    <div style={{ fontSize: '0.70rem', color: '#64748b', textAlign: 'center', lineHeight: 1.35, padding: '0 6px' }}>
+                      🍏 <strong>Apple Kalender am Mac:</strong> Im Menü oben auf <em>Ablage → Neues Kalenderabonnement</em> klicken und Link einfügen.
+                    </div>
+                  </div>
+
+                  {/* 4. Ausfallsicherer Direktexport (.ics Datei herunterladen) */}
+                  <button
+                    onClick={handleDirectIcsDownload}
+                    style={{
+                      border: '1px solid #cbd5e1',
+                      background: '#f8fafc',
+                      color: '#334155',
                       padding: '11px 18px',
                       borderRadius: '16px',
                       fontWeight: 750,
@@ -13931,11 +14131,11 @@ export function CampusEventsBoard({
                       transition: 'all 0.15s',
                       boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
                     }}
-                    onMouseEnter={e => { if (!familyCopied) e.currentTarget.style.background = '#f8fafc'; }}
-                    onMouseLeave={e => { if (!familyCopied) e.currentTarget.style.background = '#ffffff'; }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#f8fafc'; }}
                   >
-                    {familyCopied ? <Check size={16} strokeWidth={2.5} color="#16a34a" /> : <Copy size={16} color="#475569" />}
-                    {familyCopied ? 'Link kopiert! Bereit zum Teilen mit der Familie ✓' : 'Kalender-Link für Familie kopieren (Eltern, Oma & Opa)'}
+                    <Download size={16} color="#475569" />
+                    <span>Stundenplan als .ics-Datei herunterladen</span>
                   </button>
 
                   {/* Mobile-Only: QR-Code zum Abscannen für andere */}
@@ -13964,7 +14164,7 @@ export function CampusEventsBoard({
                   }}>
                     <ShieldCheck size={16} color={brandColor || '#34a853'} style={{ flexShrink: 0 }} />
                     <span style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: 1.35, fontWeight: 550 }}>
-                      <strong style={{ color: '#334155' }}>DSGVO-Garantie:</strong> Überträgt nur den Vornamen, Termine, Raum und Lehrkraft. Keine Nachnamen, Noten, Chats oder Kontaktdaten.
+                      <strong style={{ color: '#334155' }}>🔒 100 % TLS-verschlüsselt (Art. 32 DSGVO):</strong> Nur Vorname, Termine, Raum und Lehrkraft. Keine unverschlüsselten Übertragungen, keine Noten oder Chats.
                     </span>
                   </div>
 

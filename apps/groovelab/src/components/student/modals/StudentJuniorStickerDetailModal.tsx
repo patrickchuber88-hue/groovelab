@@ -1,6 +1,7 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { Check, Download, Music, Rocket, Star, X, Lock } from "lucide-react";
+import { StudentStickerAwardCelebrationModal } from "./StudentStickerAwardCelebrationModal";
 
 export interface StudentJuniorStickerDetailModalProps {
   sticker: any;
@@ -26,6 +27,19 @@ export const StudentJuniorStickerDetailModal: React.FC<StudentJuniorStickerDetai
   const isSongSticker = sticker.category === 'songs' || sticker.id === 'song-master';
   const masteredSong = assignedCampusSongs.find(s => isSongMastered(s)) || assignedCampusSongs[0];
   const songTitleDisplay = masteredSong ? `${masteredSong.artist} – ${masteredSong.title}` : (progressItems.find(p => p.status === 'MASTERED')?.topic_name || '');
+
+  // 🌟 WENN FREIGESCHALTET: ZEIGE DAS ANIMIERTE 3D SAMMLER-ZERTIFIKAT
+  if (sticker.isUnlocked) {
+    return (
+      <StudentStickerAwardCelebrationModal
+        sticker={sticker}
+        topicName={songTitleDisplay}
+        isAlreadyCollected={true}
+        onDownloadJpg={(st) => onDownloadJpg(st)}
+        onStickInAlbum={onClose}
+      />
+    );
+  }
 
   return createPortal(
     <div style={{

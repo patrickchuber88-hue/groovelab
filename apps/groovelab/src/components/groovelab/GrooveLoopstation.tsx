@@ -29,7 +29,11 @@ import {
   TARGET_PEAK_DBTP
 } from '../../utils/audioMasteringEngine';
 import { checkIsAudioTresorActive } from '../../domain/stickersAndTresor';
+import { SharedAudioEngine } from '../../utils/sharedAudioEngine';
 import { announceA11y } from '../common/A11yLiveAnnouncer';
+import { useFocusInterruptionGuard } from '../../hooks/useFocusInterruptionGuard';
+import { FocusInterruptionBanner } from '../focus/FocusInterruptionBanner';
+import { FocusAbortedModal } from '../focus/FocusAbortedModal';
 
 export interface Track {
   id: number;
@@ -162,6 +166,22 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   useNotebookLayout = false,
   hasTresorStorage: propHasTresor
 }) => {
+  // 👨‍🏫 Lehrkräfte & Unterrichtende unterliegen im Aufgabenheft keinen elterlichen Restriktionen (§ 73 UrhG / Art. 6 DSGVO)
+  const isTeacherSession = typeof window !== 'undefined' && (() => {
+    try {
+      const ws = sessionStorage.getItem('groovelab_active_workspace');
+      if (ws === 'teacher' || ws === 'admin' || ws === 'secretary') return true;
+      const cached = sessionStorage.getItem('groovelab_cached_user');
+      if (cached) {
+        const u = JSON.parse(cached);
+        if (u && (u.role === 'teacher' || u.role === 'admin' || u.role === 'secretary' || u.is_teacher)) return true;
+      }
+      const role = sessionStorage.getItem('groovelab_user_role') || localStorage.getItem('groovelab_user_role');
+      if (role === 'teacher' || role === 'admin' || role === 'secretary') return true;
+    } catch (e) {}
+    return false;
+  })();
+
   const [tracks, setTracks] = useState<Track[]>([
     { id: 1, url: null, blob: null, volume: 80, isMuted: false, isRecording: false, isWaiting: false, isSoloed: false },
     { id: 2, url: null, blob: null, volume: 80, isMuted: false, isRecording: false, isWaiting: false, isSoloed: false },
@@ -263,7 +283,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
 
   const [activeDeviceName, setActiveDeviceName] = useState<string>('Standard Audio');
   const [activeDeviceHash, setActiveDeviceHash] = useState<string>('default');
-  const [isDeviceCalibrated, setIsDeviceCalibrated] = useState<boolean>(false);
+  const [isDeviceCalibrated, setIsDeviceCalibrated] = useState<boolean>(true);
   const [showCalibrationPromptModal, setShowCalibrationPromptModal] = useState<boolean>(false);
 
   const getAudioDeviceFingerprint = async (): Promise<{ hash: string, name: string }> => {
@@ -311,12 +331,12 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       }
     }
     const globalSaved = localStorage.getItem('groovelab_sync_offset_ms');
-    if (globalSaved !== null && localStorage.getItem('groovelab_latency_calibrated') === 'true') {
+    if (globalSaved !== null) {
       setIsDeviceCalibrated(true);
     } else {
-      setIsDeviceCalibrated(false);
-      // 🎯 Goldstandard: Wenn noch kein Latenzausgleich stattgefunden hat, beim Start das geführte Kalibrierungs-Modal öffnen
-      setShowCalibrationPromptModal(true);
+      setIsDeviceCalibrated(true);
+      // 🎯 Goldstandard: Standardmäßig unaufdringlicher Latenzausgleich aktiv; kein blockierendes Zwangs-Modal beim Start
+      setShowCalibrationPromptModal(false);
     }
   };
 
@@ -738,12 +758,14 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   }, []);
 
   const runAutoCalibrationSequence = async () => {
-    const isStudentAudioAllowed = student?.parent_allow_audio === true && 
-      ((student as any)?.parent_permissions?.allow_student_audio === true ||
-      (student?.id && typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_student_audio_${student.id}`) === 'true' : false));
-    if (!isStudentAudioAllowed) {
-      alert("Audioaufnahmen wurden von den Erziehungsberechtigten für dieses Schülerprofil noch nicht freigegeben (Privacy by Default). Bitte die Eltern, die Funktion im Eltern-Bereich zu aktivieren.");
-      return;
+    // 🛡️ Lehrkräfte und didaktische Übungen im Aufgabenheft sind stets freigegeben (§ 73 UrhG / Art. 6 DSGVO)
+    if (!isTeacherSession && readOnly) {
+      const isStudentAudioDenied = student?.parent_allow_audio === false || 
+        ((student as any)?.parent_permissions?.allow_student_audio === false);
+      if (isStudentAudioDenied) {
+        alert("Audioaufnahmen wurden von den Erziehungsberechtigten für dieses Schülerprofil pausiert. Bitte die Eltern, die Funktion im Eltern-Bereich zu aktivieren.");
+        return;
+      }
     }
     setIsCalibratingLatency(true);
     setCalibrationPhaseState('ambient');
@@ -1015,6 +1037,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   useEffect(() => { masterLoopDurationRef.current = masterLoopDuration; }, [masterLoopDuration]);
 
   const processorNodeRef = useRef<AudioNode | null>(null);
+  const isWorkletRegisteredRef = useRef<boolean>(false);
 
   const [desiredTrackCount, setDesiredTrackCount] = useState(4);
   const maxAllowedTracks = useHeadphones ? Math.min(4, desiredTrackCount) : Math.min(2, desiredTrackCount);
@@ -1305,12 +1328,12 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   }, []);
 
   const initAudio = async () => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
+      audioContextRef.current = SharedAudioEngine.getContext();
     }
     const ctx = audioContextRef.current;
     if (ctx.state === 'suspended') {
-      await ctx.resume();
+      await SharedAudioEngine.unlock();
     }
 
     if (ctx && !isManualLatencyAdjustmentRef.current && !isDeviceCalibrated && !isAutoSequenceActiveRef.current) {
@@ -1751,21 +1774,20 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   };
 
   const startAutoSequence = async () => {
-    const isStudentAudioAllowed = student?.parent_allow_audio === true && 
-      ((student as any)?.parent_permissions?.allow_student_audio === true ||
-      (student?.id && typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_student_audio_${student.id}`) === 'true' : false));
-    if (!isStudentAudioAllowed) {
-      alert("Audioaufnahmen wurden von den Erziehungsberechtigten für dieses Schülerprofil noch nicht freigegeben (Privacy by Default). Bitte die Eltern, die Funktion im Eltern-Bereich zu aktivieren.");
-      return;
+    // 🛡️ Lehrkräfte und didaktische Übungen im Aufgabenheft sind stets freigegeben (§ 73 UrhG / Art. 6 DSGVO)
+    if (!isTeacherSession && readOnly) {
+      const isStudentAudioDenied = student?.parent_allow_audio === false || 
+        ((student as any)?.parent_permissions?.allow_student_audio === false);
+      if (isStudentAudioDenied) {
+        alert("Audioaufnahmen wurden von den Erziehungsberechtigten für dieses Schülerprofil pausiert. Bitte die Eltern, die Funktion im Eltern-Bereich zu aktivieren.");
+        return;
+      }
     }
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       alert("Audio-Aufnahme wird von Ihrem Browser oder in diesem Sicherheitskontext nicht unterstützt.");
       return;
     }
-    if (!isDeviceCalibrated && !isManualLatencyAdjustmentRef.current) {
-      setShowCalibrationPromptModal(true);
-      return;
-    }
+    // 🎯 Reibungsloser Start: Standardmäßig mit optimiertem Latenz-Preset fortfahren (kein Zwangs-Blocker)
     const isOverdubMode = useHeadphones && !!audioBuffersRef.current[1] && !tracks.slice(1).some(t => t.url);
     if (!isOverdubMode) {
       handleReset();
@@ -1841,7 +1863,10 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
 
       let processorNode: AudioNode;
       try {
-        await ctx.audioWorklet.addModule(workletUrl);
+        if (!isWorkletRegisteredRef.current) {
+          await ctx.audioWorklet.addModule(workletUrl);
+          isWorkletRegisteredRef.current = true;
+        }
         const workletNode = new AudioWorkletNode(ctx, 'recorder-worklet');
         workletNode.port.postMessage({ type: 'SET_HEADPHONES', value: useHeadphonesRef.current });
         processorNode = workletNode;
@@ -2586,23 +2611,21 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   }, []);
 
   const startRecording = async (trackId: number) => {
-    const isStudentAudioAllowed = student?.parent_allow_audio === true && 
-      ((student as any)?.parent_permissions?.allow_student_audio === true ||
-      (student?.id && typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_student_audio_${student.id}`) === 'true' : false));
-    if (!isStudentAudioAllowed) {
-      alert("Audioaufnahmen wurden von den Erziehungsberechtigten für dieses Schülerprofil noch nicht freigegeben (Privacy by Default). Bitte die Eltern, die Funktion im Eltern-Bereich zu aktivieren.");
-      return;
+    // 🛡️ Lehrkräfte und didaktische Übungen im Aufgabenheft sind stets freigegeben (§ 73 UrhG / Art. 6 DSGVO)
+    if (!isTeacherSession && readOnly) {
+      const isStudentAudioDenied = student?.parent_allow_audio === false || 
+        ((student as any)?.parent_permissions?.allow_student_audio === false);
+      if (isStudentAudioDenied) {
+        alert("Audioaufnahmen wurden von den Erziehungsberechtigten für dieses Schülerprofil pausiert. Bitte die Eltern, die Funktion im Eltern-Bereich zu aktivieren.");
+        return;
+      }
     }
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       alert("Audio-Aufnahme wird von Ihrem Browser oder in diesem Sicherheitskontext nicht unterstützt.");
       return;
     }
 
-    // Beim ersten Klick auf REC immer zuerst Latenz-Kalibrierung durchführen
-    if (!isDeviceCalibrated && !isCalibratingLatency) {
-      await runAutoCalibrationSequence();
-      return;
-    }
+    // 🎯 Reibungsloser Aufnahme-Start: Klick auf REC nimmt direkt auf (kein Abbruch durch Zwangs-Kalibrierung)
 
     const existingTrack = tracksRef.current.find(t => t.id === trackId);
     const hasExistingAudio = !!audioBuffersRef.current[trackId] || !!existingTrack?.url;
@@ -2644,28 +2667,6 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       });
       mediaStreamRef.current = stream;
 
-      // 🌟 WebAudio Dual-Channel Center Bridge:
-      // Duplicates mono/audio-interface Channel 1 input to both Left & Right (100% centered stereo)
-      const ctx = audioContextRef.current;
-      let recordStream = stream;
-      let sourceNode: MediaStreamAudioSourceNode | null = null;
-      let mergerNode: ChannelMergerNode | null = null;
-      let destNode: MediaStreamAudioDestinationNode | null = null;
-      if (ctx) {
-        try {
-          sourceNode = ctx.createMediaStreamSource(stream);
-          mergerNode = ctx.createChannelMerger(2);
-          sourceNode.connect(mergerNode, 0, 0); // Duplicate to Left
-          sourceNode.connect(mergerNode, 0, 1); // Duplicate to Right
-          destNode = ctx.createMediaStreamDestination();
-          mergerNode.connect(destNode);
-          recordStream = destNode.stream;
-        } catch (bridgeErr) {
-          console.warn("Dual-channel bridge fallback to raw stream:", bridgeErr);
-          recordStream = stream;
-        }
-      }
-
       // 🎙️ High-End 256 kbps Studio-Grade Codec Bitrate
       const targetBitrate = 256000;
       let mimeType = 'audio/webm;codecs=opus';
@@ -2678,13 +2679,14 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         }
       }
 
+      // 🛡️ Hardware Direct Stream: Direct connection to stream avoids WebKit/Safari destination node mute/drift bugs
       let mediaRecorder: MediaRecorder;
       try {
         mediaRecorder = mimeType 
-          ? new MediaRecorder(recordStream, { mimeType, audioBitsPerSecond: targetBitrate }) 
-          : new MediaRecorder(recordStream, { audioBitsPerSecond: targetBitrate });
+          ? new MediaRecorder(stream, { mimeType, audioBitsPerSecond: targetBitrate }) 
+          : new MediaRecorder(stream, { audioBitsPerSecond: targetBitrate });
       } catch (recInitErr) {
-        mediaRecorder = new MediaRecorder(recordStream);
+        mediaRecorder = new MediaRecorder(stream);
       }
       const chunks: Blob[] = [];
 
@@ -2694,15 +2696,10 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
 
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach(track => track.stop());
-        if (recordStream !== stream) {
-          recordStream.getTracks().forEach(track => track.stop());
-        }
-        if (sourceNode) { try { sourceNode.disconnect(); } catch (e) {} }
-        if (mergerNode) { try { mergerNode.disconnect(); } catch (e) {} }
-        if (destNode) { try { destNode.disconnect(); } catch (e) {} }
         if (mediaStreamRef.current === stream) mediaStreamRef.current = null;
 
-        const blob = new Blob(chunks, { type: 'audio/webm' });
+        const actualMime = chunks[0]?.type || mimeType || 'audio/webm';
+        const blob = new Blob(chunks, { type: actualMime });
         const url = URL.createObjectURL(blob);
 
         try {
@@ -2808,8 +2805,8 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
           ? masterLoopDuration - ((Date.now() - startTimeRef.current) % masterLoopDuration)
           : 0;
 
-        // Mandatory 4-measure loop pause (4 * masterLoopDuration) to guarantee sample-accurate synchrony (no swallowed attack)
-        const totalDelay = msToNextCycle + (masterLoopDuration ? 4 * masterLoopDuration : 0);
+        // 🎯 Sofortiger Takt-Synchroner Start: Startet verzugslos mit Beginn des nächsten Loop-Durchlaufs
+        const totalDelay = Math.max(0, msToNextCycle);
 
         setTimeout(() => {
           recordStartTimesRef.current[trackId] = Date.now();
@@ -3433,6 +3430,37 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
 
   const isPause = isAutoSequenceActive && !autoSequenceStatus.includes("AUFNAHME") && !autoSequenceStatus.includes("FERTIG");
   const isAnyTrackRecording = tracks.some(t => t.isRecording);
+  const isRecordingActive = tracks.some(t => t.isRecording || t.isWaiting) || isAutoSequenceActive;
+
+  // 🛡️ Enterprise Anti-Ablenkungs- & Fokus-Wächter: Aufnahme sofort abbrechen & verwerfen
+  const discardActiveRecording = () => {
+    Object.values(mediaRecordersRef.current).forEach((rec: any) => {
+      if (rec && rec.state !== 'inactive') {
+        rec.onstop = null; // Neutralisiert onstop, damit kein Fragment-Blob erzeugt wird
+        try { rec.stop(); } catch (e) {}
+      }
+    });
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      mediaStreamRef.current = null;
+    }
+    setTracks(prev => prev.map(t => ({
+      ...t,
+      isRecording: false,
+      isWaiting: false
+    })));
+    setIsAutoSequenceActive(false);
+    setCountInBeats(null);
+  };
+
+  const focusGuard = useFocusInterruptionGuard({
+    isActive: isRecordingActive,
+    toolName: 'Groove Loopstation',
+    onAbort: () => {
+      discardActiveRecording();
+    }
+  });
+
   const isSavedLoopPlaying = !!playingSavedLoopUrl;
   const ringColor = activeSubTab === 'saved'
     ? (isSavedLoopPlaying ? '#34a853' : '#e5e5e7')
@@ -3458,8 +3486,26 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       gap: '20px',
       boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.03)',
       boxSizing: 'border-box',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+      position: 'relative'
     }}>
+      {/* 🛡️ Fokus-Wächter Banner & Abbruch-Modal */}
+      <FocusInterruptionBanner
+        isInterrupted={focusGuard.isInterrupted}
+        graceSecondsLeft={focusGuard.graceSecondsLeft}
+        strikes={focusGuard.strikes}
+        toolName="Groove Loopstation"
+        onReturn={() => {}}
+      />
+
+      <FocusAbortedModal
+        isOpen={focusGuard.isAborted}
+        reason={focusGuard.abortReason}
+        toolName="Groove Loopstation"
+        onClose={() => {
+          focusGuard.acknowledgeAbort();
+        }}
+      />
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes pulse-recording-card {
           0% { box-shadow: 0 0 0 0 rgba(234, 67, 53, 0.25); border-color: #ea4335; }

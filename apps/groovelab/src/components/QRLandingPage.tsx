@@ -1460,7 +1460,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           parent_allow_proposals: userData.parent_allow_proposals !== undefined && userData.parent_allow_proposals !== null ? Boolean(userData.parent_allow_proposals) : false,
           parent_allow_audio: userData.parent_allow_audio !== undefined && userData.parent_allow_audio !== null ? Boolean(userData.parent_allow_audio) : false,
           parent_permissions: userData.parent_permissions || null,
-          campus_ui_level: userData.campus_ui_level || localStorage.getItem('campus_student_ui_level') || 'junior'
+          campus_ui_level: userData.campus_ui_level || (userData.id ? localStorage.getItem(`campus_student_ui_level_${userData.id}`) : null) || localStorage.getItem('campus_student_ui_level') || 'junior'
         });
 
         // Check if session was previously unlocked in sessionStorage
@@ -6787,7 +6787,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     }
 
     // 2. Unlocked Control Center with Draft Changes & Step-Up PIN Confirmation
-    const effectiveUiLevel = draftUiLevel ?? profile?.campus_ui_level ?? (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') || 'junior' : 'junior');
+    const effectiveUiLevel = draftUiLevel ?? profile?.campus_ui_level ?? (typeof window !== 'undefined' ? (profile?.id ? localStorage.getItem(`campus_student_ui_level_${profile.id}`) : null) || localStorage.getItem('campus_student_ui_level') || 'junior' : 'junior');
     const effectiveAllowAbsences = draftAllowAbsences !== null 
       ? draftAllowAbsences 
       : (profile?.parent_allow_absences !== undefined && profile?.parent_allow_absences !== null 
@@ -6985,7 +6985,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 </div>
                 <div>
                   <div style={{ fontSize: '0.94rem', fontWeight: 900, color: '#0f172a' }}>
-                    {assignedTeacher ? `${assignedTeacher.first_name || ''} ${assignedTeacher.last_name || ''}`.trim() : 'Deine Lehrkraft'}
+                    {assignedTeacher ? formatTeacherFullName(assignedTeacher) : 'Deine Lehrkraft'}
                   </div>
                   <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span>{profile?.instrument ? `Fach: ${profile.instrument}` : 'Fachunterricht'}</span>
@@ -7054,7 +7054,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                     Direkte Eltern-Lehrer-Kommunikation
                   </div>
                   <div style={{ fontSize: '0.74rem', color: '#64748b', maxWidth: '280px', lineHeight: 1.4 }}>
-                    Schreibe {assignedTeacher ? assignedTeacher.first_name : 'deiner Lehrkraft'} eine Nachricht zu Abwesenheiten, Unterrichtsfragen oder Feedback.
+                    Schreibe {assignedTeacher ? formatTeacherFullName(assignedTeacher) : 'deiner Lehrkraft'} eine Nachricht zu Abwesenheiten, Unterrichtsfragen oder Feedback.
                   </div>
                 </div>
               ) : (
@@ -7086,7 +7086,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                         marginLeft: isMe ? '0' : '4px',
                         marginRight: isMe ? '4px' : '0'
                       }}>
-                        <span>{isMe ? 'Du (Erziehungsberechtigte/r)' : (assignedTeacher?.first_name ? `${assignedTeacher.first_name} ${assignedTeacher.last_name || ''}` : 'Lehrkraft')}</span>
+                        <span>{isMe ? 'Du (Erziehungsberechtigte/r)' : (assignedTeacher ? formatTeacherFullName(assignedTeacher) : 'Lehrkraft')}</span>
                         {isParent && (
                           <span style={{
                             display: 'inline-flex',
@@ -7158,7 +7158,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             >
               <input
                 type="text"
-                placeholder={assignedTeacher ? `Nachricht an ${assignedTeacher.first_name}...` : 'Nachricht an die Lehrkraft...'}
+                placeholder={assignedTeacher ? `Nachricht an ${formatTeacherFullName(assignedTeacher)}...` : 'Nachricht an die Lehrkraft...'}
                 value={parentTypedMessage}
                 onChange={(e) => setParentTypedMessage(e.target.value)}
                 disabled={isSendingParentMessage}
@@ -7562,9 +7562,13 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
                               // Save local states
                               localStorage.setItem('campus_student_ui_level', effectiveUiLevel);
+                              if (profile?.id) {
+                                localStorage.setItem(`campus_student_ui_level_${profile.id}`, effectiveUiLevel);
+                              }
                               localStorage.setItem(`groovelab_parent_allow_absences_${profile.id}`, String(effectiveAllowAbsences));
                               localStorage.setItem(`groovelab_parent_allow_chat_${profile.id}`, String(effectiveAllowChat));
                               localStorage.setItem(`groovelab_parent_allow_leaderboard_${profile.id}`, String(effectiveAllowLeaderboard));
+                              window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: { studentId: profile?.id, uiLevel: effectiveUiLevel } }));
                               window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: effectiveUiLevel }));
 
                               setProfile(prev => prev ? {

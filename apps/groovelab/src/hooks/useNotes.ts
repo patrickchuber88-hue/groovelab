@@ -32,11 +32,77 @@ export const useNotes = ({ user, schoolId, activeStudent }: UseNotesOptions) => 
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'synced'>('saved');
 
-  // 1. Initial Load (0ms IndexedDB + Background Remote Sync)
+  // 1. Initial Load (0ms IndexedDB + Background Remote Sync & Unified Feed)
   const refreshNotes = useCallback(async () => {
     if (!userId) return;
     try {
       const fetched = await notesService.fetchNotes(userId, effectiveSchoolId);
+      
+      // 🏛️ Unified Feed: Hydrate active homework entries from progress_matrix
+      if (userId && typeof userId === 'string' && userId.length >= 30) {
+        try {
+          const { data: hwData } = await supabase
+            .from('progress_matrix')
+            .select('id, student_id, teacher_id, topic_name, homework_notes, teacher_notes, status, updated_at, created_at')
+            .eq('teacher_id', userId)
+            .order('updated_at', { ascending: false })
+            .limit(40);
+
+          if (hwData && hwData.length > 0) {
+            const existingIds = new Set(fetched.map(f => f.id));
+            const hwNotes: UserNote[] = hwData
+              .filter(h => !existingIds.has(`hw-${h.id}`))
+              .map(h => {
+                let content = h.topic_name;
+                const rawHw = h.homework_notes;
+                if (rawHw) {
+                  try {
+                    const parsed = typeof rawHw === 'string' ? JSON.parse(rawHw) : rawHw;
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                      const textParts = parsed.filter((p: any) => typeof p === 'string' && !p.startsWith('AUDIO:') && !p.startsWith('SNAPSHOT_'));
+                      if (textParts.length > 0) {
+                        content = `${h.topic_name}: ${textParts.join(' | ')}`;
+                      }
+                    }
+                  } catch (e) {
+                    content = `${h.topic_name}: ${String(rawHw)}`;
+                  }
+                }
+                return {
+                  id: `hw-${h.id}`,
+                  user_id: userId,
+                  school_id: effectiveSchoolId,
+                  student_id: h.student_id,
+                  title: h.topic_name,
+                  content: content,
+                  tags: ['#Hausaufgabe'],
+                  note_type: 'student_note',
+                  visibility: 'student_shared',
+                  is_pinned: false,
+                  is_archived: h.status === 'MASTERED',
+                  is_completed: h.status === 'MASTERED',
+                  source_origin: 'homework_book',
+                  homework_content: content,
+                  is_homework_synced: true,
+                  created_at: h.created_at || h.updated_at || new Date().toISOString(),
+                  updated_at: h.updated_at || new Date().toISOString()
+                };
+              });
+
+            const merged = [...fetched];
+            hwNotes.forEach(hn => {
+              if (!merged.some(m => m.id === hn.id || (m.student_id === hn.student_id && m.content === hn.content))) {
+                merged.push(hn);
+              }
+            });
+            setNotes(merged);
+            return;
+          }
+        } catch (hwErr) {
+          // progress_matrix query notice
+        }
+      }
+
       setNotes(fetched);
     } catch (e) {
       console.warn('Error loading notes:', e);
@@ -87,7 +153,7 @@ export const useNotes = ({ user, schoolId, activeStudent }: UseNotesOptions) => 
       // If user explicitly marked as archived or dismissed from view, hide from normal views
       if (note.is_archived || note.teacher_dismissed) return false;
 
-      // ── Auto-Sunset Lifecycle Rules for Focus Stream ──
+      // ── Auto-Sunset Lifecycle Rules for Focus Stream (Event-Driven) ──
       // If we are in 'all' view (and not searching), apply auto-sunset to keep the focus stream fresh (< 12 items)
       if (filterType === 'all' && !searchQuery.trim()) {
         // Pinned notes and unacknowledged due alerts are ALWAYS visible
@@ -97,14 +163,24 @@ export const useNotes = ({ user, schoolId, activeStudent }: UseNotesOptions) => 
           if (note.is_completed && now - updatedAtMs > twoDaysMs) {
             return false;
           }
-          // Transferred homework immediately exits the main focus stage [ Alle ] (Inbox Zero) since it's safely in the student homework book.
-          // It remains visible in the dedicated [ Aufgaben ] tab, [ Archiv ] and via search.
-          if (note.visibility === 'student_shared') {
+          // Transferred homework: Stays visible until acknowledged or replaced
+          if (note.visibility === 'student_shared' && note.is_acknowledged) {
             return false;
           }
           // Neutral scratchpad notes older than 7 days slide into archive
           if (note.note_type === 'scratchpad' && now - createdAtMs > sevenDaysMs) {
             return false;
+          }
+          // Student notes: Event-driven check! If there is a newer note for the same student, older note can sunset
+          if (note.student_id) {
+            const hasNewerNoteForStudent = notes.some(other => 
+              other.id !== note.id && 
+              other.student_id === note.student_id && 
+              new Date(other.created_at).getTime() > createdAtMs
+            );
+            if (hasNewerNoteForStudent && now - createdAtMs > sevenDaysMs) {
+              return false;
+            }
           }
         }
       }

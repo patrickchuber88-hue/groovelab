@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Edit3, 
   Mic, 
@@ -37,9 +38,10 @@ import {
 import { useNotes } from '../../hooks/useNotes';
 import { useVoiceToText } from '../../hooks/useVoiceToText';
 import { checkIsAudioTresorActive } from '../../domain/stickersAndTresor';
-import { UserNote, maskStudentName } from '../../services/notesService';
+import { UserNote, maskStudentName, parseChecklistText, parseLehrwerkAndPages, syncNotePageToProtocolMatrix } from '../../services/notesService';
 import { supabase } from '../../lib/supabase';
-import { acquireAudioStream, releaseAudioStream } from '../../services/audioPermissionService';
+import { acquireAudioStream, releaseAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
+import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RAW_LIMITER_GR_DB } from '../../utils/audioMasteringEngine';
 import {
   TagDefinition,
   STUDENT_SKILL_TAGS,
@@ -127,6 +129,30 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
   const [internalRooms, setInternalRooms] = useState<any[]>([]);
   const [internalEquipment, setInternalEquipment] = useState<any[]>([]);
   const [roomSegmentTab, setRoomSegmentTab] = useState<'all' | 'equipment' | 'rooms'>('all');
+  const [isChecklistMode, setIsChecklistMode] = useState(false);
+  const [isSavingNote, setIsSavingNote] = useState(false);
+  const isMacPlatform = useMemo(() => typeof navigator !== 'undefined' && /Mac|iPhone|iPod|iPad/i.test(navigator.platform), []);
+
+  // ⚡ Schedule-Aware Active Lesson Students
+  const currentLessonStudents = useMemo(() => {
+    if (!todayStudents || todayStudents.length === 0) return [];
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    return todayStudents.filter(student => {
+      const timeStr = student.start_time || student.time || (student as any).slot_time;
+      const endStr = student.end_time || (student as any).slot_end_time;
+      if (!timeStr) return false;
+      const [startH, startM] = timeStr.split(':').map(Number);
+      const startTotal = startH * 60 + startM;
+      let endTotal = startTotal + 45;
+      if (endStr) {
+        const [endH, endM] = endStr.split(':').map(Number);
+        endTotal = endH * 60 + endM;
+      }
+      return currentMinutes >= (startTotal - 5) && currentMinutes <= (endTotal + 5);
+    });
+  }, [todayStudents]);
 
   useEffect(() => {
     const effectiveSchoolId = schoolId || user?.school_id || (user as any)?.schoolId;
@@ -223,16 +249,121 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
   const [showTresorLockPrompt, setShowTresorLockPrompt] = useState(false);
   const [recentlyCompletedIds, setRecentlyCompletedIds] = useState<string[]>([]);
   const [showTodayQuickPeek, setShowTodayQuickPeek] = useState(false);
+  const [showAutoStudentPopover, setShowAutoStudentPopover] = useState(false);
+  const [isAutoStudentActive, setIsAutoStudentActive] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('campus_notes_auto_student_active') === 'true';
+    }
+    return false;
+  });
+
+  const toggleAutoStudent = () => {
+    setIsAutoStudentActive(prev => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('campus_notes_auto_student_active', String(next));
+      }
+      return next;
+    });
+  };
+
+  // ↩️ 5-Sekunden Undo State
+  const [undoToast, setUndoToast] = useState<{ message: string; note: UserNote } | null>(null);
+  const undoTimeoutRef = useRef<any>(null);
+
+  const handleDeleteWithUndo = (note: UserNote) => {
+    deleteNote(note.id);
+    if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
+    setUndoToast({ message: 'Notiz gelöscht', note });
+    undoTimeoutRef.current = setTimeout(() => {
+      setUndoToast(null);
+    }, 5000);
+  };
+
+  const handleUndoDelete = async () => {
+    if (!undoToast?.note) return;
+    const n = undoToast.note;
+    await createNote(n.content, {
+      studentId: n.student_id,
+      studentName: n.student_name,
+      roomId: n.room_id,
+      noteType: n.note_type,
+      tags: n.tags,
+      dueDate: n.due_date,
+      audioUrl: n.audio_url,
+      audioDurationSeconds: n.audio_duration_seconds
+    });
+    setUndoToast(null);
+    if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
+    showToast('✓ Notiz wiederhergestellt');
+  };
 
   const textareaRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
   const quickPeekRef = useRef<HTMLDivElement | null>(null);
   const templatesPopoverRef = useRef<HTMLDivElement | null>(null);
+  const templatesButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [popoverCoords, setPopoverCoords] = useState<{
+    top?: number;
+    bottom?: number;
+    right?: number;
+    left?: number;
+    maxHeight?: number;
+  }>({});
+  const autoStudentPopoverRef = useRef<HTMLDivElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<any>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   const hasTresor = checkIsAudioTresorActive(user);
+
+  // Smart Popover Viewport Positioning (Avoids clipping & auto-flips above/below)
+  const updatePopoverPosition = useCallback(() => {
+    if (!templatesButtonRef.current) return;
+    const rect = templatesButtonRef.current.getBoundingClientRect();
+    const isMobile = window.innerWidth <= 768;
+
+    if (isMobile) {
+      setPopoverCoords({
+        bottom: 20,
+        left: 14,
+        right: 14,
+        maxHeight: Math.floor(window.innerHeight * 0.85)
+      });
+      return;
+    }
+
+    const spaceBelow = window.innerHeight - rect.bottom - 16;
+    const spaceAbove = rect.top - 16;
+    const rightOffset = Math.max(16, window.innerWidth - rect.right);
+
+    // If space below is constrained (< 340px) and there is more space above, open upwards
+    if (spaceBelow < 340 && spaceAbove > spaceBelow) {
+      setPopoverCoords({
+        bottom: window.innerHeight - rect.top + 8,
+        right: rightOffset,
+        maxHeight: Math.min(520, Math.max(260, spaceAbove))
+      });
+    } else {
+      setPopoverCoords({
+        top: rect.bottom + 8,
+        right: rightOffset,
+        maxHeight: Math.min(520, Math.max(260, spaceBelow))
+      });
+    }
+  }, []);
+
+  // Sync Popover position on open, scroll and resize
+  useEffect(() => {
+    if (!showQuickTemplates) return;
+    updatePopoverPosition();
+    window.addEventListener('resize', updatePopoverPosition);
+    window.addEventListener('scroll', updatePopoverPosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePopoverPosition);
+      window.removeEventListener('scroll', updatePopoverPosition, true);
+    };
+  }, [showQuickTemplates, updatePopoverPosition]);
 
   // Close Quick-Peek on Click-Outside or Escape
   useEffect(() => {
@@ -257,7 +388,11 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
   useEffect(() => {
     if (!showQuickTemplates) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (templatesPopoverRef.current && !templatesPopoverRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        templatesPopoverRef.current && !templatesPopoverRef.current.contains(target) &&
+        templatesButtonRef.current && !templatesButtonRef.current.contains(target)
+      ) {
         setShowQuickTemplates(false);
       }
     };
@@ -271,6 +406,25 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [showQuickTemplates]);
+
+  // Close Auto-Student Popover on Click-Outside or Escape
+  useEffect(() => {
+    if (!showAutoStudentPopover) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (autoStudentPopoverRef.current && !autoStudentPopoverRef.current.contains(e.target as Node)) {
+        setShowAutoStudentPopover(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowAutoStudentPopover(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showAutoStudentPopover]);
 
   // Helper to insert smart syntax or preset templates into the input field
   const handleInsertSyntax = (prefix: string, templateType?: 'student' | 'tag' | 'room' | 'macro' | null, fullText?: string) => {
@@ -425,17 +579,72 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
     };
   }, []);
 
-  // Keyboard shortcut: Cmd+J / Ctrl+J to focus
+  const isAutoStudentActiveRef = useRef(isAutoStudentActive);
+  isAutoStudentActiveRef.current = isAutoStudentActive;
+  const undoToastRef = useRef(undoToast);
+  undoToastRef.current = undoToast;
+  const handleUndoDeleteRef = useRef(handleUndoDelete);
+  handleUndoDeleteRef.current = handleUndoDelete;
+  const handleToggleVoiceDictationRef = useRef(handleToggleVoiceDictation);
+  handleToggleVoiceDictationRef.current = handleToggleVoiceDictation;
+  const handleDirectHomeworkTransferRef = useRef<() => void>(() => {});
+
+  // ⌨️ Apple HIG Keyboard Shortcuts (Global)
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // 1. Cmd+J / Ctrl+J -> Focus Quick-Notizen
       if ((e.metaKey || e.ctrlKey) && (e.key === 'j' || e.key === 'J')) {
         e.preventDefault();
         textareaRef.current?.focus();
+        return;
+      }
+
+      // 2. Option+A / Alt+A -> Auto-Schüler Toggle (F2 & F16)
+      if (e.altKey && (e.key === 'a' || e.key === 'A' || e.code === 'KeyA')) {
+        e.preventDefault();
+        toggleAutoStudent();
+        showToast(!isAutoStudentActiveRef.current ? '⚡ Auto-Schüler aktiviert' : '⚡ Auto-Schüler deaktiviert');
+        return;
+      }
+
+      // 3. Option+D / Alt+D -> Diktat starten/stoppen
+      if (e.altKey && (e.key === 'd' || e.key === 'D' || e.code === 'KeyD')) {
+        e.preventDefault();
+        handleToggleVoiceDictationRef.current();
+        return;
+      }
+
+      // 4. Option+H / Alt+H -> Hausaufgabe Sync (F31)
+      if (e.altKey && (e.key === 'h' || e.key === 'H' || e.code === 'KeyH')) {
+        e.preventDefault();
+        handleDirectHomeworkTransferRef.current();
+        return;
+      }
+
+      // 5. Cmd+Shift+L / Ctrl+Shift+L -> Checklisten-Modus toggeln
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'l' || e.key === 'L')) {
+        e.preventDefault();
+        setIsChecklistMode(prev => {
+          const next = !prev;
+          if (next && !inputContent.trim()) setInputContent('- ');
+          showToast(next ? '✓ Checklisten-Modus aktiv' : 'Checklisten-Modus aus');
+          return next;
+        });
+        textareaRef.current?.focus();
+        return;
+      }
+
+      // 6. Cmd+Z / Ctrl+Z -> Undo bei gelöschter Notiz (F14)
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+        if (undoToastRef.current) {
+          e.preventDefault();
+          handleUndoDeleteRef.current();
+        }
       }
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, []);
+  }, [toggleAutoStudent]);
 
   // 1. Natural Language Entity Recognition (Apple Intelligence Style)
   const parsedIntent = useMemo(() => {
@@ -471,6 +680,15 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
             break;
           }
         }
+      }
+    }
+
+    // ⚡ Intelligente Auto-Zuweisung nur wenn [⚡ Auto-Schüler] aktiv geschaltet ist (F2 & F16):
+    if (!detectedStudent && isAutoStudentActive) {
+      if (currentLessonStudents && currentLessonStudents.length > 0) {
+        detectedStudent = currentLessonStudents[0];
+      } else if (activeStudent) {
+        detectedStudent = activeStudent;
       }
     }
 
@@ -577,7 +795,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
       isTodo,
       naturalDueDate
     };
-  }, [inputContent, allStudents, todayStudents, selectedDueDate, rooms, internalRooms, internalEquipment]);
+  }, [inputContent, allStudents, todayStudents, selectedDueDate, rooms, internalRooms, internalEquipment, isAutoStudentActive, currentLessonStudents, activeStudent]);
 
   // Autocomplete Suggestions List (Prioritizes Tagesplan Students)
   const suggestions = useMemo(() => {
@@ -961,91 +1179,136 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
 
   // Handle Save
   const handleSave = async (extraAudioUrl?: string, duration?: number) => {
+    if (isSavingNote) return;
     if (isListening) {
       stopListening();
       initialTextBeforeVoiceRef.current = '';
     }
 
-    const textToSave = inputContent.trim();
+    // Bereinige trailing leere Aufzählungszeichen (z. B. wenn die letzte Zeile nur "- " ist)
+    const cleanedRaw = inputContent.replace(/(?:\r?\n)?-\s*$/, '');
+    const textToSave = cleanedRaw.trim();
     if (!textToSave && !extraAudioUrl) return;
 
-    const studentToLink = parsedIntent?.detectedStudent;
-    const rawStudentName = studentToLink?.first_name ? `${studentToLink.first_name} ${studentToLink.last_name || ''}`.trim() : studentToLink?.name;
-    const maskedStudentName = studentToLink ? (maskStudentName(rawStudentName) || rawStudentName) : null;
+    setIsSavingNote(true);
+    try {
+      const studentToLink = parsedIntent?.detectedStudent;
+      const rawStudentName = studentToLink?.first_name ? `${studentToLink.first_name} ${studentToLink.last_name || ''}`.trim() : studentToLink?.name;
+      const maskedStudentName = studentToLink ? (maskStudentName(rawStudentName) || rawStudentName) : null;
 
-    const isEquipmentReport = parsedIntent?.isEquipmentIssue || !!parsedIntent?.detectedEquipmentName;
-    const isRoomReport = isEquipmentReport || parsedIntent?.isRoomIssue || !!parsedIntent?.detectedRoomName;
-    const authorFullName = `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || 'Lehrkraft';
+      const isEquipmentReport = parsedIntent?.isEquipmentIssue || !!parsedIntent?.detectedEquipmentName;
+      const isRoomReport = isEquipmentReport || parsedIntent?.isRoomIssue || !!parsedIntent?.detectedRoomName;
+      const authorFullName = `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || 'Lehrkraft';
 
-    const finalRoom = parsedIntent?.detectedRoomName || (parsedIntent?.isRoomIssue ? 'Raum' : null);
-    const roomTag = parsedIntent?.detectedRoomName ? [`#${parsedIntent.detectedRoomName}`] : [];
+      const finalRoom = parsedIntent?.detectedRoomName || (parsedIntent?.isRoomIssue ? 'Raum' : null);
+      const roomTag = parsedIntent?.detectedRoomName ? [`#${parsedIntent.detectedRoomName}`] : [];
 
-    await createNote(textToSave || 'Audio-Memo', {
-      studentId: studentToLink?.id || null,
-      studentName: maskedStudentName,
-      roomId: finalRoom,
-      authorName: authorFullName,
-      audioUrl: extraAudioUrl || null,
-      audioDurationSeconds: duration || null,
-      dueDate: selectedDueDate || parsedIntent?.naturalDueDate || null,
-      noteType: extraAudioUrl ? 'audio_memo' : isEquipmentReport ? 'room_issue' : isRoomReport ? 'room_issue' : parsedIntent?.isTodo ? 'todo' : studentToLink ? 'student_note' : 'scratchpad',
-      visibility: isRoomReport ? 'school_admin' : 'private',
-      tags: isEquipmentReport ? ['#Ausstattung', '#Mangel', ...roomTag] : roomTag.length > 0 ? roomTag : undefined
-    });
+      await createNote(textToSave || 'Audio-Memo', {
+        studentId: studentToLink?.id || null,
+        studentName: maskedStudentName,
+        roomId: finalRoom,
+        authorName: authorFullName,
+        audioUrl: extraAudioUrl || null,
+        audioDurationSeconds: duration || null,
+        dueDate: selectedDueDate || parsedIntent?.naturalDueDate || null,
+        noteType: extraAudioUrl ? 'audio_memo' : isEquipmentReport ? 'room_issue' : isRoomReport ? 'room_issue' : parsedIntent?.isTodo ? 'todo' : studentToLink ? 'student_note' : 'scratchpad',
+        visibility: isRoomReport ? 'school_admin' : 'private',
+        tags: isEquipmentReport ? ['#Ausstattung', '#Mangel', ...roomTag] : roomTag.length > 0 ? roomTag : undefined
+      });
 
-    setInputContent('');
-    setSelectedDueDate(null);
-    setShowDatePicker(false);
-    resetTranscript();
-    setAudioBlob(null);
-    setAudioUrl(null);
-    setAutocompleteType(null);
-    if (textareaRef.current) {
-      textareaRef.current.style.height = '54px';
+      // 🏛️ Lehrwerk & Seitenzahlen Protokoll-Modul Sync
+      if (studentToLink?.id && (textToSave.includes('#noten') || /(?:seite|s\.)\s*\d+/i.test(textToSave))) {
+        const lehrwerkInfo = parseLehrwerkAndPages(textToSave);
+        if (lehrwerkInfo.pages.length > 0) {
+          const title = lehrwerkInfo.detectedLehrwerk?.title || 'Lehrwerk';
+          const isRepeat = /wiederhol|nochmal/i.test(textToSave);
+          syncNotePageToProtocolMatrix({
+            schoolId: schoolId || user?.school_id || 1,
+            studentId: studentToLink.id,
+            teacherId: user?.id,
+            lehrwerkTitle: title,
+            pages: lehrwerkInfo.pages,
+            noteText: textToSave,
+            isRepeat
+          });
+        }
+      }
+
+      setInputContent('');
+      setSelectedDueDate(null);
+      setShowDatePicker(false);
+      resetTranscript();
+      setAudioBlob(null);
+      setAudioUrl(null);
+      setAutocompleteType(null);
+      setIsChecklistMode(false);
+      if (textareaRef.current) {
+        textareaRef.current.style.height = '54px';
+      }
+      
+      const targetLabel = parsedIntent?.detectedEquipmentName 
+        ? `${parsedIntent.detectedEquipmentName}${parsedIntent.detectedRoomName ? ` (${parsedIntent.detectedRoomName})` : ''}`
+        : parsedIntent?.detectedRoomName || 'Raum';
+
+      showToast(
+        isRoomReport
+          ? `✓ Mangel für ${targetLabel} an Sekretariat gemeldet`
+          : studentToLink 
+            ? `Notiz für ${studentToLink.first_name || studentToLink.name} gesichert` 
+            : 'Allgemeine Notiz gesichert'
+      );
+    } finally {
+      setIsSavingNote(false);
     }
-    
-    const targetLabel = parsedIntent?.detectedEquipmentName 
-      ? `${parsedIntent.detectedEquipmentName}${parsedIntent.detectedRoomName ? ` (${parsedIntent.detectedRoomName})` : ''}`
-      : parsedIntent?.detectedRoomName || 'Raum';
-
-    showToast(
-      isRoomReport
-        ? `✓ Mangel für ${targetLabel} an Sekretariat gemeldet`
-        : studentToLink 
-          ? `Notiz für ${studentToLink.first_name || studentToLink.name} gesichert` 
-          : 'Allgemeine Notiz gesichert'
-    );
   };
 
-  // 1-Click Direct Homework Transfer
-  const handleDirectHomeworkTransfer = async () => {
+  // 1-Click Direct Homework Transfer (F31 & ⌥H)
+  const handleDirectHomeworkTransfer = useCallback(async () => {
     if (isListening) {
       stopListening();
       initialTextBeforeVoiceRef.current = '';
     }
 
-    const student = parsedIntent?.detectedStudent || activeStudent;
+    const student = parsedIntent?.detectedStudent || activeStudent || (currentLessonStudents.length > 0 ? currentLessonStudents[0] : null);
     if (!student) {
-      showToast('Kein Schüler zugeordnet');
+      showToast('Kein Schüler zugeordnet (⌥A für Auto-Schüler)');
       return;
     }
 
     const rawName = student.first_name ? `${student.first_name} ${student.last_name || ''}`.trim() : student.name;
     const studentName = maskStudentName(rawName) || rawName;
-    const newNote = await createNote(inputContent.trim(), {
-      studentId: student.id,
-      studentName,
-      noteType: 'student_note'
-    });
+    const trimmed = inputContent.trim();
 
-    await syncToHomeworkBook(newNote, student.id, studentName);
-    setSyncedIds(prev => new Set([...Array.from(prev), newNote.id]));
-    setInputContent('');
-    if (textareaRef.current) {
-      textareaRef.current.style.height = '54px';
+    if (trimmed) {
+      const newNote = await createNote(trimmed, {
+        studentId: student.id,
+        studentName,
+        noteType: 'student_note'
+      });
+
+      await syncToHomeworkBook(newNote, student.id, studentName);
+      setSyncedIds(prev => new Set([...Array.from(prev), newNote.id]));
+      setInputContent('');
+      if (textareaRef.current) {
+        textareaRef.current.style.height = '54px';
+      }
+      showToast(`✓ Ins Hausaufgabenheft von ${student.first_name || studentName} übertragen`);
+    } else {
+      // Wenn das Textfeld leer ist: Übertrage die letzte Notiz dieses Schülers
+      const recentStudentNote = notes.find(n => !n.is_archived && String(n.student_id) === String(student.id));
+      if (recentStudentNote) {
+        await syncToHomeworkBook(recentStudentNote, student.id, studentName);
+        setSyncedIds(prev => new Set([...Array.from(prev), recentStudentNote.id]));
+        showToast(`✓ Letzte Notiz für ${student.first_name || studentName} ins Hausaufgabenheft übertragen`);
+      } else {
+        showToast('Keine Notiz zum Übertragen vorhanden');
+      }
     }
-    showToast(`✓ Ins Hausaufgabenheft von ${student.first_name || studentName} übertragen`);
-  };
+  }, [isListening, stopListening, parsedIntent, activeStudent, currentLessonStudents, inputContent, createNote, syncToHomeworkBook, notes]);
+
+  useEffect(() => {
+    handleDirectHomeworkTransferRef.current = handleDirectHomeworkTransfer;
+  }, [handleDirectHomeworkTransfer]);
 
   // Audio Recording (Audio-Tresor Gated)
   const startAudioMemo = async () => {
@@ -1055,7 +1318,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
     }
     setShowTresorLockPrompt(false);
     try {
-      const stream = await acquireAudioStream({ audio: true });
+      const stream = await acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS });
       streamRef.current = stream;
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
@@ -1065,10 +1328,28 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
         if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data);
       };
 
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        setAudioBlob(blob);
-        const url = URL.createObjectURL(blob);
+      mediaRecorder.onstop = async () => {
+        const rawBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        let finalBlob = rawBlob;
+        let url = URL.createObjectURL(rawBlob);
+
+        // 🌟 100% Pure Raw Universal Limiter Normalization (-14.5 LUFS / max 3.0 dB GR)
+        try {
+          const pureRawRes = await processPureRawBlob(rawBlob, {
+            targetLufs: TARGET_PURE_RAW_LUFS,
+            maxLimiterGrDb: MAX_PURE_RAW_LIMITER_GR_DB,
+            targetPeakDb: TARGET_PEAK_DBTP
+          });
+          finalBlob = pureRawRes.processedBlob;
+          url = pureRawRes.processedUrl;
+          if (pureRawRes.durationSec) {
+            setAudioSeconds(Math.round(pureRawRes.durationSec));
+          }
+        } catch (dspErr) {
+          console.warn('[BriefingNotesCard] Pure RAW Limiter fallback:', dspErr);
+        }
+
+        setAudioBlob(finalBlob);
         setAudioUrl(url);
         stopHardwareStream();
       };
@@ -1086,9 +1367,21 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
   };
 
   const stopAudioMemo = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    const rec = mediaRecorderRef.current;
+    if (rec && rec.state !== 'inactive') {
+      try { rec.requestData(); } catch (e) {}
+      // 🛡️ 500ms Safety Buffer: Garantiert vollständigen Ausklang & Raumhall
+      setTimeout(() => {
+        try {
+          if (rec.state !== 'inactive') {
+            rec.stop();
+          }
+        } catch (e) {}
+      }, 500);
     }
     setIsRecordingAudio(false);
   };
@@ -1148,67 +1441,116 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
         </div>
       )}
 
+      {/* 5-Sekunden Undo Toast (F14) */}
+      {undoToast && (
+        <div style={{
+          position: 'absolute',
+          bottom: '12px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: '#0f172a',
+          color: '#ffffff',
+          padding: '6px 14px',
+          borderRadius: '100px',
+          fontSize: '0.78rem',
+          fontWeight: 700,
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.25)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          zIndex: 80,
+          border: '1px solid rgba(255, 255, 255, 0.12)'
+        }}>
+          <span>{undoToast.message}</span>
+          <button
+            type="button"
+            onClick={handleUndoDelete}
+            style={{
+              background: '#ffffff',
+              color: '#0f172a',
+              border: 'none',
+              borderRadius: '100px',
+              padding: '2px 8px',
+              fontSize: '0.72rem',
+              fontWeight: 800,
+              cursor: 'pointer'
+            }}
+          >
+            Rückgängig
+          </button>
+        </div>
+      )}
+
       {/* ========================================================================= */}
       {/* 1. HEADER (Titel, Zähler, Vorlagen-Button, Board-Modal Button)            */}
       {/* ========================================================================= */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '1.02rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em' }}>
+          <span style={{ fontSize: '1.08rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.02em' }}>
             Notizen
           </span>
           {activeMetronomeBpm && (
             <div style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '4px',
+              gap: '5px',
               background: '#e6f4ea',
               color: '#166534',
-              padding: '2px 8px',
+              padding: '3px 9px',
               borderRadius: '100px',
-              fontSize: '0.72rem',
+              fontSize: '0.74rem',
               fontWeight: 800
             }}>
-              <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853', animation: 'pulse 1s infinite' }} />
+              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34a853', animation: 'pulse 1s infinite' }} />
               <span>{activeMetronomeBpm} BPM</span>
               <button
                 type="button"
                 onClick={stopMetronome}
                 style={{ background: 'none', border: 'none', color: '#166534', cursor: 'pointer', padding: 0, display: 'flex' }}
               >
-                <X size={11} />
+                <X size={12} />
               </button>
             </div>
           )}
         </div>
 
         {/* Action Cluster (Vorlagen & Board) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {/* ✨ Vorlagen Button */}
           <button
+            ref={templatesButtonRef}
             type="button"
-            onClick={() => setShowQuickTemplates(prev => !prev)}
+            onClick={() => {
+              setShowQuickTemplates(prev => {
+                const next = !prev;
+                if (next) {
+                  requestAnimationFrame(() => updatePopoverPosition());
+                }
+                return next;
+              });
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              background: showQuickTemplates ? '#ecfdf5' : '#f8fafc',
-              color: showQuickTemplates ? '#15803d' : '#0f172a',
-              border: `1px solid ${showQuickTemplates ? '#86efac' : '#e2e8f0'}`,
-              borderRadius: '9px',
-              padding: '5px 10px',
-              fontSize: '0.80rem',
+              background: showQuickTemplates ? '#0f172a' : '#f8fafc',
+              color: showQuickTemplates ? '#ffffff' : '#0f172a',
+              border: `1px solid ${showQuickTemplates ? '#0f172a' : '#e2e8f0'}`,
+              borderRadius: '10px',
+              padding: '6px 12px',
+              fontSize: '0.84rem',
               fontWeight: 750,
               cursor: 'pointer',
               transition: 'all 0.15s ease'
             }}
             className="hover-scale-mini"
-            title="Vorlagen & smarte Notiz-Funktionen öffnen (!, @, #, -, /)"
+            title="Vorlagen & Schnellbausteine öffnen"
           >
-            <Zap size={13} color={showQuickTemplates ? '#16a34a' : '#d97706'} />
+            <Zap size={14} color={showQuickTemplates ? '#ffffff' : '#0f172a'} />
             <span>Vorlagen</span>
             <ChevronDown
-              size={12}
-              color={showQuickTemplates ? '#16a34a' : '#94a3b8'}
+              size={13}
+              color={showQuickTemplates ? '#ffffff' : '#64748b'}
               style={{
                 transform: showQuickTemplates ? 'rotate(180deg)' : 'none',
                 transition: 'transform 0.15s ease'
@@ -1223,13 +1565,13 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: '7px',
               background: '#f8fafc',
               color: '#0f172a',
               border: '1px solid #e2e8f0',
-              borderRadius: '9px',
-              padding: '5px 10px',
-              fontSize: '0.80rem',
+              borderRadius: '10px',
+              padding: '6px 12px',
+              fontSize: '0.84rem',
               fontWeight: 750,
               cursor: 'pointer',
               transition: 'all 0.15s ease'
@@ -1237,99 +1579,194 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
             className="hover-scale-mini"
             title="Notizen-Board öffnen (⌘J)"
           >
-            <Layers size={13} color="#64748b" />
+            <Layers size={14} color="#0f172a" />
             <span>Notizen-Board</span>
             {activeNotesCount > 0 && (
               <span style={{
                 background: '#ffffff',
                 color: '#0f172a',
-                borderRadius: '5px',
-                padding: '1px 5px',
-                fontSize: '0.70rem',
+                borderRadius: '6px',
+                padding: '2px 6px',
+                fontSize: '0.74rem',
                 fontWeight: 800,
                 border: '1px solid #cbd5e1'
               }}>
                 {activeNotesCount}
               </span>
             )}
-            <ArrowUpRight size={11} color="#94a3b8" />
+            <ArrowUpRight size={12} color="#64748b" />
           </button>
         </div>
 
         {/* ========================================================================= */}
-        {/* ✨ VORLAGEN & FUNKTIONEN POPOVER                                          */}
+        {/* ✨ VORLAGEN & FUNKTIONEN POPOVER (PORTAL TO BODY GEGEN CLIPPING)           */}
         {/* ========================================================================= */}
-        {showQuickTemplates && (
-          <div
-            ref={templatesPopoverRef}
-            style={{
-              position: 'absolute',
-              top: 'calc(100% + 8px)',
-              right: 0,
-              width: '370px',
-              maxWidth: '92vw',
-              background: '#ffffff',
-              border: '1px solid #e2e8f0',
-              borderRadius: '16px',
-              boxShadow: '0 16px 36px -4px rgba(15,23,42,0.16), 0 0 0 1px rgba(0,0,0,0.04)',
-              zIndex: 70,
-              padding: '14px',
-              boxSizing: 'border-box',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '12px'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Zap size={16} color="#d97706" />
-                <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>
-                  Smarte Notiz-Funktionen & Vorlagen
-                </span>
-              </div>
-              <button
-                type="button"
+        {showQuickTemplates && typeof document !== 'undefined' && createPortal(
+          <>
+            {/* Mobiler Backdrop-Klick-Abschirmung */}
+            {typeof window !== 'undefined' && window.innerWidth <= 768 && (
+              <div
+                style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'rgba(15, 23, 42, 0.4)',
+                  backdropFilter: 'blur(2px)',
+                  WebkitBackdropFilter: 'blur(2px)',
+                  zIndex: 99998
+                }}
                 onClick={() => setShowQuickTemplates(false)}
-                style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', padding: '2px' }}
-              >
-                <X size={15} />
-              </button>
-            </div>
+                aria-hidden="true"
+              />
+            )}
 
-            {/* Funktion 1: ! Mängel melden */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Funktionen & Syntax
-              </div>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '5px' }}>
-                {/* ! Mangel */}
+            <div
+              ref={templatesPopoverRef}
+              role="dialog"
+              aria-label="Smarte Notiz-Funktionen und Vorlagen"
+              style={{
+                position: 'fixed',
+                ...(popoverCoords.bottom !== undefined
+                  ? { bottom: popoverCoords.bottom }
+                  : { top: popoverCoords.top ?? 80 }),
+                ...(popoverCoords.left !== undefined
+                  ? { left: popoverCoords.left }
+                  : {}),
+                ...(popoverCoords.right !== undefined
+                  ? { right: popoverCoords.right }
+                  : { right: 16 }),
+                width: typeof window !== 'undefined' && window.innerWidth <= 768 ? 'calc(100vw - 28px)' : '380px',
+                maxWidth: 'calc(100vw - 28px)',
+                maxHeight: popoverCoords.maxHeight ? `${popoverCoords.maxHeight}px` : 'min(520px, calc(100vh - 100px))',
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '16px',
+                boxShadow: '0 20px 40px -6px rgba(15,23,42,0.22), 0 4px 12px -2px rgba(0,0,0,0.06)',
+                zIndex: 99999,
+                padding: '14px',
+                boxSizing: 'border-box',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                overflow: 'hidden'
+              }}
+            >
+              {/* Header (fixiert oben im Popover) */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: '9px', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                  <Zap size={15} color="#0f172a" />
+                  <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em' }}>
+                    Smarte Notiz-Funktionen & Vorlagen
+                  </span>
+                </div>
                 <button
                   type="button"
-                  onClick={() => handleInsertSyntax('!', 'room')}
+                  onClick={() => setShowQuickTemplates(false)}
                   style={{
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    color: '#94a3b8',
+                    padding: '4px',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '8px 10px',
-                    borderRadius: '10px',
-                    border: '1px solid #fee2e2',
-                    background: '#fef2f2',
-                    cursor: 'pointer',
-                    textAlign: 'left'
+                    justifyContent: 'center',
+                    borderRadius: '6px'
                   }}
-                  className="hover-scale-mini"
+                  title="Schließen"
+                  aria-label="Schließen"
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <AlertTriangle size={15} color="#dc2626" />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#991b1b' }}>! Mangel & Defekt melden</div>
-                      <div style={{ fontSize: '0.72rem', color: '#b91c1c' }}>Raum-, Saiten- & Equipment-Meldung an Verwaltung</div>
+                  <X size={15} />
+                </button>
+              </div>
+
+              {/* Scrollbarer Inhalt (100% erreichbar ohne vertikales Abschneiden) */}
+              <div
+                className="custom-scrollbar"
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                  overflowY: 'auto',
+                  paddingRight: '2px',
+                  marginRight: '-2px'
+                }}
+              >
+                {/* Sektion 1: Syntax & Trigger */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', paddingLeft: '2px' }}>
+                    Syntax & Schnell-Trigger
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {/* ! Mangel */}
+                    <button
+                      type="button"
+                      onClick={() => handleInsertSyntax('!', 'room')}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '8px 10px',
+                        borderRadius: '9px',
+                        border: '1px solid transparent',
+                        background: 'transparent',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'all 0.12s ease',
+                        width: '100%'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#f8fafc';
+                        e.currentTarget.style.borderColor = '#e2e8f0';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.borderColor = 'transparent';
+                      }}
+                    >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                    <span style={{
+                      width: '26px',
+                      height: '26px',
+                      minWidth: '26px',
+                      borderRadius: '7px',
+                      background: '#fee2e2',
+                      color: '#dc2626',
+                      border: '1px solid #fecaca',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontFamily: 'ui-monospace, monospace',
+                      fontSize: '0.88rem',
+                      fontWeight: 800
+                    }}>
+                      !
+                    </span>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>
+                        Mangel & Defekt melden
+                      </div>
+                      <div style={{ fontSize: '0.74rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        Raum-, Saiten- & Equipment-Meldung
+                      </div>
                     </div>
                   </div>
-                  <span style={{ fontSize: '0.74rem', fontWeight: 800, background: '#fee2e2', color: '#dc2626', padding: '2px 7px', borderRadius: '6px' }}>!Raum</span>
+                  <span style={{
+                    fontSize: '0.74rem',
+                    fontFamily: 'ui-monospace, monospace',
+                    fontWeight: 700,
+                    color: '#dc2626',
+                    background: '#fee2e2',
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    whiteSpace: 'nowrap',
+                    marginLeft: '8px'
+                  }}>
+                    !Raum
+                  </span>
                 </button>
 
                 {/* @ Schüler */}
@@ -1341,24 +1778,63 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     padding: '8px 10px',
-                    borderRadius: '10px',
-                    border: '1px solid #bbf7d0',
-                    background: '#f0fdf4',
+                    borderRadius: '9px',
+                    border: '1px solid transparent',
+                    background: 'transparent',
                     cursor: 'pointer',
-                    textAlign: 'left'
+                    textAlign: 'left',
+                    transition: 'all 0.12s ease',
+                    width: '100%'
                   }}
-                  className="hover-scale-mini"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#f8fafc';
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.borderColor = 'transparent';
+                  }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <User size={15} color="#166534" />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#166534' }}>@ Schüler verknüpfen</div>
-                      <div style={{ fontSize: '0.72rem', color: '#15803d' }}>Notiz oder Hausaufgabe direkt an Schüler anheften</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                    <span style={{
+                      width: '26px',
+                      height: '26px',
+                      minWidth: '26px',
+                      borderRadius: '7px',
+                      background: '#dcfce7',
+                      color: '#16a34a',
+                      border: '1px solid #bbf7d0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontFamily: 'ui-monospace, monospace',
+                      fontSize: '0.88rem',
+                      fontWeight: 800
+                    }}>
+                      @
+                    </span>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>
+                        Schüler verknüpfen
+                      </div>
+                      <div style={{ fontSize: '0.74rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        Notiz oder Aufgabe anheften
+                      </div>
                     </div>
                   </div>
-                  <span style={{ fontSize: '0.74rem', fontWeight: 800, background: '#dcfce7', color: '#166534', padding: '2px 7px', borderRadius: '6px' }}>@Schüler</span>
+                  <span style={{
+                    fontSize: '0.74rem',
+                    fontFamily: 'ui-monospace, monospace',
+                    fontWeight: 700,
+                    color: '#166534',
+                    background: '#dcfce7',
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    whiteSpace: 'nowrap',
+                    marginLeft: '8px'
+                  }}>
+                    @Schüler
+                  </span>
                 </button>
 
                 {/* # Tag */}
@@ -1370,24 +1846,63 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     padding: '8px 10px',
-                    borderRadius: '10px',
-                    border: '1px solid #bfdbfe',
-                    background: '#eff6ff',
+                    borderRadius: '9px',
+                    border: '1px solid transparent',
+                    background: 'transparent',
                     cursor: 'pointer',
-                    textAlign: 'left'
+                    textAlign: 'left',
+                    transition: 'all 0.12s ease',
+                    width: '100%'
                   }}
-                  className="hover-scale-mini"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#f8fafc';
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.borderColor = 'transparent';
+                  }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#dbeafe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Hash size={15} color="#1d4ed8" />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#1e40af' }}># Tag & Kategorie vergeben</div>
-                      <div style={{ fontSize: '0.72rem', color: '#2563eb' }}>#Wichtig, #Material, #Eltern, #Noten, #Technik</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                    <span style={{
+                      width: '26px',
+                      height: '26px',
+                      minWidth: '26px',
+                      borderRadius: '7px',
+                      background: '#dbeafe',
+                      color: '#2563eb',
+                      border: '1px solid #bfdbfe',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontFamily: 'ui-monospace, monospace',
+                      fontSize: '0.88rem',
+                      fontWeight: 800
+                    }}>
+                      #
+                    </span>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>
+                        Tag & Kategorie vergeben
+                      </div>
+                      <div style={{ fontSize: '0.74rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        #Wichtig, #Noten, #Material, #Technik
+                      </div>
                     </div>
                   </div>
-                  <span style={{ fontSize: '0.74rem', fontWeight: 800, background: '#dbeafe', color: '#1d4ed8', padding: '2px 7px', borderRadius: '6px' }}>#Tag</span>
+                  <span style={{
+                    fontSize: '0.74rem',
+                    fontFamily: 'ui-monospace, monospace',
+                    fontWeight: 700,
+                    color: '#1d4ed8',
+                    background: '#dbeafe',
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    whiteSpace: 'nowrap',
+                    marginLeft: '8px'
+                  }}>
+                    #Tag
+                  </span>
                 </button>
 
                 {/* - To-Do */}
@@ -1399,24 +1914,63 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     padding: '8px 10px',
-                    borderRadius: '10px',
-                    border: '1px solid #e2e8f0',
-                    background: '#f8fafc',
+                    borderRadius: '9px',
+                    border: '1px solid transparent',
+                    background: 'transparent',
                     cursor: 'pointer',
-                    textAlign: 'left'
+                    textAlign: 'left',
+                    transition: 'all 0.12s ease',
+                    width: '100%'
                   }}
-                  className="hover-scale-mini"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#f8fafc';
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.borderColor = 'transparent';
+                  }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <CheckSquare size={15} color="#475569" />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#334155' }}>- To-Do Checkliste anlegen</div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Interaktive Abhakkarten-Aufgabe mit Checkbox</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                    <span style={{
+                      width: '26px',
+                      height: '26px',
+                      minWidth: '26px',
+                      borderRadius: '7px',
+                      background: '#f1f5f9',
+                      color: '#475569',
+                      border: '1px solid #e2e8f0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontFamily: 'ui-monospace, monospace',
+                      fontSize: '0.88rem',
+                      fontWeight: 800
+                    }}>
+                      -
+                    </span>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>
+                        To-Do Checkliste anlegen
+                      </div>
+                      <div style={{ fontSize: '0.74rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        Interaktive Aufgabe mit Checkbox
+                      </div>
                     </div>
                   </div>
-                  <span style={{ fontSize: '0.74rem', fontWeight: 800, background: '#e2e8f0', color: '#334155', padding: '2px 7px', borderRadius: '6px' }}>- To-Do</span>
+                  <span style={{
+                    fontSize: '0.74rem',
+                    fontFamily: 'ui-monospace, monospace',
+                    fontWeight: 700,
+                    color: '#475569',
+                    background: '#f1f5f9',
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    whiteSpace: 'nowrap',
+                    marginLeft: '8px'
+                  }}>
+                    - To-Do
+                  </span>
                 </button>
 
                 {/* / Makros */}
@@ -1428,31 +1982,70 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     padding: '8px 10px',
-                    borderRadius: '10px',
-                    border: '1px solid #fef08a',
-                    background: '#fefce8',
+                    borderRadius: '9px',
+                    border: '1px solid transparent',
+                    background: 'transparent',
                     cursor: 'pointer',
-                    textAlign: 'left'
+                    textAlign: 'left',
+                    transition: 'all 0.12s ease',
+                    width: '100%'
                   }}
-                  className="hover-scale-mini"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#f8fafc';
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.borderColor = 'transparent';
+                  }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Sparkles size={15} color="#ca8a04" />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#854d0e' }}>/ Textbausteine & Makros</div>
-                      <div style={{ fontSize: '0.72rem', color: '#a16207' }}>Schnelle Vorlagen für Übe-Aufträge & Orga</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                    <span style={{
+                      width: '26px',
+                      height: '26px',
+                      minWidth: '26px',
+                      borderRadius: '7px',
+                      background: '#fef9c3',
+                      color: '#ca8a04',
+                      border: '1px solid #fef08a',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontFamily: 'ui-monospace, monospace',
+                      fontSize: '0.88rem',
+                      fontWeight: 800
+                    }}>
+                      /
+                    </span>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>
+                        Textbausteine & Makros
+                      </div>
+                      <div style={{ fontSize: '0.74rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        Schnelle Vorlagen für Übe-Aufträge
+                      </div>
                     </div>
                   </div>
-                  <span style={{ fontSize: '0.74rem', fontWeight: 800, background: '#fef08a', color: '#854d0e', padding: '2px 7px', borderRadius: '6px' }}>/Baustein</span>
+                  <span style={{
+                    fontSize: '0.74rem',
+                    fontFamily: 'ui-monospace, monospace',
+                    fontWeight: 700,
+                    color: '#854d0e',
+                    background: '#fef9c3',
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    whiteSpace: 'nowrap',
+                    marginLeft: '8px'
+                  }}>
+                    /Baustein
+                  </span>
                 </button>
               </div>
             </div>
 
             {/* Sektion 2: 1-Klick Schnellvorlagen */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
+              <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', paddingLeft: '2px' }}>
                 1-Klick Schnell-Vorlagen
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -1460,110 +2053,173 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                   type="button"
                   onClick={() => handleInsertSyntax('!Raum 4: Mangel melden: ', 'room', '!Raum 4: Mangel melden: ')}
                   style={{
-                    padding: '5px 9px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '5px 10px',
                     borderRadius: '8px',
-                    border: '1px solid #fecaca',
-                    background: '#fef2f2',
-                    color: '#dc2626',
-                    fontSize: '0.74rem',
-                    fontWeight: 700,
-                    cursor: 'pointer'
+                    border: '1px solid #e2e8f0',
+                    background: '#f8fafc',
+                    color: '#334155',
+                    fontSize: '0.78rem',
+                    fontWeight: 650,
+                    cursor: 'pointer',
+                    transition: 'all 0.12s ease'
                   }}
-                  className="hover-scale-mini"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#ffffff';
+                    e.currentTarget.style.borderColor = '#cbd5e1';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#f8fafc';
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                  }}
                 >
-                  ! Mangel melden
+                  <span style={{ color: '#dc2626', fontWeight: 800 }}>!</span>
+                  <span>Mangel melden</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => handleInsertSyntax('- Noten kopieren für nächste Stunde', null, '- Noten kopieren für nächste Stunde')}
                   style={{
-                    padding: '5px 9px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '5px 10px',
                     borderRadius: '8px',
                     border: '1px solid #e2e8f0',
                     background: '#f8fafc',
                     color: '#334155',
-                    fontSize: '0.74rem',
-                    fontWeight: 700,
-                    cursor: 'pointer'
+                    fontSize: '0.78rem',
+                    fontWeight: 650,
+                    cursor: 'pointer',
+                    transition: 'all 0.12s ease'
                   }}
-                  className="hover-scale-mini"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#ffffff';
+                    e.currentTarget.style.borderColor = '#cbd5e1';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#f8fafc';
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                  }}
                 >
-                  - Noten kopieren
+                  <CheckSquare size={13} color="#0f172a" />
+                  <span>Noten kopieren</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => handleInsertSyntax('Takt 1-8 bei 80 BPM üben', null, 'Takt 1-8 bei 80 BPM üben')}
                   style={{
-                    padding: '5px 9px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '5px 10px',
                     borderRadius: '8px',
-                    border: '1px solid #fef08a',
-                    background: '#fefce8',
-                    color: '#854d0e',
-                    fontSize: '0.74rem',
-                    fontWeight: 700,
-                    cursor: 'pointer'
+                    border: '1px solid #e2e8f0',
+                    background: '#f8fafc',
+                    color: '#334155',
+                    fontSize: '0.78rem',
+                    fontWeight: 650,
+                    cursor: 'pointer',
+                    transition: 'all 0.12s ease'
                   }}
-                  className="hover-scale-mini"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#ffffff';
+                    e.currentTarget.style.borderColor = '#cbd5e1';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#f8fafc';
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                  }}
                 >
-                  ⚡ Takt & 80 BPM
+                  <Zap size={13} color="#0f172a" />
+                  <span>Takt & 80 BPM</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => handleInsertSyntax('Play-Along Track anhören und mitspielen', null, 'Play-Along Track anhören und mitspielen')}
                   style={{
-                    padding: '5px 9px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '5px 10px',
                     borderRadius: '8px',
-                    border: '1px solid #bbf7d0',
-                    background: '#f0fdf4',
-                    color: '#166534',
-                    fontSize: '0.74rem',
-                    fontWeight: 700,
-                    cursor: 'pointer'
+                    border: '1px solid #e2e8f0',
+                    background: '#f8fafc',
+                    color: '#334155',
+                    fontSize: '0.78rem',
+                    fontWeight: 650,
+                    cursor: 'pointer',
+                    transition: 'all 0.12s ease'
                   }}
-                  className="hover-scale-mini"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#ffffff';
+                    e.currentTarget.style.borderColor = '#cbd5e1';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#f8fafc';
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                  }}
                 >
-                  🎵 Play-Along
+                  <Music size={13} color="#0f172a" />
+                  <span>Play-Along</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => handleInsertSyntax('#Wichtig ', 'tag')}
                   style={{
-                    padding: '5px 9px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '5px 10px',
                     borderRadius: '8px',
-                    border: '1px solid #fecdd3',
-                    background: '#fff1f2',
-                    color: '#9f1239',
-                    fontSize: '0.74rem',
-                    fontWeight: 700,
-                    cursor: 'pointer'
+                    border: '1px solid #e2e8f0',
+                    background: '#f8fafc',
+                    color: '#334155',
+                    fontSize: '0.78rem',
+                    fontWeight: 650,
+                    cursor: 'pointer',
+                    transition: 'all 0.12s ease'
                   }}
-                  className="hover-scale-mini"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#ffffff';
+                    e.currentTarget.style.borderColor = '#cbd5e1';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#f8fafc';
+                    e.currentTarget.style.borderColor = '#e2e8f0';
+                  }}
                 >
-                  📌 #Wichtig
+                  <span style={{ color: '#e11d48', fontWeight: 800 }}>#</span>
+                  <span>Wichtig</span>
                 </button>
               </div>
             </div>
           </div>
-        )}
+        </div>
+      </>,
+      document.body
+    )}
       </div>
 
       {/* ========================================================================= */}
-      {/* 2. SÄULE 1: ERGONOMISCHER QUICK-CAPTURE INPUT (42px)                      */}
+      {/* 2. SÄULE 1: ERGONOMISCHER QUICK-CAPTURE INPUT (46px)                      */}
       {/* ========================================================================= */}
       <div style={{
         position: 'relative',
         background: '#f8fafc',
         borderRadius: '13px',
         border: autocompleteType ? '1.5px solid #34a853' : isListening ? '1.5px solid #dc2626' : '1px solid #e2e8f0',
-        padding: '0 8px 0 12px',
-        height: '42px',
+        padding: '6px 8px 6px 14px',
+        minHeight: '46px',
         display: 'flex',
         alignItems: 'center',
-        gap: '6px',
+        gap: '8px',
         boxSizing: 'border-box',
         transition: 'all 0.15s ease'
       }}>
@@ -1588,7 +2244,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
             gap: '3px',
             marginBottom: '6px'
           }}>
-            <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', padding: '3px 6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', padding: '4px 8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               {autocompleteType === 'student' ? 'Schüler wählen (@)' : autocompleteType === 'tag' ? 'Tag wählen (#)' : autocompleteType === 'room' ? 'Mangel / Raum wählen (!)' : 'Baustein (/)'}
             </div>
             {suggestions.map((s, idx) => (
@@ -1601,38 +2257,198 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   gap: '8px',
-                  padding: '6px 8px',
+                  padding: '7px 10px',
                   borderRadius: '8px',
                   border: 'none',
                   background: idx === suggestionIndex ? '#f1f5f9' : 'transparent',
                   color: '#0f172a',
                   cursor: 'pointer',
                   textAlign: 'left',
-                  fontSize: '0.84rem',
+                  fontSize: '0.86rem',
                   fontWeight: 650
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {s.type === 'student' ? (
-                    <User size={13} color="#166534" />
+                    <User size={14} color="#166534" />
                   ) : s.type === 'room' ? (
-                    <DoorOpen size={13} color="#dc2626" />
+                    <DoorOpen size={14} color="#dc2626" />
                   ) : (
-                    <Hash size={13} color="#64748b" />
+                    <Hash size={14} color="#64748b" />
                   )}
                   <span>{s.label}</span>
                 </div>
-                <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>{s.sub}</span>
+                <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>{s.sub}</span>
               </button>
             ))}
           </div>
         )}
 
-        <input
+        {/* ⚡ Monochromer Apple HIG Auto-Schüler Toggle (F2 & F16) */}
+        <div ref={autoStudentPopoverRef} style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={() => {
+              if (currentLessonStudents.length > 1) {
+                setShowAutoStudentPopover(prev => !prev);
+              } else {
+                toggleAutoStudent();
+              }
+            }}
+            title={
+              isAutoStudentActive
+                ? (currentLessonStudents.length > 0
+                    ? `⚡ Auto-Schüler aktiv: ${currentLessonStudents.map(s => s.first_name || s.name).join(', ')} (${isMacPlatform ? '⌥A' : 'Alt+A'})`
+                    : activeStudent
+                      ? `⚡ Auto-Schüler aktiv: ${activeStudent.first_name || activeStudent.name} (${isMacPlatform ? '⌥A' : 'Alt+A'})`
+                      : `⚡ Auto-Schüler aktiv (${isMacPlatform ? '⌥A' : 'Alt+A'})`)
+                : `⚡ Auto-Schüler Erkennung aktivieren (${isMacPlatform ? '⌥A' : 'Alt+A'})`
+            }
+            aria-label="Auto-Schüler Zuweisung umschalten"
+            style={{
+              height: '32px',
+              padding: '0 9px',
+              borderRadius: '8px',
+              border: isAutoStudentActive ? '1px solid #0f172a' : '1px solid #cbd5e1',
+              background: isAutoStudentActive ? '#0f172a' : '#ffffff',
+              color: isAutoStudentActive ? '#ffffff' : '#64748b',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '0.76rem',
+              fontWeight: 750,
+              cursor: 'pointer',
+              flexShrink: 0,
+              transition: 'all 0.15s ease'
+            }}
+            className="hover-scale-mini"
+          >
+            <Zap size={13} color={isAutoStudentActive ? '#ffffff' : '#0f172a'} />
+            <span>Auto-Schüler</span>
+            {isAutoStudentActive && currentLessonStudents.length > 0 && (
+              <span style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                background: '#22c55e',
+                boxShadow: '0 0 0 1px #ffffff'
+              }} />
+            )}
+          </button>
+
+          {/* Partner-Unterricht Popover */}
+          {showAutoStudentPopover && currentLessonStudents.length > 1 && (
+            <div style={{
+              position: 'absolute',
+              bottom: '38px',
+              left: 0,
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              borderRadius: '10px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+              padding: '6px',
+              zIndex: 10000,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px',
+              width: '220px'
+            }}>
+              <div style={{ fontSize: '0.70rem', fontWeight: 800, color: '#64748b', padding: '2px 6px' }}>
+                Aktuelle Stunde ({currentLessonStudents.length} Schüler):
+              </div>
+              {currentLessonStudents.map(s => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => {
+                    const sName = s.first_name || s.name;
+                    setInputContent(prev => prev.includes(`@${sName}`) ? prev : `@${sName} ${prev}`.trim());
+                    setShowAutoStudentPopover(false);
+                    if (textareaRef.current) textareaRef.current.focus();
+                  }}
+                  style={{
+                    textAlign: 'left',
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    padding: '6px 9px',
+                    fontSize: '0.76rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    color: '#0f172a'
+                  }}
+                >
+                  {maskStudentName(s.first_name || s.name)} ({s.instrument || 'Musik'})
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  toggleAutoStudent();
+                  setShowAutoStudentPopover(false);
+                }}
+                style={{
+                  textAlign: 'center',
+                  background: isAutoStudentActive ? '#f1f5f9' : '#0f172a',
+                  border: '1px solid #0f172a',
+                  borderRadius: '6px',
+                  padding: '6px 9px',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  color: isAutoStudentActive ? '#0f172a' : '#ffffff'
+                }}
+              >
+                {isAutoStudentActive ? '⚡ Auto-Modus deaktivieren' : '⚡ Auto-Modus aktivieren'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* ☑ Monochromer Checkbox-Modus Button */}
+        <button
+          type="button"
+          onClick={() => {
+            setIsChecklistMode(prev => {
+              const next = !prev;
+              if (next && !inputContent.trim()) {
+                setInputContent('- ');
+              }
+              return next;
+            });
+            if (textareaRef.current) textareaRef.current.focus();
+          }}
+          title={isChecklistMode ? `Checklisten-Modus aktiv (${isMacPlatform ? '⌘⇧L' : 'Strg+Shift+L'})` : `Checklisten-Modus aktivieren (${isMacPlatform ? '⌘⇧L' : 'Strg+Shift+L'})`}
+          aria-label="Checklisten-Modus aktivieren"
+          style={{
+            width: '32px',
+            height: '32px',
+            minWidth: '32px',
+            borderRadius: '8px',
+            border: isChecklistMode ? '1px solid #0f172a' : '1px solid #cbd5e1',
+            background: isChecklistMode ? '#0f172a' : '#ffffff',
+            color: isChecklistMode ? '#ffffff' : '#64748b',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            flexShrink: 0,
+            transition: 'all 0.15s ease'
+          }}
+          className="hover-scale-mini"
+        >
+          <CheckSquare size={14} color={isChecklistMode ? '#ffffff' : '#0f172a'} />
+        </button>
+
+        <textarea
           ref={textareaRef as any}
-          type="text"
+          rows={1}
           value={inputContent}
-          onChange={handleInputChange}
+          onChange={(e) => {
+            handleInputChange(e);
+            e.target.style.height = 'auto';
+            e.target.style.height = `${Math.min(e.target.scrollHeight, 140)}px`;
+          }}
           onKeyDown={(e) => {
             if (autocompleteType && suggestions.length > 0) {
               if (e.key === 'ArrowDown') {
@@ -1659,136 +2475,125 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
               }
             }
 
-            if (e.key === 'Enter') {
+            // Option+A (Alt+A) -> Auto-Schüler Toggle (F2 & F16)
+            if (e.altKey && (e.key === 'a' || e.key === 'A' || e.code === 'KeyA')) {
+              e.preventDefault();
+              toggleAutoStudent();
+              showToast(!isAutoStudentActive ? '⚡ Auto-Schüler aktiviert' : '⚡ Auto-Schüler deaktiviert');
+              return;
+            }
+
+            // Option+D (Alt+D) -> Diktat starten/stoppen
+            if (e.altKey && (e.key === 'd' || e.key === 'D' || e.code === 'KeyD')) {
+              e.preventDefault();
+              handleToggleVoiceDictation();
+              return;
+            }
+
+            // Option+H (Alt+H) -> Hausaufgabe Sync (F31)
+            if (e.altKey && (e.key === 'h' || e.key === 'H' || e.code === 'KeyH')) {
+              e.preventDefault();
+              handleDirectHomeworkTransfer();
+              return;
+            }
+
+            // Cmd+Shift+L / Ctrl+Shift+L -> Checklisten-Modus toggeln
+            if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'l' || e.key === 'L')) {
+              e.preventDefault();
+              setIsChecklistMode(prev => {
+                const next = !prev;
+                if (next && !inputContent.trim()) setInputContent('- ');
+                showToast(next ? '✓ Checklisten-Modus aktiv' : 'Checklisten-Modus aus');
+                return next;
+              });
+              return;
+            }
+
+            // Cmd+Z / Ctrl+Z -> Undo bei gelöschter Notiz wenn Eingabe leer ist (F14)
+            if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z') && !inputContent) {
+              if (undoToast) {
+                e.preventDefault();
+                handleUndoDelete();
+                return;
+              }
+            }
+
+            // Cross-Platform Speichern Shortcut (Cmd+Enter / Ctrl+Enter)
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
               e.preventDefault();
               handleSave();
+              return;
+            }
+
+            // Checklisten-Modus: Enter fügt eine neue Checkbox-Zeile ein
+            if (isChecklistMode && e.key === 'Enter' && !e.shiftKey) {
+              if (inputContent.endsWith('\n- ') || inputContent === '- ') {
+                e.preventDefault();
+                setInputContent(prev => prev.replace(/(?:\r?\n)?-\s*$/, ''));
+                return;
+              }
+              e.preventDefault();
+              setInputContent(prev => `${prev}\n- `);
+              return;
+            }
+
+            // Wenn Text mehrzeilig ist oder Shift+Enter gedrückt wird: Standard Zeilenumbruch
+            if (e.key === 'Enter' && e.shiftKey) {
+              // Standard newline in textarea
+              return;
+            }
+
+            // Normales Enter in einzeiligem Text ohne Checkliste speichert direkt
+            if (!isChecklistMode && e.key === 'Enter' && !inputContent.includes('\n')) {
+              e.preventDefault();
+              handleSave();
+              return;
             }
           }}
-          placeholder={isListening ? '🎙️ Höre zu... Diktat aktiv...' : 'Notiz, @Schüler, !Mangel, #Tag oder - To-Do... (⌘J)'}
+          placeholder={
+            isListening 
+              ? '🎙️ Höre zu... Diktat aktiv...' 
+              : isChecklistMode
+                ? `Checkliste: [Enter] = neue Zeile... Speichern mit ${isMacPlatform ? '⌘↵' : 'Strg↵'}`
+                : isAutoStudentActive && currentLessonStudents.length > 0
+                  ? `Notiz für ${currentLessonStudents[0].first_name || currentLessonStudents[0].name}... (${isMacPlatform ? '⌘↵' : '↵'})`
+                  : isAutoStudentActive && activeStudent
+                    ? `Notiz für ${activeStudent.first_name || activeStudent.name}... (${isMacPlatform ? '⌘↵' : '↵'})`
+                    : `Notiz oder To-Do schreiben... (${isMacPlatform ? '⌘↵' : '↵'})`
+          }
           style={{
             flex: 1,
-            height: '100%',
+            minHeight: '26px',
+            maxHeight: '140px',
             background: 'transparent',
             border: 'none',
             outline: 'none',
-            fontSize: '0.90rem',
+            fontSize: '0.94rem',
             color: '#0f172a',
             fontWeight: 550,
-            padding: 0
+            padding: '4px 0',
+            resize: 'none',
+            fontFamily: 'inherit',
+            lineHeight: 1.4
           }}
         />
 
-        {/* Dezente Schnellauswahl-Icons (!, @, #, -, /) direkt im Eingabefeld */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-          {/* ! Mangel */}
-          <button
-            type="button"
-            onClick={() => handleInsertSyntax('!', 'room')}
-            title="! Mangel oder Raum-Defekt melden"
-            style={{
-              background: '#fee2e2',
-              color: '#dc2626',
-              border: '1px solid #fecaca',
-              borderRadius: '7px',
-              padding: '3px 7px',
-              fontSize: '0.78rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.12s ease'
-            }}
-            className="hover-scale-mini"
-          >
-            !
-          </button>
-
-          {/* @ Schüler */}
-          <button
-            type="button"
-            onClick={() => handleInsertSyntax('@', 'student')}
-            title="@ Schüler zuordnen"
-            style={{
-              background: '#dcfce7',
-              color: '#166534',
-              border: '1px solid #bbf7d0',
-              borderRadius: '7px',
-              padding: '3px 7px',
-              fontSize: '0.78rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.12s ease'
-            }}
-            className="hover-scale-mini"
-          >
-            @
-          </button>
-
-          {/* # Tag */}
-          <button
-            type="button"
-            onClick={() => handleInsertSyntax('#', 'tag')}
-            title="# Tag vergeben (#Wichtig, #Material...)"
-            style={{
-              background: '#dbeafe',
-              color: '#1d4ed8',
-              border: '1px solid #bfdbfe',
-              borderRadius: '7px',
-              padding: '3px 7px',
-              fontSize: '0.78rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.12s ease'
-            }}
-            className="hover-scale-mini"
-          >
-            #
-          </button>
-
-          {/* - To-Do */}
-          <button
-            type="button"
-            onClick={() => handleInsertSyntax('- ')}
-            title="- To-Do Checkliste anlegen"
-            style={{
-              background: '#f1f5f9',
-              color: '#334155',
-              border: '1px solid #e2e8f0',
-              borderRadius: '7px',
-              padding: '3px 7px',
-              fontSize: '0.78rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.12s ease'
-            }}
-            className="hover-scale-mini"
-          >
-            ✓
-          </button>
-
-          <div style={{ width: '1px', height: '18px', background: '#e2e8f0', margin: '0 2px' }} />
-
+        {/* Rechte Aktionen (100% Monochrom nach Apple HIG) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           {/* Integrated Apple Spotlight Dictation Microphone */}
           <button
             type="button"
             onClick={handleToggleVoiceDictation}
-            title={isListening ? 'Diktat beenden' : 'Sprachnotiz diktieren'}
+            title={isListening ? `Diktat beenden (${isMacPlatform ? '⌥D' : 'Alt+D'})` : `Sprachnotiz diktieren (${isMacPlatform ? '⌥D' : 'Alt+D'})`}
+            aria-label={isListening ? 'Diktat beenden' : 'Sprachnotiz diktieren'}
             style={{
-              background: isListening ? '#dc2626' : 'transparent',
-              color: isListening ? '#ffffff' : '#64748b',
-              border: 'none',
-              borderRadius: '7px',
-              padding: '5px',
+              background: isListening ? '#0f172a' : 'transparent',
+              color: isListening ? '#ffffff' : '#0f172a',
+              border: isListening ? '1px solid #0f172a' : '1px solid transparent',
+              borderRadius: '8px',
+              width: '32px',
+              height: '32px',
+              minWidth: '32px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -1798,26 +2603,50 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
             }}
             className="hover-scale-mini"
           >
-            <Mic size={15} color={isListening ? '#ffffff' : '#64748b'} />
+            <Mic size={15} color={isListening ? '#ffffff' : '#0f172a'} />
           </button>
 
           {inputContent.trim() && (
             <button
               type="button"
+              disabled={isSavingNote}
               onClick={() => handleSave()}
+              title={`Notiz abschicken (${isMacPlatform ? '⌘↵' : 'Strg↵'})`}
+              aria-label={`Notiz abschicken (${isMacPlatform ? '⌘↵' : 'Strg↵'})`}
               style={{
                 border: 'none',
-                background: '#0f172a',
+                background: isSavingNote ? '#334155' : '#0f172a',
                 color: '#ffffff',
                 borderRadius: '8px',
-                padding: '4px 10px',
-                fontSize: '0.74rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                flexShrink: 0
+                height: '32px',
+                padding: '0 10px',
+                fontSize: '0.78rem',
+                fontWeight: 750,
+                cursor: isSavingNote ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                flexShrink: 0,
+                opacity: isSavingNote ? 0.75 : 1,
+                transition: 'all 0.15s ease'
               }}
+              className="hover-scale-mini"
             >
-              ↵
+              <Send size={12} color="#ffffff" />
+              <span>{isSavingNote ? 'Sendet...' : 'Senden'}</span>
+              <kbd style={{
+                fontSize: '0.66rem',
+                padding: '1px 5px',
+                borderRadius: '4px',
+                background: 'rgba(255, 255, 255, 0.22)',
+                color: '#ffffff',
+                fontFamily: 'inherit',
+                fontWeight: 650,
+                marginLeft: '1px',
+                lineHeight: 1
+              }}>
+                {isMacPlatform ? '⌘↵' : 'Strg↵'}
+              </kbd>
             </button>
           )}
         </div>
@@ -1865,7 +2694,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
               border: '1px dashed #cbd5e1'
             }}>
               <Sparkles size={16} color="#94a3b8" />
-              <span>Keine offenen Notizen • Tippe oben eine Notiz, @Schüler oder klicke auf Vorlagen</span>
+              <span>Keine offenen Notizen • Notiz oben eingeben oder [⚡ Auto-Schüler] aktivieren</span>
             </div>
           );
         }
@@ -1914,9 +2743,8 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                     borderRadius: '13px',
                     padding: '9px 13px',
                     display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '10px',
+                    flexDirection: 'column',
+                    gap: note.checklist_items && note.checklist_items.length > 0 ? '6px' : '0px',
                     minHeight: '44px',
                     boxShadow: isDone ? 'none' : '0 2px 5px rgba(0, 0, 0, 0.02)',
                     opacity: isDone ? 0.6 : 1,
@@ -1924,6 +2752,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                   }}
                   className="hover-scale-mini"
                 >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', width: '100%' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
                     {/* Action Button: Raummangel Action vs 1-Tap Apple Checkbox */}
                     {isRoomIssueOpen ? (
@@ -1974,7 +2803,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                     )}
 
                     <span style={{
-                      fontSize: '0.88rem',
+                      fontSize: '0.90rem',
                       color: isDone ? '#94a3b8' : '#0f172a',
                       textDecoration: isDone ? 'line-through' : 'none',
                       fontWeight: isDone ? 500 : (note.is_pinned ? 700 : 650),
@@ -1988,19 +2817,19 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                     {/* Student Badge */}
                     {note.student_name && (
                       <span style={{
-                        fontSize: '0.74rem',
+                        fontSize: '0.76rem',
                         color: '#166534',
                         fontWeight: 750,
                         background: '#e6f4ea',
                         border: '1px solid #bbf7d0',
-                        padding: '3px 8px',
+                        padding: '3px 9px',
                         borderRadius: '7px',
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '4px',
+                        gap: '5px',
                         flexShrink: 0
                       }}>
-                        <User size={10} />
+                        <User size={12} color="#166534" />
                         {maskStudentName(note.student_name)}
                       </span>
                     )}
@@ -2008,20 +2837,79 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                     {/* Room Badge */}
                     {isRoomItem && (
                       <span style={{
-                        fontSize: '0.72rem',
+                        fontSize: '0.74rem',
                         fontWeight: 750,
-                        padding: '3px 8px',
+                        padding: '3px 9px',
                         borderRadius: '7px',
                         background: '#fee2e2',
                         color: '#991b1b',
                         border: '1px solid #fecaca',
                         display: 'inline-flex',
                         alignItems: 'center',
+                        gap: '5px',
+                        flexShrink: 0
+                      }}>
+                        <DoorOpen size={12} color="#dc2626" />
+                        <span>{detectedRoom || 'Raum'}</span>
+                      </span>
+                    )}
+
+                    {/* Room Issue 3-Stage Feedback Badge */}
+                    {isRoomIssue && (
+                      <span style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        background: (note.room_issue_status === 'resolved' || note.is_completed) ? '#dcfce7' : note.room_issue_status === 'in_progress' ? '#fef3c7' : '#fee2e2',
+                        color: (note.room_issue_status === 'resolved' || note.is_completed) ? '#166534' : note.room_issue_status === 'in_progress' ? '#92400e' : '#991b1b',
+                        border: `1px solid ${(note.room_issue_status === 'resolved' || note.is_completed) ? '#bbf7d0' : note.room_issue_status === 'in_progress' ? '#fde68a' : '#fecaca'}`,
+                        display: 'inline-flex',
+                        alignItems: 'center',
                         gap: '4px',
                         flexShrink: 0
                       }}>
-                        <DoorOpen size={10} color="#dc2626" />
-                        <span>{detectedRoom || 'Raum'}</span>
+                        {(note.room_issue_status === 'resolved' || note.is_completed) ? '✓ Behoben' : note.room_issue_status === 'in_progress' ? 'In Arbeit' : 'Gemeldet'}
+                      </span>
+                    )}
+
+                    {/* Unified Feed Origin Badge */}
+                    {note.source_origin === 'homework_book' && (
+                      <span style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        background: '#eff6ff',
+                        color: '#1d4ed8',
+                        border: '1px solid #bfdbfe',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        flexShrink: 0
+                      }}>
+                        <BookOpen size={11} color="#1d4ed8" />
+                        <span>Aufgabenheft</span>
+                      </span>
+                    )}
+
+                    {/* Multi-Checkbox Progress Indicator */}
+                    {note.checklist_items && note.checklist_items.length > 0 && (
+                      <span style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 750,
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        background: '#f1f5f9',
+                        color: '#475569',
+                        border: '1px solid #e2e8f0',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        flexShrink: 0
+                      }}>
+                        <CheckSquare size={11} color="#475569" />
+                        <span>{note.checklist_items.filter(i => i.completed || (i as any).done).length}/{note.checklist_items.length}</span>
                       </span>
                     )}
 
@@ -2037,20 +2925,20 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                         <span
                           key={tag}
                           style={{
-                            fontSize: '0.72rem',
+                            fontSize: '0.74rem',
                             fontWeight: 750,
-                            padding: '3px 8px',
+                            padding: '3px 9px',
                             borderRadius: '7px',
                             background: style.bg,
                             color: style.color,
                             border: `1px solid ${style.border}`,
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '4px',
+                            gap: '5px',
                             flexShrink: 0
                           }}
                         >
-                          {renderMonochromeTagIcon(style.iconName, 10, style.color)}
+                          {renderMonochromeTagIcon(style.iconName, 11, style.color)}
                           <span>{style.label || tag.replace(/^#/, '')}</span>
                         </span>
                       );
@@ -2058,7 +2946,49 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                   </div>
 
                   {/* Actions */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
+                    {/* 📘 1-Tap Hausaufgabe Sync (F31) */}
+                    {(note.student_id || note.student_name) && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const targetStudent = allStudents.find(s => String(s.id) === String(note.student_id)) || 
+                                                todayStudents.find(s => String(s.id) === String(note.student_id)) ||
+                                                activeStudent;
+                          const sId = note.student_id || targetStudent?.id;
+                          const sName = note.student_name || targetStudent?.first_name || targetStudent?.name;
+                          if (sId) {
+                            await syncToHomeworkBook(note, sId, sName);
+                            setSyncedIds(prev => new Set([...Array.from(prev), note.id]));
+                            showToast(`✓ Als Hausaufgabe für ${sName || 'Schüler'} gesichert`);
+                          } else {
+                            showToast('Kein Schüler zugeordnet');
+                          }
+                        }}
+                        title={syncedIds.has(note.id) || note.is_homework_synced ? 'Bereits im Hausaufgabenheft' : `Ins Hausaufgabenheft übertragen (${isMacPlatform ? '⌥H' : 'Alt+H'})`}
+                        aria-label="Ins Hausaufgabenheft übertragen"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          background: (syncedIds.has(note.id) || note.is_homework_synced) ? '#0f172a' : '#f8fafc',
+                          color: (syncedIds.has(note.id) || note.is_homework_synced) ? '#ffffff' : '#0f172a',
+                          border: `1px solid ${(syncedIds.has(note.id) || note.is_homework_synced) ? '#0f172a' : '#cbd5e1'}`,
+                          borderRadius: '8px',
+                          padding: '3px 8px',
+                          fontSize: '0.72rem',
+                          fontWeight: 750,
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                          transition: 'all 0.15s ease'
+                        }}
+                        className="hover-scale-mini"
+                      >
+                        <BookOpen size={11} color={(syncedIds.has(note.id) || note.is_homework_synced) ? '#ffffff' : '#0f172a'} />
+                        <span>Hausaufgabe</span>
+                      </button>
+                    )}
+
                     {note.is_pinned && (
                       <button
                         type="button"
@@ -2067,7 +2997,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                         style={{
                           border: 'none',
                           background: 'transparent',
-                          color: '#64748b',
+                          color: '#0f172a',
                           cursor: 'pointer',
                           padding: '5px',
                           borderRadius: '6px',
@@ -2078,20 +3008,17 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                         }}
                         className="hover-scale-mini"
                       >
-                        <Pin size={14} />
+                        <Pin size={15} />
                       </button>
                     )}
                     <button
                       type="button"
-                      onClick={() => {
-                        deleteNote(note.id);
-                        showToast('Notiz gelöscht');
-                      }}
+                      onClick={() => handleDeleteWithUndo(note)}
                       title="Löschen"
                       style={{
                         border: 'none',
                         background: 'transparent',
-                        color: '#cbd5e1',
+                        color: '#94a3b8',
                         cursor: 'pointer',
                         padding: '5px',
                         borderRadius: '6px',
@@ -2103,10 +3030,90 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                       }}
                       className="hover-scale-mini"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={15} />
                     </button>
                   </div>
                 </div>
+
+                {/* 🏛️ Interaktive Checklisten-Items (Mehrzeilige Checkboxen) */}
+                {note.checklist_items && note.checklist_items.length > 0 && (
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '5px',
+                    paddingLeft: '32px',
+                    paddingRight: '6px',
+                    paddingBottom: '2px',
+                    marginTop: '-2px'
+                  }}>
+                    {note.checklist_items.map((ci, idx) => (
+                      <div
+                        key={ci.id || idx}
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const updated = note.checklist_items!.map(item =>
+                            item.id === ci.id ? { ...item, completed: !item.completed } : item
+                          );
+                          const allDone = updated.every(item => item.completed);
+                          await updateNote(note.id, {
+                            checklist_items: updated,
+                            is_completed: allDone
+                          });
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            e.currentTarget.click();
+                          }
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          fontSize: '0.84rem',
+                          cursor: 'pointer',
+                          color: ci.completed ? '#94a3b8' : '#0f172a',
+                          textDecoration: ci.completed ? 'line-through' : 'none',
+                          userSelect: 'none',
+                          padding: '2px 0'
+                        }}
+                      >
+                        <div style={{
+                          width: '15px',
+                          height: '15px',
+                          borderRadius: '4px',
+                          border: ci.completed ? '1.5px solid #0f172a' : '1.5px solid #94a3b8',
+                          background: ci.completed ? '#0f172a' : '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          transition: 'all 0.15s ease'
+                        }}>
+                          {ci.completed && <Check size={10} color="#ffffff" strokeWidth={3} />}
+                        </div>
+                        <span style={{ lineHeight: 1.3 }}>{ci.text}</span>
+                      </div>
+                    ))}
+                    {/* Micro Progress Bar */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px' }}>
+                      <div style={{ flex: 1, height: '3px', background: '#e2e8f0', borderRadius: '2px', overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${(note.checklist_items.filter(c => c.completed).length / note.checklist_items.length) * 100}%`,
+                          background: '#0f172a',
+                          transition: 'width 0.2s ease'
+                        }} />
+                      </div>
+                      <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700 }}>
+                        {note.checklist_items.filter(c => c.completed).length}/{note.checklist_items.length}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
               );
             })}
           </div>
@@ -2122,13 +3129,13 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                   border: `1px solid ${showTodayQuickPeek ? '#cbd5e1' : 'rgba(226, 232, 240, 0.9)'}`,
                   color: showTodayQuickPeek ? '#0f172a' : '#475569',
                   borderRadius: '100px',
-                  padding: '5px 14px',
-                  fontSize: '0.78rem',
+                  padding: '6px 16px',
+                  fontSize: '0.82rem',
                   fontWeight: 650,
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '6px',
+                  gap: '7px',
                   boxShadow: showTodayQuickPeek ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)',
                   transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
@@ -2139,15 +3146,15 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                   background: showTodayQuickPeek ? '#e2e8f0' : '#f1f5f9',
                   color: '#0f172a',
                   borderRadius: '100px',
-                  padding: '1px 7px',
-                  fontSize: '0.72rem',
+                  padding: '2px 8px',
+                  fontSize: '0.74rem',
                   fontWeight: 750
                 }}>
                   +{remainingCount}
                 </span>
                 <span>weitere</span>
                 <ChevronDown
-                  size={13}
+                  size={14}
                   color={showTodayQuickPeek ? '#0f172a' : '#94a3b8'}
                   style={{
                     transform: showTodayQuickPeek ? 'rotate(180deg)' : 'none',
@@ -2168,25 +3175,27 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingTop: '6px',
+        paddingTop: '8px',
         borderTop: '1px solid #f1f5f9',
-        fontSize: '0.76rem',
+        fontSize: '0.80rem',
         color: '#64748b',
         fontWeight: 600
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34a853' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#34a853' }} />
           <span>Auto-Sync</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span 
             onClick={() => setShowBoardModal(true)}
-            style={{ color: '#334155', cursor: 'pointer', fontWeight: 750, fontSize: '0.78rem' }}
+            style={{ color: '#0f172a', cursor: 'pointer', fontWeight: 750, fontSize: '0.82rem' }}
           >
             Alle {activeNotesCount} im Board ➔
           </span>
-          <span style={{ fontSize: '0.74rem' }}>
-            Shortcut <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '4px', padding: '2px 5px', fontFamily: 'monospace', fontSize: '0.70rem' }}>⌘J</kbd>
+          <span style={{ fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span>Fokus <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '5px', padding: '2px 5px', fontFamily: 'monospace', fontSize: '0.72rem' }}>⌘J</kbd></span>
+            <span style={{ color: '#cbd5e1' }}>•</span>
+            <span>Senden <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '5px', padding: '2px 5px', fontFamily: 'monospace', fontSize: '0.72rem' }}>{isMacPlatform ? '⌘↵' : 'Strg↵'}</kbd></span>
           </span>
         </div>
       </div>
@@ -2387,7 +3396,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
 
                       {/* Content */}
                       <span style={{
-                        fontSize: '0.84rem',
+                        fontSize: '0.88rem',
                         color: isDone ? '#94a3b8' : '#0f172a',
                         textDecoration: isDone ? 'line-through' : 'none',
                         fontWeight: isDone ? 500 : 650,
@@ -2401,19 +3410,19 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                       {/* Student Badge */}
                       {note.student_name && (
                         <span style={{
-                          fontSize: '0.66rem',
+                          fontSize: '0.74rem',
                           color: '#166534',
                           fontWeight: 750,
                           background: '#e6f4ea',
                           border: '1px solid #bbf7d0',
-                          padding: '2px 7px',
+                          padding: '3px 8px',
                           borderRadius: '6px',
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '3px',
+                          gap: '4px',
                           flexShrink: 0
                         }}>
-                          <User size={8} />
+                          <User size={11} color="#166534" />
                           {maskStudentName(note.student_name)}
                         </span>
                       )}
@@ -2440,20 +3449,79 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                           <>
                             {isPopRoom && (
                               <span style={{
-                                fontSize: '0.64rem',
+                                fontSize: '0.72rem',
                                 fontWeight: 750,
-                                padding: '2px 6px',
+                                padding: '3px 8px',
                                 borderRadius: '6px',
                                 background: '#fee2e2',
                                 color: '#991b1b',
                                 border: '1px solid #fecaca',
                                 display: 'inline-flex',
                                 alignItems: 'center',
+                                gap: '4px',
+                                flexShrink: 0
+                              }}>
+                                <DoorOpen size={11} color="#dc2626" />
+                                <span>{popoverRoom || 'Raum'}</span>
+                              </span>
+                            )}
+
+                            {/* Room Issue Feedback */}
+                            {isRoomIssue && (
+                              <span style={{
+                                fontSize: '0.70rem',
+                                fontWeight: 800,
+                                padding: '2px 6px',
+                                borderRadius: '5px',
+                                background: (note.room_issue_status === 'resolved' || note.is_completed) ? '#dcfce7' : note.room_issue_status === 'in_progress' ? '#fef3c7' : '#fee2e2',
+                                color: (note.room_issue_status === 'resolved' || note.is_completed) ? '#166534' : note.room_issue_status === 'in_progress' ? '#92400e' : '#991b1b',
+                                border: `1px solid ${(note.room_issue_status === 'resolved' || note.is_completed) ? '#bbf7d0' : note.room_issue_status === 'in_progress' ? '#fde68a' : '#fecaca'}`,
+                                display: 'inline-flex',
+                                alignItems: 'center',
                                 gap: '3px',
                                 flexShrink: 0
                               }}>
-                                <DoorOpen size={8.5} color="#dc2626" />
-                                <span>{popoverRoom || 'Raum'}</span>
+                                {(note.room_issue_status === 'resolved' || note.is_completed) ? '✓ Behoben' : note.room_issue_status === 'in_progress' ? 'In Arbeit' : 'Gemeldet'}
+                              </span>
+                            )}
+
+                            {/* Origin Badge */}
+                            {note.source_origin === 'homework_book' && (
+                              <span style={{
+                                fontSize: '0.70rem',
+                                fontWeight: 800,
+                                padding: '2px 6px',
+                                borderRadius: '5px',
+                                background: '#eff6ff',
+                                color: '#1d4ed8',
+                                border: '1px solid #bfdbfe',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                flexShrink: 0
+                              }}>
+                                <BookOpen size={10} color="#1d4ed8" />
+                                <span>Aufgabenheft</span>
+                              </span>
+                            )}
+
+                            {/* Checklist Progress */}
+                            {note.checklist_items && note.checklist_items.length > 0 && (
+                              <span style={{
+                                fontSize: '0.70rem',
+                                fontWeight: 750,
+                                padding: '2px 6px',
+                                borderRadius: '5px',
+                                background: '#f1f5f9',
+                                color: '#475569',
+                                border: '1px solid #e2e8f0',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                flexShrink: 0
+                              }}>
+                                <CheckSquare size={10} color="#475569" />
+                                <span>{note.checklist_items.filter(i => i.completed || (i as any).done).length}/{note.checklist_items.length}</span>
                               </span>
                             )}
 
@@ -2468,20 +3536,20 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                                 <span
                                   key={tag}
                                   style={{
-                                    fontSize: '0.64rem',
+                                    fontSize: '0.72rem',
                                     fontWeight: 750,
-                                    padding: '2px 6px',
+                                    padding: '3px 8px',
                                     borderRadius: '6px',
                                     background: style.bg,
                                     color: style.color,
                                     border: `1px solid ${style.border}`,
                                     display: 'inline-flex',
                                     alignItems: 'center',
-                                    gap: '3px',
+                                    gap: '4px',
                                     flexShrink: 0
                                   }}
                                 >
-                                  {renderMonochromeTagIcon(style.iconName, 8, style.color)}
+                                  {renderMonochromeTagIcon(style.iconName, 10, style.color)}
                                   <span>{style.label || tag.replace(/^#/, '')}</span>
                                 </span>
                               );
@@ -2494,11 +3562,12 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                     {/* Action button */}
                     <button
                       type="button"
-                      onClick={() => { deleteNote(note.id); showToast('Notiz gelöscht'); }}
+                      onClick={() => handleDeleteWithUndo(note)}
+                      title="Löschen"
                       style={{
                         border: 'none',
                         background: 'transparent',
-                        color: '#cbd5e1',
+                        color: '#94a3b8',
                         cursor: 'pointer',
                         padding: '4px',
                         borderRadius: '6px',
@@ -2509,9 +3578,8 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
                         transition: 'color 0.15s ease'
                       }}
                       className="hover-scale-mini"
-                      title="Löschen"
                     >
-                      <Trash2 size={13} />
+                      <Trash2 size={14} />
                     </button>
                   </div>
                 );

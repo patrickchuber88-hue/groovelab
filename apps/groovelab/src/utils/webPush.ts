@@ -20,7 +20,24 @@ function withTimeout<T>(promise: PromiseLike<T>, ms: number, fallbackValue: T): 
   ]);
 }
 
+function isDevelopmentHost(): boolean {
+  if (typeof window === 'undefined') return true;
+  const h = window.location.hostname;
+  return (
+    h === 'localhost' ||
+    h === '127.0.0.1' ||
+    h.endsWith('.localhost') ||
+    h.endsWith('.local') ||
+    h.startsWith('192.168.') ||
+    h.startsWith('10.') ||
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(h)
+  );
+}
+
 export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
+  if (isDevelopmentHost()) {
+    return null;
+  }
   if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
     try {
       const regPromise = navigator.serviceWorker.register('/sw.js', {
@@ -40,6 +57,9 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
 }
 
 export async function subscribeUserToPush(userId: string): Promise<boolean> {
+  if (isDevelopmentHost()) {
+    return false;
+  }
   try {
     if (typeof window === 'undefined' || !('Notification' in window)) {
       console.warn('Notifications not supported in this environment.');

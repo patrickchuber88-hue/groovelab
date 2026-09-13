@@ -22,7 +22,8 @@ export interface OfflineAudioRecord {
 
 const DB_NAME = 'CampusGroovelabOfflineAudioVault';
 const STORE_NAME = 'offlineAudioBlobs';
-const DB_VERSION = 1;
+const MUTATIONS_STORE_NAME = 'offlineSyncMutations';
+const DB_VERSION = 2;
 
 function openAudioDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -49,6 +50,10 @@ function openAudioDB(): Promise<IDBDatabase> {
         store.createIndex('context', 'context', { unique: false });
         store.createIndex('studentId', 'studentId', { unique: false });
         store.createIndex('createdAt', 'createdAt', { unique: false });
+      }
+      if (!db.objectStoreNames.contains(MUTATIONS_STORE_NAME)) {
+        const mutationStore = db.createObjectStore(MUTATIONS_STORE_NAME, { keyPath: 'id' });
+        mutationStore.createIndex('timestamp', 'timestamp', { unique: false });
       }
     };
   });
@@ -153,3 +158,73 @@ export async function removeOfflineAudioRecord(id: string): Promise<void> {
     console.error('[OfflineAudioVault] Error removing audio record:', err);
   }
 }
+
+/**
+ * Save a pending database mutation in IndexedDB
+ */
+export async function saveOfflineMutation(action: any): Promise<void> {
+  try {
+    const db = await openAudioDB();
+    const tx = db.transaction(MUTATIONS_STORE_NAME, 'readwrite');
+    const store = tx.objectStore(MUTATIONS_STORE_NAME);
+    store.put(action);
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.error('[OfflineAudioVault] Error saving offline mutation in IndexedDB:', err);
+    throw err;
+  }
+}
+
+/**
+ * Retrieve all pending database mutations from IndexedDB
+ */
+export async function getAllOfflineMutations(): Promise<any[]> {
+  try {
+    const db = await openAudioDB();
+    const tx = db.transaction(MUTATIONS_STORE_NAME, 'readonly');
+    const store = tx.objectStore(MUTATIONS_STORE_NAME);
+    const request = store.getAll();
+
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.error('[OfflineAudioVault] Failed to retrieve offline mutations from IndexedDB:', err);
+    return [];
+  }
+}
+
+/**
+ * Remove a mutation from IndexedDB once synced
+ */
+export async function removeOfflineMutation(id: string): Promise<void> {
+  try {
+    const db = await openAudioDB();
+    const tx = db.transaction(MUTATIONS_STORE_NAME, 'readwrite');
+    const store = tx.objectStore(MUTATIONS_STORE_NAME);
+    store.delete(id);
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.error('[OfflineAudioVault] Error removing offline mutation from IndexedDB:', err);
+  }
+}
+
+/**
+ * Get count of pending offline mutations
+ */
+export async function getOfflineMutationCount(): Promise<number> {
+  try {
+    const mutations = await getAllOfflineMutations();
+    return mutations.length;
+  } catch {
+    return 0;
+  }
+}
+

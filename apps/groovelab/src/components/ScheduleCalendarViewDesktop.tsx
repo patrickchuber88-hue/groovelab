@@ -8,6 +8,7 @@ import {
   Clock, 
   AlertCircle,
   CheckCircle,
+  Check,
   X,
   Send,
   Trash2,
@@ -31,7 +32,10 @@ import {
   Sparkles,
   MessageSquare,
   Lock,
-  BookOpen
+  BookOpen,
+  MapPin,
+  Scale,
+  Sliders
 } from 'lucide-react';
 import { useRealNamesVisibility, maskLastName, formatTeacherFullName, formatDisplaySubjectOrInstrument } from '../utils/nameHelper';
 import { MeisterwerkDocumentationModal, checkIsAudioTresorActive } from './MeisterwerkDocumentationModal';
@@ -52,12 +56,15 @@ interface ScheduleOccurrence {
   date: string;
   start_time: string;
   duration: number;
-  status: 'scheduled' | 'pending_reschedule' | 'rescheduled_confirmed' | 'cancelled' | 'teacher_sick' | 'canceled_by_teacher_sick';
+  status: 'scheduled' | 'pending_reschedule' | 'rescheduled_confirmed' | 'cancelled' | 'teacher_sick' | 'canceled_by_teacher_sick' | 'canceled_by_student';
   original_date?: string;
   original_start_time?: string;
   student_acknowledged?: boolean;
   vacant_student_id?: string;
   student?: {
+    id?: string;
+    school_id?: string;
+    teacher_id?: string;
     first_name: string;
     last_name: string;
     instrument: string;
@@ -91,7 +98,7 @@ interface ScheduleCalendarViewProps {
   setSelectedTeacherId?: (id: string) => void;
   currentUserRole?: string;
   hasSubmittedSchedule?: boolean;
-  scheduleStatus?: 'none' | 'pending' | 'approved';
+  scheduleStatus?: 'none' | 'pending' | 'approved' | 'needs_revision';
   onStartTour?: () => void;
 }
 
@@ -320,7 +327,7 @@ export function ScheduleCalendarViewDesktop({
     try {
       const { data, error } = await supabase
         .from('schedule_occurrences')
-        .select('*, student:users!schedule_occurrences_student_id_fkey(first_name, last_name, instrument), schedules:schedules(room_id, room:rooms(name))')
+        .select('*, student:users!schedule_occurrences_student_id_fkey(first_name, last_name, instrument, campus_ui_level, parent_permissions), schedules:schedules(room_id, room:rooms(name))')
         .eq('teacher_id', userId)
         .in('status', ['cancelled', 'canceled_by_student', 'teacher_sick', 'canceled_by_teacher_sick', 'open_reschedule'])
         .order('date', { ascending: true });
@@ -699,7 +706,7 @@ export function ScheduleCalendarViewDesktop({
             duration: o.duration,
             status: 'scheduled',
             student: {
-              first_name: '❇️ Freier Slot',
+              first_name: 'Freier Slot',
               last_name: `(zuvor: ${o.student?.first_name || ''})`,
               instrument: o.student?.instrument || ''
             },
@@ -844,15 +851,31 @@ export function ScheduleCalendarViewDesktop({
     }
   };
 
+  const extractDateFromChatMessage = (msg: any): string | null => {
+    if (!msg) return null;
+    if (msg.occurrence_id) {
+      const matchVirtual = String(msg.occurrence_id).match(/\d{4}-\d{2}-\d{2}/);
+      if (matchVirtual) return matchVirtual[0];
+    }
+    const text = String(msg.content || '');
+    const matchIso = text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+    if (matchIso) return `${matchIso[1]}-${matchIso[2]}-${matchIso[3]}`;
+    const matchFullYear = text.match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
+    if (matchFullYear) {
+      const day = matchFullYear[1].padStart(2, '0');
+      const month = matchFullYear[2].padStart(2, '0');
+      let year = matchFullYear[3];
+      if (year.length === 2) year = `20${year}`;
+      return `${year}-${month}-${day}`;
+    }
+    return null;
+  };
+
   const fetchChat = async (studentId: string, occurrenceId?: string) => {
     if (!userId || !studentId) return;
-    
-    let query = supabase
-      .from('campus_direct_messages')
-      .select('*');
-      
-    if (occurrenceId) {
-      const occ = occurrences.find(o => o.id === occurrenceId);
+
+    try {
+      const occ = occurrenceId ? occurrences.find(o => o.id === occurrenceId) : null;
       const isGroupOcc = occ && (occ.isGroupBlock || occurrences.some(o => 
         o.id !== occ.id && 
         o.student_id && 
@@ -861,28 +884,75 @@ export function ScheduleCalendarViewDesktop({
         o.start_time === occ.start_time && 
         (o.schedules?.room_id || null) === (occ.schedules?.room_id || null)
       ));
-      
+
+      let relevantStudentIds = [studentId];
+      let groupOccIds: string[] = [];
       if (isGroupOcc && occ) {
-        const groupOccIds = occurrences.filter(o => 
+        const groupOccs = occurrences.filter(o => 
           o.student_id && 
           o.student_id !== 'vacant' &&
           o.date === occ.date && 
           o.start_time === occ.start_time && 
           (o.schedules?.room_id || null) === (occ.schedules?.room_id || null)
-        ).map(o => o.id);
-        
-        query = query.in('occurrence_id', groupOccIds);
-      } else {
-        query = query.eq('occurrence_id', occurrenceId);
+        );
+        relevantStudentIds = Array.from(new Set(groupOccs.map(o => o.student_id).filter((s): s is string => Boolean(s))));
+        groupOccIds = groupOccs.map(o => o.id);
       }
-    } else {
-      query = query.or(`and(sender_id.eq.${userId},recipient_id.eq.${studentId}),and(sender_id.eq.${studentId},recipient_id.eq.${userId})`);
-    }
-    
-    const { data } = await query.order('created_at', { ascending: true });
-    if (data) {
-      setChatMessages(data);
-      setTimeout(() => scrollChatToBottom(true), 60);
+
+      let query = supabase
+        .from('campus_direct_messages')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (relevantStudentIds.length === 1) {
+        query = query.or(
+          `and(sender_id.eq.${userId},recipient_id.eq.${studentId}),and(sender_id.eq.${studentId},recipient_id.eq.${userId})`
+        );
+      } else {
+        const idListStr = relevantStudentIds.join(',');
+        query = query.or(
+          `and(sender_id.eq.${userId},recipient_id.in.(${idListStr})),and(sender_id.in.(${idListStr}),recipient_id.eq.${userId})`
+        );
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      if (data) {
+        let filtered = data;
+        if (occ) {
+          const targetOccId = occ.id ? String(occ.id) : null;
+          const targetScheduleId = occ.schedule_id || (occ as any).schedules?.id || null;
+          const targetDate: string = occ.date || '';
+
+          filtered = data.filter((m: any) => {
+            if (targetOccId && String(m.occurrence_id) === targetOccId) return true;
+            if (groupOccIds.length > 0 && m.occurrence_id && groupOccIds.includes(String(m.occurrence_id))) return true;
+            if (targetScheduleId && targetDate && String(m.occurrence_id) === `virtual-${targetScheduleId}-${targetDate}`) return true;
+            if (targetDate && String(m.occurrence_id).includes(targetDate)) return true;
+            if (targetDate) {
+              const extDate = extractDateFromChatMessage(m);
+              if (extDate === targetDate) return true;
+            }
+            return false;
+          });
+        }
+
+        setChatMessages(filtered);
+        setTimeout(() => scrollChatToBottom(true), 60);
+
+        // Auto-mark incoming unread messages as read for this user
+        const unreadIncoming = filtered.filter((m: any) => m.recipient_id === userId && !m.is_read);
+        if (unreadIncoming.length > 0) {
+          const unreadIds = unreadIncoming.map((m: any) => m.id);
+          await supabase
+            .from('campus_direct_messages')
+            .update({ is_read: true })
+            .in('id', unreadIds);
+        }
+      }
+    } catch (err) {
+      console.warn('[ScheduleCalendarViewDesktop] Error fetching chat messages:', err);
     }
   };
 
@@ -1028,6 +1098,8 @@ export function ScheduleCalendarViewDesktop({
     }
 
     try {
+      const fallbackOccId = occ.id || (occ.schedule_id ? `virtual-${occ.schedule_id}-${occ.date}` : null);
+
       // Optimistic update
       const tempId = `temp-${Date.now()}`;
       const optimisticMessage = {
@@ -1035,9 +1107,11 @@ export function ScheduleCalendarViewDesktop({
         sender_id: userId,
         recipient_id: studentId,
         content: messageContent,
-        occurrence_id: occ.id,
+        occurrence_id: fallbackOccId,
         created_at: new Date().toISOString(),
-        is_read: false
+        is_read: false,
+        is_system: false,
+        sender_role: 'teacher'
       };
       setChatMessages(prev => [...prev, optimisticMessage]);
       setChatTypedMessage('');
@@ -1062,11 +1136,15 @@ export function ScheduleCalendarViewDesktop({
         );
         const insertPromises = groupOccs.map(go => {
           if (!go.student_id || go.student_id === 'vacant') return Promise.resolve();
+          const goRefId = go.id || (go.schedule_id ? `virtual-${go.schedule_id}-${go.date}` : fallbackOccId);
           return supabase.from('campus_direct_messages').insert({
             sender_id: userId,
             recipient_id: go.student_id,
             content: messageContent,
-            occurrence_id: go.id
+            occurrence_id: goRefId,
+            sender_role: 'teacher',
+            is_system: false,
+            is_read: false
           });
         });
         await Promise.all(insertPromises);
@@ -1075,7 +1153,10 @@ export function ScheduleCalendarViewDesktop({
           sender_id: userId,
           recipient_id: studentId,
           content: messageContent,
-          occurrence_id: occ.id
+          occurrence_id: fallbackOccId,
+          sender_role: 'teacher',
+          is_system: false,
+          is_read: false
         });
         if (error) throw error;
       }
@@ -1136,7 +1217,7 @@ export function ScheduleCalendarViewDesktop({
     });
 
     if (schedConflict) {
-      const teacherName = schedConflict.teacher ? `${schedConflict.teacher.first_name || ''} ${schedConflict.teacher.last_name || ''}`.trim() : 'Anderer Lehrer';
+      const teacherName = schedConflict.teacher ? formatTeacherFullName(schedConflict.teacher) : 'Anderer Lehrer';
       return `${teacherName} (Dauertermin: ${schedConflict.time_slot.substring(0, 5)} - ${schedConflict.duration} min)`;
     }
 
@@ -1209,7 +1290,7 @@ export function ScheduleCalendarViewDesktop({
       ? `${rawFirstName} ${showRealNames ? rawLastName : maskLastName(rawLastName)}`.trim() 
       : 'Termin';
     const timeDisplay = updates.start_time ? ` (auf ${updates.start_time.substring(0, 5)} Uhr)` : '';
-    const message = customActionMessage || `✨ Termin für ${displayStudent}${timeDisplay} angepasst`;
+    const message = customActionMessage || `Termin für ${displayStudent}${timeDisplay} angepasst`;
 
     showActionToast(message, () => {
       setPendingChanges(prev => {
@@ -1255,7 +1336,7 @@ export function ScheduleCalendarViewDesktop({
     });
 
     const count = Object.keys(updatesMap).length;
-    const message = customActionMessage || `✨ ${count} ${count === 1 ? 'Termin' : 'Termine'} angepasst`;
+    const message = customActionMessage || `${count} ${count === 1 ? 'Termin' : 'Termine'} angepasst`;
 
     showActionToast(message, () => {
       setPendingChanges(prev => {
@@ -1619,11 +1700,11 @@ export function ScheduleCalendarViewDesktop({
             if (isNowCancelled && !wasCancelled) {
               const shortOrigDay = origDayLabel.substring(0, 2) + '.';
               const shortOrigDate = `${String(origDate.getDate()).padStart(2, '0')}.${String(origDate.getMonth() + 1).padStart(2, '0')}.${String(origDate.getFullYear()).substring(2, 4)}`;
-              notificationMessage = `❌ Terminabsage: Dein Unterrichtstermin am ${shortOrigDay} ${shortOrigDate} um ${origTimeLabel} Uhr fällt aus.\n🕒 Abgesagt am: ${execTimestampStr} durch Lehrkraft.`;
+              notificationMessage = `Terminabsage: Dein Unterrichtstermin am ${shortOrigDay} ${shortOrigDate} um ${origTimeLabel} Uhr fällt aus.\nAbgesagt am: ${execTimestampStr} durch Lehrkraft.`;
             } else if (isReset) {
               const shortNewDay = newDayLabel.substring(0, 2) + '.';
               const shortNewDate = `${String(newDate.getDate()).padStart(2, '0')}.${String(newDate.getMonth() + 1).padStart(2, '0')}.${String(newDate.getFullYear()).substring(2, 4)}`;
-              notificationMessage = `🔄 Termin reaktiviert: Dein Unterrichtstermin am ${shortNewDay} ${shortNewDate} um ${newTimeLabel} Uhr findet regulär statt.\n🕒 Reaktiviert am: ${execTimestampStr} durch Lehrkraft.`;
+              notificationMessage = `Termin reaktiviert: Dein Unterrichtstermin am ${shortNewDay} ${shortNewDate} um ${newTimeLabel} Uhr findet regulär statt.\nReaktiviert am: ${execTimestampStr} durch Lehrkraft.`;
             } else if (timeActuallyChanged && !isNowCancelled) {
               const shortOrigDay = origDayLabel.substring(0, 2) + '.';
               const shortOrigDate = `${String(origDate.getDate()).padStart(2, '0')}.${String(origDate.getMonth() + 1).padStart(2, '0')}.${String(origDate.getFullYear()).substring(2, 4)}`;
@@ -1651,13 +1732,13 @@ export function ScheduleCalendarViewDesktop({
                   .single();
 
                 if (studentProfile && studentProfile.is_campus_active) {
-                  let pushTitle = 'Terminänderung 🔄';
+                  let pushTitle = 'Terminänderung';
                   if (['cancelled', 'canceled_by_student'].includes(change.status)) {
-                    pushTitle = 'Unterricht fällt aus ☕';
+                    pushTitle = 'Unterricht fällt aus';
                   } else if (change.date === origDateStr && change.start_time.substring(0, 5) === origTimeStr.substring(0, 5)) {
-                    pushTitle = 'Termin zurückgesetzt 🔄';
+                    pushTitle = 'Termin zurückgesetzt';
                   } else {
-                    pushTitle = 'Terminänderung 🔄';
+                    pushTitle = 'Terminänderung';
                   }
 
                   const { data: dbNotif } = await supabase
@@ -2050,7 +2131,7 @@ export function ScheduleCalendarViewDesktop({
 
           // 4. Main Occurrences (single query with full fields and joins)
           supabase.from('schedule_occurrences')
-            .select('id, date, start_time, original_date, duration, status, notes, teacher_id, student_id, schedule_id, student:users!schedule_occurrences_student_id_fkey(first_name, last_name, instrument, is_campus_active, is_groovelab_active, group_id)')
+            .select('id, date, start_time, original_date, duration, status, notes, teacher_id, student_id, schedule_id, student:users!schedule_occurrences_student_id_fkey(id, school_id, teacher_id, first_name, last_name, instrument, is_campus_active, is_groovelab_active, group_id, campus_ui_level, parent_permissions)')
             .eq('teacher_id', userId)
             .or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`)
             .order('date')
@@ -2294,7 +2375,7 @@ export function ScheduleCalendarViewDesktop({
                   duration: student.duration,
                   status: 'scheduled',
                   student: {
-                    first_name: '☕️ Pause',
+                    first_name: 'Pause',
                     last_name: '',
                     instrument: ''
                   },
@@ -2369,6 +2450,9 @@ export function ScheduleCalendarViewDesktop({
                   isGroupBlock: student.isGroup || false,
                   groupOccurrences: student.groupStudents || [],
                   student: { 
+                    id: student.id,
+                    school_id: schoolId,
+                    teacher_id: userId,
                     first_name: student.first_name || 'Pause', 
                     last_name: student.last_name || '', 
                     instrument: student.instrument || 'Nicht festgelegt' 
@@ -2419,7 +2503,10 @@ export function ScheduleCalendarViewDesktop({
               duration: slot.duration || 30,
               status: slot.status === 'approved' ? 'scheduled' : (slot.status || 'scheduled'),
               student: {
-                first_name: studentObj ? studentObj.first_name : (slot.student_id ? 'Schüler' : '☕️ Pause'),
+                id: slot.student_id || (studentObj ? studentObj.id : ''),
+                school_id: schoolId,
+                teacher_id: slot.teacher_id || userId,
+                first_name: studentObj ? studentObj.first_name : (slot.student_id ? 'Schüler' : 'Pause'),
                 last_name: studentObj ? (studentObj.last_name || '') : '',
                 instrument: studentObj ? (studentObj.instrument || '') : (slot.instrument || '')
               },
@@ -2617,7 +2704,7 @@ export function ScheduleCalendarViewDesktop({
 
     let confirmMsg = `Möchtest du alle ${copiedEvents.length} kopierten Termine in diese Woche einfügen?`;
     if (hasManualChanges) {
-      confirmMsg = `⚠️ Achtung: In der Zielwoche gibt es bereits manuelle Anpassungen (verschobene Termine, Notizen oder Fehlzeiten).\n\nWenn du fortfährst, werden diese durch die kopierten Termine überschrieben. Möchtest du wirklich einfügen?`;
+      confirmMsg = `Achtung: In der Zielwoche gibt es bereits manuelle Anpassungen (verschobene Termine, Notizen oder Fehlzeiten).\n\nWenn du fortfährst, werden diese durch die kopierten Termine überschrieben. Möchtest du wirklich einfügen?`;
     } else if (existingOccurrences && existingOccurrences.length > 0) {
       confirmMsg += `\n\n(Bestehende Standardtermine dieser Woche werden überschrieben)`;
     }
@@ -3060,6 +3147,15 @@ export function ScheduleCalendarViewDesktop({
   // Enterprise+ Goldstandard: Execute reset with strict history protection
   // (Designer master schedule remains 100% untouched)
   const executeScheduleReset = async (scope: 'week' | 'school_year') => {
+    const confirmMessage = scope === 'week'
+      ? `Sicherheitsprüfung: Möchtest du wirklich alle Termine dieser Kalenderwoche (KW ${getWeekNumber(weekStart)}) verbindlich auf die Stammdaten des Stundenplan-Designers zurücksetzen? Alle individuellen Verschiebungen dieser Woche werden verworfen.`
+      : 'Sicherheitsprüfung: Möchtest du wirklich alle manuellen Terminverschiebungen für das GESAMTE RESTLICHE SCHULJAHR verbindlich auf den Designer-Stand zurücksetzen? Diese Aktion setzt alle Folgetermine zurück.';
+    
+    const isDoubleConfirmed = await showConfirm(confirmMessage);
+    if (!isDoubleConfirmed) {
+      return;
+    }
+
     setIsExecutingReset(true);
     try {
       const todayStr = toLocalYYYYMMDD(getSimulatedNow());
@@ -3393,7 +3489,7 @@ export function ScheduleCalendarViewDesktop({
     const todayYYYYMMDD = new Date().toISOString().split('T')[0];
     if (sourceOcc && sourceOcc.date && sourceOcc.date < todayYYYYMMDD) {
       e.preventDefault();
-      alert('🔒 Vergangene Termine sind schreibgeschützt und können nicht verschoben werden.');
+      alert('Vergangene Termine sind schreibgeschützt und können nicht verschoben werden.');
       return;
     }
 
@@ -4028,7 +4124,7 @@ export function ScheduleCalendarViewDesktop({
       const srcName = `${sourceOcc.student?.first_name || 'Schüler 1'} ${maskLastName(sourceOcc.student?.last_name || '', showRealNames)}`.trim();
       const tgtName = `${targetOcc.student?.first_name || 'Schüler 2'} ${maskLastName(targetOcc.student?.last_name || '', showRealNames)}`.trim();
 
-      showActionToast(`🎉 ${srcName} und ${tgtName} erfolgreich getauscht!`, async () => {
+      showActionToast(`${srcName} und ${tgtName} erfolgreich getauscht!`, async () => {
         const sourceReverted: ScheduleOccurrence = {
           ...sourceOcc,
           date: sourceOcc.date,
@@ -4075,6 +4171,29 @@ export function ScheduleCalendarViewDesktop({
     // Prevent swapping with break / pause / vacant slots due to duration mismatch
     const isSourceBreak = !sourceOcc.student_id || sourceOcc.student_id === 'vacant';
     const isTargetBreak = !targetOcc.student_id || targetOcc.student_id === 'vacant';
+
+    // Tier-1 Enterprise+ Goldstandard: Dropping onto a cancelled (red) slot directly places the active student parallel to it (Split-Slot mode)
+    const isTargetCancelled = targetOcc.status === 'cancelled' || targetOcc.status === 'canceled_by_student';
+    if (isTargetCancelled && !isSourceBreak) {
+      const sourceRoomId = sourceOcc.schedules?.room_id || null;
+      const conflict = getRoomConflict(sourceId, targetOcc.date, targetOcc.start_time, sourceOcc.duration, sourceRoomId, targetId);
+      if (conflict) {
+        const roomName = sourceOcc.schedules?.room?.name || 'diesem Raum';
+        const confirmMsg = `Warnung: Der Raum "${roomName}" ist an diesem Tag um ${targetOcc.start_time.substring(0, 5)} Uhr bereits belegt durch:\n- ${conflict}\n\nMöchtest du den Termin trotzdem dorthin verschieben?`;
+        if (!await showConfirm(confirmMsg)) {
+          setDraggedId(null);
+          return;
+        }
+      }
+
+      moveOccurrenceOrGroup(sourceId, { 
+        date: targetOcc.date, 
+        start_time: targetOcc.start_time, 
+        status: 'pending_reschedule' 
+      });
+      setDraggedId(null);
+      return;
+    }
 
     if (isSourceBreak || isTargetBreak) {
       if (isTargetBreak && !isSourceBreak) {
@@ -4236,7 +4355,7 @@ export function ScheduleCalendarViewDesktop({
                 .from('notifications')
                 .insert({
                   user_id: occ.student_id,
-                  title: 'Stundenprotokoll eingetragen 📝',
+                  title: 'Stundenprotokoll eingetragen',
                   message: displayMsg,
                   metadata: { occurrence_id: occ.id, type: 'lesson_protocol' }
                 })
@@ -4246,7 +4365,7 @@ export function ScheduleCalendarViewDesktop({
               await supabase.functions.invoke('send-push', {
                 body: {
                   userId: occ.student_id,
-                  title: 'Stundenprotokoll eingetragen 📝',
+                  title: 'Stundenprotokoll eingetragen',
                   body: displayMsg,
                   url: '/',
                   notificationId: dbNotif ? dbNotif.id : null
@@ -4759,15 +4878,19 @@ export function ScheduleCalendarViewDesktop({
             }}>
               <CalendarIcon size={16} />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap' }}>
-                <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1d1d1f', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
                   KW {weekNumber}
                 </h2>
-                <span style={{ color: '#86868b', fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                <span style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
                   ({weekStart.toLocaleDateString('de-DE')} - {new Date(weekStart.getTime() + 6 * 86400000).toLocaleDateString('de-DE')})
                 </span>
               </div>
+              <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <Scale size={11} strokeWidth={2.4} style={{ flexShrink: 0 }} />
+                <span>Didaktisches Planungswerkzeug · Aufsichtspflichten verbleiben bei der Musikschule</span>
+              </span>
             </div>
           </div>
 
@@ -4778,16 +4901,34 @@ export function ScheduleCalendarViewDesktop({
                 <button 
                   onClick={() => setActiveTab('calendar')}
                   className={`app-segmented-switch-btn ${(activeTab as string) === 'calendar' ? 'active' : ''}`}
-                  style={{ padding: '6px 12px', fontSize: '0.78rem', lineHeight: '1.2' }}
+                  style={{ 
+                    padding: '6px 12px', 
+                    fontSize: '0.78rem', 
+                    lineHeight: '1.2',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                  title="Wöchentlicher freigegebener Stundenplan"
                 >
-                  Stundenplan
+                  <CalendarIcon size={12} style={{ opacity: 0.9 }} />
+                  <span>Stundenplan</span>
                 </button>
                 <button 
                   onClick={() => setActiveTab('designer')}
                   className={`app-segmented-switch-btn ${(activeTab as string) === 'designer' ? 'active' : ''}`}
-                  style={{ padding: '6px 12px', fontSize: '0.78rem', lineHeight: '1.2' }}
+                  style={{ 
+                    padding: '6px 12px', 
+                    fontSize: '0.78rem', 
+                    lineHeight: '1.2',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
+                  }}
+                  title="Stundenplan-Designer (Planung & Zuteilung)"
                 >
-                  Stundenplan-Designer
+                  <Sliders size={12} style={{ opacity: 0.9 }} />
+                  <span>Stundenplan-Designer</span>
                 </button>
               </div>
               {currentUserRole === 'teacher' && onStartTour && (
@@ -4921,56 +5062,96 @@ export function ScheduleCalendarViewDesktop({
           <div id="tour-calendar-xray" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(0,0,0,0.03)', padding: '3px 8px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.04)' }}>
               <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Search size={11} style={{ strokeWidth: 3 }} /> Röntgen-Ansicht:
+                <Search size={11} strokeWidth={2.5} style={{ color: '#64748b' }} /> Röntgen-Ansicht:
               </span>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
                 {isTeacherScheduleUnlocked ? (
-                  activeRooms.map(room => {
-                    const isActive = selectedRoomIdForXRay === room.id;
-                    const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
-                    const primaryColor = isCampus ? '#34a853' : '#ea4335';
-                    return (
-                      <button
-                        key={room.id}
-                        type="button"
-                        onClick={() => setSelectedRoomIdForXRay(prev => prev === room.id ? null : room.id)}
-                        aria-label={`Röntgen-Ansicht für Raum ${room.name} filtern`}
-                        aria-pressed={isActive}
+                  <>
+                    {activeRooms.map(room => {
+                      const isActive = selectedRoomIdForXRay === room.id;
+                      const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
+                      const primaryColor = isCampus ? '#34a853' : '#ea4335';
+                      return (
+                        <button
+                          key={room.id}
+                          type="button"
+                          onClick={() => setSelectedRoomIdForXRay(prev => prev === room.id ? null : room.id)}
+                          aria-label={`Röntgen-Ansicht für Raum ${room.name} filtern`}
+                          aria-pressed={isActive}
+                          style={{
+                            background: isActive ? primaryColor : '#ffffff',
+                            color: isActive ? '#ffffff' : '#0f172a',
+                            border: `1px solid ${isActive ? primaryColor : '#cbd5e1'}`,
+                            borderRadius: '6px',
+                            padding: '5px 11px',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            boxShadow: isActive ? '0 2px 4px rgba(0,0,0,0.1)' : '0 1px 2px rgba(0,0,0,0.02)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            minHeight: '28px'
+                          }}
+                        >
+                          {room.name}
+                        </button>
+                      );
+                    })}
+                    {rooms.length > activeRooms.length && (
+                      <select
+                        aria-label="Anderen Raum für Röntgen-Ansicht wählen"
+                        value={activeRooms.some(ar => ar.id === selectedRoomIdForXRay) ? '' : (selectedRoomIdForXRay || '')}
+                        onChange={(e) => setSelectedRoomIdForXRay(e.target.value || null)}
                         style={{
-                          background: isActive ? primaryColor : '#ffffff',
-                          color: isActive ? '#ffffff' : '#475569',
-                          border: `1px solid ${isActive ? primaryColor : 'rgba(0,0,0,0.08)'}`,
+                          background: '#ffffff',
+                          border: '1px solid #cbd5e1',
                           borderRadius: '6px',
-                          padding: '6px 12px',
-                          fontSize: '0.78rem',
+                          padding: '4px 8px',
+                          fontSize: '0.72rem',
                           fontWeight: 700,
+                          color: '#475569',
+                          outline: 'none',
                           cursor: 'pointer',
-                          transition: 'all 0.15s ease',
-                          boxShadow: isActive ? '0 2px 4px rgba(0,0,0,0.1)' : '0 1px 2px rgba(0,0,0,0.02)',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          minHeight: '30px'
+                          minHeight: '28px'
                         }}
                       >
-                        {room.name}
-                      </button>
-                    );
-                  })
+                        <option value="">+ Weiterer Raum...</option>
+                        {rooms.filter(r => !activeRooms.some(ar => ar.id === r.id)).map(r => (
+                          <option key={r.id} value={r.id}>{r.name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </>
                 ) : (
-                  <span style={{ 
-                    fontSize: '0.72rem', 
-                    color: isCampus ? '#2e7d32' : (isGroovelab ? '#b45309' : '#ea4335'), 
-                    fontWeight: 600, 
-                    background: isCampus ? '#e6f4ea' : (isGroovelab ? '#fefce8' : '#fce8e6'), 
-                    padding: '4px 10px', 
-                    borderRadius: '6px', 
-                    display: 'inline-flex', 
-                    alignItems: 'center', 
-                    minHeight: '28px'
-                  }}>
-                    Stundenplan noch nicht eingereicht & freigegeben
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }} title="Die Raumbelegungs-Vorschau wird aktiv, sobald dein Stundenplan vom Schulsekretariat freigegeben wurde.">
+                    {activeRooms.map(room => (
+                      <span
+                        key={room.id}
+                        style={{
+                          background: '#f8fafc',
+                          color: '#94a3b8',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '6px',
+                          padding: '4px 9px',
+                          fontSize: '0.74rem',
+                          fontWeight: 700,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          cursor: 'not-allowed',
+                          opacity: 0.8
+                        }}
+                      >
+                        <Lock size={10} strokeWidth={2.4} />
+                        {room.name}
+                      </span>
+                    ))}
+                    <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600, fontStyle: 'italic', marginLeft: '4px' }}>
+                      (Freigabe ausstehend)
+                    </span>
+                  </div>
                 )}
               </div>
             </div>
@@ -5142,7 +5323,7 @@ export function ScheduleCalendarViewDesktop({
         const hasAnySchedules = hasAnyBoardsStudents || hasAnyOccurrences || hasAnyCachedSchedules;
         const isSelfView = !selectedTeacherId || selectedTeacherId === userId;
         const targetTeacher = teachers?.find((t: any) => t.id === (selectedTeacherId || userId));
-        const teacherName = targetTeacher ? (targetTeacher.name || `${targetTeacher.first_name} ${targetTeacher.last_name}`.trim()) : 'Diese Lehrkraft';
+        const teacherName = targetTeacher ? formatTeacherFullName(targetTeacher) : 'Diese Lehrkraft';
 
         // Case 1: Empty board (0 lessons)
         if (!hasAnySchedules) {
@@ -5400,41 +5581,29 @@ export function ScheduleCalendarViewDesktop({
           `}
         </style>
 
-        {/* Legal Purpose & Aufsichtspflicht Microcopy Disclaimer */}
-        <div style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '8px',
-          background: 'rgba(241, 245, 249, 0.85)',
-          border: '1px solid rgba(203, 213, 225, 0.7)',
-          borderRadius: '100px',
-          padding: '4px 14px',
-          fontSize: '0.72rem',
-          fontWeight: 700,
-          color: '#475569',
-          marginBottom: '8px',
-          width: 'fit-content'
-        }}>
-          <span>⚖️</span>
-          <span>Didaktisches Organisations- & Planungswerkzeug • Gesetzliche Aufsichtspflichten und amtliche Schulverwaltung verbleiben bei den herkömmlichen Wegen der Musikschule</span>
-        </div>
+
 
         {/* Pending Revision Info Banner */}
         {(((scheduleStatus as string) === 'ready_for_admin_review' || scheduleStatus === 'pending') || (hasSubmittedSchedule && (scheduleStatus as string) !== 'approved')) && (
           <div style={{
-            background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-            border: '1.5px solid #3b82f6',
-            borderRadius: '16px',
-            padding: '12px 18px',
+            background: '#fffbeb',
+            border: '1px solid #fde68a',
+            borderRadius: '8px',
+            padding: '4px 12px',
             display: 'flex',
             alignItems: 'center',
-            gap: '12px',
-            boxShadow: '0 4px 14px rgba(59, 130, 246, 0.08)',
+            gap: '8px',
             marginBottom: '8px',
+            width: 'fit-content',
+            maxWidth: '100%',
           }}>
-            <div style={{ fontSize: '1.25rem' }}>ℹ️</div>
-            <div style={{ fontSize: '0.84rem', color: '#1e3a8a', fontWeight: 650, fontFamily: 'Inter' }}>
-              <strong>Stundenplan-Status:</strong> Du betrachtest den aktuell noch gültigen Live-Stundenplan. Dein neu eingereichter Stundenplan befindet sich aktuell in Prüfung durch das Schulsekretariat und wird nach Raumfreigabe automatisch als Live-Plan aktiv.
+            <Info size={14} strokeWidth={2.2} color="#b45309" aria-hidden="true" style={{ flexShrink: 0 }} />
+            <div 
+              title="Du betrachtest den aktuell noch gültigen Live-Stundenplan. Dein neu eingereichter Stundenplan befindet sich aktuell in Prüfung durch das Schulsekretariat und wird nach Raumfreigabe automatisch als Live-Plan aktiv."
+              style={{ fontSize: '0.78rem', color: '#92400e', fontWeight: 550, fontFamily: 'Inter', lineHeight: 1.35, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+            >
+              <strong style={{ fontWeight: 700, color: '#78350f', marginRight: '6px' }}>Stundenplan-Status:</strong>
+              Du betrachtest den aktuell noch gültigen Live-Stundenplan. Dein neu eingereichter Stundenplan befindet sich aktuell in Prüfung durch das Schulsekretariat und wird nach Raumfreigabe automatisch als Live-Plan aktiv.
             </div>
           </div>
         )}
@@ -5890,13 +6059,14 @@ export function ScheduleCalendarViewDesktop({
                           textOverflow: 'ellipsis',
                           maxWidth: '96%'
                         }}>
-                          ✨ {roomName} von dir reserviert{bookingTitle} • {timeRange}
+                          <Sparkles size={11} color="currentColor" />
+                          <span>{roomName} von dir reserviert{bookingTitle} • {timeRange}</span>
                         </span>
                       </div>
                     );
                   }
 
-                  const teacherLabel = inv.teacherName ? ` • 👤 ${inv.teacherName}` : '';
+                  const teacherLabel = inv.teacherName ? ` • ${inv.teacherName}` : '';
                   return (
                     <div
                       key={`xray-${idx}`}
@@ -5935,7 +6105,8 @@ export function ScheduleCalendarViewDesktop({
                         textOverflow: 'ellipsis',
                         maxWidth: '96%'
                       }}>
-                        🔒 {roomName} belegt • {timeRange}{teacherLabel}
+                        <Lock size={11} color="currentColor" />
+                        <span>{roomName} belegt • {timeRange}{teacherLabel}</span>
                       </span>
                     </div>
                   );
@@ -6617,7 +6788,7 @@ export function ScheduleCalendarViewDesktop({
                             if (!swapSourceOcc) {
                               setSwapSourceOcc(occ);
                               const name = `${occ.student?.first_name || 'Schüler'} ${maskLastName(occ.student?.last_name || '', showRealNames)}`.trim();
-                              showActionToast(`✨ ${name} als 1. Termin gewählt. Klicke nun Termin 2 an (auch in Folgewochen).`);
+                              showActionToast(`${name} als 1. Termin gewählt. Klicke nun Termin 2 an (auch in Folgewochen).`);
                               return;
                             }
                             if (swapSourceOcc.id === occ.id) {
@@ -6814,21 +6985,22 @@ export function ScheduleCalendarViewDesktop({
 
                                       return (
                                         <span style={{ 
-                                          fontWeight: 800, 
+                                          fontWeight: isRoomChanged ? 700 : 600, 
                                           color: isRoomChanged ? '#7c3aed' : '#475569',
-                                          background: isRoomChanged ? '#f3e8ff' : 'rgba(255, 255, 255, 0.85)',
-                                          border: isRoomChanged ? '1px solid #ddd6fe' : '1px solid rgba(0,0,0,0.06)',
-                                          boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                                          padding: '2px 6px',
-                                          borderRadius: '6px',
+                                          background: isRoomChanged ? '#f5f3ff' : 'transparent',
+                                          border: isRoomChanged ? '1px solid #ddd6fe' : 'none',
+                                          boxShadow: 'none',
+                                          padding: isRoomChanged ? '1px 5px' : '0',
+                                          borderRadius: isRoomChanged ? '5px' : '0',
                                           fontSize: '0.68rem', 
                                           whiteSpace: 'nowrap',
                                           display: 'inline-flex',
                                           alignItems: 'center',
-                                          gap: '2px',
+                                          gap: '3px',
                                           fontFamily: "'Plus Jakarta Sans', sans-serif"
                                         }} title={isRoomChanged ? `Raum geändert zu ${currentRoomName}` : `Raum: ${currentRoomName}`}>
-                                          📍 {currentRoomName}
+                                          <MapPin size={10} strokeWidth={2} style={{ opacity: isRoomChanged ? 0.9 : 0.65, flexShrink: 0 }} />
+                                          <span>{currentRoomName}</span>
                                         </span>
                                       );
                                     })()}
@@ -6962,27 +7134,39 @@ export function ScheduleCalendarViewDesktop({
                                        );
                                      })()}
 
-                                      {((!isBreak && !isVacant && !isAbsentSlot && !isCancelled) || (isBreak && occ.status !== 'cancelled')) && (
+                                      {/* Textless Checkmark for completed/held lessons (L3) */}
+                                      {!isBreak && !isVacant && !isCancelled && (() => {
+                                        const occDateTime = new Date(`${occ.date}T${occ.start_time || '00:00:00'}`);
+                                        const isPastLesson = occDateTime.getTime() <= getSimulatedNow().getTime();
+                                        if (isPastLesson) {
+                                          return (
+                                            <span 
+                                              title="Unterricht regulär durchgeführt" 
+                                              style={{ 
+                                                display: 'inline-flex', 
+                                                alignItems: 'center', 
+                                                color: '#16a34a', 
+                                                background: 'rgba(34, 197, 94, 0.12)',
+                                                borderRadius: '50%',
+                                                padding: '2px',
+                                                flexShrink: 0 
+                                              }}
+                                            >
+                                              <Check size={11} strokeWidth={2.8} />
+                                            </span>
+                                          );
+                                        }
+                                        return null;
+                                      })()}
+
+                                      {/* Only breaks retain quick delete X; student lessons are safely managed via 1-tap drawer (L1) */}
+                                      {isBreak && occ.status !== 'cancelled' && (
                                         <button 
                                           onClick={async (e) => {
                                             e.stopPropagation();
-                                            if (isBreak) {
-                                              handleCancelBreak(e, occ);
-                                            } else {
-                                              if (isGroup) {
-                                                if (await showConfirm('Möchtest du den gesamten Gruppentermin absagen? Der Termin bleibt im Kalender rot/weiß gestreift als "Abgesagt" dokumentiert.')) {
-                                                  const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
-                                                  occurrencesInGroup.forEach(go => {
-                                                    updatesMap[go.id] = { status: 'cancelled' };
-                                                  });
-                                                  updateMultipleOccurrences(updatesMap, 'Gruppentermin abgesagt');
-                                                }
-                                              } else {
-                                                handleCancel(e, occ.id, displayNames);
-                                              }
-                                            }
+                                            handleCancelBreak(e, occ);
                                           }}
-                                          title={isBreak ? "Pause löschen" : "Termin absagen (bleibt rot/weiß dokumentiert)"}
+                                          title="Pause löschen"
                                           style={{ 
                                             background: 'transparent', 
                                             border: 'none', 
@@ -7135,21 +7319,22 @@ export function ScheduleCalendarViewDesktop({
 
                                       return (
                                         <span style={{ 
-                                          fontWeight: 800, 
+                                          fontWeight: isRoomChanged ? 700 : 600, 
                                           color: isRoomChanged ? '#7c3aed' : '#475569',
-                                          background: isRoomChanged ? '#f3e8ff' : 'rgba(255, 255, 255, 0.85)',
-                                          border: isRoomChanged ? '1px solid #ddd6fe' : '1px solid rgba(0,0,0,0.06)',
-                                          boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                                          padding: '1.5px 5px',
-                                          borderRadius: '6px',
+                                          background: isRoomChanged ? '#f5f3ff' : 'transparent',
+                                          border: isRoomChanged ? '1px solid #ddd6fe' : 'none',
+                                          boxShadow: 'none',
+                                          padding: isRoomChanged ? '1px 5px' : '0',
+                                          borderRadius: isRoomChanged ? '5px' : '0',
                                           fontSize: '0.65rem', 
                                           whiteSpace: 'nowrap',
                                           display: 'inline-flex',
                                           alignItems: 'center',
-                                          gap: '2px',
+                                          gap: '3px',
                                           fontFamily: "'Plus Jakarta Sans', sans-serif"
                                         }} title={isRoomChanged ? `Raum geändert zu ${currentRoomName}` : `Raum: ${currentRoomName}`}>
-                                          📍 {currentRoomName}
+                                          <MapPin size={10} strokeWidth={2} style={{ opacity: isRoomChanged ? 0.9 : 0.65, flexShrink: 0 }} />
+                                          <span>{currentRoomName}</span>
                                         </span>
                                       );
                                     })()}
@@ -7285,46 +7470,58 @@ export function ScheduleCalendarViewDesktop({
                                      );
                                    })()}
                                    
-                                   {((!isBreak && !isVacant && !isAbsentSlot && !isCancelled) || (isBreak && occ.status !== 'cancelled')) && (
-                                     <button 
-                                       onClick={async (e) => {
-                                         e.stopPropagation();
-                                         if (isBreak) {
-                                           handleCancelBreak(e, occ);
-                                         } else {
-                                           if (isGroup) {
-                                             if (await showConfirm('Möchtest du den gesamten Gruppentermin absagen?')) {
-                                               const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
-                                               occurrencesInGroup.forEach(go => {
-                                                 updatesMap[go.id] = { status: 'cancelled' };
-                                               });
-                                               updateMultipleOccurrences(updatesMap, 'Gruppentermin abgesagt');
-                                             }
-                                           } else {
-                                             handleCancel(e, occ.id);
-                                           }
-                                         }
-                                       }}
-                                       title={isBreak ? "Pause löschen" : "Termin absagen"}
-                                       style={{ 
-                                         background: 'transparent', 
-                                         border: 'none', 
-                                         cursor: 'pointer', 
-                                         color: finalColors.text, 
-                                         opacity: 0.5, 
-                                         padding: '2px', 
-                                         display: 'flex', 
-                                         alignItems: 'center', 
-                                         justifyContent: 'center', 
-                                         borderRadius: '4px', 
-                                         transition: 'all 0.1s' 
-                                       }}
-                                       onMouseOver={e => e.currentTarget.style.opacity = '1'}
-                                       onMouseOut={e => e.currentTarget.style.opacity = '0.5'}
-                                     >
-                                       <X size={12} strokeWidth={2.5} />
-                                     </button>
-                                   )}
+                                    {/* Textless Checkmark for completed/held lessons (L3) */}
+                                    {!isBreak && !isVacant && !isCancelled && (() => {
+                                      const occDateTime = new Date(`${occ.date}T${occ.start_time || '00:00:00'}`);
+                                      const isPastLesson = occDateTime.getTime() <= getSimulatedNow().getTime();
+                                      if (isPastLesson) {
+                                        return (
+                                          <span 
+                                            title="Unterricht regulär durchgeführt" 
+                                            style={{ 
+                                              display: 'inline-flex', 
+                                              alignItems: 'center', 
+                                              color: '#16a34a', 
+                                              background: 'rgba(34, 197, 94, 0.12)',
+                                              borderRadius: '50%',
+                                              padding: '2px',
+                                              flexShrink: 0 
+                                            }}
+                                          >
+                                            <Check size={11} strokeWidth={2.8} />
+                                          </span>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
+                                    
+                                    {/* Only breaks retain quick delete X; student lessons are safely managed via 1-tap drawer (L1) */}
+                                    {isBreak && occ.status !== 'cancelled' && (
+                                      <button 
+                                        onClick={async (e) => {
+                                          e.stopPropagation();
+                                          handleCancelBreak(e, occ);
+                                        }}
+                                        title="Pause löschen"
+                                        style={{ 
+                                          background: 'transparent', 
+                                          border: 'none', 
+                                          cursor: 'pointer', 
+                                          color: finalColors.text, 
+                                          opacity: 0.5, 
+                                          padding: '2px', 
+                                          display: 'flex', 
+                                          alignItems: 'center', 
+                                          justifyContent: 'center', 
+                                          borderRadius: '4px', 
+                                          transition: 'all 0.1s' 
+                                        }}
+                                        onMouseOver={e => e.currentTarget.style.opacity = '1'}
+                                        onMouseOut={e => e.currentTarget.style.opacity = '0.5'}
+                                      >
+                                        <X size={12} strokeWidth={2.5} />
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
 
@@ -7426,21 +7623,22 @@ return (
 
                                     return (
                                       <span style={{ 
-                                        fontWeight: 800, 
+                                        fontWeight: isRoomChanged ? 700 : 600, 
                                         color: isRoomChanged ? '#7c3aed' : '#475569',
-                                        background: isRoomChanged ? '#f3e8ff' : 'rgba(255, 255, 255, 0.85)',
-                                        border: isRoomChanged ? '1px solid #ddd6fe' : '1px solid rgba(0,0,0,0.06)',
-                                        boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                                        padding: '2px 6px',
-                                        borderRadius: '6px',
+                                        background: isRoomChanged ? '#f5f3ff' : 'transparent',
+                                        border: isRoomChanged ? '1px solid #ddd6fe' : 'none',
+                                        boxShadow: 'none',
+                                        padding: isRoomChanged ? '1px 5px' : '0',
+                                        borderRadius: isRoomChanged ? '5px' : '0',
                                         fontSize: '0.68rem', 
                                         whiteSpace: 'nowrap',
                                         display: 'inline-flex',
                                         alignItems: 'center',
-                                        gap: '2px',
+                                        gap: '3px',
                                         fontFamily: "'Plus Jakarta Sans', sans-serif"
                                       }} title={isRoomChanged ? `Raum geändert zu ${currentRoomName}` : `Raum: ${currentRoomName}`}>
-                                        📍 {currentRoomName}
+                                        <MapPin size={11} strokeWidth={2} style={{ opacity: isRoomChanged ? 0.9 : 0.65, flexShrink: 0 }} />
+                                        <span>{currentRoomName}</span>
                                       </span>
                                     );
                                   })()}
@@ -7530,9 +7728,10 @@ return (
                                               letterSpacing: '0.02em',
                                               textTransform: 'uppercase'
                                             }}
-                                            title="⚠️ Dringend: Terminverschiebung in < 2h noch unbestätigt!"
+                                            title="Dringend: Terminverschiebung in < 2h noch unbestätigt!"
                                           >
-                                            ⚡ &lt;2h
+                                            <Clock size={10} color="currentColor" />
+                                            <span>&lt;2h</span>
                                           </span>
                                         );
                                       }
@@ -7565,43 +7764,55 @@ return (
                                   )}
                                 </div>
                                 
-                                {((!isBreak && !isVacant && !isAbsentSlot && !isCancelled) || (isBreak && occ.status !== 'cancelled')) && (
-                                  <button 
-                                    onClick={async (e) => {
-                                      e.stopPropagation();
-                                      if (isBreak) {
+                                  {/* Textless Checkmark for completed/held lessons (L3) */}
+                                  {!isBreak && !isVacant && !isCancelled && (() => {
+                                    const occDateTime = new Date(`${occ.date}T${occ.start_time || '00:00:00'}`);
+                                    const isPastLesson = occDateTime.getTime() <= getSimulatedNow().getTime();
+                                    if (isPastLesson) {
+                                      return (
+                                        <span 
+                                          title="Unterricht regulär durchgeführt" 
+                                          style={{ 
+                                            display: 'inline-flex', 
+                                            alignItems: 'center', 
+                                            color: '#16a34a', 
+                                            background: 'rgba(34, 197, 94, 0.12)',
+                                            borderRadius: '50%',
+                                            padding: '2px',
+                                            flexShrink: 0 
+                                          }}
+                                        >
+                                          <Check size={12} strokeWidth={2.8} />
+                                        </span>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
+
+                                  {/* Only breaks retain quick delete X; student lessons are safely managed via 1-tap drawer (L1) */}
+                                  {isBreak && occ.status !== 'cancelled' && (
+                                    <button 
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
                                         handleCancelBreak(e, occ);
-                                      } else {
-                                        if (isGroup) {
-                                          if (await showConfirm('Möchtest du den gesamten Gruppentermin absagen? Der Termin bleibt im Kalender rot/weiß gestreift als "Abgesagt" dokumentiert.')) {
-                                            const updatesMap: Record<string, Partial<ScheduleOccurrence>> = {};
-                                            occurrencesInGroup.forEach(go => {
-                                              updatesMap[go.id] = { status: 'cancelled' };
-                                            });
-                                            updateMultipleOccurrences(updatesMap, 'Gruppentermin abgesagt');
-                                          }
-                                        } else {
-                                          handleCancel(e, occ.id, displayNames);
-                                        }
-                                      }
-                                    }}
-                                    title={isBreak ? "Pause löschen" : "Termin absagen (bleibt rot/weiß dokumentiert)"}
-                                    style={{ 
-                                      background: 'transparent', 
-                                      border: 'none', 
-                                      cursor: 'pointer', 
-                                      color: finalColors.text, 
-                                      opacity: 0.5, 
-                                      padding: '3px', 
-                                      borderRadius: '4px', 
-                                      transition: 'all 0.1s' 
-                                    }}
-                                    onMouseOver={e => e.currentTarget.style.opacity = '1'}
-                                    onMouseOut={e => e.currentTarget.style.opacity = '0.5'}
-                                  >
-                                    <X size={14} strokeWidth={2.5} />
-                                  </button>
-                                )}
+                                      }}
+                                      title="Pause löschen"
+                                      style={{ 
+                                        background: 'transparent', 
+                                        border: 'none', 
+                                        cursor: 'pointer', 
+                                        color: finalColors.text, 
+                                        opacity: 0.5, 
+                                        padding: '3px', 
+                                        borderRadius: '4px', 
+                                        transition: 'all 0.1s' 
+                                      }}
+                                      onMouseOver={e => e.currentTarget.style.opacity = '1'}
+                                      onMouseOut={e => e.currentTarget.style.opacity = '0.5'}
+                                    >
+                                      <X size={14} strokeWidth={2.5} />
+                                    </button>
+                                  )}
                               </div>
 
                               {isGroupLesson ? (
@@ -7638,12 +7849,14 @@ return (
                                   )}
                                   {isOutsideSchedule && !roomBookingApproved && (
                                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: 'rgba(124, 58, 237, 0.10)', border: '1px solid rgba(124, 58, 237, 0.25)', color: '#5b21b6', fontSize: '0.58rem', fontWeight: 800, padding: '2px 5px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: '2px', width: 'fit-content' }}>
-                                      🔔 Raumbuchung ausstehend
+                                      <Clock size={10} color="currentColor" />
+                                      <span>Raumbuchung ausstehend</span>
                                     </span>
                                   )}
                                   {isParallelConflict && (
                                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#b91c1c', fontSize: '0.58rem', fontWeight: 800, padding: '2px 5px', borderRadius: '4px', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: '2px', width: 'fit-content' }}>
-                                      ⚠️ Doppelbelegung
+                                      <AlertCircle size={10} color="currentColor" />
+                                      <span>Doppelbelegung</span>
                                     </span>
                                   )}
                                 </div>
@@ -7959,7 +8172,7 @@ return (
                 borderTopRightRadius: '0px'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span style={{ fontSize: '1.5rem' }}>💬</span>
+                  <MessageSquare size={22} color="#ffffff" />
                   <div>
                     <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>
                       {modalTitle}
@@ -7975,7 +8188,12 @@ return (
                   {occ && occ.student && (
                     <button
                       type="button"
-                      onClick={() => setDocStudent(occ.student)}
+                      onClick={() => setDocStudent({
+                        ...occ.student,
+                        id: occ.student?.id || occ.student_id,
+                        school_id: occ.student?.school_id || schoolId,
+                        teacher_id: occ.student?.teacher_id || occ.teacher_id || userId
+                      })}
                       aria-label="Aufgabenheft und pädagogische Tools öffnen"
                       style={{
                         background: 'rgba(255, 255, 255, 0.22)',
@@ -7995,7 +8213,7 @@ return (
                       }}
                       className="hover-scale"
                     >
-                      <span>📝</span>
+                      <BookOpen size={14} color="#ffffff" />
                       <span>Aufgabenheft & Tools</span>
                     </button>
                   )}
@@ -8245,7 +8463,11 @@ return (
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span>{editOccState.room_id ? '🏫' : '❌'}</span>
+                          {editOccState.room_id ? (
+                            <MapPin size={14} color="#64748b" />
+                          ) : (
+                            <X size={14} color="#94a3b8" />
+                          )}
                           <span>
                             {editOccState.room_id 
                               ? (rooms.find(r => r.id === editOccState.room_id)?.name || 'Raum') 
@@ -8289,7 +8511,7 @@ return (
                               gap: '8px'
                             }}
                           >
-                            <span>❌</span>
+                            <X size={14} color="#94a3b8" />
                             <span>Kein Raum</span>
                           </div>
 
@@ -8317,7 +8539,7 @@ return (
                                 }}
                               >
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span>🏫</span>
+                                  <MapPin size={14} color={isSelected ? (isEnsembleOcc ? '#007aff' : '#34a853') : '#64748b'} />
                                   <span>{r.name}</span>
                                 </div>
                               </div>
@@ -8328,73 +8550,164 @@ return (
                     </div>
 
 
-                    {occ && occ.student && !isEnsembleOcc && (
-                      <div style={{
-                        background: '#f8fafc',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '14px',
-                        padding: '12px',
-                        marginBottom: '16px'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            🎵 Aktuelle Songs & Themen
-                          </span>
-                        </div>
-                        {studentActiveSongs.length > 0 ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            {studentActiveSongs.slice(0, 2).map(skill => (
-                              <div key={skill.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.76rem', color: '#1e293b', background: '#ffffff', padding: '6px 8px', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
-                                <span style={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
-                                  {skill.songs?.title || 'Song'}
-                                </span>
-                                <span style={{ fontWeight: 800, color: '#34a853', fontSize: '0.72rem' }}>
-                                  {skill.progress_percent || 0}%
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <span style={{ fontSize: '0.74rem', color: '#94a3b8', fontStyle: 'italic' }}>
-                            Keine aktiven Songs eingetragen
+
+
+                    {/* Explicit Absence / Abwesenheit Lesson Section (L1) */}
+                    <div style={{ marginBottom: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <AlertCircle size={12} strokeWidth={2.4} color="#64748b" />
+                          <span>Status & Abwesenheit</span>
+                        </span>
+                        {isCancelled && (
+                          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#b91c1c', background: '#fee2e2', padding: '1px 6px', borderRadius: '4px' }}>
+                            {occ?.status === 'canceled_by_student' || (occ as any)?.canceled_by_role === 'student'
+                              ? 'Vom Schüler abgemeldet'
+                              : (occ?.notes?.includes('Lehrkraft') 
+                                ? 'Lehrkraft abwesend' 
+                                : (occ?.notes?.includes('Schulausfall') ? 'Schulausfall' : 'Schüler abwesend'))}
                           </span>
                         )}
                       </div>
-                    )}
 
-                    {/* Explicit Cancel / Ersatztermin Lesson Section */}
-                    {!isCancelled && (
-                      <div style={{ marginBottom: '16px' }}>
-                        <button 
-                          type="button"
-                          aria-label={isPastDate ? 'Ausfall melden und Ersatztermin anbieten' : 'Termin ausfallen lassen und Ersatztermin vormerken'}
-                          onClick={async (e) => {
-                            await handleCancel(e as any, editOccState.id, occ?.student ? `${occ.student.first_name} ${maskLastName(occ.student.last_name, showRealNames)}`.trim() : undefined);
-                            setEditOccState(null);
-                          }}
-                          style={{ 
-                            width: '100%',
-                            padding: '10px 12px', 
-                            borderRadius: '10px', 
-                            border: '1px solid rgba(245, 158, 11, 0.3)', 
-                            background: 'rgba(245, 158, 11, 0.08)', 
-                            color: '#d97706', 
-                            fontSize: '0.82rem', 
-                            fontWeight: 800, 
-                            cursor: 'pointer', 
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px',
-                            transition: 'all 0.2s' 
-                          }}
-                          className="hover-scale-mini"
-                        >
-                          <RefreshCw size={15} />
-                          {isPastDate ? 'Ausfall melden & Ersatztermin anbieten' : 'Termin ausfallen lassen (Ersatztermin offen)'}
-                        </button>
-                      </div>
-                    )}
+                      {!isCancelled ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, marginBottom: '2px' }}>
+                            Termin absagen / Abwesenheit erfassen:
+                          </span>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                            {/* Option 1: Schüler abwesend */}
+                            <button
+                              type="button"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                const sName = occ?.student ? `${occ.student.first_name} ${maskLastName(occ.student.last_name, showRealNames)}`.trim() : 'Schüler';
+                                if (await showConfirm(`Möchtest du ${sName} für diesen Termin als abwesend markieren?`)) {
+                                  updateOccurrence(editOccState.id, { status: 'cancelled', notes: '[Abwesend: Schüler]' }, `${sName} als abwesend markiert`);
+                                  setEditOccState(null);
+                                }
+                              }}
+                              style={{
+                                padding: '8px 6px',
+                                borderRadius: '8px',
+                                border: '1px solid #cbd5e1',
+                                background: '#ffffff',
+                                color: '#0f172a',
+                                fontSize: '0.74rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '3px',
+                                transition: 'all 0.15s'
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.borderColor = '#94a3b8'}
+                              onMouseLeave={e => e.currentTarget.style.borderColor = '#cbd5e1'}
+                              title="Schüler ist verhindert / abwesend"
+                            >
+                              <Users size={15} color="#475569" />
+                              <span>Schüler abwesend</span>
+                            </button>
+
+                            {/* Option 2: Lehrkraft abwesend */}
+                            <button
+                              type="button"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (await showConfirm('Möchtest du deine Abwesenheit für diesen Termin erfassen? (Ersatztermin fällig)')) {
+                                  updateOccurrence(editOccState.id, { status: 'cancelled', notes: '[Abwesend: Lehrkraft]' }, 'Lehrkraft als abwesend markiert');
+                                  setEditOccState(null);
+                                }
+                              }}
+                              style={{
+                                padding: '8px 6px',
+                                borderRadius: '8px',
+                                border: '1px solid #cbd5e1',
+                                background: '#ffffff',
+                                color: '#0f172a',
+                                fontSize: '0.74rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '3px',
+                                transition: 'all 0.15s'
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.borderColor = '#94a3b8'}
+                              onMouseLeave={e => e.currentTarget.style.borderColor = '#cbd5e1'}
+                              title="Lehrkraft ist verhindert / abwesend"
+                            >
+                              <UserCheck size={15} color="#475569" />
+                              <span>Lehrkraft abwesend</span>
+                            </button>
+
+                            {/* Option 3: Schulausfall / Feiertag */}
+                            <button
+                              type="button"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (await showConfirm('Möchtest du diesen Termin als Schulausfall / Feiertag erfassen?')) {
+                                  updateOccurrence(editOccState.id, { status: 'cancelled', notes: '[Abwesend: Schulausfall]' }, 'Schulausfall / Feiertag markiert');
+                                  setEditOccState(null);
+                                }
+                              }}
+                              style={{
+                                padding: '8px 6px',
+                                borderRadius: '8px',
+                                border: '1px solid #cbd5e1',
+                                background: '#ffffff',
+                                color: '#0f172a',
+                                fontSize: '0.74rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '3px',
+                                transition: 'all 0.15s'
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.borderColor = '#94a3b8'}
+                              onMouseLeave={e => e.currentTarget.style.borderColor = '#cbd5e1'}
+                              title="Schule geschlossen / Feiertag"
+                            >
+                              <Scale size={15} color="#475569" />
+                              <span>Schulausfall</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                          <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                            Termin ist aktuell als abwesend / abgesagt erfasst.
+                          </span>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              updateOccurrence(editOccState.id, { status: 'scheduled', notes: '' }, 'Termin reaktiviert');
+                              setEditOccState(null);
+                            }}
+                            style={{
+                              background: '#22c55e',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: '8px',
+                              padding: '6px 12px',
+                              fontSize: '0.76rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <RefreshCw size={12} />
+                            <span>Reaktivieren</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Left Column Action Footer Buttons */}
@@ -8542,6 +8855,27 @@ return (
                         )}
                       </div>
 
+                      {/* Didaktischer Schutzhinweis */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '8px 12px',
+                        borderRadius: '12px',
+                        background: '#f0fdf4',
+                        border: '1px solid #bbf7d0',
+                        fontSize: '0.71rem',
+                        color: '#166534',
+                        fontWeight: 650,
+                        marginBottom: '12px',
+                        flexShrink: 0
+                      }}>
+                        <ShieldCheck size={14} color="#16a34a" style={{ flexShrink: 0 }} />
+                        <span style={{ flex: 1, lineHeight: 1.35 }}>
+                          <strong>Didaktischer Schul-Chat:</strong> Nur für Unterrichtszwecke • Für Erziehungsberechtigte transparent einsehbar.
+                        </span>
+                      </div>
+
                       {/* Chat Messages Timeline */}
                       <div style={{
                         flex: 1,
@@ -8563,6 +8897,7 @@ return (
                           }
                           return chatMsgs.map((msg: any, idx: number) => {
                             const isMe = msg.sender_id === userId;
+                            const isParent = msg.sender_role === 'parent';
                             let displayedContent = msg.content;
                             let prefixText = '';
                             if (msg.content && msg.content.startsWith('[')) {
@@ -8573,10 +8908,45 @@ return (
                               }
                             }
                             
+                            const senderName = !isMe
+                              ? (isParent
+                                  ? `${occ.student?.first_name || 'Schüler'} (Eltern)`
+                                  : (occ.student?.first_name || 'Schüler'))
+                              : 'Du';
+
+                            const timeStr = msg.created_at
+                              ? new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+                              : '';
+
                             return (
-                               <div key={msg.id || idx} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start' }}>
-                                  <div style={{ background: isMe ? '#e6f4ea' : '#f1f5f9', padding: '8px 12px', borderRadius: '12px', fontSize: '0.8rem' }}>
+                               <div key={msg.id || idx} style={{ display: 'flex', flexDirection: 'column', alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '85%' }}>
+                                  {!isMe && (
+                                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: isParent ? '#0284c7' : '#34a853', marginBottom: '2px', marginLeft: '4px' }}>
+                                      {senderName}
+                                    </span>
+                                  )}
+                                  {prefixText && (
+                                    <span style={{ fontSize: '0.65rem', color: '#64748b', marginBottom: '2px', alignSelf: isMe ? 'flex-end' : 'flex-start', fontWeight: 600 }}>
+                                      [{prefixText}]
+                                    </span>
+                                  )}
+                                  <div style={{ 
+                                    background: isMe ? '#e6f4ea' : '#f1f5f9', 
+                                    color: '#0f172a',
+                                    padding: '9px 13px', 
+                                    borderRadius: isMe ? '14px 14px 2px 14px' : '14px 14px 14px 2px', 
+                                    fontSize: '0.82rem',
+                                    lineHeight: 1.4,
+                                    border: isMe ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                                    wordBreak: 'break-word'
+                                  }}>
                                     {displayedContent}
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px', marginTop: '4px' }}>
+                                      <span style={{ fontSize: '0.62rem', color: isMe ? '#166534' : '#64748b', fontWeight: 600 }}>
+                                        {timeStr}
+                                      </span>
+                                      {isMe && <CheckCheck size={12} color="#16a34a" style={{ marginLeft: '2px' }} />}
+                                    </div>
                                   </div>
                                </div>
                             );
@@ -8589,12 +8959,12 @@ return (
                       {!isFrozen && (
                         <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '4px' }}>
                           {[
-                            '👍 Ja, geht klar!',
-                            '❌ Nein, geht leider nicht',
-                            '⏳ Bin 5 Min. später',
-                            '🎼 Bitte Notenheft mitbringen',
-                            '📝 Hausaufgabe im Aufgabenheft',
-                            '✅ Termin ist bestätigt'
+                            'Ja, geht klar',
+                            'Nein, geht leider nicht',
+                            'Bin 5 Min. später',
+                            'Bitte Notenheft mitbringen',
+                            'Hausaufgabe im Aufgabenheft',
+                            'Termin ist bestätigt'
                           ].map((text, i) => (
                             <button
                               key={i}
@@ -8689,7 +9059,9 @@ return (
                 }} 
                 teacherId={userId}
                 teacherName={formatTeacherFullName((occ as any)?.teacher || allSchoolTeachers?.find((t: any) => t.id === occ?.teacher_id || t.id === selectedTeacherId || t.id === userId))}
-                uiLevel={docStudent?.campus_ui_level || 'pro'}
+                schoolId={schoolId || docStudent.school_id}
+                uiLevel={docStudent?.campus_ui_level || undefined}
+                parentPermissions={docStudent?.parent_permissions}
                 hasTresorStorage={checkIsAudioTresorActive(docStudent)}
               />
             )}
@@ -8811,7 +9183,18 @@ return (
               textAlign: 'center',
               boxSizing: 'border-box' 
             }}>
-              <div style={{ fontSize: '2.5rem' }}>🔀</div>
+              <div style={{ 
+                width: '48px', 
+                height: '48px', 
+                borderRadius: '16px', 
+                background: '#f1f5f9', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                color: '#475569' 
+              }}>
+                <ArrowLeftRight size={24} />
+              </div>
               <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#1d1d1f' }}>Termine zusammenführen oder tauschen?</h3>
               <p style={{ margin: 0, fontSize: '0.9rem', color: '#515154', lineHeight: 1.5 }}>
                 Du hast die Termine von <strong>{srcName}</strong> und <strong>{tgtName}</strong> ausgewählt. Was möchtest du tun?
@@ -8837,12 +9220,17 @@ return (
                     fontWeight: 700,
                     cursor: 'pointer',
                     transition: 'all 0.2s',
-                    boxShadow: `0 4px 12px ${primaryColor}33`
+                    boxShadow: `0 4px 12px ${primaryColor}33`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
                   }}
                   onMouseOver={e => e.currentTarget.style.filter = 'brightness(0.9)'}
                   onMouseOut={e => e.currentTarget.style.filter = 'none'}
                 >
-                  🔄 Termine tauschen (Empfohlen)
+                  <ArrowLeftRight size={15} />
+                  <span>Termine tauschen (Empfohlen)</span>
                 </button>
 
                 <button
@@ -8898,12 +9286,17 @@ return (
                     fontSize: '0.88rem',
                     fontWeight: 700,
                     cursor: 'pointer',
-                    transition: 'all 0.2s'
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
                   }}
                   onMouseOver={e => e.currentTarget.style.background = '#f8fafc'}
                   onMouseOut={e => e.currentTarget.style.background = 'transparent'}
                 >
-                  👥 Zusammenführen (Ensemble/Band-Gruppe)
+                  <Users size={15} />
+                  <span>Zusammenführen (Ensemble/Band-Gruppe)</span>
                 </button>
 
                 <button
@@ -9166,7 +9559,7 @@ return (
                   alignItems: 'center',
                   gap: '6px'
                 }}>
-                  <span>📝</span>
+                  <BookOpen size={14} color="#b45309" />
                   <span>{occ.notes}</span>
                 </div>
               )}
@@ -9227,7 +9620,7 @@ return (
             boxSizing: 'border-box'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '1.2rem', display: 'inline-flex' }}>⚠️</span>
+              <AlertCircle size={18} color="#f59e0b" style={{ flexShrink: 0 }} />
               <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1d1d1f', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto' }}>
                 Du hast {Object.keys(pendingChanges).length} ungespeicherte {Object.keys(pendingChanges).length === 1 ? 'Änderung' : 'Änderungen'} in diesem Stundenplan.
               </span>
@@ -9248,13 +9641,17 @@ return (
                   fontSize: '0.78rem',
                   fontWeight: 600,
                   cursor: 'pointer',
-                  transition: 'background 0.2s'
+                  transition: 'background 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px'
                 }}
                 onMouseOver={e => e.currentTarget.style.background = 'rgba(255, 59, 48, 0.08)'}
                 onMouseOut={e => e.currentTarget.style.background = 'transparent'}
                 title="Änderungen rückgängig machen"
               >
-                ↩ Rückgängig
+                <RotateCcw size={13} />
+                <span>Rückgängig</span>
               </button>
 
               <button

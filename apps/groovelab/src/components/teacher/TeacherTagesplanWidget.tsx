@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { maskLastName, formatSingleStudentAnonymized } from '../../utils/nameHelper';
 import { isTeacherCurrentlyAbsent } from '../../utils/teacherAbsenceHelper';
+import { isUUID } from '../../utils/uuidValidator';
 
 export interface TeacherTourDemoScheduleProps {
   isFreeDay?: boolean;
@@ -506,9 +507,6 @@ export const TeacherTagesplanRoomIssuesBanner: React.FC<TeacherTagesplanRoomIssu
       </div>
     );
   };
-
-
-const isUUID = (str?: string) => Boolean(str && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str));
 
 export const resolveSlotStudent = (slotOrStudent: any, allStudents?: any[]) => {
   if (!slotOrStudent) return null;

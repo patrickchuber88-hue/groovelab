@@ -6,6 +6,38 @@
  * Prevents history leakage, referrer leakage, and shoulder-surfing.
  */
 
+let _lastReplaceStateWindowStart = 0;
+let _replaceStateWindowCount = 0;
+
+/**
+ * Throttled history.replaceState wrapper with No-Op guard to respect Apple WebKit's
+ * 100 calls / 30 seconds rate-limit.
+ */
+export function safeReplaceUrl(targetUrl: string): void {
+  if (typeof window === 'undefined' || !window.history) return;
+  try {
+    const currentFull = window.location.pathname + window.location.search + window.location.hash;
+    // 1. Strict No-Op Guard: Do not invoke WebKit History API if URL is already clean
+    if (currentFull === targetUrl) return;
+
+    // 2. Sliding window rate limiter (max 20 calls per 10 seconds)
+    const now = Date.now();
+    if (now - _lastReplaceStateWindowStart > 10000) {
+      _lastReplaceStateWindowStart = now;
+      _replaceStateWindowCount = 0;
+    }
+    _replaceStateWindowCount++;
+    if (_replaceStateWindowCount > 20) {
+      console.warn('[Security] WebKit replaceState rate-limit protected. Skipping excessive call.');
+      return;
+    }
+
+    window.history.replaceState(null, '', targetUrl);
+  } catch (e) {
+    console.warn('[Security] replaceState failed safely:', e);
+  }
+}
+
 export function scrubSensitiveUrlParams(): void {
   if (typeof window === 'undefined') return;
 
@@ -36,7 +68,7 @@ export function scrubSensitiveUrlParams(): void {
 
     if (hasSensitive) {
       const cleanPath = url.pathname + (url.search ? url.search : '') + url.hash;
-      window.history.replaceState(null, '', cleanPath);
+      safeReplaceUrl(cleanPath);
       console.log('[Security] Sensitive URL tokens successfully scrubbed from address bar.');
     }
   } catch (err) {
@@ -57,7 +89,7 @@ export function scrubSensitiveUrlPath(cleanReplacementPath: string = '/'): void 
 
     if (isSensitivePath) {
       const cleanUrl = cleanReplacementPath + (window.location.search || '') + (window.location.hash || '');
-      window.history.replaceState(null, '', cleanUrl);
+      safeReplaceUrl(cleanUrl);
       console.log('[Security] Sensitive path token successfully scrubbed from address bar.');
     }
   } catch (err) {

@@ -44,7 +44,10 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
   const [firstName, setFirstName] = useState<string>(student.first_name || (student.name ? student.name.split(' ')[0] : ''));
   const [lastName, setLastName] = useState<string>(student.last_name || (student.name && student.name.split(' ').length > 1 ? student.name.split(' ').slice(1).join(' ') : ''));
   const [isLastNameRevealedLocally, setIsLastNameRevealedLocally] = useState<boolean>(false);
-  const [studentUiLevel, setStudentUiLevel] = useState<'junior' | 'teen' | 'pro'>(() => student.campus_ui_level || 'junior');
+  const [studentUiLevel, setStudentUiLevel] = useState<'junior' | 'teen' | 'pro'>(() => {
+    const localLevel = typeof window !== 'undefined' && student.id ? localStorage.getItem(`campus_student_ui_level_${student.id}`) : null;
+    return (localLevel || student.campus_ui_level || 'junior') as any;
+  });
   const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? student.isCampusActive ?? false);
   const [isGroovelabActive, setIsGroovelabActive] = useState<boolean>(student.is_groovelab_active ?? student.isGroovelabActive ?? false);
   const [lessonDuration, setLessonDuration] = useState<number>(student.lesson_duration || 30);
@@ -196,7 +199,8 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
     setLastName(student.last_name || (student.name && student.name.split(' ').length > 1 ? student.name.split(' ').slice(1).join(' ') : ''));
     setIsCampusActive(student.is_campus_active ?? student.isCampusActive ?? false);
     setIsGroovelabActive(student.is_groovelab_active ?? student.isGroovelabActive ?? false);
-    setStudentUiLevel(student.campus_ui_level || 'junior');
+    const localLevel = typeof window !== 'undefined' && student.id ? localStorage.getItem(`campus_student_ui_level_${student.id}`) : null;
+    setStudentUiLevel((localLevel || student.campus_ui_level || 'junior') as any);
     setLessonDuration(student.lesson_duration || 30);
     setAppUsageMode(student.app_usage_mode || 'student_only');
     setLocalQrToken(student.qr_token || '');
@@ -1599,7 +1603,13 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
       {showTageskompassModal && (
         <MeisterwerkDocumentationModal
           student={student}
+          teacherId={currentTeacherId || schedulesList?.[0]?.teacher_id || (student as any)?.teacher_id}
+          schoolId={student.school_id || (student as any)?.schoolId}
+          schoolName={(student as any)?.school_name || (student.schools as any)?.name}
+          initialLehrwerke={globalLehrwerke}
           teacherName={formatTeacherFullName(schedulesList?.[0]?.teacher || (student as any)?.teacher_name || (student as any)?.teacher)}
+          uiLevel={studentUiLevel || (student as any)?.campus_ui_level || undefined}
+          parentPermissions={(student as any)?.parent_permissions}
           onClose={() => setShowTageskompassModal(false)}
         />
       )}

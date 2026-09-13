@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Calendar, Check, X, MessageSquare, Lock, KeyRound, MapPin, User } from 'lucide-react';
+import { formatTeacherFullName } from '../../../utils/nameHelper';
 
 export interface StudentRescheduleBottomSheetModalProps {
   isOpen: boolean;
@@ -128,8 +129,7 @@ export const StudentRescheduleBottomSheetModal: React.FC<StudentRescheduleBottom
   }
 
   const occ = occurrence;
-  const resolvedTeacherName = teacherName || 
-    (occ.teacher?.first_name ? `${occ.teacher.first_name} ${occ.teacher.last_name || ''}`.trim() : 'deiner Lehrkraft');
+  const resolvedTeacherName = formatTeacherFullName(teacherName || occ.teacher || (occ.teacher?.first_name ? `${occ.teacher.first_name} ${occ.teacher.last_name || ''}` : 'deiner Lehrkraft'));
   const roomName = occ.room_override_name || occ.room_name || occ.schedule?.room?.name || 'Groovelab Raum';
 
   const origDateStr = occ.original_date

@@ -1,5 +1,5 @@
-const CACHE_NAME = 'groovelab-static-v206';
-const DYNAMIC_CACHE = 'groovelab-dynamic-v206';
+const CACHE_NAME = 'groovelab-pwa-v208';
+const DYNAMIC_CACHE = 'groovelab-dynamic-v208';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -7,12 +7,12 @@ const ASSETS_TO_CACHE = [
   '/pwa-icon.png',
   '/campus_login_hero.png',
   '/avatars/gitarre_avatar_new.png',
-  '/avatars/drums_avatar.png',
-  '/avatars/piano_avatar.png',
+  '/avatars/schlagzeug_avatar.png',
+  '/avatars/klavier_avatar_new.png',
   '/avatars/gesang_avatar.png',
-  '/avatars/sax_avatar.png',
+  '/avatars/saxophon_avatar_new.png',
   '/avatars/bass_avatar.png',
-  '/avatars/geige_avatar.png'
+  '/avatars/violine_avatar_new.png'
 ];
 
 // Security Hardening: Allowed origins for background sync & push notifications
@@ -37,6 +37,18 @@ function isValidPushHost(urlStr) {
   }
 }
 
+function limitCacheSize(cacheName, maxItems) {
+  caches.open(cacheName).then(function(cache) {
+    cache.keys().then(function(keys) {
+      if (keys.length > maxItems) {
+        cache.delete(keys[0]).then(function() {
+          limitCacheSize(cacheName, maxItems);
+        });
+      }
+    });
+  }).catch(function() {});
+}
+
 self.addEventListener('install', function(event) {
   event.waitUntil(
     caches.open(CACHE_NAME).then(function(cache) {
@@ -55,7 +67,7 @@ self.addEventListener('activate', function(event) {
     caches.keys().then(function(cacheNames) {
       return Promise.all(
         cacheNames.map(function(cacheName) {
-          if (cacheName !== CACHE_NAME) {
+          if (cacheName !== CACHE_NAME && cacheName !== DYNAMIC_CACHE) {
             return caches.delete(cacheName);
           }
         })
@@ -202,6 +214,25 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
+  // 🛡️ Localhost & Vite Development Shield:
+  // Never intercept, cache, or clone dev-server modules, HMR updates or local requests.
+  // This prevents LevelDB/IndexedDB storage starvation and Chromium IPC main thread freezes on localhost!
+  const isDevHost = self.location.hostname === 'localhost' ||
+                    self.location.hostname === '127.0.0.1' ||
+                    self.location.hostname.endsWith('.localhost') ||
+                    self.location.hostname.endsWith('.local');
+
+  const isViteDevAsset = url.pathname.includes('/@vite/') ||
+                         url.pathname.includes('/node_modules/.vite/') ||
+                         url.pathname.includes('/@fs/') ||
+                         url.pathname.includes('/@id/') ||
+                         url.searchParams.has('t') ||
+                         url.searchParams.has('import');
+
+  if (isDevHost || isViteDevAsset) {
+    return; // Pass through cleanly to browser native network stack without caching
+  }
+
   // Skip API/Supabase internal traffic, auth endpoints, and cloud storage media (Quota & Memory Shield)
   if (
     url.pathname.includes('/rest/v1/') ||
@@ -223,17 +254,23 @@ self.addEventListener('fetch', function(event) {
         fetch('/index.html')
           .then(function(response) {
             if (response && response.status === 200) {
-              const responseClone = response.clone();
+              const cloneForIndex = response.clone();
+              const cloneForRoot = response.clone();
               caches.open(CACHE_NAME).then(function(cache) {
-                cache.put('/index.html', responseClone);
-                cache.put('/', responseClone);
+                cache.put('/index.html', cloneForIndex);
+                cache.put('/', cloneForRoot);
               });
             }
             return response;
           })
           .catch(function() {
             return caches.match('/index.html').then(function(cachedResponse) {
-              return cachedResponse || caches.match('/');
+              if (cachedResponse) return cachedResponse;
+              return caches.match('/').then(function(rootCached) {
+                return rootCached || new Response('Du bist offline. Bitte überprüfe deine Internetverbindung.', {
+                  headers: { 'Content-Type': 'text/html; charset=utf-8' }
+                });
+              });
             });
           })
       );
@@ -243,25 +280,36 @@ self.addEventListener('fetch', function(event) {
     // Normal navigate mode: serve index.html shell from cache immediately, and fetch updates in background
     event.respondWith(
       caches.match('/index.html').then(function(cachedResponse) {
-        const fallbackResponse = cachedResponse || caches.match('/');
-        
-        const fetchPromise = fetch('/index.html')
+        const networkFetch = fetch('/index.html')
           .then(function(networkResponse) {
             if (networkResponse && networkResponse.status === 200) {
-              const responseClone = networkResponse.clone();
+              const cloneForIndex = networkResponse.clone();
+              const cloneForRoot = networkResponse.clone();
               caches.open(CACHE_NAME).then(function(cache) {
-                cache.put('/index.html', responseClone);
-                cache.put('/', responseClone);
+                cache.put('/index.html', cloneForIndex);
+                cache.put('/', cloneForRoot);
               });
             }
             return networkResponse;
           })
           .catch(function(err) {
             console.warn('Background navigate sync failed:', err);
+            return new Response('Du bist offline. Bitte überprüfe deine Internetverbindung.', {
+              headers: { 'Content-Type': 'text/html; charset=utf-8' }
+            });
           });
 
-        return fallbackResponse || fetchPromise || new Response('Du bist offline. Bitte überprüfe deine Internetverbindung.', {
-          headers: { 'Content-Type': 'text/html; charset=utf-8' }
+        if (cachedResponse) {
+          event.waitUntil(networkFetch);
+          return cachedResponse;
+        }
+
+        return caches.match('/').then(function(rootCached) {
+          if (rootCached) {
+            event.waitUntil(networkFetch);
+            return rootCached;
+          }
+          return networkFetch;
         });
       })
     );
@@ -276,14 +324,38 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
-  // Static assets (CSS, JS, Fonts, Images) -> Stale-While-Revalidate
+  // 1. Immutable Vite chunks with content-hash (/assets/*-[hash].*) -> Cache-First
+  const isImmutableViteAsset = url.pathname.startsWith('/assets/') && /\-[a-zA-Z0-9_-]{8,}\.(js|css|woff2)$/.test(url.pathname);
+  if (isImmutableViteAsset) {
+    event.respondWith(
+      caches.match(event.request).then(function(cachedResponse) {
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+        return fetch(event.request).then(function(networkResponse) {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseClone = networkResponse.clone();
+            caches.open(CACHE_NAME).then(function(cache) {
+              cache.put(event.request, responseClone);
+              limitCacheSize(CACHE_NAME, 80);
+            });
+          }
+          return networkResponse;
+        });
+      })
+    );
+    return;
+  }
+
+  // 2. Static assets (CSS, JS, Fonts, Images) -> Stale-While-Revalidate with LRU limit
   event.respondWith(
     caches.match(event.request, { ignoreSearch: true }).then(function(cachedResponse) {
       const fetchPromise = fetch(event.request).then(function(networkResponse) {
         if (networkResponse && networkResponse.status === 200) {
           const responseClone = networkResponse.clone();
-          caches.open(CACHE_NAME).then(function(cache) {
+          caches.open(DYNAMIC_CACHE).then(function(cache) {
             cache.put(event.request, responseClone);
+            limitCacheSize(DYNAMIC_CACHE, 50);
           });
         }
         return networkResponse;
@@ -295,7 +367,12 @@ self.addEventListener('fetch', function(event) {
         }
       });
 
-      return cachedResponse || fetchPromise;
+      if (cachedResponse) {
+        event.waitUntil(fetchPromise);
+        return cachedResponse;
+      }
+
+      return fetchPromise;
     })
   );
 });

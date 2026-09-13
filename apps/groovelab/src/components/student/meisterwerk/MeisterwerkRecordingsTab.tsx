@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X, Check, BookOpen, Music, Plus, ChevronRight, ChevronDown, ChevronUp, Book, Star,
   Mic, Square, Play, Headphones, Calendar, Clock, ArrowLeft, Edit3, Search, Lock,
@@ -29,6 +29,7 @@ export interface MeisterwerkRecordingsTabProps {
   getMonthAlbumTheme: (monthKey: string) => any;
   getNormalizedSongTitle: (title: string) => string;
   handleDeleteNote: (idx: number, url?: string) => void;
+  handleDeleteStudentAudio?: (url: string, id?: string, audMeta?: any) => Promise<void> | void;
   handleRenameStudentAudio: (url: string, newTitle: string, id?: string) => void;
   handleRenameTeacherAudio: (url: string, newTitle: string, originalIdx?: number) => void;
   handleSaveEditedTeacherAudio?: (result: { url: string; original_url?: string; duration: number; original_duration?: number; label: string; mode: 'overwrite' | 'duplicate' }, originalIdx?: number, currentUrl?: string) => Promise<void>;
@@ -95,6 +96,10 @@ export interface MeisterwerkRecordingsTabProps {
   songs: any[];
   startRecordingAudio: (overrideSongId?: string | React.MouseEvent | any, overrideLabel?: string, isMasterworkSong?: boolean) => void | Promise<void>;
   stopRecordingAudio: () => void;
+  recordCountInRemaining?: number | null;
+  cancelActiveRecordCountIn?: () => void;
+  justRecordedAudioUrl?: string | null;
+  justRecordedAudioLabel?: string | null;
   studentFirstName: string;
   toggleFavoriteAudio: (url: string) => void;
   toggleStudentAudioWeek: (weekKey: string, force?: boolean) => void;
@@ -122,6 +127,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
     getMonthAlbumTheme,
     getNormalizedSongTitle,
     handleDeleteNote,
+    handleDeleteStudentAudio,
     handleRenameStudentAudio,
     handleRenameTeacherAudio,
     handleSaveEditedTeacherAudio,
@@ -188,6 +194,10 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
     songs,
     startRecordingAudio,
     stopRecordingAudio,
+    recordCountInRemaining,
+    cancelActiveRecordCountIn,
+    justRecordedAudioUrl,
+    justRecordedAudioLabel,
     studentFirstName,
     toggleFavoriteAudio,
     toggleStudentAudioWeek,
@@ -202,6 +212,26 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
     teacherBpm?: number;
     songTag?: string;
   } | null>(null);
+
+  const [localRecordingsRevision, setLocalRecordingsRevision] = useState(0);
+  const [selectedPracticeCompanionAlbum, setSelectedPracticeCompanionAlbum] = useState<boolean>(false);
+  const [selectedPracticeStyleFilter, setSelectedPracticeStyleFilter] = useState<string>('all');
+
+  useEffect(() => {
+    const handleRecordingsChange = () => {
+      setLocalRecordingsRevision(p => p + 1);
+    };
+
+    window.addEventListener('campus_junior_recordings_updated', handleRecordingsChange);
+    window.addEventListener('campus-recordings-updated', handleRecordingsChange);
+    window.addEventListener('storage', handleRecordingsChange);
+
+    return () => {
+      window.removeEventListener('campus_junior_recordings_updated', handleRecordingsChange);
+      window.removeEventListener('campus-recordings-updated', handleRecordingsChange);
+      window.removeEventListener('storage', handleRecordingsChange);
+    };
+  }, []);
 
   return (
             <div style={{
@@ -540,29 +570,79 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                             </div>
                           )}
 
-                          <button
-                            type="button"
-                            onClick={startRecordingAudio}
-                            disabled={isUploadingAudio}
-                            style={{
-                              background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-                              color: '#fff',
-                              border: 'none',
-                              padding: '6px 14px',
-                              borderRadius: '10px',
-                              fontSize: '0.74rem',
-                              fontWeight: 850,
-                              cursor: 'pointer',
+                          {recordCountInRemaining !== null && recordCountInRemaining !== undefined ? (
+                            <div style={{
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '6px',
-                              boxShadow: '0 2px 8px rgba(34, 197, 94, 0.25)'
-                            }}
-                            className="hover-scale"
-                          >
-                            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#ffffff', display: 'inline-block' }} />
-                            <span>Aufnahme starten</span>
-                          </button>
+                              gap: '8px',
+                              background: '#fef2f2',
+                              border: '1.5px solid #f87171',
+                              borderRadius: '10px',
+                              padding: '4px 10px',
+                              boxShadow: '0 2px 8px rgba(239, 68, 68, 0.2)'
+                            }}>
+                              <span style={{
+                                width: '22px',
+                                height: '22px',
+                                borderRadius: '50%',
+                                background: '#ef4444',
+                                color: '#ffffff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 950,
+                                fontSize: '0.80rem'
+                              }}>
+                                {recordCountInRemaining}
+                              </span>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 850, color: '#991b1b' }}>
+                                Einzählen ({isRecordingMetronomeActive && recordingBpm ? `${recordingBpm} BPM` : '100 BPM'})
+                              </span>
+                              {cancelActiveRecordCountIn && (
+                                <button
+                                  type="button"
+                                  onClick={cancelActiveRecordCountIn}
+                                  style={{
+                                    background: '#ffffff',
+                                    border: '1px solid #fca5a5',
+                                    borderRadius: '6px',
+                                    color: '#b91c1c',
+                                    cursor: 'pointer',
+                                    fontSize: '0.68rem',
+                                    fontWeight: 800,
+                                    padding: '2px 6px'
+                                  }}
+                                  title="Einzählen abbrechen"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={startRecordingAudio}
+                              disabled={isUploadingAudio}
+                              style={{
+                                background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                                color: '#fff',
+                                border: 'none',
+                                padding: '6px 14px',
+                                borderRadius: '10px',
+                                fontSize: '0.74rem',
+                                fontWeight: 850,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                boxShadow: '0 2px 8px rgba(34, 197, 94, 0.25)'
+                              }}
+                              className="hover-scale"
+                            >
+                              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#ffffff', display: 'inline-block' }} />
+                              <span>Aufnahme starten</span>
+                            </button>
+                          )}
                         </div>
                       ) : (
                         <button
@@ -624,6 +704,39 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                       }}>
                         <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
                         <span>{audioLabel ? `Aufnahme: „${audioLabel}“` : 'Aufnahme ohne Titel...'}</span>
+                      </div>
+                    )}
+
+                    {justRecordedAudioLabel && !isRecordingAudio && (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                        border: '1.5px solid #86efac',
+                        borderRadius: '12px',
+                        padding: '8px 12px',
+                        color: '#15803d',
+                        fontSize: '0.78rem',
+                        fontWeight: 900,
+                        boxShadow: '0 2px 8px rgba(22, 163, 74, 0.15)'
+                      }}>
+                        <span style={{
+                          width: '20px',
+                          height: '20px',
+                          borderRadius: '50%',
+                          background: '#16a34a',
+                          color: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0
+                        }}>
+                          <Check size={13} strokeWidth={3} />
+                        </span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          Take gesichert: „{justRecordedAudioLabel}“ 🎉
+                        </span>
                       </div>
                     )}
 
@@ -835,6 +948,13 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                     teacherAudios.push(aud);
                   });
 
+                  // 🛡️ Deterministische Sortierung (Neueste Aufnahme IMMER ganz oben)
+                  teacherAudios.sort((a, b) => {
+                    const timeA = a.date ? new Date(a.date).getTime() : 0;
+                    const timeB = b.date ? new Date(b.date).getTime() : 0;
+                    return timeB - timeA;
+                  });
+
                   if (teacherAudios.length === 0) {
                     return (
                       <div style={{
@@ -890,9 +1010,15 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                     const d = aud.date ? new Date(aud.date) : now;
                     return getISOWeek(isNaN(d.getTime()) ? now : d) === currentWeekStr;
                   });
+                  currentWeekAudios.sort((a, b) => {
+                    const timeA = a.date ? new Date(a.date).getTime() : 0;
+                    const timeB = b.date ? new Date(b.date).getTime() : 0;
+                    return timeB - timeA;
+                  });
 
                   // Favorite Audios
                   const favoriteTeacherAudios = teacherAudios.filter(aud => favoriteAudioUrls.includes(aud.url));
+                  favoriteTeacherAudios.sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0));
 
                   // Group audios with songTag into Song-Alben
                   const songGroups: { [songTitle: string]: { songTitle: string; takes: any[] } } = {};
@@ -904,6 +1030,9 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                       }
                       songGroups[sTitle].takes.push(aud);
                     }
+                  });
+                  Object.values(songGroups).forEach(sg => {
+                    sg.takes.sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0));
                   });
                   const songAlbumsList = Object.values(songGroups).sort((a, b) => b.takes.length - a.takes.length);
 
@@ -925,6 +1054,11 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                     monthGroups[monthKey].weeks[weekKey].push(aud);
                     monthGroups[monthKey].totalTakes += 1;
                   });
+                  Object.values(monthGroups).forEach(mg => {
+                    Object.values(mg.weeks).forEach(wkList => {
+                      wkList.sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0));
+                    });
+                  });
 
                   const sortedMonths = Object.values(monthGroups).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
 
@@ -935,7 +1069,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                       label={aud.label} 
                       duration={aud.duration}
                       date={aud.date}
-                      isHero={isHero}
+                      isHero={isHero || (Boolean(justRecordedAudioUrl) && aud.url === justRecordedAudioUrl)}
                       contextBadge={aud.songTag}
                       onContextBadgeClick={aud.songTag ? () => { setSelectedTeacherMonth(null); setShowTeacherFavoritesOnly(false); setShowTeacherHomeworkArchive(false); setSelectedTeacherSongAlbum(aud.songTag); } : undefined}
                       availableSongs={availableSongsForTagging}
@@ -950,13 +1084,12 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                       originalDuration={aud.originalDuration}
                       onRevertToOriginal={!readOnly && aud.originalUrl && handleRevertTeacherAudioToOriginal ? () => handleRevertTeacherAudioToOriginal(aud.originalIdx, aud.url) : undefined}
                       onSaveEdited={!readOnly && handleSaveEditedTeacherAudio ? (res) => handleSaveEditedTeacherAudio(res, aud.originalIdx, aud.url) : undefined}
-                      metronomeBpm={aud.metronomeBpm}
-                      onOpenDuettDeck={aud.metronomeBpm ? () => setDuettModalData({
+                      onOpenDuettDeck={() => setDuettModalData({
                         teacherUrl: aud.url,
                         teacherTitle: aud.label || 'Lehrer-Aufnahme',
-                        teacherBpm: aud.metronomeBpm,
+                        teacherBpm: aud.metronomeBpm || 100,
                         songTag: aud.songTag
-                      }) : undefined}
+                      })}
                     />
                   );
 
@@ -1955,12 +2088,10 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                       const monthlyLimit = 240;
                       const isLimitReached = !effectiveTresorAvailable && studentRecordingsTotalSec >= monthlyLimit;
 
-                      const studentIdVal = (student as any)?.id;
-                      const localAudioKey = studentIdVal && typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_audio_${studentIdVal}`) : null;
-                      const localStudentAudioKey = studentIdVal && typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_student_audio_${studentIdVal}`) : null;
-                      const isAudioAllowed = (student as any)?.parent_allow_audio === true && 
-                        ((student as any)?.parent_permissions?.allow_student_audio === true || (localStudentAudioKey !== null ? localStudentAudioKey === 'true' : false)) &&
-                        (localAudioKey !== null ? localAudioKey === 'true' : true);
+                      const isAudioAllowed = !readOnly || (
+                        (student as any)?.parent_allow_audio !== false && 
+                        ((student as any)?.parent_permissions?.allow_student_audio !== false)
+                      );
 
                       if (!isAudioAllowed) {
                         return (
@@ -2036,36 +2167,99 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                                 width: '100%',
                                 position: 'relative'
                               }}>
-                                {/* 🔴 Prominent Tactile Record Button (52px Goldstandard) */}
-                                <button
-                                  type="button"
-                                  onClick={startRecordingAudio}
-                                  disabled={isUploadingAudio || isLimitReached}
-                                  style={{
+                                {/* 🔴 Prominent Tactile Record Button (52px Goldstandard) or 4-Beat Count-In HUD */}
+                                {recordCountInRemaining !== null && recordCountInRemaining !== undefined ? (
+                                  <div style={{
                                     flex: 1,
                                     height: '52px',
-                                    background: isLimitReached ? '#cbd5e1' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                                    color: '#ffffff',
-                                    border: 'none',
+                                    background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
+                                    border: '2px solid #ef4444',
                                     borderRadius: '16px',
-                                    padding: '10px 18px',
-                                    fontSize: '0.96rem',
-                                    fontWeight: 950,
-                                    cursor: isLimitReached ? 'not-allowed' : 'pointer',
-                                    display: 'inline-flex',
+                                    padding: '4px 14px',
+                                    display: 'flex',
                                     alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '8px',
-                                    boxShadow: isLimitReached ? 'none' : '0 4px 16px rgba(239, 68, 68, 0.35)',
-                                    whiteSpace: 'nowrap',
-                                    boxSizing: 'border-box',
-                                    transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)'
-                                  }}
-                                  className={isLimitReached ? '' : 'hover-scale'}
-                                >
-                                  <Mic size={19} strokeWidth={2.8} />
-                                  <span>Jetzt aufnehmen</span>
-                                </button>
+                                    justifyContent: 'space-between',
+                                    boxShadow: '0 4px 16px rgba(239, 68, 68, 0.25)',
+                                    boxSizing: 'border-box'
+                                  }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                      <div style={{
+                                        width: '38px',
+                                        height: '38px',
+                                        borderRadius: '50%',
+                                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                                        color: '#ffffff',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontWeight: 950,
+                                        fontSize: '1.25rem',
+                                        boxShadow: '0 2px 8px rgba(239, 68, 68, 0.4)'
+                                      }}>
+                                        {recordCountInRemaining}
+                                      </div>
+                                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                        <span style={{ fontSize: '0.82rem', fontWeight: 950, color: '#991b1b', letterSpacing: '-0.01em' }}>
+                                          Bereit machen...
+                                        </span>
+                                        <span style={{ fontSize: '0.68rem', fontWeight: 750, color: '#dc2626' }}>
+                                          {isRecordingMetronomeActive && recordingBpm ? `Puls: ${recordingBpm} BPM (Klick aktiv)` : 'Puls: 100 BPM (Standard)'}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    {cancelActiveRecordCountIn && (
+                                      <button
+                                        type="button"
+                                        onClick={cancelActiveRecordCountIn}
+                                        style={{
+                                          background: '#ffffff',
+                                          border: '1px solid #fca5a5',
+                                          borderRadius: '10px',
+                                          color: '#b91c1c',
+                                          padding: '6px 12px',
+                                          fontSize: '0.74rem',
+                                          fontWeight: 850,
+                                          cursor: 'pointer',
+                                          boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                                        }}
+                                        className="hover-scale-mini"
+                                        title="Einzählen abbrechen"
+                                      >
+                                        ✕ Abbrechen
+                                      </button>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={startRecordingAudio}
+                                    disabled={isUploadingAudio || isLimitReached}
+                                    style={{
+                                      flex: 1,
+                                      height: '52px',
+                                      background: isLimitReached ? '#cbd5e1' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      borderRadius: '16px',
+                                      padding: '10px 18px',
+                                      fontSize: '0.96rem',
+                                      fontWeight: 950,
+                                      cursor: isLimitReached ? 'not-allowed' : 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      gap: '8px',
+                                      boxShadow: isLimitReached ? 'none' : '0 4px 16px rgba(239, 68, 68, 0.35)',
+                                      whiteSpace: 'nowrap',
+                                      boxSizing: 'border-box',
+                                      transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)'
+                                    }}
+                                    className={isLimitReached ? '' : 'hover-scale'}
+                                  >
+                                    <Mic size={19} strokeWidth={2.8} />
+                                    <span>Jetzt aufnehmen</span>
+                                  </button>
+                                )}
 
                                 {/* ⏱️ Metronom / Klick Button (52px) */}
                                 <button
@@ -2209,6 +2403,40 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                                   </div>
                                 )}
                               </div>
+
+                              {/* 🎉 Success Banner after Take Completion */}
+                              {justRecordedAudioLabel && (
+                                <div style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                                  border: '1.5px solid #86efac',
+                                  borderRadius: '12px',
+                                  padding: '8px 12px',
+                                  color: '#15803d',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 900,
+                                  boxShadow: '0 2px 8px rgba(22, 163, 74, 0.15)'
+                                }}>
+                                  <span style={{
+                                    width: '20px',
+                                    height: '20px',
+                                    borderRadius: '50%',
+                                    background: '#16a34a',
+                                    color: '#ffffff',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexShrink: 0
+                                  }}>
+                                    <Check size={13} strokeWidth={3} />
+                                  </span>
+                                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    Take gesichert: „{justRecordedAudioLabel}“ 🎉
+                                  </span>
+                                </div>
+                              )}
 
                               {/* Optional Title Input + 1-Tap Spark Chips */}
                               {!isLimitReached && (
@@ -2390,37 +2618,61 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                   const studentAudios: any[] = [];
                   const seenStudentUrls = new Set<string>();
 
-                  // 1. Load from local student recordings vault
+                  // 1. Load from local student recordings vault (Multi-Tenant & Aliasing Safe across all candidateStudentIds)
                   try {
-                    if (student?.id) {
-                      const juniorKey = `campus_junior_recordings_${student.id}`;
+                    const candidateStudentIds = Array.from(new Set([
+                      student?.id,
+                      (student as any)?.student_id,
+                      (student as any)?.studentId,
+                      (student as any)?.canonical_uuid,
+                      (student as any)?.slot_id
+                    ].filter(Boolean))) as string[];
+
+                    const seenIds = new Set<string>();
+
+                    candidateStudentIds.forEach(cid => {
+                      const juniorKey = `campus_junior_recordings_${cid}`;
                       const stored = localStorage.getItem(juniorKey);
                       if (stored) {
-                        const parsed = JSON.parse(stored);
-                        if (Array.isArray(parsed)) {
-                          parsed.forEach((rec: any, idx: number) => {
-                            if (rec.url && !seenStudentUrls.has(rec.url)) {
-                              seenStudentUrls.add(rec.url);
-                              const rawSongTag = rec.songTag || rec.song || rec.songTitle || undefined;
-                              const songTag = audioSongTags[rec.url] !== undefined ? (audioSongTags[rec.url] || undefined) : rawSongTag;
-                              studentAudios.push({
-                                id: rec.id || `stud-${idx}`,
-                                url: rec.url,
-                                duration: parseInt(rec.duration || '0', 10),
-                                date: rec.date || new Date().toISOString(),
-                                label: rec.title || rec.label || `Eigene Aufnahme #${studentAudios.length + 1}`,
-                                visibility: rec.visibility || 'private',
-                                songTag,
-                                originalIdx: -1,
-                                source: 'local_junior',
-                                isCustomTitle: rec.isCustomTitle || false,
-                                metronomeBpm: rec.metronomeBpm
-                              });
-                            }
-                          });
-                        }
+                        try {
+                          const parsed = JSON.parse(stored);
+                          if (Array.isArray(parsed)) {
+                            parsed.forEach((rec: any, idx: number) => {
+                              const recId = rec.id || `stud-${cid}-${idx}`;
+                              const dedupeKey = rec.blobKey || rec.url || recId;
+                              if (dedupeKey && !seenStudentUrls.has(dedupeKey) && !seenIds.has(recId)) {
+                                if (rec.url) seenStudentUrls.add(rec.url);
+                                if (rec.blobKey) seenStudentUrls.add(rec.blobKey);
+                                seenIds.add(recId);
+                                const rawSongTag = rec.songTag || rec.song || rec.songTitle || undefined;
+                                const songTag = (rec.url && audioSongTags[rec.url] !== undefined) ? (audioSongTags[rec.url] || undefined) : rawSongTag;
+                                studentAudios.push({
+                                  id: recId,
+                                  url: rec.url,
+                                  blobKey: rec.blobKey,
+                                  duration: parseInt(rec.duration || '0', 10),
+                                  date: rec.date || new Date().toISOString(),
+                                  label: rec.title || rec.label || `Eigene Aufnahme #${studentAudios.length + 1}`,
+                                  visibility: rec.visibility || 'private',
+                                  songTag,
+                                  originalIdx: -1,
+                                  source: rec.source || 'local_junior',
+                                  bpm: rec.bpm || rec.metronomeBpm,
+                                  style: rec.style,
+                                  cloudSyncStatus: rec.cloudSyncStatus,
+                                  cloudPath: rec.cloudPath,
+                                  checksumSha256: rec.checksumSha256,
+                                  isCustomTitle: rec.isCustomTitle || (rec.source === 'practice_companion'),
+                                  metronomeBpm: rec.metronomeBpm || rec.bpm,
+                                  original_url: rec.original_url || rec.originalUrl,
+                                  original_duration: rec.original_duration || rec.originalDuration
+                                });
+                              }
+                            });
+                          }
+                        } catch {}
                       }
-                    }
+                    });
                   } catch {}
 
                   // 🎯 Intelligente, eindeutige & harmonisierte Benennung (Goldstandard: [Thema] • [Datum] [#[Nr]])
@@ -2431,9 +2683,17 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                     studentAudios.push(aud);
                   });
 
+                  // 🛡️ Deterministische Sortierung (Neueste Aufnahme IMMER ganz oben)
+                  studentAudios.sort((a, b) => {
+                    const timeA = a.date ? new Date(a.date).getTime() : 0;
+                    const timeB = b.date ? new Date(b.date).getTime() : 0;
+                    return timeB - timeA;
+                  });
+
                   // If teacher is viewing, only show student recordings that are shared
                   if (isTeacherMode) {
                     const sharedAudios = studentAudios.filter(aud => aud.visibility === 'shared_with_teacher');
+                    sharedAudios.sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0));
 
                     if (sharedAudios.length === 0) {
                       return (
@@ -2455,13 +2715,14 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         {sharedAudios.map((aud, idx) => (
                           <InlineAudioPlayer 
-                            key={`shared-aud-${idx}`}
+                            key={aud.id || aud.blobKey || aud.url || `shared-aud-${idx}`}
                             url={aud.url} 
                             label={aud.label} 
                             duration={aud.duration}
                             date={aud.date}
+                            isHero={idx === 0 || (Boolean(justRecordedAudioUrl) && (aud.url === justRecordedAudioUrl || aud.blobKey === justRecordedAudioUrl))}
                             contextBadge={aud.songTag}
-                            onContextBadgeClick={aud.songTag ? () => { setSelectedStudentMonth(null); setShowStudentFavoritesOnly(false); setSelectedStudentSongAlbum(aud.songTag); } : undefined}
+                            onContextBadgeClick={aud.songTag ? () => { setSelectedStudentMonth(null); setShowStudentFavoritesOnly(false); setSelectedPracticeCompanionAlbum(false); setSelectedStudentSongAlbum(aud.songTag); } : undefined}
                             availableSongs={availableSongsForTagging}
                             onSelectSongTag={(newTag) => handleUpdateAudioSongTag(aud.url, newTag)}
                             themeColor="#16a34a"
@@ -2473,6 +2734,12 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                             badgeColor="#15803d"
                             onRename={(newTitle) => handleRenameStudentAudio(aud.url, newTitle, aud.id)}
                             metronomeBpm={aud.metronomeBpm}
+                            onOpenDuettDeck={() => setDuettModalData({
+                              teacherUrl: aud.url,
+                              teacherTitle: aud.label || 'Schüler-Aufnahme',
+                              teacherBpm: aud.metronomeBpm || 100,
+                              songTag: aud.songTag
+                            })}
                           />
                         ))}
                       </div>
@@ -2488,148 +2755,108 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                         flexDirection: "column",
                         alignItems: "center",
                         justifyContent: "center",
-                        padding: "36px 20px",
+                        padding: "24px 16px",
                         textAlign: "center",
-                        background: "linear-gradient(180deg, #faf5ff 0%, #ffffff 100%)",
-                        borderRadius: "24px",
-                        border: "1.5px dashed #d8b4fe",
-                        boxShadow: "0 8px 24px -6px rgba(147, 51, 234, 0.08)",
-                        position: "relative",
-                        overflow: "hidden"
+                        background: "#f8fafc",
+                        borderRadius: "18px",
+                        border: "1px dashed #cbd5e1"
                       }}>
-                        {/* Background Ambient Glow */}
+                        {/* Top Clean Icon Badge */}
                         <div style={{
-                          position: "absolute",
-                          top: "-40px",
-                          width: "160px",
-                          height: "160px",
-                          borderRadius: "50%",
-                          background: "radial-gradient(circle, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0) 70%)",
-                          pointerEvents: "none"
-                        }} />
-
-                        {/* Top Luminous Icon Badge */}
-                        <div style={{
-                          width: "56px",
-                          height: "56px",
-                          borderRadius: "18px",
-                          background: "linear-gradient(135deg, #a855f7 0%, #7e22ce 100%)",
-                          color: "#ffffff",
+                          width: "44px",
+                          height: "44px",
+                          borderRadius: "12px",
+                          background: "#ffffff",
+                          border: "1px solid #e2e8f0",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          boxShadow: "0 8px 20px -4px rgba(126, 34, 206, 0.45)",
-                          marginBottom: "14px",
-                          position: "relative"
+                          color: "#334155",
+                          boxShadow: "0 2px 6px rgba(0, 0, 0, 0.03)"
                         }}>
-                          <Sparkles size={26} strokeWidth={2.4} />
+                          <Mic size={20} strokeWidth={2.2} />
                         </div>
 
                         {/* Heading & Subtitle */}
                         <h4 style={{
-                          margin: "0 0 6px",
-                          fontSize: "1.08rem",
-                          fontWeight: 950,
-                          color: "#1e1b4b",
-                          letterSpacing: "-0.02em"
+                          margin: "10px 0 3px",
+                          fontSize: "0.96rem",
+                          fontWeight: 800,
+                          color: "#0f172a",
+                          letterSpacing: "-0.01em"
                         }}>
-                          Deine Studio-Bühne wartet!
+                          Dein Audio-Tresor
                         </h4>
                         <p style={{
                           margin: "0 0 16px",
                           fontSize: "0.78rem",
-                          color: "#6b7280",
-                          maxWidth: "300px",
-                          lineHeight: 1.45,
-                          fontWeight: 650
+                          color: "#64748b",
+                          maxWidth: "280px",
+                          lineHeight: 1.4,
+                          fontWeight: 500
                         }}>
-                          Drücke oben auf <strong style={{ color: "#dc2626" }}>Jetzt aufnehmen</strong> oder starte sofort mit einer Übe-Idee:
+                          Private Übe-Aufnahmen – nur für dich sichtbar.
                         </p>
 
-                        {/* 3 Quick-Start Practice Spark Cards (1-Tap Instant Recording Triggers) */}
-                        {!isTeacherMode && (
-                          <div style={{ width: "100%", maxWidth: "340px", display: "flex", flexDirection: "column", gap: "8px" }}>
-                            <span style={{ fontSize: "0.70rem", fontWeight: 850, color: "#9333ea", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "2px" }}>
-                              1-Klick Übe-Ideen zum Loslegen:
-                            </span>
-                            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                              {[
-                                {
-                                  icon: <Music size={16} strokeWidth={2.4} />,
-                                  title: "Lieblingsriff festhalten",
-                                  desc: "Nimm deine beste Melodie auf",
-                                  prompt: "Lieblingsriff",
-                                  withMetronome: false
-                                },
-                                {
-                                  icon: <Clock size={16} strokeWidth={2.4} />,
-                                  title: "Mit Klick üben",
-                                  desc: `Startet direkt mit Metronom (${recordingBpm} BPM)`,
-                                  prompt: "Mit Klick",
-                                  withMetronome: true
-                                },
-                                {
-                                  icon: <HelpCircle size={16} strokeWidth={2.4} />,
-                                  title: "Frage an Lehrkraft",
-                                  desc: "Spiele die schwere Stelle vor",
-                                  prompt: "Frage an Lehrer",
-                                  withMetronome: false
-                                }
-                              ].map((spark, sIdx) => (
+                        {/* Schnelleinstieg / Quick Start */}
+                        <div style={{
+                          width: "100%",
+                          maxWidth: "300px",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "6px"
+                        }}>
+                          <span style={{
+                            fontSize: "0.66rem",
+                            fontWeight: 700,
+                            color: "#64748b",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.05em",
+                            textAlign: "left",
+                            paddingLeft: "2px"
+                          }}>
+                            Schnelleinstieg
+                          </span>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                            {[
+                              { icon: Music, title: "Lieblingsriff", prompt: "Lieblingsriff" },
+                              { icon: Clock, title: "Mit Klick üben", prompt: "Mit Klick" },
+                              { icon: HelpCircle, title: "Frage an Lehrkraft", prompt: "Frage an Lehrer" }
+                            ].map((spark, sIdx) => {
+                              const SparkIcon = spark.icon;
+                              return (
                                 <button
-                                  key={`spark-btn-${sIdx}`}
+                                  key={`empty-spark-${sIdx}`}
                                   type="button"
-                                  onClick={() => {
-                                    setAudioLabel(spark.prompt);
-                                    if (spark.withMetronome) {
-                                      setIsRecordingMetronomeActive(true);
-                                    }
-                                    startRecordingAudio(undefined, spark.prompt);
-                                  }}
+                                  onClick={() => startRecordingAudio(undefined, spark.prompt)}
+                                  aria-label={`${spark.title} aufnehmen`}
                                   style={{
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "space-between",
-                                    padding: "10px 14px",
+                                    padding: "8px 12px",
                                     background: "#ffffff",
-                                    border: "1.5px solid #e9d5ff",
-                                    borderRadius: "14px",
+                                    borderRadius: "10px",
+                                    border: "1px solid #e2e8f0",
                                     cursor: "pointer",
                                     textAlign: "left",
-                                    boxShadow: "0 2px 6px rgba(147, 51, 234, 0.05)",
                                     transition: "all 0.15s ease",
-                                    gap: "10px"
+                                    boxShadow: "0 1px 2px rgba(0, 0, 0, 0.02)"
                                   }}
                                   className="hover-scale"
                                 >
-                                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                    <span style={{ fontSize: "1.3rem" }}>{spark.icon}</span>
-                                    <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
-                                      <span style={{ fontSize: "0.80rem", fontWeight: 850, color: "#4c1d95" }}>{spark.title}</span>
-                                      <span style={{ fontSize: "0.68rem", color: "#7c3aed", fontWeight: 600 }}>{spark.desc}</span>
-                                    </div>
+                                  <div style={{ display: "flex", alignItems: "center", gap: "9px" }}>
+                                    <SparkIcon size={15} strokeWidth={2.2} color="#475569" />
+                                    <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "#1e293b" }}>
+                                      {spark.title}
+                                    </span>
                                   </div>
-                                  <div style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "4px",
-                                    fontSize: "0.68rem",
-                                    fontWeight: 850,
-                                    color: "#9333ea",
-                                    background: "#faf5ff",
-                                    padding: "4px 8px",
-                                    borderRadius: "8px",
-                                    border: "1px solid #f3e8ff",
-                                    flexShrink: 0
-                                  }}>
-                                    <span>Start</span>
-                                    <ChevronRight size={12} color="#9333ea" />
-                                  </div>
+                                  <ChevronRight size={14} color="#94a3b8" />
                                 </button>
-                              ))}
-                            </div>
+                              );
+                            })}
                           </div>
-                        )}
+                        </div>
                       </div>
                     );
                   }
@@ -2642,14 +2869,28 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                   const isSearching = recordingSearchQuery.trim() !== "";
                   const searchResults = isSearching ? studentAudios.filter(aud => matchesAudioSearch(aud, recordingSearchQuery)) : [];
 
-                  // Current Week Audios
+                  // Current Week Audios (Deterministisch Neueste zuerst)
                   const currentWeekAudios = studentAudios.filter(aud => {
                     const d = aud.date ? new Date(aud.date) : now;
                     return getISOWeek(isNaN(d.getTime()) ? now : d) === currentWeekStr;
                   });
+                  currentWeekAudios.sort((a, b) => {
+                    const timeA = a.date ? new Date(a.date).getTime() : 0;
+                    const timeB = b.date ? new Date(b.date).getTime() : 0;
+                    return timeB - timeA;
+                  });
 
                   // Favorite Audios
                   const favoriteStudentAudios = studentAudios.filter(aud => favoriteAudioUrls.includes(aud.url));
+                  favoriteStudentAudios.sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0));
+
+                  // ⏱️ Practice Companion (Übe-Begleiter) Audios
+                  const practiceCompanionAudios = studentAudios.filter(aud => 
+                    aud.source === 'practice_companion' || 
+                    (typeof aud.label === 'string' && (aud.label.startsWith('Übe-Begleiter:') || aud.label.includes('Übe-Begleiter'))) ||
+                    (typeof aud.title === 'string' && (aud.title.startsWith('Übe-Begleiter:') || aud.title.includes('Übe-Begleiter')))
+                  );
+                  practiceCompanionAudios.sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0));
 
                   // Group Audios by Song if tagged
                   const studentSongMap: { [songTitle: string]: any[] } = {};
@@ -2660,6 +2901,9 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                       }
                       studentSongMap[aud.songTag].push(aud);
                     }
+                  });
+                  Object.values(studentSongMap).forEach(list => {
+                    list.sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0));
                   });
                   const studentSongAlbumsList = Object.keys(studentSongMap).sort().map(songTitle => ({
                     songTitle,
@@ -2684,34 +2928,47 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                     monthGroups[monthKey].weeks[weekKey].push(aud);
                     monthGroups[monthKey].totalTakes += 1;
                   });
+                  Object.values(monthGroups).forEach(mg => {
+                    Object.values(mg.weeks).forEach(wkList => {
+                      wkList.sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0));
+                    });
+                  });
 
                   const sortedMonths = Object.values(monthGroups).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
 
                   const renderStudentPlayer = (aud: any, idxKey: string, isHero = false) => {
                     const isShared = aud.visibility === "shared_with_teacher";
+                    const isPracticeTake = aud.source === 'practice_companion' || (typeof aud.label === 'string' && aud.label.includes('Übe-Begleiter'));
+                    const playerKey = aud.id || aud.blobKey || aud.url || `${idxKey}-${aud.date || ''}`;
                     return (
                       <InlineAudioPlayer 
-                        key={idxKey}
+                        key={playerKey}
                         url={aud.url} 
                         label={aud.label} 
                         duration={aud.duration}
                         date={aud.date}
-                        isHero={isHero}
+                        isHero={isHero || (Boolean(justRecordedAudioUrl) && (aud.url === justRecordedAudioUrl || aud.blobKey === justRecordedAudioUrl))}
                         contextBadge={aud.songTag}
-                        onContextBadgeClick={aud.songTag ? () => { setSelectedStudentMonth(null); setShowStudentFavoritesOnly(false); setSelectedStudentSongAlbum(aud.songTag); } : undefined}
+                        onContextBadgeClick={aud.songTag ? () => { setSelectedStudentMonth(null); setShowStudentFavoritesOnly(false); setSelectedPracticeCompanionAlbum(false); setSelectedStudentSongAlbum(aud.songTag); } : undefined}
                         availableSongs={availableSongsForTagging}
                         onSelectSongTag={(newTag) => handleUpdateAudioSongTag(aud.url, newTag)}
                         isFavorite={favoriteAudioUrls.includes(aud.url)}
                         onToggleFavorite={() => toggleFavoriteAudio(aud.url)}
-                        themeColor="#6d28d9"
-                        themeBg="#ede9fe"
+                        themeColor={isPracticeTake ? "#d97706" : "#6d28d9"}
+                        themeBg={isPracticeTake ? "#fffbeb" : (aud.isDuettTake ? "#ecfdf5" : "#ede9fe")}
                         isSharedWithTeacher={isShared}
-                        badge={isShared ? "🚀 Für Lehrer" : "🔒 Privat"}
-                        badgeTitle={isShared ? "Mit Lehrkraft geteilt (Klicken, um wieder privat zu machen)" : "Privat (Nur für dich sichtbar - Klicken zum Teilen mit Lehrkraft)"}
-                        badgeBg={isShared ? "#dcfce7" : "#f1f5f9"}
-                        badgeColor={isShared ? "#15803d" : "#475569"}
+                        badge={aud.isDuettTake ? "👥 Duett" : (aud.cloudSyncStatus === 'synced' ? "☁️ Cloud" : (isShared ? "🚀 Für Lehrer" : "🔒 Privat"))}
+                        badgeTitle={aud.isDuettTake ? "Synchrones Duett (Spur 1 & Spur 2) - Klicke auf Duett-Deck zum Abhören" : (aud.cloudSyncStatus === 'synced' ? "Revisionssicher im Audio-Tresor gesichert" : (isShared ? "Mit Lehrkraft geteilt (Klicken, um wieder privat zu machen)" : "Privat (Nur für dich sichtbar - Klicken zum Teilen mit Lehrkraft)"))}
+                        badgeBg={aud.isDuettTake ? "#dcfce7" : (aud.cloudSyncStatus === 'synced' ? "#fef3c7" : (isShared ? "#dcfce7" : "#f1f5f9"))}
+                        badgeColor={aud.isDuettTake ? "#15803d" : (aud.cloudSyncStatus === 'synced' ? "#b45309" : (isShared ? "#15803d" : "#475569"))}
                         onRename={(newTitle) => handleRenameStudentAudio(aud.url, newTitle, aud.id)}
                         metronomeBpm={aud.metronomeBpm}
+                        onOpenDuettDeck={() => setDuettModalData({
+                          teacherUrl: aud.teacherAudioUrl || aud.url,
+                          teacherTitle: aud.teacherTitle || aud.label || 'Duett-Aufnahme',
+                          teacherBpm: aud.teacherBpm || aud.metronomeBpm || 100,
+                          songTag: aud.songTag
+                        })}
                         onBadgeClick={!isTeacherMode ? () => {
                           if (student?.id) {
                             try {
@@ -2730,70 +2987,115 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                             } catch {}
                           }
                         } : undefined}
-                        onDelete={!isTeacherMode ? () => {
-                          if (student?.id) {
+                        onDelete={!isTeacherMode ? async () => {
+                          if (handleDeleteStudentAudio) {
+                            await handleDeleteStudentAudio(aud.url, aud.id, aud);
+                          } else if (student?.id) {
                             try {
-                              const juniorKey = `campus_junior_recordings_${student.id}`;
-                              const stored = localStorage.getItem(juniorKey);
-                              if (stored) {
-                                const recs = JSON.parse(stored).filter((r: any) => r.url !== aud.url && r.id !== aud.id);
-                                localStorage.setItem(juniorKey, JSON.stringify(recs));
-                                setLocalJuniorRecordingsTrigger(p => p + 1);
-                              }
+                              const candidateStudentIds = Array.from(new Set([
+                                student?.id,
+                                (student as any)?.student_id,
+                                (student as any)?.studentId,
+                                (student as any)?.canonical_uuid,
+                                (student as any)?.slot_id
+                              ].filter(Boolean))) as string[];
+
+                              candidateStudentIds.forEach(cid => {
+                                const juniorKey = `campus_junior_recordings_${cid}`;
+                                const stored = localStorage.getItem(juniorKey);
+                                if (stored) {
+                                  const recs = JSON.parse(stored).filter((r: any) => {
+                                    const matchUrl = aud.url && (r.url === aud.url || r.original_url === aud.url);
+                                    const matchId = aud.id && r.id === aud.id;
+                                    const matchBlobKey = aud.blobKey && r.blobKey === aud.blobKey;
+                                    return !(matchUrl || matchId || matchBlobKey);
+                                  });
+                                  localStorage.setItem(juniorKey, JSON.stringify(recs));
+                                }
+                              });
+                              window.dispatchEvent(new Event('campus_junior_recordings_updated'));
                             } catch {}
                           }
+                          setLocalRecordingsRevision(p => p + 1);
+                          setLocalJuniorRecordingsTrigger(p => p + 1);
                         } : undefined}
                         originalAudioUrl={aud.original_url || aud.originalUrl}
                         originalDuration={aud.original_duration || aud.originalDuration}
                         onRevertToOriginal={(aud.original_url || aud.originalUrl) ? () => {
                           if (student?.id) {
                             try {
-                              const juniorKey = `campus_junior_recordings_${student.id}`;
-                              const stored = localStorage.getItem(juniorKey);
-                              if (stored) {
-                                const origUrl = aud.original_url || aud.originalUrl;
-                                const origDur = aud.original_duration || aud.originalDuration || aud.duration;
-                                const recs = JSON.parse(stored).map((r: any) => {
-                                  if (r.url === aud.url || r.id === aud.id) {
-                                    const { original_url, original_duration, ...rest } = r;
-                                    return { ...rest, url: origUrl, duration: origDur };
-                                  }
-                                  return r;
-                                });
-                                localStorage.setItem(juniorKey, JSON.stringify(recs));
-                                setLocalJuniorRecordingsTrigger(p => p + 1);
-                              }
+                              const candidateStudentIds = Array.from(new Set([
+                                student?.id,
+                                (student as any)?.student_id,
+                                (student as any)?.studentId,
+                                (student as any)?.canonical_uuid,
+                                (student as any)?.slot_id
+                              ].filter(Boolean))) as string[];
+
+                              const origUrl = aud.original_url || aud.originalUrl;
+                              const origDur = aud.original_duration || aud.originalDuration || aud.duration;
+
+                              candidateStudentIds.forEach(cid => {
+                                const juniorKey = `campus_junior_recordings_${cid}`;
+                                const stored = localStorage.getItem(juniorKey);
+                                if (stored) {
+                                  const recs = JSON.parse(stored).map((r: any) => {
+                                    const matchUrl = aud.url && (r.url === aud.url || r.original_url === aud.url);
+                                    const matchId = aud.id && r.id === aud.id;
+                                    const matchBlobKey = aud.blobKey && r.blobKey === aud.blobKey;
+                                    if (matchUrl || matchId || matchBlobKey) {
+                                      const { original_url, original_duration, ...rest } = r;
+                                      return { ...rest, url: origUrl, duration: origDur };
+                                    }
+                                    return r;
+                                  });
+                                  localStorage.setItem(juniorKey, JSON.stringify(recs));
+                                }
+                              });
+                              window.dispatchEvent(new Event('campus_junior_recordings_updated'));
+                              setLocalRecordingsRevision(p => p + 1);
+                              setLocalJuniorRecordingsTrigger(p => p + 1);
                             } catch {}
                           }
                         } : undefined}
                         onSaveEdited={(res) => {
                           if (student?.id) {
                             try {
-                              const juniorKey = `campus_junior_recordings_${student.id}`;
-                              const stored = localStorage.getItem(juniorKey);
-                              let recs = stored ? JSON.parse(stored) : [];
-                              if (res.mode === "overwrite") {
-                                recs = recs.map((r: any) => {
-                                  if (r.url === aud.url || r.id === aud.id) {
-                                    const masterOrig = r.original_url || aud.original_url || r.url;
-                                    const masterOrigDur = r.original_duration || aud.original_duration || r.duration;
-                                    return { ...r, url: res.url, original_url: masterOrig, duration: res.duration, original_duration: masterOrigDur, label: res.label, title: res.label };
-                                  }
-                                  return r;
-                                });
-                              } else {
-                                const newRecord = {
-                                  id: `stud-${Date.now()}`,
-                                  url: res.url,
-                                  duration: res.duration,
-                                  date: new Date().toISOString(),
-                                  title: res.label,
-                                  label: res.label,
-                                  visibility: aud.visibility || "private"
-                                };
-                                recs = [newRecord, ...recs];
-                              }
-                              localStorage.setItem(juniorKey, JSON.stringify(recs));
+                              const candidateStudentIds = Array.from(new Set([
+                                student?.id,
+                                (student as any)?.student_id,
+                                (student as any)?.studentId,
+                                (student as any)?.canonical_uuid,
+                                (student as any)?.slot_id
+                              ].filter(Boolean))) as string[];
+
+                              candidateStudentIds.forEach(cid => {
+                                const juniorKey = `campus_junior_recordings_${cid}`;
+                                const stored = localStorage.getItem(juniorKey);
+                                let recs = stored ? JSON.parse(stored) : [];
+                                if (res.mode === "overwrite") {
+                                  recs = recs.map((r: any) => {
+                                    if (r.url === aud.url || r.id === aud.id) {
+                                      const masterOrig = r.original_url || aud.original_url || r.url;
+                                      const masterOrigDur = r.original_duration || aud.original_duration || r.duration;
+                                      return { ...r, url: res.url, original_url: masterOrig, duration: res.duration, original_duration: masterOrigDur, label: res.label, title: res.label };
+                                    }
+                                    return r;
+                                  });
+                                } else {
+                                  const newRecord = {
+                                    id: `stud-${Date.now()}`,
+                                    url: res.url,
+                                    duration: res.duration,
+                                    date: new Date().toISOString(),
+                                    title: res.label,
+                                    label: res.label,
+                                    visibility: aud.visibility || "private"
+                                  };
+                                  recs = [newRecord, ...recs];
+                                }
+                                localStorage.setItem(juniorKey, JSON.stringify(recs));
+                              });
                               setLocalJuniorRecordingsTrigger(p => p + 1);
                             } catch {}
                           }
@@ -2931,6 +3233,154 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                             </div>
                           );
                         })}
+                      </div>
+                    );
+                  }
+
+                  // ⏱️ ÜBE-BEGLEITER SYSTEM-ALBUM DRILLDOWN VIEW
+                  if (selectedPracticeCompanionAlbum) {
+                    const filteredPracticeTakes = selectedPracticeStyleFilter === 'all'
+                      ? practiceCompanionAudios
+                      : practiceCompanionAudios.filter(aud => 
+                          aud.style === selectedPracticeStyleFilter || 
+                          (typeof aud.label === 'string' && aud.label.toLowerCase().includes(selectedPracticeStyleFilter.toLowerCase()))
+                        );
+                    
+                    const totalDurationSec = practiceCompanionAudios.reduce((acc, a) => acc + (a.duration || 0), 0);
+                    const totalMinutes = Math.max(1, Math.round(totalDurationSec / 60));
+
+                    const availableStyles = [
+                      { id: 'all', label: 'Alle Grooves' },
+                      { id: 'metronome', label: '⏱️ Metronom' },
+                      { id: 'rock', label: '🥁 Rock & Pop' },
+                      { id: 'hiphop', label: '🎧 Hip-Hop' },
+                      { id: 'singersongwriter', label: '🎸 Singer-Songwriter' },
+                      { id: 'swing', label: '🎺 Jazz Swing' },
+                      { id: 'funk', label: '⚡ Funk' },
+                      { id: 'latin', label: '🌴 Latin' }
+                    ];
+
+                    return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPracticeCompanionAlbum(false)}
+                            style={{
+                              background: "#ffffff",
+                              border: "1px solid #cbd5e1",
+                              borderRadius: "100px",
+                              padding: "5px 14px",
+                              fontSize: "0.74rem",
+                              fontWeight: 800,
+                              color: "#475569",
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "6px"
+                            }}
+                            className="hover-scale"
+                          >
+                            <ArrowLeft size={13} /> Zurück zur Übersicht
+                          </button>
+                          <span style={{ fontSize: "0.74rem", fontWeight: 850, background: "#fef3c7", color: "#92400e", padding: "3px 10px", borderRadius: "100px", border: "1px solid #fde68a" }}>
+                            ⏱️ {practiceCompanionAudios.length} {practiceCompanionAudios.length === 1 ? "Take" : "Takes"} {totalDurationSec > 0 ? `• ${totalMinutes} min geübt` : ''}
+                          </span>
+                        </div>
+
+                        {/* Übe-Begleiter Banner */}
+                        <div style={{
+                          background: "linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)",
+                          border: "1.5px solid #fde68a",
+                          borderRadius: "16px",
+                          padding: "14px 16px",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "12px",
+                          boxShadow: "0 2px 8px rgba(217, 119, 6, 0.10)"
+                        }}>
+                          <div style={{
+                            width: "44px",
+                            height: "44px",
+                            borderRadius: "12px",
+                            background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                            color: "#ffffff",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            boxShadow: "0 4px 12px rgba(217, 119, 6, 0.30)",
+                            flexShrink: 0
+                          }}>
+                            <Clock size={22} strokeWidth={2.4} />
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <span style={{ fontSize: "0.68rem", fontWeight: 900, color: "#b45309", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                              Übe-Begleiter & Rhythmus-Labor
+                            </span>
+                            <h4 style={{ margin: "2px 0 0", fontSize: "1.05rem", fontWeight: 900, color: "#0f172a", letterSpacing: "-0.02em" }}>
+                              Metronom & Begleit-Takes
+                            </h4>
+                            <p style={{ margin: "2px 0 0", fontSize: "0.74rem", color: "#78350f", fontWeight: 650 }}>
+                              Alle deine Rhythmus-Sessions, Tempo-Drills & Übe-Takes auf einen Blick
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Rhythmus & Groove Filter Pills */}
+                        {practiceCompanionAudios.length > 0 && (
+                          <div style={{
+                            display: "flex",
+                            gap: "6px",
+                            overflowX: "auto",
+                            paddingBottom: "4px",
+                            WebkitOverflowScrolling: "touch"
+                          }}>
+                            {availableStyles.map(st => {
+                              const isSelected = selectedPracticeStyleFilter === st.id;
+                              const count = st.id === 'all'
+                                ? practiceCompanionAudios.length
+                                : practiceCompanionAudios.filter(a => a.style === st.id || (typeof a.label === 'string' && a.label.toLowerCase().includes(st.id))).length;
+                              
+                              if (st.id !== 'all' && count === 0) return null;
+
+                              return (
+                                <button
+                                  key={`filter-${st.id}`}
+                                  type="button"
+                                  onClick={() => setSelectedPracticeStyleFilter(st.id)}
+                                  style={{
+                                    padding: "4px 10px",
+                                    borderRadius: "100px",
+                                    fontSize: "0.70rem",
+                                    fontWeight: 800,
+                                    whiteSpace: "nowrap",
+                                    cursor: "pointer",
+                                    border: isSelected ? "1.5px solid #d97706" : "1px solid #e2e8f0",
+                                    background: isSelected ? "#f59e0b" : "#ffffff",
+                                    color: isSelected ? "#ffffff" : "#64748b",
+                                    boxShadow: isSelected ? "0 2px 6px rgba(217, 119, 6, 0.25)" : "none",
+                                    transition: "all 0.15s ease"
+                                  }}
+                                >
+                                  {st.label} ({count})
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Takes List */}
+                        {filteredPracticeTakes.length === 0 ? (
+                          <div style={{ textAlign: "center", padding: "30px 16px", color: "#94a3b8", fontSize: "0.80rem", fontWeight: 700, background: "#fffbeb", borderRadius: "12px", border: "1px dashed #fde68a" }}>
+                            {practiceCompanionAudios.length === 0
+                              ? "Noch keine Übe-Begleiter Aufnahmen vorhanden. Starte im Übe-Begleiter eine Aufnahme!"
+                              : "Keine Aufnahmen für diesen Filter gefunden."}
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                            {filteredPracticeTakes.map((aud, idx) => renderStudentPlayer(aud, `stud-practice-${idx}`))}
+                          </div>
+                        )}
                       </div>
                     );
                   }
@@ -3099,7 +3549,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                             Monats-Alben, Songs & Archiv
                           </span>
                           <span style={{ fontSize: "0.66rem", color: "#94a3b8", fontWeight: 700 }}>
-                            {1 + sortedMonths.length + studentSongAlbumsList.length} Alben
+                            {2 + sortedMonths.length + studentSongAlbumsList.length} Alben
                           </span>
                         </div>
 
@@ -3113,9 +3563,22 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                             const isFilled = favoriteStudentAudios.length > 0;
                             return (
                               <div
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`Favoriten Album, ${favoriteStudentAudios.length} Takes`}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    setSelectedStudentMonth(null);
+                                    setSelectedStudentSongAlbum(null);
+                                    setSelectedPracticeCompanionAlbum(false);
+                                    setShowStudentFavoritesOnly(true);
+                                  }
+                                }}
                                 onClick={() => {
                                   setSelectedStudentMonth(null);
                                   setSelectedStudentSongAlbum(null);
+                                  setSelectedPracticeCompanionAlbum(false);
                                   setShowStudentFavoritesOnly(true);
                                 }}
                                 style={{
@@ -3206,6 +3669,117 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                             );
                           })()}
 
+                          {/* ⏱️ Übe-Begleiter & Rhythmen System Album Cover Card */}
+                          {(() => {
+                            const isFilled = practiceCompanionAudios.length > 0;
+                            return (
+                              <div
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`Übe-Begleiter Album, ${practiceCompanionAudios.length} Takes`}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    setSelectedStudentMonth(null);
+                                    setSelectedStudentSongAlbum(null);
+                                    setShowStudentFavoritesOnly(false);
+                                    setSelectedPracticeCompanionAlbum(true);
+                                  }
+                                }}
+                                onClick={() => {
+                                  setSelectedStudentMonth(null);
+                                  setSelectedStudentSongAlbum(null);
+                                  setShowStudentFavoritesOnly(false);
+                                  setSelectedPracticeCompanionAlbum(true);
+                                }}
+                                style={{
+                                  aspectRatio: "1 / 1",
+                                  background: isFilled 
+                                    ? "linear-gradient(135deg, #f59e0b 0%, #d97706 60%, #b45309 100%)" 
+                                    : "linear-gradient(145deg, #ffffff 0%, #fefce8 100%)",
+                                  borderRadius: "16px",
+                                  border: isFilled ? "1px solid rgba(255, 255, 255, 0.4)" : "1.5px solid #fef08a",
+                                  padding: "8px 4px",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  cursor: "pointer",
+                                  boxShadow: isFilled ? "0 6px 18px -2px rgba(217, 119, 6, 0.35), 0 2px 6px rgba(0,0,0,0.06)" : "0 2px 6px rgba(0,0,0,0.03)",
+                                  position: "relative",
+                                  overflow: "hidden",
+                                  transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
+                                  textAlign: "center"
+                                }}
+                                className="hover-scale"
+                              >
+                                {/* Specular Highlight Sheen */}
+                                {isFilled && (
+                                  <div style={{
+                                    position: "absolute",
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    height: "50%",
+                                    background: "linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 100%)",
+                                    pointerEvents: "none"
+                                  }} />
+                                )}
+
+                                {/* Luminous Floating Capsule with Clock/Metronome Icon */}
+                                <div style={{
+                                  width: "36px",
+                                  height: "36px",
+                                  borderRadius: "11px",
+                                  background: isFilled ? "rgba(255, 255, 255, 0.22)" : "#fef3c7",
+                                  backdropFilter: isFilled ? "blur(8px)" : "none",
+                                  WebkitBackdropFilter: isFilled ? "blur(8px)" : "none",
+                                  border: isFilled ? "1px solid rgba(255, 255, 255, 0.65)" : "1px solid #fde68a",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  boxShadow: isFilled ? "0 2px 8px rgba(0, 0, 0, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.8)" : "none",
+                                  marginTop: "2px",
+                                  color: isFilled ? "#ffffff" : "#d97706"
+                                }}>
+                                  <Clock size={20} strokeWidth={2.4} color={isFilled ? "#ffffff" : "#d97706"} />
+                                </div>
+
+                                {/* Typography */}
+                                <div style={{ width: "100%", position: "relative", zIndex: 1, padding: "0 2px" }}>
+                                  <div style={{
+                                    fontSize: "0.70rem",
+                                    fontWeight: 900,
+                                    color: isFilled ? "#ffffff" : "#78350f",
+                                    letterSpacing: "-0.01em",
+                                    lineHeight: 1.15,
+                                    whiteSpace: "nowrap",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    textShadow: isFilled ? "0 1px 3px rgba(0,0,0,0.25)" : "none"
+                                  }}>
+                                    Übe-Begleiter
+                                  </div>
+                                  <div style={{
+                                    display: "inline-block",
+                                    background: isFilled ? "rgba(0, 0, 0, 0.18)" : "#fef3c7",
+                                    backdropFilter: isFilled ? "blur(4px)" : "none",
+                                    WebkitBackdropFilter: isFilled ? "blur(4px)" : "none",
+                                    padding: "1px 6px",
+                                    borderRadius: "999px",
+                                    fontSize: "0.55rem",
+                                    fontWeight: 800,
+                                    color: isFilled ? "#fef3c7" : "#92400e",
+                                    marginTop: "2px",
+                                    border: isFilled ? "1px solid rgba(255, 255, 255, 0.2)" : "1px solid #fde68a"
+                                  }}>
+                                    {practiceCompanionAudios.length} {practiceCompanionAudios.length === 1 ? "Take" : "Takes"}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()}
+
                           {/* 🎵 Song- & Lehrwerk-Alben Covers (für jeden Song/Lehrwerk mit Snippets) */}
                           {studentSongAlbumsList.map(songAlb => {
                             const isBook = isBookAlbum(songAlb.songTitle);
@@ -3215,6 +3789,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                                 onClick={() => {
                                   setSelectedStudentMonth(null);
                                   setShowStudentFavoritesOnly(false);
+                                  setSelectedPracticeCompanionAlbum(false);
                                   setSelectedStudentSongAlbum(songAlb.songTitle);
                                 }}
                                 style={{
@@ -3344,6 +3919,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                                 onClick={() => {
                                   setSelectedStudentSongAlbum(null);
                                   setShowStudentFavoritesOnly(false);
+                                  setSelectedPracticeCompanionAlbum(false);
                                   setSelectedStudentMonth({ key: m.monthKey, label: m.monthLabel });
                                 }}
                                 style={{

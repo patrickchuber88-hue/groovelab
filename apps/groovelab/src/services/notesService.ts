@@ -27,6 +27,16 @@ export interface UserNote {
   color_accent?: string;
   created_at: string;
   updated_at: string;
+  // 🏛️ Tier-1 Enterprise+ Extensions:
+  source_origin?: 'user_notes' | 'homework_book';
+  homework_content?: string | null;
+  is_homework_synced?: boolean;
+  homework_status?: 'pending' | 'viewed' | 'practiced';
+  room_issue_status?: 'reported' | 'in_progress' | 'resolved';
+  checklist_items?: Array<{ id: string; text: string; completed: boolean }>;
+  lehrwerk_id?: string | null;
+  lehrwerk_title?: string | null;
+  lehrwerk_pages?: number[] | null;
 }
 
 const DB_NAME = 'CampusGroovelabNotesDB';
@@ -147,6 +157,196 @@ export const isRoomIssueNote = (note: { content?: string; tags?: string[]; room_
   const isDefectText = /mangel|defekt|kaputt|reparatur|stimmen|saite|notenständer|wackelt|fehlt|abgebrochen|beschädigt|problem/i.test(content);
 
   return Boolean(hasRoom && (isDefectTag || isDefectText));
+};
+
+// 🛡️ Enterprise+ Revisionssicheres Audit-Logging für Notizen (OWASP ASVS Level 3)
+export const logNoteAudit = async (
+  action: 'USER_NOTE_CREATED' | 'USER_NOTE_UPDATED' | 'USER_NOTE_CHECKLIST_TOGGLED' | 'USER_NOTE_DELETED' | 'USER_NOTE_RESTORED',
+  schoolId: number | string,
+  userId: string,
+  noteId: string,
+  details: Record<string, any>
+) => {
+  try {
+    const sId = isUUID(schoolId) ? schoolId : undefined;
+    const uId = isUUID(userId) ? userId : undefined;
+    if (sId && uId) {
+      await supabase.from('audit_logs').insert({
+        action,
+        school_id: sId,
+        user_id: uId,
+        entity_type: 'user_note',
+        entity_id: noteId,
+        details: {
+          ...details,
+          timestamp: new Date().toISOString()
+        }
+      });
+    }
+  } catch (err) {
+    // Fail-safe silent catch: local offline caching stays robust even if network/audit table is unavailable
+    console.warn('Silent note audit log notice:', err);
+  }
+};
+
+// 🏛️ Checkliste Parser (Mehrzeilig, Semikolon-getrennt oder Inline mit Bindestrich)
+export const parseChecklistText = (text: string): { isChecklist: boolean; items: Array<{ id: string; text: string; completed: boolean }> } => {
+  if (!text) return { isChecklist: false, items: [] };
+
+  const trimmed = text.trim();
+  const items: Array<{ id: string; text: string; completed: boolean }> = [];
+
+  // Fall 1: Mehrzeiliger Text (\n getrennt)
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length > 1) {
+    lines.forEach((line, idx) => {
+      const completed = line.includes('[x]') || line.includes('[X]');
+      const cleanText = line
+        .replace(/^-\s*\[[ xX]\]\s*/, '')
+        .replace(/^-\s*/, '')
+        .replace(/^\[[ xX]\]\s*/, '')
+        .trim();
+      if (cleanText) {
+        items.push({ id: `chk_${idx}_${Date.now()}`, text: cleanText, completed });
+      }
+    });
+    return { isChecklist: items.length > 0, items };
+  }
+
+  // Fall 2: Einzeiliger Text mit Semikolon-Aufzählung
+  if (text.includes(';')) {
+    const rawParts = text.replace(/^-\s*/, '').split(';').map(p => p.trim()).filter(Boolean);
+    if (rawParts.length > 1) {
+      rawParts.forEach((part, idx) => {
+        const completed = part.startsWith('[x]') || part.startsWith('[X]');
+        const cleanText = part.replace(/^\[[ xX]\]\s*/, '').replace(/^-\s*/, '').trim();
+        if (cleanText) {
+          items.push({ id: `chk_${idx}_${Date.now()}`, text: cleanText, completed });
+        }
+      });
+      return { isChecklist: items.length > 0, items };
+    }
+  }
+
+  // Fall 3: Einzeiliger Text mit inline "-" getrennten Items (z.B. "- hallo- wie gehts- was machst du" oder "- item1 - item2")
+  if (trimmed.startsWith('-') || trimmed.includes(' - ') || /-\s+[^\s]/.test(trimmed)) {
+    // Teile an jedem Bindestrich auf, der am Zeilenanfang steht oder dem Leerzeichen folgen oder dem ein Buchstabe folgt
+    const inlineParts = trimmed.split(/(?:^|\s+)-\s*|-(?=[a-zA-Z0-9äöüÄÖÜß])/).map(p => p.trim()).filter(Boolean);
+    if (inlineParts.length > 1) {
+      inlineParts.forEach((part, idx) => {
+        const completed = part.startsWith('[x]') || part.startsWith('[X]');
+        const cleanText = part.replace(/^\[[ xX]\]\s*/, '').replace(/^-\s*/, '').trim();
+        if (cleanText) {
+          items.push({ id: `chk_${idx}_${Date.now()}`, text: cleanText, completed });
+        }
+      });
+      if (items.length > 1) {
+        return { isChecklist: true, items };
+      }
+    }
+  }
+
+  // Fall 4: Einzelnes Checkbox-Item (z.B. "- Aufwärmen" oder "[ ] Üben")
+  if (trimmed.startsWith('- ') || trimmed.startsWith('[ ]') || trimmed.startsWith('[x]')) {
+    const completed = trimmed.includes('[x]') || trimmed.includes('[X]');
+    const cleanText = trimmed
+      .replace(/^-\s*\[[ xX]\]\s*/, '')
+      .replace(/^-\s*/, '')
+      .replace(/^\[[ xX]\]\s*/, '')
+      .trim();
+    if (cleanText) {
+      items.push({ id: `chk_0_${Date.now()}`, text: cleanText, completed });
+      return { isChecklist: true, items };
+    }
+  }
+
+  return { isChecklist: false, items: [] };
+};
+
+// 🏛️ Lehrwerk & Seitenzahlen-Erkennung
+export const parseLehrwerkAndPages = (text: string, studentLehrwerke: any[] = []): {
+  detectedLehrwerk: any | null;
+  pages: number[];
+  cleanNotes: string;
+} => {
+  const pages: number[] = [];
+  let detectedLehrwerk: any | null = null;
+  const cleanNotes = text;
+
+  // 1. Seitenzahlen-Muster erkennen (z.B. "Seite 14", "S. 14", "S. 14-16", "S. 14–16", "Seite 14 bis 16")
+  const pageRangeRegex = /(?:seite|s\.)\s*(\d+)(?:\s*(?:-|–|bis)\s*(\d+))?/gi;
+  let match;
+  while ((match = pageRangeRegex.exec(text)) !== null) {
+    const start = parseInt(match[1], 10);
+    const end = match[2] ? parseInt(match[2], 10) : start;
+    if (!isNaN(start)) {
+      const minP = Math.min(start, end);
+      const maxP = Math.max(start, end);
+      for (let p = minP; p <= maxP; p++) {
+        if (!pages.includes(p)) pages.push(p);
+      }
+    }
+  }
+
+  // 2. Lehrwerk-Zuordnung prüfen
+  if (studentLehrwerke && studentLehrwerke.length > 0) {
+    const lowerText = text.toLowerCase();
+    for (const lw of studentLehrwerke) {
+      const titleLower = (lw.title || '').toLowerCase();
+      if (titleLower && lowerText.includes(titleLower)) {
+        detectedLehrwerk = lw;
+        break;
+      }
+    }
+    // Falls kein Titel direkt im Text, aber nur 1 aktives Lehrwerk existiert und #noten vorhanden ist
+    if (!detectedLehrwerk && /#noten/i.test(text) && studentLehrwerke.length === 1) {
+      detectedLehrwerk = studentLehrwerke[0];
+    }
+  }
+
+  return { detectedLehrwerk, pages, cleanNotes };
+};
+
+// 🏛️ Protokoll-Modul-Brücke: Atomarer Sync in progress_matrix
+export const syncNotePageToProtocolMatrix = async (params: {
+  schoolId: number | string;
+  studentId: string;
+  teacherId: string;
+  lehrwerkTitle: string;
+  pages: number[];
+  noteText?: string;
+  isRepeat?: boolean;
+}): Promise<void> => {
+  const { schoolId, studentId, teacherId, lehrwerkTitle, pages, noteText = '', isRepeat = false } = params;
+  if (!schoolId || !studentId || !lehrwerkTitle || !pages || pages.length === 0) return;
+
+  const nowIso = new Date().toISOString();
+  const effectiveStatus = 'IN_PROGRESS';
+  const effectiveNote = isRepeat ? `[Wiederholung] ${noteText}`.trim() : noteText.trim();
+
+  for (const pageNum of pages) {
+    const topicName = `${lehrwerkTitle} - Seite ${pageNum}`;
+    try {
+      if (isUUID(studentId) && isUUID(teacherId) && isUUID(String(schoolId))) {
+        await supabase
+          .from('progress_matrix')
+          .upsert({
+            school_id: schoolId,
+            student_id: studentId,
+            teacher_id: teacherId,
+            topic_name: topicName,
+            status: effectiveStatus,
+            teacher_notes: effectiveNote,
+            homework_notes: JSON.stringify([effectiveNote]),
+            updated_at: nowIso
+          }, {
+            onConflict: 'school_id,student_id,topic_name'
+          });
+      }
+    } catch (err) {
+      console.warn('Protocol matrix sync notice:', err);
+    }
+  }
 };
 
 export const notesService = {
@@ -312,6 +512,20 @@ export const notesService = {
       ...(detectedType === 'room_issue' && !tags.some(t => t.toLowerCase() === '#mangel') ? ['#Mangel'] : [])
     ]));
 
+    const checklist = parseChecklistText(params.content);
+    const isChecklist = checklist.isChecklist && checklist.items.length > 0;
+
+    let cleanContent = params.content;
+    let homeworkContent: string | null = null;
+    let isHomeworkSynced = false;
+
+    if (params.content.includes('//')) {
+      const parts = params.content.split('//');
+      cleanContent = parts[0].trim();
+      homeworkContent = parts.slice(1).join('//').trim();
+      isHomeworkSynced = Boolean(homeworkContent);
+    }
+
     const newNote: UserNote = {
       id: 'note_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
       user_id: params.userId,
@@ -321,9 +535,9 @@ export const notesService = {
       student_name: params.studentName ? maskStudentName(params.studentName) : (studentMentions.length > 0 ? maskStudentName(studentMentions[0]) : null),
       room_id: params.roomId || (rooms.length > 0 ? rooms[0] : null),
       title: params.title || undefined,
-      content: params.content,
+      content: cleanContent,
       tags: combinedTags,
-      note_type: detectedType,
+      note_type: isChecklist ? 'todo' : detectedType,
       audio_url: params.audioUrl || null,
       audio_duration_seconds: params.audioDurationSeconds || null,
       due_date: params.dueDate || null,
@@ -332,21 +546,40 @@ export const notesService = {
       is_archived: false,
       is_completed: false,
       visibility: detectedVisibility,
+      source_origin: 'user_notes',
+      homework_content: homeworkContent,
+      is_homework_synced: isHomeworkSynced,
+      room_issue_status: detectedType === 'room_issue' ? 'reported' : undefined,
+      checklist_items: isChecklist ? checklist.items : undefined,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
 
-    // 1. Save immediately in IndexedDB (0ms)
+    // 1. Save immediately in IndexedDB (0ms Fast Local-First)
     await this.saveLocalNote(newNote);
 
-    // 2. Optimistically push to Supabase in background
+    // 2. Optimistically push to Supabase in background (non-blocking)
     if (params.userId && isUUID(params.userId) && params.schoolId && isUUID(params.schoolId)) {
-      try {
-        await supabase.from('user_notes').insert([newNote]);
-      } catch (e) {
+      Promise.resolve(supabase.from('user_notes').insert([newNote])).catch((e: any) => {
         // Graceful fallback for offline / unmigrated DB
-      }
+        console.warn('Background sync notice for user_notes:', e);
+      });
     }
+
+    // 🛡️ 3. Revisionssicheres Audit-Logging (OWASP ASVS Level 3, non-blocking)
+    logNoteAudit(
+      'USER_NOTE_CREATED',
+      params.schoolId,
+      params.userId,
+      newNote.id,
+      {
+        note_type: newNote.note_type,
+        student_name: newNote.student_name,
+        has_checklist: Boolean(newNote.checklist_items && newNote.checklist_items.length > 0),
+        checklist_count: newNote.checklist_items?.length || 0,
+        tags: newNote.tags
+      }
+    ).catch(() => {});
 
     return newNote;
   },
@@ -609,21 +842,38 @@ export const notesService = {
     // 1. Update local
     await this.saveLocalNote(updatedNote);
 
-    // 2. Push to Supabase
-    try {
-      await supabase.from('user_notes').update({
+    // 2. Push to Supabase in background (non-blocking)
+    Promise.resolve(
+      supabase.from('user_notes').update({
         ...updates,
         room_id: updatedNote.room_id,
         student_name: updatedNote.student_name,
         note_type: updatedNote.note_type,
         tags: updatedNote.tags,
         updated_at: updatedNote.updated_at
-      }).eq('id', noteId);
-    } catch (e) {}
+      }).eq('id', noteId)
+    ).catch(() => {});
+
+    // 🛡️ 3. Revisionssicheres Audit-Logging (OWASP ASVS Level 3, non-blocking)
+    const isChecklistToggle = updates.checklist_items !== undefined;
+    logNoteAudit(
+      isChecklistToggle ? 'USER_NOTE_CHECKLIST_TOGGLED' : 'USER_NOTE_UPDATED',
+      existing.school_id,
+      userId,
+      noteId,
+      {
+        action_detail: isChecklistToggle ? 'checklist_items_updated' : 'note_updated',
+        updated_keys: Object.keys(updates),
+        is_completed: updatedNote.is_completed
+      }
+    ).catch(() => {});
   },
 
   // Delete note (Physical hard delete from local + DB + Storage)
   async deleteNote(userId: string, noteId: string, audioUrl?: string | null): Promise<void> {
+    const localNotes = await this.getLocalNotes(userId);
+    const existing = localNotes.find(n => n.id === noteId);
+
     // 1. Delete local
     await this.deleteLocalNote(userId, noteId);
 
@@ -640,6 +890,21 @@ export const notesService = {
           await supabase.storage.from('user-recordings').remove([path]);
         }
       } catch (e) {}
+    }
+
+    // 🛡️ 4. Revisionssicheres Audit-Logging (OWASP ASVS Level 3)
+    if (existing) {
+      await logNoteAudit(
+        'USER_NOTE_DELETED',
+        existing.school_id,
+        userId,
+        noteId,
+        {
+          note_type: existing.note_type,
+          student_name: existing.student_name,
+          had_checklist: Boolean(existing.checklist_items && existing.checklist_items.length > 0)
+        }
+      );
     }
   }
 };

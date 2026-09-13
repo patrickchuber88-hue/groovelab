@@ -17,6 +17,7 @@ import {
   Lock, 
   Sparkles, 
   CheckCheck, 
+  Loader2, 
   ChevronDown, 
   RotateCcw, 
   AlertTriangle, 
@@ -41,7 +42,8 @@ import {
   Bell,
   Trash2,
   Sliders,
-  MessageCircle
+  MessageCircle,
+  Flag
 } from 'lucide-react';
 import { isWebAuthnSupported, authenticateParentBiometricPasskey } from '../utils/webauthn';
 import { formatTeacherFullName, formatSingleStudentAnonymized, formatStudentPureFirstName } from '../utils/nameHelper';
@@ -49,13 +51,15 @@ import { isUUID } from '../utils/uuidValidator';
 import { 
   validateChatMessageContent, 
   isQuietHoursActive, 
-  ChatRespectValidationResult 
+  ChatRespectValidationResult,
+  cleanChatMessageContent
 } from '../utils/chatRespectGuard';
 import { getInstrumentAvatarUrl, resolveCampusStudentAvatar } from './StudioAvatar';
 import { CampusCreateGroupModal } from './CampusCreateGroupModal';
 import { CampusCreateChannelModal } from './CampusCreateChannelModal';
 import { CampusTopicCard, CampusTopicReaction } from './CampusTopicCard';
 import { CampusTopicComposer } from './CampusTopicComposer';
+import { logSecurityEvent } from '../services/auditLogService';
 
 export const getGroupIconComponent = (iconId: string) => {
   switch (iconId) {
@@ -77,14 +81,14 @@ export const getGroupIconComponent = (iconId: string) => {
 };
 
 const resolveCampusAvatar = (u: any): string => {
-  if (!u) return '/avatar_ghost.jpg';
+  if (!u) return '/avatars/gitarre_avatar_new.png';
   const role = (u.role || '').toLowerCase();
   const roles = Array.isArray(u.roles) ? u.roles.map((r: any) => String(r).toLowerCase()) : [];
   
   // Teachers in Campus module must ALWAYS display their instrument avatar (per AGENTS.md)!
   const isTeacher = role === 'teacher' || roles.includes('teacher');
   if (isTeacher) {
-    return resolveCampusStudentAvatar(u);
+    return resolveCampusStudentAvatar({ ...u, role: 'teacher', isTeacherContext: true });
   }
 
   if (role === 'admin' || role === 'secretary' || roles.includes('admin') || roles.includes('secretary')) {
@@ -109,9 +113,7 @@ const formatStudentDisplayName = (u: any): string => {
 
   const isAdminRole = role === 'admin' || role === 'secretary' || roles.includes('admin') || roles.includes('secretary');
   if (isAdminRole) {
-    const fn = (u.first_name || '').trim();
-    const ln = (u.full_last_name || u.last_name || '').trim();
-    return `${fn} ${ln}`.trim() || 'Schulverwaltung';
+    return formatTeacherFullName(u);
   }
 
   // Only abbreviate last name for STUDENTS (per AGENTS.md rule)
@@ -129,10 +131,7 @@ const formatStudentDisplayName = (u: any): string => {
   return u.first_name || u.name || 'Benutzer';
 };
 
-export const cleanChatMessageContent = (content: string | null | undefined): string => {
-  if (!content) return '';
-  return String(content).replace(/^\[Termin[^\]]+\]\s*/i, '').trim();
-};
+export { cleanChatMessageContent };
 
 const parseLocalDate = (dateStr: string): Date => {
   if (!dateStr) return new Date();
@@ -572,6 +571,7 @@ const AppleSystemNotificationCard: React.FC<AppleSystemNotificationCardProps> = 
 
 interface CampusDirectMessagesProps {
   user: any;
+  currentUserId?: string;
   schoolUsers: any[];
   campusMessages: any[];
   onSendMessage: (
@@ -581,8 +581,10 @@ interface CampusDirectMessagesProps {
     channelId?: string, 
     parentMessageId?: string, 
     subject?: string
-  ) => Promise<void>;
+  ) => Promise<any>;
   onMarkAsRead: (senderId: string) => Promise<void>;
+  onMarkGroupAsRead?: (groupId: string) => Promise<void>;
+  onMarkChannelAsRead?: (channelId: string, groupId: string) => Promise<void>;
   selectedRecipient: any;
   setSelectedRecipient: (recipient: any) => void;
   studentToTeacherChat?: boolean;
@@ -591,10 +593,13 @@ interface CampusDirectMessagesProps {
 
 export function CampusDirectMessages({
   user,
+  currentUserId,
   schoolUsers,
   campusMessages,
   onSendMessage,
   onMarkAsRead,
+  onMarkGroupAsRead,
+  onMarkChannelAsRead,
   selectedRecipient,
   setSelectedRecipient,
   studentToTeacherChat = true,
@@ -610,6 +615,7 @@ export function CampusDirectMessages({
   const [searchQuery, setSearchQuery] = useState('');
   const [typedMessage, setTypedMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatScrollContainerRef = useRef<HTMLDivElement>(null);
   const [filterType, setFilterType] = useState<'all' | 'unread'>('all');
   const [activeSubTab, setActiveSubTab] = useState<string>('all');
   const [assignedStudents, setAssignedStudents] = useState<any[]>([]);
@@ -626,8 +632,48 @@ export function CampusDirectMessages({
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
   const [channelViewModeOverrides, setChannelViewModeOverrides] = useState<Record<string, 'chat' | 'threads'>>({});
   const [oneOnOneMode, setOneOnOneMode] = useState<'chat' | 'threads'>('chat');
+  const [isTopicComposerOpen, setIsTopicComposerOpen] = useState(false);
+  const [focusedTopicId, setFocusedTopicId] = useState<string | null>(null);
   const [showCreateChannelModal, setShowCreateChannelModal] = useState(false);
   const [messageReactions, setMessageReactions] = useState<CampusTopicReaction[]>([]);
+  const [reportingMessage, setReportingMessage] = useState<any | null>(null);
+  const [reportToast, setReportToast] = useState<string | null>(null);
+
+  const handleInitiateReport = (msg: any) => {
+    const lastReportKey = `cgl_last_report_${selectedRecipient?.id || 'general'}`;
+    const lastReportTime = Number(localStorage.getItem(lastReportKey) || 0);
+    const now = Date.now();
+    if (now - lastReportTime < 24 * 60 * 60 * 1000) {
+      setReportToast('Du hast für diese Gruppe heute bereits eine Meldung gesendet. Deine Lehrkraft ist bereits informiert.');
+      setTimeout(() => setReportToast(null), 4000);
+      return;
+    }
+    setReportingMessage(msg);
+  };
+
+  const handleConfirmReport = async (reasonText: string) => {
+    if (!reportingMessage) return;
+    const lastReportKey = `cgl_last_report_${selectedRecipient?.id || 'general'}`;
+    localStorage.setItem(lastReportKey, String(Date.now()));
+    try {
+      await supabase.from('audit_logs').insert({
+        action: 'group_message_reported',
+        entity_type: 'chat_message',
+        entity_id: reportingMessage.id,
+        details: {
+          reason: reasonText,
+          reporter_id: user?.id,
+          group_id: selectedRecipient?.id,
+          content_preview: String(reportingMessage.content || '').substring(0, 80)
+        }
+      });
+    } catch (err) {
+      console.warn('Silent audit log notice:', err);
+    }
+    setReportingMessage(null);
+    setReportToast('Meldung vertraulich an deine Lehrkraft übermittelt. Danke für deine Mithilfe!');
+    setTimeout(() => setReportToast(null), 4000);
+  };
 
   const isRecipientInQuietHours = useMemo(() => {
     if (!selectedRecipient) return false;
@@ -644,11 +690,145 @@ export function CampusDirectMessages({
 
   const [isMobile, setIsMobile] = useState(checkIsMobile);
 
-  const isTeacherOrStaff = 
-    user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'secretary' ||
-    (typeof window !== 'undefined' && ['teacher', 'admin', 'secretary'].includes((sessionStorage.getItem('groovelab_user_role') || localStorage.getItem('groovelab_user_role') || '').toLowerCase()));
+// 🛡️ Tier-1 Enterprise+ Local Storage Read Receipts Cache (Offline-First / Zero-Bounce)
+const getLocalChannelReads = (uid: string): Map<string, number> => {
+  const map = new Map<string, number>();
+  if (typeof window === 'undefined' || !uid) return map;
+  try {
+    const raw = localStorage.getItem(`cgl_channel_reads_${uid}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      Object.entries(parsed).forEach(([k, v]) => {
+        if (typeof v === 'number') map.set(k, v);
+      });
+    }
+  } catch (e) {}
+  return map;
+};
 
-  const isStudent = !isTeacherOrStaff && (user?.role?.toLowerCase() === 'student' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_user_role') === 'student'));
+const saveLocalChannelRead = (uid: string, channelId: string, timestamp: number) => {
+  if (typeof window === 'undefined' || !uid || !channelId) return;
+  try {
+    const key = `cgl_channel_reads_${uid}`;
+    const raw = localStorage.getItem(key);
+    const obj = raw ? JSON.parse(raw) : {};
+    if (!obj[channelId] || obj[channelId] < timestamp) {
+      obj[channelId] = timestamp;
+      localStorage.setItem(key, JSON.stringify(obj));
+    }
+  } catch (e) {}
+};
+
+const getLocalGroupReads = (uid: string): Map<string, number> => {
+  const map = new Map<string, number>();
+  if (typeof window === 'undefined' || !uid) return map;
+  try {
+    const raw = localStorage.getItem(`cgl_group_reads_${uid}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      Object.entries(parsed).forEach(([k, v]) => {
+        if (typeof v === 'number') map.set(k, v);
+      });
+    }
+  } catch (e) {}
+  return map;
+};
+
+const saveLocalGroupRead = (uid: string, groupId: string, timestamp: number) => {
+  if (typeof window === 'undefined' || !uid || !groupId) return;
+  try {
+    const key = `cgl_group_reads_${uid}`;
+    const raw = localStorage.getItem(key);
+    const obj = raw ? JSON.parse(raw) : {};
+    if (!obj[groupId] || obj[groupId] < timestamp) {
+      obj[groupId] = timestamp;
+      localStorage.setItem(key, JSON.stringify(obj));
+    }
+  } catch (e) {}
+};
+
+const getLocalDirectReads = (uid: string): Map<string, number> => {
+  const map = new Map<string, number>();
+  if (typeof window === 'undefined' || !uid) return map;
+  try {
+    const raw = localStorage.getItem(`cgl_direct_reads_${uid}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      Object.entries(parsed).forEach(([k, v]) => {
+        if (typeof v === 'number') map.set(k, v);
+      });
+    }
+  } catch (e) {}
+  return map;
+};
+
+const saveLocalDirectRead = (uid: string, partnerId: string, timestamp: number) => {
+  if (typeof window === 'undefined' || !uid || !partnerId) return;
+  try {
+    const key = `cgl_direct_reads_${uid}`;
+    const raw = localStorage.getItem(key);
+    const obj = raw ? JSON.parse(raw) : {};
+    if (!obj[partnerId] || obj[partnerId] < timestamp) {
+      obj[partnerId] = timestamp;
+      localStorage.setItem(key, JSON.stringify(obj));
+    }
+  } catch (e) {}
+};
+
+const getLocalReadMsgIds = (uid: string): Set<string> => {
+  const set = new Set<string>();
+  if (typeof window === 'undefined' || !uid) return set;
+  try {
+    const raw = localStorage.getItem(`cgl_read_msg_ids_${uid}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((id: string) => {
+          if (typeof id === 'string') set.add(id);
+        });
+      }
+    }
+  } catch (e) {}
+  return set;
+};
+
+const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
+  if (typeof window === 'undefined' || !uid || !msgIds || msgIds.length === 0) return;
+  try {
+    const key = `cgl_read_msg_ids_${uid}`;
+    const raw = localStorage.getItem(key);
+    let arr: string[] = [];
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) arr = parsed;
+      } catch (e) {}
+    }
+    const set = new Set(arr);
+    msgIds.forEach(id => {
+      if (id) set.add(id);
+    });
+    const updated = Array.from(set).slice(-1000);
+    localStorage.setItem(key, JSON.stringify(updated));
+  } catch (e) {}
+};
+
+  const effectiveUid = currentUserId || 
+    (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_selected_student_id') || sessionStorage.getItem('groovelab_user_id')) : null) || 
+    user?.id;
+
+  const isStudentViewer = typeof window !== 'undefined' && (
+    sessionStorage.getItem('groovelab_active_workspace') === 'student' ||
+    Boolean(sessionStorage.getItem('groovelab_selected_student_id')) ||
+    Boolean(currentUserId && currentUserId !== user?.id)
+  );
+
+  const isTeacherOrStaff = !isStudentViewer && (
+    user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'secretary' ||
+    (typeof window !== 'undefined' && ['teacher', 'admin', 'secretary'].includes((sessionStorage.getItem('groovelab_user_role') || localStorage.getItem('groovelab_user_role') || '').toLowerCase()))
+  );
+
+  const isStudent = isStudentViewer || (!isTeacherOrStaff && (user?.role?.toLowerCase() === 'student' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_user_role') === 'student')));
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -753,7 +933,7 @@ export function CampusDirectMessages({
     if (isStudent) {
       const fetchStudentTeachers = async () => {
         try {
-          const studentId = user?.id || (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null);
+          const studentId = effectiveUid || user?.id;
           if (!studentId || !isUUID(studentId)) return;
 
           const teacherMap = new Map<string, any>();
@@ -799,14 +979,22 @@ export function CampusDirectMessages({
             });
           } catch (e) {}
 
-          // 4. Teachers with existing 1:1 messages
+          // 4. Staff & Teachers with existing 1:1 messages (including school administration / secretariat)
           if (campusMessages && campusMessages.length > 0) {
             campusMessages.forEach((m: any) => {
+              if (m.group_id) return;
               const partnerId = m.sender_id === studentId ? m.recipient_id : m.sender_id;
               if (partnerId && partnerId !== studentId && !teacherMap.has(partnerId)) {
                 const existingInSchool = (schoolUsers || []).find((su: any) => su.id === partnerId);
-                if (existingInSchool && (existingInSchool.role === 'teacher' || (Array.isArray(existingInSchool.roles) && existingInSchool.roles.includes('teacher')))) {
+                if (existingInSchool) {
                   teacherMap.set(partnerId, existingInSchool);
+                } else {
+                  teacherMap.set(partnerId, {
+                    id: partnerId,
+                    first_name: 'Schulleitung',
+                    last_name: 'Verwaltung',
+                    role: 'admin'
+                  });
                 }
               }
             });
@@ -994,17 +1182,22 @@ export function CampusDirectMessages({
     return () => clearTimeout(timer);
   }, [user?.id, user?.school_id, user?.schools?.id, isStudent, schoolUsers]);
 
-  const [channelReads, setChannelReads] = useState<Map<string, number>>(new Map());
+  const [channelReads, setChannelReads] = useState<Map<string, number>>(() => getLocalChannelReads(effectiveUid || ''));
+  const lastAutoReadRef = useRef<{ [key: string]: number }>({});
+  const campusMessagesRef = useRef(campusMessages);
+  campusMessagesRef.current = campusMessages;
+  const channelReadsRef = useRef(channelReads);
+  channelReadsRef.current = channelReads;
 
   const fetchCampusGroups = React.useCallback(async () => {
-    const uid = user?.id || (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null);
+    const uid = effectiveUid;
     if (!uid) return;
     try {
       // 1. Groups where user is member & channel reads
       const [memberRes, channelReadsRes] = await Promise.all([
         supabase
           .from('campus_chat_group_members')
-          .select('group_id, role, last_read_at')
+          .select('group_id, user_id, role, last_read_at')
           .eq('user_id', uid),
         supabase
           .from('campus_chat_channel_reads')
@@ -1024,14 +1217,41 @@ export function CampusDirectMessages({
       }
 
       const chReadMap = new Map<string, number>();
+
+      // Merge local channel reads immediately (Offline-First)
+      const localChReads = getLocalChannelReads(uid);
+      localChReads.forEach((time, cId) => {
+        chReadMap.set(cId, time);
+      });
+
       if (channelReadsRes.data) {
         channelReadsRes.data.forEach((cr: any) => {
           if (cr.channel_id && cr.last_read_at) {
-            chReadMap.set(cr.channel_id, new Date(cr.last_read_at).getTime());
+            const dbTime = new Date(cr.last_read_at).getTime();
+            const existing = chReadMap.get(cr.channel_id) || 0;
+            chReadMap.set(cr.channel_id, Math.max(dbTime, existing));
           }
         });
       }
-      setChannelReads(chReadMap);
+      setChannelReads(prev => {
+        let hasChanges = false;
+        chReadMap.forEach((time, cId) => {
+          if ((prev.get(cId) || 0) < time) {
+            hasChanges = true;
+          }
+        });
+        if (!hasChanges && chReadMap.size <= prev.size) {
+          return prev;
+        }
+        const merged = new Map(prev);
+        chReadMap.forEach((time, cId) => {
+          const existing = merged.get(cId) || 0;
+          if (time > existing) {
+            merged.set(cId, time);
+          }
+        });
+        return merged;
+      });
 
       let groupIds: string[] = [];
       const membershipMap = new Map<string, any>();
@@ -1090,10 +1310,10 @@ export function CampusDirectMessages({
       }
       if (!groupsData) return;
 
-      // 3. Fetch member counts
+      // 3. Fetch member counts & last_read_at
       const { data: allMembers } = await supabase
         .from('campus_chat_group_members')
-        .select('group_id, user_id, role')
+        .select('group_id, user_id, role, last_read_at')
         .in('group_id', groupIds);
 
       const membersByGroup = new Map<string, any[]>();
@@ -1106,7 +1326,10 @@ export function CampusDirectMessages({
       const processed = groupsData.map((g: any) => {
         const members = membersByGroup.get(g.id) || [];
         const myMembership = membershipMap.get(g.id);
-        const groupLastRead = myMembership?.last_read_at ? new Date(myMembership.last_read_at).getTime() : 0;
+        const localGrpReads = getLocalGroupReads(uid);
+        const localGrpTime = localGrpReads.get(g.id) || 0;
+        const dbGrpTime = myMembership?.last_read_at ? new Date(myMembership.last_read_at).getTime() : 0;
+        const groupLastRead = Math.max(dbGrpTime, localGrpTime);
 
         const grpMessages = (campusMessages || []).filter((m: any) => m.group_id === g.id);
         const lastMsg = grpMessages.length > 0 ? grpMessages[grpMessages.length - 1] : null;
@@ -1209,18 +1432,39 @@ export function CampusDirectMessages({
       const channels = data || [];
       setGroupChannels(channels);
 
-      // Set active channel to first channel (or default # allgemein) if none selected or selected not in list
+      // Goldstandard: Set active channel to first channel with unread messages, or default # allgemein
       setActiveChannelId(prev => {
+        const uid = effectiveUid;
+        const currentMsgs = campusMessagesRef.current;
+        const currentReads = channelReadsRef.current;
+        // 1. Look for any channel with unread messages first
+        if (uid && currentMsgs && currentMsgs.length > 0) {
+          const unreadChannel = channels.find(ch => {
+            const lastRead = currentReads.get(ch.id) || 0;
+            return currentMsgs.some((m: any) => {
+              if (m.group_id !== groupId || m.sender_id === uid) return false;
+              const matches = m.channel_id ? m.channel_id === ch.id : ch.is_default;
+              if (!matches) return false;
+              return new Date(m.created_at).getTime() > lastRead;
+            });
+          });
+          if (unreadChannel) {
+            return unreadChannel.id;
+          }
+        }
+
+        // 2. If no unread messages in other channels, keep previous channel if valid
         if (prev && channels.some(c => c.id === prev)) {
           return prev;
         }
+
         const defaultChannel = channels.find(c => c.is_default) || channels[0];
         return defaultChannel ? defaultChannel.id : null;
       });
     } catch (err) {
       console.error('[CampusDirectMessages] Error fetching group channels:', err);
     }
-  }, []);
+  }, [user?.id, effectiveUid]);
 
   useEffect(() => {
     if (selectedRecipient?.is_group && selectedRecipient?.id) {
@@ -1312,38 +1556,53 @@ export function CampusDirectMessages({
     };
   }, [selectedRecipient?.id]);
 
-  const handlePublishTopic = async (subject: string, content: string) => {
+  const handlePublishTopic = async (subject: string, content?: string) => {
     if (!selectedRecipient) return;
-    const isGroup = Boolean(selectedRecipient.is_group);
-    if (isGroup && !activeChannelId) return;
+    const cleanSub = subject.trim();
+    const cleanBody = (content && content.trim()) || cleanSub;
+    if (!cleanSub) return;
 
-    const validation = validateChatMessageContent(`${subject} ${content}`);
+    const isGroup = Boolean(selectedRecipient.is_group);
+    const effectiveChannelId = isGroup 
+      ? (activeChannelId || groupChannels.find(c => c.is_default)?.id || groupChannels[0]?.id)
+      : undefined;
+
+    const validation = validateChatMessageContent(`${cleanSub} ${cleanBody}`);
     if (!validation.isValid) {
       setRespectWarning(validation);
       return;
     }
     setRespectWarning(null);
 
+    let createdTopic: any = null;
     if (isGroup) {
-      await onSendMessage(
+      createdTopic = await onSendMessage(
         user.id,
-        content.trim(),
+        cleanBody,
         selectedRecipient.id,
-        activeChannelId || undefined,
+        effectiveChannelId || undefined,
         undefined,
-        subject.trim()
+        cleanSub
       );
     } else {
-      await onSendMessage(
+      createdTopic = await onSendMessage(
         selectedRecipient.id,
-        content.trim(),
+        cleanBody,
         undefined,
         undefined,
         undefined,
-        subject.trim()
+        cleanSub
       );
     }
-    setTimeout(scrollToBottom, 50);
+    setIsTopicComposerOpen(false);
+
+    if (createdTopic?.id) {
+      setFocusedTopicId(createdTopic.id);
+      setTimeout(() => setFocusedTopicId(null), 4000);
+    }
+
+    setTimeout(() => scrollToBottom(true), 50);
+    return createdTopic;
   };
 
   const handleSendTopicReply = async (topicId: string, content: string) => {
@@ -1377,7 +1636,7 @@ export function CampusDirectMessages({
         undefined
       );
     }
-    setTimeout(scrollToBottom, 50);
+    setTimeout(() => scrollToBottom(true), 50);
   };
 
   const handleToggleReaction = async (messageId: string, emoji: string) => {
@@ -1514,19 +1773,27 @@ export function CampusDirectMessages({
 
   // Group messages and unread counts
   const partnersWithMetadata = useMemo(() => {
+    const currentViewerId = effectiveUid || user?.id;
+    const directReads = getLocalDirectReads(currentViewerId || '');
+    const readMsgIds = getLocalReadMsgIds(currentViewerId || '');
+
     return filteredPartners.map(partner => {
       const threadMessages = (campusMessages || []).filter(m => 
-        (m.sender_id === user?.id && m.recipient_id === partner.id) ||
-        (m.sender_id === partner.id && m.recipient_id === user?.id)
+        (m.sender_id === currentViewerId && m.recipient_id === partner.id) ||
+        (m.sender_id === partner.id && m.recipient_id === currentViewerId)
       );
 
       const directHumanMessages = threadMessages.filter(m => !isSystemMessage(m));
       const lastMessage = directHumanMessages.length > 0 
         ? directHumanMessages[directHumanMessages.length - 1] 
         : threadMessages[threadMessages.length - 1];
-      const unreadCount = directHumanMessages.filter(m => 
-        m.sender_id === partner.id && m.recipient_id === user?.id && !m.is_read
-      ).length;
+      const partnerLastRead = directReads.get(partner.id) || 0;
+      const unreadCount = directHumanMessages.filter(m => {
+        if (m.sender_id !== partner.id || m.recipient_id !== currentViewerId) return false;
+        if (m.is_read || readMsgIds.has(m.id)) return false;
+        if (partnerLastRead > 0 && new Date(m.created_at).getTime() <= partnerLastRead) return false;
+        return true;
+      }).length;
 
       return {
         ...partner,
@@ -1535,7 +1802,7 @@ export function CampusDirectMessages({
         lastMessageTime: lastMessage ? new Date(lastMessage.created_at) : null
       };
     });
-  }, [filteredPartners, campusMessages, user?.id]);
+  }, [filteredPartners, campusMessages, user?.id, effectiveUid]);
 
   // Filter based on Quick-Filters with deterministic alphabetical sorting (A-Z)
   const finalPartnersList = useMemo(() => {
@@ -1587,78 +1854,275 @@ export function CampusDirectMessages({
     });
   }, [isStudent, finalPartnersList, filteredGroupsList]);
 
-  // Auto-scroll to bottom of messages
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  // Controlled scroll to bottom of messages container
+  const scrollToBottom = (smooth = false) => {
+    if (chatScrollContainerRef.current) {
+      chatScrollContainerRef.current.scrollTo({
+        top: chatScrollContainerRef.current.scrollHeight,
+        behavior: smooth ? 'smooth' : 'auto'
+      });
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
+    }
   };
 
   useEffect(() => {
     if (!isMobile && !selectedRecipient) {
       if (isStudent && studentCombinedList.length > 0) {
+        const unreadConvo = studentCombinedList.find(p => (p.unreadCount || 0) > 0);
         const directTeacher = studentCombinedList.find(p => !p.is_group && String(p.id) === String(user?.teacher_id));
-        setSelectedRecipient(directTeacher || studentCombinedList[0]);
+        setSelectedRecipient(unreadConvo || directTeacher || studentCombinedList[0]);
       } else if (!isStudent) {
         if (activeMainTab === 'groups' && filteredGroupsList.length > 0) {
-          setSelectedRecipient(filteredGroupsList[0]);
+          const unreadGroup = filteredGroupsList.find(g => (g.unreadCount || 0) > 0);
+          setSelectedRecipient(unreadGroup || filteredGroupsList[0]);
         } else if (finalPartnersList.length > 0) {
-          setSelectedRecipient(finalPartnersList[0]);
+          const unreadPartner = finalPartnersList.find(p => (p.unreadCount || 0) > 0);
+          setSelectedRecipient(unreadPartner || finalPartnersList[0]);
         }
       }
     }
   }, [isMobile, finalPartnersList, filteredGroupsList, studentCombinedList, selectedRecipient, setSelectedRecipient, user?.teacher_id, isStudent, activeMainTab]);
 
-  useEffect(() => {
-    if (!selectedRecipient) return;
-    scrollToBottom();
+  const [isMarkingAsRead, setIsMarkingAsRead] = useState(false);
 
-    if (selectedRecipient.is_group && user?.id) {
-      fetchGroupMembersDetails(selectedRecipient.id);
+  // 🛡️ Autoritativer, revisionssicherer Quittierungs- und Lese-Handler gem. § 130 BGB / GoBD
+  const handleAcknowledgeAndMarkAsRead = async (targetRecipient?: any) => {
+    const target = targetRecipient || selectedRecipient;
+    const uid = effectiveUid || user?.id;
+    if (!target || !uid || isMarkingAsRead) return;
 
-      // Channel-specific mark-as-read: only mark the active channel as read!
-      if (activeChannelId) {
-        const activeChan = groupChannels.find(c => c.id === activeChannelId);
-        const hasUnreadInChannel = (campusMessages || []).some((m: any) => {
-          if (m.group_id !== selectedRecipient.id || m.sender_id === user.id) return false;
-          const matches = m.channel_id ? m.channel_id === activeChannelId : activeChan?.is_default;
-          if (!matches) return false;
-          const lastRead = channelReads.get(activeChannelId) || 0;
-          return new Date(m.created_at).getTime() > lastRead;
+    setIsMarkingAsRead(true);
+    const nowTime = Date.now();
+    const nowIso = new Date(nowTime).toISOString();
+
+    try {
+      if (target.is_group) {
+        const groupId = target.id;
+        saveLocalGroupRead(uid, groupId, nowTime);
+
+        // 1. 0ms Optimistisches UI-Update: Unread auf 0 setzen
+        setCampusGroups(prev => prev.map(g => {
+          if (g.id === groupId) {
+            return { ...g, unreadCount: 0 };
+          }
+          return g;
+        }));
+
+        // Alle Kanäle der Gruppe lokal als gelesen setzen
+        setChannelReads(prev => {
+          const next = new Map(prev);
+          (groupChannels || []).forEach(ch => {
+            if (ch.group_id === groupId || !ch.group_id) {
+              next.set(ch.id, nowTime);
+              saveLocalChannelRead(uid, ch.id, nowTime);
+            }
+          });
+          if (activeChannelId) {
+            next.set(activeChannelId, nowTime);
+            saveLocalChannelRead(uid, activeChannelId, nowTime);
+          }
+          return next;
         });
 
-        if (hasUnreadInChannel) {
-          const nowTime = Date.now();
-          // Optimistic local update
-          setChannelReads(prev => new Map(prev).set(activeChannelId, nowTime));
+        // 2. Revisionssicheres Audit-Logging gem. § 130 BGB / GoBD
+        logSecurityEvent({
+          action: 'QUITTUNG_LESEBESTAETIGUNG',
+          schoolId: user?.school_id,
+          userId: uid,
+          targetId: groupId,
+          metadata: {
+            type: 'group_chat',
+            group_name: target.name,
+            channels_count: groupChannels.length,
+            legal_basis: '§ 130 BGB / GoBD'
+          }
+        }).catch(e => console.warn('[CampusDirectMessages] Audit log error:', e));
 
+        if (onMarkGroupAsRead) {
+          await onMarkGroupAsRead(groupId);
+        } else {
           // Serverseitiger, atomarer RPC nach OWASP ASVS Level 3
-          supabase.rpc('mark_campus_channel_as_read', { p_channel_id: activeChannelId })
+          await supabase.rpc('mark_campus_group_as_read', { p_group_id: groupId, p_user_id: uid });
+        }
+      } else {
+        const partnerId = target.id;
+        const targetSchoolId = user?.school_id || user?.schoolId || (Array.isArray(user?.schools) ? user.schools[0]?.id : user?.schools?.id);
+        
+        saveLocalDirectRead(uid, partnerId, nowTime);
+        const targetMsgIds = (campusMessages || [])
+          .filter(m => !m.group_id && m.sender_id === partnerId && m.recipient_id === uid)
+          .map(m => m.id);
+        if (targetMsgIds.length > 0) {
+          saveLocalReadMsgIds(uid, targetMsgIds);
+        }
+
+        // 1. Revisionssicheres Audit-Logging gem. § 130 BGB / GoBD
+        logSecurityEvent({
+          action: 'QUITTUNG_LESEBESTAETIGUNG',
+          schoolId: targetSchoolId,
+          userId: uid,
+          targetId: partnerId,
+          metadata: {
+            type: 'direct_chat',
+            partner_name: `${target.first_name || ''} ${target.last_name || ''}`.trim(),
+            legal_basis: '§ 130 BGB / GoBD'
+          }
+        }).catch(e => console.warn('[CampusDirectMessages] Audit log error:', e));
+
+        if (onMarkAsRead) {
+          await onMarkAsRead(partnerId);
+        } else {
+          await supabase.rpc('mark_campus_direct_chat_as_read', { p_partner_id: partnerId, p_user_id: uid });
+        }
+      }
+    } catch (err) {
+      console.error('[CampusDirectMessages] Error marking chat as read:', err);
+    } finally {
+      setIsMarkingAsRead(false);
+    }
+  };
+
+  // 1. Group members fetching: isolated strictly to selectedRecipient id changes
+  useEffect(() => {
+    if (selectedRecipient?.is_group && selectedRecipient?.id && user?.id) {
+      fetchGroupMembersDetails(selectedRecipient.id);
+    } else {
+      setGroupMembersDetails([]);
+    }
+  }, [selectedRecipient?.id, selectedRecipient?.is_group, user?.id]);
+
+  // 2. Instant scroll when changing recipient or channel (zero-wobble container scroll)
+  useEffect(() => {
+    if (!selectedRecipient) return;
+    const timer = setTimeout(() => {
+      scrollToBottom(false);
+    }, 20);
+    return () => clearTimeout(timer);
+  }, [selectedRecipient?.id, activeChannelId, activeSubTab]);
+
+  // 3. Automatische Gelesen-Funktion (Auto-Read Engine)
+  // Wenn ein Kanal oder eine Nachricht geöffnet wurde, gilt sie sofort und revisionssicher als gelesen.
+  useEffect(() => {
+    const uid = effectiveUid;
+    if (!selectedRecipient || !uid) return;
+
+    if (selectedRecipient.is_group) {
+      const activeChan = groupChannels.find(c => c.id === activeChannelId) || groupChannels.find(c => c.is_default) || groupChannels[0];
+      const targetChanId = activeChannelId || activeChan?.id;
+      if (!targetChanId) return;
+
+      const readKey = `chan_${selectedRecipient.id}_${targetChanId}`;
+      const now = Date.now();
+      if (lastAutoReadRef.current[readKey] && (now - lastAutoReadRef.current[readKey]) < 2000) {
+        return;
+      }
+
+      const myMembership = selectedRecipient.members?.find((mb: any) => mb.user_id === uid);
+      const groupLastRead = myMembership?.last_read_at ? new Date(myMembership.last_read_at).getTime() : 0;
+      const lastRead = channelReads.has(targetChanId) ? (channelReads.get(targetChanId) || 0) : groupLastRead;
+
+      const unreadInActiveChannel = (campusMessages || []).filter((m: any) => {
+        if (m.group_id !== selectedRecipient.id || m.sender_id === uid) return false;
+        const matches = m.channel_id ? m.channel_id === targetChanId : activeChan?.is_default;
+        if (!matches) return false;
+        return new Date(m.created_at).getTime() > lastRead;
+      });
+
+      if (unreadInActiveChannel.length > 0 || (channelReads.get(targetChanId) || 0) === 0) {
+        lastAutoReadRef.current[readKey] = now;
+        const nowTime = now;
+        // 0ms optimistisches lokales Update
+        setChannelReads(prev => new Map(prev).set(targetChanId, nowTime));
+        saveLocalChannelRead(uid, targetChanId, nowTime);
+
+        // Optimistisch Gruppen-Ungelesen-Zähler herabsetzen
+        if (unreadInActiveChannel.length > 0) {
+          setCampusGroups(prev => prev.map(g => {
+            if (g.id === selectedRecipient.id) {
+              return { ...g, unreadCount: Math.max(0, (g.unreadCount || 0) - unreadInActiveChannel.length) };
+            }
+            return g;
+          }));
+        }
+
+        // Revisionssicheres Audit-Logging gem. § 130 BGB / GoBD
+        const targetSchoolId = user?.school_id || user?.schoolId || (Array.isArray(user?.schools) ? user.schools[0]?.id : user?.schools?.id);
+        logSecurityEvent({
+          action: 'QUITTUNG_LESEBESTAETIGUNG',
+          schoolId: targetSchoolId,
+          userId: uid,
+          targetId: targetChanId,
+          metadata: {
+            type: 'channel_auto_read',
+            group_id: selectedRecipient.id,
+            channel_id: targetChanId,
+            channel_name: activeChan?.name || 'default',
+            messages_count: unreadInActiveChannel.length,
+            legal_basis: '§ 130 BGB / GoBD'
+          }
+        }).catch(e => console.warn('[CampusDirectMessages] Channel auto-read audit error:', e));
+
+        if (onMarkChannelAsRead) {
+          onMarkChannelAsRead(targetChanId, selectedRecipient.id);
+        } else {
+          // Serverseitiger, atomarer RPC nach OWASP ASVS Level 3
+          supabase.rpc('mark_campus_channel_as_read', { p_channel_id: targetChanId, p_user_id: uid })
             .then(({ error }: any) => {
-              if (error) {
-                // Fallback direct table upsert
+              if (error && targetSchoolId) {
                 supabase
                   .from('campus_chat_channel_reads')
                   .upsert({
-                    channel_id: activeChannelId,
-                    user_id: user.id,
-                    school_id: user.school_id,
+                    channel_id: targetChanId,
+                    user_id: uid,
+                    school_id: targetSchoolId,
                     last_read_at: new Date(nowTime).toISOString()
-                  }, { onConflict: 'channel_id,user_id' })
-                  .then(() => fetchCampusGroups());
-              } else {
-                fetchCampusGroups();
+                  }, { onConflict: 'channel_id,user_id' });
               }
             });
         }
       }
     } else {
-      const unreadFromRecipient = campusMessages.some(m => 
-        !m.group_id && m.sender_id === selectedRecipient.id && m.recipient_id === user.id && !m.is_read
+      const partnerId = selectedRecipient.id;
+      const readKey = `direct_${partnerId}`;
+      const now = Date.now();
+
+      // Immediately save to local direct reads (Zero-Bounce Guarantee)
+      saveLocalDirectRead(uid, partnerId, now);
+
+      const unreadFromRecipient = (campusMessages || []).filter(m => 
+        !m.group_id && m.sender_id === partnerId && m.recipient_id === uid && !m.is_read
       );
-      if (unreadFromRecipient) {
-        onMarkAsRead(selectedRecipient.id);
+
+      if (unreadFromRecipient.length > 0) {
+        const unreadIds = unreadFromRecipient.map(m => m.id);
+        saveLocalReadMsgIds(uid, unreadIds);
+
+        if (lastAutoReadRef.current[readKey] && (now - lastAutoReadRef.current[readKey]) < 2000) {
+          return;
+        }
+        lastAutoReadRef.current[readKey] = now;
+        const targetSchoolId = user?.school_id || user?.schoolId || (Array.isArray(user?.schools) ? user.schools[0]?.id : user?.schools?.id);
+        // Revisionssicheres Audit-Logging
+        logSecurityEvent({
+          action: 'QUITTUNG_LESEBESTAETIGUNG',
+          schoolId: targetSchoolId,
+          userId: uid,
+          targetId: partnerId,
+          metadata: {
+            type: 'direct_chat_auto_read',
+            partner_name: `${selectedRecipient.first_name || ''} ${selectedRecipient.last_name || ''}`.trim(),
+            messages_count: unreadFromRecipient.length,
+            legal_basis: '§ 130 BGB / GoBD'
+          }
+        }).catch(e => console.warn('[CampusDirectMessages] Direct auto-read audit error:', e));
+
+        if (onMarkAsRead) {
+          onMarkAsRead(partnerId);
+        }
       }
     }
-  }, [selectedRecipient, activeChannelId, groupChannels, campusMessages, user?.id, channelReads]);
+  }, [selectedRecipient?.id, selectedRecipient?.is_group, activeChannelId, campusMessages, effectiveUid, onMarkChannelAsRead, onMarkAsRead]);
 
   // Get active messages in the current thread (sorted chronologically)
   const activeThreadMessages = useMemo(() => {
@@ -1681,15 +2145,16 @@ export function CampusDirectMessages({
         })
         .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
     }
+    const currentViewerId = effectiveUid || user.id;
     return [...campusMessages]
       .filter(m => 
         !m.group_id && (
-          (m.sender_id === user.id && m.recipient_id === selectedRecipient.id) ||
-          (m.sender_id === selectedRecipient.id && m.recipient_id === user.id)
+          (m.sender_id === currentViewerId && m.recipient_id === selectedRecipient.id) ||
+          (m.sender_id === selectedRecipient.id && m.recipient_id === currentViewerId)
         )
       )
       .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-  }, [campusMessages, selectedRecipient, user.id, activeChannelId, groupChannels]);
+  }, [campusMessages, selectedRecipient, user.id, effectiveUid, activeChannelId, groupChannels]);
 
   const findUserById = React.useCallback((userId: string) => {
     if (!userId) return null;
@@ -2028,16 +2493,20 @@ export function CampusDirectMessages({
     return activeThreadMessages.filter(m => !m.occurrence_id && !isSystemMessage(m) && !extractOccurrenceDateFromMessage(m));
   }, [activeThreadMessages]);
 
-  // Count of genuine human messages across the entire thread (strictly human dialogues)
-  const humanMessagesCount = useMemo(() => {
-    return activeThreadMessages.filter(m => !isSystemMessage(m)).length;
+  // Genuine human messages in 1:1 chat (Chat tab: strictly human dialogues, excluding topics and thread replies)
+  const humanMessages = useMemo(() => {
+    return activeThreadMessages.filter(m => !isSystemMessage(m) && !m.parent_message_id && !m.subject && m.message_type !== 'topic' && !String(m.content || '').startsWith('📌 ['));
   }, [activeThreadMessages]);
+
+  // Count of genuine human messages in 1:1 chat (Chat tab)
+  const humanMessagesCount = humanMessages.length;
 
   // 4. Smart Auto-Tab Selection when switching students: Always default to 'all' (Unified Feed) & 'chat' mode
   useEffect(() => {
     if (!selectedRecipient) return;
     setActiveSubTab('all');
     setOneOnOneMode('chat');
+    setIsTopicComposerOpen(false);
   }, [selectedRecipient?.id]);
 
   // 4b. Graceful fallback if selected subtab no longer exists (e.g. empty tab was filtered out)
@@ -2059,17 +2528,85 @@ export function CampusDirectMessages({
       return activeThreadMessages;
     }
     // Tab "Alle" (Unified Timeline for 1:1 chat):
-    // strictly human dialogues, excluding replies inside topics (which belong in the topic thread)
-    return activeThreadMessages.filter(m => !isSystemMessage(m) && !m.parent_message_id);
-  }, [activeThreadMessages, selectedRecipient?.is_group]);
+    // strictly human dialogues, excluding replies inside topics and excluding structured topics
+    return humanMessages;
+  }, [activeThreadMessages, selectedRecipient?.is_group, humanMessages]);
 
   const activeRootTopics = useMemo(() => {
     if (selectedRecipient?.is_group) {
       return activeThreadMessages.filter(m => !m.parent_message_id);
     }
-    // For 1:1 direct chats: topics are messages created with a subject or topic type
-    return activeThreadMessages.filter(m => !m.parent_message_id && (Boolean(m.subject) || m.message_type === 'topic'));
+    // For 1:1 direct chats: topics are messages created with a subject, topic type, or fallback prefix
+    return activeThreadMessages.filter(m => !m.parent_message_id && (
+      Boolean(m.subject) || 
+      m.message_type === 'topic' || 
+      String(m.content || '').startsWith('📌 [')
+    ));
   }, [selectedRecipient?.is_group, activeThreadMessages]);
+
+  const unreadDirectChatCount = useMemo(() => {
+    if (!selectedRecipient || selectedRecipient.is_group) return 0;
+    const uid = effectiveUid || user?.id || '';
+    const directReads = getLocalDirectReads(uid);
+    const partnerLastRead = directReads.get(selectedRecipient.id) || 0;
+    const readMsgIds = getLocalReadMsgIds(uid);
+
+    return humanMessages.filter(m => {
+      if (m.sender_id !== selectedRecipient.id) return false;
+      if (m.recipient_id && m.recipient_id !== uid) return false;
+      if (m.is_read || readMsgIds.has(m.id)) return false;
+      if (partnerLastRead > 0 && new Date(m.created_at).getTime() <= partnerLastRead) return false;
+      return true;
+    }).length;
+  }, [selectedRecipient, humanMessages, effectiveUid, user?.id]);
+
+  const unreadGroupChatCount = useMemo(() => {
+    if (!selectedRecipient || !selectedRecipient.is_group) return 0;
+    const myMembership = selectedRecipient.members?.find((mb: any) => mb.user_id === effectiveUid);
+    const localGrpReads = getLocalGroupReads(effectiveUid || '');
+    const localGrpTime = localGrpReads.get(selectedRecipient.id) || 0;
+    const dbGrpTime = myMembership?.last_read_at ? new Date(myMembership.last_read_at).getTime() : 0;
+    const groupLastRead = Math.max(dbGrpTime, localGrpTime);
+    const lastRead = (activeChannelId && channelReads.has(activeChannelId))
+      ? (channelReads.get(activeChannelId) || 0)
+      : groupLastRead;
+    return humanMessages.filter(m => m.sender_id !== effectiveUid && new Date(m.created_at).getTime() > lastRead).length;
+  }, [selectedRecipient, effectiveUid, activeChannelId, channelReads, humanMessages]);
+
+  const unreadTopicsCount = useMemo(() => {
+    if (!selectedRecipient) return 0;
+    if (selectedRecipient.is_group) {
+      const myMembership = selectedRecipient.members?.find((mb: any) => mb.user_id === effectiveUid);
+      const localGrpReads = getLocalGroupReads(effectiveUid || '');
+      const localGrpTime = localGrpReads.get(selectedRecipient.id) || 0;
+      const dbGrpTime = myMembership?.last_read_at ? new Date(myMembership.last_read_at).getTime() : 0;
+      const groupLastRead = Math.max(dbGrpTime, localGrpTime);
+      const lastRead = (activeChannelId && channelReads.has(activeChannelId))
+        ? (channelReads.get(activeChannelId) || 0)
+        : groupLastRead;
+      return activeRootTopics.filter(topic => {
+        const replies = activeThreadMessages.filter(m => m.parent_message_id === topic.id);
+        return Boolean(
+          effectiveUid && (
+            (topic.sender_id !== effectiveUid && new Date(topic.created_at).getTime() > lastRead) ||
+            replies.some(r => r.sender_id !== effectiveUid && new Date(r.created_at).getTime() > lastRead)
+          )
+        );
+      }).length;
+    } else {
+      const uid = effectiveUid || user?.id || '';
+      const directReads = getLocalDirectReads(uid);
+      const partnerLastRead = selectedRecipient ? (directReads.get(selectedRecipient.id) || 0) : 0;
+      const readMsgIds = getLocalReadMsgIds(uid);
+
+      return activeRootTopics.filter(topic => {
+        const replies = activeThreadMessages.filter(m => m.parent_message_id === topic.id);
+        const isTopicUnread = topic.sender_id !== effectiveUid && !topic.is_read && !readMsgIds.has(topic.id) && (partnerLastRead === 0 || new Date(topic.created_at).getTime() > partnerLastRead);
+        const hasUnreadReply = replies.some(r => r.sender_id !== effectiveUid && !r.is_read && !readMsgIds.has(r.id) && (partnerLastRead === 0 || new Date(r.created_at).getTime() > partnerLastRead));
+        return Boolean(effectiveUid && (isTopicUnread || hasUnreadReply));
+      }).length;
+    }
+  }, [selectedRecipient, effectiveUid, activeChannelId, channelReads, activeRootTopics, activeThreadMessages, user?.id]);
 
   // Asynchronous Self-Healing: Persist missing reactivation audit record to PostgreSQL if absent
   useEffect(() => {
@@ -2123,7 +2660,7 @@ export function CampusDirectMessages({
         selectedRecipient.id, 
         activeChannelId || undefined
       );
-      setTimeout(scrollToBottom, 50);
+      setTimeout(() => scrollToBottom(true), 50);
       return;
     }
     
@@ -2137,13 +2674,13 @@ export function CampusDirectMessages({
           occurrence_id: targetOccTab.id,
           read_by: [user.id]
         });
-        setTimeout(scrollToBottom, 50);
+        setTimeout(() => scrollToBottom(true), 50);
         return;
       }
     }
 
     await onSendMessage(selectedRecipient.id, content.trim());
-    setTimeout(scrollToBottom, 50);
+    setTimeout(() => scrollToBottom(true), 50);
   };
 
   const handleSend = async (e: React.FormEvent) => {
@@ -2184,7 +2721,7 @@ export function CampusDirectMessages({
         border: '1px solid #f1f5f9',
         boxShadow: '0 10px 30px rgba(0,0,0,0.02)',
         flexShrink: 0,
-        transition: 'all 0.3s ease'
+        transition: isMobile ? 'width 0.25s ease, opacity 0.25s ease' : 'none'
       }}>
         {/* Search & Header */}
         <div style={{ 
@@ -2466,7 +3003,7 @@ export function CampusDirectMessages({
                             position: 'absolute',
                             bottom: '-2px',
                             right: '-2px',
-                            background: '#34a853',
+                            background: '#ea4335',
                             color: 'white',
                             borderRadius: '50%',
                             width: '18px',
@@ -2489,11 +3026,13 @@ export function CampusDirectMessages({
                           <span style={{ fontWeight: 800, fontSize: '0.9rem', color: isSelected ? '#34a853' : '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {group.name}
                           </span>
-                          {group.lastMessageTime && (
-                            <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#94a3b8', flexShrink: 0, marginLeft: '6px' }}>
-                              {new Date(group.lastMessageTime).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
-                            </span>
-                          )}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: '6px' }}>
+                            {group.lastMessageTime && (
+                              <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#94a3b8' }}>
+                                {new Date(group.lastMessageTime).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
@@ -2534,9 +3073,35 @@ export function CampusDirectMessages({
           {isStudent && (
             <div>
               {studentCombinedList.length === 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '200px', color: '#94a3b8', textAlign: 'center', padding: '20px' }}>
-                  <User size={36} style={{ color: '#cbd5e1', marginBottom: '8px' }} />
-                  <div style={{ fontSize: '0.85rem', fontWeight: 800 }}>Keine Chats oder Gruppen gefunden</div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '220px', color: '#94a3b8', textAlign: 'center', padding: '20px' }}>
+                  {filterType === 'unread' ? (
+                    <>
+                      <div style={{
+                        width: '46px',
+                        height: '46px',
+                        borderRadius: '50%',
+                        background: '#f0fdf4',
+                        border: '1.5px solid #bbf7d0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginBottom: '10px'
+                      }}>
+                        <CheckCheck size={22} color="#15803d" strokeWidth={2.6} />
+                      </div>
+                      <div style={{ fontSize: '0.88rem', fontWeight: 850, color: '#166534' }}>
+                        Alles erledigt &amp; abgehakt
+                      </div>
+                      <div style={{ fontSize: '0.74rem', color: '#15803d', marginTop: '4px', fontWeight: 600 }}>
+                        Keine offenen ungelesenen Nachrichten.
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <User size={36} style={{ color: '#cbd5e1', marginBottom: '8px' }} />
+                      <div style={{ fontSize: '0.85rem', fontWeight: 800 }}>Keine Chats oder Gruppen gefunden</div>
+                    </>
+                  )}
                 </div>
               ) : (
                 studentCombinedList.map(item => {
@@ -2590,7 +3155,7 @@ export function CampusDirectMessages({
                               position: 'absolute',
                               bottom: '-2px',
                               right: '-2px',
-                              background: '#34a853',
+                              background: '#ea4335',
                               color: 'white',
                               borderRadius: '50%',
                               width: '18px',
@@ -2601,7 +3166,7 @@ export function CampusDirectMessages({
                               alignItems: 'center',
                               justifyContent: 'center',
                               border: '2px solid white',
-                              boxShadow: '0 2px 6px rgba(52, 168, 83, 0.45)'
+                              boxShadow: '0 2px 6px rgba(234, 67, 53, 0.45)'
                             }}>
                               {item.unreadCount}
                             </div>
@@ -2626,11 +3191,13 @@ export function CampusDirectMessages({
                                 Gruppe
                               </span>
                             </div>
-                            {item.lastMessageTime && (
-                              <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#94a3b8', flexShrink: 0, marginLeft: '6px' }}>
-                                {new Date(item.lastMessageTime).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
-                              </span>
-                            )}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: '6px' }}>
+                              {item.lastMessageTime && (
+                                <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#94a3b8' }}>
+                                  {new Date(item.lastMessageTime).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+                                </span>
+                              )}
+                            </div>
                           </div>
                           
                           <p style={{
@@ -2653,7 +3220,22 @@ export function CampusDirectMessages({
                   return (
                     <button
                       key={item.id}
-                      onClick={() => setSelectedRecipient(item)}
+                      onClick={() => {
+                        setSelectedRecipient(item);
+                        const uid = effectiveUid || user?.id || '';
+                        if (uid && item?.id) {
+                          saveLocalDirectRead(uid, item.id, Date.now());
+                          const unreads = (campusMessages || [])
+                            .filter(m => !m.group_id && m.sender_id === item.id && m.recipient_id === uid)
+                            .map(m => m.id);
+                          if (unreads.length > 0) {
+                            saveLocalReadMsgIds(uid, unreads);
+                          }
+                          if (onMarkAsRead) {
+                            onMarkAsRead(item.id);
+                          }
+                        }
+                      }}
                       className="hover-scale-mini"
                       style={{
                         width: '100%',
@@ -2705,11 +3287,13 @@ export function CampusDirectMessages({
                           <span style={{ fontWeight: 800, fontSize: '0.9rem', color: isSelected ? '#34a853' : '#1e293b' }}>
                             {formatStudentDisplayName(item)}
                           </span>
-                          {item.lastMessage && (
-                            <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#94a3b8' }}>
-                              {new Date(item.lastMessage.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
-                            </span>
-                          )}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: '6px' }}>
+                            {item.lastMessage && (
+                              <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#94a3b8' }}>
+                                {new Date(item.lastMessage.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         
                         <p style={{
@@ -2746,7 +3330,22 @@ export function CampusDirectMessages({
                   return (
                     <button
                       key={partner.id}
-                      onClick={() => setSelectedRecipient(partner)}
+                      onClick={() => {
+                        setSelectedRecipient(partner);
+                        const uid = effectiveUid || user?.id || '';
+                        if (uid && partner?.id) {
+                          saveLocalDirectRead(uid, partner.id, Date.now());
+                          const unreads = (campusMessages || [])
+                            .filter(m => !m.group_id && m.sender_id === partner.id && m.recipient_id === uid)
+                            .map(m => m.id);
+                          if (unreads.length > 0) {
+                            saveLocalReadMsgIds(uid, unreads);
+                          }
+                          if (onMarkAsRead) {
+                            onMarkAsRead(partner.id);
+                          }
+                        }
+                      }}
                       className="hover-scale-mini"
                       style={{
                         width: '100%',
@@ -2798,11 +3397,13 @@ export function CampusDirectMessages({
                           <span style={{ fontWeight: 800, fontSize: '0.9rem', color: isSelected ? '#34a853' : '#1e293b' }}>
                             {formatStudentDisplayName(partner)}
                           </span>
-                          {partner.lastMessage && (
-                            <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#94a3b8' }}>
-                              {new Date(partner.lastMessage.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
-                            </span>
-                          )}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: '6px' }}>
+                            {partner.lastMessage && (
+                              <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#94a3b8' }}>
+                                {new Date(partner.lastMessage.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+                              </span>
+                            )}
+                          </div>
                         </div>
                     
                     <p style={{
@@ -2860,7 +3461,7 @@ export function CampusDirectMessages({
         overflow: 'hidden', 
         border: '1px solid #f1f5f9',
         boxShadow: '0 10px 30px rgba(0,0,0,0.02)',
-        transition: 'all 0.3s ease'
+        transition: isMobile ? 'opacity 0.25s ease' : 'none'
       }}>
         {selectedRecipient ? (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: 1 }}>
@@ -3002,8 +3603,8 @@ export function CampusDirectMessages({
                 )}
               </div>
 
-              {/* Status Badges */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap' }}>
+              {/* Status Badge: DSGVO-konform (OWASP ASVS Level 3 / Art. 32 DSGVO) */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, whiteSpace: 'nowrap' }}>
                 <span 
                   title="DSGVO-konform: Transportverschlüsselung via TLS 1.3, Datenbank im Ruhezustand AES-256 geschützt (Art. 32 DSGVO)"
                   style={{
@@ -3067,10 +3668,10 @@ export function CampusDirectMessages({
                     // Unread count for this channel
                     const unreadCount = (campusMessages || []).filter((m: any) => {
                       if (m.group_id !== selectedRecipient.id) return false;
-                      if (m.sender_id === user?.id) return false;
+                      if (m.sender_id === effectiveUid) return false;
                       const msgChannelMatches = m.channel_id ? m.channel_id === channel.id : channel.is_default;
                       if (!msgChannelMatches) return false;
-                      const myMembership = selectedRecipient.members?.find((mb: any) => mb.user_id === user?.id);
+                      const myMembership = selectedRecipient.members?.find((mb: any) => mb.user_id === effectiveUid);
                       const groupLastRead = myMembership?.last_read_at ? new Date(myMembership.last_read_at).getTime() : 0;
                       const lastRead = channelReads.has(channel.id) ? (channelReads.get(channel.id) || 0) : groupLastRead;
                       return new Date(m.created_at).getTime() > lastRead;
@@ -3098,7 +3699,28 @@ export function CampusDirectMessages({
                           aria-selected={isActive}
                           aria-controls={`panel-${channel.id}`}
                           id={`tab-${channel.id}`}
-                          onClick={() => setActiveChannelId(channel.id)}
+                          onClick={() => {
+                            setActiveChannelId(channel.id);
+                            const nowTime = Date.now();
+                            lastAutoReadRef.current[`chan_${selectedRecipient.id}_${channel.id}`] = nowTime;
+                            setChannelReads(prev => new Map(prev).set(channel.id, nowTime));
+                            if (effectiveUid) {
+                              saveLocalChannelRead(effectiveUid, channel.id, nowTime);
+                            }
+                            if (selectedRecipient?.id) {
+                              if (unreadCount > 0) {
+                                setCampusGroups(prev => prev.map(g => {
+                                  if (g.id === selectedRecipient.id) {
+                                    return { ...g, unreadCount: Math.max(0, (g.unreadCount || 0) - unreadCount) };
+                                  }
+                                  return g;
+                                }));
+                              }
+                              if (onMarkChannelAsRead) {
+                                onMarkChannelAsRead(channel.id, selectedRecipient.id);
+                              }
+                            }
+                          }}
                           style={{
                             border: 'none',
                             background: 'transparent',
@@ -3116,11 +3738,11 @@ export function CampusDirectMessages({
                         >
                           <IconComp size={13} color={isActive ? '#ffffff' : (isAnnounce ? '#eab308' : '#64748b')} strokeWidth={2.4} />
                           <span>{channel.name}</span>
-                          {unreadCount > 0 && (
+                          {!isActive && unreadCount > 0 && (
                             <span style={{
                               marginLeft: '3px',
-                              background: isActive ? '#ffffff' : '#ea4335',
-                              color: isActive ? '#15803d' : '#ffffff',
+                              background: '#ea4335',
+                              color: '#ffffff',
                               padding: '1px 6px',
                               borderRadius: '100px',
                               fontSize: '0.64rem',
@@ -3269,6 +3891,18 @@ export function CampusDirectMessages({
                         >
                           <Layers size={13} color={isThreads ? '#15803d' : '#64748b'} strokeWidth={2.4} />
                           <span>Themen</span>
+                          {unreadTopicsCount > 0 && (
+                            <span style={{
+                              background: '#ea4335',
+                              color: '#ffffff',
+                              borderRadius: '100px',
+                              padding: '1px 6px',
+                              fontSize: '0.65rem',
+                              fontWeight: 800
+                            }}>
+                              {unreadTopicsCount}
+                            </span>
+                          )}
                         </button>
                       </div>
                     );
@@ -3361,13 +3995,18 @@ export function CampusDirectMessages({
                   >
                     <MessageCircle size={13} color={oneOnOneMode === 'chat' ? '#15803d' : '#64748b'} strokeWidth={2.4} />
                     <span>Chat</span>
-                    <span style={{
-                      fontSize: '0.7rem',
-                      opacity: 0.75,
-                      fontWeight: 700
-                    }}>
-                      ({humanMessagesCount})
-                    </span>
+                    {unreadDirectChatCount > 0 && (
+                      <span style={{
+                        background: '#ea4335',
+                        color: '#ffffff',
+                        borderRadius: '100px',
+                        padding: '1px 6px',
+                        fontSize: '0.65rem',
+                        fontWeight: 800
+                      }}>
+                        {unreadDirectChatCount}
+                      </span>
+                    )}
                   </button>
 
                   <button
@@ -3402,7 +4041,18 @@ export function CampusDirectMessages({
                   >
                     <Layers size={13} color={oneOnOneMode === 'threads' ? '#15803d' : '#64748b'} strokeWidth={2.4} />
                     <span>Themen</span>
-                    {activeRootTopics.length > 0 && (
+                    {unreadTopicsCount > 0 ? (
+                      <span style={{
+                        background: '#ea4335',
+                        color: '#ffffff',
+                        borderRadius: '100px',
+                        padding: '1px 6px',
+                        fontSize: '0.65rem',
+                        fontWeight: 800
+                      }}>
+                        {unreadTopicsCount}
+                      </span>
+                    ) : activeRootTopics.length > 0 ? (
                       <span style={{
                         background: oneOnOneMode === 'threads' ? '#e6f4ea' : '#e2e8f0',
                         color: oneOnOneMode === 'threads' ? '#15803d' : '#475569',
@@ -3413,27 +4063,61 @@ export function CampusDirectMessages({
                       }}>
                         {activeRootTopics.length}
                       </span>
-                    )}
+                    ) : null}
                   </button>
                 </div>
 
-                {/* Right Context Hint */}
+                {/* Right Context Hint & Quick Topic Action */}
                 <div style={{
                   display: isMobile ? 'none' : 'flex',
                   alignItems: 'center',
-                  gap: '6px',
-                  fontSize: '0.74rem',
-                  color: '#94a3b8',
-                  fontWeight: 650
+                  gap: '10px'
                 }}>
-                  <ShieldCheck size={12} color="#15803d" />
-                  <span>Direktchat</span>
+                  {oneOnOneMode === 'threads' && (
+                    <button
+                      type="button"
+                      onClick={() => setIsTopicComposerOpen(true)}
+                      aria-label="Neues Thema eröffnen"
+                      style={{
+                        padding: '4px 12px',
+                        borderRadius: '100px',
+                        border: '1px solid #bbf7d0',
+                        background: '#f0fdf4',
+                        color: '#15803d',
+                        fontSize: '0.74rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        transition: 'all 0.15s ease',
+                        boxShadow: '0 1px 3px rgba(22, 163, 74, 0.08)'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Plus size={13} strokeWidth={2.8} />
+                      <span>Neues Thema</span>
+                    </button>
+                  )}
+
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '0.74rem',
+                    color: '#94a3b8',
+                    fontWeight: 650
+                  }}>
+                    <ShieldCheck size={12} color="#15803d" />
+                    <span>Direktchat</span>
+                  </div>
                 </div>
               </div>
             )}
 
             {/* Message History */}
             <div 
+              ref={chatScrollContainerRef}
               role="tabpanel"
               id={selectedRecipient.is_group ? `panel-${activeChannelId || 'default'}` : `panel-${activeSubTab}`}
               aria-labelledby={selectedRecipient.is_group ? `tab-${activeChannelId || 'default'}` : undefined}
@@ -3735,7 +4419,7 @@ export function CampusDirectMessages({
                 if (isThreadsMode) {
                   if (activeRootTopics.length === 0) {
                     return (
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: '#94a3b8', gap: '12px', padding: '40px 20px', textAlign: 'center' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: '#94a3b8', gap: '14px', padding: '40px 20px', textAlign: 'center' }}>
                         <div style={{
                           width: '56px',
                           height: '56px',
@@ -3761,11 +4445,41 @@ export function CampusDirectMessages({
                             'Eröffne ein Thema mit Betreff (z. B. Kaufempfehlungen, Übestrategien oder Notenfragen), um wichtige Absprachen übersichtlich im Thread festzuhalten.'
                           )}
                         </div>
+
+                        {/* Goldstandard Empty State Action Button */}
+                        {(!isGroupActive || !isStudent || currentActiveChannel?.allow_student_topics) && (
+                          <button
+                            type="button"
+                            onClick={() => setIsTopicComposerOpen(true)}
+                            aria-label="Erstes Thema eröffnen"
+                            style={{
+                              marginTop: '6px',
+                              padding: '9px 18px',
+                              borderRadius: '12px',
+                              background: '#16a34a',
+                              color: '#ffffff',
+                              border: 'none',
+                              fontSize: '0.82rem',
+                              fontWeight: 800,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              cursor: 'pointer',
+                              boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)',
+                              transition: 'all 0.15s ease',
+                              touchAction: 'manipulation'
+                            }}
+                            className="hover-scale"
+                          >
+                            <Plus size={15} strokeWidth={2.8} />
+                            <span>Erstes Thema eröffnen</span>
+                          </button>
+                        )}
                       </div>
                     );
                   }
 
-                  const myMembership = isGroupActive ? selectedRecipient.members?.find((mb: any) => mb.user_id === user?.id) : null;
+                  const myMembership = isGroupActive ? selectedRecipient.members?.find((mb: any) => mb.user_id === effectiveUid) : null;
                   const groupLastRead = myMembership?.last_read_at ? new Date(myMembership.last_read_at).getTime() : 0;
                   const lastRead = isGroupActive
                     ? (activeChannelId && channelReads.has(activeChannelId) 
@@ -3776,9 +4490,9 @@ export function CampusDirectMessages({
                   return activeRootTopics.map(topic => {
                     const replies = activeThreadMessages.filter(m => m.parent_message_id === topic.id);
                     const isUnread = Boolean(
-                      user?.id && topic.sender_id !== user.id && (
+                      effectiveUid && topic.sender_id !== effectiveUid && (
                         (isGroupActive ? new Date(topic.created_at).getTime() > lastRead : !topic.is_read) ||
-                        replies.some(r => r.sender_id !== user.id && (isGroupActive ? new Date(r.created_at).getTime() > lastRead : !r.is_read))
+                        replies.some(r => r.sender_id !== effectiveUid && (isGroupActive ? new Date(r.created_at).getTime() > lastRead : !r.is_read))
                       )
                     );
 
@@ -3787,7 +4501,7 @@ export function CampusDirectMessages({
                         key={topic.id}
                         topic={topic}
                         replies={replies}
-                        currentUserId={user?.id}
+                        currentUserId={effectiveUid || user?.id}
                         isStudent={isStudent}
                         canReply={isGroupActive ? (!currentActiveChannel?.is_announcement_only || !isStudent) : true}
                         onSendReply={handleSendTopicReply}
@@ -3798,6 +4512,7 @@ export function CampusDirectMessages({
                         findUserById={findUserById}
                         isMobile={isMobile}
                         isUnread={isUnread}
+                        autoFocusReply={Boolean(focusedTopicId && topic.id === focusedTopicId)}
                       />
                     );
                   });
@@ -4042,7 +4757,7 @@ export function CampusDirectMessages({
                           >
                             <div>{cleanChatMessageContent(msg.content)}</div>
 
-                            {/* Time & Read Status Footer inside the bubble */}
+                            {/* Time, Read Status & Report Flag inside the bubble */}
                             <div style={{
                               display: 'flex',
                               alignItems: 'center',
@@ -4059,6 +4774,31 @@ export function CampusDirectMessages({
                                 <div style={{ display: 'inline-flex', alignItems: 'center' }}>
                                   <CheckCheck size={14} color="#ffffff" style={{ opacity: msg.is_read ? 1 : 0.75 }} />
                                 </div>
+                              )}
+                              {Boolean(selectedRecipient?.is_group) && !isSelf && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleInitiateReport(msg);
+                                  }}
+                                  title="Nachricht vertraulich melden"
+                                  aria-label="Nachricht vertraulich melden"
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    padding: '2px',
+                                    cursor: 'pointer',
+                                    color: '#94a3b8',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    marginLeft: '4px'
+                                  }}
+                                  onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444'; }}
+                                  onMouseLeave={(e) => { e.currentTarget.style.color = '#94a3b8'; }}
+                                >
+                                  <Flag size={11} />
+                                </button>
                               )}
                             </div>
                           </div>
@@ -4089,9 +4829,13 @@ export function CampusDirectMessages({
                 return (
                   <CampusTopicComposer
                     channelName={isGroupActive ? (currentActiveChannel?.name || 'allgemein') : (selectedRecipient?.first_name || 'Direkt')}
+                    recipientDisplayName={isGroupActive ? undefined : formatStudentDisplayName(selectedRecipient)}
+                    isGroup={isGroupActive}
                     canCreateTopic={isGroupActive ? (!isStudent || Boolean(currentActiveChannel?.allow_student_topics)) : true}
                     onPublishTopic={handlePublishTopic}
                     isMobile={isMobile}
+                    isOpen={isTopicComposerOpen}
+                    onOpenChange={setIsTopicComposerOpen}
                   />
                 );
               }
@@ -4117,7 +4861,10 @@ export function CampusDirectMessages({
                     </div>
                     <button
                       type="button"
-                      onClick={() => sendDirectQuickMessage('✓ Gesehen & notiert')}
+                      onClick={async () => {
+                        await sendDirectQuickMessage('Gesehen & notiert');
+                        await handleAcknowledgeAndMarkAsRead(selectedRecipient);
+                      }}
                       style={{
                         padding: '6px 14px',
                         borderRadius: '100px',
@@ -4214,7 +4961,15 @@ export function CampusDirectMessages({
                         <button
                           key={`chip-${idx}`}
                           type="button"
-                          onClick={() => setTypedMessage(chip.text)}
+                          onClick={async () => {
+                            if (chip.label.includes('Gesehen')) {
+                              await sendDirectQuickMessage(chip.text);
+                              await handleAcknowledgeAndMarkAsRead(selectedRecipient);
+                              setTypedMessage('');
+                            } else {
+                              setTypedMessage(chip.text);
+                            }
+                          }}
                           style={{
                             padding: '6px 14px',
                             borderRadius: '100px',
@@ -4244,37 +4999,28 @@ export function CampusDirectMessages({
                   );
                 })()}
 
-                {/* Right to Disconnect / Ruhezeit-Hinweis (Arbeitszeit- & Lehrkräfte-Schutz gem. § 5 ArbZG) */}
+                {/* 🌙 Geschützte Ruhezeit & Feierabend */}
                 {(() => {
                   if (isRecipientInQuietHours && isStudent) {
                     const teacherName = formatTeacherFullName(selectedRecipient);
                     return (
                       <div style={{
                         display: 'flex',
-                        alignItems: 'flex-start',
+                        alignItems: 'center',
                         gap: '8px',
                         background: '#f8fafc',
                         border: '1px solid #e2e8f0',
                         borderRadius: '12px',
-                        padding: '8px 12px',
+                        padding: '7px 12px',
                         marginBottom: '6px',
                         fontSize: '0.74rem',
                         color: '#475569',
                         fontWeight: 600,
                         width: '100%',
-                        boxSizing: 'border-box',
-                        lineHeight: 1.4
+                        boxSizing: 'border-box'
                       }}>
-                        <Clock size={15} color="#64748b" style={{ flexShrink: 0, marginTop: '2px' }} />
-                        <div>
-                          <div style={{ fontWeight: 800, color: '#1e293b', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                            <Moon size={14} color="#64748b" style={{ flexShrink: 0 }} />
-                            <span>Ruhezeit von {teacherName}:</span>
-                          </div>
-                          <div>
-                            Deine Nachricht wird zugestellt. Beachte bitte, dass Lehrkräfte außerhalb ihrer Unterrichtszeiten nicht zur Beantwortung verpflichtet sind. Dringende Absagen bitte per E-Mail an die Lehrkraft senden.
-                          </div>
-                        </div>
+                        <Moon size={14} color="#64748b" style={{ flexShrink: 0 }} />
+                        <span>🌙 {teacherName} hat Feierabend • Deine Nachricht wird zugestellt und am nächsten Schultag beantwortet.</span>
                       </div>
                     );
                   }
@@ -4520,7 +5266,22 @@ export function CampusDirectMessages({
                   {finalPartnersList.map(partner => (
                     <button
                       key={`hero-${partner.id}`}
-                      onClick={() => setSelectedRecipient(partner)}
+                      onClick={() => {
+                        setSelectedRecipient(partner);
+                        const uid = effectiveUid || user?.id || '';
+                        if (uid && partner?.id) {
+                          saveLocalDirectRead(uid, partner.id, Date.now());
+                          const unreads = (campusMessages || [])
+                            .filter(m => !m.group_id && m.sender_id === partner.id && m.recipient_id === uid)
+                            .map(m => m.id);
+                          if (unreads.length > 0) {
+                            saveLocalReadMsgIds(uid, unreads);
+                          }
+                          if (onMarkAsRead) {
+                            onMarkAsRead(partner.id);
+                          }
+                        }
+                      }}
                       className="hover-scale"
                       style={{
                         background: 'white',
@@ -4772,7 +5533,7 @@ export function CampusDirectMessages({
         isOpen={isCreateGroupModalOpen}
         onClose={() => setIsCreateGroupModalOpen(false)}
         assignedStudents={assignedStudents}
-        currentUserId={user?.id || ''}
+        currentUserId={effectiveUid || user?.id || ''}
         onGroupCreated={(newGroup) => {
           fetchCampusGroups();
           if (newGroup) {
@@ -5063,9 +5824,161 @@ export function CampusDirectMessages({
               fontWeight: 600
             }}>
               <ShieldCheck size={14} color="#15803d" style={{ flexShrink: 0 }} />
-              <span>Didaktischer Schul-Chat • Für Erziehungsberechtigte transparent einsehbar</span>
+              <span>Didaktischer Schul-Chat: Nur für Unterrichtszwecke • Für Erziehungsberechtigte transparent einsehbar.</span>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 🚩 2-Stufen Melde-Modal für Gruppen-Chats (F49) */}
+      {reportingMessage && (
+        <div 
+          onClick={() => setReportingMessage(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1200,
+            background: 'rgba(15, 23, 42, 0.45)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+          }}
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#ffffff',
+              borderRadius: '24px',
+              maxWidth: '380px',
+              width: '100%',
+              padding: '24px',
+              boxShadow: '0 20px 40px -10px rgba(0,0,0,0.2)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+              textAlign: 'left'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '12px',
+                background: '#fef2f2',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ef4444'
+              }}>
+                <Flag size={20} />
+              </div>
+              <div>
+                <div style={{ fontWeight: 850, fontSize: '0.98rem', color: '#0f172a' }}>Nachricht melden</div>
+                <div style={{ fontSize: '0.74rem', color: '#64748b' }}>Vertraulich an deine Lehrkraft</div>
+              </div>
+            </div>
+
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '12px',
+              padding: '10px 12px',
+              fontSize: '0.78rem',
+              color: '#334155',
+              fontStyle: 'italic',
+              lineHeight: 1.4,
+              maxHeight: '70px',
+              overflowY: 'auto'
+            }}>
+              „{String(reportingMessage.content || '').slice(0, 140)}“
+            </div>
+
+            <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: 1.4 }}>
+              Bitte wähle den Grund aus. Deine Lehrkraft wird diesen Abschnitt vertraulich überprüfen:
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => handleConfirmReport('Beleidigung / Unhöflich')}
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: '12px',
+                  border: '1px solid #fecaca',
+                  background: '#fef2f2',
+                  color: '#b91c1c',
+                  fontWeight: 750,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  textAlign: 'left'
+                }}
+              >
+                🚨 Beleidigung oder unhöflich
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleConfirmReport('Streit / Spam')}
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: '12px',
+                  border: '1px solid #fed7aa',
+                  background: '#fff7ed',
+                  color: '#c2410c',
+                  fontWeight: 750,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  textAlign: 'left'
+                }}
+              >
+                ⚠️ Streit oder Spam
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setReportingMessage(null)}
+                style={{
+                  padding: '9px 14px',
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0',
+                  background: '#ffffff',
+                  color: '#64748b',
+                  fontWeight: 650,
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  marginTop: '4px'
+                }}
+              >
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🔔 Feedback Toast */}
+      {reportToast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 1300,
+          background: '#0f172a',
+          color: '#ffffff',
+          padding: '10px 18px',
+          borderRadius: '100px',
+          fontSize: '0.82rem',
+          fontWeight: 700,
+          boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          <CheckCheck size={16} color="#34a853" />
+          <span>{reportToast}</span>
         </div>
       )}
 

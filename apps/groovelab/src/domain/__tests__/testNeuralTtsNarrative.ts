@@ -103,6 +103,48 @@ function runTests() {
   }
   console.log('✅ Test 5 Passed!\n');
 
+  // Test 6: Single name only (e.g. 'Severin') -> MUST be completely omitted in speech!
+  const t6 = buildContinuousHomeworkNarrative({
+    teacherName: 'Severin',
+    songs: [{ title: 'Song X', note: 'Üben' }]
+  });
+  console.log('Test 6 (Single Name Only - Omission):');
+  console.log(t6);
+  if (!t6.startsWith('Hallo! Hier ist deine Hausaufgabe für diese Woche.')) {
+    throw new Error('Test 6 Failed: Single first name must be completely omitted from speech greeting');
+  }
+  if (t6.includes('Severin')) {
+    throw new Error('Test 6 Failed: Single first name should not be present in spoken greeting');
+  }
+  console.log('✅ Test 6 Passed!\n');
+
+  // Test 7: Generic placeholder ('deine Lehrkraft') -> MUST be completely omitted in speech!
+  const t7 = buildContinuousHomeworkNarrative({
+    teacherName: 'deine Lehrkraft',
+    songs: [{ title: 'Song Y', note: 'Üben' }]
+  });
+  console.log('Test 7 (Placeholder - Omission):');
+  console.log(t7);
+  if (!t7.startsWith('Hallo! Hier ist deine Hausaufgabe für diese Woche.')) {
+    throw new Error('Test 7 Failed: Placeholder must be completely omitted from speech greeting');
+  }
+  if (t7.includes('deine Lehrkraft') || t7.includes('Lehrkraft')) {
+    throw new Error('Test 7 Failed: Placeholder should not be present in spoken greeting');
+  }
+  console.log('✅ Test 7 Passed!\n');
+
+  // Test 8: Single initial ('Florian H.') -> MUST be completely omitted in speech!
+  const t8 = buildContinuousHomeworkNarrative({
+    teacherName: 'Florian H.',
+    songs: [{ title: 'Song Z', note: 'Üben' }]
+  });
+  console.log('Test 8 (Single Initial - Omission):');
+  console.log(t8);
+  if (!t8.startsWith('Hallo! Hier ist deine Hausaufgabe für diese Woche.')) {
+    throw new Error('Test 8 Failed: Initial must be completely omitted from speech greeting');
+  }
+  console.log('✅ Test 8 Passed!\n');
+
   console.log('🎉 ALL NEURAL TTS NARRATIVE TESTS PASSED WITH FLYING COLORS!');
 }
 

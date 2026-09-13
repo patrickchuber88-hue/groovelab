@@ -17,6 +17,7 @@ import { scrubSensitiveUrlParams } from '../utils/urlSecurityScrubber';
 import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from './CampusGroovelabBrand';
 import { getInstrumentAvatarUrl, resolveCampusStudentAvatar } from './StudioAvatar';
 import { getCanonicalQrLandingUrl } from '../utils/tenantUrlHelper';
+import { isUUID } from '../utils/uuidValidator';
 
 
 
@@ -2238,9 +2239,15 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       try {
         const targetSchoolId = effectiveSchool?.id || user.school_id;
         if (targetSchoolId) {
-          registerClientSessionLease(user, targetSchoolId).catch(err => console.warn('[SessionLease] Async registration notice:', err));
+          await registerClientSessionLease(user, targetSchoolId).catch(err => console.warn('[SessionLease] Async registration notice:', err));
         }
       } catch (e) {}
+
+      // 🛡️ Student Safety: Clear stale simulated test dates when logging in as student (Anti-Date-Drift)
+      if (user.role === 'student' || !user.role) {
+        localStorage.removeItem('groovelab_simulated_date');
+        localStorage.removeItem('groovelab_simulated_start_timestamp');
+      }
 
       setLoading(false);
       
@@ -5731,11 +5738,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                                 localStorage.setItem('groovelab_kiosk_token', schoolData.groovelab_kiosk_token);
                               }
 
-                               const isUuid = (str: any) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
                                const generatedSecretToken = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-0000-4000-8000-' + Math.floor(Math.random()*1e12).toString(16).padStart(12, '0'));
 
                                // Check if kiosk record already exists for this station
-                               const { data: existingKiosk, error: fetchErr } = isUuid(newSelection) ? await supabase
+                               const { data: existingKiosk, error: fetchErr } = isUUID(newSelection) ? await supabase
                                  .from('kiosks')
                                  .select('*')
                                  .eq('station_id', newSelection)
@@ -5754,8 +5760,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                                      school_id: schoolData.id,
                                      name: station.name || 'iPad Kiosk',
                                      secret_token: generatedSecretToken,
-                                     room_id: isUuid(station.room_id) ? station.room_id : null,
-                                     station_id: isUuid(station.id) ? station.id : null
+                                     room_id: isUUID(station.room_id) ? station.room_id : null,
+                                     station_id: isUUID(station.id) ? station.id : null
                                    })
                                    .select();
 
@@ -7215,6 +7221,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 sessionStorage.setItem('groovelab_active_tab', 'briefing');
                 sessionStorage.setItem('groovelab_location_mode', 'home');
                 sessionStorage.setItem('groovelab_user_id', targetUser.id);
+                // 🛡️ Anti-Date-Drift: Clear any stale teacher simulation date
+                localStorage.removeItem('groovelab_simulated_date');
+                localStorage.removeItem('groovelab_simulated_start_timestamp');
                 sessionStorage.removeItem('groovelab_qr_token');
                 localStorage.removeItem('groovelab_last_qr_token');
                 localStorage.removeItem('groovelab_qr_token');

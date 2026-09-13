@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Book, Star, Sliders, RotateCcw, RotateCw, Mic, Square, Play, Pause, VolumeX, Volume2, Trash2, Headphones, Minimize2, Maximize2, Calendar, FileText, Zap, Clock, Info, Activity, ArrowLeft, Edit3, Disc, Search, Lock, Unlock, Share2, Sparkles, Radio, Download, Repeat, Timer, Scissors, Moon, Wrench, Hash, Filter, Target, User, Printer, MessageSquare, Mail, Copy, ExternalLink, HelpCircle, Hand, Lightbulb, MoreHorizontal, Pin, EyeOff, ArrowRightLeft } from 'lucide-react';
+import { X, Check, Award, Flame, AlertCircle, BookOpen, Music, History, Plus, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Book, Star, Sliders, RotateCcw, RotateCw, Mic, Square, Play, Pause, VolumeX, Volume2, Trash2, Headphones, Minimize2, Maximize2, Calendar, FileText, Zap, Clock, Info, Activity, ArrowLeft, Edit3, Disc, Search, Lock, Unlock, Share2, Sparkles, Radio, Download, Repeat, Timer, Scissors, Moon, Wrench, Hash, Filter, Target, User, Printer, MessageSquare, Mail, Copy, ExternalLink, HelpCircle, Hand, Lightbulb, MoreHorizontal, Pin, EyeOff, ArrowRightLeft, Send } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { supabase } from '../lib/supabase';
 import { GroovePracticeCompanion } from './groovelab/GroovePracticeCompanion';
@@ -9,6 +9,8 @@ import type { CustomPlaylist, CustomPlaylistTrack } from './campus/AudioBiograph
 import { processPureRawBlob, processStudioMastering, TARGET_PURE_RAW_LUFS, TARGET_STUDIO_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RAW_LIMITER_GR_DB } from '../utils/audioMasteringEngine';
 import { storeBlob, getBlob, deleteBlob } from '../utils/blobStorage';
 import { validateMediaBlob } from '../utils/mediaSecurityValidator';
+import { fixWebmDuration } from '../utils/webmDurationPatcher';
+import { buildCanonicalAudioStoragePath, getSecureAudioUrl } from '../utils/audioStorageHelper';
 import { AudioTrackCarousel } from './AudioTrackCarousel';
 import { MeisterOhrSticker } from './MeisterOhrSticker';
 const AudioEditorModal = React.lazy(() => import('./campus/AudioEditorModal').then(m => ({ default: m.AudioEditorModal })));
@@ -131,9 +133,124 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   initialSongs,
   initialProgressItems,
   initialLocalProgress,
-  onSongsUpdated
+  onSongsUpdated,
+  isTeacherSandbox = false,
+  onOpenAssignModal,
+  schoolId: propSchoolId
 }) => {
-  const uiLevel: 'junior' | 'teen' | 'pro' = propUiLevel || (student as any)?.campus_ui_level || 'junior';
+  const isTeacherSelf = isTeacherSandbox || isTeacherTools || student?.id === 'teacher-self' || student?.id === 'teacher-studio-sandbox' || (student as any)?.role === 'teacher' || (student as any)?.is_teacher || (student as any)?.role === 'admin';
+
+  // 🛡️ REVISIONSSICHERE ALTERSTUFE: Reaktiv und prioritär synchron mit Elternbereich
+  const resolveInitialUiLevel = (): 'junior' | 'teen' | 'pro' => {
+    if (isTeacherSelf) return 'pro';
+    const sId = student?.id;
+    if (typeof window !== 'undefined' && sId && sId !== 'teacher-self') {
+      const studentStorage = localStorage.getItem(`campus_student_ui_level_${sId}`);
+      if (studentStorage === 'junior' || studentStorage === 'teen' || studentStorage === 'pro') {
+        return studentStorage;
+      }
+    }
+    const fromStudentObj = (student as any)?.campus_ui_level;
+    if (fromStudentObj === 'junior' || fromStudentObj === 'teen' || fromStudentObj === 'pro') {
+      return fromStudentObj;
+    }
+    if (propUiLevel === 'junior' || propUiLevel === 'teen' || propUiLevel === 'pro') {
+      return propUiLevel;
+    }
+    if (typeof window !== 'undefined') {
+      const globalStorage = localStorage.getItem('campus_student_ui_level');
+      if (globalStorage === 'junior' || globalStorage === 'teen' || globalStorage === 'pro') {
+        return globalStorage as 'junior' | 'teen' | 'pro';
+      }
+    }
+    return 'junior';
+  };
+
+  const [uiLevel, setUiLevel] = useState<'junior' | 'teen' | 'pro'>(resolveInitialUiLevel);
+  const [effectiveParentPermissions, setEffectiveParentPermissions] = useState<any>(() => {
+    return propParentPermissions || (student as any)?.parent_permissions || null;
+  });
+
+  // Re-synchronize when propUiLevel or student changes
+  useEffect(() => {
+    const nextLvl = resolveInitialUiLevel();
+    setUiLevel(nextLvl);
+    if (propParentPermissions || (student as any)?.parent_permissions) {
+      setEffectiveParentPermissions(propParentPermissions || (student as any)?.parent_permissions);
+    }
+  }, [student?.id, (student as any)?.campus_ui_level, propUiLevel]);
+
+  // 🛡️ Live DB Sync & Cross-Tab/Event Sync mit dem Elternbereich
+  useEffect(() => {
+    if (isTeacherSelf || !student?.id || student.id === 'teacher-self') return;
+
+    // 1. Authoritative DB fetch from users table
+    supabase
+      .from('users')
+      .select('campus_ui_level, parent_permissions')
+      .eq('id', student.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!error && data) {
+          if (data.campus_ui_level && (data.campus_ui_level === 'junior' || data.campus_ui_level === 'teen' || data.campus_ui_level === 'pro')) {
+            setUiLevel(data.campus_ui_level as 'junior' | 'teen' | 'pro');
+            if (typeof window !== 'undefined') {
+              localStorage.setItem(`campus_student_ui_level_${student.id}`, data.campus_ui_level);
+            }
+          }
+          if (data.parent_permissions) {
+            setEffectiveParentPermissions(data.parent_permissions);
+          }
+        }
+      }, (e: any) => console.warn('[MeisterwerkDocumentationModal] DB ui_level fetch error:', e));
+
+    // 2. CustomEvent listener (fired by Elternbereich on same window)
+    const handleLevelChangeEvt = (e: any) => {
+      const newLvl = e?.detail;
+      if (newLvl && (newLvl === 'junior' || newLvl === 'teen' || newLvl === 'pro')) {
+        setUiLevel(newLvl);
+      }
+    };
+    window.addEventListener('campus_ui_level_changed', handleLevelChangeEvt);
+
+    // 3. Storage listener (cross-tab / multi-window)
+    const handleStorageEvt = (e: StorageEvent) => {
+      if (e.key === `campus_student_ui_level_${student.id}` && e.newValue) {
+        if (e.newValue === 'junior' || e.newValue === 'teen' || e.newValue === 'pro') {
+          setUiLevel(e.newValue as 'junior' | 'teen' | 'pro');
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorageEvt);
+
+    // 4. Realtime subscription on users table for this student
+    const channel = supabase
+      .channel(`meisterwerk_student_level_${student.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${student.id}` },
+        (payload: any) => {
+          const updated = payload.new;
+          if (updated?.campus_ui_level && (updated.campus_ui_level === 'junior' || updated.campus_ui_level === 'teen' || updated.campus_ui_level === 'pro')) {
+            setUiLevel(updated.campus_ui_level as 'junior' | 'teen' | 'pro');
+            if (typeof window !== 'undefined') {
+              localStorage.setItem(`campus_student_ui_level_${student.id}`, updated.campus_ui_level);
+            }
+          }
+          if (updated?.parent_permissions) {
+            setEffectiveParentPermissions(updated.parent_permissions);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      window.removeEventListener('campus_ui_level_changed', handleLevelChangeEvt);
+      window.removeEventListener('storage', handleStorageEvt);
+      supabase.removeChannel(channel);
+    };
+  }, [student?.id, isTeacherSelf]);
+
   const [showAgeUiInfoModal, setShowAgeUiInfoModal] = useState<boolean>(false);
   const [recTargetLevel, setRecTargetLevel] = useState<'teen' | 'pro' | 'loopstation'>('teen');
   const [recNote, setRecNote] = useState<string>('');
@@ -153,8 +270,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     } catch (e) {}
     return false;
   })();
-  const isTeacherMode = !readOnly || isTeacherTools || isSessionTeacher;
-  const studentFirstName = (student?.first_name || (student as any)?.name?.split(' ')[0] || 'Schüler').trim();
+  const isTeacherMode = !readOnly || isTeacherTools || isTeacherSandbox || isSessionTeacher;
+  const effectiveIsSoftLocked = isTeacherSelf ? false : isSoftLocked;
+  const effectiveIsParentUnlocked = isTeacherSelf ? true : (isParentUnlocked || false);
+  const studentFirstName = isTeacherSelf 
+    ? (formatTeacherFullName(propTeacherName || student).split(' ')[0] || 'Lehrkraft')
+    : (student?.first_name || (student as any)?.name?.split(' ')[0] || 'Schüler').trim();
 
   // 👥 DUO & GRUPPENUNTERRICHT: Compute all participants of the current lesson group
   const effectiveGroupStudents: Student[] = useMemo(() => {
@@ -258,18 +379,24 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   }, []);
 
   const displayedStudentName = useMemo(() => {
+    if (isTeacherSelf) {
+      return formatTeacherFullName(propTeacherName || student) || 'Aufgaben-Studio';
+    }
     return readOnly
       ? 'Aufgabenheft'
       : `${student.first_name}${student.last_name ? ' ' + student.last_name.trim().charAt(0) + '.' : ''}`;
-  }, [readOnly, student.first_name, student.last_name]);
+  }, [readOnly, isTeacherSelf, propTeacherName, student.first_name, student.last_name]);
 
   const actualStudentName = useMemo(() => {
+    if (isTeacherSelf) {
+      return formatTeacherFullName(propTeacherName || student) || 'Lehrkraft';
+    }
     const fName = (student.first_name || '').trim();
     if (!fName) return 'Musiker';
     if (readOnly) return fName; // 🛡️ Zero-Knowledge for students: strictly pure first name
     const lInitial = student.last_name ? ' ' + student.last_name.trim().charAt(0) + '.' : '';
     return `${fName}${lInitial}`;
-  }, [readOnly, student.first_name, student.last_name]);
+  }, [readOnly, isTeacherSelf, propTeacherName, student.first_name, student.last_name]);
 
   const getSchoolYearString = (dateInput?: string | Date) => {
     let d = new Date();
@@ -314,6 +441,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   const [studentInstrument, setStudentInstrument] = useState<string | null>(null);
   const [studentSchoolId, setStudentSchoolId] = useState<string | null>(null);
+  const [studentTeacherId, setStudentTeacherId] = useState<string | null>(null);
   const [progressItems, setProgressItems] = useState<ProgressItem[]>(() => initialProgressItems || []);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -578,7 +706,33 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [songPart, setSongPart] = useState('');
 
   // Lehrwerke assigned to student states
-  const [globalLehrwerke, setGlobalLehrwerke] = useState<any[]>(() => initialLehrwerke || []);
+  const [globalLehrwerke, setGlobalLehrwerke] = useState<any[]>(() => {
+    let list = Array.isArray(initialLehrwerke) ? [...initialLehrwerke] : [];
+    try {
+      if (typeof window !== 'undefined') {
+        const storedCustom = localStorage.getItem('custom_lehrwerke');
+        if (storedCustom) {
+          const parsed = JSON.parse(storedCustom);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((c: any) => {
+              if (c && c.id) {
+                const normTitle = (c.title || '').trim().toLowerCase();
+                if (!list.some(m => String(m.id) === String(c.id) || (m.title || '').trim().toLowerCase() === normTitle)) {
+                  list.push({
+                    ...c,
+                    totalPages: c.totalPages || c.total_pages || 50,
+                    emoji: c.emoji || '📖',
+                    color: c.color || '#34a853'
+                  });
+                }
+              }
+            });
+          }
+        }
+      }
+    } catch {}
+    return list;
+  });
   const [assignedLehrwerke, setAssignedLehrwerke] = useState<any[]>(() => {
     if (initialLocalProgress && Array.isArray(initialLocalProgress)) {
       return initialLocalProgress.filter((item: any) => String(item.studentId) === String(student.id));
@@ -1501,7 +1655,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   const [stickerCategoryFilter, setStickerCategoryFilter] = useState<'all' | 'ueben' | 'xp' | 'streaks' | 'songs' | 'spezial'>('all');
   const [isXpLegendOpen, setIsXpLegendOpen] = useState<boolean>(false);
-  const [activeViewMode, setActiveViewMode] = useState<'document' | 'recordings' | 'loopstation' | 'practice' | 'tuner' | 'groovetrainer' | 'earlab'>(initialViewMode || (isTeacherTools ? 'loopstation' : 'document'));
+  const [activeViewMode, setActiveViewMode] = useState<'document' | 'recordings' | 'loopstation' | 'practice' | 'tuner' | 'groovetrainer' | 'earlab'>(initialViewMode || 'document');
 
   useEffect(() => {
     if (isSoftLocked && !isTeacherMode && (activeViewMode === 'loopstation' || activeViewMode === 'practice' || activeViewMode === 'recordings' || activeViewMode === 'groovetrainer' || activeViewMode === 'earlab')) {
@@ -2073,9 +2227,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
 
     const narrative = buildContinuousHomeworkNarrative({
-      teacherName: (effectiveTeacherFullName && effectiveTeacherFullName !== 'deine Lehrkraft') 
+      teacherName: (effectiveTeacherFullName && !/^(deine\s+lehrkraft|lehrkraft|fachlehrkraft)$/i.test(effectiveTeacherFullName.trim())) 
         ? effectiveTeacherFullName 
-        : ((student as any)?.teacher_name || (student as any)?.teacher?.name),
+        : ((student as any)?.teacher_name || (student as any)?.teacher?.name || undefined),
       instrument: (student as any)?.instrument || (student as any)?.instrument_type,
       books: lehrwerkeList.map(b => ({
         title: b.title,
@@ -2269,6 +2423,45 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const pendingCountInStreamRef = useRef<MediaStream | null>(null);
   const pendingCountInAudioCtxRef = useRef<AudioContext | null>(null);
   const pendingCountInPreparedRef = useRef<any>(null);
+
+  // ⏱️ General Record Count-In (4-Beat Vorzähler) & Recent Success Feedback
+  const [recordCountInRemaining, setRecordCountInRemaining] = useState<number | null>(null);
+  const [justRecordedAudioUrl, setJustRecordedAudioUrl] = useState<string | null>(null);
+  const [justRecordedAudioLabel, setJustRecordedAudioLabel] = useState<string | null>(null);
+  const recordCountInIntervalRef = useRef<any>(null);
+  const pendingRecordStreamRef = useRef<MediaStream | null>(null);
+  const pendingRecordAudioCtxRef = useRef<AudioContext | null>(null);
+  const pendingRecordPreparedRef = useRef<any>(null);
+
+  const cancelActiveRecordCountIn = useCallback(() => {
+    if (recordCountInIntervalRef.current) {
+      clearInterval(recordCountInIntervalRef.current);
+      recordCountInIntervalRef.current = null;
+    }
+    if (pendingRecordStreamRef.current) {
+      try {
+        pendingRecordStreamRef.current.getTracks().forEach(track => {
+          track.stop();
+          pendingRecordStreamRef.current?.removeTrack(track);
+        });
+      } catch (e) {}
+      pendingRecordStreamRef.current = null;
+    }
+    if (pendingRecordAudioCtxRef.current && pendingRecordAudioCtxRef.current.state !== 'closed') {
+      try {
+        pendingRecordAudioCtxRef.current.close().catch(() => {});
+      } catch (e) {}
+      pendingRecordAudioCtxRef.current = null;
+    }
+    pendingRecordPreparedRef.current = null;
+    setRecordCountInRemaining(null);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      cancelActiveRecordCountIn();
+    };
+  }, [cancelActiveRecordCountIn]);
 
   const cancelPlayAlongCountIn = useCallback(() => {
     if (playAlongCountInIntervalRef.current) {
@@ -2565,23 +2758,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
 
     const userRoleInSession = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_user_role') || localStorage.getItem('groovelab_user_role')) : null;
-    const isStudentActor = !isTeacherTools && userRoleInSession?.toLowerCase() === 'student';
+    const isStudentActor = !isTeacherTools && userRoleInSession?.toLowerCase() === 'student' && readOnly;
     if (isStudentActor) {
-      const studentIdVal = (student as any)?.id;
-      const localAudioKey = studentIdVal && typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_audio_${studentIdVal}`) : null;
-      const localStudentAudioKey = studentIdVal && typeof window !== 'undefined' ? localStorage.getItem(`groovelab_parent_allow_student_audio_${studentIdVal}`) : null;
-      const isAudioAllowed = (student as any)?.parent_allow_audio === true && 
-        ((student as any)?.parent_permissions?.allow_student_audio === true || (localStudentAudioKey !== null ? localStudentAudioKey === 'true' : false)) &&
-        (localAudioKey !== null ? localAudioKey === 'true' : true);
-      if (!isAudioAllowed) {
-        alert('Die Aufnahme-Funktion für Schüler ist im Eltern-Kontrollzentrum aktuell noch nicht freigegeben (Privacy by Default). Bitte deine Eltern, sie im Eltern-Bereich zu aktivieren.');
+      const isAudioDenied = (student as any)?.parent_allow_audio === false || 
+        ((student as any)?.parent_permissions?.allow_student_audio === false);
+      if (isAudioDenied) {
+        alert('Die Aufnahme-Funktion für Schüler ist im Eltern-Kontrollzentrum aktuell pausiert. Bitte deine Eltern, sie im Eltern-Bereich zu aktivieren.');
         return null;
       }
-    } else {
-      // 🛡️ Didaktische Audio-Memos der Lehrkraft (§ 73 UrhG / Art. 6 DSGVO)
-      // Haben die Erziehungsberechtigten Tonaufnahmen des Schülers untersagt, wird die Lehrkraft
-      // NICHT blockiert: Sie darf weiterhin eigene Referenz-Play-Alongs und Übe-Muster vorspielen.
-      // Die App blendet den rechtlichen Disclaimer (§ 201 StGB) und die Freigabe-Anfrage ein.
     }
 
     if (checkIsAudioTresorReadOnly(student)) {
@@ -2689,36 +2873,30 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           }
         } catch (e) {}
 
-        const rawBlob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+        let rawBlob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+        if ((recorder.mimeType || 'audio/webm').includes('webm') && durationInSeconds > 0) {
+          try {
+            rawBlob = await fixWebmDuration(rawBlob, durationInSeconds);
+          } catch (ebmlErr) {
+            console.warn('[Meisterwerk] EBML patch note:', ebmlErr);
+          }
+        }
         // 🎙️ 100% PURE RAW & STUDIO MASTERING DSP (Calibrated Loudness from sample 0):
         let dspDuration = 0;
         let blob: Blob = rawBlob;
         let url = '';
         try {
-          if (isTeacherMode) {
-            const masterRes = await processStudioMastering(rawBlob, {
-              profile: 'acoustic_audiophile',
-              targetLufs: TARGET_STUDIO_LUFS,
-              targetPeakDb: TARGET_PEAK_DBTP
-            });
-            blob = masterRes.masteredBlob;
-            url = masterRes.masteredUrl;
-            if (masterRes.durationSec) {
-              dspDuration = masterRes.durationSec;
-              durationInSeconds = Math.round(masterRes.durationSec);
-            }
-          } else {
-            const pureRawRes = await processPureRawBlob(rawBlob, { 
-              targetLufs: TARGET_PURE_RAW_LUFS, 
-              targetPeakDb: TARGET_PEAK_DBTP,
-              maxLimiterGrDb: MAX_PURE_RAW_LIMITER_GR_DB
-            });
-            blob = pureRawRes.processedBlob;
-            url = pureRawRes.processedUrl;
-            if (pureRawRes.durationSec) {
-              dspDuration = pureRawRes.durationSec;
-              durationInSeconds = Math.round(pureRawRes.durationSec);
-            }
+          // 🌟 100% PURE RAW Universal Limiter Normalization (-14.5 LUFS / max 3.0 dB GR)
+          const pureRawRes = await processPureRawBlob(rawBlob, { 
+            targetLufs: TARGET_PURE_RAW_LUFS, 
+            targetPeakDb: TARGET_PEAK_DBTP,
+            maxLimiterGrDb: MAX_PURE_RAW_LIMITER_GR_DB
+          });
+          blob = pureRawRes.processedBlob;
+          url = pureRawRes.processedUrl;
+          if (pureRawRes.durationSec) {
+            dspDuration = pureRawRes.durationSec;
+            durationInSeconds = Math.round(pureRawRes.durationSec);
           }
         } catch (dspErr) {
           console.warn('[MeisterwerkDocumentationModal] Primary DSP fallback:', dspErr);
@@ -2957,9 +3135,15 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           });
         }
 
-        // 🌟 Kid & Teacher Celebration Feedback Toast
+        // 🌟 Kid & Teacher Celebration Feedback Toast & Hero Highlight
         setRecordingSavedToast(isTeacherActor ? '🎙️ Unterrichts-Aufnahme gespeichert!' : '🌟 Klasse Take gespeichert!');
-        setTimeout(() => setRecordingSavedToast(null), 3500);
+        setJustRecordedAudioUrl(localBlobKey);
+        setJustRecordedAudioLabel(smartTitle);
+        setTimeout(() => {
+          setRecordingSavedToast(null);
+          setJustRecordedAudioUrl(null);
+          setJustRecordedAudioLabel(null);
+        }, 4000);
 
         notifyHomeworkChange();
         setAudioLabel('');
@@ -2969,9 +3153,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         (async () => {
           try {
             let targetSchoolId = student?.school_id || (student as any)?.schoolId || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
-            const schoolPathPrefix = targetSchoolId ? `schools/${targetSchoolId}/` : '';
-            const fileName = `${student.id}_feedback_${timeStamp}.${fileExt}`;
-            const filePath = `${schoolPathPrefix}recordings/${fileName}`;
+            const fileName = `feedback_${timeStamp}.${fileExt}`;
+            const filePath = buildCanonicalAudioStoragePath(targetSchoolId, student.id, 'recordings', fileName);
 
             // 🛡️ Enterprise Media Security & Anti-Malware Ingestion Validation
             const validation = await validateMediaBlob(blob, 'audio', contentType);
@@ -2995,11 +3178,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             const uploadRes = await Promise.race([uploadPromise, timeoutPromise]) as any;
 
             if (uploadRes && !uploadRes.error) {
-              const { data: publicUrlData } = supabase.storage
-                .from('campus-assets')
-                .getPublicUrl(filePath);
+              const cloudUrl = await getSecureAudioUrl(filePath, 'campus-assets', 300);
               
-              const cloudUrl = publicUrlData?.publicUrl;
               if (cloudUrl) {
                 // Also cache under cloudUrl in IndexedDB for seamless offline/online playback
                 await storeBlob(cloudUrl, blob).catch(() => {});
@@ -3130,14 +3310,43 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   const startRecordingAudio = async (overrideSongId?: string | React.MouseEvent, overrideLabel?: string, isMasterworkSong = false) => {
     const prep = await prepareRecordingEngine(overrideSongId, overrideLabel, isMasterworkSong);
-    if (prep) {
-      startRecordingWithEngine(prep);
-    }
+    if (!prep) return;
+
+    cancelActiveRecordCountIn();
+    pendingRecordStreamRef.current = prep.stream;
+    pendingRecordAudioCtxRef.current = prep.recordAudioCtx;
+    pendingRecordPreparedRef.current = prep;
+
+    let count = 4;
+    setRecordCountInRemaining(count);
+    playCountInBeep(true);
+
+    const effectiveBpm = (isRecordingMetronomeActive && recordingBpm) ? recordingBpm : 100;
+    const intervalMs = (60 / effectiveBpm) * 1000;
+
+    recordCountInIntervalRef.current = setInterval(() => {
+      count -= 1;
+      if (count > 0) {
+        setRecordCountInRemaining(count);
+        playCountInBeep(false);
+      } else {
+        if (recordCountInIntervalRef.current) {
+          clearInterval(recordCountInIntervalRef.current);
+          recordCountInIntervalRef.current = null;
+        }
+        setRecordCountInRemaining(null);
+        pendingRecordStreamRef.current = null;
+        pendingRecordAudioCtxRef.current = null;
+        pendingRecordPreparedRef.current = null;
+        startRecordingWithEngine(prep);
+      }
+    }, intervalMs);
   };
 
   const stopRecordingAudio = (activeRecorder?: MediaRecorder) => {
     if (isStoppingAudioRef.current) return;
     isStoppingAudioRef.current = true;
+    cancelActiveRecordCountIn();
     cancelPlayAlongCountIn();
 
     // 🛡️ Mindestaufnahmedauer & Anti-Prell-Schutz (500ms): Verhindert versehentliche 0-Sekunden-Takes
@@ -3739,19 +3948,24 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   }, []);
 
   // Load Lehrwerke data from Supabase (Strictly aligned with Teacher's Campus Mediathek & Deduplicated)
-  const loadLehrwerke = async (resolvedSchoolId?: string) => {
+  const loadLehrwerke = async (resolvedSchoolId?: string, resolvedTeacherId?: string) => {
     try {
       const activeTId = await getCurrentTeacherId();
-      const schoolId = resolvedSchoolId || student?.school_id || (student as any)?.schoolId || studentSchoolId || localStorage.getItem('campus_school_id') || localStorage.getItem('groovelab_school_id') || localStorage.getItem('school_id');
-      const effectiveTeacherId = teacherId || activeTId;
+      const schoolId = propSchoolId || resolvedSchoolId || student?.school_id || (student as any)?.schoolId || studentSchoolId || sessionStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id') || localStorage.getItem('groovelab_school_id') || localStorage.getItem('school_id');
+      const effectiveTeacherId = teacherId || resolvedTeacherId || studentTeacherId || activeTId || (student as any)?.teacher_id;
 
       let lehrwerkeData: any[] = [];
       
-      // 1. Unified Query: Fetch school-specific and global (school_id is null) Lehrwerke (100% same as StudentAvatarDashboard)
+      // 1. Unified Query: Fetch school-specific, teacher-specific and global (school_id is null) Lehrwerke (100% aligned with Mediathek)
       let query = supabase.from('lehrwerke').select('*');
+      const orParts: string[] = ['school_id.is.null'];
       if (schoolId) {
-        query = query.or(`school_id.eq.${schoolId},school_id.is.null`);
+        orParts.push(`school_id.eq.${schoolId}`);
       }
+      if (effectiveTeacherId) {
+        orParts.push(`teacher_id.eq.${effectiveTeacherId}`);
+      }
+      query = query.or(orParts.join(','));
       const { data: allData, error } = await query.order('title');
       if (error) console.warn('Lehrwerke load note:', error);
       if (allData) lehrwerkeData = allData;
@@ -4154,6 +4368,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   useEffect(() => {
     if (student.id) {
       if (student.id === 'teacher-self') {
+        loadLehrwerke();
         setLoading(false);
         return;
       }
@@ -4164,15 +4379,19 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       const fetchProfile = async () => {
         try {
           const knownInstrument = (student as any)?.instrument || (student as any)?.resolved_instrument;
-          const knownSchoolId = student?.school_id || (student as any)?.schoolId;
+          const knownSchoolId = propSchoolId || student?.school_id || (student as any)?.schoolId;
+          const knownTeacherId = teacherId || (student as any)?.teacher_id || (student as any)?.teacherId;
           const knownSchoolName = propSchoolName || student?.school_name || (Array.isArray((student as any)?.schools) ? (student as any)?.schools[0]?.name : (student as any)?.schools?.name);
 
           if (knownInstrument) {
             setStudentInstrument(knownInstrument);
           }
+          if (knownTeacherId) {
+            setStudentTeacherId(knownTeacherId);
+          }
           if (knownSchoolId) {
             setStudentSchoolId(knownSchoolId);
-            loadLehrwerke(knownSchoolId);
+            loadLehrwerke(knownSchoolId, knownTeacherId);
           }
           if (knownSchoolName) {
             setSchoolName(knownSchoolName);
@@ -4191,20 +4410,24 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               });
           }
 
-          // Query users and schools only if instrument or schoolId is missing
-          if (!knownInstrument || !knownSchoolId) {
+          // Query users and schools only if instrument, schoolId or teacherId is missing
+          if (!knownInstrument || !knownSchoolId || !knownTeacherId) {
             const { data, error } = await supabase
               .from('users')
-              .select('instrument, school_id')
+              .select('instrument, school_id, teacher_id')
               .eq('id', student.id)
               .maybeSingle();
             if (!error && data) {
               if (data.instrument && !knownInstrument) {
                 setStudentInstrument(data.instrument);
               }
+              const resTid = knownTeacherId || data.teacher_id;
+              if (data.teacher_id && !knownTeacherId) {
+                setStudentTeacherId(data.teacher_id);
+              }
               if (data.school_id && !knownSchoolId) {
                 setStudentSchoolId(data.school_id);
-                loadLehrwerke(data.school_id);
+                loadLehrwerke(data.school_id, resTid);
                 
                 if (!knownSchoolName) {
                   const { data: schoolData } = await supabase
@@ -4216,6 +4439,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                     setSchoolName(schoolData.name);
                   }
                 }
+              } else if (data.teacher_id && !knownTeacherId) {
+                loadLehrwerke(knownSchoolId, data.teacher_id);
               }
             }
           }
@@ -6233,6 +6458,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     currentUrl?: string
   ) => {
     try {
+      const candidateStudentIds = Array.from(new Set([
+        student?.id,
+        (student as any)?.student_id,
+        (student as any)?.studentId,
+        (student as any)?.canonical_uuid,
+        (student as any)?.slot_id
+      ].filter(Boolean))) as string[];
+
       let targetIdx = originalIdx;
       if (targetIdx === undefined || targetIdx < 0 || (currentUrl && !homeworkNotesList[targetIdx]?.includes(currentUrl))) {
         targetIdx = homeworkNotesList.findIndex(n => typeof n === 'string' && n.startsWith('AUDIO:') && (currentUrl ? n.includes(currentUrl) : false));
@@ -6244,6 +6477,44 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       if (targetIdx >= 0 && list[targetIdx]) {
         originalNote = list[targetIdx];
+      } else if (currentUrl) {
+        // Search in progressItems
+        for (const p of (progressItems || [])) {
+          if (p.homework_notes && typeof p.homework_notes === 'string' && p.homework_notes.includes(currentUrl)) {
+            const chunks = p.homework_notes.split('AUDIO:');
+            for (const chunk of chunks) {
+              if (chunk && chunk.includes(currentUrl)) {
+                const firstDelim = chunk.search(/[\n\r"\]]/);
+                const audioContent = firstDelim !== -1 ? chunk.substring(0, firstDelim) : chunk;
+                originalNote = 'AUDIO:' + audioContent.trim();
+                break;
+              }
+            }
+          }
+          if (originalNote) break;
+        }
+
+        // Also search in candidate localStorage vaults if not found in progressItems
+        if (!originalNote) {
+          for (const cid of candidateStudentIds) {
+            const vaultRaw = localStorage.getItem(`campus_teacher_audio_vault_${cid}`) || localStorage.getItem(`campus_homework_notes_${cid}`);
+            if (vaultRaw && vaultRaw.includes(currentUrl)) {
+              const chunks = vaultRaw.split('AUDIO:');
+              for (const chunk of chunks) {
+                if (chunk && chunk.includes(currentUrl)) {
+                  const firstDelim = chunk.search(/[\n\r"\]]/);
+                  const audioContent = firstDelim !== -1 ? chunk.substring(0, firstDelim) : chunk;
+                  originalNote = 'AUDIO:' + audioContent.trim();
+                  break;
+                }
+              }
+            }
+            if (originalNote) break;
+          }
+        }
+      }
+
+      if (originalNote) {
         const parts = originalNote.substring(6).split('|');
         const masterOrigUrl = parts[9]?.trim() || parts[0]?.trim() || result.original_url || '';
         const masterOrigDur = parts[10]?.trim() || parts[1]?.trim() || String(result.original_duration || result.duration || 0);
@@ -6260,10 +6531,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
         updatedNote = `AUDIO:${newParts.join('|')}`;
 
-        if (result.mode === 'overwrite') {
-          list[targetIdx] = updatedNote;
-        } else {
-          list.push(updatedNote);
+        if (targetIdx >= 0) {
+          if (result.mode === 'overwrite') {
+            list[targetIdx] = updatedNote;
+          } else {
+            list.push(updatedNote);
+          }
         }
       } else {
         const masterOrigUrl = result.original_url || currentUrl || result.url;
@@ -6274,9 +6547,21 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       setHomeworkNotesList(list);
 
-      try {
-        localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(list));
-      } catch {}
+      candidateStudentIds.forEach(cid => {
+        try {
+          const hwRaw = localStorage.getItem(`campus_homework_notes_${cid}`);
+          if (hwRaw && originalNote && updatedNote && result.mode === 'overwrite' && hwRaw.includes(originalNote)) {
+            localStorage.setItem(`campus_homework_notes_${cid}`, hwRaw.replace(originalNote, updatedNote));
+          } else if (cid === student?.id) {
+            localStorage.setItem(`campus_homework_notes_${cid}`, JSON.stringify(list));
+          }
+
+          const vaultRaw = localStorage.getItem(`campus_teacher_audio_vault_${cid}`);
+          if (vaultRaw && originalNote && updatedNote && result.mode === 'overwrite' && vaultRaw.includes(originalNote)) {
+            localStorage.setItem(`campus_teacher_audio_vault_${cid}`, vaultRaw.replace(originalNote, updatedNote));
+          }
+        } catch {}
+      });
 
       await syncHomeworkNotes(list);
       notifyHomeworkChange();
@@ -6286,7 +6571,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           const { data: allStudentMatrix } = await supabase
             .from('progress_matrix')
             .select('id, homework_notes')
-            .eq('student_id', student.id);
+            .in('student_id', candidateStudentIds);
 
           if (allStudentMatrix) {
             for (const row of allStudentMatrix) {
@@ -6318,6 +6603,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   const handleRevertTeacherAudioToOriginal = async (originalIdx?: number, currentUrl?: string) => {
     try {
+      const candidateStudentIds = Array.from(new Set([
+        student?.id,
+        (student as any)?.student_id,
+        (student as any)?.studentId,
+        (student as any)?.canonical_uuid,
+        (student as any)?.slot_id
+      ].filter(Boolean))) as string[];
+
       let targetIdx = originalIdx;
       if (targetIdx === undefined || targetIdx < 0 || (currentUrl && !homeworkNotesList[targetIdx]?.includes(currentUrl))) {
         targetIdx = homeworkNotesList.findIndex(n => typeof n === 'string' && n.startsWith('AUDIO:') && (currentUrl ? n.includes(currentUrl) : false));
@@ -6340,9 +6633,21 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       list[targetIdx] = updatedNote;
       setHomeworkNotesList(list);
 
-      try {
-        localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(list));
-      } catch {}
+      candidateStudentIds.forEach(cid => {
+        try {
+          const hwRaw = localStorage.getItem(`campus_homework_notes_${cid}`);
+          if (hwRaw && hwRaw.includes(originalNote)) {
+            localStorage.setItem(`campus_homework_notes_${cid}`, hwRaw.replace(originalNote, updatedNote));
+          } else if (cid === student?.id) {
+            localStorage.setItem(`campus_homework_notes_${cid}`, JSON.stringify(list));
+          }
+
+          const vaultRaw = localStorage.getItem(`campus_teacher_audio_vault_${cid}`);
+          if (vaultRaw && vaultRaw.includes(originalNote)) {
+            localStorage.setItem(`campus_teacher_audio_vault_${cid}`, vaultRaw.replace(originalNote, updatedNote));
+          }
+        } catch {}
+      });
 
       await syncHomeworkNotes(list);
       notifyHomeworkChange();
@@ -6352,7 +6657,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           const { data: allStudentMatrix } = await supabase
             .from('progress_matrix')
             .select('id, homework_notes')
-            .eq('student_id', student.id);
+            .in('student_id', candidateStudentIds);
 
           if (allStudentMatrix) {
             for (const row of allStudentMatrix) {
@@ -6413,6 +6718,99 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       }
     } catch (err) {
       console.warn('[handleRenameStudentAudio] Error:', err);
+    }
+  };
+
+  const handleDeleteStudentAudio = async (targetUrl: string, targetId?: string, audMeta?: any) => {
+    try {
+      const candidateStudentIds = Array.from(new Set([
+        student?.id,
+        (student as any)?.student_id,
+        (student as any)?.studentId,
+        (student as any)?.canonical_uuid,
+        (student as any)?.slot_id,
+        'current'
+      ].filter(Boolean))) as string[];
+
+      const matchesTarget = (r: any) => {
+        if (!r) return false;
+        if (targetId && r.id && String(r.id) === String(targetId)) return true;
+        if (targetUrl && r.url && (r.url === targetUrl || r.url.includes(targetUrl) || targetUrl.includes(r.url))) return true;
+        if (audMeta?.blobKey && (r.blobKey === audMeta.blobKey || r.url === audMeta.blobKey)) return true;
+        if (r.blobKey && (r.blobKey === targetUrl || (targetId && r.blobKey.includes(targetId)))) return true;
+        if (audMeta?.original_url && (r.url === audMeta.original_url || r.original_url === audMeta.original_url)) return true;
+        if (audMeta?.date && r.date === audMeta.date && (r.title === audMeta.label || r.label === audMeta.label || r.harmonizedTitle === audMeta.label)) return true;
+        return false;
+      };
+
+      // 1. Delete across all candidate student IDs (junior recordings & audio biography)
+      candidateStudentIds.forEach(cid => {
+        const juniorKey = `campus_junior_recordings_${cid}`;
+        try {
+          const stored = localStorage.getItem(juniorKey);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed)) {
+              const filtered = parsed.filter(r => !matchesTarget(r));
+              localStorage.setItem(juniorKey, JSON.stringify(filtered));
+            }
+          }
+        } catch {}
+
+        const bioKey = `campus_audio_biography_${cid}`;
+        try {
+          const storedBio = localStorage.getItem(bioKey);
+          if (storedBio) {
+            const parsedBio = JSON.parse(storedBio);
+            if (Array.isArray(parsedBio)) {
+              const filteredBio = parsedBio.filter(r => !matchesTarget(r));
+              localStorage.setItem(bioKey, JSON.stringify(filteredBio));
+            }
+          }
+        } catch {}
+      });
+
+      // 2. Remove binary from local IndexedDB if local blobKey exists
+      if (targetUrl && (targetUrl.startsWith('campus_blob_') || targetUrl.startsWith('campus_audio_'))) {
+        deleteBlob(targetUrl).catch(() => {});
+      }
+      if (audMeta?.blobKey) {
+        deleteBlob(audMeta.blobKey).catch(() => {});
+      }
+      if (targetId) {
+        deleteBlob(`campus_audio_${targetId}_raw`).catch(() => {});
+        deleteBlob(`campus_audio_${targetId}_master`).catch(() => {});
+      }
+
+      // 3. Remove remote binary from Supabase Storage if uploaded
+      const effectiveUrl = targetUrl || audMeta?.url;
+      if (effectiveUrl && effectiveUrl.includes('campus-assets/')) {
+        const parts = effectiveUrl.split('campus-assets/');
+        if (parts[1]) {
+          supabase.storage.from('campus-assets').remove([parts[1]]).catch(() => {});
+        }
+      }
+
+      // 4. Remove from progress_matrix if present
+      if (student?.id) {
+        try {
+          if (targetId) {
+            await supabase.from('progress_matrix').delete().eq('id', targetId);
+          }
+          if (effectiveUrl && effectiveUrl.startsWith('http')) {
+            await supabase.from('progress_matrix').delete().eq('recording_url', effectiveUrl);
+          }
+        } catch {}
+      }
+
+      // 5. Trigger live cross-tab and component sync
+      setLocalJuniorRecordingsTrigger(prev => prev + 1);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new CustomEvent('campus_junior_recordings_updated'));
+      }
+    } catch (err) {
+      console.warn('[handleDeleteStudentAudio] Error deleting student audio:', err);
     }
   };
 
@@ -7564,6 +7962,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
   };
 
+  const handleGrooveTrainerRewardXp = useCallback(async (xp: number, durationSeconds: number = 0) => {
+    if (student?.id && (xp > 0 || durationSeconds > 0)) {
+      await awardCampusXP(xp, 'Groove-Trainer gemeistert', durationSeconds);
+    }
+  }, [student?.id]);
+
 
   const handleStudentRatingChange = (val: number) => {
     setStudentRating(val);
@@ -8563,7 +8967,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
     setNewLehrwerkLoading(true);
     try {
-      const schoolId = student?.school_id || (student as any)?.schoolId || studentSchoolId || localStorage.getItem('campus_school_id') || localStorage.getItem('groovelab_school_id') || localStorage.getItem('school_id');
+      const schoolId = propSchoolId || student?.school_id || (student as any)?.schoolId || studentSchoolId || sessionStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id') || localStorage.getItem('groovelab_school_id') || localStorage.getItem('school_id');
       const totalPages = parseInt(newLehrwerkPages, 10) || 50;
 
       let createdId = `custom-${Date.now()}`;
@@ -9535,7 +9939,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   };
 
   const renderAgeUiInfoModal = () => {
-    if (!showAgeUiInfoModal) return null;
+    if (isTeacherSandbox || isTeacherTools || isTeacherSelf || !showAgeUiInfoModal) return null;
     return (
       <div
         role="dialog"
@@ -10089,63 +10493,85 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   >
                     {displayedStudentName}
                   </h2>
-                  <button
-                    type="button"
-                    onClick={() => { setOnboardingStep(0); setShowProtokollOnboarding(true); }}
-                    title="Anleitung & Onboarding anzeigen"
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.18)',
-                      border: '1px solid rgba(255, 255, 255, 0.28)',
-                      color: '#ffffff',
-                      width: '22px',
-                      height: '22px',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      padding: 0,
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
-                      transition: 'all 0.2s ease',
-                      flexShrink: 0
-                    }}
-                    className="hover-scale"
-                  >
-                    <Info size={13} color="#ffffff" />
-                  </button>
-                  {/* Interaktives Alter-UI Badge */}
-                  <button
-                    type="button"
-                    onClick={() => setShowAgeUiInfoModal(true)}
-                    title="Altersstufe & Berechtigungen anzeigen"
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      background: uiLevel === 'junior' 
-                        ? 'rgba(254, 240, 138, 0.22)' 
-                        : uiLevel === 'teen' 
-                          ? 'rgba(199, 210, 254, 0.22)' 
-                          : 'rgba(233, 213, 255, 0.22)',
-                      border: uiLevel === 'junior' 
-                        ? '1px solid rgba(253, 224, 71, 0.55)' 
-                        : uiLevel === 'teen' 
-                          ? '1px solid rgba(165, 180, 252, 0.55)' 
-                          : '1px solid rgba(216, 180, 254, 0.55)',
-                      borderRadius: '100px',
-                      padding: '2px 8px',
-                      color: '#ffffff',
-                      fontSize: '0.70rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 5px rgba(0,0,0,0.12)',
-                      transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
-                      flexShrink: 0
-                    }}
-                    className="hover-scale"
-                  >
-                    <span>{uiLevel === 'junior' ? '🧒 Junior (6–10 J.)' : uiLevel === 'teen' ? '⚡ Teen (11–15 J.)' : '🎓 Pro (ab 16 J.)'}</span>
-                  </button>
+                  {!isTeacherSandbox && !isTeacherTools && !isTeacherSelf ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => { setOnboardingStep(0); setShowProtokollOnboarding(true); }}
+                        title="Anleitung & Onboarding anzeigen"
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.18)',
+                          border: '1px solid rgba(255, 255, 255, 0.28)',
+                          color: '#ffffff',
+                          width: '22px',
+                          height: '22px',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          padding: 0,
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+                          transition: 'all 0.2s ease',
+                          flexShrink: 0
+                        }}
+                        className="hover-scale"
+                      >
+                        <Info size={13} color="#ffffff" />
+                      </button>
+                      {/* Interaktives Alter-UI Badge (Nur für Schüler) */}
+                      <button
+                        type="button"
+                        onClick={() => setShowAgeUiInfoModal(true)}
+                        title="Altersstufe & Berechtigungen anzeigen"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          background: uiLevel === 'junior' 
+                            ? 'rgba(254, 240, 138, 0.22)' 
+                            : uiLevel === 'teen' 
+                              ? 'rgba(199, 210, 254, 0.22)' 
+                              : 'rgba(233, 213, 255, 0.22)',
+                          border: uiLevel === 'junior' 
+                            ? '1px solid rgba(253, 224, 71, 0.55)' 
+                            : uiLevel === 'teen' 
+                              ? '1px solid rgba(165, 180, 252, 0.55)' 
+                              : '1px solid rgba(216, 180, 254, 0.55)',
+                          borderRadius: '100px',
+                          padding: '2px 8px',
+                          color: '#ffffff',
+                          fontSize: '0.70rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 5px rgba(0,0,0,0.12)',
+                          transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                          flexShrink: 0
+                        }}
+                        className="hover-scale"
+                      >
+                        <span>{uiLevel === 'junior' ? '🧒 Junior (6–10 J.)' : uiLevel === 'teen' ? '⚡ Teen (11–15 J.)' : '🎓 Pro (ab 16 J.)'}</span>
+                      </button>
+                    </>
+                  ) : (
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        background: 'rgba(255, 255, 255, 0.2)',
+                        border: '1px solid rgba(255, 255, 255, 0.35)',
+                        borderRadius: '100px',
+                        padding: '2px 8px',
+                        color: '#ffffff',
+                        fontSize: '0.70rem',
+                        fontWeight: 800,
+                        flexShrink: 0
+                      }}
+                    >
+                      Lehrkraft
+                    </span>
+                  )}
                 </div>
                 {(activeViewMode === 'recordings' || activeModalTab === 'audiobiography') && (
                   <span style={{ fontSize: '0.68rem', fontWeight: 650, color: 'rgba(255, 255, 255, 0.75)', lineHeight: 1, marginTop: '2px' }}>
@@ -10256,6 +10682,35 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
             {/* Actions (Always visible on all screen sizes, including Fullscreen + Close) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }} className="header-right-actions">
+              {onOpenAssignModal && (
+                <button
+                  type="button"
+                  onClick={onOpenAssignModal}
+                  aria-label="Hausaufgabe an Schüler zuweisen"
+                  style={{
+                    background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                    border: '1px solid rgba(255,255,255,0.35)',
+                    borderRadius: '20px',
+                    padding: '6px 14px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    cursor: 'pointer',
+                    color: '#ffffff',
+                    fontWeight: 850,
+                    fontSize: '0.80rem',
+                    flexShrink: 0,
+                    boxShadow: '0 2px 10px rgba(2, 132, 199, 0.35)'
+                  }}
+                  className="hover-scale"
+                  title="Hausaufgabe an Schüler zuweisen"
+                >
+                  <Send size={13} />
+                  <span>An Schüler zuweisen</span>
+                </button>
+              )}
               {renderFullscreenButton()}
               {renderCloseButton()}
             </div>
@@ -10320,7 +10775,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       outline: 'none'
                     }}
                   >
-                    Module
+                    {isTeacherSelf ? 'Studio-Module' : 'Module'}
                   </button>
 
                   <button
@@ -10351,7 +10806,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                       outline: 'none'
                     }}
                   >
-                    Hausaufgaben
+                    {isTeacherSelf ? 'Anleitung & Tipps' : 'Hausaufgaben'}
                   </button>
                 </div>
               </div>
@@ -10359,9 +10814,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           })()}
         </div>
 
-        {/* 🏫 LEHRER-DEMO-BANNER (wenn Modul im Schüler-UI-Level inaktiv ist) */}
-        {isTeacherMode && (() => {
-          const overrides = (student as any)?.parent_permissions?.module_overrides || propParentPermissions?.module_overrides;
+        {/* 🏫 LEHRER-DEMO-BANNER (wenn Modul im Schüler-UI-Level inaktiv ist) - NIEMALS IM LEHRER-SANDBOX / TOOLS MODUS */}
+        {isTeacherMode && !isTeacherSandbox && !isTeacherTools && !isTeacherSelf && (() => {
+          const overrides = effectiveParentPermissions?.module_overrides || (student as any)?.parent_permissions?.module_overrides || propParentPermissions?.module_overrides;
           const isCurrentModuleInactive = (activeViewMode === "loopstation" && uiLevel === "junior" && !overrides?.loopstation)
             || (activeSubView === "history" && activeViewMode === "document" && uiLevel !== "pro" && !overrides?.archive);
           if (!isCurrentModuleInactive) return null;
@@ -10501,11 +10956,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 uiLevel={uiLevel}
                 useNotebookLayout={true}
                 homeworkNotesList={homeworkNotesList}
-                onRewardXp={async (xp, durationSeconds = 0) => {
-                  if (student?.id && (xp > 0 || durationSeconds > 0)) {
-                    await awardCampusXP(xp, 'Groove-Trainer gemeistert', durationSeconds);
-                  }
-                }}
+                onRewardXp={handleGrooveTrainerRewardXp}
               />
             </div>
           ) : activeViewMode === 'loopstation' ? (
@@ -10638,6 +11089,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               getMonthAlbumTheme={getMonthAlbumTheme}
               getNormalizedSongTitle={getNormalizedSongTitle}
               handleDeleteNote={handleDeleteNote}
+              handleDeleteStudentAudio={handleDeleteStudentAudio}
               handleRenameStudentAudio={handleRenameStudentAudio}
               handleRenameTeacherAudio={handleRenameTeacherAudio}
               handleSaveEditedTeacherAudio={handleSaveEditedTeacherAudio}
@@ -10704,6 +11156,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               songs={songs}
               startRecordingAudio={startRecordingAudio}
               stopRecordingAudio={stopRecordingAudio}
+              recordCountInRemaining={recordCountInRemaining}
+              cancelActiveRecordCountIn={cancelActiveRecordCountIn}
+              justRecordedAudioUrl={justRecordedAudioUrl}
+              justRecordedAudioLabel={justRecordedAudioLabel}
               studentFirstName={studentFirstName}
               toggleFavoriteAudio={toggleFavoriteAudio}
               toggleStudentAudioWeek={toggleStudentAudioWeek}
@@ -10806,6 +11262,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               isSubSlidersExpanded={isSubSlidersExpanded}
               isTeacherMode={isTeacherMode}
               isTeacherTools={isTeacherTools}
+              isTeacherSelf={isTeacherSelf}
+              onClose={onClose}
               isTtsSpeaking={isTtsSpeaking}
               isUploadingAudio={isUploadingAudio}
               lastClickRef={lastClickRef}
@@ -10935,6 +11393,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               triggerDirectSongSave={triggerDirectSongSave}
               triggerImmediateAutoSave={triggerImmediateAutoSave}
               uiLevel={uiLevel}
+              parentPermissions={effectiveParentPermissions}
               updateLehrwerkVisibility={updateLehrwerkVisibility}
               useNotebookLayout={useNotebookLayout}
               viewingWeekOffset={viewingWeekOffset}

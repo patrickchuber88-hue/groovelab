@@ -41,7 +41,7 @@ import {
   Bookmark,
   ArrowRight
 } from 'lucide-react';
-import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel } from '../utils/nameHelper';
+import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel, formatTeacherFullName } from '../utils/nameHelper';
 import { ScheduleCalendarView } from './ScheduleCalendarView';
 import { LiquidGlassSkeleton } from './ui/LiquidGlassSkeleton';
 const ScheduleBoardDesktop = React.lazy(() => import('./ScheduleBoardDesktop').then(m => ({ default: m.ScheduleBoardDesktop })));
@@ -49,104 +49,23 @@ import { StudentScheduleSlotsModal } from './StudentScheduleSlotsModal';
 import { run15StageSolver } from '../engine/Schedule15StageSolverEngine';
 import { getParentOnboardingUrl } from '../utils/tenantUrlHelper';
 import { isUUID } from '../utils/uuidValidator';
-export interface Student {
-  id: string;
-  first_name: string;
-  last_name: string;
-  instrument: string;
-  duration: number; // Duration in minutes (e.g. 30, 45, 60)
-  assignedDay?: number; // 1 = Mon, 2 = Tue, etc.
-  assignedTime?: string; // e.g. "14:30"
-  isBreak?: boolean;
-  customStartTime?: string;
-  isPinned?: boolean;
-  preferenceMatch?: 'first' | 'secondary' | 'deviation';
-  status?: 'ausstehend' | 'verplant' | 'aktiv' | 'in_bearbeitung';
-  isGroup?: boolean;
-  groupStudents?: Student[];
-  sibling_group_id?: string;
-  group_id?: string | null;
-  isOnboarded?: boolean;
-  hasPreferences?: boolean;
-  teacher_id?: string;
-  isVacant?: boolean;
-}
-
-export interface DayBoard {
-  id: string; // unique board id
-  dayOfWeek: number; // 1 = Monday, 2 = Tuesday, etc.
-  startAnchor: string; // e.g. "14:00"
-  endAnchor?: string;
-  availabilityEnd?: string; // hard limit for teacher's day
-  roomId?: string; // room associated with this board
-  students: Student[]; // Ordered list of assigned students
-}
-
-interface Room {
-  id: string;
-  name: string;
-}
+import {
+  Student,
+  DayBoard,
+  ScheduleRoom as Room,
+  parseTime,
+  getPrefStartEndMinutes,
+  parseDayNumber,
+  resolveFirstName,
+  resolveLastName,
+  formatMinutes
+} from '../domain/schedule/scheduleBoardTypes';
+export type { Student, DayBoard };
 
 interface ScheduleBoardProps {
   schoolId: string;
   userId: string;
 }
-
-const parseTime = (timeStr: string | null | undefined, fallback = '14:00'): [number, number] => {
-  const str = timeStr || fallback || '14:00';
-  if (!str || typeof str !== 'string' || !str.includes(':')) return [14, 0];
-  const parts = str.split(':').map(Number);
-  if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return [14, 0];
-  return [parts[0], parts[1]];
-};
-
-const getPrefStartEndMinutes = (pref: any): { startMin: number; endMin: number } => {
-  if (!pref) return { startMin: 0, endMin: 0 };
-  const [sh, sm] = parseTime(pref.start_time);
-  const [eh, em] = parseTime(pref.end_time || pref.start_time);
-  const startMin = sh * 60 + sm;
-  let endMin = eh * 60 + em;
-  if (endMin <= startMin) {
-    endMin = startMin + 120;
-  }
-  return { startMin, endMin };
-};
-
-const parseDayNumber = (val: any): number => {
-  if (typeof val === 'number') return val;
-  if (!val) return 0;
-  const num = Number(val);
-  if (!isNaN(num)) return num;
-  const str = String(val).trim().toLowerCase();
-  if (str.includes('mon')) return 1;
-  if (str.includes('die') || str.includes('tue')) return 2;
-  if (str.includes('mit') || str.includes('wed')) return 3;
-  if (str.includes('don') || str.includes('thu')) return 4;
-  if (str.includes('fre') || str.includes('fri')) return 5;
-  if (str.includes('sam') || str.includes('sat')) return 6;
-  if (str.includes('son') || str.includes('sun')) return 7;
-  return 0;
-};
-
-const resolveFirstName = (s: any): string => {
-  if (s && s.first_name && typeof s.first_name === 'string' && s.first_name.trim()) return s.first_name.trim();
-  const fullName = s?.full_name || s?.name || s?.display_name || '';
-  if (fullName && typeof fullName === 'string' && fullName.trim()) return fullName.trim().split(' ')[0];
-  return 'Schüler';
-};
-
-const resolveLastName = (s: any): string => {
-  if (s && s.last_name && typeof s.last_name === 'string' && s.last_name.trim()) return s.last_name.trim();
-  const fullName = s?.full_name || s?.name || s?.display_name || '';
-  if (fullName && typeof fullName === 'string' && fullName.trim().includes(' ')) return fullName.trim().split(' ').slice(1).join(' ');
-  return '';
-};
-
-const formatMinutes = (totalMins: number): string => {
-  const h = Math.floor(totalMins / 60);
-  const m = totalMins % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-};
 
 const DAYS_OF_WEEK = [
   { value: 1, name: 'Montag' },
@@ -829,7 +748,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
         map[key].push({
           start,
           end,
-          teacherName: os.teacher ? `${os.teacher.first_name} ${os.teacher.last_name}` : 'Anderer Lehrer',
+          teacherName: os.teacher ? formatTeacherFullName(os.teacher) : 'Anderer Lehrer',
           studentName: os.student ? `${os.student.first_name} ${maskLastName(os.student.last_name, showRealNames)}` : 'Schüler'
         });
       }
@@ -1755,6 +1674,7 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                 }
                 return {
                   ...s,
+                  first_name: formatGroupStudentsAnonymized(validMembers, false),
                   groupStudents: validMembers
                 };
               }
@@ -5107,6 +5027,38 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                   </button>
                 </div>
               </div>
+
+              {/* Right: Didactic Purpose & Secretariat Approval Disclaimer Badge (Desktop Only) */}
+              {!isMobilePortrait && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', minWidth: 0 }}>
+                  <div 
+                    title="Didaktische Entwurfsplanung • Genehmigungsvorbehalt durch Schulsekretariat"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: 'rgba(255, 255, 255, 0.85)',
+                      border: '1px solid rgba(0, 0, 0, 0.06)',
+                      borderRadius: '100px',
+                      padding: '4px 12px',
+                      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
+                      fontSize: '0.70rem',
+                      fontWeight: 700,
+                      color: '#475569',
+                      letterSpacing: '0.01em',
+                      whiteSpace: 'nowrap',
+                      textOverflow: 'ellipsis',
+                      overflow: 'hidden',
+                      maxWidth: '100%'
+                    }}
+                  >
+                    <span style={{ fontSize: '0.78rem', flexShrink: 0 }}>⚖️</span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      Didaktische Entwurfsplanung • Genehmigungsvorbehalt durch Schulsekretariat
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Divider (Desktop Only) */}
@@ -5385,13 +5337,13 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: 'space-between',
-              gap: '12px',
+              gap: '16px',
               marginTop: '-4px',
-              flexWrap: 'wrap'
+              flexWrap: 'nowrap'
             }}>
               {/* Left: Apple Segmented Control for Drafts + Integrated Add Button */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', fontFamily: 'Urbanist, sans-serif' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flexShrink: 1 }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', fontFamily: 'Urbanist, sans-serif', flexShrink: 0 }}>
                   Entwürfe:
                 </span>
                 <div style={{ 
@@ -5401,7 +5353,10 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                   borderRadius: '10px', 
                   padding: '2px', 
                   border: '1px solid rgba(0, 0, 0, 0.05)',
-                  gap: '2px'
+                  gap: '2px',
+                  overflowX: 'auto',
+                  scrollbarWidth: 'none',
+                  maxWidth: '100%'
                 }}>
                   {drafts.map(d => {
                     const isActive = d.id === activeDraftId;
@@ -5425,6 +5380,8 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                           gap: '6px',
                           boxShadow: isActive ? '0 1px 4px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.1)' : 'none',
                           transition: 'all 0.16s cubic-bezier(0.16, 1, 0.3, 1)',
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0
                         }}
                         onMouseOver={e => {
                           if (!isActive) {
@@ -5449,7 +5406,8 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                               borderRadius: '50%',
                               background: '#22c55e',
                               display: 'inline-block',
-                              boxShadow: '0 0 4px rgba(34, 197, 94, 0.5)'
+                              boxShadow: '0 0 4px rgba(34, 197, 94, 0.5)',
+                              flexShrink: 0
                             }}
                           />
                         )}
@@ -5459,7 +5417,8 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                           padding: '1px 5px',
                           fontSize: '0.64rem',
                           fontWeight: 700,
-                          color: isActive ? '#0f172a' : '#94a3b8'
+                          color: isActive ? '#0f172a' : '#94a3b8',
+                          flexShrink: 0
                         }}>
                           {totalLessons}
                         </span>
@@ -5482,7 +5441,8 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                       display: 'inline-flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      transition: 'all 0.16s ease'
+                      transition: 'all 0.16s ease',
+                      flexShrink: 0
                     }}
                     onMouseOver={e => {
                       e.currentTarget.style.background = 'rgba(255, 255, 255, 0.65)';
@@ -5497,29 +5457,9 @@ function ScheduleBoardMobileView({ schoolId, userId }: ScheduleBoardProps) {
                   </button>
                 </div>
               </div>
-              
-              {/* Center: Didactic Purpose & Secretariat Approval Disclaimer Badge */}
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                background: 'rgba(255, 255, 255, 0.85)',
-                border: '1px solid rgba(0, 0, 0, 0.06)',
-                borderRadius: '100px',
-                padding: '4px 14px',
-                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
-                fontSize: '0.70rem',
-                fontWeight: 700,
-                color: '#475569',
-                letterSpacing: '0.01em',
-                whiteSpace: 'nowrap'
-              }}>
-                <span style={{ fontSize: '0.78rem' }}>⚖️</span>
-                <span>Didaktische Entwurfsplanung • Genehmigungsvorbehalt durch Schulsekretariat</span>
-              </div>
 
               {/* Right: Flagship Action (Hero) + Apple Toolbar Group */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
                 {/* 🌟 HERO FLAGGSCHIFF: Automatisch zuteilen */}
                 <button
                   type="button"

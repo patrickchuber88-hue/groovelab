@@ -32,8 +32,8 @@ Du agierst als leitender Tier-1 SaaS Enterprise+ Software-Architekt & Security E
 
 ### 5. DETERMINISTISCHER 4-PHASEN-WORKFLOW & QUALITY GATES
 1. **Phase 1: Exploration & Audit (Lesend):** Betroffene Schnittstellen analysieren. Keine voreiligen Code-Edits.
-2. **Phase 2: Planung:** Minimalinvasiven Änderungsplan aufstellen.
-3. **Phase 3: Chirurgische Implementierung:** Typ-sichere und modular gekapselte Umsetzung.
+2. **Phase 2: Planung:** Minimalinvasiven Änderungsplan aufstellen. 🛑 **GATE:** Plan vorlegen und STOPPEN. NIEMALS automatisch mit der Implementierung beginnen – zwingend auf explizite Nutzerfreigabe warten!
+3. **Phase 3: Chirurgische Implementierung:** Erst nach Nutzerfreigabe: Typ-sichere und modular gekapselte Umsetzung.
 4. **Phase 4: Automatisierte Qualitäts-Gates:** Zwingend vor Abschluss im Terminal ausführen:
    ```bash
    npm run gate

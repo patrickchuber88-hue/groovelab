@@ -10,6 +10,8 @@ import { reportClientError, initGlobalErrorListeners } from './lib/errorTelemetr
 import { isDevEnvironment } from './utils/tenantUrlHelper';
 import { CampusGroovelabText } from './components/CampusGroovelabBrand';
 import { scrubSharedDeviceCache } from './utils/sharedDeviceScrubber';
+import { SharedAudioEngine } from './utils/sharedAudioEngine';
+import { requestPersistentStorage } from './utils/storagePersistence';
 
 // Initialize global error interception
 initGlobalErrorListeners();
@@ -47,6 +49,7 @@ const HelpCenterModal = lazy(() => import('./components/help/HelpCenterModal').t
 const TrialInfoModal = lazy(() => import('./components/TrialInfoModal').then(m => ({ default: m.TrialInfoModal })));
 const AdminSecuritySuiteModal = lazy(() => import('./components/AdminSecuritySuiteModal').then(m => ({ default: m.AdminSecuritySuiteModal })));
 const QuarterlyAccessReportModal = lazy(() => import('./components/ui/QuarterlyAccessReportModal').then(m => ({ default: m.QuarterlyAccessReportModal })));
+const SessionLockModal = lazy(() => import('./components/ui/SessionLockModal').then(m => ({ default: m.SessionLockModal })));
 const LegalTextModal = lazy(() => import('./components/LegalTextModal').then(m => ({ default: m.LegalTextModal })));
 const ConfettiModal = lazy(() => import('./components/ConfettiModal'));
 const MaintenanceLockoutOverlay = lazy(() => import('./components/MaintenanceLockoutOverlay').then(m => ({ default: m.MaintenanceLockoutOverlay })));
@@ -138,6 +141,11 @@ let _replaceStateCount = 0;
 const safeReplaceState = (data: any, unused: string, url?: string | URL | null) => {
   if (typeof window === 'undefined' || !window.history) return;
   try {
+    if (url) {
+      const urlStr = typeof url === 'string' ? url : url.toString();
+      const currentFull = window.location.pathname + window.location.search + window.location.hash;
+      if (currentFull === urlStr) return;
+    }
     const now = Date.now();
     if (now - _lastReplaceStateTime > 10000) {
       _lastReplaceStateTime = now;
@@ -338,7 +346,7 @@ if (kioskTokenParam) {
   params.delete('kiosk_room_id');
   const newSearch = params.toString();
   const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '');
-  window.history.replaceState({}, '', newUrl);
+  safeReplaceState({}, '', newUrl);
 }
 
 const kioskStationId = params.get('kiosk_station_id') || params.get('station_id');
@@ -714,7 +722,7 @@ function App() {
   const [isScreenLockedByInactivity, setIsScreenLockedByInactivity] = useState(false);
   const [showQuarterlyAccessReportModal, setShowQuarterlyAccessReportModal] = useState(false);
 
-  // 🛡️ Universal 45-Minute Inactivity Idle Privacy-Lock (Hiscox CyberSafe / BSI APP.3.1)
+  // 🔒 Universal 45-Minute Inactivity Idle Screen Lock (Enterprise Goldstandard)
   useInactivityTimeout({
     timeoutMs: 45 * 60 * 1000,
     enabled: Boolean(currentView === 'dashboard' && !isScreenLockedByInactivity),
@@ -832,10 +840,11 @@ function App() {
     const isLocalhost = typeof window !== 'undefined' && (
       window.location.hostname === 'localhost' || 
       window.location.hostname === '127.0.0.1' ||
+      window.location.hostname.endsWith('.localhost') ||
       window.location.hostname.endsWith('.local')
     );
 
-    // In local development, unregister any stale service worker to prevent cached index.html from freezing Vite HMR!
+    // In local development, unregister any stale service worker and purge CacheStorage to prevent freezing Vite HMR!
     if (isLocalhost) {
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then((registrations) => {
@@ -844,11 +853,21 @@ function App() {
           }
         }).catch(() => {});
       }
+      if ('caches' in window) {
+        caches.keys().then((keys) => {
+          for (const key of keys) {
+            caches.delete(key);
+          }
+        }).catch(() => {});
+      }
     } else if ('serviceWorker' in navigator) {
       // Register service worker in production to ensure PWA installability and update checking
       navigator.serviceWorker.register('/sw.js', { scope: '/' })
         .then((reg) => {
           console.log('Service Worker registered successfully on load:', reg.scope);
+
+          // 📱 Tier-1 Storage Persistence Guard (Protects IndexedDB & Offline Vault from iOS ITP 7-day auto-purge)
+          requestPersistentStorage().catch(() => {});
 
           // If there is already a waiting worker, prompt user to update smoothly via floating toast
           if (reg.waiting && navigator.serviceWorker.controller) {
@@ -921,27 +940,8 @@ function App() {
       (navigator as any).clearAppBadge().catch(() => {});
     }
 
-    // iOS Web AudioContext auto-unlock on first user interaction
-    const unlockAudioContext = () => {
-      try {
-        const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
-        if (AudioCtxClass) {
-          const dummyCtx = new AudioCtxClass();
-          if (dummyCtx.state === 'suspended') {
-            dummyCtx.resume().catch(() => {});
-          }
-          const osc = dummyCtx.createOscillator();
-          const gain = dummyCtx.createGain();
-          gain.gain.value = 0.00001;
-          osc.connect(gain);
-          gain.connect(dummyCtx.destination);
-          osc.start(0);
-          osc.stop(0.001);
-        }
-      } catch (e) {}
-    };
-    window.addEventListener('pointerdown', unlockAudioContext, { passive: true, once: true });
-    window.addEventListener('keydown', unlockAudioContext, { passive: true, once: true });
+    // iOS Web AudioContext auto-unlock on first user interaction via SharedAudioEngine singleton
+    SharedAudioEngine.initAutoUnlock();
 
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
@@ -963,8 +963,6 @@ function App() {
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       document.removeEventListener('click', handleAnchorClick);
-      window.removeEventListener('pointerdown', unlockAudioContext);
-      window.removeEventListener('keydown', unlockAudioContext);
     };
   }, []);
 
@@ -1190,44 +1188,6 @@ function App() {
     loadKiosk();
   }, []);
 
-  // Clean up legacy local storage dummy data and delete dummy textbooks/progress from Supabase
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('campus_lehrwerke');
-    }
-    
-    async function cleanupDummies() {
-      try {
-        const dummyTitles = [
-          'GrooveLab Guitar Vol. 1',
-          'GrooveLab Drums Vol. 1',
-          'GrooveLab Guitar Vol. 2',
-          'GrooveLab Drums Vol. 2',
-          'GrooveLab Bass Vol. 1',
-          'GrooveLab Keyboard Vol. 1',
-          'GrooveLab Keys Vol. 1',
-          'GrooveLab Vocals Vol. 1'
-        ];
-        
-        // Delete textbook entries
-        await supabase
-          .from('lehrwerke')
-          .delete()
-          .in('title', dummyTitles);
-
-        // Delete progress items referencing dummy textbooks
-        for (const title of dummyTitles) {
-          await supabase
-            .from('progress_matrix')
-            .delete()
-            .like('topic_name', `${title} - %`);
-        }
-      } catch (err) {
-        console.error('[Cleanup] Failed to clean up dummy textbooks:', err);
-      }
-    }
-    cleanupDummies();
-  }, []);
 
   // Kiosk Room Auto-Bootstrap: when kiosk_room_id is in the URL WITHOUT kiosk_setup=1,
   // automatically resolve a station ID for that room and go directly to the QR-scanner.
@@ -1507,7 +1467,7 @@ function App() {
         sessionStorage.removeItem('groovelab_ghost_impersonated_user_id');
         sessionStorage.removeItem('groovelab_ghost_active_role');
         const cleanUrl = window.location.pathname;
-        window.history.replaceState({}, document.title, cleanUrl);
+        safeReplaceState({}, document.title, cleanUrl);
         return;
       }
 
@@ -1546,7 +1506,7 @@ function App() {
 
       // Enterprise Zero-Trace URL Sanitization: Purge sensitive credentials immediately from browser address bar & history
       try {
-        window.history.replaceState({}, document.title, window.location.pathname);
+        safeReplaceState({}, document.title, window.location.pathname);
       } catch (e) {}
 
       const resolveGhostIdentity = async () => {
@@ -2831,7 +2791,7 @@ function App() {
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'campus_chat_channel_reads', filter: `user_id=eq.${user.id}` },
+        { event: '*', schema: 'public', table: 'campus_chat_channel_reads' },
         () => {
           console.log('[Realtime] campus_chat_channel_reads update detected');
           fetchCampusMessages();
@@ -2839,7 +2799,7 @@ function App() {
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'campus_chat_group_members', filter: `user_id=eq.${user.id}` },
+        { event: '*', schema: 'public', table: 'campus_chat_group_members' },
         () => {
           console.log('[Realtime] campus_chat_group_members update detected');
           fetchCampusMessages();
@@ -2887,7 +2847,7 @@ function App() {
     return () => {
       supabase.removeChannel(syncChannel);
     };
-  }, [user]);
+  }, [user?.id, user?.school_id, user?.role, user?.token_version]);
 
   const isKioskMode = (stationIdFromStorage && stationIdFromStorage !== 'skip') || (typeof window !== 'undefined' ? !!localStorage.getItem('groovelab_kiosk_token') : false);
 
@@ -3049,7 +3009,7 @@ function App() {
         clearInterval(sessionLeaseInterval);
       };
     }
-  }, [loggedInUserId, user, session, isKioskMode]);
+  }, [loggedInUserId, user?.id, user?.school_id, user?.role, user?.is_master_admin, session?.id, session?.check_out_time, isKioskMode]);
 
   // Realtime Session Monitor (Single Login Rule - Students only)
   useEffect(() => {
@@ -3477,8 +3437,24 @@ function App() {
       // ─── INSTANT UI UNBLOCK FOR STUDENTS ───
       // We set the user and session immediately so the dashboard mounts.
       // The heavier details (Stage 2) load in the background, updating the view reactively.
-      setUser(userData);
-      setSession(sessionRes.data);
+      setUser((prev: any) => {
+        if (!prev) return userData;
+        const substantiveKeys = [
+          'id', 'school_id', 'role', 'is_active', 'is_campus_active', 'is_groovelab_active',
+          'token_version', 'is_master_admin', 'first_name', 'last_name', 'instrument',
+          'nickname', 'avatar_url', 'photo_url', 'sick_until', 'sick_start', 'student_level'
+        ];
+        const hasChange = substantiveKeys.some(key => (prev as any)[key] !== (userData as any)[key]);
+        return hasChange ? userData : prev;
+      });
+      setSession((prev: any) => {
+        if (!prev && !sessionRes.data) return null;
+        if (!prev || !sessionRes.data) return sessionRes.data;
+        if (prev.id !== sessionRes.data.id || prev.check_out_time !== sessionRes.data.check_out_time || prev.station_id !== sessionRes.data.station_id) {
+          return sessionRes.data;
+        }
+        return prev;
+      });
       if (isInitial) {
         setLoading(false); 
       }
@@ -4787,17 +4763,141 @@ function App() {
     setStudentMessagesLoading(false);
   };
 
+// 🛡️ Tier-1 Enterprise+ Local Storage Read Receipts Cache (Offline-First / Zero-Bounce)
+const getLocalChannelReads = (uid: string): Map<string, number> => {
+  const map = new Map<string, number>();
+  if (typeof window === 'undefined' || !uid) return map;
+  try {
+    const raw = localStorage.getItem(`cgl_channel_reads_${uid}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      Object.entries(parsed).forEach(([k, v]) => {
+        if (typeof v === 'number') map.set(k, v);
+      });
+    }
+  } catch (e) {}
+  return map;
+};
+
+const saveLocalChannelRead = (uid: string, channelId: string, timestamp: number) => {
+  if (typeof window === 'undefined' || !uid || !channelId) return;
+  try {
+    const key = `cgl_channel_reads_${uid}`;
+    const raw = localStorage.getItem(key);
+    const obj = raw ? JSON.parse(raw) : {};
+    if (!obj[channelId] || obj[channelId] < timestamp) {
+      obj[channelId] = timestamp;
+      localStorage.setItem(key, JSON.stringify(obj));
+    }
+  } catch (e) {}
+};
+
+const getLocalGroupReads = (uid: string): Map<string, number> => {
+  const map = new Map<string, number>();
+  if (typeof window === 'undefined' || !uid) return map;
+  try {
+    const raw = localStorage.getItem(`cgl_group_reads_${uid}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      Object.entries(parsed).forEach(([k, v]) => {
+        if (typeof v === 'number') map.set(k, v);
+      });
+    }
+  } catch (e) {}
+  return map;
+};
+
+const saveLocalGroupRead = (uid: string, groupId: string, timestamp: number) => {
+  if (typeof window === 'undefined' || !uid || !groupId) return;
+  try {
+    const key = `cgl_group_reads_${uid}`;
+    const raw = localStorage.getItem(key);
+    const obj = raw ? JSON.parse(raw) : {};
+    if (!obj[groupId] || obj[groupId] < timestamp) {
+      obj[groupId] = timestamp;
+      localStorage.setItem(key, JSON.stringify(obj));
+    }
+  } catch (e) {}
+};
+
+const getLocalDirectReads = (uid: string): Map<string, number> => {
+  const map = new Map<string, number>();
+  if (typeof window === 'undefined' || !uid) return map;
+  try {
+    const raw = localStorage.getItem(`cgl_direct_reads_${uid}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      Object.entries(parsed).forEach(([k, v]) => {
+        if (typeof v === 'number') map.set(k, v);
+      });
+    }
+  } catch (e) {}
+  return map;
+};
+
+const saveLocalDirectRead = (uid: string, partnerId: string, timestamp: number) => {
+  if (typeof window === 'undefined' || !uid || !partnerId) return;
+  try {
+    const key = `cgl_direct_reads_${uid}`;
+    const raw = localStorage.getItem(key);
+    const obj = raw ? JSON.parse(raw) : {};
+    if (!obj[partnerId] || obj[partnerId] < timestamp) {
+      obj[partnerId] = timestamp;
+      localStorage.setItem(key, JSON.stringify(obj));
+    }
+  } catch (e) {}
+};
+
+const getLocalReadMsgIds = (uid: string): Set<string> => {
+  const set = new Set<string>();
+  if (typeof window === 'undefined' || !uid) return set;
+  try {
+    const raw = localStorage.getItem(`cgl_read_msg_ids_${uid}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((id: string) => {
+          if (typeof id === 'string') set.add(id);
+        });
+      }
+    }
+  } catch (e) {}
+  return set;
+};
+
+const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
+  if (typeof window === 'undefined' || !uid || !msgIds || msgIds.length === 0) return;
+  try {
+    const key = `cgl_read_msg_ids_${uid}`;
+    const raw = localStorage.getItem(key);
+    let arr: string[] = [];
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) arr = parsed;
+      } catch (e) {}
+    }
+    const set = new Set(arr);
+    msgIds.forEach(id => {
+      if (id) set.add(id);
+    });
+    const updated = Array.from(set).slice(-1000);
+    localStorage.setItem(key, JSON.stringify(updated));
+  } catch (e) {}
+};
+
   const fetchCampusMessages = React.useCallback(async () => {
-    const uid = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_user_id') || (user?.id)) : user?.id;
+    const uid = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_selected_student_id') || sessionStorage.getItem('groovelab_user_id') || (user?.id)) : user?.id;
     if (!uid) return;
     setCampusMessagesLoading(true);
     try {
       let groupFilter = '';
-      const groupLastReadMap = new Map<string, number>();
-      const channelLastReadMap = new Map<string, number>();
+      const groupLastReadMap = getLocalGroupReads(uid);
+      const channelLastReadMap = getLocalChannelReads(uid);
+      const groupDefaultChannelMap = new Map<string, string>();
 
       try {
-        const [memberGroupsRes, createdGroupsRes, channelReadsRes] = await Promise.all([
+        const [memberGroupsRes, createdGroupsRes, channelReadsRes, channelsRes] = await Promise.all([
           supabase
             .from('campus_chat_group_members')
             .select('group_id, last_read_at')
@@ -4810,17 +4910,30 @@ function App() {
           supabase
             .from('campus_chat_channel_reads')
             .select('channel_id, last_read_at')
-            .eq('user_id', uid)
+            .eq('user_id', uid),
+          supabase
+            .from('campus_chat_channels')
+            .select('id, group_id, is_default')
         ]);
 
         const allGIds = new Set<string>();
+
+        if (channelsRes.data && channelsRes.data.length > 0) {
+          channelsRes.data.forEach((ch: any) => {
+            if (ch.group_id && ch.is_default) {
+              groupDefaultChannelMap.set(ch.group_id, ch.id);
+            }
+          });
+        }
 
         if (memberGroupsRes.data && memberGroupsRes.data.length > 0) {
           memberGroupsRes.data.forEach((gm: any) => {
             if (gm.group_id) {
               allGIds.add(gm.group_id);
               if (gm.last_read_at) {
-                groupLastReadMap.set(gm.group_id, new Date(gm.last_read_at).getTime());
+                const dbTime = new Date(gm.last_read_at).getTime();
+                const existing = groupLastReadMap.get(gm.group_id) || 0;
+                groupLastReadMap.set(gm.group_id, Math.max(dbTime, existing));
               }
             }
           });
@@ -4841,7 +4954,9 @@ function App() {
         if (channelReadsRes.data && channelReadsRes.data.length > 0) {
           channelReadsRes.data.forEach((cr: any) => {
             if (cr.channel_id && cr.last_read_at) {
-              channelLastReadMap.set(cr.channel_id, new Date(cr.last_read_at).getTime());
+              const dbTime = new Date(cr.last_read_at).getTime();
+              const existing = channelLastReadMap.get(cr.channel_id) || 0;
+              channelLastReadMap.set(cr.channel_id, Math.max(dbTime, existing));
             }
           });
         }
@@ -4856,20 +4971,42 @@ function App() {
         .order('created_at', { ascending: true });
       if (error) throw error;
       if (data) {
-        setCampusMessages(data);
+        const directLastReadMap = getLocalDirectReads(uid);
+        const readMsgIds = getLocalReadMsgIds(uid);
+
+        // 🛡️ Sanitize incoming messages with local persistence (Offline-First / Zero-Bounce)
+        const sanitizedData = data.map((m: any) => {
+          if (m.is_read) return m;
+          if (readMsgIds.has(m.id)) {
+            return { ...m, is_read: true };
+          }
+          if (!m.group_id && m.recipient_id === uid && m.sender_id) {
+            const partnerLastRead = directLastReadMap.get(m.sender_id) || 0;
+            if (partnerLastRead > 0 && new Date(m.created_at).getTime() <= partnerLastRead) {
+              return { ...m, is_read: true };
+            }
+          }
+          return m;
+        });
+
+        setCampusMessages(sanitizedData);
         
         // 1. Unread direct (1:1) messages
-        const directUnread = data.filter((m: any) => !m.group_id && m.recipient_id === uid && !m.is_read).length;
+        const directUnread = sanitizedData.filter((m: any) => !m.group_id && m.recipient_id === uid && !m.is_read).length;
 
-        // 2. Unread group channel messages (Goldstandard: channel_reads prioritized, fallback to group last_read)
-        const groupUnread = data.filter((m: any) => {
+        // 2. Unread group channel messages (Goldstandard: channel_reads prioritized with default channel fallback)
+        const groupUnread = sanitizedData.filter((m: any) => {
           if (!m.group_id || m.sender_id === uid) return false;
+          if (m.is_read || readMsgIds.has(m.id)) return false;
           const msgTime = new Date(m.created_at).getTime();
-          if (m.channel_id && channelLastReadMap.has(m.channel_id)) {
-            return msgTime > (channelLastReadMap.get(m.channel_id) || 0);
+          const effectiveChannelId = m.channel_id || groupDefaultChannelMap.get(m.group_id);
+          const chanLastRead = effectiveChannelId && channelLastReadMap.has(effectiveChannelId) ? (channelLastReadMap.get(effectiveChannelId) || 0) : 0;
+          const grpLastRead = groupLastReadMap.get(m.group_id) || 0;
+          const maxReadTime = Math.max(chanLastRead, grpLastRead);
+          if (maxReadTime > 0) {
+            return msgTime > maxReadTime;
           }
-          const groupLastRead = groupLastReadMap.get(m.group_id) || 0;
-          return msgTime > groupLastRead;
+          return true;
         }).length;
 
         setCampusUnreadCount(directUnread + groupUnread);
@@ -4880,6 +5017,16 @@ function App() {
       setCampusMessagesLoading(false);
     }
   }, [user?.id]);
+
+  const fetchCampusMessagesTimeoutRef = useRef<any>(null);
+  const debouncedFetchCampusMessages = React.useCallback(() => {
+    if (fetchCampusMessagesTimeoutRef.current) {
+      clearTimeout(fetchCampusMessagesTimeoutRef.current);
+    }
+    fetchCampusMessagesTimeoutRef.current = setTimeout(() => {
+      fetchCampusMessages();
+    }, 250);
+  }, [fetchCampusMessages]);
 
   const handleSendCampusMessage = async (
     recipientId: string, 
@@ -4925,23 +5072,85 @@ function App() {
         payload.recipient_id = uid;
         if (channelId) payload.channel_id = channelId;
         if (parentMessageId) payload.parent_message_id = parentMessageId;
-        if (subject) payload.subject = subject;
+        if (subject) {
+          payload.subject = subject;
+          payload.message_type = 'topic';
+        }
       } else {
         payload.recipient_id = recipientId;
         if (parentMessageId) payload.parent_message_id = parentMessageId;
-        if (subject) payload.subject = subject;
+        if (subject) {
+          payload.subject = subject;
+          payload.message_type = 'topic';
+        }
       }
 
-      const { data: insertedMsg, error } = await supabase.from('campus_direct_messages').insert(payload).select().single();
+      let insertedMsg: any = null;
+      const { data, error } = await supabase.from('campus_direct_messages').insert(payload).select().single();
       if (error) {
-        // Rollback optimistic update on error
-        setCampusMessages(prev => prev.filter(m => m.id !== tempId));
-        throw error;
+        const errorStr = String(error.message || (error as any).details || (error as any).hint || '');
+        const isColumnMissing = error.code === '42703' || 
+          error.code === 'PGRST204' ||
+          errorStr.includes('schema cache') ||
+          errorStr.includes('message_type') ||
+          errorStr.includes('subject') || 
+          errorStr.includes('parent_message_id') ||
+          errorStr.includes('channel_id');
+
+        if (isColumnMissing) {
+          console.warn('[handleSendCampusMessage] DB schema column pending in cache, applying resilient insert fallback:', error);
+          const fallbackPayload: any = {
+            sender_id: uid,
+            content: subject && errorStr.includes('subject') ? `📌 [${subject}]\n\n${content}` : content
+          };
+          if (groupId) {
+            fallbackPayload.group_id = groupId;
+            fallbackPayload.recipient_id = uid;
+            if (channelId && !errorStr.includes('channel_id')) fallbackPayload.channel_id = channelId;
+          } else {
+            fallbackPayload.recipient_id = recipientId;
+          }
+          if (subject && !errorStr.includes('subject')) {
+            fallbackPayload.subject = subject;
+          }
+          if (parentMessageId && !errorStr.includes('parent_message_id')) {
+            fallbackPayload.parent_message_id = parentMessageId;
+          }
+          // Only pass message_type if error was not about message_type / schema cache
+          if (payload.message_type && !errorStr.includes('message_type') && !errorStr.includes('schema cache')) {
+            fallbackPayload.message_type = payload.message_type;
+          }
+
+          const retryRes = await supabase.from('campus_direct_messages').insert(fallbackPayload).select().single();
+          if (retryRes.error) {
+            console.warn('[handleSendCampusMessage] Level 1 fallback failed, applying minimal safe insert:', retryRes.error);
+            const minimalPayload: any = {
+              sender_id: uid,
+              content: subject ? `📌 [${subject}]\n\n${content}` : content,
+              recipient_id: groupId ? uid : recipientId
+            };
+            if (groupId) minimalPayload.group_id = groupId;
+            const minimalRes = await supabase.from('campus_direct_messages').insert(minimalPayload).select().single();
+            if (minimalRes.error) {
+              setCampusMessages(prev => prev.filter(m => m.id !== tempId));
+              throw minimalRes.error;
+            }
+            insertedMsg = minimalRes.data;
+          } else {
+            insertedMsg = retryRes.data;
+          }
+        } else {
+          // Rollback optimistic update on error
+          setCampusMessages(prev => prev.filter(m => m.id !== tempId));
+          throw error;
+        }
+      } else {
+        insertedMsg = data;
       }
 
-      // Replace optimistic message with actual persisted message
+      // Replace optimistic message with actual persisted message, preserving subject for thread view
       if (insertedMsg) {
-        setCampusMessages(prev => prev.map(m => m.id === tempId ? insertedMsg : m));
+        setCampusMessages(prev => prev.map(m => m.id === tempId ? { ...insertedMsg, subject: insertedMsg.subject || subject } : m));
       }
 
       // Group lesson message replication: Check if recipient has a group_id (only for 1:1 direct messages)
@@ -4977,34 +5186,146 @@ function App() {
       }
 
       fetchCampusMessages();
+      return insertedMsg || optimisticMessage;
     } catch (err) {
       console.error('Error sending campus message:', err);
+      throw err;
     }
   };
 
   const handleMarkCampusMessagesAsRead = async (senderId: string) => {
-    const uid = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_user_id') || (user?.id)) : user?.id;
-    if (!uid) return;
+    const uid = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_selected_student_id') || sessionStorage.getItem('groovelab_user_id') || (user?.id)) : user?.id;
+    if (!uid || !senderId) return;
+
+    const nowTime = Date.now();
+    const nowIso = new Date(nowTime).toISOString();
+
+    // 1. Persist to local storage immediately (Zero-Bounce Guarantee)
+    saveLocalDirectRead(uid, senderId, nowTime);
+    const affectedMsgIds: string[] = [];
 
     // Optimistic 0ms update: mark direct messages locally as read
+    let unreadCountDiff = 0;
     setCampusMessages(prev => prev.map(m => {
-      if (!m.group_id && m.sender_id === senderId && m.recipient_id === uid) {
-        return { ...m, is_read: true };
+      if (!m.group_id && m.sender_id === senderId && m.recipient_id === uid && !m.is_read) {
+        unreadCountDiff++;
+        affectedMsgIds.push(m.id);
+        return { ...m, is_read: true, read_at: nowIso, acknowledged_at: nowIso };
       }
       return m;
     }));
-    setCampusUnreadCount(prev => Math.max(0, prev - 1));
+    if (affectedMsgIds.length > 0) {
+      saveLocalReadMsgIds(uid, affectedMsgIds);
+    }
+    setCampusUnreadCount(prev => Math.max(0, prev - unreadCountDiff));
 
     try {
-      const { error } = await supabase
-        .from('campus_direct_messages')
-        .update({ is_read: true })
-        .eq('sender_id', senderId)
-        .eq('recipient_id', uid);
-      if (error) throw error;
-      fetchCampusMessages();
+      const { error } = await supabase.rpc('mark_campus_direct_chat_as_read', { p_partner_id: senderId, p_user_id: uid });
+      if (error) {
+        // Fallback direct table update
+        await supabase
+          .from('campus_direct_messages')
+          .update({ is_read: true, read_at: nowIso })
+          .eq('sender_id', senderId)
+          .eq('recipient_id', uid);
+      }
+      debouncedFetchCampusMessages();
     } catch (err) {
       console.error('Error marking messages as read:', err);
+    }
+  };
+
+  const handleMarkCampusGroupAsRead = async (groupId: string) => {
+    const uid = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_selected_student_id') || sessionStorage.getItem('groovelab_user_id') || (user?.id)) : user?.id;
+    if (!uid || !groupId) return;
+
+    const nowTime = Date.now();
+    saveLocalGroupRead(uid, groupId, nowTime);
+
+    const affectedMsgIds: string[] = [];
+    // 0ms Optimistic Update: Unread-Zähler atomar berechnen und anpassen
+    let unreadCountDiff = 0;
+    setCampusMessages(prev => {
+      return prev.map(m => {
+        if (m.group_id === groupId && m.sender_id !== uid) {
+          unreadCountDiff++;
+          affectedMsgIds.push(m.id);
+        }
+        return m;
+      });
+    });
+    if (affectedMsgIds.length > 0) {
+      saveLocalReadMsgIds(uid, affectedMsgIds);
+    }
+    setCampusUnreadCount(prev => Math.max(0, prev - unreadCountDiff));
+
+    try {
+      const { error } = await supabase.rpc('mark_campus_group_as_read', { p_group_id: groupId, p_user_id: uid });
+      if (error) {
+        console.warn('[App] Fallback direct group channel read update:', error);
+        // Fallback direct table updates
+        const nowIso = new Date().toISOString();
+        await supabase
+          .from('campus_chat_group_members')
+          .update({ last_read_at: nowIso })
+          .eq('group_id', groupId)
+          .eq('user_id', uid);
+      }
+      debouncedFetchCampusMessages();
+    } catch (err) {
+      console.error('Error marking campus group as read:', err);
+    }
+  };
+
+  const handleMarkCampusChannelAsRead = async (channelId: string, groupId: string) => {
+    const uid = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_selected_student_id') || sessionStorage.getItem('groovelab_user_id') || (user?.id)) : user?.id;
+    if (!uid || !channelId) return;
+
+    const nowTime = Date.now();
+    saveLocalChannelRead(uid, channelId, nowTime);
+    if (groupId) {
+      saveLocalGroupRead(uid, groupId, nowTime);
+    }
+
+    const affectedIds: string[] = [];
+    // 0ms Optimistic Update: Unread-Zähler für diesen Kanal atomar berechnen und anpassen
+    let unreadCountDiff = 0;
+    setCampusMessages(prev => {
+      return prev.map(m => {
+        if (m.group_id === groupId && (m.channel_id === channelId || (!m.channel_id && channelId)) && m.sender_id !== uid) {
+          unreadCountDiff++;
+          affectedIds.push(m.id);
+        }
+        return m;
+      });
+    });
+    if (affectedIds.length > 0) {
+      saveLocalReadMsgIds(uid, affectedIds);
+    }
+    if (unreadCountDiff > 0) {
+      setCampusUnreadCount(prev => Math.max(0, prev - unreadCountDiff));
+    }
+
+    try {
+      const { error } = await supabase.rpc('mark_campus_channel_as_read', { p_channel_id: channelId, p_user_id: uid });
+      if (error) {
+        console.warn('[App] Fallback direct channel read update:', error);
+        const schoolId = user?.school_id || (Array.isArray(user?.schools) ? user?.schools[0]?.id : user?.schools?.id);
+        if (schoolId) {
+          const nowIso = new Date().toISOString();
+          await supabase
+            .from('campus_chat_channel_reads')
+            .upsert({
+              channel_id: channelId,
+              user_id: uid,
+              school_id: schoolId,
+              last_read_at: nowIso
+            }, { onConflict: 'channel_id,user_id' });
+        }
+      }
+      debouncedFetchCampusMessages();
+    } catch (err) {
+      console.error('Error marking campus channel as read:', err);
     }
   };
 
@@ -6756,10 +7077,6 @@ function App() {
         } catch (e) {}
         try { (supabase.realtime as any)?.connect?.(); } catch (e) {}
         updateHeartbeat();
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new Event('resize'));
-          window.dispatchEvent(new CustomEvent('groovelab_orientation_changed'));
-        }
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -7342,46 +7659,74 @@ function App() {
         {(!loading || debugError) && (
           <button
             type="button"
+            role="button"
+            tabIndex={0}
+            aria-label="Zurück zum Login und neu anmelden"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                e.currentTarget.click();
+              }
+            }}
             onClick={async () => {
               try {
                 await supabase.auth.signOut();
               } catch (e) {}
-              sessionStorage.removeItem('groovelab_user_id');
-              sessionStorage.removeItem('groovelab_location_mode');
-              sessionStorage.removeItem('groovelab_cached_user');
-              sessionStorage.removeItem('gl_active_session_lease_id');
-              localStorage.removeItem('groovelab_user_id');
-              localStorage.removeItem('groovelab_location_mode');
-              localStorage.removeItem('groovelab_cached_user');
-              localStorage.removeItem('gl_active_session_lease_id');
+              try {
+                sessionStorage.clear();
+              } catch (e) {}
+              try {
+                localStorage.removeItem('groovelab_user_id');
+                localStorage.removeItem('groovelab_current_user_id');
+                localStorage.removeItem('campus_active_user_id');
+                localStorage.removeItem('groovelab_cached_user');
+                localStorage.removeItem('groovelab_location_mode');
+                localStorage.removeItem('gl_active_session_lease_id');
+                localStorage.removeItem('gl_global_device_key');
+              } catch (e) {}
               setLoggedInUserId(null);
               setUser(null);
               setLoading(false);
-              window.location.reload();
+              window.location.href = '/';
             }}
             style={{
-              marginTop: '24px',
-              background: 'transparent',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              color: '#a1a1aa',
-              fontSize: '12px',
-              fontWeight: 600,
-              padding: '8px 16px',
-              borderRadius: '20px',
+              marginTop: '20px',
+              background: '#facc15',
+              border: 'none',
+              color: '#0f172a',
+              fontSize: '14px',
+              fontWeight: 700,
+              padding: '12px 28px',
+              borderRadius: '12px',
               cursor: 'pointer',
-              transition: 'all 0.2s',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              minHeight: '44px',
+              boxShadow: '0 4px 14px rgba(250, 204, 21, 0.3)',
+              transition: 'all 0.15s ease-in-out',
+              userSelect: 'none',
+              WebkitTapHighlightColor: 'transparent',
+              touchAction: 'manipulation',
               outline: 'none'
             }}
             onMouseOver={(e) => {
-              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-              e.currentTarget.style.color = '#ffffff';
+              e.currentTarget.style.background = '#eab308';
+              e.currentTarget.style.transform = 'translateY(-1px)';
             }}
             onMouseOut={(e) => {
-              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
-              e.currentTarget.style.color = '#a1a1aa';
+              e.currentTarget.style.background = '#facc15';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.boxShadow = '0 0 0 3px rgba(250, 204, 21, 0.6)';
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.boxShadow = '0 4px 14px rgba(250, 204, 21, 0.3)';
             }}
           >
-            Sitzung zurücksetzen & neu anmelden
+            Zurück zum Login (Neu anmelden)
           </button>
         )}
       </div>
@@ -9587,7 +9932,7 @@ function App() {
                                   <User size={14} color="#3b82f6" />
                                   <span>
                                     {(() => {
-                                      const matchedTeacher = teachers.find(t => t.id === user.teacher_id) || (teachers.length > 0 ? teachers[0] : null);
+                                      const matchedTeacher = (user.teacher_id && teachers.find(t => t.id === user.teacher_id)) || user.teacher || (teachers.length > 0 ? teachers[0] : null);
                                       return formatTeacherFullName(matchedTeacher, matchedTeacher?.last_name);
                                     })()}
                                   </span>
@@ -10216,6 +10561,7 @@ function App() {
                   <TeacherDashboard 
                     key="student-live-dashboard"
                     userId={user.id} 
+                    initialTeacher={user}
                     hideHeader={true} 
                     viewMode="student" 
                     onTabChange={setActiveStudentTab}
@@ -12038,10 +12384,13 @@ function App() {
               <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b', fontWeight: 600 }}>Lade Chats...</div>}>
                 <CampusDirectMessages
                   user={user}
+                  currentUserId={typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_selected_student_id') || sessionStorage.getItem('groovelab_user_id') || user?.id) : user?.id}
                   schoolUsers={schoolUsers}
                   campusMessages={campusMessages}
                   onSendMessage={handleSendCampusMessage}
                   onMarkAsRead={handleMarkCampusMessagesAsRead}
+                  onMarkGroupAsRead={handleMarkCampusGroupAsRead}
+                  onMarkChannelAsRead={handleMarkCampusChannelAsRead}
                   selectedRecipient={selectedCampusRecipient}
                   setSelectedRecipient={setSelectedCampusRecipient}
                   studentToTeacherChat={user?.schools?.opening_hours?.campus_settings?.student_to_teacher_chat !== false}
@@ -15535,143 +15884,23 @@ function App() {
         </Suspense>
       )}
 
-      {/* 🛡️ Universal 45-Minute Inactivity Idle Privacy-Screen Lock (Hiscox CyberSafe / BSI APP.3.1 / OWASP ASVS) */}
+      {/* 🔒 Universal 45-Minute Inactivity Screen Lock (Enterprise Goldstandard) */}
       {isScreenLockedByInactivity && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 999999,
-            backdropFilter: 'blur(28px)',
-            WebkitBackdropFilter: 'blur(28px)',
-            backgroundColor: 'rgba(15, 23, 42, 0.75)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '24px'
-          }}
-        >
-          <div
-            style={{
-              background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
-              borderRadius: '28px',
-              padding: '36px 32px',
-              maxWidth: '440px',
-              width: '100%',
-              textAlign: 'center',
-              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.4) inset',
-              position: 'relative'
+        <Suspense fallback={null}>
+          <SessionLockModal
+            user={user}
+            supabase={supabase}
+            schoolData={school}
+            activePlatform={activePlatform}
+            onUnlock={() => {
+              setIsScreenLockedByInactivity(false);
+              setIsCampusUnlocked(true);
             }}
-          >
-            {/* Lock Icon */}
-            <div
-              style={{
-                width: '64px',
-                height: '64px',
-                borderRadius: '22px',
-                background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 20px',
-                color: '#ffffff',
-                boxShadow: '0 10px 25px -5px rgba(2, 132, 199, 0.4)'
-              }}
-            >
-              <Lock size={32} />
-            </div>
-
-            <h3
-              style={{
-                fontSize: '1.4rem',
-                fontWeight: 900,
-                color: '#0f172a',
-                marginBottom: '8px',
-                letterSpacing: '-0.02em',
-                fontFamily: "'Plus Jakarta Sans', sans-serif"
-              }}
-            >
-              Sitzung geschützt
-            </h3>
-
-            <p
-              style={{
-                fontSize: '0.92rem',
-                color: '#475569',
-                lineHeight: 1.55,
-                marginBottom: '20px'
-              }}
-            >
-              Automatische Bildschirmsperre nach 45 Minuten Inaktivität zum Schutz vor unbefugten Blicken (Shoulder Surfing). Ihre offenen Daten und Formulare bleiben vollständig erhalten.
-            </p>
-
-            <div
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 14px',
-                borderRadius: '999px',
-                background: '#e0f2fe',
-                color: '#0369a1',
-                fontSize: '0.8rem',
-                fontWeight: 800,
-                marginBottom: '26px'
-              }}
-            >
-              <span>🛡️</span>
-              <span>Hiscox CyberSafe &amp; DSGVO Art. 32 konform</span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={() => setShowCampusPinPrompt(true)}
-                style={{
-                  width: '100%',
-                  padding: '14px 20px',
-                  borderRadius: '16px',
-                  background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-                  color: '#ffffff',
-                  border: 'none',
-                  fontSize: '1rem',
-                  fontWeight: 900,
-                  cursor: 'pointer',
-                  boxShadow: '0 8px 20px -4px rgba(2, 132, 199, 0.35)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                <Key size={18} />
-                <span>Mit PIN entsperren</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  handleLogout(true, false);
-                }}
-                style={{
-                  width: '100%',
-                  padding: '12px 20px',
-                  borderRadius: '16px',
-                  background: 'transparent',
-                  color: '#64748b',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '0.92rem',
-                  fontWeight: 750,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                Abmelden
-              </button>
-            </div>
-          </div>
-        </div>
+            onLogout={() => {
+              handleLogout(true, false);
+            }}
+          />
+        </Suspense>
       )}
 
 

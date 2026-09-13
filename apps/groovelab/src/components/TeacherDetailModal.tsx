@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, Star, Briefcase } from 'lucide-react';
 import { renderInstrumentIcon } from '../utils/instruments';
+import { formatTeacherFullName } from '../utils/nameHelper';
 
 interface TeacherDetailModalProps {
   teacher: any;
@@ -188,8 +189,8 @@ export const TeacherDetailModal: React.FC<TeacherDetailModalProps> = ({ teacher,
             }}>
               <img 
                 src={teacher.photo_url || '/avatar_ghost.jpg'} 
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                alt={`${teacher.first_name} ${teacher.last_name}`} 
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                alt={formatTeacherFullName(teacher)} 
               />
             </div>
 
@@ -201,7 +202,7 @@ export const TeacherDetailModal: React.FC<TeacherDetailModalProps> = ({ teacher,
               letterSpacing: '-0.02em',
               lineHeight: 1.2
             }}>
-              {teacher.first_name} {teacher.last_name}
+              {formatTeacherFullName(teacher)}
             </h2>
 
             {/* Premium Role Pill */}

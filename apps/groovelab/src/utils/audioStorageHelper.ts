@@ -89,6 +89,64 @@ export async function computeBlobSha256(blob: Blob): Promise<string> {
   }
 }
 
+export interface CanonicalAudioStoragePathOptions {
+  schoolId?: string | null;
+  studentId?: string | null;
+  category?: string;
+  trackId?: string | null;
+  extension?: string;
+}
+
+/**
+ * Generates canonical, multi-tenant scoped storage path:
+ * schools/<schoolId>/students/<studentId>/<category>/<uniqueId>.<ext>
+ * Polymorphic: Supports both options object and positional arguments.
+ */
+export function buildCanonicalAudioStoragePath(
+  paramsOrSchoolId: CanonicalAudioStoragePathOptions | string | null | undefined,
+  studentIdArg?: string | null,
+  categoryArg?: string,
+  trackIdOrFileNameArg?: string | null,
+  extensionArg?: string
+): string {
+  let schoolId: string | null | undefined;
+  let studentId: string | null | undefined;
+  let category: string | undefined;
+  let trackId: string | null | undefined;
+  let extension: string | undefined;
+
+  if (paramsOrSchoolId && typeof paramsOrSchoolId === 'object') {
+    schoolId = paramsOrSchoolId.schoolId;
+    studentId = paramsOrSchoolId.studentId;
+    category = paramsOrSchoolId.category;
+    trackId = paramsOrSchoolId.trackId;
+    extension = paramsOrSchoolId.extension;
+  } else {
+    schoolId = typeof paramsOrSchoolId === 'string' ? paramsOrSchoolId : null;
+    studentId = studentIdArg;
+    category = categoryArg;
+    trackId = trackIdOrFileNameArg;
+    extension = extensionArg;
+  }
+
+  // Handle case where trackIdOrFileNameArg already has an extension (e.g. feedback_123.webm or track.mp3)
+  if (trackId && trackId.includes('.')) {
+    const lastDot = trackId.lastIndexOf('.');
+    if (!extension) {
+      extension = trackId.substring(lastDot + 1);
+    }
+    trackId = trackId.substring(0, lastDot);
+  }
+
+  const safeSchool = (schoolId || 'global').replace(/[^a-zA-Z0-9_-]/g, '') || 'global';
+  const safeStudent = (studentId || 'general').replace(/[^a-zA-Z0-9_-]/g, '') || 'general';
+  const safeCat = (category || 'recordings').replace(/[^a-zA-Z0-9_-]/g, '') || 'recordings';
+  const safeTrackId = (trackId || `track_${Date.now()}`).replace(/[^a-zA-Z0-9_-]/g, '');
+  const safeExt = (extension || 'mp3').replace(/[^a-zA-Z0-9]/g, '');
+
+  return `schools/${safeSchool}/students/${safeStudent}/${safeCat}/${safeTrackId}.${safeExt}`;
+}
+
 export interface AudioUploadIntegrityResult {
   success: boolean;
   filePath: string;

@@ -49,7 +49,7 @@ import {
   Filter,
   Download
 } from 'lucide-react';
-import { UserNote, maskStudentName } from '../../services/notesService';
+import { UserNote, maskStudentName, parseChecklistText, parseLehrwerkAndPages, syncNotePageToProtocolMatrix, logNoteAudit } from '../../services/notesService';
 import { useVoiceToText } from '../../hooks/useVoiceToText';
 import { checkIsAudioTresorActive } from '../../domain/stickersAndTresor';
 import { generateTeacherNotesDailyPlanPDF } from '../../utils/pdfGenerator';
@@ -110,7 +110,10 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
     setModalToast(msg);
     setTimeout(() => setModalToast(null), 3000);
   };
-  const [viewMode, setViewMode] = useState<'kanban' | 'list' | 'students'>('kanban');
+
+  // 📱 Responsive View Mode (Defaults to 'students' on Tablets/Mobile <= 1024px)
+  const isTabletOrMobile = typeof window !== 'undefined' && window.innerWidth <= 1024;
+  const [viewMode, setViewMode] = useState<'kanban' | 'list' | 'students'>(isTabletOrMobile ? 'students' : 'kanban');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
   const [activeTagPickerNoteId, setActiveTagPickerNoteId] = useState<string | null>(null);
@@ -119,6 +122,31 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
   const [showUniversalAdd, setShowUniversalAdd] = useState(false);
   const [universalInputContent, setUniversalInputContent] = useState('');
   const quickInputRef = useRef<HTMLInputElement | null>(null);
+
+  // ⚡ Schedule-Aware Active Lesson Students
+  const currentLessonStudents = useMemo(() => {
+    if (!todayStudents || todayStudents.length === 0) return [];
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    return todayStudents.filter(student => {
+      const timeStr = student.start_time || student.time || (student as any).slot_time;
+      const endStr = student.end_time || (student as any).slot_end_time;
+      if (!timeStr) return false;
+      const [startH, startM] = timeStr.split(':').map(Number);
+      const startTotal = startH * 60 + startM;
+      let endTotal = startTotal + 45; // default 45 min
+      if (endStr) {
+        const [endH, endM] = endStr.split(':').map(Number);
+        endTotal = endH * 60 + endM;
+      }
+      return currentMinutes >= (startTotal - 5) && currentMinutes <= (endTotal + 5);
+    });
+  }, [todayStudents]);
+
+  const [showAutoStudentPopover, setShowAutoStudentPopover] = useState(false);
+  const [isChecklistMode, setIsChecklistMode] = useState(false);
+  const isMacPlatform = useMemo(() => typeof navigator !== 'undefined' && /Mac|iPhone|iPod|iPad/i.test(navigator.platform), []);
 
   // ✨ Prominente Omni-Capture Top Stage State
   const [omniContent, setOmniContent] = useState('');
@@ -130,7 +158,7 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
   const [showOmniStudentPicker, setShowOmniStudentPicker] = useState(false);
   const [showOmniTagPicker, setShowOmniTagPicker] = useState(false);
   const [showOmniDueDatePicker, setShowOmniDueDatePicker] = useState(false);
-  const omniInputRef = useRef<HTMLInputElement | null>(null);
+  const omniInputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
 
   // 🔍 Omni Typeahead Dropdown State (@Student, #Tag)
   const [omniTypeahead, setOmniTypeahead] = useState<{
@@ -710,14 +738,23 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
     setStudentQuickInput(prev => ({ ...prev, [sId]: '' }));
   };
 
-  // Drop on Student Column
+  // Drop on Student Column (revisionssicher mit Audit-Trail)
   const handleDropOnStudentColumn = async (student: any) => {
     if (!draggingNoteId) return;
+    const note = notes.find(n => n.id === draggingNoteId);
     await onUpdateNote(draggingNoteId, {
-      student_id: student.id,
+      student_id: String(student.id),
       student_name: student.first_name || student.name,
       note_type: 'student_note'
     });
+    if (note && user) {
+      await logNoteAudit('USER_NOTE_UPDATED', user.school_id || 1, user.id, note.id, {
+        action_detail: 'assigned_to_student_via_drag_drop',
+        student_id: String(student.id),
+        student_name: student.first_name || student.name
+      });
+    }
+    showSuccessNotification(`✓ Für ${maskStudentName(student.first_name || student.name)} hinterlegt`);
     setDraggingNoteId(null);
     setDragOverColId(null);
   };
@@ -751,7 +788,7 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
     let noteType: 'student_note' | 'todo' | 'room_issue' | 'scratchpad' = 'scratchpad';
     if (omniStudentId || omniStudentName || omniIsSharedWithHomework) {
       noteType = 'student_note';
-    } else if (omniSelectedTag === '#To-Do') {
+    } else if (omniSelectedTag === '#To-Do' || isChecklistMode) {
       noteType = 'todo';
     } else if (omniSelectedTag === '#Raum') {
       noteType = 'room_issue';
@@ -770,6 +807,24 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
       await onSyncToHomeworkBook(created);
     }
 
+    // 🏛️ Lehrwerk & Seitenzahlen Protokoll-Modul Sync
+    if (omniStudentId && (omniContent.includes('#noten') || /(?:seite|s\.)\s*\d+/i.test(omniContent))) {
+      const lehrwerkInfo = parseLehrwerkAndPages(omniContent.trim());
+      if (lehrwerkInfo.pages.length > 0) {
+        const title = lehrwerkInfo.detectedLehrwerk?.title || 'Lehrwerk';
+        const isRepeat = /wiederhol|nochmal/i.test(omniContent);
+        syncNotePageToProtocolMatrix({
+          schoolId: user?.school_id || 1,
+          studentId: omniStudentId,
+          teacherId: user?.id,
+          lehrwerkTitle: title,
+          pages: lehrwerkInfo.pages,
+          noteText: omniContent.trim(),
+          isRepeat
+        });
+      }
+    }
+
     // Reset Omni Bar
     setOmniContent('');
     setOmniStudentId(null);
@@ -777,6 +832,7 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
     setOmniSelectedTag(null);
     setOmniDueDate(null);
     setOmniIsSharedWithHomework(false);
+    setIsChecklistMode(false);
   };
 
   const handleSetNoteTag = async (note: UserNote, tagKey: string) => {
@@ -789,32 +845,54 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
     setActiveTagPickerNoteId(null);
   };
 
-  // Drag and Drop Handler for Column Drop
+  // Drag and Drop Handler for Column Drop (Revisionssicher)
   const handleDropOnColumn = async (columnId: string) => {
     if (!draggingNoteId) return;
     const note = notes.find(n => n.id === draggingNoteId);
     if (!note) return;
 
     if (columnId === 'completed') {
-      if (!note.is_completed) onToggleCompleteTodo(note.id);
-    } else if (columnId === 'todos') {
+      if (!note.is_completed) await onToggleCompleteTodo(note.id);
+      showSuccessNotification('✓ Als erledigt markiert');
+    } else if (columnId === 'todos_orga' || columnId === 'todos') {
       await onUpdateNote(note.id, {
         note_type: 'todo',
         is_completed: false,
+        is_archived: false,
         tags: Array.from(new Set([...(note.tags || []), '#To-Do']))
       });
+      showSuccessNotification('✓ In "Wochen-To-Dos & Organisation" verschoben');
     } else if (columnId === 'orga') {
       await onUpdateNote(note.id, {
         is_completed: false,
+        is_archived: false,
         tags: Array.from(new Set([...(note.tags || []), '#Raum']))
       });
+      showSuccessNotification('✓ Als Organisations-Notiz markiert');
+    } else if (columnId === 'students') {
+      await onUpdateNote(note.id, {
+        is_completed: false,
+        is_archived: false,
+        note_type: 'student_note'
+      });
+      showSuccessNotification('✓ In "Schüler & Didaktik" verschoben');
     } else if (columnId === 'inbox') {
       await onUpdateNote(note.id, {
         is_completed: false,
         is_archived: false,
         note_type: 'scratchpad'
       });
+      showSuccessNotification('✓ In Inbox verschoben');
     }
+
+    if (user) {
+      await logNoteAudit('USER_NOTE_UPDATED', user.school_id || 1, user.id, note.id, {
+        action_detail: 'moved_to_column_via_drag_drop',
+        target_column: columnId,
+        previous_completed: note.is_completed
+      });
+    }
+
     setDraggingNoteId(null);
     setDragOverColId(null);
     setDragOverCardTarget(null);
@@ -833,23 +911,40 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
     const note = notes.find(n => n.id === draggingNoteId);
     if (note) {
       if (columnId === 'completed' && !note.is_completed) {
-        onToggleCompleteTodo(note.id);
-      } else if (columnId === 'todos') {
+        await onToggleCompleteTodo(note.id);
+      } else if (columnId === 'todos_orga' || columnId === 'todos') {
         await onUpdateNote(note.id, {
           note_type: 'todo',
           is_completed: false,
+          is_archived: false,
           tags: Array.from(new Set([...(note.tags || []), '#To-Do']))
         });
       } else if (columnId === 'orga') {
         await onUpdateNote(note.id, {
           is_completed: false,
+          is_archived: false,
           tags: Array.from(new Set([...(note.tags || []), '#Raum']))
+        });
+      } else if (columnId === 'students') {
+        await onUpdateNote(note.id, {
+          is_completed: false,
+          is_archived: false,
+          note_type: 'student_note'
         });
       } else if (columnId === 'inbox') {
         await onUpdateNote(note.id, {
           is_completed: false,
           is_archived: false,
           note_type: 'scratchpad'
+        });
+      }
+
+      if (user) {
+        await logNoteAudit('USER_NOTE_UPDATED', user.school_id || 1, user.id, note.id, {
+          action_detail: 'reordered_into_column_via_drag_drop',
+          target_column: columnId,
+          target_note_id: targetNoteId,
+          position
         });
       }
     }
@@ -903,8 +998,8 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
         aria-label="Notizen-Board"
         style={{
           width: '100%',
-          maxWidth: '1380px',
-          height: '92vh',
+          maxWidth: 'min(96vw, 1680px)',
+          height: '94vh',
           backgroundColor: '#f8fafc',
           borderRadius: '24px',
           boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.6) inset',
@@ -935,9 +1030,9 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
           {/* Left: Title & Badge */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{
-              width: '38px',
-              height: '38px',
-              borderRadius: '12px',
+              width: '42px',
+              height: '42px',
+              borderRadius: '13px',
               background: 'linear-gradient(135deg, #0f172a 0%, #334155 100%)',
               display: 'flex',
               alignItems: 'center',
@@ -945,25 +1040,25 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
               color: '#ffffff',
               boxShadow: '0 4px 12px rgba(15, 23, 42, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.3)'
             }}>
-              <Layers size={18} />
+              <Layers size={20} color="#ffffff" />
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                <h2 style={{ margin: 0, fontSize: '1.24rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
                   Notizen-Board
                 </h2>
                 <span style={{
                   background: '#f1f5f9',
-                  color: '#475569',
-                  padding: '2px 8px',
+                  color: '#334155',
+                  padding: '3px 10px',
                   borderRadius: '100px',
-                  fontSize: '0.68rem',
+                  fontSize: '0.74rem',
                   fontWeight: 800
                 }}>
                   {notes.length} Notizen
                 </span>
               </div>
-              <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+              <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
                 Zentrale Unterrichtsorganisation &amp; Didaktik-Board
               </p>
             </div>
@@ -973,9 +1068,9 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
           <div style={{
             display: 'flex',
             background: '#f1f5f9',
-            padding: '3px',
-            borderRadius: '12px',
-            gap: '3px'
+            padding: '4px',
+            borderRadius: '14px',
+            gap: '4px'
           }}>
             <button
               type="button"
@@ -984,21 +1079,21 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                 border: 'none',
                 background: viewMode === 'kanban' ? '#ffffff' : 'transparent',
                 color: viewMode === 'kanban' ? '#0f172a' : '#64748b',
-                fontWeight: viewMode === 'kanban' ? 800 : 600,
-                fontSize: '0.74rem',
-                padding: '6px 14px',
-                borderRadius: '9px',
+                fontWeight: viewMode === 'kanban' ? 850 : 600,
+                fontSize: '0.84rem',
+                padding: '8px 16px',
+                borderRadius: '10px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
+                gap: '8px',
                 boxShadow: viewMode === 'kanban' ? '0 1px 4px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255, 255, 255, 0.8)' : 'none',
                 transition: 'all 0.15s ease'
               }}
             >
-              <Layers size={13} />
+              <Layers size={15} color={viewMode === 'kanban' ? '#0f172a' : '#64748b'} />
               <span>Kanban-Board</span>
-              <kbd style={{ opacity: 0.5, fontSize: '0.62rem', fontFamily: 'monospace' }}>1</kbd>
+              <kbd style={{ opacity: 0.6, fontSize: '0.68rem', fontFamily: 'monospace' }}>1</kbd>
             </button>
 
             <button
@@ -1008,21 +1103,21 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                 border: 'none',
                 background: viewMode === 'list' ? '#ffffff' : 'transparent',
                 color: viewMode === 'list' ? '#0f172a' : '#64748b',
-                fontWeight: viewMode === 'list' ? 800 : 600,
-                fontSize: '0.74rem',
-                padding: '6px 14px',
-                borderRadius: '9px',
+                fontWeight: viewMode === 'list' ? 850 : 600,
+                fontSize: '0.84rem',
+                padding: '8px 16px',
+                borderRadius: '10px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
+                gap: '8px',
                 boxShadow: viewMode === 'list' ? '0 1px 4px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255, 255, 255, 0.8)' : 'none',
                 transition: 'all 0.15s ease'
               }}
             >
-              <SlidersHorizontal size={13} />
+              <SlidersHorizontal size={15} color={viewMode === 'list' ? '#0f172a' : '#64748b'} />
               <span>Dichte Liste</span>
-              <kbd style={{ opacity: 0.5, fontSize: '0.62rem', fontFamily: 'monospace' }}>2</kbd>
+              <kbd style={{ opacity: 0.6, fontSize: '0.68rem', fontFamily: 'monospace' }}>2</kbd>
             </button>
 
             <button
@@ -1032,26 +1127,26 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                 border: 'none',
                 background: viewMode === 'students' ? '#ffffff' : 'transparent',
                 color: viewMode === 'students' ? '#0f172a' : '#64748b',
-                fontWeight: viewMode === 'students' ? 800 : 600,
-                fontSize: '0.74rem',
-                padding: '6px 14px',
-                borderRadius: '9px',
+                fontWeight: viewMode === 'students' ? 850 : 600,
+                fontSize: '0.84rem',
+                padding: '8px 16px',
+                borderRadius: '10px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
+                gap: '8px',
                 boxShadow: viewMode === 'students' ? '0 1px 4px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255, 255, 255, 0.8)' : 'none',
                 transition: 'all 0.15s ease'
               }}
             >
-              <User size={13} />
+              <User size={15} color={viewMode === 'students' ? '#0f172a' : '#64748b'} />
               <span>Nach Schülern</span>
-              <kbd style={{ opacity: 0.5, fontSize: '0.62rem', fontFamily: 'monospace' }}>3</kbd>
+              <kbd style={{ opacity: 0.6, fontSize: '0.68rem', fontFamily: 'monospace' }}>3</kbd>
             </button>
           </div>
 
           {/* Right: Print PDF + Filter Toggle + Search + Close */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {/* 1-Click Print Tages-Plan PDF (Apple Quick-Look Preview) */}
             <button
               type="button"
@@ -1062,20 +1157,20 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                 background: '#f8fafc',
                 color: '#334155',
                 border: '1px solid #cbd5e1',
-                borderRadius: '10px',
-                padding: '6px 12px',
-                fontSize: '0.76rem',
+                borderRadius: '11px',
+                padding: '8px 14px',
+                fontSize: '0.82rem',
                 fontWeight: 750,
                 cursor: isGeneratingPdf ? 'wait' : 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
+                gap: '7px',
                 transition: 'all 0.15s ease',
                 opacity: isGeneratingPdf ? 0.7 : 1
               }}
               className="hover-scale"
             >
-              <Printer size={13} color="#475569" />
+              <Printer size={14} color="#475569" />
               <span>{isGeneratingPdf ? 'Lade Vorschau...' : 'Tagesplan PDF'}</span>
             </button>
 
@@ -1085,12 +1180,12 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
               alignItems: 'center',
               background: '#f8fafc',
               border: '1px solid #e2e8f0',
-              borderRadius: '10px',
-              padding: '6px 10px',
-              gap: '6px',
-              minWidth: '180px'
+              borderRadius: '11px',
+              padding: '7px 12px',
+              gap: '8px',
+              minWidth: '210px'
             }}>
-              <Search size={13} color="#94a3b8" />
+              <Search size={14} color="#94a3b8" />
               <input
                 type="text"
                 placeholder="Suchen... (J/K)"
@@ -1100,7 +1195,7 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                   border: 'none',
                   background: 'transparent',
                   outline: 'none',
-                  fontSize: '0.76rem',
+                  fontSize: '0.82rem',
                   color: '#0f172a',
                   width: '100%'
                 }}
@@ -1109,9 +1204,9 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  style={{ border: 'none', background: 'transparent', color: '#94a3b8', cursor: 'pointer', padding: 0 }}
+                  style={{ border: 'none', background: 'transparent', color: '#94a3b8', cursor: 'pointer', padding: 0, display: 'flex' }}
                 >
-                  <X size={12} />
+                  <X size={14} color="#64748b" />
                 </button>
               )}
             </div>
@@ -1123,12 +1218,12 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
               aria-label="Board schließen"
               title="Board schließen (Esc)"
               style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '10px',
+                width: '36px',
+                height: '36px',
+                borderRadius: '11px',
                 border: '1px solid #e2e8f0',
                 background: '#ffffff',
-                color: '#64748b',
+                color: '#475569',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -1137,7 +1232,7 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
               }}
               className="hover-scale"
             >
-              <X size={15} />
+              <X size={17} color="#475569" />
             </button>
           </div>
         </div>
@@ -1159,36 +1254,190 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '10px',
+            gap: '12px',
             background: '#f8fafc',
             border: omniTypeahead.type ? '1.5px solid #34a853' : '1.5px solid #cbd5e1',
-            borderRadius: '14px',
-            padding: '6px 12px',
+            borderRadius: '16px',
+            padding: '8px 14px',
             boxShadow: omniTypeahead.type ? '0 0 0 3px rgba(52, 168, 83, 0.12)' : 'inset 0 1px 2px rgba(0,0,0,0.02)',
             transition: 'all 0.15s ease'
           }}>
-            <div style={{
-              width: '28px',
-              height: '28px',
-              borderRadius: '8px',
-              background: '#0f172a',
-              color: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}>
-              <Plus size={16} />
+            {/* ⚡ Monochromer Auto-Student Button */}
+            <div style={{ position: 'relative' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (currentLessonStudents.length === 1) {
+                    const s = currentLessonStudents[0];
+                    setOmniStudentId(String(s.id));
+                    setOmniStudentName(s.first_name || s.name);
+                    setOmniContent(prev => prev.includes(`@${s.first_name || s.name}`) ? prev : `@${s.first_name || s.name} ${prev}`.trim());
+                    omniInputRef.current?.focus();
+                  } else if (currentLessonStudents.length > 1) {
+                    setShowAutoStudentPopover(prev => !prev);
+                  }
+                }}
+                title={
+                  currentLessonStudents.length > 0 
+                    ? `Auto-Zuweisung: ${currentLessonStudents.map(s => s.first_name || s.name).join(', ')} [Tab]` 
+                    : 'Kein Schüler im aktiven Unterrichtsfenster'
+                }
+                aria-label="Auto-Zuweisung für aktuellen Schüler"
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  border: currentLessonStudents.length > 0 ? (omniStudentId ? '1.5px solid #0f172a' : '1px solid #cbd5e1') : '1px dashed #e2e8f0',
+                  background: omniStudentId ? '#0f172a' : (currentLessonStudents.length > 0 ? '#ffffff' : '#f8fafc'),
+                  color: omniStudentId ? '#ffffff' : (currentLessonStudents.length > 0 ? '#0f172a' : '#94a3b8'),
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: currentLessonStudents.length > 0 ? 'pointer' : 'default',
+                  position: 'relative',
+                  flexShrink: 0,
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <Zap size={16} fill={omniStudentId ? '#ffffff' : 'none'} color={omniStudentId ? '#ffffff' : '#0f172a'} />
+                {currentLessonStudents.length > 0 && !omniStudentId && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '4px',
+                    right: '4px',
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: '#22c55e',
+                    boxShadow: '0 0 0 1.5px #ffffff'
+                  }} />
+                )}
+              </button>
+
+              {/* Partner-Unterricht Popover */}
+              {showAutoStudentPopover && currentLessonStudents.length > 1 && (
+                <div style={{
+                  position: 'absolute',
+                  top: '42px',
+                  left: 0,
+                  background: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '12px',
+                  boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                  padding: '8px',
+                  zIndex: 10000,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '5px',
+                  width: '230px'
+                }}>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', padding: '2px 6px' }}>
+                    Aktuelle Stunde ({currentLessonStudents.length} Schüler):
+                  </div>
+                  {currentLessonStudents.map(s => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => {
+                        setOmniStudentId(String(s.id));
+                        setOmniStudentName(s.first_name || s.name);
+                        setOmniContent(prev => `@${s.first_name || s.name} ${prev}`.trim());
+                        setShowAutoStudentPopover(false);
+                        omniInputRef.current?.focus();
+                      }}
+                      style={{
+                        textAlign: 'left',
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        padding: '6px 10px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        color: '#0f172a'
+                      }}
+                    >
+                      {maskStudentName(s.first_name || s.name)} ({s.instrument || 'Musik'})
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const names = currentLessonStudents.map(s => `@${s.first_name || s.name}`).join(' ');
+                      setOmniContent(prev => `${names} ${prev}`.trim());
+                      setShowAutoStudentPopover(false);
+                      omniInputRef.current?.focus();
+                    }}
+                    style={{
+                      textAlign: 'center',
+                      background: '#f1f5f9',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '8px',
+                      padding: '6px 10px',
+                      fontSize: '0.74rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      color: '#0f172a',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '5px'
+                    }}
+                  >
+                    <Users size={13} color="#0f172a" />
+                    <span>Beide zuweisen</span>
+                  </button>
+                </div>
+              )}
             </div>
 
-            <input
-              ref={omniInputRef}
-              type="text"
-              placeholder="Notiz, Hausaufgabe oder Beobachtung blitzschnell erfassen... (@Schüler, #Tag, morgen, !Raum)"
+            {/* ☑ Monochromer Checkbox-Modus Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsChecklistMode(prev => {
+                  const next = !prev;
+                  if (next && !omniContent.trim()) {
+                    setOmniContent('- ');
+                  }
+                  return next;
+                });
+                omniInputRef.current?.focus();
+              }}
+              title={isChecklistMode ? 'Checklisten-Modus aktiv (Enter = neue Zeile)' : 'Checklisten-Modus aktivieren'}
+              aria-label="Checklisten-Modus aktivieren"
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '10px',
+                border: isChecklistMode ? '1.5px solid #0f172a' : '1px solid #cbd5e1',
+                background: isChecklistMode ? '#0f172a' : '#ffffff',
+                color: isChecklistMode ? '#ffffff' : '#475569',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                flexShrink: 0,
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <CheckSquare size={16} color={isChecklistMode ? '#ffffff' : '#475569'} />
+            </button>
+
+            <textarea
+              ref={omniInputRef as any}
+              rows={isChecklistMode ? 2 : 1}
+              placeholder={
+                isChecklistMode 
+                  ? `Checkliste aktiv: [Enter] = neue Aufgabe... Speichern mit ${isMacPlatform ? '⌘↵' : 'Strg↵'}`
+                  : 'Notiz, Hausaufgabe oder Beobachtung erfassen... (@Schüler, #Tag, morgen, !Raum)'
+              }
               value={omniContent}
               onChange={(e) => {
                 const cursor = e.target.selectionStart || e.target.value.length;
                 handleOmniInputChange(e.target.value, cursor);
+                e.target.style.height = 'auto';
+                e.target.style.height = `${Math.min(e.target.scrollHeight, 130)}px`;
               }}
               onKeyDown={(e) => {
                 if (omniTypeahead.type && omniSuggestions.length > 0) {
@@ -1217,19 +1466,50 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                   }
                 }
 
-                if (e.key === 'Enter') {
+                // Cross-Platform Speichern Shortcut
+                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
                   e.preventDefault();
                   handleOmniCreateNote();
+                  return;
+                }
+
+                // Checklisten-Modus Enter
+                if (isChecklistMode && e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  setOmniContent(prev => `${prev}\n- `);
+                  return;
+                }
+
+                // Normales Enter
+                if (!isChecklistMode && e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleOmniCreateNote();
+                  return;
+                }
+
+                // Tab Shortcut für Auto-Student
+                if (e.key === 'Tab' && !omniStudentId && currentLessonStudents.length > 0 && !omniTypeahead.type) {
+                  e.preventDefault();
+                  const s = currentLessonStudents[0];
+                  setOmniStudentId(String(s.id));
+                  setOmniStudentName(s.first_name || s.name);
+                  setOmniContent(prev => `@${s.first_name || s.name} ${prev}`.trim());
                 }
               }}
               style={{
                 flex: 1,
                 border: 'none',
                 background: 'transparent',
-                fontSize: '0.85rem',
+                fontSize: '0.92rem',
                 fontWeight: 600,
                 color: '#0f172a',
-                outline: 'none'
+                outline: 'none',
+                resize: 'none',
+                minHeight: '26px',
+                maxHeight: '130px',
+                fontFamily: 'inherit',
+                lineHeight: '1.4',
+                padding: '4px 0'
               }}
             />
 
@@ -1238,22 +1518,22 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
               type="button"
               onClick={isOmniListening ? stopOmniListening : startOmniListening}
               style={{
-                border: isOmniListening ? '1.5px solid #ef4444' : '1px solid #e2e8f0',
-                background: isOmniListening ? '#fef2f2' : '#ffffff',
-                color: isOmniListening ? '#ef4444' : '#64748b',
-                padding: '5px 8px',
-                borderRadius: '8px',
+                border: isOmniListening ? '1.5px solid #0f172a' : '1px solid #e2e8f0',
+                background: isOmniListening ? '#f1f5f9' : '#ffffff',
+                color: isOmniListening ? '#0f172a' : '#475569',
+                padding: '6px 11px',
+                borderRadius: '9px',
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '4px',
-                fontSize: '0.68rem',
+                gap: '6px',
+                fontSize: '0.78rem',
                 fontWeight: 750,
                 flexShrink: 0
               }}
               title="Spracheingabe starten"
             >
-              <Mic size={12} color={isOmniListening ? '#ef4444' : '#64748b'} />
+              <Mic size={14} color={isOmniListening ? '#0f172a' : '#475569'} />
               <span>{isOmniListening ? 'Zuhören...' : 'Diktieren'}</span>
             </button>
 
@@ -1266,21 +1546,23 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                 border: 'none',
                 background: omniContent.trim() ? '#0f172a' : '#cbd5e1',
                 color: '#ffffff',
-                padding: '6px 14px',
-                borderRadius: '9px',
-                fontSize: '0.74rem',
-                fontWeight: 800,
+                padding: '8px 18px',
+                borderRadius: '10px',
+                fontSize: '0.84rem',
+                fontWeight: 850,
                 cursor: omniContent.trim() ? 'pointer' : 'default',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '5px',
+                gap: '6px',
                 flexShrink: 0,
                 boxShadow: omniContent.trim() ? '0 2px 6px rgba(15, 23, 42, 0.2)' : 'none',
                 transition: 'all 0.15s ease'
               }}
             >
               <span>Speichern</span>
-              <kbd style={{ opacity: 0.6, fontSize: '0.60rem', fontFamily: 'monospace' }}>↵</kbd>
+              <kbd style={{ opacity: 0.6, fontSize: '0.68rem', fontFamily: 'monospace' }}>
+                {isChecklistMode ? (isMacPlatform ? '⌘↵' : 'Strg↵') : '↵'}
+              </kbd>
             </button>
           </div>
 
@@ -1289,23 +1571,23 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
             <div
               style={{
                 position: 'absolute',
-                top: '56px',
+                top: '62px',
                 left: '60px',
                 background: '#ffffff',
                 border: '1px solid #cbd5e1',
                 borderRadius: '14px',
                 boxShadow: '0 16px 36px -4px rgba(15, 23, 42, 0.22), 0 4px 12px rgba(0,0,0,0.06)',
-                width: '320px',
-                maxHeight: '260px',
+                width: '340px',
+                maxHeight: '280px',
                 overflowY: 'auto',
                 zIndex: 9999,
-                padding: '6px',
+                padding: '8px',
                 animation: 'scaleIn 0.12s ease-out'
               }}
             >
               <div style={{
                 padding: '4px 8px 6px 8px',
-                fontSize: '0.62rem',
+                fontSize: '0.68rem',
                 fontWeight: 800,
                 color: '#94a3b8',
                 textTransform: 'uppercase',
@@ -1313,7 +1595,7 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                 borderBottom: '1px solid #f1f5f9',
                 marginBottom: '4px'
               }}>
-                {omniTypeahead.type === 'student' ? '👤 Schüler auswählen (@)' : '🏷️ Didaktik-Tag auswählen (#)'}
+                {omniTypeahead.type === 'student' ? 'Schüler auswählen (@)' : 'Didaktik-Tag auswählen (#)'}
               </div>
 
               {omniTypeahead.type === 'student' && omniSuggestions.map((s: any, idx: number) => {
@@ -1328,9 +1610,9 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       padding: '7px 10px',
-                      borderRadius: '10px',
-                      background: isSelected ? '#f1f5f9' : 'transparent',
+                      borderRadius: '8px',
                       cursor: 'pointer',
+                      background: isSelected ? '#f1f5f9' : 'transparent',
                       transition: 'background 0.1s ease'
                     }}
                   >
@@ -1339,37 +1621,28 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                         width: '24px',
                         height: '24px',
                         borderRadius: '50%',
-                        background: '#e6f4ea',
-                        color: '#166534',
+                        background: '#f1f5f9',
+                        color: '#0f172a',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: '0.68rem',
+                        fontSize: '0.74rem',
                         fontWeight: 800
                       }}>
                         {s.first_name?.[0] || 'S'}
                       </div>
                       <div>
-                        <div style={{ fontSize: '0.78rem', fontWeight: 750, color: '#0f172a' }}>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#0f172a' }}>
                           {maskStudentName(s.first_name || s.name)}
                         </div>
-                        <div style={{ fontSize: '0.64rem', color: '#64748b', fontWeight: 550 }}>
-                          {s.instrument || 'Instrument'}
+                        <div style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                          {s.instrument || 'Musikschüler'}
                         </div>
                       </div>
                     </div>
-                    {s.isToday && (
-                      <span style={{
-                        fontSize: '0.60rem',
-                        fontWeight: 800,
-                        color: '#166534',
-                        background: '#dcfce7',
-                        padding: '2px 6px',
-                        borderRadius: '6px'
-                      }}>
-                        Heute
-                      </span>
-                    )}
+                    <span style={{ fontSize: '0.70rem', color: '#94a3b8', fontWeight: 600 }}>
+                      @{s.first_name || s.name}
+                    </span>
                   </div>
                 );
               })}
@@ -1378,7 +1651,7 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                 const isSelected = idx === omniTypeaheadIndex;
                 return (
                   <div
-                    key={t.key}
+                    key={t.tag}
                     onClick={() => selectOmniTag(t)}
                     onMouseEnter={() => setOmniTypeaheadIndex(idx)}
                     style={{
@@ -1386,41 +1659,41 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       padding: '7px 10px',
-                      borderRadius: '10px',
-                      background: isSelected ? '#f1f5f9' : 'transparent',
+                      borderRadius: '8px',
                       cursor: 'pointer',
+                      background: isSelected ? '#f1f5f9' : 'transparent',
                       transition: 'background 0.1s ease'
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{
-                        display: 'flex',
+                        display: 'inline-flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        width: '22px',
-                        height: '22px',
-                        borderRadius: '6px',
-                        background: t.bg,
-                        color: t.color
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '7px',
+                        background: '#f1f5f9',
+                        color: '#0f172a'
                       }}>
-                        {renderMonochromeTagIcon(t.iconName, 12, t.color)}
+                        {renderMonochromeTagIcon(t.iconName, 13, '#0f172a')}
                       </span>
                       <div>
-                        <div style={{ fontSize: '0.78rem', fontWeight: 750, color: '#0f172a' }}>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#0f172a' }}>
                           {t.tag}
                         </div>
-                        <div style={{ fontSize: '0.64rem', color: '#64748b', fontWeight: 550 }}>
+                        <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 550 }}>
                           {t.desc}
                         </div>
                       </div>
                     </div>
                     <span style={{
-                      fontSize: '0.62rem',
+                      fontSize: '0.68rem',
                       fontWeight: 700,
-                      color: t.color,
-                      background: t.bg,
-                      border: `1px solid ${t.border}`,
-                      padding: '2px 6px',
+                      color: '#0f172a',
+                      background: '#f1f5f9',
+                      border: '1px solid #e2e8f0',
+                      padding: '2px 7px',
                       borderRadius: '6px'
                     }}>
                       {t.label}
@@ -1432,29 +1705,29 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
           )}
 
           {/* Omni Context Meta Chips Row */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             {/* Student Chip */}
             <div style={{ position: 'relative' }}>
               <button
                 type="button"
                 onClick={() => setShowOmniStudentPicker(prev => !prev)}
                 style={{
-                  border: omniStudentName ? '1.5px solid #86efac' : '1px dashed #cbd5e1',
-                  background: omniStudentName ? '#e6f4ea' : '#ffffff',
-                  color: omniStudentName ? '#166534' : '#64748b',
-                  padding: '3px 8px',
-                  borderRadius: '8px',
-                  fontSize: '0.68rem',
+                  border: omniStudentName ? '1.5px solid #0f172a' : '1px dashed #cbd5e1',
+                  background: omniStudentName ? '#f8fafc' : '#ffffff',
+                  color: omniStudentName ? '#0f172a' : '#475569',
+                  padding: '6px 12px',
+                  borderRadius: '9px',
+                  fontSize: '0.80rem',
                   fontWeight: 750,
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '4px'
+                  gap: '6px'
                 }}
               >
-                <User size={11} />
+                <User size={13} color="#475569" />
                 <span>{omniStudentName ? maskStudentName(omniStudentName) : 'Schüler zuweisen'}</span>
-                <ChevronDown size={9} opacity={0.6} />
+                <ChevronDown size={11} color="#64748b" />
               </button>
 
               {showOmniStudentPicker && (
@@ -1481,22 +1754,22 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                       type="button"
                       onClick={() => setShowOmniTagPicker(prev => !prev)}
                       style={{
-                        border: `1.5px solid ${tStyle.border}`,
-                        background: tStyle.bg,
-                        color: tStyle.color,
-                        padding: '3px 8px',
-                        borderRadius: '8px',
-                        fontSize: '0.68rem',
+                        border: '1.5px solid #cbd5e1',
+                        background: '#ffffff',
+                        color: '#0f172a',
+                        padding: '6px 12px',
+                        borderRadius: '9px',
+                        fontSize: '0.80rem',
                         fontWeight: 800,
                         cursor: 'pointer',
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '4px'
+                        gap: '6px'
                       }}
                     >
-                      <span>{renderMonochromeTagIcon(tStyle.iconName, 11, tStyle.color)}</span>
+                      <span>{renderMonochromeTagIcon(tStyle.iconName, 13, '#0f172a')}</span>
                       <span>{tStyle.label}</span>
-                      <ChevronDown size={9} opacity={0.7} />
+                      <ChevronDown size={11} color="#64748b" />
                     </button>
                   );
                 })()
@@ -1507,20 +1780,20 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                   style={{
                     border: '1px dashed #cbd5e1',
                     background: '#ffffff',
-                    color: '#64748b',
-                    padding: '3px 8px',
-                    borderRadius: '8px',
-                    fontSize: '0.68rem',
+                    color: '#475569',
+                    padding: '6px 12px',
+                    borderRadius: '9px',
+                    fontSize: '0.80rem',
                     fontWeight: 750,
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '4px'
+                    gap: '6px'
                   }}
                 >
-                  <Hash size={11} />
+                  <Hash size={13} color="#475569" />
                   <span>Themen-Tag</span>
-                  <ChevronDown size={9} opacity={0.6} />
+                  <ChevronDown size={11} color="#64748b" />
                 </button>
               )}
 
@@ -1546,22 +1819,22 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                 type="button"
                 onClick={() => setShowOmniDueDatePicker(prev => !prev)}
                 style={{
-                  border: omniDueDate ? '1.5px solid #93c5fd' : '1px dashed #cbd5e1',
-                  background: omniDueDate ? '#eff6ff' : '#ffffff',
-                  color: omniDueDate ? '#1e40af' : '#64748b',
-                  padding: '3px 8px',
-                  borderRadius: '8px',
-                  fontSize: '0.68rem',
+                  border: omniDueDate ? '1.5px solid #0f172a' : '1px dashed #cbd5e1',
+                  background: omniDueDate ? '#f8fafc' : '#ffffff',
+                  color: omniDueDate ? '#0f172a' : '#475569',
+                  padding: '6px 12px',
+                  borderRadius: '9px',
+                  fontSize: '0.80rem',
                   fontWeight: 750,
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '4px'
+                  gap: '6px'
                 }}
               >
-                <Calendar size={11} />
+                <Calendar size={13} color="#475569" />
                 <span>{omniDueDate ? formatDueDateBadge(omniDueDate).label : 'Fälligkeit'}</span>
-                <ChevronDown size={9} opacity={0.6} />
+                <ChevronDown size={11} color="#64748b" />
               </button>
 
               {showOmniDueDatePicker && (
@@ -1576,22 +1849,22 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
               )}
             </div>
 
-            {/* 1-Klick Sichtbarkeits-Toggle: 🔒 Privat ⇄ 📖 Im Aufgabenheft */}
+            {/* 1-Klick Sichtbarkeits-Toggle: Privat ⇄ Im Aufgabenheft */}
             <button
               type="button"
               onClick={() => setOmniIsSharedWithHomework(prev => !prev)}
               style={{
-                border: omniIsSharedWithHomework ? '1.5px solid #86efac' : '1px solid #e2e8f0',
-                background: omniIsSharedWithHomework ? '#f0fdf4' : '#ffffff',
-                color: omniIsSharedWithHomework ? '#166534' : '#64748b',
-                padding: '3px 10px',
-                borderRadius: '8px',
-                fontSize: '0.68rem',
+                border: omniIsSharedWithHomework ? '1.5px solid #0f172a' : '1px solid #e2e8f0',
+                background: omniIsSharedWithHomework ? '#f8fafc' : '#ffffff',
+                color: omniIsSharedWithHomework ? '#0f172a' : '#475569',
+                padding: '6px 14px',
+                borderRadius: '9px',
+                fontSize: '0.80rem',
                 fontWeight: 800,
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '5px',
+                gap: '6px',
                 boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
                 transition: 'all 0.15s ease'
               }}
@@ -1599,13 +1872,13 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
             >
               {omniIsSharedWithHomework ? (
                 <>
-                  <BookOpen size={11} color="#16a34a" />
-                  <span>📖 Im Aufgabenheft aktiv (Geteilt)</span>
+                  <BookOpen size={13} color="#0f172a" />
+                  <span>Im Aufgabenheft aktiv (Geteilt)</span>
                 </>
               ) : (
                 <>
-                  <Lock size={11} color="#64748b" />
-                  <span>🔒 Lehrkraft-Notiz (Privat)</span>
+                  <Lock size={13} color="#64748b" />
+                  <span>Lehrkraft-Notiz (Privat)</span>
                 </>
               )}
             </button>
@@ -1645,12 +1918,12 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                     onDrop={() => handleDropOnColumn(col.id)}
                     style={{
                       flex: '1 1 0%',
-                      minWidth: '250px',
-                      maxWidth: '300px',
+                      minWidth: '280px',
+                      maxWidth: '380px',
                       height: '100%',
                       background: isDragOver ? '#eff6ff' : '#ffffff',
                       border: isDragOver ? '2px dashed #3b82f6' : '1px solid #e2e8f0',
-                      borderRadius: '18px',
+                      borderRadius: '20px',
                       display: 'flex',
                       flexDirection: 'column',
                       boxShadow: '0 2px 8px rgba(0,0,0,0.02), inset 0 1px 0 rgba(255, 255, 255, 0.7)',
@@ -1659,15 +1932,15 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                   >
                     {/* Clean Column Header with Color Badge & Archive Cleaner */}
                     <div style={{
-                      padding: '12px 14px',
+                      padding: '14px 16px',
                       borderBottom: '1px solid #f1f5f9',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <col.icon size={14} style={{ color: col.color }} />
-                        <span style={{ fontSize: '0.80rem', fontWeight: 850, color: '#0f172a' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <col.icon size={16} color="#0f172a" />
+                        <span style={{ fontSize: '0.92rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.01em' }}>
                           {col.title}
                         </span>
                       </div>
@@ -1686,28 +1959,28 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                               border: 'none',
                               background: '#f1f5f9',
                               color: '#64748b',
-                              padding: '2px 6px',
-                              borderRadius: '6px',
-                              fontSize: '0.62rem',
+                              padding: '3px 8px',
+                              borderRadius: '7px',
+                              fontSize: '0.70rem',
                               fontWeight: 750,
                               cursor: 'pointer',
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: '3px'
+                              gap: '4px'
                             }}
                             title="Archiv leeren"
                           >
-                            <Trash2 size={9} />
+                            <Trash2 size={11} color="#64748b" />
                             <span>Leeren</span>
                           </button>
                         )}
                         <span style={{
-                          fontSize: '0.66rem',
+                          fontSize: '0.74rem',
                           fontWeight: 800,
                           background: col.bg,
                           color: col.color,
                           border: `1.5px solid ${col.border || '#e2e8f0'}`,
-                          padding: '2px 8px',
+                          padding: '3px 10px',
                           borderRadius: '100px'
                         }}>
                           {col.count}
@@ -1717,7 +1990,7 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
 
                     {/* Top-of-Column Quick Add Input */}
                     <div style={{
-                      padding: '8px 10px',
+                      padding: '10px 12px',
                       borderBottom: '1px solid #f1f5f9',
                       background: '#fafbfc'
                     }}>
@@ -1734,11 +2007,11 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                         }}
                         style={{
                           width: '100%',
-                          fontSize: '0.72rem',
+                          fontSize: '0.82rem',
                           fontWeight: 600,
                           border: '1px solid #e2e8f0',
-                          borderRadius: '8px',
-                          padding: '5px 8px',
+                          borderRadius: '9px',
+                          padding: '7px 10px',
                           outline: 'none',
                           boxSizing: 'border-box',
                           background: '#ffffff'
@@ -1750,7 +2023,7 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                     <div style={{
                       flex: 1,
                       overflowY: 'auto',
-                      padding: '10px',
+                      padding: '12px',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '10px'
@@ -1758,30 +2031,30 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                       {col.items.length === 0 ? (
                         /* Sleek Ghost Card Empty State */
                         <div style={{
-                          padding: '26px 14px',
+                          padding: '32px 16px',
                           border: '1.5px dashed #e2e8f0',
-                          borderRadius: '14px',
+                          borderRadius: '16px',
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
                           justifyContent: 'center',
                           textAlign: 'center',
-                          gap: '8px',
+                          gap: '10px',
                           background: '#fafbfc'
                         }}>
                           <div style={{
-                            width: '34px',
-                            height: '34px',
-                            borderRadius: '10px',
-                            background: col.bg,
-                            border: `1px solid ${col.border || '#e2e8f0'}`,
+                            width: '40px',
+                            height: '40px',
+                            borderRadius: '12px',
+                            background: '#f1f5f9',
+                            border: '1px solid #e2e8f0',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center'
                           }}>
-                            <col.icon size={16} color={col.color} />
+                            <col.icon size={18} color="#64748b" />
                           </div>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 650, maxWidth: '180px', lineHeight: 1.35 }}>
+                          <span style={{ fontSize: '0.84rem', color: '#64748b', fontWeight: 650, maxWidth: '220px', lineHeight: 1.4 }}>
                             {col.emptyHint}
                           </span>
                         </div>
@@ -1828,6 +2101,8 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                               onUnsyncFromHomework={onUnsyncFromHomeworkBook ? () => onUnsyncFromHomeworkBook(note) : undefined}
                               onOpenHomeworkModal={onOpenHomeworkModal}
                               onOpenRoomIssueModal={(n) => setSelectedRoomIssueModalNote(n)}
+                              onUpdateNote={onUpdateNote}
+                              onToggleArchive={onToggleArchive}
                             />
                           );
                         })
@@ -1856,13 +2131,13 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
               {/* Structured Linear Table Header with Sort & Multi-Select */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: '32px 40px 1fr 180px 180px 140px 110px',
-                padding: '10px 16px',
+                gridTemplateColumns: '36px 44px 1fr 200px 200px 150px 110px',
+                padding: '12px 18px',
                 background: '#f8fafc',
                 borderBottom: '1px solid #e2e8f0',
-                fontSize: '0.64rem',
+                fontSize: '0.74rem',
                 fontWeight: 800,
-                color: '#64748b',
+                color: '#475569',
                 letterSpacing: '0.04em',
                 textTransform: 'uppercase',
                 alignItems: 'center',
@@ -1873,7 +2148,7 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                     type="checkbox"
                     checked={filteredNotes.length > 0 && selectedNoteIds.size === filteredNotes.length}
                     onChange={handleSelectAllNotes}
-                    style={{ cursor: 'pointer' }}
+                    style={{ cursor: 'pointer', width: '15px', height: '15px' }}
                   />
                 </div>
                 <div 
@@ -1881,70 +2156,71 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                   tabIndex={0}
                   onClick={() => handleToggleSort('status')} 
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToggleSort('status'); } }}
-                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
                 >
                   <span>Status</span>
-                  {sortField === 'status' && (sortOrder === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+                  {sortField === 'status' && (sortOrder === 'asc' ? <ArrowUp size={12} color="#0f172a" /> : <ArrowDown size={12} color="#0f172a" />)}
                 </div>
                 <div 
                   role="button"
                   tabIndex={0}
                   onClick={() => handleToggleSort('content')} 
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToggleSort('content'); } }}
-                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
                 >
                   <span>Notiz / Aufgabe</span>
-                  {sortField === 'content' && (sortOrder === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+                  {sortField === 'content' && (sortOrder === 'asc' ? <ArrowUp size={12} color="#0f172a" /> : <ArrowDown size={12} color="#0f172a" />)}
                 </div>
                 <div 
                   role="button"
                   tabIndex={0}
                   onClick={() => handleToggleSort('student')} 
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToggleSort('student'); } }}
-                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
                 >
                   <span>Schüler / Kontext</span>
-                  {sortField === 'student' && (sortOrder === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+                  {sortField === 'student' && (sortOrder === 'asc' ? <ArrowUp size={12} color="#0f172a" /> : <ArrowDown size={12} color="#0f172a" />)}
                 </div>
                 <div 
                   role="button"
                   tabIndex={0}
                   onClick={() => handleToggleSort('tag')} 
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToggleSort('tag'); } }}
-                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
                 >
                   <span>Themen-Tag</span>
-                  {sortField === 'tag' && (sortOrder === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+                  {sortField === 'tag' && (sortOrder === 'asc' ? <ArrowUp size={12} color="#0f172a" /> : <ArrowDown size={12} color="#0f172a" />)}
                 </div>
                 <div 
                   role="button"
                   tabIndex={0}
                   onClick={() => handleToggleSort('due_date')} 
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToggleSort('due_date'); } }}
-                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
                 >
                   <span>Fälligkeit</span>
-                  {sortField === 'due_date' && (sortOrder === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+                  {sortField === 'due_date' && (sortOrder === 'asc' ? <ArrowUp size={12} color="#0f172a" /> : <ArrowDown size={12} color="#0f172a" />)}
                 </div>
                 <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
                   <button
                     type="button"
                     onClick={() => window.print()}
                     style={{
-                      border: 'none',
-                      background: 'transparent',
-                      color: '#64748b',
+                      border: '1px solid #cbd5e1',
+                      background: '#ffffff',
+                      color: '#475569',
                       cursor: 'pointer',
-                      padding: '2px',
+                      padding: '4px 8px',
+                      borderRadius: '6px',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '3px',
-                      fontSize: '0.62rem',
-                      fontWeight: 700
+                      gap: '4px',
+                      fontSize: '0.72rem',
+                      fontWeight: 750
                     }}
                     title="Liste drucken"
                   >
-                    <Printer size={11} />
+                    <Printer size={13} color="#475569" />
                     <span>Drucken</span>
                   </button>
                 </div>
@@ -1952,8 +2228,29 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
 
               {/* Table Rows */}
               {sortedNotesList.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px 10px', color: '#94a3b8', fontSize: '0.78rem' }}>
-                  Keine Notizen gefunden
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '60px 20px',
+                  gap: '12px',
+                  textAlign: 'center'
+                }}>
+                  <div style={{
+                    width: '44px',
+                    height: '44px',
+                    borderRadius: '12px',
+                    background: '#f1f5f9',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <SlidersHorizontal size={22} color="#64748b" />
+                  </div>
+                  <span style={{ color: '#64748b', fontSize: '0.88rem', fontWeight: 650 }}>
+                    Keine Notizen gefunden
+                  </span>
                 </div>
               ) : (
                 sortedNotesList.map(note => {
@@ -2095,10 +2392,10 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                 <div style={{
                   display: 'flex',
                   background: '#ffffff',
-                  padding: '3px',
-                  borderRadius: '10px',
+                  padding: '4px',
+                  borderRadius: '12px',
                   border: '1px solid #e2e8f0',
-                  gap: '3px'
+                  gap: '4px'
                 }}>
                   <button
                     type="button"
@@ -2107,17 +2404,17 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                       border: 'none',
                       background: studentFilterScope === 'today' ? '#0f172a' : 'transparent',
                       color: studentFilterScope === 'today' ? '#ffffff' : '#64748b',
-                      fontSize: '0.72rem',
+                      fontSize: '0.80rem',
                       fontWeight: 800,
-                      padding: '4px 10px',
-                      borderRadius: '7px',
+                      padding: '6px 14px',
+                      borderRadius: '8px',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '5px'
+                      gap: '6px'
                     }}
                   >
-                    <Calendar size={11} />
+                    <Calendar size={13} color={studentFilterScope === 'today' ? '#ffffff' : '#64748b'} />
                     <span>Heute unterrichtet ({todayStudents.length})</span>
                   </button>
                   <button
@@ -2127,23 +2424,23 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                       border: 'none',
                       background: studentFilterScope === 'all' ? '#0f172a' : 'transparent',
                       color: studentFilterScope === 'all' ? '#ffffff' : '#64748b',
-                      fontSize: '0.72rem',
+                      fontSize: '0.80rem',
                       fontWeight: 800,
-                      padding: '4px 10px',
-                      borderRadius: '7px',
+                      padding: '6px 14px',
+                      borderRadius: '8px',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '5px'
+                      gap: '6px'
                     }}
                   >
-                    <Users size={11} />
+                    <Users size={13} color={studentFilterScope === 'all' ? '#ffffff' : '#64748b'} />
                     <span>Alle Schüler ({allStudents.length})</span>
                   </button>
                 </div>
 
                 {/* Instant Student Filter Search */}
-                <div style={{ position: 'relative', width: '220px' }}>
+                <div style={{ position: 'relative', width: '240px' }}>
                   <input
                     type="text"
                     placeholder="Schüler suchen..."
@@ -2151,16 +2448,16 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                     onChange={(e) => setStudentSearchQuery(e.target.value)}
                     style={{
                       width: '100%',
-                      fontSize: '0.72rem',
-                      padding: '5px 8px 5px 24px',
-                      borderRadius: '8px',
+                      fontSize: '0.80rem',
+                      padding: '7px 10px 7px 30px',
+                      borderRadius: '9px',
                       border: '1px solid #e2e8f0',
                       background: '#ffffff',
                       outline: 'none',
                       boxSizing: 'border-box'
                     }}
                   />
-                  <Search size={11} color="#94a3b8" style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)' }} />
+                  <Search size={13} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
                 </div>
               </div>
 
@@ -2187,12 +2484,12 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                       onDrop={() => handleDropOnStudentColumn(group.student)}
                       style={{
                         flex: '1 1 0%',
-                        minWidth: '270px',
-                        maxWidth: '320px',
+                        minWidth: '290px',
+                        maxWidth: '360px',
                         height: '100%',
                         background: isDragOver ? '#eff6ff' : '#ffffff',
                         border: isDragOver ? '2px dashed #3b82f6' : '1px solid #e2e8f0',
-                        borderRadius: '18px',
+                        borderRadius: '20px',
                         display: 'flex',
                         flexDirection: 'column',
                         boxShadow: '0 2px 8px rgba(0,0,0,0.02), inset 0 1px 0 rgba(255, 255, 255, 0.7)',
@@ -2201,32 +2498,32 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                     >
                       {/* Student Column Header */}
                       <div style={{
-                        padding: '12px 14px',
+                        padding: '14px 16px',
                         borderBottom: '1px solid #f1f5f9',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between'
                       }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <div style={{
-                            width: '26px',
-                            height: '26px',
+                            width: '32px',
+                            height: '32px',
                             borderRadius: '50%',
-                            background: '#e6f4ea',
-                            color: '#166534',
+                            background: '#f1f5f9',
+                            color: '#0f172a',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontSize: '0.70rem',
+                            fontSize: '0.82rem',
                             fontWeight: 800
                           }}>
                             {group.student.first_name?.[0] || 'S'}
                           </div>
                           <div>
-                            <div style={{ fontSize: '0.80rem', fontWeight: 850, color: '#0f172a' }}>
+                            <div style={{ fontSize: '0.92rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.01em' }}>
                               {maskStudentName(group.student.first_name || group.student.name)}
                             </div>
-                            <div style={{ fontSize: '0.64rem', color: '#64748b', fontWeight: 600 }}>
+                            <div style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
                               {group.student.instrument || 'Instrument'}
                             </div>
                           </div>
@@ -2238,36 +2535,40 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                             onClick={() => onOpenHomeworkModal(group.student)}
                             title="Schüler-Protokoll öffnen"
                             style={{
-                              border: 'none',
-                              background: '#f0fdf4',
-                              color: '#166534',
-                              fontSize: '0.66rem',
+                              border: '1px solid #e2e8f0',
+                              background: '#f8fafc',
+                              color: '#0f172a',
+                              fontSize: '0.76rem',
                               fontWeight: 800,
-                              padding: '3px 8px',
-                              borderRadius: '6px',
-                              cursor: 'pointer'
+                              padding: '4px 10px',
+                              borderRadius: '7px',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
                             }}
                           >
-                            Heft ➔
+                            <span>Heft</span>
+                            <ArrowUpRight size={12} color="#0f172a" />
                           </button>
                         )}
                       </div>
 
                       {/* Top-of-Column Comfort Quick Add Input for Student with 🎙️ Dictation */}
                       <div style={{
-                        padding: '8px 10px',
+                        padding: '10px 12px',
                         borderBottom: '1px solid #e2e8f0',
                         background: '#f8fafc'
                       }}>
                         <div style={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '6px',
+                          gap: '8px',
                           background: '#ffffff',
-                          border: activeDictatingStudentId === sId && isColumnListening ? '1.5px solid #ef4444' : '1.5px solid #cbd5e1',
-                          borderRadius: '10px',
-                          padding: '3px 8px',
-                          boxShadow: activeDictatingStudentId === sId && isColumnListening ? '0 0 0 3px rgba(239, 68, 68, 0.12)' : '0 1px 2px rgba(0,0,0,0.02)',
+                          border: activeDictatingStudentId === sId && isColumnListening ? '1.5px solid #0f172a' : '1.5px solid #cbd5e1',
+                          borderRadius: '11px',
+                          padding: '4px 10px',
+                          boxShadow: activeDictatingStudentId === sId && isColumnListening ? '0 0 0 3px rgba(15, 23, 42, 0.08)' : '0 1px 2px rgba(0,0,0,0.02)',
                           transition: 'all 0.15s ease'
                         }}>
                           <input
@@ -2283,11 +2584,11 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                             }}
                             style={{
                               flex: 1,
-                              fontSize: '0.78rem',
+                              fontSize: '0.82rem',
                               fontWeight: 600,
                               border: 'none',
                               outline: 'none',
-                              padding: '5px 2px',
+                              padding: '6px 2px',
                               color: '#0f172a',
                               background: 'transparent'
                             }}
@@ -2300,10 +2601,10 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                             title={activeDictatingStudentId === sId && isColumnListening ? 'Diktat beenden' : 'Notiz für diesen Schüler einsprechen'}
                             style={{
                               border: 'none',
-                              background: activeDictatingStudentId === sId && isColumnListening ? '#fee2e2' : '#f1f5f9',
-                              color: activeDictatingStudentId === sId && isColumnListening ? '#dc2626' : '#64748b',
-                              padding: '5px',
-                              borderRadius: '6px',
+                              background: activeDictatingStudentId === sId && isColumnListening ? '#0f172a' : '#f1f5f9',
+                              color: activeDictatingStudentId === sId && isColumnListening ? '#ffffff' : '#64748b',
+                              padding: '6px',
+                              borderRadius: '7px',
                               cursor: 'pointer',
                               display: 'flex',
                               alignItems: 'center',
@@ -2311,7 +2612,7 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                               transition: 'all 0.15s ease'
                             }}
                           >
-                            <Mic size={13} color={activeDictatingStudentId === sId && isColumnListening ? '#dc2626' : '#64748b'} />
+                            <Mic size={14} color={activeDictatingStudentId === sId && isColumnListening ? '#ffffff' : '#64748b'} />
                           </button>
 
                           {/* Quick Save Send Button */}
@@ -2324,17 +2625,17 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                                 border: 'none',
                                 background: '#0f172a',
                                 color: '#ffffff',
-                                padding: '4px 7px',
-                                borderRadius: '6px',
+                                padding: '5px 9px',
+                                borderRadius: '7px',
                                 cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '2px',
-                                fontSize: '0.66rem',
+                                gap: '3px',
+                                fontSize: '0.72rem',
                                 fontWeight: 800
                               }}
                             >
-                              <Send size={10} />
+                              <Send size={11} color="#ffffff" />
                             </button>
                           )}
                         </div>
@@ -2344,26 +2645,36 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                       <div style={{
                         flex: 1,
                         overflowY: 'auto',
-                        padding: '10px',
+                        padding: '12px',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '10px'
                       }} className="custom-scrollbar">
                         {group.items.length === 0 ? (
                           <div style={{
-                            padding: '24px 12px',
-                            border: '1px dashed #e2e8f0',
-                            borderRadius: '12px',
+                            padding: '32px 14px',
+                            border: '1.5px dashed #e2e8f0',
+                            borderRadius: '16px',
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'center',
                             justifyContent: 'center',
                             textAlign: 'center',
-                            gap: '6px',
-                            background: '#fcfcfd'
+                            gap: '8px',
+                            background: '#fafbfc'
                           }}>
-                            <User size={18} color="#cbd5e1" />
-                            <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 650 }}>
+                            <div style={{
+                              width: '38px',
+                              height: '38px',
+                              borderRadius: '12px',
+                              background: '#f1f5f9',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}>
+                              <User size={20} color="#64748b" />
+                            </div>
+                            <span style={{ fontSize: '0.84rem', color: '#64748b', fontWeight: 650, lineHeight: 1.4 }}>
                               Keine Notizen für {maskStudentName(group.student.first_name || group.student.name)}
                             </span>
                           </div>
@@ -2400,6 +2711,8 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                                 onUnsyncFromHomework={onUnsyncFromHomeworkBook ? () => onUnsyncFromHomeworkBook(note) : undefined}
                                 onOpenHomeworkModal={onOpenHomeworkModal}
                                 onOpenRoomIssueModal={(n) => setSelectedRoomIssueModalNote(n)}
+                                onUpdateNote={onUpdateNote}
+                                onToggleArchive={onToggleArchive}
                               />
                             );
                           })
@@ -2416,20 +2729,20 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
           {deletedNoteUndo && (
             <div style={{
               position: 'absolute',
-              bottom: '20px',
+              bottom: '24px',
               left: '50%',
               transform: 'translateX(-50%)',
               background: '#0f172a',
               color: '#ffffff',
               borderRadius: '100px',
-              padding: '8px 18px',
+              padding: '10px 22px',
               display: 'flex',
               alignItems: 'center',
-              gap: '12px',
+              gap: '14px',
               boxShadow: '0 12px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.2)',
               zIndex: 99999,
               animation: 'slideUp 0.18s ease-out',
-              fontSize: '0.78rem',
+              fontSize: '0.84rem',
               fontWeight: 650
             }}>
               <span>Notiz gelöscht</span>
@@ -2440,19 +2753,19 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                   border: 'none',
                   background: 'rgba(255,255,255,0.2)',
                   color: '#ffffff',
-                  padding: '3px 10px',
+                  padding: '4px 12px',
                   borderRadius: '100px',
-                  fontSize: '0.72rem',
+                  fontSize: '0.76rem',
                   fontWeight: 800,
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '4px'
+                  gap: '5px'
                 }}
               >
-                <RotateCcw size={11} />
+                <RotateCcw size={13} />
                 <span>Rückgängig</span>
-                <kbd style={{ opacity: 0.6, fontSize: '0.62rem', fontFamily: 'monospace' }}>⌘Z</kbd>
+                <kbd style={{ opacity: 0.6, fontSize: '0.68rem', fontFamily: 'monospace' }}>⌘Z</kbd>
               </button>
             </div>
           )}
@@ -2461,20 +2774,20 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
           {modalToast && (
             <div style={{
               position: 'absolute',
-              bottom: '20px',
+              bottom: '24px',
               left: '50%',
               transform: 'translateX(-50%)',
               background: '#0f172a',
               color: '#ffffff',
               borderRadius: '100px',
-              padding: '8px 18px',
+              padding: '10px 22px',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
+              gap: '10px',
               boxShadow: '0 12px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.2)',
               zIndex: 99999,
               animation: 'slideUp 0.18s ease-out',
-              fontSize: '0.78rem',
+              fontSize: '0.84rem',
               fontWeight: 650
             }}>
               <span>{modalToast}</span>
@@ -2532,16 +2845,16 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                       <Printer size={16} />
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.94rem', fontWeight: 800, color: '#0f172a' }}>
+                      <div style={{ fontSize: '1.02rem', fontWeight: 850, color: '#0f172a', letterSpacing: '-0.01em' }}>
                         Tages-Fahrplan (Druck-Vorschau)
                       </div>
-                      <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>
+                      <div style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
                         DIN A4 • Für Notenständer & Unterrichtsvorbereitung
                       </div>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     {/* 1-Click Print */}
                     <button
                       type="button"
@@ -2557,19 +2870,19 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                         background: '#0f172a',
                         color: '#ffffff',
                         border: 'none',
-                        borderRadius: '10px',
-                        padding: '8px 14px',
-                        fontSize: '0.78rem',
+                        borderRadius: '11px',
+                        padding: '9px 16px',
+                        fontSize: '0.84rem',
                         fontWeight: 750,
                         cursor: 'pointer',
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '6px',
+                        gap: '7px',
                         boxShadow: '0 2px 6px rgba(15, 23, 42, 0.2)'
                       }}
                       className="hover-scale"
                     >
-                      <Printer size={14} color="#ffffff" />
+                      <Printer size={15} color="#ffffff" />
                       <span>Drucken (⌘P)</span>
                     </button>
 
@@ -2581,19 +2894,19 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                         background: '#ffffff',
                         color: '#0f172a',
                         border: '1px solid #cbd5e1',
-                        borderRadius: '10px',
-                        padding: '8px 14px',
-                        fontSize: '0.78rem',
+                        borderRadius: '11px',
+                        padding: '9px 16px',
+                        fontSize: '0.84rem',
                         fontWeight: 750,
                         cursor: 'pointer',
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '6px',
+                        gap: '7px',
                         textDecoration: 'none'
                       }}
                       className="hover-scale"
                     >
-                      <Download size={14} color="#0f172a" />
+                      <Download size={15} color="#0f172a" />
                       <span>PDF Speichern</span>
                     </a>
 
@@ -2605,8 +2918,8 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                         background: '#f1f5f9',
                         border: 'none',
                         borderRadius: '50%',
-                        width: '32px',
-                        height: '32px',
+                        width: '36px',
+                        height: '36px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -2616,7 +2929,7 @@ export const TeacherNotesBoardModal: React.FC<TeacherNotesBoardModalProps> = ({
                       className="hover-scale"
                       title="Schließen (Esc)"
                     >
-                      <X size={16} />
+                      <X size={17} />
                     </button>
                   </div>
                 </div>
@@ -2847,6 +3160,19 @@ export const InlineDueDatePickerPopover: React.FC<InlineDueDatePickerPopoverProp
   onSelectDueDate,
   onClose
 }) => {
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+  const [openUpwards, setOpenUpwards] = useState(false);
+
+  useEffect(() => {
+    if (popoverRef.current) {
+      const rect = popoverRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.top;
+      if (spaceBelow < 250 && rect.top > 250) {
+        setOpenUpwards(true);
+      }
+    }
+  }, []);
+
   const getPresetDate = (type: 'today' | 'tomorrow' | 'friday' | 'next_week'): string => {
     const d = new Date();
     if (type === 'tomorrow') d.setDate(d.getDate() + 1);
@@ -2868,11 +3194,14 @@ export const InlineDueDatePickerPopover: React.FC<InlineDueDatePickerPopoverProp
 
   return (
     <div
+      ref={popoverRef}
       style={{
         position: 'absolute',
-        top: '100%',
+        top: openUpwards ? undefined : '100%',
+        bottom: openUpwards ? '100%' : undefined,
         left: 0,
-        marginTop: '6px',
+        marginTop: openUpwards ? undefined : '6px',
+        marginBottom: openUpwards ? '6px' : undefined,
         background: '#ffffff',
         border: '1px solid #e2e8f0',
         borderRadius: '12px',
@@ -3018,6 +3347,19 @@ export const InlineStudentPickerPopover: React.FC<InlineStudentPickerPopoverProp
   onClose
 }) => {
   const [q, setQ] = useState('');
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+  const [openUpwards, setOpenUpwards] = useState(false);
+
+  useEffect(() => {
+    if (popoverRef.current) {
+      const rect = popoverRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.top;
+      if (spaceBelow < 280 && rect.top > 280) {
+        setOpenUpwards(true);
+      }
+    }
+  }, []);
+
   const filtered = students.filter(s => {
     const name = (s.first_name || s.name || '').toLowerCase();
     const inst = (s.instrument || '').toLowerCase();
@@ -3026,11 +3368,14 @@ export const InlineStudentPickerPopover: React.FC<InlineStudentPickerPopoverProp
 
   return (
     <div
+      ref={popoverRef}
       style={{
         position: 'absolute',
-        top: '100%',
+        top: openUpwards ? undefined : '100%',
+        bottom: openUpwards ? '100%' : undefined,
         left: 0,
-        marginTop: '6px',
+        marginTop: openUpwards ? undefined : '6px',
+        marginBottom: openUpwards ? '6px' : undefined,
         background: '#ffffff',
         border: '1px solid #e2e8f0',
         borderRadius: '12px',
@@ -3180,10 +3525,22 @@ export const CategoryTagPickerPopover: React.FC<CategoryTagPickerPopoverProps> =
   onClose
 }) => {
   const currentTags = note.tags || [];
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+  const [openUpwards, setOpenUpwards] = useState(false);
+
+  useEffect(() => {
+    if (popoverRef.current) {
+      const rect = popoverRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.top;
+      if (spaceBelow < 280 && rect.top > 280) {
+        setOpenUpwards(true);
+      }
+    }
+  }, []);
 
   // Determine context
   const isStudentContext = columnId === 'students' || !!(note.student_id || note.student_name || note.note_type === 'student_note');
-  const isTodoOrgaContext = columnId === 'todos' || columnId === 'orga' || note.note_type === 'todo';
+  const isTodoOrgaContext = columnId === 'todos' || columnId === 'orga' || columnId === 'todos_orga' || note.note_type === 'todo';
 
   // Neutral state: Allow tab toggle if not explicitly student or todo
   const [activeTab, setActiveTab] = useState<'didaktik' | 'orga'>(
@@ -3197,11 +3554,14 @@ export const CategoryTagPickerPopover: React.FC<CategoryTagPickerPopoverProps> =
 
   return (
     <div
+      ref={popoverRef}
       style={{
         position: 'absolute',
-        top: '100%',
+        top: openUpwards ? undefined : '100%',
+        bottom: openUpwards ? '100%' : undefined,
         left: 0,
-        marginTop: '6px',
+        marginTop: openUpwards ? undefined : '6px',
+        marginBottom: openUpwards ? '6px' : undefined,
         background: '#ffffff',
         border: '1px solid #e2e8f0',
         borderRadius: '12px',
@@ -3398,6 +3758,8 @@ interface NoteCardItemProps {
   onUnsyncFromHomework?: () => void;
   onOpenHomeworkModal?: (student: any) => void;
   onOpenRoomIssueModal?: (note: UserNote) => void;
+  onUpdateNote?: (id: string, updates: Partial<UserNote>) => Promise<any> | void;
+  onToggleArchive?: (id: string) => Promise<any> | void;
 }
 
 export const NoteCardItem: React.FC<NoteCardItemProps> = ({
@@ -3431,7 +3793,9 @@ export const NoteCardItem: React.FC<NoteCardItemProps> = ({
   onSyncToHomework,
   onUnsyncFromHomework,
   onOpenHomeworkModal,
-  onOpenRoomIssueModal
+  onOpenRoomIssueModal,
+  onUpdateNote,
+  onToggleArchive
 }) => {
   const isTagPickerOpen = activeTagPickerNoteId === note.id;
   const isDuePickerOpen = activeDueDatePickerNoteId === note.id;
@@ -3517,11 +3881,11 @@ export const NoteCardItem: React.FC<NoteCardItemProps> = ({
             ? '1px solid #fca5a5' 
             : '1px solid rgba(226, 232, 240, 0.85)',
         borderLeft: isOverdue ? '3px solid #dc2626' : undefined,
-        borderRadius: '12px',
-        padding: '7px 9px',
+        borderRadius: '14px',
+        padding: '10px 12px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '3px',
+        gap: '6px',
         boxShadow: isFocused
           ? '0 0 0 2px #0f172a, 0 6px 18px -4px rgba(15, 23, 42, 0.12)'
           : isDragging 
@@ -3565,7 +3929,7 @@ export const NoteCardItem: React.FC<NoteCardItemProps> = ({
       )}
 
       {/* Top / Main Meta row */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', flex: 1, minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', flex: 1, minWidth: 0 }}>
         {/* Checkbox toggle with Spring Bounce OR Room Issue Button */}
         {(() => {
           const isDefectTag = note.tags?.some(t => {
@@ -3587,11 +3951,11 @@ export const NoteCardItem: React.FC<NoteCardItemProps> = ({
                 style={{
                   background: '#fee2e2',
                   border: '1px solid #fca5a5',
-                  borderRadius: '6px',
-                  padding: '2px 4px',
+                  borderRadius: '7px',
+                  padding: '3px 6px',
                   color: '#dc2626',
                   cursor: 'pointer',
-                  marginTop: '1.5px',
+                  marginTop: '1px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -3601,7 +3965,7 @@ export const NoteCardItem: React.FC<NoteCardItemProps> = ({
                 title="Beim Sekretariat gemeldet – Klicken für Optionen"
                 className="hover-scale-mini"
               >
-                <DoorOpen size={11.5} color="#dc2626" />
+                <DoorOpen size={13} color="#dc2626" />
               </button>
             );
           }
@@ -3619,14 +3983,16 @@ export const NoteCardItem: React.FC<NoteCardItemProps> = ({
                 color: note.is_completed ? '#16a34a' : '#cbd5e1',
                 cursor: 'pointer',
                 padding: 0,
-                marginTop: '1.5px',
+                marginTop: '1px',
                 display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 flexShrink: 0,
                 transition: 'transform 0.18s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
               }}
               className="hover-scale"
             >
-              {note.is_completed ? <CheckCircle2 size={13.5} /> : <Circle size={13.5} />}
+              {note.is_completed ? <CheckCircle2 size={16} color="#16a34a" /> : <Circle size={16} color="#cbd5e1" />}
             </button>
           );
         })()}
@@ -3634,21 +4000,21 @@ export const NoteCardItem: React.FC<NoteCardItemProps> = ({
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* Compact Student badge & 1-Klick Sichtbarkeits-Toggle */}
           {showHomeworkPill && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', flexWrap: 'wrap' }}>
               {showStudentPill && (
                 <span style={{
-                  fontSize: '0.60rem',
+                  fontSize: '0.72rem',
                   fontWeight: 800,
                   color: '#166534',
                   background: '#e6f4ea',
                   border: '1px solid #bbf7d0',
-                  padding: '0.5px 5px',
+                  padding: '2px 7px',
                   borderRadius: '6px',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '2.5px'
+                  gap: '4px'
                 }}>
-                  <User size={8.5} />
+                  <User size={10} color="#166534" />
                   <span>{maskStudentName(note.student_name)}</span>
                 </span>
               )}
@@ -3671,27 +4037,27 @@ export const NoteCardItem: React.FC<NoteCardItemProps> = ({
                 }
                 style={{
                   border: isSharedWithHomework ? '1px solid #86efac' : '1px solid #e2e8f0',
-                  background: isSharedWithHomework ? '#f0fdf4' : '#ffffff',
+                  background: isSharedWithHomework ? '#f0fdf4' : '#f8fafc',
                   color: isSharedWithHomework ? '#166534' : '#64748b',
-                  padding: '0.5px 5px',
+                  padding: '2px 7px',
                   borderRadius: '6px',
-                  fontSize: '0.58rem',
+                  fontSize: '0.70rem',
                   fontWeight: 750,
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '2.5px',
+                  gap: '4px',
                   transition: 'all 0.15s ease'
                 }}
               >
                 {isSharedWithHomework ? (
                   <>
-                    <BookOpen size={8.5} color="#16a34a" />
+                    <BookOpen size={10} color="#16a34a" />
                     <span>Im Heft</span>
                   </>
                 ) : (
                   <>
-                    <Lock size={8.5} color="#64748b" />
+                    <Lock size={10} color="#64748b" />
                     <span>Privat</span>
                   </>
                 )}
@@ -3716,39 +4082,144 @@ export const NoteCardItem: React.FC<NoteCardItemProps> = ({
               }}
               style={{
                 width: '100%',
-                fontSize: '0.76rem',
+                fontSize: '0.84rem',
                 fontWeight: 550,
                 border: '1px solid #3b82f6',
-                borderRadius: '4px',
-                padding: '1px 4px',
+                borderRadius: '6px',
+                padding: '3px 6px',
                 outline: 'none',
                 boxSizing: 'border-box'
               }}
             />
           ) : (
-            <div
-              onClick={() => {
-                setEditDraft(note.content);
-                setIsEditing(true);
-              }}
-              title="Klicken zum Bearbeiten"
-              style={{
-                fontSize: '0.76rem',
-                color: note.is_completed ? '#94a3b8' : '#0f172a',
-                textDecoration: note.is_completed ? 'line-through' : 'none',
-                fontWeight: 550,
-                lineHeight: 1.35,
-                wordBreak: 'break-word',
-                cursor: 'text'
-              }}
-            >
-              {cleanDisplayContent}
+            <div>
+              {/* Origin Badge if from homework book */}
+              {note.source_origin === 'homework_book' && (
+                <div style={{ marginBottom: '4px' }}>
+                  <span style={{
+                    fontSize: '0.68rem',
+                    color: '#0369a1',
+                    background: '#e0f2fe',
+                    border: '1px solid #7dd3fc',
+                    borderRadius: '5px',
+                    padding: '1.5px 6px',
+                    fontWeight: 750,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <BookOpen size={10} color="#0284c7" />
+                    Aufgabenheft
+                  </span>
+                </div>
+              )}
+
+              {/* Text Content */}
+              <div
+                onClick={() => {
+                  setEditDraft(note.content);
+                  setIsEditing(true);
+                }}
+                title="Klicken zum Bearbeiten"
+                style={{
+                  fontSize: '0.84rem',
+                  color: note.is_completed ? '#94a3b8' : '#0f172a',
+                  textDecoration: note.is_completed ? 'line-through' : 'none',
+                  fontWeight: 550,
+                  lineHeight: 1.4,
+                  wordBreak: 'break-word',
+                  cursor: 'text'
+                }}
+              >
+                {cleanDisplayContent}
+              </div>
+
+              {/* Interactive Checklist Items */}
+              {note.checklist_items && note.checklist_items.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
+                  {note.checklist_items.map((ci, idx) => (
+                    <div
+                      key={ci.id || idx}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const updated = note.checklist_items!.map(item => item.id === ci.id ? { ...item, completed: !item.completed } : item);
+                        const allDone = updated.every(item => item.completed);
+                        if (onUpdateNote) {
+                          onUpdateNote(note.id, {
+                            checklist_items: updated,
+                            is_completed: allDone
+                          });
+                        }
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '7px',
+                        fontSize: '0.82rem',
+                        cursor: 'pointer',
+                        color: ci.completed ? '#94a3b8' : '#0f172a',
+                        textDecoration: ci.completed ? 'line-through' : 'none',
+                        userSelect: 'none'
+                      }}
+                    >
+                      <div style={{
+                        width: '15px',
+                        height: '15px',
+                        borderRadius: '4px',
+                        border: ci.completed ? '1.5px solid #16a34a' : '1.5px solid #94a3b8',
+                        background: ci.completed ? '#16a34a' : '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        {ci.completed && <Check size={10} color="#ffffff" strokeWidth={3} />}
+                      </div>
+                      <span>{ci.text}</span>
+                    </div>
+                  ))}
+                  {/* Micro Progress Bar */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
+                    <div style={{ flex: 1, height: '4px', background: '#e2e8f0', borderRadius: '2px', overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%',
+                        width: `${(note.checklist_items.filter(c => c.completed).length / note.checklist_items.length) * 100}%`,
+                        background: '#16a34a',
+                        transition: 'width 0.2s ease'
+                      }} />
+                    </div>
+                    <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 700 }}>
+                      {note.checklist_items.filter(c => c.completed).length}/{note.checklist_items.length}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Dual Output: Shared Homework Box */}
+              {note.homework_content && (
+                <div style={{
+                  marginTop: '6px',
+                  padding: '5px 8px',
+                  background: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '7px',
+                  fontSize: '0.78rem',
+                  color: '#166534',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px'
+                }}>
+                  <BookOpen size={12} color="#16a34a" />
+                  <span>Hausaufgabe: {note.homework_content}</span>
+                </div>
+              )}
             </div>
           )}
 
           {/* 🎙️ Audio Waveform Player Badge (Audio-Tresor Gated) */}
           {hasTresorStorage && note.audio_url && (
-            <div style={{ marginTop: '3px' }}>
+            <div style={{ marginTop: '4px' }}>
               <div
                 onClick={(e) => {
                   e.stopPropagation();
@@ -3757,12 +4228,12 @@ export const NoteCardItem: React.FC<NoteCardItemProps> = ({
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '5px',
+                  gap: '6px',
                   background: playingAudioNoteId === note.id ? '#f0fdf4' : '#f8fafc',
                   border: `1px solid ${playingAudioNoteId === note.id ? '#86efac' : '#e2e8f0'}`,
                   borderRadius: '16px',
-                  padding: '1px 6px',
-                  fontSize: '0.62rem',
+                  padding: '2px 8px',
+                  fontSize: '0.72rem',
                   fontWeight: 750,
                   color: playingAudioNoteId === note.id ? '#166534' : '#0f172a',
                   cursor: 'pointer',
@@ -3770,12 +4241,12 @@ export const NoteCardItem: React.FC<NoteCardItemProps> = ({
                 }}
                 title="Sprachnotiz abspielen (Audio-Tresor)"
               >
-                {playingAudioNoteId === note.id ? <Pause size={9} color="#166534" /> : <Play size={9} color="#0f172a" />}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5px', height: '9px' }}>
-                  <div style={{ width: '1.5px', height: playingAudioNoteId === note.id ? '9px' : '4px', background: 'currentColor', borderRadius: '1px' }} />
-                  <div style={{ width: '1.5px', height: playingAudioNoteId === note.id ? '5px' : '7px', background: 'currentColor', borderRadius: '1px' }} />
-                  <div style={{ width: '1.5px', height: playingAudioNoteId === note.id ? '9px' : '4px', background: 'currentColor', borderRadius: '1px' }} />
-                  <div style={{ width: '1.5px', height: playingAudioNoteId === note.id ? '6px' : '3px', background: 'currentColor', borderRadius: '1px' }} />
+                {playingAudioNoteId === note.id ? <Pause size={11} color="#166534" /> : <Play size={11} color="#0f172a" />}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '2px', height: '11px' }}>
+                  <div style={{ width: '2px', height: playingAudioNoteId === note.id ? '10px' : '5px', background: 'currentColor', borderRadius: '1px' }} />
+                  <div style={{ width: '2px', height: playingAudioNoteId === note.id ? '6px' : '8px', background: 'currentColor', borderRadius: '1px' }} />
+                  <div style={{ width: '2px', height: playingAudioNoteId === note.id ? '10px' : '5px', background: 'currentColor', borderRadius: '1px' }} />
+                  <div style={{ width: '2px', height: playingAudioNoteId === note.id ? '7px' : '4px', background: 'currentColor', borderRadius: '1px' }} />
                 </div>
                 <span>{note.audio_duration_seconds ? `${Math.floor(note.audio_duration_seconds / 60)}:${(note.audio_duration_seconds % 60).toString().padStart(2, '0')}` : '0:15'}</span>
               </div>
@@ -3784,54 +4255,70 @@ export const NoteCardItem: React.FC<NoteCardItemProps> = ({
 
           {/* Metadata badges: Room, Defect status */}
           {hasRoomBadge && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', marginTop: '2px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap', marginTop: '4px' }}>
               <span style={{ 
-                fontSize: '0.60rem', 
+                fontSize: '0.72rem', 
                 color: '#991b1b', 
                 background: '#fee2e2', 
                 border: '1px solid #fecaca', 
-                borderRadius: '4px', 
-                padding: '0.5px 4px', 
+                borderRadius: '5px', 
+                padding: '1.5px 6px', 
                 fontWeight: 750, 
                 display: 'inline-flex', 
                 alignItems: 'center', 
-                gap: '2px' 
+                gap: '3px' 
               }}>
-                <DoorOpen size={8} color="#dc2626" />
+                <DoorOpen size={10} color="#dc2626" />
                 {detectedRoomLabel || 'Raum'}
               </span>
               {note.note_type === 'room_issue' && (
                 note.is_completed || note.is_acknowledged ? (
-                  <span style={{ 
-                    fontSize: '0.60rem', 
-                    color: '#166534', 
-                    background: '#dcfce7', 
-                    border: '1px solid #86efac', 
-                    borderRadius: '4px', 
-                    padding: '0.5px 4px', 
-                    fontWeight: 800, 
-                    display: 'inline-flex', 
-                    alignItems: 'center', 
-                    gap: '2px' 
-                  }}>
-                    <CheckCheck size={8} color="#16a34a" />
-                    Behoben
+                  <span 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onToggleArchive) onToggleArchive(note.id);
+                    }}
+                    title="Behoben - Klicken zum Quittieren/Archivieren"
+                    style={{ 
+                      fontSize: '0.72rem', 
+                      color: '#166534', 
+                      background: '#dcfce7', 
+                      border: '1px solid #86efac', 
+                      borderRadius: '5px', 
+                      padding: '1.5px 6px', 
+                      fontWeight: 800, 
+                      display: 'inline-flex', 
+                      alignItems: 'center', 
+                      gap: '3px',
+                      cursor: 'pointer'
+                    }}>
+                    <CheckCheck size={10} color="#16a34a" />
+                    <span>Behoben</span>
                   </span>
                 ) : (
                   <span style={{ 
-                    fontSize: '0.60rem', 
-                    color: '#991b1b', 
-                    background: '#fee2e2', 
-                    border: '1px solid #fca5a5', 
-                    borderRadius: '4px', 
-                    padding: '0.5px 4px', 
+                    fontSize: '0.72rem', 
+                    color: note.room_issue_status === 'in_progress' ? '#1e40af' : '#b45309', 
+                    background: note.room_issue_status === 'in_progress' ? '#eff6ff' : '#fef3c7', 
+                    border: note.room_issue_status === 'in_progress' ? '1px solid #bfdbfe' : '1px solid #fde68a', 
+                    borderRadius: '5px', 
+                    padding: '1.5px 6px', 
                     fontWeight: 800, 
                     display: 'inline-flex', 
                     alignItems: 'center', 
-                    gap: '2px' 
+                    gap: '3px' 
                   }}>
-                    <Send size={8} color="#dc2626" />
-                    An Sekretariat
+                    {note.room_issue_status === 'in_progress' ? (
+                      <>
+                        <Activity size={10} color="#2563eb" />
+                        <span>In Arbeit</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send size={10} color="#b45309" />
+                        <span>Gemeldet</span>
+                      </>
+                    )}
                   </span>
                 )
               )}
@@ -3840,18 +4327,18 @@ export const NoteCardItem: React.FC<NoteCardItemProps> = ({
         </div>
       </div>
 
-      {/* Footer / Meta Actions (Micro Slim) */}
+      {/* Footer / Meta Actions */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginTop: '1px',
-        paddingTop: '3px',
+        marginTop: '2px',
+        paddingTop: '5px',
         borderTop: '1px solid #f8fafc',
-        gap: '4px'
+        gap: '6px'
       }}>
         {/* Left: Tag Button & Due Date Pill */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '3px', position: 'relative' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', position: 'relative' }}>
           {tagStyle ? (
             <button
               type="button"
@@ -3863,19 +4350,19 @@ export const NoteCardItem: React.FC<NoteCardItemProps> = ({
                 border: `1px solid ${tagStyle.border}`,
                 background: tagStyle.bg,
                 color: tagStyle.color,
-                padding: '1px 6px',
-                borderRadius: '5px',
-                fontSize: '0.60rem',
+                padding: '2px 7px',
+                borderRadius: '6px',
+                fontSize: '0.72rem',
                 fontWeight: 750,
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '3px'
+                gap: '4px'
               }}
             >
-              <span>{renderMonochromeTagIcon(tagStyle.iconName, 9, tagStyle.color)}</span>
+              <span>{renderMonochromeTagIcon(tagStyle.iconName, 11, tagStyle.color)}</span>
               <span>{tagStyle.label}</span>
-              <ChevronDown size={8} opacity={0.7} />
+              <ChevronDown size={10} opacity={0.7} />
             </button>
           ) : (
             <button
@@ -3887,18 +4374,18 @@ export const NoteCardItem: React.FC<NoteCardItemProps> = ({
               style={{
                 border: '1px dashed #cbd5e1',
                 background: '#ffffff',
-                color: '#94a3b8',
-                padding: '1px 5px',
-                borderRadius: '5px',
-                fontSize: '0.58rem',
+                color: '#64748b',
+                padding: '2px 7px',
+                borderRadius: '6px',
+                fontSize: '0.70rem',
                 fontWeight: 700,
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '2px'
+                gap: '3px'
               }}
             >
-              <Plus size={8} />
+              <Plus size={10} color="#64748b" />
               <span>Tag</span>
             </button>
           )}
@@ -3916,17 +4403,17 @@ export const NoteCardItem: React.FC<NoteCardItemProps> = ({
                   border: 'none',
                   background: dueInfo.isOverdue ? '#fee2e2' : dueInfo.isToday ? '#fef3c7' : '#eff6ff',
                   color: dueInfo.isOverdue ? '#991b1b' : dueInfo.isToday ? '#92400e' : '#1e40af',
-                  padding: '1px 5px',
-                  borderRadius: '5px',
-                  fontSize: '0.58rem',
+                  padding: '2px 7px',
+                  borderRadius: '6px',
+                  fontSize: '0.70rem',
                   fontWeight: 750,
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '2px'
+                  gap: '3px'
                 }}
               >
-                <Calendar size={7.5} />
+                <Calendar size={10} />
                 <span>{dueInfo.label}</span>
               </button>
 
@@ -3944,6 +4431,7 @@ export const NoteCardItem: React.FC<NoteCardItemProps> = ({
           {isTagPickerOpen && (
             <CategoryTagPickerPopover
               note={note}
+              columnId={columnId}
               onSelectTag={onSelectTag}
               onClose={() => onOpenTagPicker(null)}
             />
@@ -3951,7 +4439,7 @@ export const NoteCardItem: React.FC<NoteCardItemProps> = ({
         </div>
 
         {/* Right: Quick Action Buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <button
             type="button"
             onClick={(e) => {
@@ -3962,13 +4450,14 @@ export const NoteCardItem: React.FC<NoteCardItemProps> = ({
             style={{
               border: 'none',
               background: 'transparent',
-              color: note.is_pinned ? '#0f172a' : '#cbd5e1',
+              color: note.is_pinned ? '#0f172a' : '#94a3b8',
               cursor: 'pointer',
-              padding: '1.5px',
-              display: 'flex'
+              padding: '3px',
+              display: 'flex',
+              borderRadius: '4px'
             }}
           >
-            <Pin size={10} />
+            <Pin size={13} color={note.is_pinned ? '#0f172a' : '#94a3b8'} />
           </button>
 
           <button
@@ -3981,13 +4470,14 @@ export const NoteCardItem: React.FC<NoteCardItemProps> = ({
             style={{
               border: 'none',
               background: 'transparent',
-              color: '#cbd5e1',
+              color: '#94a3b8',
               cursor: 'pointer',
-              padding: '1.5px',
-              display: 'flex'
+              padding: '3px',
+              display: 'flex',
+              borderRadius: '4px'
             }}
           >
-            <Trash2 size={10} />
+            <Trash2 size={13} color="#94a3b8" />
           </button>
         </div>
       </div>
@@ -4050,10 +4540,10 @@ export const NoteListTableRow: React.FC<NoteCardItemProps> = ({
       style={{
         display: 'grid',
         gridTemplateColumns: '32px 40px 1fr 180px 180px 140px 110px',
-        padding: '8px 16px',
+        padding: '10px 18px',
         borderBottom: '1px solid #f1f5f9',
         alignItems: 'center',
-        fontSize: '0.78rem',
+        fontSize: '0.84rem',
         background: isSelectedRow ? '#eff6ff' : isFocused ? '#f8fafc' : 'transparent',
         boxShadow: isSelectedRow ? 'inset 2px 0 0 #3b82f6' : 'none',
         position: 'relative',
@@ -4068,7 +4558,7 @@ export const NoteListTableRow: React.FC<NoteCardItemProps> = ({
           type="checkbox"
           checked={isSelectedRow}
           onChange={onToggleSelectRow}
-          style={{ cursor: 'pointer' }}
+          style={{ cursor: 'pointer', width: '15px', height: '15px' }}
         />
       </div>
 
@@ -4095,7 +4585,7 @@ export const NoteListTableRow: React.FC<NoteCardItemProps> = ({
                   background: '#fee2e2',
                   border: '1px solid #fca5a5',
                   borderRadius: '6px',
-                  padding: '2px 4px',
+                  padding: '3px 6px',
                   color: '#dc2626',
                   cursor: 'pointer',
                   display: 'flex',
@@ -4106,7 +4596,7 @@ export const NoteListTableRow: React.FC<NoteCardItemProps> = ({
                 title="Beim Sekretariat gemeldet – Klicken für Optionen"
                 className="hover-scale-mini"
               >
-                <DoorOpen size={12} color="#dc2626" />
+                <DoorOpen size={14} color="#dc2626" />
               </button>
             );
           }
@@ -4124,7 +4614,7 @@ export const NoteListTableRow: React.FC<NoteCardItemProps> = ({
                 display: 'flex'
               }}
             >
-              {note.is_completed ? <CheckCircle2 size={15} /> : <Circle size={15} />}
+              {note.is_completed ? <CheckCircle2 size={17} /> : <Circle size={17} />}
             </button>
           );
         })()}
@@ -4148,11 +4638,11 @@ export const NoteListTableRow: React.FC<NoteCardItemProps> = ({
             }}
             style={{
               width: '100%',
-              fontSize: '0.78rem',
+              fontSize: '0.86rem',
               fontWeight: 550,
               border: '1px solid #3b82f6',
-              borderRadius: '4px',
-              padding: '2px 4px',
+              borderRadius: '6px',
+              padding: '4px 8px',
               outline: 'none',
               boxSizing: 'border-box'
             }}
@@ -4167,6 +4657,7 @@ export const NoteListTableRow: React.FC<NoteCardItemProps> = ({
             style={{
               color: note.is_completed ? '#94a3b8' : '#0f172a',
               textDecoration: note.is_completed ? 'line-through' : 'none',
+              fontSize: '0.86rem',
               fontWeight: 550,
               whiteSpace: 'nowrap',
               overflow: 'hidden',
@@ -4189,12 +4680,12 @@ export const NoteListTableRow: React.FC<NoteCardItemProps> = ({
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '4px',
+              gap: '5px',
               background: playingAudioNoteId === note.id ? '#f0fdf4' : '#f8fafc',
               border: `1px solid ${playingAudioNoteId === note.id ? '#86efac' : '#e2e8f0'}`,
               borderRadius: '12px',
-              padding: '1px 6px',
-              fontSize: '0.62rem',
+              padding: '2px 8px',
+              fontSize: '0.72rem',
               fontWeight: 750,
               color: playingAudioNoteId === note.id ? '#166534' : '#0f172a',
               cursor: 'pointer',
@@ -4202,35 +4693,38 @@ export const NoteListTableRow: React.FC<NoteCardItemProps> = ({
             }}
             title="Sprachnotiz abspielen"
           >
-            {playingAudioNoteId === note.id ? <Pause size={9} color="#166534" /> : <Play size={9} color="#0f172a" />}
+            {playingAudioNoteId === note.id ? <Pause size={11} color="#166534" /> : <Play size={11} color="#0f172a" />}
             <span>{note.audio_duration_seconds ? `${Math.floor(note.audio_duration_seconds / 60)}:${(note.audio_duration_seconds % 60).toString().padStart(2, '0')}` : '0:15'}</span>
           </div>
         )}
       </div>
 
       {/* 3. Student / Context & 1-Klick Sichtbarkeits-Toggle */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', position: 'relative' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', position: 'relative' }}>
         {note.student_name ? (
           <>
             <span
-              onClick={() => onOpenStudentPicker && onOpenStudentPicker(isStudentPickerOpen ? null : note.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onOpenStudentPicker) onOpenStudentPicker(isStudentPickerOpen ? null : note.id);
+              }}
               style={{
-                fontSize: '0.66rem',
+                fontSize: '0.74rem',
                 fontWeight: 800,
                 color: '#166534',
                 background: '#e6f4ea',
                 border: '1px solid #bbf7d0',
-                padding: '2px 8px',
+                padding: '3px 10px',
                 borderRadius: '100px',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '4px',
+                gap: '5px',
                 boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
                 cursor: 'pointer'
               }}
               title="Schüler ändern / aufheben"
             >
-              <User size={10} />
+              <User size={12} color="#166534" />
               <span>{maskStudentName(note.student_name)}</span>
             </span>
 
@@ -4260,35 +4754,39 @@ export const NoteListTableRow: React.FC<NoteCardItemProps> = ({
                 color: (note.visibility === 'student_shared' || (note.tags || []).includes('#Hausaufgabe'))
                   ? '#166534'
                   : '#64748b',
-                padding: '2px 6px',
+                padding: '3px 8px',
                 borderRadius: '100px',
-                fontSize: '0.60rem',
+                fontSize: '0.72rem',
                 fontWeight: 800,
                 cursor: 'pointer',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '2px'
+                gap: '4px'
               }}
             >
               {(note.visibility === 'student_shared' || (note.tags || []).includes('#Hausaufgabe')) ? (
-                <BookOpen size={9} color="#16a34a" />
+                <BookOpen size={11} color="#16a34a" />
               ) : (
-                <Lock size={9} color="#64748b" />
+                <Lock size={11} color="#64748b" />
               )}
             </button>
           </>
         ) : (
           <button
             type="button"
-            onClick={() => onOpenStudentPicker && onOpenStudentPicker(isStudentPickerOpen ? null : note.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onOpenStudentPicker) onOpenStudentPicker(isStudentPickerOpen ? null : note.id);
+            }}
             style={{
               border: 'none',
               background: 'transparent',
               color: '#94a3b8',
-              fontSize: '0.70rem',
+              fontSize: '0.76rem',
+              fontWeight: 650,
               cursor: 'pointer',
-              padding: '2px 4px',
-              borderRadius: '4px'
+              padding: '3px 6px',
+              borderRadius: '6px'
             }}
             title="Schüler zuweisen"
           >
@@ -4311,46 +4809,52 @@ export const NoteListTableRow: React.FC<NoteCardItemProps> = ({
         {tagStyle ? (
           <button
             type="button"
-            onClick={() => onOpenTagPicker(isTagPickerOpen ? null : note.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenTagPicker(isTagPickerOpen ? null : note.id);
+            }}
             style={{
               border: `1.5px solid ${tagStyle.border}`,
               background: tagStyle.bg,
               color: tagStyle.color,
-              padding: '2px 8px',
-              borderRadius: '7px',
-              fontSize: '0.66rem',
+              padding: '3px 9px',
+              borderRadius: '8px',
+              fontSize: '0.74rem',
               fontWeight: 800,
               cursor: 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '4px',
+              gap: '5px',
               boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
             }}
           >
-            <span>{renderMonochromeTagIcon(tagStyle.iconName, 10, tagStyle.color)}</span>
+            <span>{renderMonochromeTagIcon(tagStyle.iconName, 12, tagStyle.color)}</span>
             <span>{tagStyle.label}</span>
-            <ChevronDown size={9} opacity={0.7} />
+            <ChevronDown size={11} opacity={0.7} />
           </button>
         ) : (
           <button
             type="button"
-            onClick={() => onOpenTagPicker(isTagPickerOpen ? null : note.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenTagPicker(isTagPickerOpen ? null : note.id);
+            }}
             style={{
               border: '1px dashed #cbd5e1',
               background: '#ffffff',
               color: '#64748b',
-              padding: '2px 7px',
+              padding: '3px 9px',
               borderRadius: '8px',
-              fontSize: '0.64rem',
+              fontSize: '0.74rem',
               fontWeight: 750,
               cursor: 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '3px',
+              gap: '4px',
               boxShadow: '0 1px 2px rgba(0,0,0,0.02), inset 0 1px 0 #ffffff'
             }}
           >
-            <Plus size={9} />
+            <Plus size={11} />
             <span>Tag</span>
           </button>
         )}
@@ -4371,36 +4875,43 @@ export const NoteListTableRow: React.FC<NoteCardItemProps> = ({
         {note.due_date ? (
           <button
             type="button"
-            onClick={() => onOpenDueDatePicker && onOpenDueDatePicker(isDuePickerOpen ? null : note.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onOpenDueDatePicker) onOpenDueDatePicker(isDuePickerOpen ? null : note.id);
+            }}
             style={{
               border: 'none',
               background: dueInfo.isOverdue ? '#fee2e2' : dueInfo.isToday ? '#fef3c7' : '#f1f5f9',
               color: dueInfo.isOverdue ? '#991b1b' : dueInfo.isToday ? '#92400e' : '#475569',
-              padding: '2px 6px',
-              borderRadius: '6px',
-              fontSize: '0.68rem',
+              padding: '3px 8px',
+              borderRadius: '7px',
+              fontSize: '0.74rem',
               fontWeight: 750,
               cursor: 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '3px'
+              gap: '4px'
             }}
           >
-            <Calendar size={10} />
+            <Calendar size={12} />
             <span>{dueInfo.label}</span>
           </button>
         ) : (
           <button
             type="button"
-            onClick={() => onOpenDueDatePicker && onOpenDueDatePicker(isDuePickerOpen ? null : note.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onOpenDueDatePicker) onOpenDueDatePicker(isDuePickerOpen ? null : note.id);
+            }}
             style={{
               border: 'none',
               background: 'transparent',
               color: '#94a3b8',
-              fontSize: '0.70rem',
+              fontSize: '0.76rem',
+              fontWeight: 650,
               cursor: 'pointer',
-              padding: '2px 4px',
-              borderRadius: '4px'
+              padding: '3px 6px',
+              borderRadius: '6px'
             }}
           >
             + Datum
@@ -4417,7 +4928,7 @@ export const NoteListTableRow: React.FC<NoteCardItemProps> = ({
       </div>
 
       {/* 6. Actions */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
         <button
           type="button"
           onClick={onTogglePin}
@@ -4425,13 +4936,14 @@ export const NoteListTableRow: React.FC<NoteCardItemProps> = ({
           style={{
             border: 'none',
             background: 'transparent',
-            color: note.is_pinned ? '#0f172a' : '#cbd5e1',
+            color: note.is_pinned ? '#0f172a' : '#94a3b8',
             cursor: 'pointer',
-            padding: '4px',
-            display: 'flex'
+            padding: '5px',
+            display: 'flex',
+            borderRadius: '6px'
           }}
         >
-          <Pin size={12} />
+          <Pin size={14} />
         </button>
 
         <button
@@ -4441,13 +4953,14 @@ export const NoteListTableRow: React.FC<NoteCardItemProps> = ({
           style={{
             border: 'none',
             background: 'transparent',
-            color: '#cbd5e1',
+            color: '#94a3b8',
             cursor: 'pointer',
-            padding: '4px',
-            display: 'flex'
+            padding: '5px',
+            display: 'flex',
+            borderRadius: '6px'
           }}
         >
-          <Trash2 size={12} />
+          <Trash2 size={14} />
         </button>
       </div>
     </div>

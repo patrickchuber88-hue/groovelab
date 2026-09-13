@@ -2563,6 +2563,23 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
             const isEpic = st.rarity === 'epic';
             const isSchuljahr = st.category === 'schuljahr';
 
+            // 🌟 FREIGESCHALTETE KARTE: PRÄSENTIERE DAS VOLLWERTIG ANIMIERTE 3D SAMMLER-ZERTIFIKAT!
+            if (isCollected) {
+              return (
+                <StudentStickerAwardCelebrationModal
+                  sticker={st}
+                  actualStudentName={actualStudentName || student?.first_name || 'Musiker'}
+                  studentInstrument={studentInstrument || student?.instrument}
+                  schoolName={schoolName || student?.school_name}
+                  selectedSchoolYear={selectedSchoolYear}
+                  topicName={activeTopic || topicName}
+                  isAlreadyCollected={true}
+                  onDownloadJpg={(stickerObj, topicOverride) => downloadShareCard(stickerObj, topicOverride || activeTopic)}
+                  onStickInAlbum={() => setSelectedPreviewSticker(null)}
+                />
+              );
+            }
+
             return (
               <div 
                 role="dialog"

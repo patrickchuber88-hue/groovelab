@@ -48,6 +48,7 @@ Denkweise & Handlungsmaxime:
 - Minimalinvasiven Umsetzungsplan formulieren.
 - Schnittstellen und Typen definieren; Veredelungsschritte zur Einhaltung des Goldstandards einplanen.
 - Verifikations-Kriterien festlegen.
+- 🛑 GATE: Implementierungsplan dem Benutzer vorlegen und STOPPEN. NIEMALS automatisch mit Phase 3 beginnen! Auf explizite Nutzerfreigabe warten.
 
 ## PHASE 3: CHIRURGISCHE UMSETZUNG & POSITIVE INTERVENTION
 - Geplante Features implementieren und identifizierte Architektur-Mängel direkt im selben Schritt beheben.

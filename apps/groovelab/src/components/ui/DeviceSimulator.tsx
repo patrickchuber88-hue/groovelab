@@ -412,7 +412,10 @@ export const DeviceSimulator: React.FC<DeviceSimulatorProps> = ({ children }) =>
                   position: 'relative',
                   boxSizing: 'border-box',
                   scrollbarWidth: 'none',
-                  msOverflowStyle: 'none'
+                  msOverflowStyle: 'none',
+                  ['--safe-area-inset-top' as any]: currentPreset.hasNotch && !isRotated ? '44px' : '0px',
+                  ['--sat' as any]: currentPreset.hasNotch && !isRotated ? '44px' : '0px',
+                  ['--safe-top' as any]: currentPreset.hasNotch && !isRotated ? '44px' : '0px'
                 }}
               >
                 {children}

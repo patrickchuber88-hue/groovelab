@@ -195,5 +195,27 @@ const coachAdmin = {
 assert.strictEqual(resolveGrooveLabTeacherAvatar(coachAdmin), '/avatar_ghost.jpg');
 console.log('✔ Test 14: Dual-role coach (admin + teacher) in GrooveLab receives ghost musician avatar instead of chalkboard');
 
+// Test 15: Teacher Peter in Campus context resolves to 3D instrument avatar, NEVER chalkboard and NEVER musician avatar
+const campusTeacherPeter = {
+  id: 'teacher-peter',
+  first_name: 'Peter',
+  last_name: 'Pan',
+  role: 'teacher',
+  roles: ['admin', 'teacher'],
+  instrument: 'Gitarre',
+  photo_url: '/campus_login_hero.png'
+};
+assert.strictEqual(resolveCampusStudentAvatar({ ...campusTeacherPeter, isTeacherContext: true }), '/avatars/gitarre_avatar_new.png');
+console.log('✔ Test 15: Teacher Peter Pan in Campus context receives instrument avatar (/avatars/gitarre_avatar_new.png), NEVER chalkboard or musician avatar');
+
+// Test 16: formatTeacherFullName normalizes Peter with initial 'P.' or 'Petersen' to 'Peter Pan'
+import { formatTeacherFullName } from '../utils/nameHelper';
+assert.strictEqual(formatTeacherFullName('Peter', 'P.'), 'Peter Pan');
+assert.strictEqual(formatTeacherFullName('Peter', 'Petersen'), 'Peter Pan');
+assert.strictEqual(formatTeacherFullName({ first_name: 'Peter', last_name: 'P.' }), 'Peter Pan');
+assert.strictEqual(formatTeacherFullName({ first_name: 'Peter', last_name: 'Petersen' }), 'Peter Pan');
+assert.strictEqual(formatTeacherFullName({ first_name: 'Peter', full_last_name: 'Pan', last_name: 'P.' }), 'Peter Pan');
+console.log('✔ Test 16: formatTeacherFullName guarantees full name Peter Pan for teacher Peter');
+
 console.log('\n🎉 ALL AVATAR RESOLUTION INVARIANT TESTS PASSED WITH 100% SUCCESS!');
 

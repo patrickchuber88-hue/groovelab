@@ -168,6 +168,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       if (activePlatform === 'campus') {
         return [
           { id: 'briefing', label: 'Briefing', icon: Monitor },
+          { id: 'studio', label: 'Aufgaben-Studio', icon: BookOpen },
           { id: 'schedule', label: 'Stundenplan', icon: Calendar },
           { id: 'events', label: 'Termine', icon: Calendar },
           { id: 'messages', label: 'Nachrichten', icon: Mail, badge: unreadCount },
@@ -227,8 +228,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       return activePlatform === 'campus'
         ? [
             { id: 'briefing', label: 'Briefing', icon: Monitor },
+            { id: 'studio', label: 'Studio', icon: BookOpen },
             { id: 'schedule', label: 'Stundenplan', icon: Calendar },
-            { id: 'songs', label: 'Mediathek', icon: Library },
             { id: 'messages', label: 'Chat', icon: Mail, badge: unreadCount }
           ]
         : [

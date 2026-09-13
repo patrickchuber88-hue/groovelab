@@ -233,7 +233,7 @@ export const resolveCampusStudentAvatar = (
   fallbackTeacherOrTeachersList?: any,
   schedules?: any[]
 ): string => {
-  if (!user) return '/avatar_ghost.jpg';
+  if (!user) return '/avatars/gitarre_avatar_new.png';
 
   const role = (user.role || '').toLowerCase();
   const roles = Array.isArray(user.roles) ? user.roles.map((r: any) => String(r).toLowerCase()) : [];

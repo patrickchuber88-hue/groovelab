@@ -17,6 +17,7 @@ export interface MeisterwerkDocumentationModalProps {
   teacherId?: string;
   teacherName?: string;
   schoolName?: string;
+  schoolId?: string;
   initialLehrwerkId?: string;
   initialViewMode?: 'document' | 'recordings' | 'loopstation' | 'practice';
   initialModalTab?: 'document' | 'logbook' | 'stickeralbum' | 'skillradar' | 'audiobiography';
@@ -41,6 +42,8 @@ export interface MeisterwerkDocumentationModalProps {
   initialProgressItems?: any[];
   initialLocalProgress?: any[];
   onSongsUpdated?: (updatedSkills: any[]) => void;
+  isTeacherSandbox?: boolean;
+  onOpenAssignModal?: () => void;
 }
 
 export interface ProgressItem {

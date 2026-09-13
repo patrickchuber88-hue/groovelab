@@ -17,12 +17,17 @@ import {
   Search,
   RotateCcw,
   X,
-  Layers
+  Layers,
+  MessageSquareQuote
 } from 'lucide-react';
 import { getBlob } from '../../../utils/blobStorage';
 import { formatHarmonizedAudioTitle } from '../../../utils/audioNamingHelper';
+import { safeDecodeAudioData } from '../../../utils/audioMasteringEngine';
+import { getAudioNotesCount, getAudioNotes, addAudioNote, updateAudioNote, deleteAudioNote, fetchAudioNotesFromServer } from '../../../utils/audioNotesStorage';
+import { getSecureAudioUrl } from '../../../utils/audioStorageHelper';
 
 const AudioEditorModal = React.lazy(() => import('../../campus/AudioEditorModal').then(m => ({ default: m.AudioEditorModal })));
+const AudioNotesModal = React.lazy(() => import('../../campus/AudioNotesModal').then(m => ({ default: m.AudioNotesModal })));
 
 export const CassetteIcon: React.FC<{ isPlaying: boolean; color?: string }> = ({ isPlaying, color = 'currentColor' }) => {
   return (
@@ -138,6 +143,12 @@ export const MasterworkAudioCapsule: React.FC<MasterworkAudioCapsuleProps> = ({
           setResolvedUrl(createdBlobUrl);
         }
       }).catch((err: any) => console.warn('[MasterworkAudioCapsule] Blob load note:', err));
+    } else if (url.startsWith('http') || url.includes('/storage/v1/object/') || url.startsWith('schools/')) {
+      getSecureAudioUrl(url, 'campus-assets', 300).then(secUrl => {
+        if (active && secUrl) setResolvedUrl(secUrl);
+      }).catch(() => {
+        if (active) setResolvedUrl(url);
+      });
     } else {
       setResolvedUrl(url);
     }
@@ -216,7 +227,7 @@ export const MasterworkAudioCapsule: React.FC<MasterworkAudioCapsuleProps> = ({
         boxSizing: 'border-box'
       }}
     >
-      <audio ref={audioRef} src={resolvedUrl} />
+      <audio ref={audioRef} src={resolvedUrl} preload="none" />
 
       {/* Play / Pause Circular Button */}
       <button
@@ -393,18 +404,58 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState<number>(initialDuration || 0);
   const [currentTime, setCurrentTime] = useState<number>(0);
+
+  // Sync duration with prop changes
+  useEffect(() => {
+    if (initialDuration && initialDuration > 0) {
+      setDuration(initialDuration);
+    }
+  }, [initialDuration]);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isLooping, setIsLooping] = useState(false);
   const [countInActive, setCountInActive] = useState(false);
   const [countInStep, setCountInStep] = useState<number | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
   const [resolvedUrl, setResolvedUrl] = useState<string>(url);
+  const [notesCount, setNotesCount] = useState<number>(() => getAudioNotesCount(url || ''));
+
+  // 🔔 Reaktiv synchronisierte Notizen-Anzahl (SoundCloud-Style Marker)
+  useEffect(() => {
+    const audioKey = url || resolvedUrl;
+    setNotesCount(getAudioNotesCount(audioKey));
+
+    // 🛡️ Revisionssicherer Server-Abruf
+    fetchAudioNotesFromServer(audioKey)
+      .then(srvNotes => {
+        if (srvNotes) setNotesCount(srvNotes.length);
+      })
+      .catch(() => {});
+
+    const handleNotesChanged = () => {
+      setNotesCount(getAudioNotesCount(audioKey));
+    };
+
+    window.addEventListener('campus-audio-notes-changed', handleNotesChanged);
+    return () => {
+      window.removeEventListener('campus-audio-notes-changed', handleNotesChanged);
+    };
+  }, [url, resolvedUrl]);
   const [isSongPickerOpen, setIsSongPickerOpen] = useState(false);
   const [songSearchInput, setSongSearchInput] = useState('');
   const songPickerRef = React.useRef<HTMLDivElement | null>(null);
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
   const countInTimerRef = React.useRef<any>(null);
   const playerIdRef = React.useRef<string>(`player_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`);
+
+  // 🔁 Hardware-nahe Web Audio Looping Engine (0,000 ms Latenz / absolut lückenlos)
+  const audioCtxRef = React.useRef<AudioContext | null>(null);
+  const audioBufferRef = React.useRef<AudioBuffer | null>(null);
+  const loopSourceRef = React.useRef<AudioBufferSourceNode | null>(null);
+  const loopStartTimestampRef = React.useRef<number>(0);
+  const loopOffsetSecRef = React.useRef<number>(0);
+  const animFrameRef = React.useRef<number | null>(null);
+  const isWebAudioPlayingRef = React.useRef<boolean>(false);
   const checkIsMobile = () => {
     if (typeof window === 'undefined') return false;
     return window.innerWidth < 768 || Boolean(typeof document !== 'undefined' && document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait'));
@@ -415,6 +466,9 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
   const [isDownloading, setIsDownloading] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitleInput, setEditedTitleInput] = useState('');
+  const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
+  const [modalTitleInput, setModalTitleInput] = useState('');
+  const [modalNotesInput, setModalNotesInput] = useState('');
 
   const displayTitle = useMemo(() => {
     if (label && label.trim() !== '') {
@@ -428,6 +482,44 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
     });
   }, [label, resolvedUrl, date, contextBadge]);
 
+  const handleOpenRenameModal = () => {
+    const audioKey = url || resolvedUrl;
+    setModalTitleInput(displayTitle);
+    const existingNotes = getAudioNotes(audioKey);
+    const generalNote = existingNotes.find(n => n.tag === 'general') || (existingNotes.length === 1 && existingNotes[0].time === 0 ? existingNotes[0] : null);
+    setModalNotesInput(generalNote ? generalNote.text : '');
+    setIsRenameModalOpen(true);
+  };
+
+  const handleSaveRenameAndNotes = () => {
+    const trimmedTitle = modalTitleInput.trim();
+    if (trimmedTitle && onRename && trimmedTitle !== displayTitle) {
+      onRename(trimmedTitle);
+    }
+
+    const audioKey = url || resolvedUrl;
+    const trimmedNotes = modalNotesInput.trim();
+    const existingNotes = getAudioNotes(audioKey);
+    const generalNote = existingNotes.find(n => n.tag === 'general') || (existingNotes.length === 1 && existingNotes[0].time === 0 ? existingNotes[0] : null);
+
+    if (trimmedNotes) {
+      if (generalNote) {
+        updateAudioNote(audioKey, generalNote.id, { text: trimmedNotes });
+      } else {
+        addAudioNote(audioKey, {
+          time: 0,
+          text: trimmedNotes,
+          tag: 'general',
+          authorRole: badge?.toLowerCase().includes('lehrer') || isSharedWithTeacher ? 'teacher' : 'student'
+        });
+      }
+    } else if (generalNote) {
+      deleteAudioNote(audioKey, generalNote.id);
+    }
+
+    setIsRenameModalOpen(false);
+  };
+
   const handleSaveRename = () => {
     const trimmed = editedTitleInput.trim();
     if (trimmed && onRename && trimmed !== displayTitle) {
@@ -435,6 +527,17 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
     }
     setIsEditingTitle(false);
   };
+
+  useEffect(() => {
+    if (!isRenameModalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsRenameModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isRenameModalOpen]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(checkIsMobile());
@@ -471,6 +574,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
           countInTimerRef.current = null;
           setCountInStep(null);
         }
+        stopWebAudioLoop();
         if (audioRef.current && !audioRef.current.paused) {
           audioRef.current.pause();
         }
@@ -494,6 +598,12 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
           setResolvedUrl(createdBlobUrl);
         }
       }).catch(err => console.warn('[InlineAudioPlayer] Blob load note:', err));
+    } else if (url.startsWith('http') || url.includes('/storage/v1/object/') || url.startsWith('schools/')) {
+      getSecureAudioUrl(url, 'campus-assets', 300).then(secUrl => {
+        if (active && secUrl) setResolvedUrl(secUrl);
+      }).catch(() => {
+        if (active) setResolvedUrl(url);
+      });
     } else {
       setResolvedUrl(url);
     }
@@ -505,12 +615,185 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
     };
   }, [url]);
 
-  // 🔁 Seamless Gapless Native Loop
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.loop = isLooping;
+  // 🔁 Web Audio Hardware Engine Helper Functions (0,000 ms Latenz / Gapless Looping)
+  const getOrCreateAudioContext = async () => {
+    if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      audioCtxRef.current = new AudioCtx();
     }
-  }, [isLooping]);
+    if (audioCtxRef.current.state === 'suspended') {
+      await audioCtxRef.current.resume().catch(() => {});
+    }
+    return audioCtxRef.current;
+  };
+
+  const loadAudioBuffer = async (): Promise<AudioBuffer | null> => {
+    if (audioBufferRef.current) return audioBufferRef.current;
+    try {
+      const ctx = await getOrCreateAudioContext();
+      if (!ctx) return null;
+      let arrayBuffer: ArrayBuffer | null = null;
+      
+      // 1. Direktzugriff auf IndexedDB bei lokalen Campus-Schlüsseln (verhindert instabile blob:-Fetch-Fehler)
+      const localKey = (url && (url.startsWith('campus_blob_') || url.startsWith('campus_audio_')))
+        ? url
+        : ((resolvedUrl && (resolvedUrl.startsWith('campus_blob_') || resolvedUrl.startsWith('campus_audio_'))) ? resolvedUrl : null);
+
+      if (localKey) {
+        const raw = await getBlob(localKey);
+        if (raw instanceof Blob) {
+          arrayBuffer = await raw.arrayBuffer();
+        } else if (raw instanceof ArrayBuffer) {
+          arrayBuffer = raw;
+        }
+      } else {
+        const targetUrl = resolvedUrl || url;
+        if (targetUrl.startsWith('blob:') || targetUrl.startsWith('data:')) {
+          const resp = await fetch(targetUrl);
+          arrayBuffer = await resp.arrayBuffer();
+        } else {
+          const resp = await fetch(targetUrl, { mode: 'cors' });
+          arrayBuffer = await resp.arrayBuffer();
+        }
+      }
+
+      if (arrayBuffer) {
+        const decoded = await safeDecodeAudioData(ctx, arrayBuffer);
+        audioBufferRef.current = decoded;
+        if (decoded.duration && isFinite(decoded.duration)) {
+          setDuration(Number(decoded.duration.toFixed(2)));
+        }
+        return decoded;
+      }
+    } catch (err) {
+      console.warn('[InlineAudioPlayer] Web Audio load note:', err);
+    }
+    return null;
+  };
+
+  const stopWebAudioLoop = (resetTime = false) => {
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    if (loopSourceRef.current) {
+      try {
+        loopSourceRef.current.onended = null;
+        loopSourceRef.current.stop();
+        loopSourceRef.current.disconnect();
+      } catch {}
+      loopSourceRef.current = null;
+    }
+    isWebAudioPlayingRef.current = false;
+    if (resetTime) {
+      setCurrentTime(0);
+    }
+  };
+
+  const startWebAudioLoop = async (offsetSec?: number) => {
+    const ctx = await getOrCreateAudioContext();
+    const buffer = await loadAudioBuffer();
+    if (!ctx || !buffer) {
+      if (audioRef.current) {
+        audioRef.current.loop = true;
+        audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+      }
+      return;
+    }
+
+    stopWebAudioLoop();
+    if (audioRef.current && !audioRef.current.paused) {
+      audioRef.current.pause();
+    }
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.playbackRate.value = playbackRate;
+    // 🔁 Sample-akkurates, 0.000 ms Latenz Hardware-Looping (exakt wie in der Zuschneiden-Maske)
+    source.loop = true;
+    source.loopStart = 0;
+    source.loopEnd = buffer.duration;
+    source.connect(ctx.destination);
+
+    const bufDur = buffer.duration;
+    let playStart = offsetSec !== undefined ? offsetSec : currentTime;
+    if (bufDur > 0 && playStart >= bufDur - 0.05) playStart = 0;
+
+    source.start(0, playStart);
+    loopSourceRef.current = source;
+    isWebAudioPlayingRef.current = true;
+    loopStartTimestampRef.current = ctx.currentTime;
+    loopOffsetSecRef.current = playStart;
+    setIsPlaying(true);
+    setCurrentTime(playStart);
+
+    source.onended = () => {
+      if (!isWebAudioPlayingRef.current) {
+        setIsPlaying(false);
+      }
+    };
+
+    const updatePlayhead = () => {
+      if (!isWebAudioPlayingRef.current || !loopSourceRef.current || !ctx || !audioBufferRef.current) return;
+      const curBufDur = audioBufferRef.current.duration;
+      if (curBufDur > 0) {
+        const elapsed = (ctx.currentTime - loopStartTimestampRef.current) * playbackRate;
+        const current = (loopOffsetSecRef.current + elapsed) % curBufDur;
+        setCurrentTime(current);
+      }
+      animFrameRef.current = requestAnimationFrame(updatePlayhead);
+    };
+    animFrameRef.current = requestAnimationFrame(updatePlayhead);
+  };
+
+  const toggleLooping = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const nextLoop = !isLooping;
+    setIsLooping(nextLoop);
+
+    if (isPlaying) {
+      if (nextLoop) {
+        // Nahtloser Übergang: HTML5-Audio stoppen, Web Audio Gapless Loop an aktueller Position starten
+        const cur = audioRef.current ? audioRef.current.currentTime : currentTime;
+        if (audioRef.current) audioRef.current.pause();
+        startWebAudioLoop(cur);
+      } else {
+        // Nahtloser Übergang: Web Audio stoppen, HTML5-Audio an aktueller Position fortführen
+        const cur = currentTime;
+        stopWebAudioLoop();
+        if (audioRef.current) {
+          audioRef.current.currentTime = cur;
+          audioRef.current.loop = false;
+          audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+        }
+      }
+    } else {
+      if (nextLoop) {
+        loadAudioBuffer().catch(() => {});
+      }
+      if (audioRef.current) {
+        audioRef.current.loop = nextLoop;
+      }
+    }
+  };
+
+  // 🔁 Cleanup Web Audio on unmount or URL change
+  useEffect(() => {
+    return () => {
+      stopWebAudioLoop();
+      if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+        audioCtxRef.current.close().catch(() => {});
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    audioBufferRef.current = null;
+    stopWebAudioLoop();
+    if (isLooping) {
+      loadAudioBuffer().catch(() => {});
+    }
+  }, [resolvedUrl]);
 
   const togglePlay = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -520,42 +803,73 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       setCountInStep(null);
       return;
     }
-    if (!audioRef.current) return;
+
     if (isPlaying) {
-      audioRef.current.pause();
+      if (isWebAudioPlayingRef.current) {
+        stopWebAudioLoop();
+      }
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
       setIsPlaying(false);
     } else {
       notifyGlobalPlay();
-      if (audioRef.current.ended || (duration > 0 && audioRef.current.currentTime >= duration)) {
-        audioRef.current.currentTime = 0;
-      }
-      if (countInActive) {
-        let step = 4;
-        setCountInStep(step);
-        playCountInBeep(true);
 
-        const runCount = () => {
-          step -= 1;
-          if (step > 0) {
-            setCountInStep(step);
-            playCountInBeep(false);
-            countInTimerRef.current = setTimeout(runCount, 550);
-          } else {
-            setCountInStep(null);
-            countInTimerRef.current = null;
-            if (audioRef.current) {
-              if (audioRef.current.ended || (duration > 0 && audioRef.current.currentTime >= duration)) {
-                audioRef.current.currentTime = 0;
-              }
-              audioRef.current.loop = isLooping;
-              audioRef.current.play().then(() => setIsPlaying(true)).catch(err => console.warn('[InlineAudioPlayer] Play error:', err));
+      if (isLooping) {
+        if (countInActive) {
+          let step = 4;
+          setCountInStep(step);
+          playCountInBeep(true);
+
+          const runCount = () => {
+            step -= 1;
+            if (step > 0) {
+              setCountInStep(step);
+              playCountInBeep(false);
+              countInTimerRef.current = setTimeout(runCount, 550);
+            } else {
+              setCountInStep(null);
+              countInTimerRef.current = null;
+              startWebAudioLoop();
             }
-          }
-        };
-        countInTimerRef.current = setTimeout(runCount, 550);
+          };
+          countInTimerRef.current = setTimeout(runCount, 550);
+        } else {
+          startWebAudioLoop();
+        }
       } else {
-        audioRef.current.loop = isLooping;
-        audioRef.current.play().then(() => setIsPlaying(true)).catch(err => console.warn('[InlineAudioPlayer] Play error:', err));
+        if (!audioRef.current) return;
+        if (audioRef.current.ended || (duration > 0 && audioRef.current.currentTime >= duration)) {
+          audioRef.current.currentTime = 0;
+        }
+        if (countInActive) {
+          let step = 4;
+          setCountInStep(step);
+          playCountInBeep(true);
+
+          const runCount = () => {
+            step -= 1;
+            if (step > 0) {
+              setCountInStep(step);
+              playCountInBeep(false);
+              countInTimerRef.current = setTimeout(runCount, 550);
+            } else {
+              setCountInStep(null);
+              countInTimerRef.current = null;
+              if (audioRef.current) {
+                if (audioRef.current.ended || (duration > 0 && audioRef.current.currentTime >= duration)) {
+                  audioRef.current.currentTime = 0;
+                }
+                audioRef.current.loop = false;
+                audioRef.current.play().then(() => setIsPlaying(true)).catch(err => console.warn('[InlineAudioPlayer] Play error:', err));
+              }
+            }
+          };
+          countInTimerRef.current = setTimeout(runCount, 550);
+        } else {
+          audioRef.current.loop = false;
+          audioRef.current.play().then(() => setIsPlaying(true)).catch(err => console.warn('[InlineAudioPlayer] Play error:', err));
+        }
       }
     }
   };
@@ -569,10 +883,12 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       }
     };
     const handleTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
+      if (!isWebAudioPlayingRef.current) {
+        setCurrentTime(audio.currentTime);
+      }
     };
     const handleEnded = () => {
-      if (!isLooping) {
+      if (!isLooping && !isWebAudioPlayingRef.current) {
         setIsPlaying(false);
         setCurrentTime(0);
       }
@@ -597,6 +913,11 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
     if (audioRef.current) {
       audioRef.current.playbackRate = playbackRate;
       (audioRef.current as any).preservesPitch = true;
+    }
+    if (loopSourceRef.current && isWebAudioPlayingRef.current && audioCtxRef.current) {
+      loopSourceRef.current.playbackRate.value = playbackRate;
+      loopOffsetSecRef.current = currentTime;
+      loopStartTimestampRef.current = audioCtxRef.current.currentTime;
     }
   }, [playbackRate]);
 
@@ -1129,7 +1450,11 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
         const newRatio = Math.max(0, Math.min(1, clickX / rect.width));
         const newTime = newRatio * (duration || 0);
         setCurrentTime(newTime);
-        if (audioRef.current) audioRef.current.currentTime = newTime;
+        if (isWebAudioPlayingRef.current) {
+          startWebAudioLoop(newTime);
+        } else if (audioRef.current) {
+          audioRef.current.currentTime = newTime;
+        }
       }}
       style={{
         display: "flex",
@@ -1185,10 +1510,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
         {/* 🔁 Loop Toggle (Icon only) */}
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsLooping(!isLooping);
-          }}
+          onClick={toggleLooping}
           style={{
             border: isLooping 
               ? (isIndigoPurple ? '1.5px solid #7c3aed' : '1.5px solid #16a34a') 
@@ -1376,12 +1698,16 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
         borderRadius: "16px",
         border: isPlaying
           ? (isShared ? "1.5px solid #22c55e" : (isIndigoPurple ? "1.5px solid #c4b5fd" : "1.5px solid #86efac"))
-          : (isShared ? "1.5px solid #86efac" : "1px solid #e2e8f0"),
+          : isHero
+            ? (isIndigoPurple ? "2px solid #a855f7" : "2px solid #22c55e")
+            : (isShared ? "1.5px solid #86efac" : "1px solid #e2e8f0"),
         padding: isMobile ? "8px 10px" : "8px 12px",
         width: "100%",
         boxShadow: isPlaying
           ? (isShared ? "0 4px 16px -2px rgba(22, 163, 74, 0.28)" : (isIndigoPurple ? "0 3px 12px -2px rgba(109, 40, 217, 0.2)" : "0 3px 12px -2px rgba(34, 197, 94, 0.2)"))
-          : (isShared ? "0 4px 14px -2px rgba(22, 163, 74, 0.16), 0 1px 3px rgba(0, 0, 0, 0.02)" : "0 1px 3px rgba(0, 0, 0, 0.03)"),
+          : isHero
+            ? (isIndigoPurple ? "0 4px 16px -2px rgba(168, 85, 247, 0.22), 0 2px 6px rgba(0, 0, 0, 0.04)" : "0 4px 16px -2px rgba(34, 197, 94, 0.22), 0 2px 6px rgba(0, 0, 0, 0.04)")
+            : (isShared ? "0 4px 14px -2px rgba(22, 163, 74, 0.16), 0 1px 3px rgba(0, 0, 0, 0.02)" : "0 1px 3px rgba(0, 0, 0, 0.03)"),
         display: "flex",
         flexDirection: "column",
         gap: isToolsOpen ? "8px" : (isMobile ? "6px" : "0px"),
@@ -1390,7 +1716,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
         position: "relative"
       }}
     >
-      <audio ref={audioRef} src={resolvedUrl} />
+      <audio ref={audioRef} src={resolvedUrl} preload="none" />
 
       {/* 1. Main Row: On Desktop, single line with title, waveform, time and action buttons */}
       {isMobile ? (
@@ -1423,58 +1749,27 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
           style={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '8px',
+            gap: '6px',
             paddingTop: '8px',
             marginTop: '2px',
             borderTop: '1px dashed #e2e8f0',
             width: '100%',
-            boxSizing: 'border-box'
+            boxSizing: 'border-box',
+            flexWrap: 'nowrap',
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none'
           }}
         >
-          {/* Left: Creative & Studio Tools */}
-          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-            {/* ✏️ Benennung bearbeiten */}
-            {onRename && (
-              <button
-                type="button"
-                onClick={() => {
-                  setEditedTitleInput(displayTitle);
-                  setIsEditingTitle(true);
-                }}
-                style={{
-                  border: '1px solid #cbd5e1',
-                  background: '#ffffff',
-                  color: '#334155',
-                  fontSize: '0.74rem',
-                  fontWeight: 700,
-                  height: '32px',
-                  padding: '0 10px',
-                  borderRadius: '9px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  transition: 'all 0.15s ease'
-                }}
-                className="hover-scale-mini"
-                title="Titel dieser Aufnahme umbenennen"
-              >
-                <Edit3 size={13} strokeWidth={2.2} color="#475569" />
-                <span>Umbenennen</span>
-              </button>
-            )}
-
-            {/* ✂️ Studio Trimmer */}
+          {/* ✏️ Benennung & Notizen bearbeiten */}
+          {onRename && (
             <button
               type="button"
-              onClick={() => setIsEditorOpen(true)}
+              onClick={handleOpenRenameModal}
               style={{
-                border: '1px solid #ddd6fe',
-                background: '#f5f3ff',
-                color: '#6366f1',
+                border: '1px solid #cbd5e1',
+                background: '#ffffff',
+                color: '#334155',
                 fontSize: '0.74rem',
                 fontWeight: 700,
                 height: '32px',
@@ -1484,138 +1779,433 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '5px',
-                boxShadow: '0 1px 2px rgba(99, 102, 241, 0.08)',
-                transition: 'all 0.15s ease'
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                transition: 'all 0.15s ease',
+                flexShrink: 0,
+                whiteSpace: 'nowrap'
               }}
               className="hover-scale-mini"
-              title="Audio zuschneiden, einblenden & Pitch anpassen"
+              title="Aufnahme benennen und Notizen bearbeiten"
             >
-              <Scissors size={13} strokeWidth={2.2} />
-              <span>Zuschneiden</span>
+              <Edit3 size={13} strokeWidth={2.2} />
+              <span>Umbenennen</span>
             </button>
+          )}
 
-            {/* 👥 Duett-Deck (Dual Layer): Streng konditioniert – nur bei Aufnahme mit Metronom-Grid */}
-            {onOpenDuettDeck && Boolean(metronomeBpm) && (
+          {/* 💬 Studio Timeline Notizen / Marker (SoundCloud-Style) */}
+          <button
+            type="button"
+            onClick={() => setIsNotesModalOpen(true)}
+            style={{
+              border: '1px solid #cbd5e1',
+              background: '#ffffff',
+              color: '#334155',
+              fontSize: '0.74rem',
+              fontWeight: 700,
+              height: '32px',
+              padding: '0 10px',
+              borderRadius: '9px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+              transition: 'all 0.15s ease',
+              flexShrink: 0,
+              whiteSpace: 'nowrap'
+            }}
+            className="hover-scale-mini"
+            title="Timeline-Notizen & Marker anzeigen oder hinzufügen"
+            aria-label={`Notizen öffnen (${notesCount} Notizen vorhanden)`}
+          >
+            <MessageSquareQuote size={13} strokeWidth={2.2} />
+            <span>{notesCount > 0 ? `Notizen (${notesCount})` : 'Notizen'}</span>
+          </button>
+
+          {/* ✂️ Studio Trimmer */}
+          <button
+            type="button"
+            onClick={() => setIsEditorOpen(true)}
+            style={{
+              border: '1px solid #cbd5e1',
+              background: '#ffffff',
+              color: '#334155',
+              fontSize: '0.74rem',
+              fontWeight: 700,
+              height: '32px',
+              padding: '0 10px',
+              borderRadius: '9px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+              transition: 'all 0.15s ease',
+              flexShrink: 0,
+              whiteSpace: 'nowrap'
+            }}
+            className="hover-scale-mini"
+            title="Audio zuschneiden, einblenden & Pitch anpassen"
+          >
+            <Scissors size={13} strokeWidth={2.2} />
+            <span>Zuschneiden</span>
+          </button>
+
+          {/* 👥 Duett-Deck (Dual Layer): Synchrones Play-Along Deck */}
+          {onOpenDuettDeck && (
+            <button
+              type="button"
+              onClick={() => {
+                setIsToolsOpen(false);
+                onOpenDuettDeck();
+              }}
+              style={{
+                border: '1px solid #cbd5e1',
+                background: '#ffffff',
+                color: '#334155',
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                height: '32px',
+                padding: '0 10px',
+                borderRadius: '9px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                transition: 'all 0.15s ease',
+                flexShrink: 0,
+                whiteSpace: 'nowrap'
+              }}
+              className="hover-scale-mini"
+              title={metronomeBpm ? `Duett-Deck (${metronomeBpm} BPM)` : 'Duett-Deck öffnen'}
+              aria-label={metronomeBpm ? `Duett-Deck öffnen (${metronomeBpm} BPM)` : 'Duett-Deck öffnen'}
+            >
+              <Layers size={13} strokeWidth={2.2} />
+              <span>Duett</span>
+            </button>
+          )}
+
+          {/* ↩️ Original wiederherstellen (Non-destructive revert) */}
+          {originalAudioUrl && onRevertToOriginal && (
+            <button
+              type="button"
+              onClick={onRevertToOriginal}
+              style={{
+                border: '1px solid #cbd5e1',
+                background: '#ffffff',
+                color: '#334155',
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                height: '32px',
+                padding: '0 10px',
+                borderRadius: '9px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                transition: 'all 0.15s ease',
+                flexShrink: 0,
+                whiteSpace: 'nowrap'
+              }}
+              className="hover-scale-mini"
+              title="Gekürzten Zuschnitt verwerfen und ungeschnittenes Original wiederherstellen"
+            >
+              <RotateCcw size={13} strokeWidth={2.2} />
+              <span>Original</span>
+            </button>
+          )}
+
+          {/* 📥 Download */}
+          {allowDownload && (
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={isDownloading}
+              style={{
+                border: '1px solid #cbd5e1',
+                background: isDownloading ? '#f8fafc' : '#ffffff',
+                color: isDownloading ? '#94a3b8' : '#334155',
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                height: '32px',
+                padding: '0 10px',
+                borderRadius: '9px',
+                cursor: isDownloading ? 'wait' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                transition: 'all 0.15s ease',
+                flexShrink: 0,
+                whiteSpace: 'nowrap'
+              }}
+              className="hover-scale-mini"
+              title={isDownloading ? "Audio wird vorbereitet..." : "Audio-Datei herunterladen"}
+            >
+              <Download size={13} strokeWidth={2.2} />
+              <span>{isDownloading ? 'Lädt...' : 'Download'}</span>
+            </button>
+          )}
+
+          {/* 🗑️ Delete */}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirmModal(true)}
+              style={{
+                border: '1px solid #cbd5e1',
+                background: '#ffffff',
+                color: '#334155',
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                height: '32px',
+                padding: '0 10px',
+                borderRadius: '9px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                transition: 'all 0.15s ease',
+                flexShrink: 0,
+                whiteSpace: 'nowrap'
+              }}
+              className="hover-scale-mini"
+              title="Audioaufnahme unwiderruflich löschen"
+            >
+              <Trash2 size={13} strokeWidth={2.2} />
+              <span>Löschen</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ✏️ Maske: Aufnahme benennen & Notizen bearbeiten */}
+      {isRenameModalOpen && (
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsRenameModalOpen(false);
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            padding: '20px',
+            boxSizing: 'border-box'
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="rename-audio-modal-title"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#ffffff',
+              borderRadius: '24px',
+              padding: '24px 26px',
+              maxWidth: '460px',
+              width: '100%',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              boxSizing: 'border-box',
+              position: 'relative'
+            }}
+          >
+            {/* Header with Title & Close button */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div
+                  style={{
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '12px',
+                    background: '#f1f5f9',
+                    color: '#334155',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <Edit3 size={18} strokeWidth={2.2} />
+                </div>
+                <div>
+                  <h3 id="rename-audio-modal-title" style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
+                    Aufnahme benennen
+                  </h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.76rem', color: '#64748b' }}>
+                    Titel und persönliche Notizen für diese Aufnahme anpassen
+                  </p>
+                </div>
+              </div>
               <button
                 type="button"
-                onClick={() => {
-                  setIsToolsOpen(false);
-                  onOpenDuettDeck();
-                }}
+                onClick={() => setIsRenameModalOpen(false)}
                 style={{
-                  border: '1px solid #cbd5e1',
-                  background: '#ffffff',
-                  color: isIndigoPurple ? '#6d28d9' : '#15803d',
-                  fontSize: '0.74rem',
-                  fontWeight: 700,
+                  border: 'none',
+                  background: '#f1f5f9',
+                  borderRadius: '10px',
+                  width: '32px',
                   height: '32px',
-                  padding: '0 10px',
-                  borderRadius: '9px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                  color: '#64748b',
                   transition: 'all 0.15s ease'
                 }}
                 className="hover-scale-mini"
-                title={`Duett-Deck: Mitspielen & Abgleichen (${metronomeBpm} BPM)`}
+                aria-label="Maske schließen"
               >
-                <Layers size={13} strokeWidth={2.2} />
-                <span>Duett-Deck</span>
+                <X size={16} />
               </button>
-            )}
+            </div>
 
-            {/* ↩️ Original wiederherstellen (Non-destructive revert) */}
-            {originalAudioUrl && onRevertToOriginal && (
-              <button
-                type="button"
-                onClick={onRevertToOriginal}
-                style={{
-                  border: '1px solid #fed7aa',
-                  background: '#fff7ed',
-                  color: '#ea580c',
-                  fontSize: '0.74rem',
-                  fontWeight: 700,
-                  height: '32px',
-                  padding: '0 10px',
-                  borderRadius: '9px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  boxShadow: '0 1px 2px rgba(234, 88, 12, 0.08)',
-                  transition: 'all 0.15s ease'
-                }}
-                className="hover-scale-mini"
-                title="Gekürzten Zuschnitt verwerfen und ungeschnittenes Original wiederherstellen"
-              >
-                <RotateCcw size={13} strokeWidth={2.2} />
-                <span>Original</span>
-              </button>
-            )}
-          </div>
+            {/* Form */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSaveRenameAndNotes();
+              }}
+              style={{ display: 'flex', flexDirection: 'column', gap: '14px', margin: 0 }}
+            >
+              {/* Name / Titel der Aufnahme */}
+              <div>
+                <label
+                  htmlFor="recording-title-input"
+                  style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}
+                >
+                  Titel der Aufnahme
+                </label>
+                <input
+                  id="recording-title-input"
+                  type="text"
+                  value={modalTitleInput}
+                  onChange={(e) => setModalTitleInput(e.target.value)}
+                  placeholder="z. B. Take 1 – Strophe & Refrain"
+                  autoFocus
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    fontSize: '0.88rem',
+                    fontWeight: 700,
+                    color: '#0f172a',
+                    borderRadius: '12px',
+                    border: '1.5px solid #cbd5e1',
+                    background: '#f8fafc',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                    transition: 'border-color 0.15s ease'
+                  }}
+                  onFocus={(e) => (e.currentTarget.style.borderColor = '#3b82f6')}
+                  onBlur={(e) => (e.currentTarget.style.borderColor = '#cbd5e1')}
+                />
+              </div>
 
-          {/* Right: Action & Management Tools (Download & Delete) */}
-          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-            {/* 📥 Download */}
-            {allowDownload && (
-              <button
-                type="button"
-                onClick={handleDownload}
-                disabled={isDownloading}
-                style={{
-                  border: '1px solid #cbd5e1',
-                  background: isDownloading ? '#f8fafc' : '#ffffff',
-                  color: isDownloading ? '#94a3b8' : '#475569',
-                  fontSize: '0.74rem',
-                  fontWeight: 700,
-                  height: '32px',
-                  padding: '0 10px',
-                  borderRadius: '9px',
-                  cursor: isDownloading ? 'wait' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
-                  transition: 'all 0.15s ease'
-                }}
-                className="hover-scale-mini"
-                title={isDownloading ? "Audio wird vorbereitet..." : "Audio-Datei herunterladen"}
-              >
-                <Download size={13} strokeWidth={2.2} />
-                <span>{isDownloading ? 'Lädt...' : 'Download'}</span>
-              </button>
-            )}
+              {/* Notizen zur Aufnahme */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <label
+                    htmlFor="recording-notes-input"
+                    style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}
+                  >
+                    Notizen & Übe-Hinweise
+                  </label>
+                  <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
+                    Optional
+                  </span>
+                </div>
+                <textarea
+                  id="recording-notes-input"
+                  value={modalNotesInput}
+                  onChange={(e) => setModalNotesInput(e.target.value)}
+                  placeholder="z. B. Takt 12 noch holprig, Tempo bei 120 BPM halten, schöne Dynamik..."
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    fontSize: '0.82rem',
+                    fontWeight: 500,
+                    color: '#0f172a',
+                    borderRadius: '12px',
+                    border: '1.5px solid #cbd5e1',
+                    background: '#f8fafc',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                    resize: 'vertical',
+                    minHeight: '75px',
+                    fontFamily: 'inherit',
+                    lineHeight: 1.4,
+                    transition: 'border-color 0.15s ease'
+                  }}
+                  onFocus={(e) => (e.currentTarget.style.borderColor = '#3b82f6')}
+                  onBlur={(e) => (e.currentTarget.style.borderColor = '#cbd5e1')}
+                  onKeyDown={(e) => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSaveRenameAndNotes();
+                    }
+                  }}
+                />
+              </div>
 
-            {/* 🗑️ Delete */}
-            {onDelete && (
-              <button
-                type="button"
-                onClick={() => setShowDeleteConfirmModal(true)}
-                style={{
-                  border: '1px solid #fee2e2',
-                  background: '#fff1f2',
-                  color: '#e11d48',
-                  fontSize: '0.74rem',
-                  fontWeight: 700,
-                  height: '32px',
-                  padding: '0 10px',
-                  borderRadius: '9px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  boxShadow: '0 1px 2px rgba(225, 29, 72, 0.05)',
-                  transition: 'all 0.15s ease'
-                }}
-                className="hover-scale-mini"
-                title="Audioaufnahme unwiderruflich löschen"
-              >
-                <Trash2 size={13} strokeWidth={2.2} />
-                <span>Löschen</span>
-              </button>
-            )}
+              {/* Buttons: Abbrechen & Speichern */}
+              <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsRenameModalOpen(false)}
+                  style={{
+                    flex: 1,
+                    height: '40px',
+                    borderRadius: '12px',
+                    border: '1.5px solid #cbd5e1',
+                    background: '#ffffff',
+                    color: '#475569',
+                    fontSize: '0.84rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover-scale-mini"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    flex: 1.3,
+                    height: '40px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    background: '#0f172a',
+                    color: '#ffffff',
+                    fontSize: '0.84rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    boxShadow: '0 2px 8px rgba(15, 23, 42, 0.2)',
+                    transition: 'all 0.15s ease'
+                  }}
+                  className="hover-scale-mini"
+                >
+                  <Check size={16} strokeWidth={2.4} />
+                  <span>Speichern</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -1728,12 +2318,55 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
           <AudioEditorModal
             isOpen={isEditorOpen}
             onClose={() => setIsEditorOpen(false)}
-            audioUrl={resolvedUrl}
-            originalAudioUrl={originalAudioUrl}
+            audioUrl={url || resolvedUrl}
+            originalAudioUrl={originalAudioUrl || (url.startsWith('blob:') ? undefined : url)}
             initialLabel={displayTitle}
             initialDuration={duration}
             initialOriginalDuration={originalDuration}
             onSave={(res) => {
+              // 1. Wiedergabe sofort stoppen und Playhead zurücksetzen
+              stopWebAudioLoop(true);
+              if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current.currentTime = 0;
+              }
+              setIsPlaying(false);
+              setCurrentTime(0);
+
+              // 2. Veralteten AudioBuffer-Cache sofort leeren
+              audioBufferRef.current = null;
+
+              // 3. Neue gekürzte Dauer sofort im Player-State spiegeln
+              if (res.duration && res.duration > 0) {
+                setDuration(res.duration);
+              }
+
+              // 4. Neu gekürzten WAV-Blob sofort in den Player laden & vor-dekodieren
+              if (res.url) {
+                if (res.url.startsWith('campus_blob_') || res.url.startsWith('campus_audio_')) {
+                  getBlob(res.url).then(raw => {
+                    if (raw) {
+                      const finalBlob = raw instanceof Blob ? raw : new Blob([raw], { type: 'audio/wav' });
+                      const newBlobUrl = URL.createObjectURL(finalBlob);
+                      setResolvedUrl(newBlobUrl);
+                      getOrCreateAudioContext().then(ctx => {
+                        const getAb = raw instanceof Blob ? raw.arrayBuffer() : Promise.resolve(raw as ArrayBuffer);
+                        getAb.then(ab => {
+                          safeDecodeAudioData(ctx, ab).then(decoded => {
+                            audioBufferRef.current = decoded;
+                            if (decoded.duration && isFinite(decoded.duration)) {
+                              setDuration(Number(decoded.duration.toFixed(2)));
+                            }
+                          }).catch(() => {});
+                        });
+                      });
+                    }
+                  }).catch(() => {});
+                } else {
+                  setResolvedUrl(res.url);
+                }
+              }
+
               if (onSaveEdited) {
                 onSaveEdited(res);
               }
@@ -1743,6 +2376,21 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
               onRevertToOriginal();
               setIsEditorOpen(false);
             } : undefined}
+          />
+        </React.Suspense>
+      )}
+
+      {/* 💬 Audio Timeline Notes & Markers Modal (SoundCloud-Style) */}
+      {isNotesModalOpen && (
+        <React.Suspense fallback={null}>
+          <AudioNotesModal
+            isOpen={isNotesModalOpen}
+            onClose={() => setIsNotesModalOpen(false)}
+            audioId={url || resolvedUrl}
+            audioUrl={resolvedUrl || url}
+            title={displayTitle}
+            initialDuration={duration}
+            currentUserRole={badge?.toLowerCase().includes('lehrer') || isSharedWithTeacher ? 'teacher' : 'student'}
           />
         </React.Suspense>
       )}

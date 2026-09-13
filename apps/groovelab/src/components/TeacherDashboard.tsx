@@ -7,10 +7,11 @@ const TeacherTagesplanWidget = lazy(() => import('./teacher/TeacherTagesplanWidg
 const TeacherTagesplanRoomIssuesBanner = lazy(() => import('./teacher/TeacherTagesplanWidget').then(m => ({ default: m.TeacherTagesplanRoomIssuesBanner })));
 const TeacherTourDemoSchedule = lazy(() => import('./teacher/TeacherTagesplanWidget').then(m => ({ default: m.TeacherTourDemoSchedule })));
 const TeacherLiveView = lazy(() => import('./teacher/TeacherLiveView').then(m => ({ default: m.TeacherLiveView })));
+const TeacherStudioBoardView = lazy(() => import('./teacher/TeacherStudioBoardView').then(m => ({ default: m.TeacherStudioBoardView })));
 import { AvatarImage, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, resolveCampusStudentAvatar, resolveGrooveLabTeacherAvatar } from './common/AvatarImage';
 import { MUSIC_QUOTES, getQuotesForAudience, getDailyQuote } from '@groovelab/shared';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
-import { supabase, deleteUserStorageAssets } from '../lib/supabase';
+import { supabase, deleteUserStorageAssets, queryCache } from '../lib/supabase';
 import { Monitor, Music, Award, Box, Plus, AlertCircle, AlertTriangle, User, Users, Star, TrendingUp, Shield, Zap, Play, Info, CheckCircle, Check, Search, Trash2, Bell, X, Clock, ChevronDown, ChevronUp, ChevronsUpDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, LayoutDashboard, LogOut, Flame, GraduationCap, UserPlus, Edit3, Calendar, Activity, CheckSquare, Mail, Copy, Sparkles, BookOpen, MessageSquare, Lock, Palmtree, Heart, Settings, Key, Sun, ThumbsUp, Building2, Hourglass, Eye, EyeOff, ShieldCheck, CheckCheck, CalendarX, Send, Lightbulb, Download, Sliders, Mic, Disc, Radio, Timer, ArrowRight, Headphones, FileText, DoorOpen, HelpCircle, RotateCcw, Phone, Coffee } from 'lucide-react';
 import { notesService, UserNote } from '../services/notesService';
 import { formatCleanNoteContent } from './notes/notesConstants';
@@ -83,6 +84,18 @@ const getSimulatedNow = (): Date => {
   const elapsedMinutes = Math.floor((Date.now() - simStartTime) / 60000);
 
   return new Date(baseSim.getTime() + elapsedMinutes * 60000);
+};
+
+const parseDayNumber = (dayInput: any): number => {
+  if (typeof dayInput === 'number') return dayInput;
+  if (!dayInput) return 1;
+  const map: Record<string, number> = {
+    'Montag': 1, 'Dienstag': 2, 'Mittwoch': 3, 'Donnerstag': 4, 'Freitag': 5, 'Samstag': 6, 'Sonntag': 7,
+    'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6, 'Sunday': 7,
+    'Mo': 1, 'Di': 2, 'Mi': 3, 'Do': 4, 'Fr': 5, 'Sa': 6, 'So': 7,
+    'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6, 'Sun': 7
+  };
+  return map[String(dayInput).trim()] || parseInt(String(dayInput), 10) || 1;
 };
 
 const splitAndNormalizeStudents = (studentsList: any[], allStudentsList: any[] = []): any[] => {
@@ -285,6 +298,7 @@ const resolveStudentInstrument = (slotInst?: string | null, studentInst?: string
 
 interface TeacherDashboardProps {
   userId: string;
+  initialTeacher?: any;
   onLogout?: () => void;
   locationMode?: 'lab' | 'home';
   onLocationModeChange?: (mode: 'lab' | 'home') => void;
@@ -306,6 +320,7 @@ interface TeacherDashboardProps {
 
 export function TeacherDashboard({ 
   userId, 
+  initialTeacher,
   onLogout, 
   locationMode = 'lab', 
   onLocationModeChange,
@@ -323,8 +338,10 @@ export function TeacherDashboard({
   onSidebarNotificationsChange,
   activePlatform: propsActivePlatform
 }: TeacherDashboardProps) {
-  const activePlatform = propsActivePlatform || (typeof window !== 'undefined' ? (localStorage.getItem('groovelab_active_platform') || 'campus') : 'campus');
+  const activePlatform: 'campus' | 'groovelab' = (propsActivePlatform === 'groovelab' || (typeof window !== 'undefined' && localStorage.getItem('groovelab_active_platform') === 'groovelab')) ? 'groovelab' : 'campus';
   const [teacher, setTeacher] = useState<any>(() => {
+    if (initialTeacher) return initialTeacher;
+    if (session?.users) return session.users;
     if (typeof window !== 'undefined') {
       const isGhost = userId === 'master-support-id' || sessionStorage.getItem('groovelab_support_ghost') === 'true';
       if (isGhost) {
@@ -349,9 +366,29 @@ export function TeacherDashboard({
           }
         };
       }
+
+      const cached = sessionStorage.getItem('groovelab_cached_user') || localStorage.getItem('groovelab_cached_user') || sessionStorage.getItem('campus_user') || localStorage.getItem('campus_user');
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (parsed && (!userId || parsed.id === userId)) {
+            return parsed;
+          }
+        } catch (e) {}
+      }
     }
     return null;
   });
+
+  useEffect(() => {
+    if (initialTeacher) {
+      setTeacher((prev: any) => {
+        if (prev && areObjectsEqualFast(prev, initialTeacher)) return prev;
+        return prev ? { ...prev, ...initialTeacher } : initialTeacher;
+      });
+    }
+  }, [initialTeacher]);
+
   const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
 
   useEffect(() => {
@@ -740,7 +777,7 @@ export function TeacherDashboard({
   const [kioskPinInput, setKioskPinInput] = useState('');
   const [targetKioskStation, setTargetKioskStation] = useState<any>(null);
   const [checkingInStatus, setCheckingInStatus] = useState<'idle' | 'locating' | 'verifying' | 'success' | 'error'>('idle');
-  const [geoErrorMsg, setGeoErrorMsg] = useState<string>('');
+  const [checkInErrorMsg, setCheckInErrorMsg] = useState<string>('');
   const [shakeLock, setShakeLock] = useState(false);
   const [wallSongs, setWallSongs] = useState<any[]>([]);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -753,20 +790,26 @@ export function TeacherDashboard({
   const [ticker, setTicker] = useState(0);
   const [selectedCoachProfile, setSelectedCoachProfile] = useState<any>(null);
   const [selectedStudentProfile, setSelectedStudentProfile] = useState<any>(null);
+  const [allStudents, setAllStudents] = useState<any[]>([]);
   const [docStudent, setDocStudent] = useState<any>(null);
 
   const modalDocStudent = useMemo(() => {
     if (!docStudent) return null;
+    const sId = docStudent.id || docStudent.user_id;
+    const matchedInAll = allStudents.find((s: any) => String(s.id) === String(sId));
+    const localSavedLevel = typeof window !== 'undefined' && sId ? localStorage.getItem(`campus_student_ui_level_${sId}`) : null;
     return {
       ...docStudent,
+      campus_ui_level: localSavedLevel || docStudent.campus_ui_level || matchedInAll?.campus_ui_level,
+      parent_permissions: docStudent.parent_permissions || matchedInAll?.parent_permissions,
       school_id: teacher?.school_id || docStudent.school_id,
       schools: schoolData || docStudent.schools,
-      teacher_name: teacher?.first_name ? `${teacher.first_name} ${teacher.last_name || ''}`.trim() : (teacher?.name || '')
+      teacher_name: teacher ? formatTeacherFullName(teacher) : ''
     };
-  }, [docStudent, teacher?.school_id, teacher?.first_name, teacher?.last_name, teacher?.name, schoolData]);
-  const [activeTab, setActiveTabRaw] = useState<'briefing' | 'live' | 'bands' | 'students' | 'proposals' | 'settings' | 'coaches' | 'messages'>(() => {
+  }, [docStudent, allStudents, teacher?.school_id, teacher?.first_name, teacher?.last_name, teacher?.name, schoolData]);
+  const [activeTab, setActiveTabRaw] = useState<'briefing' | 'live' | 'bands' | 'students' | 'proposals' | 'settings' | 'coaches' | 'messages' | 'studio'>(() => {
     if (initialTab) return initialTab;
-    const valid = ['briefing', 'live', 'bands', 'students', 'proposals', 'settings', 'coaches', 'messages'];
+    const valid = ['briefing', 'live', 'bands', 'students', 'proposals', 'settings', 'coaches', 'messages', 'studio'];
     const saved = typeof window !== 'undefined' ? (sessionStorage.getItem('campus_teacher_active_tab') || localStorage.getItem('campus_teacher_active_tab')) : null;
     if (saved && valid.includes(saved)) {
       if (saved === 'live' && !hideHeader && activePlatform === 'campus') return 'briefing';
@@ -775,7 +818,7 @@ export function TeacherDashboard({
     return hideHeader ? 'live' : 'briefing';
   });
 
-  const setActiveTab = (tab: 'briefing' | 'live' | 'bands' | 'students' | 'proposals' | 'settings' | 'coaches' | 'messages') => {
+  const setActiveTab = (tab: 'briefing' | 'live' | 'bands' | 'students' | 'proposals' | 'settings' | 'coaches' | 'messages' | 'studio') => {
     setActiveTabRaw(tab);
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('campus_teacher_active_tab', tab);
@@ -825,7 +868,6 @@ export function TeacherDashboard({
   const [initialSchoolData, setInitialSchoolData] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [allBands, setAllBands] = useState<any[]>([]);
-  const [allStudents, setAllStudents] = useState<any[]>([]);
   const [hoveredCopilotSlotId, setHoveredCopilotSlotId] = useState<string | null>(null);
   const [deleteStudentModalData, setDeleteStudentModalData] = useState<StudentToDelete | null>(null);
   const [studentSearch, setStudentSearch] = useState('');
@@ -923,13 +965,18 @@ export function TeacherDashboard({
 
   useEffect(() => {
     (window as any).openTageskompass = (std: any) => {
+      const sId = std.id || std.user_id;
+      const matched = allStudents.find((s: any) => String(s.id) === String(sId));
+      const localLevel = typeof window !== 'undefined' && sId ? localStorage.getItem(`campus_student_ui_level_${sId}`) : null;
       setDocStudent({
         ...std,
-        id: std.id,
+        id: sId,
         first_name: std.first_name || std.name?.split(' ')[0],
         last_name: std.last_name || std.name?.split(' ').slice(1).join(' '),
         photo_url: std.photo_url || '/avatar_ghost.jpg',
         is_campus_active: std.is_campus_active,
+        campus_ui_level: localLevel || std.campus_ui_level || matched?.campus_ui_level,
+        parent_permissions: std.parent_permissions || matched?.parent_permissions,
         school_id: std.school_id || teacher?.school_id,
         schoolId: std.school_id || teacher?.school_id,
         schools: std.schools || (teacher as any)?.schools,
@@ -939,9 +986,28 @@ export function TeacherDashboard({
     return () => {
       delete (window as any).openTageskompass;
     };
-  }, [teacher?.school_id]);
+  }, [teacher?.school_id, allStudents]);
+
+  useEffect(() => {
+    const handleLevelChangeEvt = (e: any) => {
+      const detail = e.detail;
+      const newLevel = typeof detail === 'string' ? detail : detail?.uiLevel;
+      const studentId = typeof detail === 'object' ? detail?.studentId : null;
+      if (newLevel) {
+        if (studentId) {
+          setAllStudents((prev: any[]) => prev.map(s => String(s.id) === String(studentId) ? { ...s, campus_ui_level: newLevel } : s));
+          setDocStudent((prev: any) => prev && String(prev.id) === String(studentId) ? { ...prev, campus_ui_level: newLevel } : prev);
+        } else {
+          setDocStudent((prev: any) => prev ? { ...prev, campus_ui_level: newLevel } : prev);
+        }
+      }
+    };
+    window.addEventListener('campus_ui_level_changed', handleLevelChangeEvt);
+    return () => window.removeEventListener('campus_ui_level_changed', handleLevelChangeEvt);
+  }, []);
 
   const performDirectTeacherCheckin = async () => {
+    setCheckInErrorMsg('');
     setCheckingInStatus('verifying');
     const now = new Date().toISOString();
     try {
@@ -994,7 +1060,7 @@ export function TeacherDashboard({
           setLocalCheckedIn(true);
           if (onLocationModeChange) onLocationModeChange('lab');
         } else {
-          alert('Fehler beim Einchecken: ' + sessErr.message);
+          setCheckInErrorMsg(sessErr.message || 'Fehler beim Anmelden am Live Lab');
           setCheckingInStatus('error');
         }
       } else {
@@ -1035,7 +1101,7 @@ export function TeacherDashboard({
         setLocalCheckedIn(true);
         if (onLocationModeChange) onLocationModeChange('lab');
       } else {
-        alert('Fehler beim Einchecken: ' + (e?.message || String(e)));
+        setCheckInErrorMsg(e?.message || 'Fehler beim Anmelden am Live Lab');
         setCheckingInStatus('error');
       }
     }
@@ -1053,9 +1119,10 @@ export function TeacherDashboard({
   // Auto-checkin intentionally disabled: Teachers explicitly check in via "Einloggen" button
   // to ensure full control over presence, accurate session lifecycle and visibility of the fine-net overlay (§ 87 BetrVG / DSGVO).
 
-  const handleGeofenceCheck = () => {
+  const handleLiveLabCheckIn = () => {
     // ⚡ Enterprise+ Tier-1 Privacy: Zero geolocation tracking (§ 87 BetrVG / DSGVO Art. 5)
     console.log('[Presence] Direct check-in activated without location tracking.');
+    setCheckInErrorMsg('');
     if (isTeacher) {
       performDirectTeacherCheckin();
     } else {
@@ -1063,6 +1130,7 @@ export function TeacherDashboard({
       setShowKioskView(true);
     }
   };
+  const handleGeofenceCheck = handleLiveLabCheckIn;
 
   const handleKioskStationSelect = async (station: any) => {
     if (!userId) return;
@@ -2233,7 +2301,9 @@ export function TeacherDashboard({
   const [rawBriefingData, setRawBriefingData] = useState<any>(() => {
     if (typeof window !== 'undefined' && userId) {
       try {
-        const cached = localStorage.getItem(`groovelab_briefing_cache_${userId}`);
+        const simNow = getSimulatedNow();
+        const simDateStr = simNow.toLocaleDateString('sv-SE');
+        const cached = localStorage.getItem(`groovelab_briefing_cache_${userId}_${simDateStr}`) || localStorage.getItem(`groovelab_briefing_cache_${userId}`);
         if (cached) return JSON.parse(cached);
       } catch (e) {}
     }
@@ -2242,7 +2312,9 @@ export function TeacherDashboard({
   const [briefingLoading, setBriefingLoading] = useState<boolean>(() => {
     if (typeof window !== 'undefined' && userId) {
       try {
-        const cached = localStorage.getItem(`groovelab_briefing_cache_${userId}`);
+        const simNow = getSimulatedNow();
+        const simDateStr = simNow.toLocaleDateString('sv-SE');
+        const cached = localStorage.getItem(`groovelab_briefing_cache_${userId}_${simDateStr}`) || localStorage.getItem(`groovelab_briefing_cache_${userId}`);
         if (cached) return false;
       } catch (e) {}
     }
@@ -2264,7 +2336,7 @@ export function TeacherDashboard({
   const isTodayHoliday = useMemo(() => {
     const todayStr = getSimulatedNow().toLocaleDateString('sv-SE');
     return holidays.find(h => todayStr >= h.start && todayStr <= h.end);
-  }, [holidays]);
+  }, [holidays, briefingRefreshTicker]);
 
   const [myBookings, setMyBookings] = useState<any[]>([]);
   const [myChangedAppointments, setMyChangedAppointments] = useState<any[]>([]);
@@ -4321,9 +4393,26 @@ export function TeacherDashboard({
     return widgetState === 'ACTIVE';
   }, [widgetState]);
 
+  const todayWeekdayNumber = useMemo(() => {
+    const raw = getSimulatedNow().getDay();
+    return raw === 0 ? 7 : raw;
+  }, [currentTimeStr, briefingRefreshTicker]);
+
+  const isTeacherWorkingOnDay = useMemo(() => {
+    const activeDays = Object.keys(teacher?.teacher_availability || {}).map(Number);
+    if (teacher?.teacher_onboarding_completed && activeDays.length > 0) {
+      return activeDays.includes(todayWeekdayNumber);
+    }
+    // Default: Monday to Friday (1 to 5) are standard music school teaching days
+    return todayWeekdayNumber >= 1 && todayWeekdayNumber <= 5;
+  }, [teacher?.teacher_availability, teacher?.teacher_onboarding_completed, todayWeekdayNumber]);
+
   const isFreeDay = useMemo(() => {
-    return !isWeekend && (!briefingData?.timeline || briefingData.timeline.length === 0);
-  }, [isWeekend, briefingData?.timeline]);
+    if (isWeekend) return false;
+    if (isTodayHoliday) return true;
+    if (!isTeacherWorkingOnDay) return true;
+    return false;
+  }, [isWeekend, isTodayHoliday, isTeacherWorkingOnDay]);
 
   const isTourDemoScheduleActive = useMemo(() => {
     return Boolean(
@@ -4405,6 +4494,49 @@ export function TeacherDashboard({
     };
   }, [dailyBriefingStableChoices, currentTimeStr]);
 
+  // Robust full-name resolution for teacher greeting (filtering out generic 'Lehrkraft' placeholder)
+  const resolvedTeacherFullName = useMemo(() => {
+    // 1. Try formatted full name from teacher state
+    const formatted = formatTeacherFullName(teacher);
+    if (formatted && formatted !== 'Lehrkraft') return formatted;
+    
+    // 2. Try direct first & last name from teacher state
+    const directName = [teacher?.first_name, teacher?.last_name].filter(Boolean).join(' ').trim() || teacher?.name;
+    if (directName && directName !== 'Lehrkraft') return directName;
+    
+    // 3. Try initialTeacher prop (from AdminDashboard / App)
+    if (initialTeacher) {
+      const initFormatted = formatTeacherFullName(initialTeacher);
+      if (initFormatted && initFormatted !== 'Lehrkraft') return initFormatted;
+      const initDirect = [initialTeacher?.first_name, initialTeacher?.last_name].filter(Boolean).join(' ').trim() || initialTeacher?.name;
+      if (initDirect && initDirect !== 'Lehrkraft') return initDirect;
+    }
+
+    // 4. Try session user
+    if (session?.users) {
+      const sessFormatted = formatTeacherFullName(session.users);
+      if (sessFormatted && sessFormatted !== 'Lehrkraft') return sessFormatted;
+      const sessDirect = [session.users.first_name, session.users.last_name].filter(Boolean).join(' ').trim() || session.users.name;
+      if (sessDirect && sessDirect !== 'Lehrkraft') return sessDirect;
+    }
+
+    // 5. Try cached user storage
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = sessionStorage.getItem('groovelab_cached_user') || localStorage.getItem('groovelab_cached_user') || sessionStorage.getItem('campus_user') || localStorage.getItem('campus_user');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          const parsedFormatted = formatTeacherFullName(parsed);
+          if (parsedFormatted && parsedFormatted !== 'Lehrkraft') return parsedFormatted;
+          const parsedDirect = [parsed?.first_name, parsed?.last_name].filter(Boolean).join(' ').trim() || parsed?.name;
+          if (parsedDirect && parsedDirect !== 'Lehrkraft') return parsedDirect;
+        }
+      } catch {}
+    }
+
+    return (teacher ? formatTeacherFullName(teacher) : '') || 'Coach';
+  }, [teacher, initialTeacher, session]);
+
   // Stage Toolbox & Group selection states
   const [showStageToolbox, setShowStageToolbox] = useState<'tuner' | 'metronome' | null>(null);
   const [selectedGroupStudentId, setSelectedGroupStudentId] = useState<string | null>(null);
@@ -4425,6 +4557,9 @@ export function TeacherDashboard({
       sessionStorage.setItem('campus_left_column_tab', tab);
     }
   }, []);
+
+  const isRestDay = (isWeekend || isFreeDay) && !isTourDemoScheduleActive;
+  const effectiveLeftColumnTab = isRestDay && leftColumnTab === 'briefing' ? 'notes' : leftColumnTab;
 
   // Quick 1-Click Audio-Hausaufgabe state
   const [quickAudioStudent, setQuickAudioStudent] = useState<any | null>(null);
@@ -4884,10 +5019,14 @@ export function TeacherDashboard({
         }
 
         const [roomsRes, tUserRes, schoolStudentsRes, schedRes, occRes] = await Promise.all([
-          safeQuery(supabase.from('rooms').select('id, name').eq('school_id', teacherProfile.school_id)),
-          targetTeacherId !== 'master-support-id' 
-            ? safeQuery(supabase.from('users').select('planned_boards').eq('id', targetTeacherId).maybeSingle(), { data: null })
-            : Promise.resolve({ data: null, error: null }),
+          (rooms && rooms.length > 0)
+            ? Promise.resolve({ data: rooms, error: null })
+            : safeQuery(supabase.from('rooms').select('id, name').eq('school_id', teacherProfile.school_id)),
+          (targetTeacherId !== 'master-support-id' && targetTeacherId === teacherProfile.id && teacherProfile.planned_boards)
+            ? Promise.resolve({ data: { planned_boards: teacherProfile.planned_boards }, error: null })
+            : (targetTeacherId !== 'master-support-id' 
+                ? safeQuery(supabase.from('users').select('planned_boards').eq('id', targetTeacherId).maybeSingle(), { data: null })
+                : Promise.resolve({ data: null, error: null })),
           safeQuery(supabase.from('users').select('id, first_name, last_name, instrument, is_app_user, birth_date, campus_ui_level, parent_permissions, avatars(avatar_style, evolution_level, xp, streak_flame)').eq('school_id', teacherProfile.school_id)),
           safeQuery(schedQuery),
           safeQuery(occQuery)
@@ -4906,8 +5045,14 @@ export function TeacherDashboard({
           let loadedActiveDraftId = 'default';
           let loadedSubmittedDraftId = '';
 
-          const storedDraftState = localStorage.getItem(`groovelab_teacher_draft_state_${activePlatform}_${targetTeacherId}`) || localStorage.getItem(`groovelab_teacher_draft_state_campus_${targetTeacherId}`);
-          const storedBoardsState = localStorage.getItem(`groovelab_teacher_boards_${activePlatform}_${targetTeacherId}`) || localStorage.getItem(`groovelab_teacher_boards_${targetTeacherId}`);
+          const storedDraftState = localStorage.getItem(`groovelab_teacher_draft_state_${activePlatform}_${targetTeacherId}`) || 
+                                   localStorage.getItem(`groovelab_teacher_draft_state_campus_${targetTeacherId}`) ||
+                                   localStorage.getItem(`groovelab_teacher_draft_state_groovelab_${targetTeacherId}`) ||
+                                   localStorage.getItem(`groovelab_teacher_draft_state_${targetTeacherId}`);
+          const storedBoardsState = localStorage.getItem(`groovelab_teacher_boards_${activePlatform}_${targetTeacherId}`) || 
+                                    localStorage.getItem(`groovelab_teacher_boards_campus_${targetTeacherId}`) ||
+                                    localStorage.getItem(`groovelab_teacher_boards_groovelab_${targetTeacherId}`) ||
+                                    localStorage.getItem(`groovelab_teacher_boards_${targetTeacherId}`);
 
           if (storedDraftState) {
             try {
@@ -4950,8 +5095,7 @@ export function TeacherDashboard({
           const todayBoards = boards.filter((b: any) => {
             const dayVal = b.dayOfWeek ?? b.day_of_week ?? b.day;
             if (dayVal === undefined || dayVal === null) return false;
-            const dStr = String(dayVal).trim();
-            return dStr === String(todayWeekday);
+            return parseDayNumber(dayVal) === todayWeekday;
           });
 
           // Helper to recalculate board lesson times identically to ScheduleBoardDesktop
@@ -5018,6 +5162,7 @@ export function TeacherDashboard({
                   effectiveCustomTime = snappedTarget;
                 } else {
                   assignedStart = currentTime;
+                  effectiveCustomTime = currentTime;
                 }
               } else if (s.assignedTime) {
                 const snappedTarget = snapTimeToGridHelper(s.assignedTime, 15);
@@ -5149,10 +5294,7 @@ export function TeacherDashboard({
         // 2. Secondary Fallback: Load from pre-fetched schedules table if no board slots
         if (slots.length === 0) {
           const dbSlots = (allTeacherSlots || []).filter((s: any) => {
-            return s.day_of_week === todayWeekday || 
-                   s.day_of_week === dayNameStr || 
-                   String(s.day_of_week) === String(todayWeekday) ||
-                   String(s.day_of_week) === dayNameStr;
+            return parseDayNumber(s.day_of_week) === todayWeekday;
           });
 
           dbSlots.forEach((slot: any) => {
@@ -5260,7 +5402,9 @@ export function TeacherDashboard({
                  isAppUser: student.is_app_user ?? false,
                  isAnalogStickerUser,
                  birthDate: student.birth_date,
-                 streakFlame: avatar?.streak_flame || 0
+                 streakFlame: avatar?.streak_flame || 0,
+                 campus_ui_level: student.campus_ui_level,
+                 parent_permissions: student.parent_permissions
                } : null
              };
            });
@@ -5335,7 +5479,9 @@ export function TeacherDashboard({
                      isAppUser: student.is_app_user ?? false,
                      isAnalogStickerUser,
                      birthDate: student.birth_date,
-                     streakFlame: avatar?.streak_flame || 0
+                     streakFlame: avatar?.streak_flame || 0,
+                     campus_ui_level: student.campus_ui_level,
+                     parent_permissions: student.parent_permissions
                    } : (existingItem?.student || null)
                  };
 
@@ -5555,6 +5701,7 @@ export function TeacherDashboard({
 
         if (typeof window !== 'undefined' && targetTeacherId) {
           try {
+            localStorage.setItem(`groovelab_briefing_cache_${targetTeacherId}_${todayStr}`, JSON.stringify(nextBriefing));
             localStorage.setItem(`groovelab_briefing_cache_${targetTeacherId}`, JSON.stringify(nextBriefing));
           } catch (e) {}
         }
@@ -5695,8 +5842,9 @@ export function TeacherDashboard({
 
     const sId = teacher?.school_id;
 
-    const channelSessions = supabase
-      .channel(`realtime_teacher_sessions_${userId}`)
+    // Consolidate all 8 topics into 1 single high-performance multiplexed channel
+    const teacherWorkspaceChannel = supabase
+      .channel(`realtime_teacher_workspace_${userId}`)
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
@@ -5705,10 +5853,6 @@ export function TeacherDashboard({
       }, () => {
         debouncedFetchData();
       })
-      .subscribe();
-
-    const channelHelp = supabase
-      .channel(`realtime_teacher_help_${userId}`)
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
@@ -5717,10 +5861,6 @@ export function TeacherDashboard({
       }, () => {
         debouncedFetchData();
       })
-      .subscribe();
-
-    const channelSkills = supabase
-      .channel(`realtime_teacher_skills_${userId}`)
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
@@ -5729,10 +5869,6 @@ export function TeacherDashboard({
       }, () => {
         debouncedFetchData();
       })
-      .subscribe();
-
-    const channelBands = supabase
-      .channel(`realtime_teacher_bands_${userId}`)
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
@@ -5741,25 +5877,23 @@ export function TeacherDashboard({
       }, () => {
         debouncedFetchData();
       })
-      .subscribe();
-
-    const channelCrisis = supabase
-      .channel(`realtime_teacher_crisis_${userId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'crisis_notifications', filter: `teacher_id=eq.${userId}` }, () => {
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'crisis_notifications', 
+        filter: `teacher_id=eq.${userId}` 
+      }, () => {
         debouncedFetchData();
       })
-      .subscribe();
-
-    const channelOccurrences = supabase
-      .channel(`realtime_teacher_occurrences_${userId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_occurrences', filter: `teacher_id=eq.${userId}` }, () => {
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'schedule_occurrences', 
+        filter: `teacher_id=eq.${userId}` 
+      }, () => {
         debouncedFetchData();
         setBriefingRefreshTicker(prev => prev + 1);
       })
-      .subscribe();
-
-    const channelUsers = supabase
-      .channel(`realtime_teacher_users_${userId}`)
       .on('postgres_changes', { 
         event: 'UPDATE', 
         schema: 'public', 
@@ -5780,11 +5914,12 @@ export function TeacherDashboard({
         }
         debouncedFetchData();
       })
-      .subscribe();
-
-    const channelStudents = supabase
-      .channel(`realtime_teacher_students_${userId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'students', filter: `teacher_id=eq.${userId}` }, (payload) => {
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'students', 
+        filter: `teacher_id=eq.${userId}` 
+      }, (payload) => {
         const oldRec = payload.old as any;
         const newRec = payload.new as any;
         if (oldRec?.teacher_id === userId && newRec?.teacher_id !== userId) {
@@ -5796,17 +5931,10 @@ export function TeacherDashboard({
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channelSessions);
-      supabase.removeChannel(channelHelp);
-      supabase.removeChannel(channelSkills);
-      supabase.removeChannel(channelBands);
-      supabase.removeChannel(channelCrisis);
-      supabase.removeChannel(channelOccurrences);
-      supabase.removeChannel(channelUsers);
-      supabase.removeChannel(channelStudents);
+      supabase.removeChannel(teacherWorkspaceChannel);
       if (debounceTimer) clearTimeout(debounceTimer);
     };
-  }, [userId, activePlatform]);
+  }, [userId, teacher?.school_id, activePlatform]);
 
   const isFetchingRef = useRef<Promise<void> | null>(null);
 
@@ -5877,16 +6005,33 @@ export function TeacherDashboard({
       } else {
         const [bIds, tDataRes] = await Promise.all([
           fetchUserBandIds(userId),
-          supabase.from('users').select('*, schools(*)').eq('id', userId).single()
+          supabase.from('users').select('*, schools(*)').eq('id', userId).maybeSingle()
         ]);
 
         tData = tDataRes.data;
 
-        // Fallback: if schools join failed (e.g. RLS on schools table for student), query users directly
+        // Fallback 1: if schools join failed (e.g. RLS on schools table for student), query users directly
         if (!tData && userId) {
-          const { data: fallbackUser } = await supabase.from('users').select('*').eq('id', userId).single();
+          const { data: fallbackUser } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
           if (fallbackUser) {
             tData = fallbackUser;
+          }
+        }
+
+        // Fallback 2: Retrieve from initialTeacher or cached localStorage/sessionStorage user if API failed
+        if (!tData) {
+          if (initialTeacher && (!userId || initialTeacher.id === userId)) {
+            tData = initialTeacher;
+          } else if (typeof window !== 'undefined') {
+            const cached = sessionStorage.getItem('groovelab_cached_user') || localStorage.getItem('groovelab_cached_user') || sessionStorage.getItem('campus_user') || localStorage.getItem('campus_user');
+            if (cached) {
+              try {
+                const parsed = JSON.parse(cached);
+                if (parsed && (!userId || parsed.id === userId)) {
+                  tData = parsed;
+                }
+              } catch (e) {}
+            }
           }
         }
 
@@ -6015,8 +6160,15 @@ export function TeacherDashboard({
           (isGrooveLabMode && activeTab === 'bands')
             ? Promise.resolve(supabase.from('bands').select('*, band_members(*, users(*)), coach:users!coach_id(id, first_name, last_name, photo_url), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, last_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready))))').eq('school_id', tData.school_id).order('name')).catch(e => ({ data: [], error: e }))
             : Promise.resolve({ data: [], error: null }),
-          // student list (always fetched to ensure student roster and messaging board are populated)
-          Promise.resolve(studentQuery.order('first_name')).catch(e => ({ data: [], error: e })),
+          // student list (always fetched with SWR caching to ensure student roster and messaging board are populated at 0ms)
+          queryCache.fetch(
+            `teacher_students_${tData.school_id}_${tData.is_ghost_mode ? 'ghost' : userId}_${viewMode}`,
+            async () => {
+              const res = await studentQuery.order('first_name');
+              return res;
+            },
+            { ttlMs: 60_000, staleWhileRevalidate: true }
+          ).catch(e => ({ data: [], error: e })),
           // help requests
           ((activeTab === 'live' || activeTab === 'briefing') && viewMode !== 'student')
             ? Promise.resolve(supabase.from('help_requests').select('*, users(*)').eq('school_id', tData.school_id).eq('status', 'pending').order('created_at', { ascending: false })).catch(e => ({ data: [], error: e }))
@@ -7372,7 +7524,7 @@ useEffect(() => {
     const studentToDelete = allStudents.find(s => s.id === id);
     if (!studentToDelete) return;
 
-    const teacherName = teacher ? `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() : undefined;
+    const teacherName = teacher ? formatTeacherFullName(teacher) : undefined;
     const studentName = `${studentToDelete.first_name || ''} ${studentToDelete.last_name || ''}`.trim() || 'Schüler';
 
     setDeleteStudentModalData({
@@ -7421,6 +7573,7 @@ useEffect(() => {
       if (error) {
         alert('Fehler: ' + error.message);
       } else if (data) {
+        queryCache.invalidatePrefix('teacher_students_');
         setAllStudents(prev => [...prev, data]);
         fetchData();
         const link = `${window.location.origin}/?invite=${qrToken}`;
@@ -7860,6 +8013,7 @@ useEffect(() => {
         getSimulatedNow={getSimulatedNow}
         showRealNames={showRealNames}
         widgetState={widgetState}
+        onOpenStudio={() => setActiveTab('studio')}
       />
     </Suspense>
   );
@@ -8158,13 +8312,18 @@ useEffect(() => {
               setSelectedStudentProfile(null);
             }}
             onOpenTageskompass={(std) => {
+              const sId = std.id || std.user_id;
+              const matched = allStudents.find((s: any) => String(s.id) === String(sId));
+              const localLevel = typeof window !== 'undefined' && sId ? localStorage.getItem(`campus_student_ui_level_${sId}`) : null;
               setDocStudent({
                 ...std,
-                id: std.id,
+                id: sId,
                 first_name: std.first_name,
                 last_name: std.last_name,
                 photo_url: std.photo_url || '/avatar_ghost.jpg',
                 is_campus_active: std.is_campus_active,
+                campus_ui_level: localLevel || std.campus_ui_level || matched?.campus_ui_level,
+                parent_permissions: std.parent_permissions || matched?.parent_permissions,
                 school_id: std.school_id || teacher?.school_id,
                 schoolId: std.school_id || teacher?.school_id,
                 schools: std.schools || (teacher as any)?.schools,
@@ -8199,6 +8358,7 @@ useEffect(() => {
                 if (fName && s.first_name && s.first_name.toLowerCase().trim() === fName) return false;
                 return true;
               }));
+              queryCache.invalidatePrefix('teacher_students_');
               await fetchData();
             }}
           />
@@ -8206,15 +8366,16 @@ useEffect(() => {
       )}
        {modalDocStudent && (
          <Suspense fallback={null}>
-           <MeisterwerkDocumentationModal 
-             student={modalDocStudent} 
-             onClose={() => setDocStudent(null)} 
-             teacherId={userId}
-             teacherName={formatTeacherFullName(teacher)}
-             schoolName={schoolData?.name || ''}
-             hasTresorStorage={Number(schoolData?.storage_addon_gb || 0) > 0 || checkIsAudioTresorActive(modalDocStudent)}
+            <MeisterwerkDocumentationModal 
+              student={modalDocStudent} 
+              onClose={() => setDocStudent(null)} 
+              teacherId={userId}
+              teacherName={formatTeacherFullName(teacher)}
+              schoolId={modalDocStudent?.school_id || teacher?.school_id || schoolData?.id}
+              schoolName={schoolData?.name || ''}
+              hasTresorStorage={Number(schoolData?.storage_addon_gb || 0) > 0 || checkIsAudioTresorActive(modalDocStudent)}
              readOnly={teacherDunningStatus?.isTeacherReadOnly || false}
-             uiLevel={modalDocStudent?.campus_ui_level || 'junior'}
+             uiLevel={modalDocStudent?.campus_ui_level || undefined}
              parentPermissions={modalDocStudent?.parent_permissions}
              groupStudents={modalDocStudent?.groupStudents || (modalDocStudent?.students && modalDocStudent.students.length > 1 ? modalDocStudent.students : [])}
              onProfileClick={(student) => {
@@ -8257,13 +8418,18 @@ useEffect(() => {
               setLeftColumnTab('notes');
             }}
             onOpenStudentHomework={(student) => {
+              const sId = student.id || student.user_id;
+              const matched = allStudents.find((s: any) => String(s.id) === String(sId));
+              const localLevel = typeof window !== 'undefined' && sId ? localStorage.getItem(`campus_student_ui_level_${sId}`) : null;
               setDocStudent({
                 ...student,
-                id: student.id,
+                id: sId,
                 first_name: student.first_name || student.name?.split(' ')[0],
                 last_name: student.last_name || student.name?.split(' ').slice(1).join(' '),
                 photo_url: student.photo_url || '/avatar_ghost.jpg',
                 is_campus_active: student.is_campus_active ?? false,
+                campus_ui_level: localLevel || student.campus_ui_level || matched?.campus_ui_level,
+                parent_permissions: student.parent_permissions || matched?.parent_permissions,
                 school_id: student.school_id || teacher?.school_id,
                 schoolId: student.school_id || teacher?.school_id
               });
@@ -8437,6 +8603,7 @@ useEffect(() => {
             {(() => {
               const tabs = [
                 { id: 'briefing', label: 'Briefing', icon: LayoutDashboard },
+                { id: 'studio', label: 'Aufgaben-Studio', icon: BookOpen },
                 { id: 'live', label: 'Live Lab', icon: Music },
                 { id: 'bands', label: 'Bands', icon: Users },
                 { id: 'students', label: 'Schüler', icon: teachersManageTeachers ? Users : GraduationCap }
@@ -8542,7 +8709,7 @@ useEffect(() => {
                     )}
                   </h2>
                   <p style={{ color: '#64748b', fontWeight: 600, fontSize: '0.85rem', marginTop: '4px' }}>
-                    {teacher ? `${teacher.first_name} ${teacher.last_name} • ${teacher.instrument || 'Coach'}` : 'Zentrale'}
+                    {teacher ? `${formatTeacherFullName(teacher)} • ${teacher.instrument || 'Coach'}` : 'Zentrale'}
                   </p>
                 </>
               )}
@@ -9509,7 +9676,7 @@ useEffect(() => {
                                     wordBreak: 'break-word',
                                     overflowWrap: 'break-word'
                                   }}>
-                                    Hi, <span style={{ color: '#007aff' }}>{formatTeacherFullName(teacher) || teacher?.first_name || 'Lehrer'}</span>!
+                                    Hi, <span style={{ color: '#007aff' }}>{resolvedTeacherFullName}</span>!
                                   </h2>
                                   <p style={{
                                     margin: '6px 0 0 0',
@@ -9778,9 +9945,9 @@ useEffect(() => {
                       display: 'flex', 
                       flexDirection: 'column', 
                       gap: '20px', 
-                      flex: (isWeekend || isFreeDay) && !isTourDemoScheduleActive ? '1 1 100%' : '1 1 350px', 
+                      flex: isRestDay ? '1 1 380px' : '1 1 350px', 
                       minWidth: (windowWidth < 768 || isMobileDevice) ? '100%' : '300px',
-                      maxHeight: (isWeekend || isFreeDay) && !isTourDemoScheduleActive ? undefined : (windowWidth >= 768 ? '700px' : undefined),
+                      maxHeight: isRestDay ? undefined : (windowWidth >= 768 ? '700px' : undefined),
                       boxSizing: 'border-box'
                     }}>
                       {/* Premium Greeting Banner with Avatar & Wave Design */}
@@ -9797,15 +9964,15 @@ useEffect(() => {
                           boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
                           transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                           width: '100%',
-                          minHeight: windowWidth < 768 ? 'auto' : (((isWeekend || isFreeDay) && !isTourDemoScheduleActive) ? '260px' : '200px'),
-                          flex: (isFreeDay || isWeekend) && !isTourDemoScheduleActive ? '0 0 auto' : '0 1 auto',
+                          minHeight: windowWidth < 768 ? 'auto' : '200px',
+                          flex: '0 1 auto',
                           boxSizing: 'border-box',
                           overflow: 'hidden'
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
                             {/* Avatar: Compact Circle on mobile, Full height on desktop */}
                             <div style={{
-                              width: windowWidth < 768 ? '54px' : (((isWeekend || isFreeDay) && !isTourDemoScheduleActive) ? '420px' : '190px'),
+                              width: windowWidth < 768 ? '54px' : '190px',
                               height: windowWidth < 768 ? '54px' : '100%',
                               borderRadius: windowWidth < 768 ? '50%' : '0',
                               margin: windowWidth < 768 ? '12px 0 12px 14px' : '0',
@@ -9843,7 +10010,7 @@ useEffect(() => {
                             </div>
                             
                             <div style={{ 
-                              padding: windowWidth < 768 ? '12px 14px' : ((isWeekend && !isTourDemoScheduleActive) ? '32px 48px' : '24px 32px'), 
+                              padding: windowWidth < 768 ? '12px 14px' : '24px 32px', 
                               display: 'flex', 
                               flexDirection: 'column', 
                               justifyContent: 'center', 
@@ -9872,24 +10039,24 @@ useEffect(() => {
 
                               <h3 style={{ 
                                 margin: 0, 
-                                fontSize: windowWidth < 768 ? '1.25rem' : ((isWeekend && !isTourDemoScheduleActive) ? '36px' : '30px'), 
+                                fontSize: windowWidth < 768 ? '1.25rem' : '28px', 
                                 fontWeight: 950, 
                                 color: '#0f172a', 
                                 fontFamily: "'Plus Jakarta Sans', sans-serif", 
                                 lineHeight: 1.2
                               }}>
-                                {(isWeekend && !isTourDemoScheduleActive) ? 'Schönes Wochenende,' : `${dynamicGreeting.greeting},`}{' '}
+                                {isWeekend ? 'Schönes Wochenende,' : `${dynamicGreeting.greeting},`}{' '}
                                 <span style={{ 
                                   color: '#007aff', 
                                   fontWeight: 900,
                                   letterSpacing: '-0.01em',
                                   display: 'inline'
-                                }}>{formatTeacherFullName(teacher) || teacher?.first_name || 'Coach'}</span>!
+                                }}>{resolvedTeacherFullName}</span>!
                               </h3>
                               {windowWidth >= 768 && (
-                                <p style={{ margin: (isWeekend && !isTourDemoScheduleActive) ? '14px 0 0 0' : '6px 0 0 0', fontSize: (isWeekend && !isTourDemoScheduleActive) ? '1rem' : '0.82rem', color: (isWeekend && !isTourDemoScheduleActive) ? '#4b5563' : '#64748b', fontWeight: 600, lineHeight: (isWeekend && !isTourDemoScheduleActive) ? 1.5 : 1.25, maxWidth: (isWeekend && !isTourDemoScheduleActive) ? '650px' : undefined }}>
-                                  {(isWeekend && !isTourDemoScheduleActive)
-                                    ? 'Genieße deine wohlverdiente Pause! Keine Termine, kein Schulstress. Erhole dich gut und tanke Kraft für neue musikalische Abenteuer in der kommenden Woche.'
+                                <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: 1.35, maxWidth: '420px' }}>
+                                  {isWeekend
+                                    ? 'Keine Termine heute – Zeit zum Durchatmen und Erholen.'
                                     : ((isFreeDay && !isTourDemoScheduleActive) ? 'Heute hast du frei! Genieße deinen freien Tag.' : (isTourDemoScheduleActive ? 'Bereit für einen produktiven Tag? Hier ist deine Übersicht.' : dynamicGreeting.subtitle))
                                   }
                                 </p>
@@ -9913,55 +10080,57 @@ useEffect(() => {
                           boxSizing: 'border-box'
                         }}
                       >
-                        {/* 1. Tages-Kompass */}
-                        <button
-                          type="button"
-                          role="tab"
-                          id="tab-briefing"
-                          aria-selected={leftColumnTab === 'briefing'}
-                          aria-controls="tabpanel-briefing"
-                          onClick={() => setLeftColumnTab('briefing')}
-                          style={{
-                            flex: 1,
-                            padding: '7px 8px',
-                            borderRadius: '10px',
-                            border: leftColumnTab === 'briefing' ? '1px solid #cbd5e1' : 'none',
-                            background: leftColumnTab === 'briefing' ? '#ffffff' : 'transparent',
-                            color: leftColumnTab === 'briefing' ? '#0f172a' : '#64748b',
-                            fontWeight: leftColumnTab === 'briefing' ? 850 : 600,
-                            fontSize: '0.76rem',
-                            cursor: 'pointer',
-                            boxShadow: leftColumnTab === 'briefing' ? '0 2px 6px rgba(0,0,0,0.04)' : 'none',
-                            transition: 'all 0.15s ease',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '5px'
-                          }}
-                        >
-                          <Sparkles size={13} color={leftColumnTab === 'briefing' ? '#0f172a' : '#64748b'} />
-                          <span>Tages-Kompass</span>
-                        </button>
+                        {/* 1. Tages-Kompass (Werktags) */}
+                        {!isRestDay && (
+                          <button
+                            type="button"
+                            role="tab"
+                            id="tab-briefing"
+                            aria-selected={effectiveLeftColumnTab === 'briefing'}
+                            aria-controls="tabpanel-briefing"
+                            onClick={() => setLeftColumnTab('briefing')}
+                            style={{
+                              flex: 1,
+                              padding: '7px 8px',
+                              borderRadius: '10px',
+                              border: effectiveLeftColumnTab === 'briefing' ? '1px solid #cbd5e1' : 'none',
+                              background: effectiveLeftColumnTab === 'briefing' ? '#ffffff' : 'transparent',
+                              color: effectiveLeftColumnTab === 'briefing' ? '#0f172a' : '#64748b',
+                              fontWeight: effectiveLeftColumnTab === 'briefing' ? 850 : 600,
+                              fontSize: '0.76rem',
+                              cursor: 'pointer',
+                              boxShadow: effectiveLeftColumnTab === 'briefing' ? '0 2px 6px rgba(0,0,0,0.04)' : 'none',
+                              transition: 'all 0.15s ease',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '5px'
+                            }}
+                          >
+                            <Sparkles size={13} color={effectiveLeftColumnTab === 'briefing' ? '#0f172a' : '#64748b'} />
+                            <span>Tages-Kompass</span>
+                          </button>
+                        )}
 
                         {/* 2. Notizen */}
                         <button
                           type="button"
                           role="tab"
                           id="tab-notes"
-                          aria-selected={leftColumnTab === 'notes'}
+                          aria-selected={effectiveLeftColumnTab === 'notes'}
                           aria-controls="tabpanel-notes"
                           onClick={() => setLeftColumnTab('notes')}
                           style={{
                             flex: 1,
                             padding: '7px 8px',
                             borderRadius: '10px',
-                            border: leftColumnTab === 'notes' ? '1px solid #cbd5e1' : 'none',
-                            background: leftColumnTab === 'notes' ? '#ffffff' : 'transparent',
-                            color: leftColumnTab === 'notes' ? '#0f172a' : '#64748b',
-                            fontWeight: leftColumnTab === 'notes' ? 850 : 600,
+                            border: effectiveLeftColumnTab === 'notes' ? '1px solid #cbd5e1' : 'none',
+                            background: effectiveLeftColumnTab === 'notes' ? '#ffffff' : 'transparent',
+                            color: effectiveLeftColumnTab === 'notes' ? '#0f172a' : '#64748b',
+                            fontWeight: effectiveLeftColumnTab === 'notes' ? 850 : 600,
                             fontSize: '0.76rem',
                             cursor: 'pointer',
-                            boxShadow: leftColumnTab === 'notes' ? '0 2px 6px rgba(0,0,0,0.04)' : 'none',
+                            boxShadow: effectiveLeftColumnTab === 'notes' ? '0 2px 6px rgba(0,0,0,0.04)' : 'none',
                             transition: 'all 0.15s ease',
                             display: 'flex',
                             alignItems: 'center',
@@ -9969,7 +10138,7 @@ useEffect(() => {
                             gap: '5px'
                           }}
                         >
-                          <Edit3 size={13} color={leftColumnTab === 'notes' ? '#0f172a' : '#64748b'} />
+                          <Edit3 size={13} color={effectiveLeftColumnTab === 'notes' ? '#0f172a' : '#64748b'} />
                           <span>Notizen</span>
                         </button>
 
@@ -9978,20 +10147,20 @@ useEffect(() => {
                           type="button"
                           role="tab"
                           id="tab-toolbox"
-                          aria-selected={leftColumnTab === 'toolbox'}
+                          aria-selected={effectiveLeftColumnTab === 'toolbox'}
                           aria-controls="tabpanel-toolbox"
                           onClick={() => setLeftColumnTab('toolbox')}
                           style={{
                             flex: 1,
                             padding: '7px 8px',
                             borderRadius: '10px',
-                            border: leftColumnTab === 'toolbox' ? '1px solid #cbd5e1' : 'none',
-                            background: leftColumnTab === 'toolbox' ? '#ffffff' : 'transparent',
-                            color: leftColumnTab === 'toolbox' ? '#0f172a' : '#64748b',
-                            fontWeight: leftColumnTab === 'toolbox' ? 850 : 600,
+                            border: effectiveLeftColumnTab === 'toolbox' ? '1px solid #cbd5e1' : 'none',
+                            background: effectiveLeftColumnTab === 'toolbox' ? '#ffffff' : 'transparent',
+                            color: effectiveLeftColumnTab === 'toolbox' ? '#0f172a' : '#64748b',
+                            fontWeight: effectiveLeftColumnTab === 'toolbox' ? 850 : 600,
                             fontSize: '0.76rem',
                             cursor: 'pointer',
-                            boxShadow: leftColumnTab === 'toolbox' ? '0 2px 6px rgba(0,0,0,0.04)' : 'none',
+                            boxShadow: effectiveLeftColumnTab === 'toolbox' ? '0 2px 6px rgba(0,0,0,0.04)' : 'none',
                             transition: 'all 0.15s ease',
                             display: 'flex',
                             alignItems: 'center',
@@ -9999,16 +10168,16 @@ useEffect(() => {
                             gap: '5px'
                           }}
                         >
-                          <Sliders size={13} color={leftColumnTab === 'toolbox' ? '#0f172a' : '#64748b'} />
+                          <Sliders size={13} color={effectiveLeftColumnTab === 'toolbox' ? '#0f172a' : '#64748b'} />
                           <span>Toolbox</span>
                         </button>
                       </div>
 
-                      {leftColumnTab === 'briefing' ? (
+                      {effectiveLeftColumnTab === 'briefing' ? (
                         <div role="tabpanel" id="tabpanel-briefing" aria-labelledby="tab-briefing" tabIndex={0} style={{ width: '100%', display: 'flex', flexDirection: 'column', flex: 1 }}>
                           {renderHausaufgabenWidget()}
                         </div>
-                      ) : leftColumnTab === 'notes' ? (
+                      ) : effectiveLeftColumnTab === 'notes' ? (
                         <div role="tabpanel" id="tabpanel-notes" aria-labelledby="tab-notes" tabIndex={0} style={{ width: '100%' }}>
                           <BriefingNotesCard
                             user={teacher}
@@ -10019,13 +10188,18 @@ useEffect(() => {
                             rooms={rooms}
                             onOpenDrawer={() => setShowNotesDrawer(true)}
                             onOpenHomeworkModal={(stud) => {
+                              const sId = stud.id || stud.user_id;
+                              const matched = allStudents.find((s: any) => String(s.id) === String(sId));
+                              const localLevel = typeof window !== 'undefined' && sId ? localStorage.getItem(`campus_student_ui_level_${sId}`) : null;
                               setDocStudent({
                                 ...stud,
-                                id: stud.id,
+                                id: sId,
                                 first_name: stud.first_name || stud.name?.split(' ')[0],
                                 last_name: stud.last_name || stud.name?.split(' ').slice(1).join(' '),
                                 photo_url: stud.photo_url || '/avatar_ghost.jpg',
                                 is_campus_active: stud.is_campus_active ?? false,
+                                campus_ui_level: localLevel || stud.campus_ui_level || matched?.campus_ui_level,
+                                parent_permissions: stud.parent_permissions || matched?.parent_permissions,
                                 school_id: stud.school_id || teacher?.school_id,
                                 schoolId: stud.school_id || teacher?.school_id
                               });
@@ -10039,11 +10213,177 @@ useEffect(() => {
                       )}
                     </div>
 
-                    {/* RIGHT COLUMN: TAGESPLAN */}
+                    {/* RIGHT COLUMN: TAGESPLAN ODER WOCHENEND-REFUGIUM */}
                     {isTourDemoScheduleActive ? (
                       renderTourDemoScheduleJSX()
-                    ) : !(isWeekend || isFreeDay) && (
-                      isTeacherCurrentlyAbsent(teacher) && !bypassAbsenceView ? (
+                    ) : isRestDay ? (
+                      <div style={{
+                        flex: '1.2 1 450px',
+                        minWidth: (windowWidth < 768 || isMobileDevice) ? '100%' : '300px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px',
+                        boxSizing: 'border-box'
+                      }}>
+                        <div id="tour-teacher-schedule" className="google-card" style={{
+                          width: '100%',
+                          padding: (windowWidth < 768 || isMobileDevice) ? '20px 16px' : '28px 28px',
+                          borderRadius: '24px',
+                          border: '1px solid rgba(139, 92, 246, 0.2)',
+                          boxShadow: '0 8px 32px rgba(139, 92, 246, 0.06), 0 2px 12px rgba(0,0,0,0.03)',
+                          background: 'linear-gradient(135deg, #ffffff 0%, #faf8ff 50%, #f5f3ff 100%)',
+                          boxSizing: 'border-box',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          minHeight: windowWidth >= 768 ? '360px' : 'auto'
+                        }}>
+                          {/* Ambient background glow */}
+                          <div style={{
+                            position: 'absolute',
+                            top: '-30%',
+                            right: '-30%',
+                            width: '80%',
+                            height: '80%',
+                            background: 'radial-gradient(circle, rgba(167, 139, 250, 0.15) 0%, transparent 70%)',
+                            pointerEvents: 'none',
+                            zIndex: 0
+                          }} />
+                          <div style={{
+                            position: 'absolute',
+                            bottom: '-25%',
+                            left: '-25%',
+                            width: '70%',
+                            height: '70%',
+                            background: 'radial-gradient(circle, rgba(129, 140, 248, 0.1) 0%, transparent 70%)',
+                            pointerEvents: 'none',
+                            zIndex: 0
+                          }} />
+
+                          {/* Header */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', position: 'relative', zIndex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '10px',
+                                background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(109, 40, 217, 0.1) 100%)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#8b5cf6'
+                              }}>
+                                <Sparkles size={16} />
+                              </div>
+                              <div>
+                                <strong style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                  {isWeekend ? 'Wochenend-Refugium' : 'Unterrichtsfreier Tag'}
+                                </strong>
+                                <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                                  {getSimulatedNow().toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+                                </div>
+                              </div>
+                            </div>
+                            <span style={{
+                              fontSize: '0.72rem',
+                              fontWeight: 800,
+                              padding: '4px 12px',
+                              borderRadius: '100px',
+                              background: '#f5f3ff',
+                              color: '#7c3aed',
+                              border: '1px solid rgba(139, 92, 246, 0.25)',
+                              fontFamily: 'Inter',
+                              letterSpacing: '0.04em'
+                            }}>
+                              AUSZEIT
+                            </span>
+                          </div>
+
+                          {/* Center Content: Zen Resting Card */}
+                          <div style={{
+                            flex: 1,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            textAlign: 'center',
+                            padding: (windowWidth < 768 || isMobileDevice) ? '20px 10px' : '32px 20px',
+                            position: 'relative',
+                            zIndex: 1
+                          }}>
+                            <div style={{
+                              width: '58px',
+                              height: '58px',
+                              background: 'linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%)',
+                              borderRadius: '18px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              boxShadow: '0 12px 24px -4px rgba(124, 58, 237, 0.3)',
+                              marginBottom: '18px',
+                              transform: 'rotate(-4deg)'
+                            }}>
+                              <Sun size={28} color="#ffffff" />
+                            </div>
+
+                            <h4 style={{
+                              margin: '0 0 6px 0',
+                              fontSize: '1.35rem',
+                              fontWeight: 950,
+                              color: '#1e1b4b',
+                              fontFamily: "'Plus Jakarta Sans', sans-serif",
+                              letterSpacing: '-0.02em'
+                            }}>
+                              {isWeekend ? 'Schönes Wochenende!' : 'Entspannter freier Tag!'}
+                            </h4>
+                            
+                            <p style={{
+                              margin: '0 0 14px 0',
+                              fontSize: '0.8rem',
+                              color: '#7c3aed',
+                              fontWeight: 800,
+                              letterSpacing: '0.05em',
+                              textTransform: 'uppercase'
+                            }}>
+                              Ruhe &amp; Regeneration
+                            </p>
+
+                            <p style={{
+                              margin: '0 auto 20px auto',
+                              fontSize: '0.9rem',
+                              color: '#475569',
+                              fontWeight: 500,
+                              maxWidth: '420px',
+                              lineHeight: 1.6
+                            }}>
+                              {isWeekend
+                                ? 'Genieße deine wohlverdiente Pause ohne Termine und Schulstress. Erhole dich gut und tanke Kraft für neue musikalische Abenteuer!'
+                                : 'Heute finden keine Unterrichte statt. Nimm dir Zeit für dich, neue Inspiration oder einfach eine gute Tasse Kaffee.'}
+                            </p>
+
+                            {/* Quote Box */}
+                            <div style={{
+                              background: 'rgba(255, 255, 255, 0.75)',
+                              backdropFilter: 'blur(8px)',
+                              border: '1px solid rgba(139, 92, 246, 0.15)',
+                              borderRadius: '14px',
+                              padding: '12px 20px',
+                              maxWidth: '440px',
+                              fontStyle: 'italic',
+                              fontSize: '0.82rem',
+                              color: '#64748b',
+                              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
+                            }}>
+                              „Musik ist die Stille zwischen den Tönen.“
+                              <div style={{ fontStyle: 'normal', fontWeight: 700, fontSize: '0.74rem', color: '#8b5cf6', marginTop: '4px' }}>
+                                — Claude Debussy
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : isTeacherCurrentlyAbsent(teacher) && !bypassAbsenceView ? (
                       <div style={{
                         flex: '1.2 1 450px',
                         minWidth: (windowWidth < 768 || isMobileDevice) ? '100%' : '300px',
@@ -10531,6 +10871,10 @@ useEffect(() => {
                                              is_campus_active: foundStud ? foundStud.is_campus_active : activeStudentObj.is_campus_active,
                                              campus_ui_level: foundStud?.campus_ui_level || (activeStudentObj as any).campus_ui_level,
                                              parent_permissions: foundStud?.parent_permissions || (activeStudentObj as any).parent_permissions,
+                                             school_id: foundStud?.school_id || activeStudentObj.school_id || teacher?.school_id,
+                                             schoolId: foundStud?.school_id || activeStudentObj.school_id || teacher?.school_id,
+                                             teacher_id: foundStud?.teacher_id || teacher?.id || userId,
+                                             instrument: foundStud?.instrument || activeStudentObj.instrument,
                                              groupStudents: groupStudentsList
                                            });
                                          }
@@ -10565,6 +10909,10 @@ useEffect(() => {
                                          is_campus_active: foundStud ? foundStud.is_campus_active : activeStudentObj.is_campus_active,
                                          campus_ui_level: foundStud?.campus_ui_level || (activeStudentObj as any).campus_ui_level,
                                          parent_permissions: foundStud?.parent_permissions || (activeStudentObj as any).parent_permissions,
+                                         school_id: foundStud?.school_id || activeStudentObj.school_id || teacher?.school_id,
+                                         schoolId: foundStud?.school_id || activeStudentObj.school_id || teacher?.school_id,
+                                         teacher_id: foundStud?.teacher_id || teacher?.id || userId,
+                                         instrument: foundStud?.instrument || activeStudentObj.instrument,
                                          groupStudents: groupStudentsList
                                        });
                                      }
@@ -11117,7 +11465,7 @@ useEffect(() => {
                                 marginBottom: '6px'
                               }}>
                                 {(() => {
-                                  const day = new Date().getDay();
+                                  const day = getSimulatedNow().getDay();
                                   return (day === 0 || day === 6) ? 'Schönes Wochenende! 🎉' : 'Freier Tag!';
                                 })()}
                               </h4>
@@ -11140,7 +11488,7 @@ useEffect(() => {
                                 lineHeight: 1.55 
                               }}>
                                 {(() => {
-                                  const day = new Date().getDay();
+                                  const day = getSimulatedNow().getDay();
                                   return (day === 0 || day === 6)
                                     ? 'Genieße deine unterrichtsfreie Zeit, lass die Instrumente ruhen und erhole dich gut.'
                                     : 'Heute stehen keine Unterrichte an. Zeit zum Durchatmen, Entspannen und Kraft sammeln.';
@@ -11154,8 +11502,7 @@ useEffect(() => {
                     {/* Raummängel-Banner direkt unterhalb des Tagesplans angedockt */}
                     {renderTagesplanRoomIssuesBanner(true)}
                   </div>
-                )
-              )}
+                )}
             </div>
           </>
         )}
@@ -11303,10 +11650,12 @@ useEffect(() => {
               setTargetKioskStation={setTargetKioskStation}
               checkingInStatus={checkingInStatus}
               setCheckingInStatus={setCheckingInStatus}
-              geoErrorMsg={geoErrorMsg}
+              geoErrorMsg={checkInErrorMsg}
+              checkInErrorMsg={checkInErrorMsg}
               shakeLock={shakeLock}
               isUserCheckedIn={isUserCheckedIn}
-              handleGeofenceCheck={handleGeofenceCheck}
+              handleGeofenceCheck={handleLiveLabCheckIn}
+              handleLiveLabCheckIn={handleLiveLabCheckIn}
               handleKioskStationSelect={handleKioskStationSelect}
               handleTeacherSelfCheckout={handleTeacherSelfCheckout}
               handleTeacherCheckout={handleTeacherCheckout}
@@ -11681,6 +12030,17 @@ useEffect(() => {
             </div>
           )}
         </div>
+      ) : activeTab === 'studio' ? (
+        <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Aufgaben-Studio wird geladen...</div>}>
+          <TeacherStudioBoardView
+            teacher={teacher}
+            allStudents={allStudents}
+            todayStudents={todayTagesplanStudents}
+            schoolData={schoolData}
+            activePlatform={activePlatform}
+            onClose={() => setActiveTab('briefing')}
+          />
+        </Suspense>
       ) : activeTab === 'students' ? (
         <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Schülerverwaltung wird geladen...</div>}>
           <TeacherStudentsView
@@ -13787,7 +14147,7 @@ useEffect(() => {
             onClose={() => setIsFeedbackModalOpen(false)}
             userRole="teacher"
             userId={userId}
-            userName={`${teacher?.first_name || ''} ${teacher?.last_name || ''}`.trim() || 'Lehrkraft'}
+            userName={teacher ? formatTeacherFullName(teacher) : 'Lehrkraft'}
             schoolId={teacher?.school_id || (teacher as any)?.schoolId}
             schoolName={schoolData?.name || (teacher as any)?.school_name}
             activePlatform={activePlatform}
@@ -13827,13 +14187,18 @@ useEffect(() => {
         todayStudents={todayTagesplanStudents}
         rooms={rooms}
         onOpenHomeworkModal={(stud) => {
+          const sId = stud.id || stud.user_id;
+          const matched = allStudents.find((s: any) => String(s.id) === String(sId));
+          const localLevel = typeof window !== 'undefined' && sId ? localStorage.getItem(`campus_student_ui_level_${sId}`) : null;
           setDocStudent({
             ...stud,
-            id: stud.id,
+            id: sId,
             first_name: stud.first_name || stud.name?.split(' ')[0],
             last_name: stud.last_name || stud.name?.split(' ').slice(1).join(' '),
             photo_url: stud.photo_url || '/avatar_ghost.jpg',
             is_campus_active: stud.is_campus_active ?? false,
+            campus_ui_level: localLevel || stud.campus_ui_level || matched?.campus_ui_level,
+            parent_permissions: stud.parent_permissions || matched?.parent_permissions,
             school_id: stud.school_id || teacher?.school_id,
             schoolId: stud.school_id || teacher?.school_id
           });

@@ -28,7 +28,7 @@ process.stdout.write('       Scanning for architectural regressions & invariant 
 process.stdout.write(`${HR}\n\n`);
 
 // =============================================================================
-// PATTERN REGISTRY — 10 OWASP ASVS L3 Invariants
+// PATTERN REGISTRY — 12 OWASP ASVS L3 & Architecture Invariants
 // =============================================================================
 const FORBIDDEN_FRONTEND_PATTERNS = [
   {
@@ -110,6 +110,30 @@ const FORBIDDEN_FRONTEND_PATTERNS = [
     severity:    'CRITICAL',
     description: 'Sovereign Hetzner Invariant: All requests must strictly route through self-hosted Hetzner infrastructure (*.campus-groovelab.de). Third-party US cloud or public proxy domains are strictly forbidden.',
     allowedFiles: []
+  },
+  {
+    id:          'FE-11',
+    name:        'Dead / Empty Button Handler Invariant',
+    regex:       /\bonClick\s*=\s*\{\s*\(\s*\)\s*=>\s*\{\s*\}\s*\}/g,
+    severity:    'HIGH',
+    description: 'Buttons must never contain empty stub handlers (e.g. onClick={() => {}}). Every interactive element must be wired to functional application logic.',
+    allowedFiles: []
+  },
+  {
+    id:          'FE-12',
+    name:        'Direct Client-Side Role Mutation Invariant',
+    regex:       /\.from\(\s*['"]users['"]\s*\)[^;]*\.update\(\s*\{[^}]*\brole\s*:/gs,
+    severity:    'CRITICAL',
+    description: 'Privilege Escalation Protection: User roles must NEVER be updated via direct client .update({ role: ... }). Role transitions must strictly use switch_user_active_role RPC.',
+    allowedFiles: ['src/tests/']
+  },
+  {
+    id:          'FE-13',
+    name:        'Forbidden Teacher Name Masking / Inversion Invariant',
+    regex:       /maskLastName\(\s*(?:teacher|assignedTeacher|schedConflict\.teacher)\.last_name/g,
+    severity:    'HIGH',
+    description: 'Teacher names must ALWAYS be communicated as full "Vorname Nachname" (formatTeacherFullName). Masking (maskLastName) is strictly reserved for students.',
+    allowedFiles: ['src/tests/']
   }
 ];
 
@@ -135,7 +159,7 @@ function walkDir(dir, filterExt = ['.ts', '.tsx', '.js', '.jsx']) {
 }
 
 // 1. SCAN FRONTEND SOURCE CODE
-process.stdout.write('  📂 [1/4] Frontend Source Scan (apps/groovelab/src)...\n');
+process.stdout.write('  📂 [1/5] Frontend Source Scan (apps/groovelab/src)...\n');
 const frontendFiles = walkDir(SRC_DIR);
 
 for (const filePath of frontendFiles) {
@@ -167,7 +191,7 @@ process.stdout.write(
 );
 
 // 2. SCAN SQL MIGRATIONS FOR RLS DEFICIENCIES & DML SHIELDS
-process.stdout.write('  📂 [2/4] SQL Migration Invariants (supabase/migrations)...\n');
+process.stdout.write('  📂 [2/5] SQL Migration Invariants (supabase/migrations)...\n');
 const migrationFiles = walkDir(MIGRATIONS_DIR, ['.sql']);
 
 let latestDmlMigration = null;
@@ -233,7 +257,7 @@ process.stdout.write(
 );
 
 // 3. FINOPS ARCHITECTURAL INVARIANT & BILLING SUITE
-process.stdout.write('  📂 [3/4] FinOps Billing Invariants (runBillingInvariantTests.ts)...\n');
+process.stdout.write('  📂 [3/5] FinOps Billing Invariants (runBillingInvariantTests.ts)...\n');
 try {
   const out = execSync('npx tsx src/domain/__tests__/runBillingInvariantTests.ts', {
     cwd: path.join(ROOT_DIR, 'apps', 'groovelab'),
@@ -249,7 +273,7 @@ try {
 }
 
 // 4. FORENSIC RLS & SCHEMA CATALOG INVARIANTS
-process.stdout.write('  📂 [4/4] Forensic RLS & Schema Catalog Invariants...\n');
+process.stdout.write('  📂 [4/5] Forensic RLS & Schema Catalog Invariants...\n');
 try {
   const out = execSync('npx tsx scripts/verify_rls_catalog_invariants.ts', {
     cwd: ROOT_DIR,
@@ -260,6 +284,22 @@ try {
   process.stdout.write('     ✅ All 13 Forensic Architecture & Performance Invariants: VERIFIED\n\n');
 } catch (err) {
   process.stderr.write('  🚨 Forensic RLS Catalog Invariant Check FAILED: Schema invariant violation detected!\n');
+  process.stderr.write((err.stdout || err.message) + '\n');
+  violationsCount++;
+}
+
+// 5. TEACHER NAME COMMUNICATION INVARIANTS ("Vorname Nachname")
+process.stdout.write('  📂 [5/5] Teacher Name Communication Invariants (runTeacherNameInvariantTests.ts)...\n');
+try {
+  const out = execSync('npx tsx src/tests/runTeacherNameInvariantTests.ts', {
+    cwd: path.join(ROOT_DIR, 'apps', 'groovelab'),
+    encoding: 'utf-8',
+    stdio: ['pipe', 'pipe', 'pipe']
+  });
+  if (out) process.stdout.write(out.split('\n').map(l => `       ${l}`).join('\n') + '\n');
+  process.stdout.write('     ✅ Teacher Name Communication Suite: PASSED — Vorname Nachname Doktrin bestätigt.\n\n');
+} catch (err) {
+  process.stderr.write('  🚨 Teacher Name Communication Check FAILED: Invariant violation detected!\n');
   process.stderr.write((err.stdout || err.message) + '\n');
   violationsCount++;
 }

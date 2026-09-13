@@ -100,7 +100,7 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
         right: 0,
         height: 'auto',
         minHeight: '52px',
-        paddingTop: 'max(12px, env(safe-area-inset-top, 12px))',
+        paddingTop: 'max(12px, var(--safe-area-inset-top, env(safe-area-inset-top, 12px)))',
         paddingBottom: '10px',
         background: 'rgba(255, 255, 255, 0.95)',
         backdropFilter: 'blur(20px)',

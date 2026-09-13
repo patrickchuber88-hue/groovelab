@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import { Play, Pause, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Trash2, Mic, Repeat, Timer, Scissors, Pin, EyeOff } from 'lucide-react';
+import { Play, Pause, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Trash2, Mic, Repeat, Timer, Scissors, Pin, EyeOff, MessageSquareQuote } from 'lucide-react';
 import { getBlob, storeBlob } from '../utils/blobStorage';
 import { harmonizeAudioList, formatHarmonizedAudioTitle } from '../utils/audioNamingHelper';
+import { getAudioNotesCount, fetchAudioNotesFromServer } from '../utils/audioNotesStorage';
+import { getSecureAudioUrl } from '../utils/audioStorageHelper';
 
 const AudioEditorModal = lazy(() => import('./campus/AudioEditorModal').then(m => ({ default: m.AudioEditorModal })));
+const AudioNotesModal = lazy(() => import('./campus/AudioNotesModal').then(m => ({ default: m.AudioNotesModal })));
 
 export interface AudioTrackItem {
   url: string;
@@ -188,6 +191,8 @@ export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
               onKeep={!readOnly && onKeep ? () => onKeep(targetIdx ?? idx, track.url) : undefined}
               onHide={!readOnly && onHide ? () => onHide(targetIdx ?? idx, track.url) : undefined}
               isFutureWeek={isFutureWeek}
+              isTeacher={isTeacher}
+              readOnly={readOnly}
             />
           );
         })}
@@ -322,6 +327,8 @@ export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
         onHide={!readOnly && onHide ? handleHideCurrent : undefined}
         isCarriedOver={hasCarriedOverTracks}
         hideCarriedOverBadge={hideCarriedOverBadge}
+        isTeacher={isTeacher}
+        readOnly={readOnly}
       />
     </div>
   );
@@ -363,6 +370,8 @@ interface CompactAudioStripProps {
   onHide?: () => void;
   onSaveEdited?: (result: { url: string; duration: number; label: string; mode: 'overwrite' | 'duplicate' }) => void;
   isFutureWeek?: boolean;
+  isTeacher?: boolean;
+  readOnly?: boolean;
 }
 
 const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
@@ -374,17 +383,49 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
   onKeep,
   onHide,
   onSaveEdited,
-  isFutureWeek = false
+  isFutureWeek = false,
+  isTeacher = true,
+  readOnly = false
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState<number>(initialDuration || 0);
   const [currentTime, setCurrentTime] = useState<number>(0);
+
+  useEffect(() => {
+    if (initialDuration && initialDuration > 0) {
+      setDuration(initialDuration);
+    }
+  }, [initialDuration]);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isLooping, setIsLooping] = useState(false);
   const [countInActive, setCountInActive] = useState(false);
   const [countInStep, setCountInStep] = useState<number | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
   const [resolvedUrl, setResolvedUrl] = useState<string>(url);
+  const [notesCount, setNotesCount] = useState<number>(() => getAudioNotesCount(url || ''));
+
+  // 🔔 Reaktiv synchronisierte Notizen-Anzahl (SoundCloud-Style Marker)
+  useEffect(() => {
+    const audioKey = url || resolvedUrl;
+    setNotesCount(getAudioNotesCount(audioKey));
+
+    // 🛡️ Revisionssicherer Server-Abruf
+    fetchAudioNotesFromServer(audioKey)
+      .then(srvNotes => {
+        if (srvNotes) setNotesCount(srvNotes.length);
+      })
+      .catch(() => {});
+
+    const handleNotesChanged = () => {
+      setNotesCount(getAudioNotesCount(audioKey));
+    };
+
+    window.addEventListener('campus-audio-notes-changed', handleNotesChanged);
+    return () => {
+      window.removeEventListener('campus-audio-notes-changed', handleNotesChanged);
+    };
+  }, [url, resolvedUrl]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const countInTimerRef = useRef<any>(null);
   const playerIdRef = useRef<string>(`carousel_strip_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`);
@@ -424,6 +465,12 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
           setResolvedUrl(createdBlobUrl);
         }
       }).catch((err: any) => console.warn('[CompactAudioStrip] Blob load note:', err));
+    } else if (url.startsWith('http') || url.includes('/storage/v1/object/') || url.startsWith('schools/')) {
+      getSecureAudioUrl(url, 'campus-assets', 300).then((secUrl: string) => {
+        if (active && secUrl) setResolvedUrl(secUrl);
+      }).catch(() => {
+        if (active) setResolvedUrl(url);
+      });
     } else {
       setResolvedUrl(url);
     }
@@ -646,6 +693,40 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
         {Math.round(playbackRate * 100)}%
       </button>
 
+      {/* 💬 Timeline Notizen / Marker Button (SoundCloud-Style) */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsNotesModalOpen(true);
+        }}
+        aria-label={`Notizen öffnen (${notesCount} Notizen vorhanden)`}
+        style={{
+          border: notesCount > 0 ? '1px solid #fed7aa' : '1px solid #cbd5e1',
+          background: notesCount > 0 ? '#fff7ed' : '#ffffff',
+          color: notesCount > 0 ? '#ea580c' : '#475569',
+          height: isMobile ? '38px' : '34px',
+          minWidth: isMobile ? '38px' : '34px',
+          padding: '0 8px',
+          borderRadius: '10px',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '4px',
+          fontSize: '0.75rem',
+          fontWeight: 750,
+          boxShadow: notesCount > 0 ? '0 1px 3px rgba(234, 88, 12, 0.12)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
+          transition: 'all 0.15s ease',
+          touchAction: 'manipulation'
+        }}
+        className="hover-scale-mini"
+        title="Timeline-Notizen & Marker anzeigen oder hinzufügen"
+      >
+        <MessageSquareQuote size={15} strokeWidth={2.2} />
+        {notesCount > 0 && <span>{notesCount}</span>}
+      </button>
+
       {/* ✂️ Studio Trimmer Button */}
       <button
         type="button"
@@ -735,7 +816,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
         position: 'relative'
       }}
     >
-      <audio ref={audioRef} src={resolvedUrl} />
+      <audio ref={audioRef} src={resolvedUrl} preload="none" />
 
       {/* Media Playback & Primary Row Controls */}
       <div style={{
@@ -887,7 +968,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
           <AudioEditorModal
             isOpen={isEditorOpen}
             onClose={() => setIsEditorOpen(false)}
-            audioUrl={resolvedUrl}
+            audioUrl={resolvedUrl || url}
             initialLabel={label || `Aufnahme #${trackIndex + 1}`}
             initialDuration={duration}
             onSave={(res) => {
@@ -896,6 +977,21 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
               }
               setIsEditorOpen(false);
             }}
+          />
+        </Suspense>
+      )}
+
+      {/* Audio Timeline Notes & Markers Modal (SoundCloud-Style) */}
+      {isNotesModalOpen && (
+        <Suspense fallback={null}>
+          <AudioNotesModal
+            isOpen={isNotesModalOpen}
+            onClose={() => setIsNotesModalOpen(false)}
+            audioId={url || resolvedUrl}
+            audioUrl={resolvedUrl || url}
+            title={label || `Aufnahme #${trackIndex + 1}`}
+            initialDuration={duration}
+            currentUserRole={readOnly || !isTeacher ? 'student' : 'teacher'}
           />
         </Suspense>
       )}
@@ -918,6 +1014,8 @@ interface AppleSplitCapsulePlayerProps {
   onHide?: (e: React.MouseEvent) => void;
   isCarriedOver?: boolean;
   hideCarriedOverBadge?: boolean;
+  isTeacher?: boolean;
+  readOnly?: boolean;
 }
 
 const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
@@ -933,7 +1031,9 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
   onKeep,
   onHide,
   isCarriedOver = false,
-  hideCarriedOverBadge = false
+  hideCarriedOverBadge = false,
+  isTeacher = true,
+  readOnly = false
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState<number>(initialDuration || 0);
@@ -943,7 +1043,31 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
   const [countInActive, setCountInActive] = useState(false);
   const [countInStep, setCountInStep] = useState<number | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
   const [resolvedUrl, setResolvedUrl] = useState<string>(url);
+  const [notesCount, setNotesCount] = useState<number>(() => getAudioNotesCount(url || ''));
+
+  // 🔔 Reaktiv synchronisierte Notizen-Anzahl (SoundCloud-Style Marker)
+  useEffect(() => {
+    const audioKey = url || resolvedUrl;
+    setNotesCount(getAudioNotesCount(audioKey));
+
+    // 🛡️ Revisionssicherer Server-Abruf
+    fetchAudioNotesFromServer(audioKey)
+      .then(srvNotes => {
+        if (srvNotes) setNotesCount(srvNotes.length);
+      })
+      .catch(() => {});
+
+    const handleNotesChanged = () => {
+      setNotesCount(getAudioNotesCount(audioKey));
+    };
+
+    window.addEventListener('campus-audio-notes-changed', handleNotesChanged);
+    return () => {
+      window.removeEventListener('campus-audio-notes-changed', handleNotesChanged);
+    };
+  }, [url, resolvedUrl]);
   const [isHovered, setIsHovered] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const countInTimerRef = useRef<any>(null);
@@ -984,6 +1108,12 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
           setResolvedUrl(createdBlobUrl);
         }
       }).catch((err: any) => console.warn('[SplitCapsulePlayer] Blob load note:', err));
+    } else if (url.startsWith('http') || url.includes('/storage/v1/object/') || url.startsWith('schools/')) {
+      getSecureAudioUrl(url, 'campus-assets', 300).then((secUrl: string) => {
+        if (active && secUrl) setResolvedUrl(secUrl);
+      }).catch(() => {
+        if (active) setResolvedUrl(url);
+      });
     } else {
       setResolvedUrl(url);
     }
@@ -1197,6 +1327,40 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
         {Math.round(playbackRate * 100)}%
       </button>
 
+      {/* 💬 Timeline Notizen / Marker Button (SoundCloud-Style) */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsNotesModalOpen(true);
+        }}
+        aria-label={`Notizen öffnen (${notesCount} Notizen vorhanden)`}
+        style={{
+          border: notesCount > 0 ? '1px solid #fed7aa' : '1px solid #cbd5e1',
+          background: notesCount > 0 ? '#fff7ed' : '#ffffff',
+          color: notesCount > 0 ? '#ea580c' : '#475569',
+          height: isMobile ? '38px' : '34px',
+          minWidth: isMobile ? '38px' : '34px',
+          padding: '0 8px',
+          borderRadius: '10px',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '4px',
+          fontSize: '0.75rem',
+          fontWeight: 750,
+          boxShadow: notesCount > 0 ? '0 1px 3px rgba(234, 88, 12, 0.12)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
+          transition: 'all 0.15s ease',
+          touchAction: 'manipulation'
+        }}
+        className="hover-scale-mini"
+        title="Timeline-Notizen & Marker anzeigen oder hinzufügen"
+      >
+        <MessageSquareQuote size={15} strokeWidth={2.2} />
+        {notesCount > 0 && <span>{notesCount}</span>}
+      </button>
+
       {/* ✂️ Studio Trimmer Button */}
       <button
         type="button"
@@ -1204,6 +1368,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
           e.stopPropagation();
           setIsEditorOpen(true);
         }}
+        aria-label="Studio Trimmer öffnen"
         style={{
           border: '1px solid #cbd5e1',
           background: '#ffffff',
@@ -1282,7 +1447,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
         transform: isTransitioning ? 'scale(0.992)' : 'scale(1)'
       }}
     >
-      <audio ref={audioRef} src={resolvedUrl} />
+      <audio ref={audioRef} src={resolvedUrl} preload="none" />
 
       <div style={{
         display: 'flex',
@@ -1587,6 +1752,21 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
             onSave={(_res) => {
               setIsEditorOpen(false);
             }}
+          />
+        </Suspense>
+      )}
+
+      {/* Audio Timeline Notes & Markers Modal (SoundCloud-Style) */}
+      {isNotesModalOpen && (
+        <Suspense fallback={null}>
+          <AudioNotesModal
+            isOpen={isNotesModalOpen}
+            onClose={() => setIsNotesModalOpen(false)}
+            audioId={url || resolvedUrl}
+            audioUrl={resolvedUrl || url}
+            title={label || 'Aufnahme'}
+            initialDuration={duration}
+            currentUserRole={readOnly || !isTeacher ? 'student' : 'teacher'}
           />
         </Suspense>
       )}

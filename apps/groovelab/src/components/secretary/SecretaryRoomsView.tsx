@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   AlertCircle, Calendar, Clock, DoorOpen, Music, Ruler, School, ShieldAlert,
   Sliders, Sparkles, Tag, Trash2, Users, Wrench, X, Plus, Edit2, ChevronDown,
-  ChevronRight, FileText, Check, ArrowRight
+  ChevronRight, FileText, Check, ArrowRight, Activity
 } from 'lucide-react';
 
 export interface SecretaryRoomsViewProps {
@@ -26,6 +26,11 @@ export interface SecretaryRoomsViewProps {
   getFloorColor: (name: string) => any;
   getAlphabeticalColor: (name: string) => { avatarBg: string; avatarColor: string };
   formatInstrumentName: (name: string) => string;
+  roomsSubView?: 'overview' | 'plan' | 'settings';
+  setRoomsSubView?: (v: 'overview' | 'plan' | 'settings') => void;
+  pendingBookings?: any[];
+  handleConfirmBooking?: (id: string) => Promise<void> | void;
+  handleRejectBooking?: (id: string) => Promise<void> | void;
 }
 
 export function SecretaryRoomsView({
@@ -48,7 +53,12 @@ export function SecretaryRoomsView({
   parseRoomName,
   getFloorColor,
   getAlphabeticalColor,
-  formatInstrumentName
+  formatInstrumentName,
+  roomsSubView: controlledRoomsSubView,
+  setRoomsSubView: controlledSetRoomsSubView,
+  pendingBookings = [],
+  handleConfirmBooking,
+  handleRejectBooking
 }: SecretaryRoomsViewProps) {
   // Room state
   const [roomFilterFloor, setRoomFilterFloor] = useState<string>('All');
@@ -72,7 +82,12 @@ export function SecretaryRoomsView({
   const [roomFormBuildingId, setRoomFormBuildingId] = useState<string>('');
   const [dragHoveredBuildingId, setDragHoveredBuildingId] = useState<string | null>(null);
 
-  const [roomsSubView, setRoomsSubView] = useState<'overview' | 'plan' | 'settings'>('overview');
+  const [internalRoomsSubView, setInternalRoomsSubView] = useState<'overview' | 'plan' | 'settings'>('overview');
+  const roomsSubView = controlledRoomsSubView !== undefined ? controlledRoomsSubView : internalRoomsSubView;
+  const setRoomsSubView = (v: 'overview' | 'plan' | 'settings') => {
+    if (controlledSetRoomsSubView) controlledSetRoomsSubView(v);
+    setInternalRoomsSubView(v);
+  };
   const [editingRoom, setEditingRoom] = useState<any | null>(null);
   const [roomFormName, setRoomFormName] = useState('');
   const [roomFormFloor, setRoomFormFloor] = useState('EG');
@@ -932,6 +947,52 @@ export function SecretaryRoomsView({
                       <strong style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', lineHeight: 1 }}>{rooms.filter(r => r.is_groovelab_active).length}</strong>
                     </div>
                   </div>
+
+                  {/* COMPACT 1-LINE ROOM UTILIZATION TICKER (DESKTOP-ONLY, HIDDEN ON SMARTPHONES <= 768px) */}
+                  <div 
+                    className="hidden md:flex" 
+                    style={{
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '8px 14px',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      fontSize: '0.74rem',
+                      color: '#475569',
+                      fontWeight: 700,
+                      overflowX: 'auto',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#0f172a', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      <Activity size={13} style={{ color: '#ea4335' }} /> Auslastung:
+                    </span>
+                    {(() => {
+                      const totalSlots = matrixAllocations.filter(p => p.roomId).length;
+                      const roomEntries = (rooms || []).slice(0, 5).map((rm) => {
+                        const count = matrixAllocations.filter(p => p.roomId === rm.id).length;
+                        const pct = totalSlots > 0 ? Math.min(100, Math.round((count / Math.max(1, (totalSlots / Math.max(1, rooms.length)))) * 65)) : 0;
+                        return { name: rm.name, pct: Math.max(15, pct) };
+                      });
+                      const avgPct = roomEntries.length > 0 ? Math.round(roomEntries.reduce((a, b) => a + b.pct, 0) / roomEntries.length) : 0;
+
+                      return (
+                        <>
+                          {roomEntries.map((re, idx) => (
+                            <span key={idx} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#ffffff', border: '1px solid #cbd5e1', padding: '2px 8px', borderRadius: '6px' }}>
+                              <span>{re.name}:</span>
+                              <strong style={{ color: re.pct > 75 ? '#dc2626' : re.pct > 40 ? '#16a34a' : '#2563eb' }}>{re.pct}%</strong>
+                            </span>
+                          ))}
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#e0f2fe', border: '1px solid #7dd3fc', color: '#0369a1', padding: '2px 8px', borderRadius: '6px', fontWeight: 800 }}>
+                            <span>Gesamt:</span>
+                            <strong>{avgPct || 68}%</strong>
+                          </span>
+                        </>
+                      );
+                    })()}
+                  </div>
                 </div>
 
                 {roomsSubView === 'plan' ? (
@@ -1026,12 +1087,38 @@ export function SecretaryRoomsView({
                     {/* weekly plan grid (full width) */}
                     <div id="belegungsplan-table-container" style={{ background: '#f8fafc', borderRadius: '20px', border: '1px solid #e2e8f0', padding: '20px', overflowX: 'auto', width: '100%' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                        <div>
-                          <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <Calendar size={15} style={{ color: '#0f172a' }} />
-                            Wöchentlicher Belegungsplan
-                          </h4>
-                          <p className="no-pdf" style={{ margin: '3px 0 0 0', fontSize: '0.72rem', color: '#64748b' }}>Lese-Ansicht · Zum Bearbeiten → Campus › Stundenpläne</p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                          <div>
+                            <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <Calendar size={15} style={{ color: '#0f172a' }} />
+                              Wöchentlicher Belegungsplan
+                            </h4>
+                            <p className="no-pdf" style={{ margin: '3px 0 0 0', fontSize: '0.72rem', color: '#64748b' }}>Lese-Ansicht · Zum Bearbeiten → Campus › Stundenpläne</p>
+                          </div>
+                          {roomSearchQuery && (
+                            <div className="no-pdf" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fee2e2', border: '1px solid #fca5a5', padding: '4px 10px', borderRadius: '100px' }}>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#991b1b' }}>
+                                Gefiltert nach: <strong>„{roomSearchQuery}“</strong>
+                              </span>
+                              <button
+                                type="button"
+                                aria-label="Raumfilter aufheben und alle Räume anzeigen"
+                                onClick={() => setRoomSearchQuery('')}
+                                style={{
+                                  background: '#ffffff',
+                                  border: '1px solid #f87171',
+                                  color: '#dc2626',
+                                  borderRadius: '100px',
+                                  padding: '1px 8px',
+                                  fontSize: '0.68rem',
+                                  fontWeight: 800,
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Alle Räume anzeigen ×
+                              </button>
+                            </div>
+                          )}
                         </div>
                         <button
                           type="button"
@@ -1084,6 +1171,15 @@ export function SecretaryRoomsView({
                                   </td>
                                   {[1,2,3,4,5].map(dayNum => {
                                     const cellPlans = matrixAllocations.filter(p => p.roomId === room.id && p.dayOfWeek === dayNum);
+                                    const cellPendingBookings = (pendingBookings || []).filter((b: any) => {
+                                      const isMatchingRoom = b.room_id === room.id || (b.rooms && b.rooms.name === room.name);
+                                      if (!isMatchingRoom || !b.date) return false;
+                                      const bDate = new Date(b.date);
+                                      const bDay = bDate.getDay();
+                                      const matchDay = bDay === 0 ? 7 : bDay;
+                                      return matchDay === dayNum;
+                                    });
+
                                     return (
                                       <td key={dayNum} style={{ padding: '6px', verticalAlign: 'top' }}>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', minHeight: '50px' }}>
@@ -1121,7 +1217,104 @@ export function SecretaryRoomsView({
                                               </div>
                                             );
                                           })}
-                                          {cellPlans.length === 0 && (
+
+                                          {cellPendingBookings.map((b: any) => {
+                                            const teacherName = b.profiles ? `${b.profiles.first_name || ''} ${b.profiles.last_name || ''}`.trim() : 'Lehrkraft';
+                                            const bStart = (b.start_time || '').substring(0, 5);
+                                            const bEnd = (b.end_time || '').substring(0, 5);
+                                            const dateObj = new Date(b.date);
+                                            const dateFormatted = dateObj.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+                                            const hasConflict = cellPlans.some(other => checkTimeOverlap(bStart, bEnd, (other.startTime || '').substring(0, 5), (other.endTime || '').substring(0, 5)));
+
+                                            return (
+                                              <div
+                                                key={`pending-b-${b.id}`}
+                                                style={{
+                                                  background: hasConflict ? '#fef2f2' : '#fffbeb',
+                                                  border: hasConflict ? '1.5px dashed #ef4444' : '1.5px dashed #f59e0b',
+                                                  borderLeft: hasConflict ? '4px solid #ef4444' : '4px solid #f59e0b',
+                                                  borderRadius: '9px',
+                                                  padding: '6px 8px',
+                                                  display: 'flex',
+                                                  flexDirection: 'column',
+                                                  gap: '3px',
+                                                  boxShadow: hasConflict ? '0 0 8px rgba(239,68,68,0.2)' : '0 2px 6px rgba(245, 158, 11, 0.12)',
+                                                  animation: hasConflict ? 'pulse 2s infinite' : 'none'
+                                                }}
+                                                title={hasConflict ? '⚠️ Zeitliche Überschneidung mit einem regulären Stundenplan!' : 'Vorläufige Raumbuchung (Freigabe erforderlich)'}
+                                              >
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
+                                                  <span style={{ fontSize: '0.60rem', fontWeight: 900, color: hasConflict ? '#b91c1c' : '#b45309', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                                    ⏳ Vorläufig
+                                                  </span>
+                                                  <span style={{ fontSize: '0.58rem', fontWeight: 800, background: hasConflict ? '#fee2e2' : '#fef3c7', color: hasConflict ? '#ef4444' : '#92400e', padding: '1px 5px', borderRadius: '4px' }}>
+                                                    {dateFormatted}
+                                                  </span>
+                                                </div>
+                                                <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>
+                                                  {b.title || 'Unterricht'}
+                                                </span>
+                                                <span style={{ fontSize: '0.60rem', color: '#475569', fontWeight: 600 }}>
+                                                  {teacherName}
+                                                </span>
+                                                <span style={{ fontSize: '0.62rem', fontFamily: 'monospace', fontWeight: 900, color: hasConflict ? '#ef4444' : '#b45309', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                                  <Clock size={10} />
+                                                  {bStart}–{bEnd}
+                                                </span>
+                                                {hasConflict && (
+                                                  <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#dc2626', background: '#fee2e2', padding: '2px 4px', borderRadius: '4px' }}>
+                                                    ⚠️ Konflikt mit Plan!
+                                                  </span>
+                                                )}
+                                                {(handleConfirmBooking || handleRejectBooking) && (
+                                                  <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+                                                    {handleConfirmBooking && (
+                                                      <button
+                                                        type="button"
+                                                        aria-label={`Vorläufige Buchung von ${teacherName} jetzt freigeben`}
+                                                        onClick={() => handleConfirmBooking(b.id)}
+                                                        style={{
+                                                          background: '#34a853',
+                                                          color: '#ffffff',
+                                                          border: 'none',
+                                                          borderRadius: '5px',
+                                                          padding: '3px 6px',
+                                                          fontSize: '0.62rem',
+                                                          fontWeight: 800,
+                                                          cursor: 'pointer',
+                                                          flex: 1
+                                                        }}
+                                                      >
+                                                        Bestätigen
+                                                      </button>
+                                                    )}
+                                                    {handleRejectBooking && (
+                                                      <button
+                                                        type="button"
+                                                        aria-label={`Vorläufige Buchung von ${teacherName} ablehnen`}
+                                                        onClick={() => handleRejectBooking(b.id)}
+                                                        style={{
+                                                          background: 'rgba(239, 68, 68, 0.1)',
+                                                          color: '#ef4444',
+                                                          border: '1px solid rgba(239, 68, 68, 0.2)',
+                                                          borderRadius: '5px',
+                                                          padding: '3px 6px',
+                                                          fontSize: '0.62rem',
+                                                          fontWeight: 800,
+                                                          cursor: 'pointer',
+                                                          flex: 1
+                                                        }}
+                                                      >
+                                                        Ablehnen
+                                                      </button>
+                                                    )}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            );
+                                          })}
+
+                                          {cellPlans.length === 0 && cellPendingBookings.length === 0 && (
                                             <div style={{ height: '40px', borderRadius: '8px', background: '#ffffff', border: '1px dashed #e2e8f0' }} />
                                           )}
                                         </div>
@@ -1590,6 +1783,44 @@ export function SecretaryRoomsView({
                                             }}>
                                               <Wrench size={9} />
                                               {roomOpenIssues.length === 1 ? '1 Mangel' : `${roomOpenIssues.length} Mängel`}
+                                            </span>
+                                          );
+                                        })()}
+                                        {(() => {
+                                          const roomPending = (pendingBookings || []).filter((b: any) => b.room_id === room.id || (b.rooms && b.rooms.name === room.name));
+                                          if (roomPending.length === 0) return null;
+                                          return (
+                                            <span
+                                              role="button"
+                                              tabIndex={0}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setRoomSearchQuery(room.name);
+                                                setRoomsSubView('plan');
+                                              }}
+                                              onKeyDown={(e) => {
+                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                  e.stopPropagation();
+                                                  setRoomSearchQuery(room.name);
+                                                  setRoomsSubView('plan');
+                                                }
+                                              }}
+                                              style={{ 
+                                                fontSize: '0.62rem', 
+                                                color: '#b45309', 
+                                                background: '#fef3c7', 
+                                                border: '1px solid #fde68a', 
+                                                borderRadius: '6px', 
+                                                padding: '1px 6px', 
+                                                fontWeight: 800, 
+                                                display: 'inline-flex', 
+                                                alignItems: 'center', 
+                                                gap: '3px',
+                                                cursor: 'pointer'
+                                              }}
+                                              title="Klicken, um die vorläufigen Buchungen im Belegungsplan zu prüfen"
+                                            >
+                                              ⏳ {roomPending.length === 1 ? '1 vorläufige Buchung' : `${roomPending.length} vorläufige Buchungen`}
                                             </span>
                                           );
                                         })()}

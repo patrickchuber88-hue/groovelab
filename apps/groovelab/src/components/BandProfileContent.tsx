@@ -1818,6 +1818,24 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
+                    background: 'rgba(52, 168, 83, 0.1)',
+                    border: '1px solid rgba(52, 168, 83, 0.25)',
+                    borderRadius: '10px',
+                    padding: '6px 10px',
+                    fontSize: '0.64rem',
+                    color: '#86efac',
+                    fontWeight: 600,
+                    marginBottom: '8px',
+                    lineHeight: 1.3
+                  }}>
+                    <ShieldCheck size={12} color="#4ade80" style={{ flexShrink: 0 }} />
+                    <span><strong>Didaktischer Schul-Chat:</strong> Nur für Unterrichtszwecke • Für Erziehungsberechtigte transparent einsehbar.</span>
+                  </div>
+
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
                     background: 'rgba(255,255,255,0.03)',
                     border: '1px solid rgba(255,255,255,0.06)',
                     borderRadius: '10px',

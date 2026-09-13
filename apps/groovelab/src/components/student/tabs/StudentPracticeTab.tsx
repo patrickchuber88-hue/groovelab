@@ -39,6 +39,7 @@ export interface StudentPracticeTabProps {
   getJuniorMissionDetails: () => any;
   getTargetMinutes: (streak?: number) => number;
   sessionActive: boolean;
+  isPhoneFlat?: boolean;
   secondsElapsed: number;
   isMobile?: boolean;
   isMusicStandMode?: boolean;
@@ -95,6 +96,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
   getJuniorMissionDetails,
   getTargetMinutes,
   sessionActive,
+  isPhoneFlat = true,
   secondsElapsed,
   isMobile = false,
   isMusicStandMode = false,
@@ -124,6 +126,23 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
   expandedMonths,
   setExpandedMonths,
 }) => {
+  const [showFlatReminder, setShowFlatReminder] = useState(false);
+
+  useEffect(() => {
+    // Wenn Übung aktiv ist, Countdown abgeschlossen ist und das Handy nicht flach liegt -> nach 5s Hinweis einblenden
+    if (sessionActive && !isPhoneFlat && (preStartCountdown === null || preStartCountdown <= 0)) {
+      const timer = setTimeout(() => {
+        setShowFlatReminder(true);
+      }, 5000);
+
+      return () => {
+        clearTimeout(timer);
+      };
+    } else {
+      setShowFlatReminder(false);
+    }
+  }, [sessionActive, isPhoneFlat, preStartCountdown]);
+
   return (
       <div id="tour-student-practice" style={{ display: activeTab === 'practice_board' ? 'flex' : 'none', flexDirection: 'column', gap: '16px', width: '100%' }} className="animation-slide-up practice-board-wrapper">
         {activeTab === 'practice_board' && (
@@ -233,6 +252,10 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                     }
                     .junior-day-coin {
                       transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+                    }
+                    @keyframes flatReminderPulse {
+                      0%, 100% { transform: scale(1); opacity: 0.95; }
+                      50% { transform: scale(1.05); opacity: 1; }
                     }
                     .junior-day-coin:hover {
                       transform: translateY(-3px) scale(1.05);
@@ -1207,6 +1230,10 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                       0% { transform: translateY(60px) scale(0.92); opacity: 0; }
                       100% { transform: translateY(0) scale(1); opacity: 1; }
                     }
+                    @keyframes flatReminderPulse {
+                      0%, 100% { transform: scale(1); opacity: 0.95; }
+                      50% { transform: scale(1.05); opacity: 1; }
+                    }
                     .junior-zen-bg {
                       background: #000000;
                       transition: background 2.5s ease;
@@ -1701,9 +1728,19 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                 title="Tipp antippen für Spickzettel-Ansicht"
                               >
                                 <Lightbulb size={13} color="#fcd34d" style={{ flexShrink: 0 }} />
+                                {missionInfo.isCarriedOver && (
+                                  <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '1px 5px', borderRadius: '4px', flexShrink: 0 }}>
+                                    {missionInfo.carriedOverWeek ? `${missionInfo.carriedOverWeek}` : 'Vorwoche'}
+                                  </span>
+                                )}
                                 <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#cbd5e1' }}>
                                   „{missionInfo.teacherNote}“
                                 </span>
+                                {missionInfo.teacherNotes && missionInfo.teacherNotes.length > 1 && (
+                                  <span style={{ fontSize: '0.68rem', color: '#94a3b8', flexShrink: 0, fontWeight: 700 }}>
+                                    (+{missionInfo.teacherNotes.length - 1})
+                                  </span>
+                                )}
                               </div>
                             )}
                           </div>
@@ -1732,6 +1769,11 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#fcd34d', fontWeight: 900, fontSize: '0.94rem' }}>
                                   <Lightbulb size={18} />
                                   <span>Tipp von deiner Lehrkraft</span>
+                                  {missionInfo.isCarriedOver && (
+                                    <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.18)', padding: '2px 6px', borderRadius: '6px' }}>
+                                      Aus {missionInfo.carriedOverWeek || 'Vorwoche'}
+                                    </span>
+                                  )}
                                 </div>
                                 <button 
                                   type="button" 
@@ -1741,9 +1783,20 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                   <X size={18} />
                                 </button>
                               </div>
-                              <p style={{ margin: 0, fontSize: '1.00rem', color: '#f8fafc', lineHeight: 1.5, fontWeight: 650 }}>
-                                „{missionInfo.teacherNote}“
-                              </p>
+                              {missionInfo.teacherNotes && missionInfo.teacherNotes.length > 1 ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '240px', overflowY: 'auto' }}>
+                                  {missionInfo.teacherNotes.map((note: string, nIdx: number) => (
+                                    <div key={`n-${nIdx}`} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.94rem', color: '#f8fafc', lineHeight: 1.45, fontWeight: 650 }}>
+                                      <span style={{ color: '#fcd34d', fontWeight: 900 }}>•</span>
+                                      <span>{note}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p style={{ margin: 0, fontSize: '1.00rem', color: '#f8fafc', lineHeight: 1.5, fontWeight: 650 }}>
+                                  „{missionInfo.teacherNote}“
+                                </p>
+                              )}
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.12)', fontSize: '0.84rem', color: '#a5b4fc' }}>
                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
                                   <Clock size={13} color="#a5b4fc" /> Timer läuft weiter
@@ -1871,32 +1924,53 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                   {String(currentMins).padStart(2, '0')}:{String(currentSecs).padStart(2, '0')}
                                 </div>
 
-                                <div style={{
-                                  fontSize: isMusicStandMode ? '0.94rem' : '0.84rem',
-                                  fontWeight: 900,
-                                  color: isGoalReached ? '#fde047' : '#e0e7ff',
-                                  letterSpacing: '0.02em',
-                                  background: isGoalReached ? 'rgba(245, 158, 11, 0.25)' : 'rgba(255, 255, 255, 0.10)',
-                                  border: isGoalReached ? '2px solid rgba(251, 191, 36, 0.6)' : '1.5px solid rgba(255, 255, 255, 0.20)',
-                                  padding: isMusicStandMode ? '6px 16px' : '4px 14px',
-                                  borderRadius: '100px',
-                                  backdropFilter: 'blur(12px)',
-                                  boxShadow: isGoalReached ? '0 0 20px rgba(245, 158, 11, 0.4)' : '0 4px 14px rgba(0,0,0,0.4)',
-                                  transition: 'all 1.5s ease',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '5px'
-                                }}>
-                                  {!isGoalReached ? (
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                      <Target size={13} color="#e0e7ff" /> Ziel: {String(targetMins).padStart(2, '0')}:00 Min.
-                                    </span>
-                                  ) : (
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                      <Star size={13} fill="#fbbf24" color="#fbbf24" /> Sternen-Ziel erreicht!
-                                    </span>
-                                  )}
-                                </div>
+                                {showFlatReminder ? (
+                                  <div style={{
+                                    fontSize: isMusicStandMode ? '0.92rem' : '0.82rem',
+                                    fontWeight: 900,
+                                    color: '#fef3c7',
+                                    background: 'rgba(245, 158, 11, 0.25)',
+                                    border: '1.5px solid rgba(251, 191, 36, 0.65)',
+                                    padding: isMusicStandMode ? '6px 16px' : '4px 14px',
+                                    borderRadius: '100px',
+                                    backdropFilter: 'blur(12px)',
+                                    boxShadow: '0 0 20px rgba(245, 158, 11, 0.45)',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    animation: 'flatReminderPulse 2s ease-in-out infinite'
+                                  }}>
+                                    <Smartphone size={14} strokeWidth={2.4} color="#fef3c7" style={{ flexShrink: 0 }} />
+                                    <span>Handy flach hinlegen</span>
+                                  </div>
+                                ) : (
+                                  <div style={{
+                                    fontSize: isMusicStandMode ? '0.94rem' : '0.84rem',
+                                    fontWeight: 900,
+                                    color: isGoalReached ? '#fde047' : '#e0e7ff',
+                                    letterSpacing: '0.02em',
+                                    background: isGoalReached ? 'rgba(245, 158, 11, 0.25)' : 'rgba(255, 255, 255, 0.10)',
+                                    border: isGoalReached ? '2px solid rgba(251, 191, 36, 0.6)' : '1.5px solid rgba(255, 255, 255, 0.20)',
+                                    padding: isMusicStandMode ? '6px 16px' : '4px 14px',
+                                    borderRadius: '100px',
+                                    backdropFilter: 'blur(12px)',
+                                    boxShadow: isGoalReached ? '0 0 20px rgba(245, 158, 11, 0.4)' : '0 4px 14px rgba(0,0,0,0.4)',
+                                    transition: 'all 1.5s ease',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '5px'
+                                  }}>
+                                    {!isGoalReached ? (
+                                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                        <Target size={13} color="#e0e7ff" /> Ziel: {String(targetMins).padStart(2, '0')}:00 Min.
+                                      </span>
+                                    ) : (
+                                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                        <Star size={13} fill="#fbbf24" color="#fbbf24" /> Sternen-Ziel erreicht!
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </div>
 
@@ -2888,11 +2962,25 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
 
                               {/* Spezifische Lehrkraft-Notiz */}
                               {missionInfo.hasSpecificNote && missionInfo.teacherNote && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingTop: '2px', borderTop: (missionInfo.books?.length || missionInfo.songs?.length) ? '1px solid rgba(255, 255, 255, 0.06)' : 'none' }}>
+                                <div 
+                                  onClick={() => setShowJuniorCheatSheet(prev => !prev)}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingTop: '2px', borderTop: (missionInfo.books?.length || missionInfo.songs?.length) ? '1px solid rgba(255, 255, 255, 0.06)' : 'none', cursor: 'pointer' }}
+                                  title="Tipp antippen für Notizen-Ansicht"
+                                >
                                   <Lightbulb size={13} color="#fcd34d" style={{ flexShrink: 0 }} />
+                                  {missionInfo.isCarriedOver && (
+                                    <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#f59e0b', background: 'rgba(245, 158, 11, 0.15)', padding: '1px 5px', borderRadius: '4px', flexShrink: 0 }}>
+                                      {missionInfo.carriedOverWeek ? `${missionInfo.carriedOverWeek}` : 'Vorwoche'}
+                                    </span>
+                                  )}
                                   <span style={{ fontSize: '0.84rem', color: '#cbd5e1', fontWeight: 650, fontStyle: 'italic', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                                     „{missionInfo.teacherNote}“
                                   </span>
+                                  {missionInfo.teacherNotes && missionInfo.teacherNotes.length > 1 && (
+                                    <span style={{ fontSize: '0.68rem', color: '#94a3b8', flexShrink: 0, fontWeight: 700 }}>
+                                      (+{missionInfo.teacherNotes.length - 1})
+                                    </span>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -2980,30 +3068,51 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                 {String(currentMins).padStart(2, '0')}:{String(currentSecs).padStart(2, '0')}
                               </div>
 
-                              <div style={{
-                                fontSize: isMusicStandMode ? '0.94rem' : '0.84rem',
-                                fontWeight: 900,
-                                color: isGoalReached ? '#34d399' : '#fbbf24',
-                                background: isGoalReached ? 'rgba(52, 211, 153, 0.15)' : 'rgba(245, 158, 11, 0.25)',
-                                border: isGoalReached ? '1.5px solid rgba(52, 211, 153, 0.5)' : '1.5px solid rgba(245, 158, 11, 0.5)',
-                                padding: isMusicStandMode ? '6px 16px' : '4px 14px',
-                                borderRadius: '100px',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '6px'
-                              }}>
-                                {!isGoalReached ? (
-                                  <>
-                                    <Target size={13} color="#fbbf24" style={{ flexShrink: 0 }} />
-                                    <span>Ziel: {String(targetMins).padStart(2, '0')}:00 Min.</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Zap size={13} color="#34d399" style={{ flexShrink: 0 }} />
-                                    <span>Flow-Ziel erreicht!</span>
-                                  </>
-                                )}
-                              </div>
+                              {showFlatReminder ? (
+                                <div style={{
+                                  fontSize: isMusicStandMode ? '0.92rem' : '0.84rem',
+                                  fontWeight: 900,
+                                  color: '#fef3c7',
+                                  background: 'rgba(245, 158, 11, 0.25)',
+                                  border: '1.5px solid rgba(251, 191, 36, 0.65)',
+                                  padding: isMusicStandMode ? '6px 16px' : '4px 14px',
+                                  borderRadius: '100px',
+                                  backdropFilter: 'blur(12px)',
+                                  boxShadow: '0 0 20px rgba(245, 158, 11, 0.45)',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  animation: 'flatReminderPulse 2s ease-in-out infinite'
+                                }}>
+                                  <Smartphone size={14} strokeWidth={2.4} color="#fef3c7" style={{ flexShrink: 0 }} />
+                                  <span>Handy flach hinlegen</span>
+                                </div>
+                              ) : (
+                                <div style={{
+                                  fontSize: isMusicStandMode ? '0.94rem' : '0.84rem',
+                                  fontWeight: 900,
+                                  color: isGoalReached ? '#34d399' : '#fbbf24',
+                                  background: isGoalReached ? 'rgba(52, 211, 153, 0.15)' : 'rgba(245, 158, 11, 0.25)',
+                                  border: isGoalReached ? '1.5px solid rgba(52, 211, 153, 0.5)' : '1.5px solid rgba(245, 158, 11, 0.5)',
+                                  padding: isMusicStandMode ? '6px 16px' : '4px 14px',
+                                  borderRadius: '100px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px'
+                                }}>
+                                  {!isGoalReached ? (
+                                    <>
+                                      <Target size={13} color="#fbbf24" style={{ flexShrink: 0 }} />
+                                      <span>Ziel: {String(targetMins).padStart(2, '0')}:00 Min.</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Zap size={13} color="#34d399" style={{ flexShrink: 0 }} />
+                                      <span>Flow-Ziel erreicht!</span>
+                                    </>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </div>
 
@@ -3810,11 +3919,25 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
 
                               {/* Spezifische Lehrkraft-Notiz */}
                               {missionInfo.hasSpecificNote && missionInfo.teacherNote && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingTop: '2px', borderTop: (missionInfo.books?.length || missionInfo.songs?.length) ? '1px solid #f1f5f9' : 'none' }}>
+                                <div 
+                                  onClick={() => setShowJuniorCheatSheet(prev => !prev)}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingTop: '2px', borderTop: (missionInfo.books?.length || missionInfo.songs?.length) ? '1px solid #f1f5f9' : 'none', cursor: 'pointer' }}
+                                  title="Tipp antippen für Notizen-Ansicht"
+                                >
                                   <Lightbulb size={13} color="#16a34a" style={{ flexShrink: 0 }} />
+                                  {missionInfo.isCarriedOver && (
+                                    <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#16a34a', background: 'rgba(22, 163, 74, 0.12)', padding: '1px 5px', borderRadius: '4px', flexShrink: 0 }}>
+                                      {missionInfo.carriedOverWeek ? `${missionInfo.carriedOverWeek}` : 'Vorwoche'}
+                                    </span>
+                                  )}
                                   <span style={{ fontSize: '0.84rem', color: '#475569', fontWeight: 650, fontStyle: 'italic', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                                     „{missionInfo.teacherNote}“
                                   </span>
+                                  {missionInfo.teacherNotes && missionInfo.teacherNotes.length > 1 && (
+                                    <span style={{ fontSize: '0.68rem', color: '#64748b', flexShrink: 0, fontWeight: 700 }}>
+                                      (+{missionInfo.teacherNotes.length - 1})
+                                    </span>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -3898,30 +4021,50 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                 {String(currentMins).padStart(2, '0')}:{String(currentSecs).padStart(2, '0')}
                               </div>
 
-                              <div style={{
-                                fontSize: isMusicStandMode ? '0.94rem' : '0.84rem',
-                                fontWeight: 900,
-                                color: '#15803d',
-                                background: isGoalReached ? '#dcfce7' : '#e6f4ea',
-                                border: '1.5px solid #86efac',
-                                padding: isMusicStandMode ? '6px 16px' : '4px 14px',
-                                borderRadius: '100px',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '6px'
-                              }}>
-                                {!isGoalReached ? (
-                                  <>
-                                    <Target size={13} color="#16a34a" />
-                                    <span>Ziel: {String(targetMins).padStart(2, '0')}:00 Min.</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <CheckCircle size={13} color="#15803d" />
-                                    <span>Tagesziel erreicht</span>
-                                  </>
-                                )}
-                              </div>
+                              {showFlatReminder ? (
+                                <div style={{
+                                  fontSize: isMusicStandMode ? '0.92rem' : '0.84rem',
+                                  fontWeight: 900,
+                                  color: '#92400e',
+                                  background: 'rgba(245, 158, 11, 0.14)',
+                                  border: '1.5px solid rgba(217, 119, 6, 0.5)',
+                                  padding: isMusicStandMode ? '6px 16px' : '4px 14px',
+                                  borderRadius: '100px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  boxShadow: '0 2px 10px rgba(245, 158, 11, 0.2)',
+                                  animation: 'flatReminderPulse 2s ease-in-out infinite'
+                                }}>
+                                  <Smartphone size={14} strokeWidth={2.4} color="#92400e" style={{ flexShrink: 0 }} />
+                                  <span>Handy flach hinlegen</span>
+                                </div>
+                              ) : (
+                                <div style={{
+                                  fontSize: isMusicStandMode ? '0.94rem' : '0.84rem',
+                                  fontWeight: 900,
+                                  color: '#15803d',
+                                  background: isGoalReached ? '#dcfce7' : '#e6f4ea',
+                                  border: '1.5px solid #86efac',
+                                  padding: isMusicStandMode ? '6px 16px' : '4px 14px',
+                                  borderRadius: '100px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px'
+                                }}>
+                                  {!isGoalReached ? (
+                                    <>
+                                      <Target size={13} color="#16a34a" />
+                                      <span>Ziel: {String(targetMins).padStart(2, '0')}:00 Min.</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <CheckCircle size={13} color="#15803d" />
+                                      <span>Tagesziel erreicht</span>
+                                    </>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </div>
 

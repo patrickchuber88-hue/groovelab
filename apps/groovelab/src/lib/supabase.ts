@@ -54,6 +54,11 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
   if (sessionToken) {
     clientInfo += `;session_token=${sessionToken}`;
   }
+
+  const activeUserId = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null;
+  if (activeUserId) {
+    clientInfo += `;user_id=${activeUserId}`;
+  }
   
   let qrToken = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_qr_token') : null;
   if (!qrToken && typeof window !== 'undefined' && (window.location.pathname.startsWith('/onboarding') || window.location.pathname.startsWith('/qr'))) {

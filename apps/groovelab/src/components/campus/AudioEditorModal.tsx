@@ -16,7 +16,8 @@ import {
 } from 'lucide-react';
 import { getBlob, storeBlob } from '../../utils/blobStorage';
 import { shiftAudioBufferPitch } from '../../utils/pitchShifter';
-import { safeDecodeAudioData } from '../../utils/audioMasteringEngine';
+import { safeDecodeAudioData, audioBufferToWavBlob } from '../../utils/audioMasteringEngine';
+import { getAudioNotes } from '../../utils/audioNotesStorage';
 
 export interface AudioEditorSaveResult {
   url: string;
@@ -43,62 +44,6 @@ export interface AudioEditorModalProps {
   hasAudioTresor?: boolean;
   onSave: (result: AudioEditorSaveResult) => void;
   onRevertToOriginal?: () => void;
-}
-
-// Convert AudioBuffer to 16-bit PCM WAV Blob
-function audioBufferToWavBlob(buffer: AudioBuffer): Blob {
-  const numOfChan = buffer.numberOfChannels;
-  const length = buffer.length * numOfChan * 2 + 44;
-  const outBuffer = new ArrayBuffer(length);
-  const view = new DataView(outBuffer);
-  const channels: Float32Array[] = [];
-  const sampleRate = buffer.sampleRate;
-  let offset = 0;
-  let pos = 0;
-
-  function setUint16(data: number) {
-    view.setUint16(pos, data, true);
-    pos += 2;
-  }
-  function setUint32(data: number) {
-    view.setUint32(pos, data, true);
-    pos += 4;
-  }
-
-  // RIFF header
-  setUint32(0x46464952); // "RIFF"
-  setUint32(length - 8);
-  setUint32(0x45564157); // "WAVE"
-
-  // FMT sub-chunk
-  setUint32(0x20746d66); // "fmt "
-  setUint32(16);
-  setUint16(1); // PCM
-  setUint16(numOfChan);
-  setUint32(sampleRate);
-  setUint32(sampleRate * 2 * numOfChan);
-  setUint16(numOfChan * 2);
-  setUint16(16);
-
-  // data sub-chunk
-  setUint32(0x61746164); // "data"
-  setUint32(length - pos - 4);
-
-  for (let i = 0; i < buffer.numberOfChannels; i++) {
-    channels.push(buffer.getChannelData(i));
-  }
-
-  while (offset < buffer.length) {
-    for (let i = 0; i < numOfChan; i++) {
-      let sample = Math.max(-1, Math.min(1, channels[i][offset]));
-      sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
-      view.setInt16(pos, sample, true);
-      pos += 2;
-    }
-    offset++;
-  }
-
-  return new Blob([outBuffer], { type: 'audio/wav' });
 }
 
 export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
@@ -130,6 +75,8 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [activeDraggingHandle, setActiveDraggingHandle] = useState<'start' | 'end' | null>(null);
   const [isHoveringHandle, setIsHoveringHandle] = useState<'start' | 'end' | null>(null);
+  // 📍 Subtle Referenz-Pins aus Audio Timeline Notizen
+  const timelineNotes = useMemo(() => getAudioNotes(audioUrl || ''), [audioUrl]);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const activeSourceRef = useRef<AudioBufferSourceNode | null>(null);
@@ -514,34 +461,21 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
 
     try {
       const sampleRate = audioBuffer.sampleRate;
-      const startSample = Math.floor(startTime * sampleRate);
-      const endSample = Math.floor(endTime * sampleRate);
+      const startSample = Math.max(0, Math.min(audioBuffer.length - 1, Math.floor(startTime * sampleRate)));
+      const endSample = Math.max(startSample + 1, Math.min(audioBuffer.length, Math.floor(endTime * sampleRate)));
       const newLength = Math.max(1, endSample - startSample);
 
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       const offlineCtx = new OfflineAudioContext(audioBuffer.numberOfChannels, newLength, sampleRate);
       const croppedBuffer = offlineCtx.createBuffer(audioBuffer.numberOfChannels, newLength, sampleRate);
 
-      // 25ms Anti-Click Micro-Fade (clean fade-in & fade-out)
-      const fadeSamples = Math.min(Math.floor(sampleRate * 0.025), Math.floor(newLength / 2));
-
+      // 🔁 Exakte 1:1 Sample-Kopie des ausgewählten Bereichs ohne Lautstärke-Dips (identisch zur Loop-Vorschau)
       for (let c = 0; c < audioBuffer.numberOfChannels; c++) {
         const srcData = audioBuffer.getChannelData(c);
         const destData = croppedBuffer.getChannelData(c);
 
         for (let i = 0; i < newLength; i++) {
-          let sample = srcData[startSample + i];
-
-          // Fade-In at start
-          if (i < fadeSamples) {
-            sample *= (i / fadeSamples);
-          }
-          // Fade-Out at end
-          else if (i > newLength - fadeSamples) {
-            sample *= ((newLength - i) / fadeSamples);
-          }
-
-          destData[i] = sample;
+          destData[i] = srcData[startSample + i] || 0;
         }
       }
 
@@ -555,7 +489,7 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
       const newKey = `campus_audio_cut_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.wav`;
       await storeBlob(newKey, wavBlob);
 
-      const newDurationSec = Math.max(1, Math.round(finalBuffer.duration));
+      const newDurationSec = Math.max(0.1, Number(finalBuffer.duration.toFixed(2)));
       let finalLabel = editLabel.trim() || initialLabel;
       if (mode === 'duplicate' && (finalLabel === initialLabel || !editLabel.trim())) {
         finalLabel = `${initialLabel} (Kopie)`;
@@ -772,18 +706,20 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
               <span>Start: {formatTime(startTime)}</span>
             </span>
             
-            <span style={{
-              color: '#334155',
-              fontWeight: 850,
-              background: '#ffffff',
-              border: '1px solid #cbd5e1',
-              padding: '4px 10px',
-              borderRadius: '8px',
-              fontSize: '0.78rem',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-            }}>
-              Dauer: {formatTime(Math.max(0, endTime - startTime))}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{
+                color: '#334155',
+                fontWeight: 850,
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                padding: '4px 10px',
+                borderRadius: '8px',
+                fontSize: '0.78rem',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+              }}>
+                Dauer: {formatTime(Math.max(0, endTime - startTime))}
+              </span>
+            </div>
 
             <span style={{
               background: '#fee2e2',
@@ -908,7 +844,63 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
                     </g>
                   </svg>
 
-                  {/* 3. Live Playhead Needle during Playback */}
+                  {/* 3. Subtle Reference Pins from Audio Timeline Notes (SoundCloud-Style) */}
+                  {duration > 0 && timelineNotes.map((note) => {
+                    const markerPct = Math.max(0, Math.min(100, (note.time / duration) * 100));
+                    const pinColor = note.tag === 'tip' ? '#eab308' : note.tag === 'bar' ? '#3b82f6' : note.tag === 'highlight' ? '#ec4899' : '#f97316';
+                    return (
+                      <div
+                        key={note.id}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Zu Notiz "${note.text.substring(0, 24)}" (${formatTime(note.time)}) springen`}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            playFrom(note.time);
+                          }
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          playFrom(note.time);
+                        }}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          bottom: 0,
+                          left: `${markerPct}%`,
+                          transform: 'translateX(-50%)',
+                          width: '16px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          zIndex: 25,
+                          cursor: 'pointer'
+                        }}
+                        title={`Notiz: "${note.text}" (${formatTime(note.time)}) - Klick zum Anspringen`}
+                      >
+                        <div style={{
+                          width: '9px',
+                          height: '9px',
+                          borderRadius: '50%',
+                          background: pinColor,
+                          border: '1.5px solid #ffffff',
+                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.25)',
+                          marginTop: '2px'
+                        }} />
+                        <div style={{
+                          width: '1px',
+                          flex: 1,
+                          background: pinColor,
+                          opacity: 0.5,
+                          borderLeft: '1px dashed'
+                        }} />
+                      </div>
+                    );
+                  })}
+
+                  {/* 3b. Live Playhead Needle during Playback */}
                   {isPlaying && (
                     <div style={{
                       position: 'absolute',

@@ -567,14 +567,20 @@ export async function getStudentBriefingHandler(req: Request, res: Response): Pr
 
     let todayLesson = null;
     if (todaySchedules) {
-      const teacherName = teacherProfile 
-        ? `Herr/Frau ${teacherProfile.last_name}` 
-        : 'Lehrkraft';
+      const teacherFirstName = teacherProfile?.first_name ? teacherProfile.first_name.trim() : '';
+      const teacherLastName = teacherProfile?.last_name ? teacherProfile.last_name.trim() : '';
+      const teacherFullName = (teacherFirstName && teacherLastName)
+        ? `${teacherFirstName} ${teacherLastName}`
+        : (teacherFirstName || teacherLastName || 'Lehrkraft');
+
       todayLesson = {
+        id: todaySchedules.id,
         time: todaySchedules.time_slot,
         room: (todaySchedules.rooms as any)?.name || 'Unterrichtsraum',
-        teacher: teacherName,
-        displayString: `Heute ${todaySchedules.time_slot} Uhr, ${(todaySchedules.rooms as any)?.name || 'Raum'} bei ${teacherName}`
+        teacher: teacherFullName,
+        teacher_name: teacherFullName,
+        teacher_id: todaySchedules.teacher_id,
+        displayString: `Heute ${todaySchedules.time_slot} Uhr, ${(todaySchedules.rooms as any)?.name || 'Raum'} bei ${teacherFullName}`
       };
     }
 

@@ -871,7 +871,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
           }}>
             <ShieldCheck size={13} color="#15803d" style={{ flexShrink: 0 }} />
             <span>
-              <strong>Didaktischer Schul-Chat (§ 8a SGB VIII):</strong> Nur für Unterrichtszwecke • Für Erziehungsberechtigte transparent einsehbar.
+              <strong>Didaktischer Schul-Chat:</strong> Nur für Unterrichtszwecke • Für Erziehungsberechtigte transparent einsehbar.
             </span>
           </div>
         )}
@@ -978,7 +978,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
               maxWidth: '92%'
             }}>
               <ShieldCheck size={12} color="#15803d" style={{ flexShrink: 0 }} />
-              <span>Schul-Chat (§ 8a SGB VIII) • Für Erziehungsberechtigte einsehbar</span>
+              <span>Didaktischer Schul-Chat: Nur für Unterrichtszwecke • Für Erziehungsberechtigte transparent einsehbar.</span>
             </div>
           )}
           {isFrozen && (
@@ -1133,7 +1133,14 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
                       <span style={{ fontSize: '0.74rem', color: isMe ? 'rgba(255, 255, 255, 0.85)' : '#64748b', fontWeight: 650 }}>
                         {new Date(msg.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}, {new Date(msg.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
                       </span>
-                      {isMe && <CheckCheck size={14} color="#ffffff" style={{ marginLeft: '2px', opacity: 0.95 }} />}
+                      {isMe && (
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', marginLeft: '4px' }}>
+                          <CheckCheck size={14} color="#ffffff" style={{ opacity: msg.is_read ? 1 : 0.75 }} />
+                          <span style={{ fontSize: '0.68rem', color: 'rgba(255, 255, 255, 0.85)' }}>
+                            {msg.is_read ? 'Gelesen' : 'Zugestellt'}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

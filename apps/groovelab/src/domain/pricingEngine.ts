@@ -40,18 +40,8 @@ export const MASTER_CURRENCY_RATES: Record<CurrencyCode, CurrencyPricingRates> =
   },
 };
 
-/**
- * Formats monetary amounts with strict localization standards:
- * - EUR: "14,90 €" / "0,49 €" (German comma formatting)
- * - CHF: "CHF 19.90" / "CHF 0.80" (Official Swiss dot & prefix standard)
- */
-export function formatCurrency(amount: number, currency: CurrencyCode = 'EUR'): string {
-  const num = typeof amount === 'number' && !isNaN(amount) ? amount : 0;
-  if (currency === 'CHF') {
-    return `CHF ${num.toFixed(2)}`;
-  }
-  return `${num.toFixed(2).replace('.', ',')} €`;
-}
+import { formatCurrency } from '../utils/formatters';
+export { formatCurrency };
 
 export interface StorageTier {
   gb: number;

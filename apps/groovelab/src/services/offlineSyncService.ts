@@ -3,6 +3,9 @@ import {
   getAllPendingAudioRecords, 
   removeOfflineAudioRecord, 
   getPendingAudioCount,
+  saveOfflineMutation,
+  getAllOfflineMutations,
+  removeOfflineMutation,
   OfflineAudioRecord 
 } from '../utils/offlineAudioVault';
 
@@ -77,14 +80,55 @@ const notifyListeners = async () => {
   });
 };
 
-export const getPendingSyncActions = (): PendingSyncAction[] => {
+let memoryActionsCache: PendingSyncAction[] = [];
+let isCacheLoaded = false;
+
+// Preload & migrate from localStorage to IndexedDB
+export const loadAndMigrateOfflineMutations = async (): Promise<PendingSyncAction[]> => {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const idbMutations = await getAllOfflineMutations();
+    const rawLocal = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
+    const localMutations: PendingSyncAction[] = rawLocal ? JSON.parse(rawLocal) : [];
+
+    // If there are legacy local mutations, migrate them into IndexedDB
+    if (localMutations.length > 0) {
+      for (const item of localMutations) {
+        if (!idbMutations.some(m => m.id === item.id)) {
+          await saveOfflineMutation(item).catch(() => {});
+          idbMutations.push(item);
+        }
+      }
+      try { localStorage.removeItem(STORAGE_KEY); } catch {}
+    }
+
+    memoryActionsCache = idbMutations;
+    isCacheLoaded = true;
+    return idbMutations;
+  } catch (err) {
+    console.warn('[OfflineSync] Error loading/migrating offline mutations:', err);
+    return getPendingSyncActionsFallback();
+  }
+};
+
+// Initial auto-migration trigger
+if (typeof window !== 'undefined') {
+  loadAndMigrateOfflineMutations().then(() => notifyListeners()).catch(() => {});
+}
+
+const getPendingSyncActionsFallback = (): PendingSyncAction[] => {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
     return raw ? JSON.parse(raw) : [];
-  } catch (e) {
-    console.error('[OfflineSync] Failed to read pending actions:', e);
+  } catch {
     return [];
   }
+};
+
+export const getPendingSyncActions = (): PendingSyncAction[] => {
+  if (isCacheLoaded) {
+    return memoryActionsCache;
+  }
+  return getPendingSyncActionsFallback();
 };
 
 export const getPendingOfflineActionsCount = (): number => {
@@ -100,7 +144,6 @@ export const enqueueOfflineAction = (
   }
 ): void => {
   try {
-    const actions = getPendingSyncActions();
     const newAction: PendingSyncAction = {
       id: `${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
       table,
@@ -113,10 +156,19 @@ export const enqueueOfflineAction = (
       timestamp: new Date().toISOString(),
       attempts: 0
     };
-    actions.push(newAction);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(actions));
+    memoryActionsCache.push(newAction);
+    isCacheLoaded = true;
+
+    // Persist to IndexedDB asynchronously
+    saveOfflineMutation(newAction).catch((err) => {
+      console.warn('[OfflineSync] Fallback saving mutation to localStorage:', err);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(memoryActionsCache));
+      } catch {}
+    });
+
     notifyListeners();
-    console.log('[OfflineSync] Action enqueued for offline sync:', newAction);
+    console.log('[OfflineSync] Action enqueued for offline sync (IndexedDB):', newAction);
   } catch (e) {
     console.error('[OfflineSync] Failed to enqueue offline action:', e);
   }
@@ -222,10 +274,10 @@ export const flushOfflineAudioQueue = async (): Promise<{ success: number; faile
  * Flush pending database mutations with Smart Conflict Resolution (Last-Write-Wins)
  */
 export const flushOfflineSyncQueue = async (): Promise<{ success: number; failed: number; quarantined: number }> => {
-  const actions = getPendingSyncActions();
+  const actions = await loadAndMigrateOfflineMutations();
   if (actions.length === 0) return { success: 0, failed: 0, quarantined: 0 };
 
-  console.log(`[OfflineSync] Flushing ${actions.length} pending offline actions...`);
+  console.log(`[OfflineSync] Flushing ${actions.length} pending offline actions from IndexedDB...`);
   let successCount = 0;
   let failedCount = 0;
   let quarantinedCount = 0;
@@ -246,7 +298,7 @@ export const flushOfflineSyncQueue = async (): Promise<{ success: number; failed
         const { error } = await supabase.from(action.table).insert(action.payload);
         if (error) throw error;
       } else {
-        // Smart Conflict Resolution (Opt 6): Last-Write-Wins with Timestamp Comparison
+        // Smart Conflict Resolution: Compare timestamps before upserting
         if (action.payload?.id && action.payload?.updated_at) {
           const { data: remoteRecord } = await supabase
             .from(action.table)
@@ -256,6 +308,7 @@ export const flushOfflineSyncQueue = async (): Promise<{ success: number; failed
 
           if (remoteRecord?.updated_at && new Date(remoteRecord.updated_at) > new Date(action.payload.updated_at)) {
             console.log(`[OfflineSync] Remote version is newer for ${action.id}. Skipping stale offline write.`);
+            await removeOfflineMutation(action.id);
             successCount++;
             continue;
           }
@@ -265,6 +318,7 @@ export const flushOfflineSyncQueue = async (): Promise<{ success: number; failed
         if (error) throw error;
       }
 
+      await removeOfflineMutation(action.id);
       successCount++;
       console.log(`[OfflineSync] Synced action ${action.id} to ${action.table}`);
     } catch (err: any) {
@@ -276,21 +330,24 @@ export const flushOfflineSyncQueue = async (): Promise<{ success: number; failed
 
       if (currentAttempts >= MAX_RETRY_ATTEMPTS) {
         console.warn(`[OfflineSync] Action ${action.id} exceeded max retries. Moving to quarantine.`);
+        await removeOfflineMutation(action.id);
         quarantinedActions.push(action);
         quarantinedCount++;
       } else {
+        await saveOfflineMutation(action).catch(() => {});
         remainingActions.push(action);
       }
     }
   }
 
-  // Save remaining retryable actions
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(remainingActions));
+  // Update memory cache and notify listeners
+  memoryActionsCache = remainingActions;
+  notifyListeners();
 
   // Save quarantined actions
   if (quarantinedActions.length > 0) {
     try {
-      const rawQuarantine = localStorage.getItem(QUARANTINE_KEY);
+      const rawQuarantine = typeof localStorage !== 'undefined' ? localStorage.getItem(QUARANTINE_KEY) : null;
       const existingQuarantine = rawQuarantine ? JSON.parse(rawQuarantine) : [];
       localStorage.setItem(QUARANTINE_KEY, JSON.stringify([...existingQuarantine, ...quarantinedActions]));
     } catch {

@@ -9,8 +9,16 @@ import {
   audioBufferToWavBlob, 
   processPureRawAudioBuffer,
   TARGET_PURE_RAW_LUFS,
-  TARGET_PEAK_DBTP
+  TARGET_PEAK_DBTP,
+  MAX_PURE_RAW_LIMITER_GR_DB
 } from '../../utils/audioMasteringEngine';
+import { acquireAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
+import { supabase } from '../../lib/supabase';
+import { validateMediaBlob, stripAudioMetadata } from '../../utils/mediaSecurityValidator';
+import { getSecureAudioUrl, buildCanonicalAudioStoragePath, computeBlobSha256 } from '../../utils/audioStorageHelper';
+import { useFocusInterruptionGuard } from '../../hooks/useFocusInterruptionGuard';
+import { FocusInterruptionBanner } from '../focus/FocusInterruptionBanner';
+import { FocusAbortedModal } from '../focus/FocusAbortedModal';
 
 // Helper to decode Base64 WAV into AudioBuffer with true header sample rate
 const decodeBase64Wav = (ctx: AudioContext | BaseAudioContext, b64Uri: string): AudioBuffer => {
@@ -501,7 +509,11 @@ async function mixMicWithDirectBackingBeat(
     }
 
     const renderedBuffer = await offlineCtx.startRendering();
-    processPureRawAudioBuffer(renderedBuffer, { targetLufs: -14.0, targetPeakDb: -1.0 });
+    processPureRawAudioBuffer(renderedBuffer, { 
+      targetLufs: TARGET_PURE_RAW_LUFS, 
+      targetPeakDb: TARGET_PEAK_DBTP,
+      maxLimiterGrDb: MAX_PURE_RAW_LIMITER_GR_DB
+    });
 
     const wavBlob = audioBufferToWavBlob(renderedBuffer, {
       title: 'Campus-Groovelab Übe-Take',
@@ -516,7 +528,11 @@ async function mixMicWithDirectBackingBeat(
     };
   } catch (err) {
     console.warn('[mixMicWithDirectBackingBeat] Falling back to pure raw blob:', err);
-    const fallback = await processPureRawBlob(micBlob, { targetLufs: TARGET_PURE_RAW_LUFS, targetPeakDb: TARGET_PEAK_DBTP });
+    const fallback = await processPureRawBlob(micBlob, { 
+      targetLufs: TARGET_PURE_RAW_LUFS, 
+      targetPeakDb: TARGET_PEAK_DBTP,
+      maxLimiterGrDb: MAX_PURE_RAW_LIMITER_GR_DB
+    });
     return {
       processedBlob: fallback.processedBlob,
       processedUrl: fallback.processedUrl,
@@ -989,7 +1005,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
     setInstrumentToneCount(0);
     setInstrumentToneDoneText(null);
 
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+    acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS }).then(stream => {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const source = audioCtx.createMediaStreamSource(stream);
       const analyser = audioCtx.createAnalyser();
@@ -1219,20 +1235,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
 
   const startCountInAndRecord = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          googEchoCancellation: false,
-          googAutoGainControl: false,
-          googNoiseSuppression: false,
-          googHighpassFilter: false,
-          googTypingNoiseDetection: false,
-          channelCount: 1,
-          sampleRate: 48000
-        } as any
-      });
+      const stream = await acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS });
       recordingStreamRef.current = stream;
 
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -1301,7 +1304,11 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
         } catch (dspErr) {
           console.warn('[GroovePracticeCompanion] Direct Beat Mix fallback:', dspErr);
           try {
-            const pureRawRes = await processPureRawBlob(rawBlob, { targetLufs: TARGET_PURE_RAW_LUFS, targetPeakDb: TARGET_PEAK_DBTP });
+            const pureRawRes = await processPureRawBlob(rawBlob, { 
+              targetLufs: TARGET_PURE_RAW_LUFS, 
+              targetPeakDb: TARGET_PEAK_DBTP,
+              maxLimiterGrDb: MAX_PURE_RAW_LIMITER_GR_DB
+            });
             finalBlob = pureRawRes.processedBlob;
             blobUrl = pureRawRes.processedUrl;
             if (pureRawRes.durationSec) durationSec = Math.round(pureRawRes.durationSec);
@@ -1408,9 +1415,15 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
       const blobKey = `campus_audio_${recId}_raw`;
       await storeBlob(blobKey, pendingPreviewTake.blob).catch(() => {});
 
+      // Derive song tag if practiced in an active song context
+      const songTag = typeof activeSongContext === 'string'
+        ? activeSongContext
+        : ((activeSongContext as any)?.songTitle || (activeSongContext as any)?.title || (activeSongContext as any)?.name || undefined);
+
       const newRec = {
         id: recId,
         url: blobKey,
+        blobKey: blobKey,
         previewUrl: pendingPreviewTake.blobUrl,
         duration: pendingPreviewTake.duration,
         date: pendingPreviewTake.date.toISOString(),
@@ -1419,34 +1432,156 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
         visibility: 'private',
         source: 'practice_companion',
         bpm: pendingPreviewTake.bpm,
-        style: pendingPreviewTake.style
+        style: pendingPreviewTake.style,
+        songTag,
+        cloudSyncStatus: 'pending' as const
       };
 
-      const targetStudentId = studentId || student?.id || (() => {
-        try {
-          const u = localStorage.getItem('groovelab_user');
-          if (u) return JSON.parse(u).id;
-        } catch {}
-        return 'student-default';
-      })();
+      // 🛡️ Multi-Tenant & Aliasing Safe candidate resolution across all possible ID representations
+      const candidateStudentIds = Array.from(new Set([
+        studentId,
+        student?.id,
+        (student as any)?.student_id,
+        (student as any)?.studentId,
+        (student as any)?.canonical_uuid,
+        (student as any)?.slot_id,
+        (() => {
+          try {
+            const u = localStorage.getItem('groovelab_user') || localStorage.getItem('campus_user');
+            if (u) return JSON.parse(u).id;
+          } catch {}
+          return null;
+        })()
+      ].filter(Boolean))) as string[];
 
-      const juniorKey = `campus_junior_recordings_${targetStudentId}`;
-      let existing: any[] = [];
-      try {
-        const stored = localStorage.getItem(juniorKey);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed)) existing = parsed;
-        }
-      } catch {}
-      const updated = [newRec, ...existing];
-      localStorage.setItem(juniorKey, JSON.stringify(updated));
-      window.dispatchEvent(new CustomEvent('campus-recordings-updated', { detail: { studentId: targetStudentId } }));
+      const primaryStudentId = candidateStudentIds[0] || 'student-default';
+      const targetSchoolId = student?.school_id || (student as any)?.schoolId || localStorage.getItem('campus_school_id') || localStorage.getItem('groovelab_school_id') || 'global';
+
+      // 1. Optimistic Local Persistence across all candidate keys
+      candidateStudentIds.forEach(cid => {
+        const juniorKey = `campus_junior_recordings_${cid}`;
+        let existing: any[] = [];
+        try {
+          const stored = localStorage.getItem(juniorKey);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed)) existing = parsed;
+          }
+        } catch {}
+        const updated = [newRec, ...existing.filter((r: any) => r.id !== recId && r.url !== blobKey)];
+        localStorage.setItem(juniorKey, JSON.stringify(updated));
+      });
+
+      // ⚡ Dispatch events on both event contracts for 100% reactive parity
+      candidateStudentIds.forEach(cid => {
+        window.dispatchEvent(new CustomEvent('campus_junior_recordings_updated', { detail: { studentId: cid } }));
+        window.dispatchEvent(new CustomEvent('campus-recordings-updated', { detail: { studentId: cid } }));
+      });
+      window.dispatchEvent(new Event('campus_junior_recordings_updated'));
+      window.dispatchEvent(new Event('campus-recordings-updated'));
       window.dispatchEvent(new Event('storage'));
 
       setSavedTakeSuccessToast(pendingPreviewTake.title);
       setTimeout(() => setSavedTakeSuccessToast(null), 4000);
+
+      // Keep reference to take for background sync before clearing pendingPreviewTake
+      const currentTake = pendingPreviewTake;
       setPendingPreviewTake(null);
+
+      // ☁️ 2. Revisionssicherer Tier-1 Enterprise+ Background Cloud-Sync (Non-blocking with 10s Guard)
+      (async () => {
+        try {
+          const takeBlob = currentTake.blob;
+          const contentType = takeBlob.type || 'audio/webm';
+          const fileExt = contentType.includes('mp4') ? 'mp4' : (contentType.includes('ogg') ? 'ogg' : 'webm');
+          const fileName = `${recId}.${fileExt}`;
+          const filePath = buildCanonicalAudioStoragePath(targetSchoolId, primaryStudentId, 'practice_companion', fileName);
+
+          // 🛡️ Enterprise Child Privacy: Strip device metadata / hardware fingerprints
+          const sanitizedBlob = await stripAudioMetadata(takeBlob);
+          const checksum = await computeBlobSha256(sanitizedBlob);
+
+          // 🛡️ Anti-Malware Ingestion Gate
+          const validation = await validateMediaBlob(sanitizedBlob, 'audio', contentType);
+          if (!validation.isValid) {
+            console.warn('[GroovePracticeCompanion] Media validation blocked upload:', validation.reason);
+            return;
+          }
+
+          // Resilient Upload with 10s Timeout Guard
+          const uploadPromise = supabase.storage
+            .from('campus-assets')
+            .upload(filePath, sanitizedBlob, {
+              contentType,
+              upsert: true,
+              cacheControl: 'private, max-age=3600'
+            });
+
+          const timeoutPromise = new Promise<{ error: Error }>((_, reject) =>
+            setTimeout(() => reject(new Error('Storage upload timeout')), 10000)
+          );
+
+          const uploadRes = await Promise.race([uploadPromise, timeoutPromise]) as any;
+
+          if (uploadRes && !uploadRes.error) {
+            const cloudUrl = await getSecureAudioUrl(filePath, 'campus-assets', 300);
+            if (cloudUrl) {
+              // Cache also in IndexedDB under cloudUrl for instantaneous offline/online playback
+              await storeBlob(cloudUrl, sanitizedBlob).catch(() => {});
+
+              // Stilles Upgrade in allen candidate IDs
+              candidateStudentIds.forEach(cid => {
+                const jKey = `campus_junior_recordings_${cid}`;
+                try {
+                  const stored = localStorage.getItem(jKey);
+                  if (stored) {
+                    const parsed = JSON.parse(stored);
+                    if (Array.isArray(parsed)) {
+                      const upgraded = parsed.map((r: any) => {
+                        if (r.id === recId || r.url === blobKey) {
+                          return {
+                            ...r,
+                            url: cloudUrl,
+                            cloudSyncStatus: 'synced',
+                            cloudPath: filePath,
+                            checksumSha256: checksum
+                          };
+                        }
+                        return r;
+                      });
+                      localStorage.setItem(jKey, JSON.stringify(upgraded));
+                    }
+                  }
+                } catch {}
+              });
+
+              // Reaktiv benachrichtigen
+              window.dispatchEvent(new Event('campus_junior_recordings_updated'));
+              window.dispatchEvent(new Event('storage'));
+            }
+          }
+
+          // Optional: Quota Accounting in schools table (Audio-Tresor Quota)
+          if (targetSchoolId && targetSchoolId !== 'global' && sanitizedBlob.size) {
+            try {
+              const { data: schoolData } = await supabase
+                .from('schools')
+                .select('storage_used_bytes')
+                .eq('id', targetSchoolId)
+                .maybeSingle();
+              if (schoolData) {
+                const currentBytes = Number(schoolData.storage_used_bytes || 0);
+                await supabase
+                  .from('schools')
+                  .update({ storage_used_bytes: currentBytes + sanitizedBlob.size })
+                  .eq('id', targetSchoolId);
+              }
+            } catch {}
+          }
+        } catch (syncErr) {
+          console.warn('[GroovePracticeCompanion] Background cloud upload note (local playback fully intact):', syncErr);
+        }
+      })();
     } catch (e) {
       console.error('Error saving take:', e);
     } finally {
@@ -1674,7 +1809,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
 
     let animFrameId: number;
 
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+    acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS }).then(stream => {
       micStreamRef.current = stream;
 
       const initTracking = () => {
@@ -2214,6 +2349,37 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
     }
   };
 
+  // 🛡️ Enterprise Anti-Ablenkungs- & Fokus-Wächter: Aufnahme sofort abbrechen & verwerfen
+  const discardActiveCompanionRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.onstop = null; // Neutralisiert onstop
+      try { mediaRecorderRef.current.stop(); } catch (e) {}
+    }
+    if (recordingStreamRef.current) {
+      recordingStreamRef.current.getTracks().forEach(t => t.stop());
+      recordingStreamRef.current = null;
+    }
+    if (recordAudioCtxRef.current) {
+      try { recordAudioCtxRef.current.close(); } catch (e) {}
+      recordAudioCtxRef.current = null;
+    }
+    audioChunksRef.current = [];
+    setIsRecording(false);
+    setIsCountingIn(false);
+    setIsPlaying(false);
+    setPendingPreviewTake(null);
+  };
+
+  const isCompanionGuarded = isRecording || isCountingIn;
+
+  const focusGuard = useFocusInterruptionGuard({
+    isActive: isCompanionGuarded,
+    toolName: 'Übe-Begleiter (Recorder)',
+    onAbort: () => {
+      discardActiveCompanionRecording();
+    }
+  });
+
   return (
     <div style={{
       display: 'flex',
@@ -2229,8 +2395,26 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
       gap: '14px',
       width: '100%',
       boxSizing: 'border-box',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+      position: 'relative'
     }}>
+      {/* 🛡️ Fokus-Wächter Banner & Abbruch-Modal */}
+      <FocusInterruptionBanner
+        isInterrupted={focusGuard.isInterrupted}
+        graceSecondsLeft={focusGuard.graceSecondsLeft}
+        strikes={focusGuard.strikes}
+        toolName="Übe-Begleiter (Recorder)"
+        onReturn={() => {}}
+      />
+
+      <FocusAbortedModal
+        isOpen={focusGuard.isAborted}
+        reason={focusGuard.abortReason}
+        toolName="Übe-Begleiter (Recorder)"
+        onClose={() => {
+          focusGuard.acknowledgeAbort();
+        }}
+      />
       
       {/* Mobile Segmented Switcher for Metronome vs Begleit-Rhythmen */}
       {isMobileView && (

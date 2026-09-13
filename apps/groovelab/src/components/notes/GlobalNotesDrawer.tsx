@@ -60,8 +60,8 @@ export const GlobalNotesDrawer: React.FC<GlobalNotesDrawerProps> = ({
       <div
         ref={drawerRef}
         style={{
-          width: '100%',
-          maxWidth: '440px',
+          width: 'min(540px, 95vw)',
+          maxWidth: '540px',
           height: '100%',
           backgroundColor: '#f8fafc',
           boxShadow: '-12px 0 35px rgba(0, 0, 0, 0.12)',

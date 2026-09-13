@@ -7,13 +7,23 @@
 export function initAntiTamperShield(): void {
   if (typeof window === 'undefined') return;
 
-  const isDev = import.meta.env.DEV || 
-                window.location.hostname === 'localhost' || 
-                window.location.hostname === '127.0.0.1';
+  const h = window.location.hostname;
+  const p = window.location.port;
 
-  // Never tamper with local development workflows
+  const isDev = import.meta.env.DEV || 
+                h === 'localhost' || 
+                h === '127.0.0.1' ||
+                h.endsWith('.localhost') ||
+                h.endsWith('.local') ||
+                h.startsWith('192.168.') ||
+                h.startsWith('10.') ||
+                /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(h) ||
+                p === '5173' ||
+                p === '4173';
+
+  // Never tamper with local development workflows or private network test devices
   if (isDev) {
-    console.info('🛠️ [Anti-Tamper] Development mode active: DevTools & Logging unrestricted.');
+    console.info('🛠️ [Anti-Tamper] Development / Private network mode active: DevTools & Logging unrestricted.');
     return;
   }
 

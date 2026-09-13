@@ -72,6 +72,10 @@ export interface SecretaryBriefingViewProps {
   handleConfirmBooking: (id: string) => Promise<void> | void;
   handleRejectBooking: (id: string) => Promise<void> | void;
   getEffectiveStorageUsedBytes: (profile: any) => number;
+  roomsSubView?: 'overview' | 'plan' | 'settings';
+  setRoomsSubView?: (view: 'overview' | 'plan' | 'settings') => void;
+  roomSearchQuery?: string;
+  setRoomSearchQuery?: React.Dispatch<React.SetStateAction<string>>;
 }
 
 export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
@@ -135,6 +139,10 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
   handleConfirmBooking,
   handleRejectBooking,
   getEffectiveStorageUsedBytes,
+  roomsSubView,
+  setRoomsSubView,
+  roomSearchQuery,
+  setRoomSearchQuery,
 }) => {
             const todayDayNum = new Date().getDay() === 0 ? 7 : new Date().getDay();
             const todayDateStr = new Date().toISOString().split('T')[0];
@@ -320,6 +328,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                   {/* Community Update & Helden-Moment Hero */}
                   <UpdateAnnouncementHero userId={userId} activePlatform={activeTab} />
+
 
                   {/* ⏳ Active Audio-Tresor Termination & Grace Period Monitor */}
                   {(() => {
@@ -884,39 +893,77 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                           </span>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        aria-label="Logbuch der Raumbuchungen öffnen"
-                        onClick={() => {
-                          fetchLogbookBookings();
-                          setShowLogbookModal(true);
-                        }}
-                        style={{
-                          background: '#f2f2f7', // Apple neutral gray
-                          border: 'none',
-                          color: '#1c1c1e', // Apple primary dark text
-                          padding: '6px 14px',
-                          borderRadius: '9999px',
-                          fontSize: '0.78rem',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                          letterSpacing: '-0.01em',
-                          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = '#e5e5ea';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = '#f2f2f7';
-                        }}
-                      >
-                        <BookOpen size={13} style={{ color: '#1c1c1e' }} />
-                        <span>Logbuch öffnen</span>
-                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <button
+                          type="button"
+                          aria-label="Direkt zum Räume-Board wechseln"
+                          onClick={() => {
+                            if (setRoomsSubView) setRoomsSubView('plan');
+                            if (setRoomSearchQuery) setRoomSearchQuery('');
+                            setActiveTab('secretary');
+                            setSecretarySubTab('rooms');
+                          }}
+                          style={{
+                            background: '#ea4335',
+                            border: 'none',
+                            color: '#ffffff',
+                            padding: '6px 14px',
+                            borderRadius: '9999px',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                            letterSpacing: '-0.01em',
+                            fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
+                            boxShadow: '0 2px 6px rgba(234, 67, 53, 0.2)'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#d93025';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#ea4335';
+                          }}
+                        >
+                          <DoorOpen size={13} style={{ color: '#ffffff' }} />
+                          <span>Räume-Board</span>
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Logbuch der Raumbuchungen öffnen"
+                          onClick={() => {
+                            fetchLogbookBookings();
+                            setShowLogbookModal(true);
+                          }}
+                          style={{
+                            background: '#f2f2f7', // Apple neutral gray
+                            border: 'none',
+                            color: '#1c1c1e', // Apple primary dark text
+                            padding: '6px 14px',
+                            borderRadius: '9999px',
+                            fontSize: '0.78rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                            letterSpacing: '-0.01em',
+                            fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#e5e5ea';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#f2f2f7';
+                          }}
+                        >
+                          <BookOpen size={13} style={{ color: '#1c1c1e' }} />
+                          <span>Logbuch öffnen</span>
+                        </button>
+                      </div>
                     </div>
 
                     {pendingBookings.length === 0 ? (
@@ -967,7 +1014,43 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                   Gebucht von: <strong style={{ color: '#475569' }}>{teacherName}</strong>
                                 </span>
                               </div>
-                              <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                              <div style={{ display: 'flex', gap: '8px', flexShrink: 0, alignItems: 'center' }}>
+                                <button
+                                  type="button"
+                                  aria-label={`Buchung für ${roomName} am ${dateFormatted} im Räume-Board ansehen`}
+                                  onClick={() => {
+                                    if (setRoomSearchQuery) setRoomSearchQuery(b.rooms?.name || roomName);
+                                    if (setRoomsSubView) setRoomsSubView('plan');
+                                    setActiveTab('secretary');
+                                    setSecretarySubTab('rooms');
+                                  }}
+                                  style={{
+                                    background: '#f8fafc',
+                                    color: '#0f172a',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: '8px',
+                                    padding: '6px 12px',
+                                    fontSize: '0.74rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    transition: 'all 0.15s ease',
+                                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = '#f1f5f9';
+                                    e.currentTarget.style.borderColor = '#94a3b8';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = '#f8fafc';
+                                    e.currentTarget.style.borderColor = '#cbd5e1';
+                                  }}
+                                >
+                                  <DoorOpen size={13} style={{ color: '#ea4335' }} />
+                                  <span>Im Räume-Board ansehen</span>
+                                </button>
                                 <button
                                   type="button"
                                   aria-label={`Raumbuchung für ${roomName} am ${dateFormatted} freigeben`}

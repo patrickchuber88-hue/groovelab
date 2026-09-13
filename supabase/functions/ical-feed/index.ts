@@ -143,42 +143,34 @@ Deno.serve(async (req) => {
       },
     })
 
-    // 1. Fetch user strictly by dedicated calendar_token (Zero-Credential-Leakage)
-    const { data: user, error: userErr } = await supabase
-      .from('users_raw')
-      .select('id, first_name, last_name, role, school_id, calendar_token')
-      .eq('calendar_token', token)
-      .maybeSingle();
+    // 1. Resolve user strictly via authoritative SECURITY DEFINER RPC (Zero-Credential-Leakage & OWASP Goldstandard)
+    let user: any = null;
+    const { data: rpcUser, error: rpcErr } = await supabase.rpc('resolve_calendar_feed_user', {
+      p_calendar_token: token.trim()
+    });
 
-    if (userErr) {
-      console.error('Error querying user by calendar_token:', userErr)
-      return new Response(
-        JSON.stringify({ error: 'Internal server database error' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    if (!rpcErr && rpcUser) {
+      user = rpcUser;
+    } else {
+      // Fallback to public.users view (where calendar_token is safely exposed to authorized callers)
+      const { data: viewUser, error: viewErr } = await supabase
+        .from('users')
+        .select('id, first_name, last_name, role, school_id, instrument, calendar_token')
+        .eq('calendar_token', token.trim())
+        .maybeSingle();
+
+      if (!viewErr && viewUser) {
+        user = viewUser;
+      } else {
+        console.warn('Could not resolve user by calendar_token:', { rpcErr, viewErr });
+      }
     }
 
     if (!user) {
-      // Check if caller used a deprecated legacy login credential (qr_token)
-      const { data: legacyUser } = await supabase
-        .from('users_raw')
-        .select('id')
-        .or(`qr_token.eq.${token},teacher_qr_token.eq.${token}`)
-        .maybeSingle();
-
-      if (legacyUser) {
-        return new Response(
-          JSON.stringify({
-            error: 'Sicherheits-Update: Veralteter Kalender-Link. Bitte erstelle deinen Kalender-Link in der Campus-App neu (1 Klick).'
-          }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json; charset=utf-8' } }
-        );
-      }
-
       return new Response(
         JSON.stringify({ error: 'Ungültiger oder abgelaufener Kalender-Schlüssel' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json; charset=utf-8' } }
-      )
+      );
     }
 
     const { id: userId, role, first_name, last_name, school_id: schoolId } = user
@@ -795,12 +787,15 @@ Deno.serve(async (req) => {
       })
     }
 
+    const isDownload = url.searchParams.get('dl') === '1' || url.searchParams.get('download') === '1'
+    const dispositionType = isDownload ? 'attachment' : 'inline'
+
     return new Response(icsBody, {
       status: 200,
       headers: {
         ...corsHeaders,
         'Content-Type': 'text/calendar; charset=utf-8',
-        'Content-Disposition': `attachment; filename="campus-groovelab-unterricht.ics"`,
+        'Content-Disposition': `${dispositionType}; filename="campus-groovelab-unterricht.ics"`,
         'ETag': etag,
         'Cache-Control': 'private, max-age=1800, stale-while-revalidate=3600'
       }

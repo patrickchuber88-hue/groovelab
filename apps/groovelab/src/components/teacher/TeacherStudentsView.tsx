@@ -251,7 +251,9 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                           cursor: 'pointer',
                           width: '100%',
                           maxWidth: '100%',
-                          boxSizing: 'border-box'
+                          boxSizing: 'border-box',
+                          contentVisibility: 'auto',
+                          containIntrinsicSize: '0 90px'
                         }}
                         onClick={() => setSelectedStudentProfile(student)}
                       >

@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { maskLastName } from '../../utils/nameHelper';
 import { formatHarmonizedAudioTitle } from '../../utils/audioNamingHelper';
 import { getDailyQuote } from '@groovelab/shared';
+import { supabase } from '../../lib/supabase';
 
 import {
   Activity, BookOpen, Calendar, Clock, Edit3, Flame,
-  Mic, Music, Sparkles, Sun, User, Users
+  Mic, Music, Sparkles, Sun, User, Users, Zap
 } from 'lucide-react';
 import { isTeacherCurrentlyAbsent } from '../../utils/teacherAbsenceHelper';
 
@@ -34,6 +35,7 @@ export interface TeacherHausaufgabenWidgetProps {
   getSimulatedNow: () => Date;
   showRealNames: boolean;
   widgetState: any;
+  onOpenStudio?: () => void;
 }
 
 export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps> = ({
@@ -61,7 +63,90 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
   getSimulatedNow,
   showRealNames,
   widgetState,
+  onOpenStudio,
 }) => {
+  const [isCopyingPrevWeek, setIsCopyingPrevWeek] = useState(false);
+
+  const handleCopyPrevWeekToCurrent = async (currentPrep: any) => {
+    if (!currentPrep?.studentId || !currentPrep?.prevWeekNotes || currentPrep.prevWeekNotes.length === 0) return;
+    setIsCopyingPrevWeek(true);
+    try {
+      const curWkNum = currentPrep.currentWeekNum;
+      if (!curWkNum) return;
+
+      const activeTId = teacher?.id;
+      const notesJson = JSON.stringify(currentPrep.prevWeekNotes);
+
+      // Check if current week row exists in progress_matrix
+      const { data: existingRows, error: fetchErr } = await supabase
+        .from('progress_matrix')
+        .select('id')
+        .eq('student_id', currentPrep.studentId)
+        .eq('topic_name', `Hausaufgabe KW ${curWkNum}`)
+        .limit(1);
+
+      if (fetchErr) console.warn('[copyPrevWeek] fetch warning:', fetchErr);
+
+      if (existingRows && existingRows.length > 0) {
+        const { error: updErr } = await supabase
+          .from('progress_matrix')
+          .update({
+            homework_notes: notesJson,
+            is_current_homework: true,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingRows[0].id);
+        if (updErr) throw updErr;
+      } else {
+        const { error: insErr } = await supabase
+          .from('progress_matrix')
+          .insert({
+            student_id: currentPrep.studentId,
+            teacher_id: activeTId,
+            topic_name: `Hausaufgabe KW ${curWkNum}`,
+            status: 'IN_PROGRESS',
+            is_current_homework: true,
+            homework_notes: notesJson,
+            teacher_notes: '',
+            updated_at: new Date().toISOString()
+          });
+        if (insErr) throw insErr;
+      }
+
+      // Re-activate prevWeekItems (books, songs) as current homework if present
+      if (currentPrep.prevWeekItems && currentPrep.prevWeekItems.length > 0) {
+        for (const it of currentPrep.prevWeekItems) {
+          if (it.title) {
+            await supabase
+              .from('progress_matrix')
+              .update({ is_current_homework: true, updated_at: new Date().toISOString() })
+              .eq('student_id', currentPrep.studentId)
+              .eq('topic_name', it.title);
+          }
+        }
+      }
+
+      // Update dynamicPrepMirror state immediately
+      setDynamicPrepMirror((prev: any) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          currentWeekNotes: currentPrep.prevWeekNotes,
+          currentWeekItems: currentPrep.prevWeekItems && currentPrep.prevWeekItems.length > 0 ? currentPrep.prevWeekItems : (prev.currentWeekItems || [])
+        };
+      });
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('campus_homework_updated', { detail: { studentId: currentPrep.studentId } }));
+      }
+    } catch (err: any) {
+      console.error('[copyPrevWeek] Error copying homework:', err);
+      alert('Fehler beim Übertragen der Hausaufgaben: ' + (err?.message || err));
+    } finally {
+      setIsCopyingPrevWeek(false);
+    }
+  };
+
   return (
     <div className="google-card" style={{ 
       width: '100%', 
@@ -230,14 +315,41 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontFamily: "'Inter', sans-serif", flex: 1, minHeight: 0 }}>
                 {/* Title Section: borderless, simple, calm */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-                  <Calendar size={16} color="#475569" style={{ opacity: 0.8 }} />
-                  <div>
-                    <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.01em' }}>
-                      Vorbereitung
-                    </h4>
-                    <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 500 }}>Fahrplan &amp; Änderungen</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexShrink: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Calendar size={16} color="#475569" style={{ opacity: 0.8 }} />
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.01em' }}>
+                        Vorbereitung
+                      </h4>
+                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 500 }}>Fahrplan &amp; Änderungen</div>
+                    </div>
                   </div>
+                  {onOpenStudio && (
+                    <button
+                      type="button"
+                      onClick={onOpenStudio}
+                      style={{
+                        background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '10px',
+                        padding: '6px 12px',
+                        fontSize: '0.74rem',
+                        fontWeight: 800,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 8px rgba(2, 132, 199, 0.25)'
+                      }}
+                      className="hover-scale"
+                      title="Eigenes Aufgaben-Studio öffnen"
+                    >
+                      <Sparkles size={13} />
+                      <span>Aufgaben-Studio</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Unified Compact Info Container */}
@@ -925,8 +1037,45 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
                       })}
                     </div>
                   ) : (
-                    <div style={{ fontSize: '0.80rem', color: '#94a3b8', fontStyle: 'italic', padding: '2px 0' }}>
-                      Noch keine Hausaufgaben erfasst.
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ fontSize: '0.80rem', color: '#94a3b8', fontStyle: 'italic', padding: '2px 0' }}>
+                        Noch keine Hausaufgaben erfasst.
+                      </div>
+                      {prep.prevWeekNotes && prep.prevWeekNotes.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleCopyPrevWeekToCurrent(prep)}
+                          disabled={isCopyingPrevWeek}
+                          style={{
+                            background: '#f0fdf4',
+                            border: '1.5px solid #86efac',
+                            borderRadius: '12px',
+                            padding: '9px 14px',
+                            color: '#15803d',
+                            fontSize: '0.80rem',
+                            fontWeight: 800,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '7px',
+                            cursor: isCopyingPrevWeek ? 'not-allowed' : 'pointer',
+                            opacity: isCopyingPrevWeek ? 0.7 : 1,
+                            transition: 'all 0.2s',
+                            minHeight: '44px',
+                            touchAction: 'manipulation',
+                            userSelect: 'none',
+                            boxShadow: '0 1px 3px rgba(34, 197, 94, 0.08)'
+                          }}
+                          className="hover-scale"
+                          title={`Aufgaben und Notizen aus KW ${prep.prevWeekNum} direkt für heute übernehmen`}
+                          aria-label={`Aufgaben und Notizen aus KW ${prep.prevWeekNum} direkt für diese Woche übernehmen`}
+                        >
+                          <Zap size={14} color="#16a34a" />
+                          <span>
+                            {isCopyingPrevWeek ? 'Wird übernommen...' : `Aufgaben & Notizen aus KW ${prep.prevWeekNum} übernehmen`}
+                          </span>
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

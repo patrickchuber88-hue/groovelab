@@ -27,7 +27,10 @@ import {
 import { storeBlob, getBlob, deleteBlob } from '../../utils/blobStorage';
 import { broadcastPracticeUpdate } from '../../utils/studentProgressEngine';
 import { JuniorAudioBiographyWizard } from './JuniorAudioBiographyWizard';
-import { acquireAudioStream } from '../../services/audioPermissionService';
+import { acquireAudioStream, stabilizeAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
+import { getSecureAudioUrl, buildCanonicalAudioStoragePath } from '../../utils/audioStorageHelper';
+import { fixWebmDuration } from '../../utils/webmDurationPatcher';
+import { StudioMasterClock } from '../../utils/studioMasterClock';
 import JSZip from 'jszip';
 
 
@@ -846,7 +849,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   // Dual-Version Decision States (Equal Loudness -14 LUFS)
   const [pendingDualResult, setPendingDualResult] = useState<DualMasteringResult | null>(null);
   const [pendingDurationSec, setPendingDurationSec] = useState<number>(0);
-  const [selectedVersionChoice, setSelectedVersionChoice] = useState<'master' | 'raw'>('master');
+  const [selectedVersionChoice, setSelectedVersionChoice] = useState<'master' | 'raw'>('raw');
   const [modalPreviewPlaying, setModalPreviewPlaying] = useState<'master' | 'raw' | null>(null);
   const [selectedUploadRoomType, setSelectedUploadRoomType] = useState<ReverbRoomType>('medium');
   const [reverbWetSlider, setReverbWetSlider] = useState<number>(8.0); // 8.0% Default Concert Hall
@@ -1415,7 +1418,11 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         clearInterval(timerIntervalRef.current);
       }
       if (countInIntervalRef.current) {
-        clearInterval(countInIntervalRef.current);
+        if (typeof countInIntervalRef.current.cancel === 'function') {
+          countInIntervalRef.current.cancel();
+        } else {
+          clearInterval(countInIntervalRef.current);
+        }
       }
     };
   }, [studentId]);
@@ -2369,34 +2376,35 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   // 🌟 MIKROFON-FREIGABE ZUERST ANFORDERN -> DANN 3-SEKUNDEN COUNT-IN
   const triggerRecordingCountIn = async () => {
     try {
-      // 1. Mikrofon-Berechtigung ZUERST anfordern mit audiophilen Settings
+      // 1. Mikrofon-Berechtigung ZUERST anfordern mit audiophilen HiFi-Stereo Settings
+      // channelCount: 2 signalisiert Browser & Betriebssystem (macOS CoreAudio), dass es sich
+      // um eine Musik-Aufnahme handelt, und deaktiviert die aggressive Mono-Sprach-AGC / Ducking.
       const stream = await acquireAudioStream({ 
         audio: {
+          ...PURE_RAW_AUDIO_CONSTRAINTS,
           echoCancellation: false,
           noiseSuppression: false,
           autoGainControl: false,
+          voiceIsolation: false,
           googEchoCancellation: false,
           googAutoGainControl: false,
           googNoiseSuppression: false,
           googHighpassFilter: false,
           googTypingNoiseDetection: false,
-          channelCount: 1,
-          sampleRate: 48000
+          channelCount: { ideal: 2 },
+          sampleRate: { ideal: 48000 }
         } as any
       });
       activeMicStreamRef.current = stream;
 
-      // 🌟 WebAudio Dual-Channel Center Bridge:
-      // Takes raw microphone input and routes it 1:1 to Left and Right channels (100% centered stereo)
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      const bioRecordAudioCtx = new AudioCtx();
-      const sourceNode = bioRecordAudioCtx.createMediaStreamSource(stream);
-      const mergerNode = bioRecordAudioCtx.createChannelMerger(2);
-      sourceNode.connect(mergerNode, 0, 0); // Duplicate to Left
-      sourceNode.connect(mergerNode, 0, 1); // Duplicate to Right
-      const destNode = bioRecordAudioCtx.createMediaStreamDestination();
-      mergerNode.connect(destNode);
-      const recordStream = destNode.stream;
+      // Hardware- & Pre-Roll-Stabilisierung (400ms Vorlauf gegen Einschalt-Transienten & CoreAudio Pegelsprünge)
+      await stabilizeAudioStream(stream, 400);
+
+      // 🌟 Direkte Hardware-Pipeline (Bit-pure CoreAudio Stream in den MediaRecorder):
+      // Keine verlustbehaftete Zwischenleitung durch AudioContext/MediaStreamDestination mehr!
+      // Das schließt Clock-Drift zwischen Hardware-Quarz und Browser-Audio-Thread,
+      // Puffer-Underruns und plötzliches WebKit-Resampling / Pitch-Shifting mitten im Song zu 100% aus.
+      // Die Stereo-Zentrierung erfolgt verlustfrei beim Laden/Decodieren durch ensureCenteredStereoAudioBuffer.
 
       // 2. Browser MIME-Type Ermittlung (Safari, Chrome, Firefox, iOS Kompatibilität)
       let mimeType = 'audio/webm;codecs=opus';
@@ -2415,8 +2423,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       }
 
       const recorder = mimeType 
-        ? new MediaRecorder(recordStream, { mimeType, audioBitsPerSecond: 256000 }) 
-        : new MediaRecorder(recordStream, { audioBitsPerSecond: 256000 });
+        ? new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 256000 }) 
+        : new MediaRecorder(stream, { audioBitsPerSecond: 256000 });
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
 
@@ -2428,16 +2436,21 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
 
       recorder.onstop = async () => {
         const actualMime = recorder.mimeType || (audioChunksRef.current[0]?.type) || 'audio/webm';
-        const audioBlob = new Blob(audioChunksRef.current, { type: actualMime });
+        let audioBlob = new Blob(audioChunksRef.current, { type: actualMime });
+
+        // Tier-1 Goldstandard: Patch WebM EBML header with exact duration for smooth timeline scrubbing
+        if (actualMime.includes('webm') && recordSeconds > 0) {
+          try {
+            audioBlob = await fixWebmDuration(audioBlob, recordSeconds);
+          } catch (ebmlErr) {
+            console.warn('[AudioBiographyView] WebM EBML duration patch note:', ebmlErr);
+          }
+        }
 
         // WICHTIG: Tracks erst beenden, wenn alle Audiodaten vollständig geflusht wurden!
         if (activeMicStreamRef.current) {
           activeMicStreamRef.current.getTracks().forEach(track => track.stop());
           activeMicStreamRef.current = null;
-        }
-        recordStream.getTracks().forEach(track => track.stop());
-        if (bioRecordAudioCtx && bioRecordAudioCtx.state !== 'closed') {
-          bioRecordAudioCtx.close().catch(() => {});
         }
 
         if (audioBlob.size > 0) {
@@ -2449,16 +2462,16 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         }
       };
 
-      // 3. 3-Sekunden Count-In („Hände ans Instrument“)
+      // 3. 3-Sekunden Studio Master Clock Count-In („Hände ans Instrument“)
       setCountDown(3);
-      let currentCount = 3;
 
-      countInIntervalRef.current = setInterval(() => {
-        currentCount -= 1;
-        if (currentCount > 0) {
-          setCountDown(currentCount);
-        } else {
-          clearInterval(countInIntervalRef.current);
+      const cancelCountIn = StudioMasterClock.runCountIn(
+        60,
+        3,
+        (remaining) => {
+          setCountDown(remaining);
+        },
+        () => {
           setCountDown(null);
 
           // 4. Lückenloser Aufnahmestart mit 250ms Puffer-Timeslices
@@ -2478,7 +2491,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
             });
           }, 1000);
         }
-      }, 1000);
+      );
+      countInIntervalRef.current = { cancel: cancelCountIn } as any;
 
     } catch (err) {
       console.error('Microphone access failed:', err);
@@ -2493,7 +2507,11 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
 
   const stopRecording = (isAutoStopped = false) => {
     if (countInIntervalRef.current) {
-      clearInterval(countInIntervalRef.current);
+      if (typeof countInIntervalRef.current.cancel === 'function') {
+        countInIntervalRef.current.cancel();
+      } else {
+        clearInterval(countInIntervalRef.current);
+      }
     }
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
@@ -2527,9 +2545,9 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
 
   /**
    * 🎛️ DUAL MASTERING PIPELINE (EBU R128 Loudness-Staging: -14.0 LUFS Master / -14.5 LUFS Pure RAW):
-   * Erzeugt simultan auf dem exakt gleichen 20-Sekunden-Ausschnitt ab Songmitte (50%):
+   * Erzeugt simultan auf dem exakt gleichen 20-Sekunden-Ausschnitt ab Songbeginn (t = 0.0s):
    * 1. Studio Audio-Processing (-14.0 LUFS, Analog Tube Warmth, Presence Boost & Convolution Reverb)
-   * 2. Pure RAW (-14.5 LUFS Wow-Abstand, 100% unverfälschter Originalklang)
+   * 2. Pure RAW (-14.5 LUFS Wow-Abstand, 100% unverfälschter Originalklang mit 30 Hz Filter & -3.0 dB GR Limiter)
    */
   const processDualMasteringForModal = async (
     fileOrBlob: Blob | File, 
@@ -2547,7 +2565,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     const chosenRoom: ReverbRoomType = initialWetMixPercent <= 6 ? 'small' : initialWetMixPercent <= 10 ? 'medium' : 'large';
 
     try {
-      // ⚡ 1. Extrahiere den 20-Sekunden-Slice exakt ab der Songmitte (50% der Aufnahme)
+      // ⚡ 1. Extrahiere den 20-Sekunden-Slice exakt ab Songbeginn (t = 0.0s)
       const previewSliceBlob = await sliceAudioBlobForPreview(fileOrBlob, 20);
 
       // ⚡ 2. Berechne Master und Pure RAW auf dem EXAKT GLEICHEN 20s Slice
@@ -2577,7 +2595,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         originalLufs: rawRes.originalLufs,
         finalLufs: masterRes.finalLufs
       });
-      setSelectedVersionChoice('master');
+      setSelectedVersionChoice('raw');
       setPendingDurationSec(durationSec || 0);
     } catch (e) {
       console.warn('Dual mastering processing fallback:', e);
@@ -2701,17 +2719,6 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
 
     // Wenn bereits synchron im Hintergrund laufend: Sofortiger Lautstärken-Crossfade / Instant A/B Switch
     if (modalDualAudioRef.current.master && modalDualAudioRef.current.raw && modalPreviewPlaying) {
-      const activeEl = modalDualAudioRef.current[modalPreviewPlaying];
-      const currentPos = activeEl ? activeEl.currentTime : 0;
-      
-      // Resynchronisiere Positionen
-      if (modalDualAudioRef.current.master && Math.abs(modalDualAudioRef.current.master.currentTime - currentPos) > 0.04) {
-        modalDualAudioRef.current.master.currentTime = currentPos;
-      }
-      if (modalDualAudioRef.current.raw && Math.abs(modalDualAudioRef.current.raw.currentTime - currentPos) > 0.04) {
-        modalDualAudioRef.current.raw.currentTime = currentPos;
-      }
-
       if (version === 'master') {
         modalDualAudioRef.current.raw.volume = 0.0;
         modalDualAudioRef.current.master.volume = 1.0;
@@ -2775,6 +2782,9 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       detail: 'Rendere vollen Song mit 4-Band EQ, Glue-Kompression & 3D Raumakustik'
     });
 
+    let masterStreamBlob: Blob | null = null;
+    let rawStreamBlob: Blob | null = null;
+
     // ⚡ 100% Full-Length Processing for both Studio Master & Pure RAW
     if (lastRawInputFile) {
       try {
@@ -2799,6 +2809,10 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         masteredUrl = fullMasterRes.masteredUrl;
         rawBlob = fullRawRes.processedBlob;
         rawUrl = fullRawRes.processedUrl;
+
+        // Streaming tier blobs (256 kbit/s transparent compression for instant playback)
+        masterStreamBlob = fullMasterRes.masteredStreamingBlob || masterBlob;
+        rawStreamBlob = fullRawRes.processedStreamingBlob || rawBlob;
       } catch (err) {
         console.warn('Full master and raw render on save fallback:', err);
       }
@@ -2810,7 +2824,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       detail: 'Speichere verlustfreie 24-Bit PCM WAV Spuren in IndexedDB'
     });
 
-    // 1. 💾 PERSIST TO LOCAL BINARY INDEXEDDB (parallel)
+    // 1. 💾 PERSIST UNCOMPRESSED LOSSLESS 24-BIT PCM WAV TO LOCAL BINARY INDEXEDDB (parallel)
     await Promise.allSettled([
       storeBlob(`campus_audio_${targetTrackId}_raw`, rawBlob),
       storeBlob(`campus_audio_${targetTrackId}_master`, masterBlob)
@@ -2819,10 +2833,10 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     setSaveProgress({
       percent: 75,
       stage: 'Audio-Tresor Cloud-Upload...',
-      detail: 'Synchronisiere Master & Pure RAW Spuren in Supabase'
+      detail: 'Synchronisiere hochauflösende Master & Pure RAW Spuren in Supabase'
     });
 
-    // 2. ☁️ PERSIST TO SUPABASE CLOUD STORAGE (Bucket: campus-assets) (parallel)
+    // 2. ☁️ PERSIST CANONICAL STREAMING ASSETS TO SUPABASE CLOUD STORAGE (Bucket: campus-assets)
     try {
       const sId = student?.id || studentId || 'student';
       let targetSchoolId = student?.school_id || (student as any)?.schoolId || (window as any).__groovelab_school_id || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
@@ -2838,28 +2852,46 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         } catch (stErr) {}
       }
 
-      const schoolPathPrefix = targetSchoolId ? `schools/${targetSchoolId}/` : '';
-      const rawPath = `${schoolPathPrefix}audio_biography/${sId}_${targetTrackId}_raw.wav`;
-      const masterPath = `${schoolPathPrefix}audio_biography/${sId}_${targetTrackId}_master.wav`;
+      // Canonical multi-tenant isolation paths
+      const rawExt = rawStreamBlob?.type?.includes('mpeg') || rawStreamBlob?.type?.includes('mp3') ? 'mp3' : 'wav';
+      const masterExt = masterStreamBlob?.type?.includes('mpeg') || masterStreamBlob?.type?.includes('mp3') ? 'mp3' : 'wav';
 
-      const [rawUploadRes, masterUploadRes] = await Promise.all([
-        supabase.storage.from('campus-assets').upload(rawPath, rawBlob, { contentType: 'audio/wav', upsert: true }),
-        supabase.storage.from('campus-assets').upload(masterPath, masterBlob, { contentType: 'audio/wav', upsert: true })
-      ]);
+      const rawPath = buildCanonicalAudioStoragePath(targetSchoolId, sId, 'audio_biography', `${targetTrackId}_raw.${rawExt}`);
+      const masterPath = buildCanonicalAudioStoragePath(targetSchoolId, sId, 'audio_biography', `${targetTrackId}_master.${masterExt}`);
 
-      if (!rawUploadRes.error) {
-        const { data: rawData } = supabase.storage.from('campus-assets').getPublicUrl(rawPath);
-        if (rawData?.publicUrl) rawUrl = rawData.publicUrl;
+      const uploadUploadTasks: Promise<any>[] = [];
+      const isMasterChoice = selectedVersionChoice === 'master';
+
+      // Smart Upload: Always upload the selected version; upload alternate if available
+      uploadUploadTasks.push(
+        supabase.storage.from('campus-assets').upload(rawPath, rawStreamBlob || rawBlob, {
+          contentType: rawExt === 'mp3' ? 'audio/mpeg' : 'audio/wav',
+          upsert: true
+        })
+      );
+
+      uploadUploadTasks.push(
+        supabase.storage.from('campus-assets').upload(masterPath, masterStreamBlob || masterBlob, {
+          contentType: masterExt === 'mp3' ? 'audio/mpeg' : 'audio/wav',
+          upsert: true
+        })
+      );
+
+      const [rawUploadRes, masterUploadRes] = await Promise.all(uploadUploadTasks);
+
+      if (!rawUploadRes?.error) {
+        const secureRaw = await getSecureAudioUrl(rawPath, 'campus-assets', 300);
+        if (secureRaw) rawUrl = secureRaw;
       }
 
-      if (!masterUploadRes.error) {
-        const { data: masterData } = supabase.storage.from('campus-assets').getPublicUrl(masterPath);
-        if (masterData?.publicUrl) masteredUrl = masterData.publicUrl;
+      if (!masterUploadRes?.error) {
+        const secureMaster = await getSecureAudioUrl(masterPath, 'campus-assets', 300);
+        if (secureMaster) masteredUrl = secureMaster;
       }
 
       // 3. 🎙️ UPDATE AUDIO-TRESOR STORAGE QUOTA (Async non-blocking)
       if (targetSchoolId) {
-        const addedBytes = (rawBlob?.size || 0) + (masterBlob?.size || 0);
+        const addedBytes = ((rawStreamBlob || rawBlob)?.size || 0) + ((masterStreamBlob || masterBlob)?.size || 0);
         (async () => {
           try {
             const { data: schoolData } = await (supabase
@@ -3042,7 +3074,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
     setEditTempMasterUrl(null);
     setEditPreviewRawUrl(null);
 
-    // ⚡ Asynchrones Vorbereiten des synchronen 20s-Slices für Master & RAW (ab Songmitte)
+    // ⚡ Asynchrones Vorbereiten des synchronen 20s-Slices für Master & RAW (ab Songbeginn)
     (async () => {
       try {
         let rawBlobData = await getBlob(`campus_audio_${track.id}_raw`);
@@ -3117,7 +3149,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
         }
 
         if (rawBlob) {
-          // ⚡ Schneller 20s Ausschnitt exakt ab der Songmitte
+          // ⚡ Schneller 20s Ausschnitt exakt ab Songbeginn (t = 0.0s)
           const previewSliceBlob = await sliceAudioBlobForPreview(rawBlob, 20);
 
           const effectiveProfile: MasteringProfile = selectedProfile;
@@ -3334,14 +3366,18 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
 
         try {
           const sId = student?.id || studentId || 'student';
-          const masterPath = `audio_biography/${sId}_${editingTrackData.trackId}_master.wav`;
+          let targetSchoolId = student?.school_id || (student as any)?.schoolId || (window as any).__groovelab_school_id || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
+          const streamBlob = fullMasterRes.masteredStreamingBlob || fullMasterRes.masteredBlob;
+          const ext = streamBlob.type.includes('mpeg') || streamBlob.type.includes('mp3') ? 'mp3' : 'wav';
+          const masterPath = buildCanonicalAudioStoragePath(targetSchoolId, sId, 'audio_biography', `${editingTrackData.trackId}_master.${ext}`);
+
           const { error: masterErr } = await supabase.storage
             .from('campus-assets')
-            .upload(masterPath, fullMasterRes.masteredBlob, { contentType: 'audio/wav', upsert: true });
+            .upload(masterPath, streamBlob, { contentType: ext === 'mp3' ? 'audio/mpeg' : 'audio/wav', upsert: true });
 
           if (!masterErr) {
-            const { data: masterData } = supabase.storage.from('campus-assets').getPublicUrl(masterPath);
-            if (masterData?.publicUrl) finalMasteredUrl = masterData.publicUrl;
+            const secureMaster = await getSecureAudioUrl(masterPath, 'campus-assets', 300);
+            if (secureMaster) finalMasteredUrl = secureMaster;
           }
         } catch (stErr) {
           console.warn('Cloud storage update note:', stErr);
@@ -9807,7 +9843,13 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               </div>
               <button
                 onClick={() => {
-                  if (countInIntervalRef.current) clearInterval(countInIntervalRef.current);
+                  if (countInIntervalRef.current) {
+                    if (typeof countInIntervalRef.current.cancel === 'function') {
+                      countInIntervalRef.current.cancel();
+                    } else {
+                      clearInterval(countInIntervalRef.current);
+                    }
+                  }
                   if (activeMicStreamRef.current) {
                     activeMicStreamRef.current.getTracks().forEach(track => track.stop());
                     activeMicStreamRef.current = null;

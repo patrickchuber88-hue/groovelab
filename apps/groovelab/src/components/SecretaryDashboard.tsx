@@ -25,6 +25,9 @@ import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell } from 're
 import { StudentToDelete } from './ConfirmDeleteStudentModal';
 import { deleteStudentFully } from '../utils/studentDeletionService';
 import { getParentOnboardingUrl, isDevEnvironment } from '../utils/tenantUrlHelper';
+import { isUUID } from '../utils/uuidValidator';
+import { getAlphabeticalHue, getAlphabeticalUniColor } from '../utils/adminColorHelpers';
+import { formatCurrency, formatGermanDate } from '../utils/formatters';
 
 // Lazy load heavy auxiliary modals and views on demand
 const QRCodeModal = lazy(() => import('./QRCodeModal').then(m => ({ default: m.QRCodeModal })));
@@ -863,28 +866,8 @@ const getAlphabeticalColor = (name: string) => {
       avatarColor: '#475569'
     };
   }
-  const firstChar = trimmed.charAt(0).toUpperCase();
-  const charCode = firstChar.charCodeAt(0) || 65;
-  const clampedCode = Math.max(65, Math.min(90, charCode));
-  const hue = Math.round(((clampedCode - 65) / 25) * 360);
+  const hue = getAlphabeticalHue(trimmed);
   const avatarBg = `linear-gradient(135deg, hsl(${hue}, 85%, 94%) 0%, hsl(${hue}, 80%, 84%) 100%)`;
-  const avatarColor = `hsl(${hue}, 90%, 25%)`;
-  return { avatarBg, avatarColor };
-};
-
-const getAlphabeticalUniColor = (name: string) => {
-  const trimmed = (name || '').trim();
-  if (trimmed.toLowerCase() === 'ohne zuweisung') {
-    return {
-      avatarBg: '#f1f5f9',
-      avatarColor: '#475569'
-    };
-  }
-  const firstChar = trimmed.charAt(0).toUpperCase();
-  const charCode = firstChar.charCodeAt(0) || 65;
-  const clampedCode = Math.max(65, Math.min(90, charCode));
-  const hue = Math.round(((clampedCode - 65) / 25) * 360);
-  const avatarBg = `hsl(${hue}, 80%, 93%)`;
   const avatarColor = `hsl(${hue}, 90%, 25%)`;
   return { avatarBg, avatarColor };
 };
@@ -1751,6 +1734,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     }
   };
   const [schedulesRoomsViewMode, setSchedulesRoomsViewMode] = useState<'designer' | 'live'>('designer');
+  const [roomsSubView, setRoomsSubView] = useState<'overview' | 'plan' | 'settings'>('overview');
   const [liveViewDay, setLiveViewDay] = useState<number>(1);
   const [showAdHocBooking, setShowAdHocBooking] = useState<boolean>(false);
   const [adHocRoomId, setAdHocRoomId] = useState<string | null>(null);
@@ -7410,33 +7394,17 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       }
 
       // 1. Authoritative RPC call (Fail-Closed, Security Definer)
-      let updated = false;
-      try {
-        const { data: rpcData, error: rpcErr } = await supabase.rpc('update_employee_roles', {
-          p_target_user_id: employeeId,
-          p_roles: currentRoles,
-          p_primary_role: primaryRole
-        });
-        if (!rpcErr && rpcData?.success) {
-          updated = true;
-        } else if (rpcErr) {
-          console.warn('[handleUpdateEmployeeRole] RPC fallback:', rpcErr.message);
-        }
-      } catch (e: any) {
-        console.warn('[handleUpdateEmployeeRole] RPC exception:', e?.message);
-      }
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('update_employee_roles', {
+        p_target_user_id: employeeId,
+        p_roles: currentRoles,
+        p_primary_role: primaryRole
+      });
+      if (rpcErr) throw rpcErr;
+      if (!rpcData?.success) throw new Error(rpcData?.error || 'Rollen-Update fehlgeschlagen');
 
-      // 2. Fallback to direct table/view update
-      if (!updated) {
-        const { error: rawErr } = await supabase
-          .from('users')
-          .update({ 
-            role: primaryRole,
-            roles: currentRoles,
-            ...updateFields
-          })
-          .eq('id', employeeId);
-        if (!rawErr) updated = true;
+      // 2. Optional non-role module flags update
+      if (Object.keys(updateFields).length > 0) {
+        await supabase.from('users').update(updateFields).eq('id', employeeId);
       }
 
       alert(`Mitarbeiter-Rolle erfolgreich aktualisiert.`);
@@ -7494,35 +7462,17 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       }
 
       // 1. Authoritative RPC call (Fail-Closed, Security Definer)
-      let updated = false;
-      try {
-        const { data: rpcData, error: rpcErr } = await supabase.rpc('update_employee_roles', {
-          p_target_user_id: emp.id,
-          p_roles: newRoles,
-          p_primary_role: primaryRole
-        });
-        if (!rpcErr && rpcData?.success) {
-          updated = true;
-        } else if (rpcErr) {
-          console.warn('[handleToggleRole] RPC fallback:', rpcErr.message);
-        }
-      } catch (e: any) {
-        console.warn('[handleToggleRole] RPC exception:', e?.message);
-      }
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('update_employee_roles', {
+        p_target_user_id: emp.id,
+        p_roles: newRoles,
+        p_primary_role: primaryRole
+      });
+      if (rpcErr) throw rpcErr;
+      if (!rpcData?.success) throw new Error(rpcData?.error || 'Rollen-Update fehlgeschlagen');
 
-      // 2. Fallback to direct table/view update
-      if (!updated) {
-        const { error: rawErr } = await supabase
-          .from('users')
-          .update({ 
-            roles: newRoles,
-            role: primaryRole,
-            ...updateFields
-          })
-          .eq('id', emp.id);
-
-        if (!rawErr) updated = true;
-        if (!updated && rawErr) throw rawErr;
+      // 2. Optional non-role module flags update
+      if (Object.keys(updateFields).length > 0) {
+        await supabase.from('users').update(updateFields).eq('id', emp.id);
       }
 
       await fetchDashboardData();
@@ -9601,7 +9551,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
     setIsSavingApproval(true);
     try {
-      const isUUID = (str: any) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
       const dayNames = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
 
       // Only process plans that have a room assigned
@@ -12412,6 +12361,10 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               setCampusSubTab={setCampusSubTab}
               schedulesRoomsViewMode={schedulesRoomsViewMode}
               setSchedulesRoomsViewMode={setSchedulesRoomsViewMode}
+              roomsSubView={roomsSubView}
+              setRoomsSubView={setRoomsSubView}
+              roomSearchQuery={roomSearchQuery}
+              setRoomSearchQuery={setRoomSearchQuery}
               expandedSidebarTeacherId={expandedSidebarTeacherId}
               setExpandedSidebarTeacherId={setExpandedSidebarTeacherId}
               selectedFilterTeacherId={selectedFilterTeacherId}
@@ -19957,6 +19910,11 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               getAlphabeticalUniColor={getAlphabeticalUniColor}
               checkTimeOverlap={checkTimeOverlap}
               getPlanDisplayName={getPlanDisplayName}
+              roomsSubView={roomsSubView}
+              setRoomsSubView={setRoomsSubView}
+              pendingBookings={pendingBookings}
+              handleConfirmBooking={handleConfirmBooking}
+              handleRejectBooking={handleRejectBooking}
             />
           </Suspense>
         )}

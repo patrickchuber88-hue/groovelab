@@ -12,6 +12,8 @@
  * - Phonetisches Lautschrift-Wörterbuch (G2P) für englische Songtitel & Fachbegriffe
  */
 
+import { isTeacherFullName } from '../utils/nameHelper';
+
 export interface NeuralVoiceOption {
   id: string;
   name: string;
@@ -542,15 +544,11 @@ export function buildContinuousHomeworkNarrative(options: {
   }
 
   // 2. Pädagogischer Einstieg & Begrüßung (Senior Pädagoge)
+  // 🛡️ Option A: Entweder verifizierter vollständiger Name (Vorname + Nachname) oder komplett weglassen!
   const rawTeacher = (options.teacherName || '').trim();
-  const isGenericTeacher = !rawTeacher || /^(admin|sekretariat|verwaltung|lehrer|gast)$/i.test(rawTeacher);
   let teacherIntro = '';
-  if (!isGenericTeacher && rawTeacher.length > 2) {
-    if (/^deine\s+lehrkraft/i.test(rawTeacher)) {
-      teacherIntro = ` von ${rawTeacher}`;
-    } else {
-      teacherIntro = ` von deiner Lehrkraft ${rawTeacher}`;
-    }
+  if (isTeacherFullName(rawTeacher)) {
+    teacherIntro = ` von deiner Lehrkraft ${rawTeacher}`;
   }
 
   if (totalTasks > 1) {

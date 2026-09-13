@@ -8,26 +8,31 @@ interface PwaUpdateToastProps {
 
 export const PwaUpdateToast: React.FC<PwaUpdateToastProps> = ({ onUpdate, onDismiss }) => {
   return (
-    <div style={{
-      position: 'fixed',
-      bottom: '24px',
-      left: '50%',
-      transform: 'translateX(-50%)',
-      zIndex: 9999999,
-      maxWidth: '480px',
-      width: 'calc(100% - 32px)',
-      background: 'rgba(15, 23, 42, 0.95)',
-      backdropFilter: 'blur(16px)',
-      border: '1px solid rgba(255, 255, 255, 0.15)',
-      borderRadius: '100px',
-      padding: '8px 12px 8px 16px',
-      boxShadow: '0 20px 45px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.1)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: '12px',
-      animation: 'cgSlideUpFade 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards'
-    }}>
+    <div 
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      style={{
+        position: 'fixed',
+        bottom: '24px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 9999999,
+        maxWidth: '480px',
+        width: 'calc(100% - 32px)',
+        background: 'rgba(15, 23, 42, 0.95)',
+        backdropFilter: 'blur(16px)',
+        border: '1px solid rgba(255, 255, 255, 0.15)',
+        borderRadius: '100px',
+        padding: '8px 12px 8px 16px',
+        boxShadow: '0 20px 45px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '12px',
+        animation: 'cgSlideUpFade 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+      }}
+    >
       <style>{`
         @keyframes cgSlideUpFade {
           from { opacity: 0; transform: translate(-50%, 20px); }
@@ -105,6 +110,7 @@ export const PwaUpdateToast: React.FC<PwaUpdateToastProps> = ({ onUpdate, onDism
           onMouseOver={(e) => { e.currentTarget.style.color = '#ffffff'; }}
           onMouseOut={(e) => { e.currentTarget.style.color = '#94a3b8'; }}
           title="Später"
+          aria-label="Später"
         >
           <X size={15} />
         </button>

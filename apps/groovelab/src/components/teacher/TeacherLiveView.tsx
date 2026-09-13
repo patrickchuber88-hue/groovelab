@@ -592,10 +592,12 @@ export interface TeacherLiveViewProps {
   setTargetKioskStation: (st: any) => void;
   checkingInStatus: 'idle' | 'locating' | 'verifying' | 'success' | 'error';
   setCheckingInStatus: React.Dispatch<React.SetStateAction<'idle' | 'locating' | 'verifying' | 'success' | 'error'>>;
-  geoErrorMsg: string | null;
+  geoErrorMsg?: string | null;
+  checkInErrorMsg?: string | null;
   shakeLock: boolean;
   isUserCheckedIn: boolean;
-  handleGeofenceCheck: () => void;
+  handleGeofenceCheck?: () => void;
+  handleLiveLabCheckIn?: () => void;
   handleKioskStationSelect: (st: any) => void;
   handleTeacherSelfCheckout: () => void;
   handleTeacherCheckout: (coach: any) => void;
@@ -608,6 +610,8 @@ export interface TeacherLiveViewProps {
   fetchData: () => void;
   cleanRoomName: (name: string | null | undefined) => string;
   setToastMessage: (msg: string | null) => void;
+  isMobile?: boolean;
+  isDesktop?: boolean;
 }
 
 export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
@@ -618,6 +622,8 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
   hideHeader = false,
   windowWidth,
   windowHeight,
+  isMobile = false,
+  isDesktop = true,
   containerWidth,
   containerRef,
   showRealNames,
@@ -657,9 +663,11 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
   checkingInStatus,
   setCheckingInStatus,
   geoErrorMsg,
+  checkInErrorMsg,
   shakeLock,
   isUserCheckedIn,
   handleGeofenceCheck,
+  handleLiveLabCheckIn,
   handleKioskStationSelect,
   handleTeacherSelfCheckout,
   handleTeacherCheckout,
@@ -673,6 +681,8 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
   cleanRoomName,
   setToastMessage,
 }) => {
+  const effectiveCheckInHandler = handleLiveLabCheckIn || handleGeofenceCheck;
+  const effectiveErrorMsg = checkInErrorMsg || geoErrorMsg;
   // Auto-align selectedRoomId if unset, invalid, or currently pointing to a room with 0 stations while other rooms have stations
   useEffect(() => {
     if (!rooms || rooms.length === 0) return;
@@ -686,6 +696,12 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
       }
     }
   }, [rooms, selectedRoomId, stations, setSelectedRoomId]);
+
+  // Memoize kiosk stations and position adjustment physics to eliminate O(N^2) 50-iteration loop on non-station re-renders
+  const positionedKioskStations = useMemo(() => {
+    const kiosk = stations.filter(s => s.room_id === selectedRoomId && !s.name.toLowerCase().includes('lehrer') && !s.name.toLowerCase().includes('teacher'));
+    return adjustPositions(kiosk, 586);
+  }, [stations, selectedRoomId]);
 
   return (
         <div id="tour-teacher-livelab" className={`live-lab-grid ${isSidebarCollapsed ? 'collapsed' : ''}`}>
@@ -826,13 +842,13 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                             <div className="spin-checkin" style={{ width: '20px', height: '20px', border: '3px solid #fbbc05', borderTopColor: 'transparent', borderRadius: '50%' }} />
                             <span style={{ fontSize: '12px', fontWeight: 600, color: '#eab308' }}>
-                              {checkingInStatus === 'locating' ? 'Bestimme Standort...' : 'Verifiziere Geodaten...'}
+                              Verbinde mit Live Lab...
                             </span>
                           </div>
                         ) : (
                           <button
                             type="button"
-                            onClick={handleGeofenceCheck}
+                            onClick={effectiveCheckInHandler}
                             className="pulse-btn-checkin"
                             aria-label="Am Live Lab Board einloggen"
                             style={{
@@ -850,10 +866,10 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                             Einloggen
                           </button>
                         )}
-                        {checkingInStatus === 'error' && geoErrorMsg && (
+                        {checkingInStatus === 'error' && effectiveErrorMsg && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px', padding: '8px 12px', background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '10px', color: '#ef4444', fontSize: '12px' }}>
                             <AlertCircle size={14} style={{ flexShrink: 0 }} />
-                            <span style={{ fontWeight: 600, textAlign: 'left' }}>{geoErrorMsg}</span>
+                            <span style={{ fontWeight: 600, textAlign: 'left' }}>{effectiveErrorMsg}</span>
                           </div>
                         )}
                       </div>
@@ -1585,13 +1601,13 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
                               <div className="spin-checkin" style={{ width: '24px', height: '24px', border: '3px solid #fbbc05', borderTopColor: 'transparent', borderRadius: '50%' }} />
                               <span style={{ fontSize: '13px', fontWeight: 600, color: '#eab308' }}>
-                                {checkingInStatus === 'locating' ? 'Bestimme Standort...' : 'Verifiziere Geodaten...'}
+                                Verbinde mit Live Lab...
                               </span>
                             </div>
                           ) : (
                             <button
                               type="button"
-                              onClick={handleGeofenceCheck}
+                              onClick={effectiveCheckInHandler}
                               className="pulse-btn-checkin"
                               aria-label="Am Live Lab Board einloggen"
                               style={{
@@ -1611,10 +1627,10 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                             </button>
                           )}
 
-                          {checkingInStatus === 'error' && geoErrorMsg && (
+                          {checkingInStatus === 'error' && effectiveErrorMsg && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px', padding: '10px 16px', background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '12px', color: '#ef4444', fontSize: '13px', maxWidth: '340px' }}>
                               <AlertCircle size={16} style={{ flexShrink: 0 }} />
-                              <span style={{ fontWeight: 600, textAlign: 'left' }}>{geoErrorMsg}</span>
+                              <span style={{ fontWeight: 600, textAlign: 'left' }}>{effectiveErrorMsg}</span>
                             </div>
                           )}
                         </div>
@@ -1828,13 +1844,13 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
                           <div className="spin-checkin" style={{ width: '24px', height: '24px', border: '3px solid #fbbc05', borderTopColor: 'transparent', borderRadius: '50%' }} />
                           <span style={{ fontSize: '13px', fontWeight: 600, color: '#eab308' }}>
-                            {checkingInStatus === 'locating' ? 'Bestimme Standort...' : 'Verifiziere Geodaten...'}
+                            Verbinde mit Live Lab...
                           </span>
                         </div>
                       ) : (
                         <button
                           type="button"
-                          onClick={handleGeofenceCheck}
+                          onClick={effectiveCheckInHandler}
                           className="pulse-btn-checkin"
                           aria-label="Am Live Lab Board einloggen"
                           style={{
@@ -1854,10 +1870,10 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                         </button>
                       )}
 
-                      {checkingInStatus === 'error' && geoErrorMsg && (
+                      {checkingInStatus === 'error' && effectiveErrorMsg && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px', padding: '10px 16px', background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '12px', color: '#ef4444', fontSize: '13px', maxWidth: '340px' }}>
                           <AlertCircle size={16} style={{ flexShrink: 0 }} />
-                          <span style={{ fontWeight: 600, textAlign: 'left' }}>{geoErrorMsg}</span>
+                          <span style={{ fontWeight: 600, textAlign: 'left' }}>{effectiveErrorMsg}</span>
                         </div>
                       )}
                     </div>
@@ -2907,11 +2923,10 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                   }}
                 >
                   {(() => {
-                    const kioskStations = stations.filter(s => s.room_id === selectedRoomId && !s.name.toLowerCase().includes('lehrer') && !s.name.toLowerCase().includes('teacher'));
                     // Active sessions station IDs
                     const activeSessionStationIds = activeSessions.map(se => se.station_id);
 
-                    return adjustPositions(kioskStations, 586).map((station) => {
+                    return positionedKioskStations.map((station) => {
                       const isOccupied = activeSessionStationIds.includes(station.id);
                       const posX = station.x;
                       const posY = station.y;

@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  BookOpen, Clock, Disc, Lightbulb, Moon, Radio, ShieldCheck, Sliders, Sparkles, Sun, X, Fingerprint
+  BookOpen, Clock, Disc, Lightbulb, Moon, Radio, ShieldCheck, Sliders, Sparkles, Sun, X, Fingerprint,
+  Key, Lock, CheckCircle2, AlertCircle, Trash2, Eye, EyeOff, Loader2, RefreshCw
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { DEFAULT_QUIET_HOURS_CONFIG, QuietHoursConfig } from '../../utils/chatRespectGuard';
 import { isWebAuthnSupported, registerBiometrics } from '../../utils/webauthn';
+import { formatTeacherFullName } from '../../utils/nameHelper';
 
 export interface TeacherSettingsViewProps {
   teacher: any;
@@ -35,6 +37,44 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
   setIsHelpCenterOpen,
   windowWidth,
 }) => {
+  // Security, PIN & Passkey state
+  const [securityOverview, setSecurityOverview] = useState<{
+    has_personal_pin?: boolean;
+    has_passkey?: boolean;
+    passkey_count?: number;
+    passkeys?: Array<{ id: string; device_name: string; created_at: string; counter?: number }>;
+    ausweis_nummer?: string;
+  } | null>(null);
+  const [loadingSecurity, setLoadingSecurity] = useState(false);
+  const [savingPin, setSavingPin] = useState(false);
+  const [pinSuccessMessage, setPinSuccessMessage] = useState<string | null>(null);
+  const [pinErrorMessage, setPinErrorMessage] = useState<string | null>(null);
+  const [newPinInput, setNewPinInput] = useState('');
+  const [showPin, setShowPin] = useState(false);
+  const [registeringPasskey, setRegisteringPasskey] = useState(false);
+  const [revokingPasskey, setRevokingPasskey] = useState(false);
+
+  // Fetch security overview from authoritative server RPC
+  const fetchSecurityOverview = useCallback(async () => {
+    if (!teacher?.id) return;
+    try {
+      setLoadingSecurity(true);
+      const { data, error } = await supabase.rpc('get_teacher_security_overview', {
+        p_teacher_id: teacher.id
+      });
+      if (!error && data?.success) {
+        setSecurityOverview(data);
+      }
+    } catch (err: any) {
+      console.warn('[TeacherSettingsView] get_teacher_security_overview fallback:', err?.message || err);
+    } finally {
+      setLoadingSecurity(false);
+    }
+  }, [teacher?.id]);
+
+  useEffect(() => {
+    fetchSecurityOverview();
+  }, [fetchSecurityOverview]);
   React.useEffect(() => {
     if (!activeTeacherSettingsModal) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -93,7 +133,7 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
               {
                 id: 'profile',
                 title: 'Coach-Profil & Avatar',
-                subtitle: `${teacher?.first_name || ''} ${teacher?.last_name || ''}`.trim() || 'Musiker-Avatar & Rolle',
+                subtitle: (teacher ? formatTeacherFullName(teacher) : '') || 'Musiker-Avatar & Rolle',
                 badge: teacher?.instrument || 'Band-Coach',
                 gradient: 'linear-gradient(135deg, #eab308 0%, #a16207 100%)',
                 shadowColor: 'rgba(234, 179, 8, 0.35)',
@@ -101,9 +141,11 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
               },
               {
                 id: 'security',
-                title: 'Sicherheit & Kiosk-PIN',
-                subtitle: teacher?.personal_pin ? '4-stellige Coach-PIN aktiv' : 'Geräte-Pairing & PIN Schutz',
-                badge: teacher?.personal_pin ? 'PIN Aktiv' : 'Geschützt',
+                title: 'PIN & Login',
+                subtitle: (securityOverview?.has_personal_pin || teacher?.has_personal_pin)
+                  ? (securityOverview?.has_passkey ? '4-stellige PIN & Passkey aktiv' : '4-stellige PIN aktiv • Passkey hinzufügen')
+                  : (securityOverview?.has_passkey ? 'Passkey aktiv • PIN einrichten' : 'PIN & Passkey einrichten'),
+                badge: (securityOverview?.has_personal_pin || teacher?.has_personal_pin) ? 'PIN Aktiv ✓' : 'Sicherheit',
                 gradient: 'linear-gradient(135deg, #ca8a04 0%, #854d0e 100%)',
                 shadowColor: 'rgba(202, 138, 4, 0.40)',
                 icon: ShieldCheck
@@ -346,15 +388,15 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                         {activeTeacherSettingsModal === 'livelab' && 'Live Lab & Proberaum-Setup'}
                         {activeTeacherSettingsModal === 'repertoire' && 'Repertoire & Song-Standards'}
                         {(activeTeacherSettingsModal === 'profile' || activeTeacherSettingsModal === 'avatar') && 'Coach-Profil & Musiker-Avatar'}
-                        {activeTeacherSettingsModal === 'security' && 'Sicherheit & Kiosk-PIN'}
+                        {activeTeacherSettingsModal === 'security' && 'PIN & Login-Sicherheit'}
                         {activeTeacherSettingsModal === 'quiet_hours' && 'Chat-Ruhezeiten & Feierabend'}
                       </h3>
                       <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b', fontWeight: 500 }}>
                         {activeTeacherSettingsModal === 'livelab' && 'Wähle deinen Standard-Proberaum und automatische Kiosk-Abmeldezeiten im Bandraum.'}
                         {activeTeacherSettingsModal === 'repertoire' && 'Definiere Schwellenwerte für bühnenreife Songs und Band-Vorschlagsrechte.'}
                         {(activeTeacherSettingsModal === 'profile' || activeTeacherSettingsModal === 'avatar') && 'Deine hinterlegten Stammdaten und Musiker-Avatar im GrooveLab-Modul.'}
-                        {activeTeacherSettingsModal === 'security' && '4-stellige Coach-PIN und Sicherheitsstatus für den Proberaum.'}
-                        {activeTeacherSettingsModal === 'quiet_hours' && 'Lege fest, wann deine didaktische Ruhezeit gilt. Dein Feierabend ist geschützt (gem. § 5 ArbZG & Herrenberg-Urteil).'}
+                        {activeTeacherSettingsModal === 'security' && 'Verwalte deine 4-stellige persönliche PIN, biometrische Passkeys (Apple Touch ID / Face ID) und Sperrbildschirm-Freigaben.'}
+                        {activeTeacherSettingsModal === 'quiet_hours' && 'Lege fest, wann deine didaktische Ruhezeit gilt. Außerhalb deiner Unterrichtszeiten bleibt deine Freizeit ungestört.'}
                       </p>
                     </div>
                   </div>
@@ -748,172 +790,552 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                     </div>
                   )}
 
-                  {/* TAB 4: SECURITY & KIOSK PIN */}
+                  {/* TAB 4: PIN & LOGIN SICHERHEIT */}
                   {activeTeacherSettingsModal === 'security' && (() => {
+                    const hasPin = Boolean(securityOverview?.has_personal_pin || teacher?.has_personal_pin);
+                    const passkeyCount = securityOverview?.passkey_count || (securityOverview?.passkeys?.length || 0);
+                    const hasPasskeys = Boolean(securityOverview?.has_passkey || passkeyCount > 0);
+
+                    // Handler: Save 4-digit Personal PIN via authoritative Server RPC
+                    const handleSavePin = async (e?: React.FormEvent) => {
+                      if (e) e.preventDefault();
+                      if (savingPin || !teacher?.id) return;
+                      const cleanPin = newPinInput.trim();
+
+                      if (!/^\d{4}$/.test(cleanPin)) {
+                        setPinErrorMessage('Bitte gib eine gültige 4-stellige Zahlen-PIN ein (z. B. 4829).');
+                        setPinSuccessMessage(null);
+                        return;
+                      }
+
+                      const trivialPins = ['0000', '1111', '2222', '3333', '4444', '5555', '6666', '7777', '8888', '9999', '1234', '4321'];
+                      if (trivialPins.includes(cleanPin)) {
+                        setPinErrorMessage('Diese PIN ist zu einfach zu erraten (bitte keine Reihen wie 1234 oder 0000 wählen).');
+                        setPinSuccessMessage(null);
+                        return;
+                      }
+
+                      setSavingPin(true);
+                      setPinErrorMessage(null);
+                      setPinSuccessMessage(null);
+
+                      let rpcSuccess = false;
+                      let rpcErrorMsg = '';
+
+                      try {
+                        // 1. Primary RPC: set_personal_pin(p_user_id, p_pin)
+                        const { data: res1, error: err1 } = await supabase.rpc('set_personal_pin', {
+                          p_user_id: teacher.id,
+                          p_pin: cleanPin
+                        });
+
+                        if (!err1 && res1 === true) {
+                          rpcSuccess = true;
+                        } else if (err1) {
+                          // 2. Secondary fallback RPC: set_personal_pin(p_user_id, p_new_pin)
+                          const { data: res2, error: err2 } = await supabase.rpc('set_personal_pin', {
+                            p_user_id: teacher.id,
+                            p_new_pin: cleanPin
+                          });
+                          if (!err2 && res2 === true) {
+                            rpcSuccess = true;
+                          } else {
+                            rpcErrorMsg = err2?.message || err1?.message || 'Serverfehler beim Speichern der PIN.';
+                          }
+                        } else {
+                          rpcErrorMsg = 'Server hat die PIN-Aktualisierung nicht bestätigt.';
+                        }
+                      } catch (err: any) {
+                        rpcErrorMsg = err?.message || 'Verbindungsfehler beim Speichern der PIN.';
+                      } finally {
+                        setSavingPin(false);
+                      }
+
+                      if (rpcSuccess) {
+                        setPinSuccessMessage('Deine 4-stellige PIN wurde erfolgreich und sicher auf dem Server gespeichert!');
+                        setNewPinInput('');
+                        setTeacher((prev: any) => ({ ...prev, has_personal_pin: true }));
+                        setSecurityOverview((prev: any) => prev ? { ...prev, has_personal_pin: true } : { has_personal_pin: true });
+                        await fetchSecurityOverview();
+                      } else {
+                        setPinErrorMessage(rpcErrorMsg || 'Fehler beim Speichern der PIN. Bitte versuche es erneut.');
+                      }
+                    };
+
+                    // Handler: Register Biometric Passkey (Touch ID / Face ID)
+                    const handleRegisterPasskey = async () => {
+                      if (registeringPasskey || !teacher?.id) return;
+                      if (!isWebAuthnSupported()) {
+                        alert('WebAuthn / Biometrie wird von diesem Browser oder Gerät leider nicht unterstützt.');
+                        return;
+                      }
+
+                      setRegisteringPasskey(true);
+                      try {
+                        // 1. Request registration challenge from server
+                        const { data: chalData, error: chalErr } = await supabase.rpc('generate_webauthn_challenge', {
+                          p_user_id: teacher.id,
+                          p_type: 'register'
+                        });
+                        if (chalErr || !chalData?.challenge) {
+                          throw new Error('Sicherheits-Challenge konnte nicht bezogen werden: ' + (chalErr?.message || 'Serverfehler'));
+                        }
+
+                        const email = teacher.email || `lehrer.${teacher.id.substring(0, 8)}@campus-groovelab.local`;
+                        const teacherName = formatTeacherFullName(teacher) || 'Lehrkraft';
+
+                        const passkeyResult = await registerBiometrics(
+                          email,
+                          teacher.id,
+                          chalData.challenge,
+                          `${teacherName} (Lehrkraft)`
+                        );
+
+                        const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+                        const deviceName = isIOS ? 'Apple Touch ID / Face ID' : 'Passkey Authenticator';
+
+                        const { data: regResult, error: regErr } = await supabase.rpc('register_webauthn_credential', {
+                          p_user_id: teacher.id,
+                          p_credential_id: passkeyResult.id,
+                          p_public_key: JSON.stringify(passkeyResult.response),
+                          p_device_name: deviceName,
+                          p_challenge: chalData.challenge
+                        });
+
+                        if (regErr || !regResult?.success) {
+                          throw new Error(regErr?.message || regResult?.error || 'Registrierung fehlgeschlagen.');
+                        }
+
+                        alert('Erfolg: Dein biometrischer Passkey wurde erfolgreich auf diesem Gerät aktiviert!');
+                        await fetchSecurityOverview();
+                      } catch (err: any) {
+                        if (err.name === 'NotAllowedError' || err.name === 'AbortError') {
+                          return;
+                        }
+                        alert('Passkey-Einrichtung fehlgeschlagen: ' + err.message);
+                      } finally {
+                        setRegisteringPasskey(false);
+                      }
+                    };
+
+                    // Handler: Revoke all teacher passkeys
+                    const handleRevokePasskeys = async () => {
+                      if (revokingPasskey || !teacher?.id) return;
+                      const teacherName = formatTeacherFullName(teacher) || 'dein Konto';
+                      if (!confirm(`Möchtest du alle biometrischen Passkeys für ${teacherName} widerrufen? Dadurch werden alle verknüpften Passkey-Geräte gelöscht und aktive Sitzungen auf anderen Geräten zur Sicherheit beendet.`)) {
+                        return;
+                      }
+
+                      setRevokingPasskey(true);
+                      try {
+                        const { data, error } = await supabase.rpc('revoke_teacher_passkeys', {
+                          p_teacher_id: teacher.id
+                        });
+                        if (error) throw error;
+                        alert(`Erfolg: ${data?.message || 'Alle Passkeys wurden erfolgreich widerrufen.'}`);
+                        await fetchSecurityOverview();
+                      } catch (err: any) {
+                        alert('Fehler beim Widerrufen der Passkeys: ' + err.message);
+                      } finally {
+                        setRevokingPasskey(false);
+                      }
+                    };
+
                     return (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-                          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#fefce8', border: '1px solid #fef08a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ca8a04' }}>
-                            <ShieldCheck size={24} />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        {/* 1. STATUS & ARCHITEKTUR BANNER */}
+                        <div style={{
+                          background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '18px',
+                          padding: '20px',
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          justifyContent: 'space-between',
+                          gap: '16px',
+                          flexWrap: 'wrap'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', flex: 1, minWidth: '260px' }}>
+                            <div style={{
+                              width: '44px',
+                              height: '44px',
+                              borderRadius: '12px',
+                              background: '#fefce8',
+                              border: '1px solid #fef08a',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#ca8a04',
+                              flexShrink: 0
+                            }}>
+                              <ShieldCheck size={26} strokeWidth={2.4} />
+                            </div>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                <strong style={{ fontSize: '0.96rem', color: '#0f172a' }}>PIN &amp; Login-Sicherheitsstatus</strong>
+                                <span style={{
+                                  fontSize: '0.7rem',
+                                  fontWeight: 800,
+                                  padding: '3px 10px',
+                                  borderRadius: '999px',
+                                  background: hasPin ? '#dcfce7' : '#fef3c7',
+                                  color: hasPin ? '#15803d' : '#b45309',
+                                  border: `1px solid ${hasPin ? '#bbf7d0' : '#fde68a'}`
+                                }}>
+                                  {hasPin ? 'PIN Aktiviert ✓' : 'PIN nicht hinterlegt'}
+                                </span>
+                                {hasPasskeys && (
+                                  <span style={{
+                                    fontSize: '0.7rem',
+                                    fontWeight: 800,
+                                    padding: '3px 10px',
+                                    borderRadius: '999px',
+                                    background: '#e0f2fe',
+                                    color: '#0369a1',
+                                    border: '1px solid #bae6fd'
+                                  }}>
+                                    {passkeyCount} Passkey(s) aktiv ✓
+                                  </span>
+                                )}
+                              </div>
+                              <p style={{ margin: '6px 0 0 0', fontSize: '0.78rem', color: '#64748b', lineHeight: 1.5 }}>
+                                Mit deiner persönlichen 4-stelligen PIN und Touch ID / Face ID entsperrst du deinen Arbeitsplatz nach Inaktivität (45-Minuten-Sperrbildschirm) sowie Proberaum-Kiosks sekundenschnell ohne Passworteingabe.
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <strong style={{ fontSize: '0.86rem', color: '#0f172a', display: 'block' }}>DSGVO &amp; Datenschutz-Status</strong>
-                            <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Dein Account ist mit TLS 1.3 Transport- und AES-256 Server-Verschlüsselung (Art. 32 DSGVO) geschützt.</span>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={fetchSecurityOverview}
+                            disabled={loadingSecurity}
+                            title="Sicherheitsstatus neu laden"
+                            aria-label="Sicherheitsstatus neu laden"
+                            style={{
+                              padding: '8px 12px',
+                              borderRadius: '10px',
+                              border: '1px solid #cbd5e1',
+                              background: '#ffffff',
+                              color: '#64748b',
+                              fontSize: '0.76rem',
+                              fontWeight: 750,
+                              cursor: loadingSecurity ? 'not-allowed' : 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px'
+                            }}
+                          >
+                            <RefreshCw size={14} className={loadingSecurity ? 'animate-spin' : ''} />
+                            <span>Aktualisieren</span>
+                          </button>
                         </div>
 
-                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          <strong style={{ fontSize: '0.84rem', color: '#0f172a' }}>Persönliche Coach-PIN (für Kiosk-Freigaben)</strong>
-                          <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: 1.45 }}>
-                            Mit dieser 4-stelligen PIN kannst du dich an Kiosk-iPads im Proberaum anmelden oder Schülersitzungen entsperren.
-                          </span>
-                          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '4px' }}>
-                            <input 
-                              type="password"
-                              maxLength={4}
-                              placeholder="4-stellige PIN"
-                              defaultValue={teacher?.personal_pin || ''}
-                              id="groovelab_coach_pin_input"
-                              style={{ width: '160px', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #cbd5e1', fontSize: '1rem', fontWeight: 800, textAlign: 'center', letterSpacing: '4px' }}
-                            />
+                        {/* 2. PERSÖNLICHE 4-STELLIGE PIN VERWALTEN */}
+                        <div style={{
+                          background: '#ffffff',
+                          border: '1.5px solid #e2e8f0',
+                          borderRadius: '18px',
+                          padding: '22px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '14px',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div style={{
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '10px',
+                                background: '#fefce8',
+                                border: '1px solid #fef08a',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#ca8a04'
+                              }}>
+                                <Key size={20} strokeWidth={2.3} />
+                              </div>
+                              <div>
+                                <strong style={{ fontSize: '0.92rem', color: '#0f172a', display: 'block' }}>Persönliche 4-stellige PIN</strong>
+                                <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Schnell-Entsperrung für Bildschirmsperre &amp; Proberaum-iPads</span>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              {hasPin ? (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', fontWeight: 800, color: '#166534', background: '#dcfce7', padding: '3px 10px', borderRadius: '100px', border: '1px solid #bbf7d0' }}>
+                                  <CheckCircle2 size={14} /> Aktiviert
+                                </span>
+                              ) : (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', fontWeight: 800, color: '#b45309', background: '#fef3c7', padding: '3px 10px', borderRadius: '100px', border: '1px solid #fde68a' }}>
+                                  <AlertCircle size={14} /> Keine PIN hinterlegt
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: 1.5 }}>
+                            Lege eine 4-stellige PIN fest. Wird dein Bildschirm nach Inaktivität gesperrt, kannst du ihn mit dieser PIN in 2 Sekunden wieder entsperren.
+                          </p>
+
+                          {pinSuccessMessage && (
+                            <div style={{
+                              padding: '12px 16px',
+                              borderRadius: '12px',
+                              background: '#f0fdf4',
+                              border: '1px solid #bbf7d0',
+                              color: '#15803d',
+                              fontSize: '0.82rem',
+                              fontWeight: 700,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '10px'
+                            }}>
+                              <CheckCircle2 size={18} style={{ flexShrink: 0 }} />
+                              <span>{pinSuccessMessage}</span>
+                            </div>
+                          )}
+
+                          {pinErrorMessage && (
+                            <div style={{
+                              padding: '12px 16px',
+                              borderRadius: '12px',
+                              background: '#fef2f2',
+                              border: '1px solid #fecaca',
+                              color: '#b91c1c',
+                              fontSize: '0.82rem',
+                              fontWeight: 700,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '10px'
+                            }}>
+                              <AlertCircle size={18} style={{ flexShrink: 0 }} />
+                              <span>{pinErrorMessage}</span>
+                            </div>
+                          )}
+
+                          <form onSubmit={handleSavePin} style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', marginTop: '4px' }}>
+                            <div style={{ position: 'relative', width: '180px' }}>
+                              <input
+                                type={showPin ? 'text' : 'password'}
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                maxLength={4}
+                                placeholder="••••"
+                                value={newPinInput}
+                                onChange={(e) => {
+                                  const filtered = e.target.value.replace(/\D/g, '').slice(0, 4);
+                                  setNewPinInput(filtered);
+                                  if (pinErrorMessage) setPinErrorMessage(null);
+                                  if (pinSuccessMessage) setPinSuccessMessage(null);
+                                }}
+                                disabled={savingPin}
+                                aria-label="Neue 4-stellige PIN"
+                                style={{
+                                  width: '100%',
+                                  padding: '12px 42px 12px 16px',
+                                  borderRadius: '12px',
+                                  border: '1.5px solid #cbd5e1',
+                                  background: '#ffffff',
+                                  fontSize: '1.25rem',
+                                  fontWeight: 900,
+                                  textAlign: 'center',
+                                  letterSpacing: '8px',
+                                  outline: 'none',
+                                  boxSizing: 'border-box'
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowPin(!showPin)}
+                                aria-label={showPin ? 'PIN verbergen' : 'PIN anzeigen'}
+                                style={{
+                                  position: 'absolute',
+                                  right: '10px',
+                                  top: '50%',
+                                  transform: 'translateY(-50%)',
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#64748b',
+                                  cursor: 'pointer',
+                                  padding: '4px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}
+                              >
+                                {showPin ? <EyeOff size={18} /> : <Eye size={18} />}
+                              </button>
+                            </div>
+
                             <button
-                              type="button"
-                              onClick={async () => {
-                                const input = document.getElementById('groovelab_coach_pin_input') as HTMLInputElement;
-                                if (!input || !teacher?.id) return;
-                                const val = input.value.trim();
-                                if (val.length !== 4 || !/^\d{4}$/.test(val)) {
-                                  alert('Bitte gib eine gültige 4-stellige Zahlen-PIN ein.');
-                                  return;
-                                }
-                                try {
-                                  const { error } = await supabase.from('users').update({ personal_pin: val }).eq('id', teacher.id);
-                                  if (error) throw error;
-                                  setTeacher((prev: any) => ({ ...prev, personal_pin: val }));
-                                  alert('Coach-PIN erfolgreich aktualisiert!');
-                                } catch (e: any) {
-                                  alert('Fehler beim Speichern: ' + e.message);
-                                }
-                              }}
-                              style={{ 
-                                padding: '10px 18px', 
-                                minHeight: '44px',
-                                borderRadius: '10px', 
-                                background: '#eab308', 
-                                color: '#1e293b', 
-                                border: 'none', 
-                                fontWeight: 800, 
-                                fontSize: '0.82rem', 
-                                cursor: 'pointer',
+                              type="submit"
+                              disabled={savingPin || newPinInput.trim().length !== 4}
+                              style={{
+                                padding: '12px 22px',
+                                minHeight: '46px',
+                                borderRadius: '12px',
+                                background: newPinInput.trim().length === 4 ? 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)' : '#e2e8f0',
+                                color: newPinInput.trim().length === 4 ? '#0f172a' : '#94a3b8',
+                                border: 'none',
+                                fontWeight: 850,
+                                fontSize: '0.86rem',
+                                cursor: savingPin || newPinInput.trim().length !== 4 ? 'not-allowed' : 'pointer',
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
+                                gap: '8px',
+                                boxShadow: newPinInput.trim().length === 4 ? '0 4px 14px rgba(234, 179, 8, 0.35)' : 'none',
+                                transition: 'all 0.15s ease',
                                 touchAction: 'manipulation'
                               }}
-                              className="hover-scale"
                             >
-                              PIN speichern
+                              {savingPin ? <Loader2 size={18} className="animate-spin" /> : <Lock size={18} />}
+                              <span>{hasPin ? 'Neue PIN speichern' : 'PIN aktivieren'}</span>
                             </button>
-                          </div>
+                          </form>
                         </div>
 
-                        {/* BIOMETRISCHER PASSKEY FÜR LEHRER */}
-                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <Fingerprint size={20} style={{ color: '#ca8a04' }} />
-                              <strong style={{ fontSize: '0.84rem', color: '#0f172a' }}>Biometrischer Passkey (Apple Touch ID / Face ID)</strong>
+                        {/* 3. BIOMETRISCHER PASSKEY (APPLE TOUCH ID / FACE ID) */}
+                        <div style={{
+                          background: '#ffffff',
+                          border: '1.5px solid #e2e8f0',
+                          borderRadius: '18px',
+                          padding: '22px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '14px',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div style={{
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '10px',
+                                background: '#f0fdf4',
+                                border: '1px solid #bbf7d0',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#16a34a'
+                              }}>
+                                <Fingerprint size={22} strokeWidth={2.3} />
+                              </div>
+                              <div>
+                                <strong style={{ fontSize: '0.92rem', color: '#0f172a', display: 'block' }}>Biometrischer Passkey (Touch ID / Face ID)</strong>
+                                <span style={{ fontSize: '0.74rem', color: '#64748b' }}>Passwortloser Zugang mit Fingerabdruck oder Gesichtsscan</span>
+                              </div>
                             </div>
-                            {isWebAuthnSupported() && (
-                              <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', background: '#e6f4ea', color: '#166534' }}>
-                                Unterstützt ✓
-                              </span>
-                            )}
+                            <div>
+                              {isWebAuthnSupported() ? (
+                                <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '3px 10px', borderRadius: '100px', background: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0' }}>
+                                  Gerät unterstützt Biometrie ✓
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '3px 10px', borderRadius: '100px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}>
+                                  Nicht unterstützt
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: 1.45 }}>
-                            Verknüpfe dieses Gerät mit deinem persönlichen biometrischen Passkey für blitzschnelle und passwortlose Logins. Deine biometrischen Daten verbleiben zu 100 % sicher auf deinem Gerät (Art. 9 DSGVO / Zero-Biometrie-Transfer).
-                          </span>
-                          <div style={{ marginTop: '4px' }}>
+
+                          <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: 1.5 }}>
+                            Verknüpfe dieses Gerät (MacBook, iPad, iPhone oder Windows PC) mit deinem persönlichen biometrischen Passkey. Deine Biometrie verbleibt zu 100 % lokal auf deinem Endgerät und wird niemals über das Netzwerk übertragen (Art. 9 DSGVO / Zero-Biometrie-Transfer).
+                          </p>
+
+                          {/* LIST OF REGISTERED PASSKEYS */}
+                          {securityOverview?.passkeys && securityOverview.passkeys.length > 0 && (
+                            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '14px 16px' }}>
+                              <strong style={{ fontSize: '0.76rem', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '8px' }}>
+                                Registrierte Geräte &amp; Passkeys ({securityOverview.passkeys.length})
+                              </strong>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {securityOverview.passkeys.map((cred: any, idx: number) => (
+                                  <div key={cred.id || idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#ffffff', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <Fingerprint size={16} color="#16a34a" />
+                                      <span style={{ fontSize: '0.82rem', fontWeight: 750, color: '#0f172a' }}>{cred.device_name || 'Passkey-Gerät'}</span>
+                                    </div>
+                                    <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600 }}>
+                                      {cred.created_at ? new Date(cred.created_at).toLocaleDateString('de-DE') : 'Aktiv'}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', marginTop: '4px' }}>
                             <button
                               type="button"
-                              onClick={async () => {
-                                if (!isWebAuthnSupported()) {
-                                  alert('WebAuthn / Biometrie wird von diesem Browser oder Gerät leider nicht unterstützt.');
-                                  return;
-                                }
-                                if (!teacher?.id) return;
-                                try {
-                                  // 1. Request registration challenge from server
-                                  const { data: chalData, error: chalErr } = await supabase.rpc('generate_webauthn_challenge', {
-                                    p_user_id: teacher.id,
-                                    p_type: 'register'
-                                  });
-                                  if (chalErr || !chalData?.challenge) {
-                                    throw new Error('Sicherheits-Challenge konnte nicht bezogen werden: ' + (chalErr?.message || 'Serverfehler'));
-                                  }
-
-                                  const email = teacher.email || `lehrer.${teacher.id.substring(0, 8)}@campus-groovelab.local`;
-                                  const teacherName = `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() || 'Lehrkraft';
-
-                                  const passkeyResult = await registerBiometrics(
-                                    email,
-                                    teacher.id,
-                                    chalData.challenge,
-                                    `${teacherName} (Lehrkraft)`
-                                  );
-
-                                  const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
-                                  const deviceName = isIOS ? 'Apple Touch ID / Face ID' : 'Passkey Authenticator';
-
-                                  const { data: regResult, error: regErr } = await supabase.rpc('register_webauthn_credential', {
-                                    p_user_id: teacher.id,
-                                    p_credential_id: passkeyResult.id,
-                                    p_public_key: JSON.stringify(passkeyResult.response),
-                                    p_device_name: deviceName,
-                                    p_challenge: chalData.challenge
-                                  });
-
-                                  if (regErr || !regResult?.success) {
-                                    throw new Error(regErr?.message || regResult?.error || 'Registrierung fehlgeschlagen.');
-                                  }
-
-                                  alert('Erfolg: Dein biometrischer Passkey wurde erfolgreich auf diesem Gerät aktiviert!');
-                                } catch (err: any) {
-                                  if (err.name === 'NotAllowedError' || err.name === 'AbortError') {
-                                    return;
-                                  }
-                                  alert('Passkey-Einrichtung fehlgeschlagen: ' + err.message);
-                                }
-                              }}
+                              onClick={handleRegisterPasskey}
+                              disabled={registeringPasskey || !isWebAuthnSupported()}
                               style={{
-                                padding: '10px 18px',
-                                minHeight: '44px',
-                                borderRadius: '10px',
+                                padding: '12px 20px',
+                                minHeight: '46px',
+                                borderRadius: '12px',
                                 background: '#1e293b',
                                 color: '#ffffff',
                                 border: 'none',
                                 fontWeight: 800,
-                                fontSize: '0.82rem',
-                                cursor: 'pointer',
+                                fontSize: '0.84rem',
+                                cursor: registeringPasskey || !isWebAuthnSupported() ? 'not-allowed' : 'pointer',
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '8px',
-                                touchAction: 'manipulation'
+                                touchAction: 'manipulation',
+                                transition: 'all 0.15s ease'
                               }}
                               className="hover-scale"
                             >
-                              <Fingerprint size={16} />
-                              Touch ID / Face ID als Passkey aktivieren
+                              {registeringPasskey ? <Loader2 size={18} className="animate-spin" /> : <Fingerprint size={18} />}
+                              <span>Touch ID / Face ID auf diesem Gerät aktivieren</span>
                             </button>
+
+                            {hasPasskeys && (
+                              <button
+                                type="button"
+                                onClick={handleRevokePasskeys}
+                                disabled={revokingPasskey}
+                                style={{
+                                  padding: '12px 18px',
+                                  minHeight: '46px',
+                                  borderRadius: '12px',
+                                  background: 'transparent',
+                                  color: '#dc2626',
+                                  border: '1.5px solid #fecaca',
+                                  fontWeight: 750,
+                                  fontSize: '0.82rem',
+                                  cursor: revokingPasskey ? 'not-allowed' : 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  touchAction: 'manipulation',
+                                  transition: 'all 0.15s ease'
+                                }}
+                              >
+                                {revokingPasskey ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                                <span>Alle Passkeys widerrufen</span>
+                              </button>
+                            )}
                           </div>
                         </div>
 
-                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {/* 4. KOPPLUNG & KIOSK-INFOS */}
+                        <div style={{
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '16px',
+                          padding: '18px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '6px'
+                        }}>
                           <strong style={{ fontSize: '0.84rem', color: '#0f172a' }}>Kopplung &amp; Proberaum-Status</strong>
-                          <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: 1.45 }}>
+                          <span style={{ fontSize: '0.74rem', color: '#64748b', lineHeight: 1.5 }}>
                             Schul-ID: <strong>{teacher?.school_id || 'Aktiv'}</strong><br />
-                            Rolle: <strong>GrooveLab Coach (Band-Lehrkraft)</strong><br />
-                            Zugriffsberechtigungen: <strong>Live Lab, Song-Bibliothek &amp; Repertoire-Planer</strong>
+                            Schulausweis-ID: <strong>{securityOverview?.ausweis_nummer || teacher?.ausweis_nummer || teacher?.id?.substring(0, 8) || '–'}</strong><br />
+                            Rolle: <strong>GrooveLab Coach (Lehrkraft)</strong><br />
+                            Sperrbildschirm-Schutz: <strong>Aktiviert (45 Min. Inaktivitätssperre)</strong>
                           </span>
                         </div>
                       </div>
@@ -1137,13 +1559,13 @@ export const TeacherSettingsView: React.FC<TeacherSettingsViewProps> = ({
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, fontSize: '0.78rem', color: '#166534' }}>
                             <ShieldCheck size={16} color="#16a34a" />
-                            <span>Didaktische Autonomie & Arbeitszeitschutz (§ 5 ArbZG)</span>
+                            <span>Didaktische Autonomie & geschützte Ruhezeiten</span>
                           </div>
                           <p style={{ margin: 0, fontSize: '0.72rem', color: '#15803d', lineHeight: 1.45 }}>
-                            Außerhalb deiner Unterrichts- und Dienstzeiten besteht keine Pflicht zur ständigen Erreichbarkeit. Im Chatfenster von Schülern wird dein Ruhezeit-Banner eingeblendet:
+                            Außerhalb deiner Unterrichts- und Dienstzeiten besteht keine Pflicht zur ständigen Erreichbarkeit. Im Chatfenster von Schülern wird dein Feierabend-Banner eingeblendet:
                             <br />
                             <em style={{ display: 'block', marginTop: '6px', padding: '8px 12px', background: '#ffffff', borderRadius: '8px', border: '1px solid #bbf7d0', color: '#166534' }}>
-                              „<Moon size={13} color="#166534" style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />Ruhezeit von {teacher?.first_name ? `${teacher.first_name} ${teacher.last_name || ''}`.trim() : 'deiner Lehrkraft'}: Deine Nachricht wird zugestellt. Beachte bitte, dass Lehrkräfte außerhalb ihrer Unterrichtszeiten nicht zur Beantwortung verpflichtet sind. Dringende Absagen bitte per E-Mail an die Lehrkraft senden.“
+                              „<Moon size={13} color="#166534" style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />{teacher ? formatTeacherFullName(teacher) : 'Lehrkraft'} hat Feierabend: Deine Nachricht wird zugestellt und am nächsten Schultag beantwortet. Dringende Absagen bitte direkt per E-Mail senden.“
                             </em>
                           </p>
                         </div>

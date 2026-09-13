@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   Compass, Sliders, Volume2, Zap, Mic, Headphones, Calendar, RotateCcw,
-  Mail, Trophy, Sparkles, Check, ShieldCheck, AlertTriangle, Star, Target
+  Mail, Trophy, Sparkles, Check, ShieldCheck, AlertTriangle, Star, Target, BookOpen
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { CAMPUS_AGE_STANDARDS } from '../studentAgeStandards';
@@ -87,6 +87,8 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
     curTimer !== standard.allowTimer ||
     curLeaderboard !== standard.allowLeaderboard ||
     curAudio !== standard.allowAudio ||
+    curStudentAudio !== standard.allowStudentAudio ||
+    curTeacherAudio !== standard.allowTeacherAudio ||
     curTts !== standard.allowTts;
 
   const handleSwitchAgeLevelWithStandard = async (targetLevelId: 'junior' | 'teen' | 'pro') => {
@@ -100,6 +102,8 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
       allowTimer: curTimer,
       allowLeaderboard: curLeaderboard,
       allowAudio: curAudio,
+      allowStudentAudio: curStudentAudio,
+      allowTeacherAudio: curTeacherAudio,
       allowTts: curTts,
     };
 
@@ -110,6 +114,8 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
       allowTimer: targetStandard.allowTimer,
       allowLeaderboard: targetStandard.allowLeaderboard,
       allowAudio: targetStandard.allowAudio,
+      allowStudentAudio: targetStandard.allowStudentAudio,
+      allowTeacherAudio: targetStandard.allowTeacherAudio,
       allowTts: targetStandard.allowTts,
     };
 
@@ -150,6 +156,8 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
       allowLeaderboard: targetStandard.allowLeaderboard,
       allowProposals: true,
       allowAudio: targetStandard.allowAudio,
+      allowStudentAudio: targetStandard.allowStudentAudio,
+      allowTeacherAudio: targetStandard.allowTeacherAudio,
       allowTts: targetStandard.allowTts,
       boardOverrides: { ...targetStandard.boardOverrides, mediathek: true },
       bedtimeEnabled: targetStandard.bedtimeEnabled,
@@ -197,6 +205,7 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
   const hlTts = getHighlightProps('allowTts');
   const hlTimer = getHighlightProps('allowTimer');
   const hlAudio = getHighlightProps('allowAudio');
+  const hlTeacherAudio = getHighlightProps('allowTeacherAudio');
   const hlAbsences = getHighlightProps('allowAbsences');
   const hlReschedule = getHighlightProps('allowRescheduleConfirm');
   const hlChat = getHighlightProps('allowChat');
@@ -613,7 +622,7 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
           </div>
           <input
             type="checkbox"
-            checked={curStudentAudio && curAudio}
+            checked={Boolean(curStudentAudio && curAudio)}
             onChange={(e) => applyAndSaveParentControls({ 
               allowAudio: e.target.checked, 
               allowStudentAudio: e.target.checked, 
@@ -631,17 +640,20 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
           padding: '14px 16px',
           borderRadius: '16px',
           cursor: 'pointer',
-          background: curTeacherAudio ? '#f0fdf4' : '#f8fafc',
-          border: curTeacherAudio ? '1.5px solid #86efac' : '1px solid #e2e8f0',
-          transition: 'all 0.2s ease'
+          ...(hlTeacherAudio.isHighlighted ? hlTeacherAudio.style : {
+            background: curTeacherAudio ? '#f0fdf4' : '#f8fafc',
+            border: curTeacherAudio ? '1.5px solid #86efac' : '1px solid #e2e8f0',
+            transition: 'all 0.2s ease'
+          })
         }}>
           <div style={{ paddingRight: '12px', textAlign: 'left' }}>
             <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <Headphones size={16} color="#16a34a" style={{ flexShrink: 0 }} />
-              <span>Tonaufnahmen des Schülers durch die Lehrkraft im Unterricht</span>
+              <span>Didaktische Tonaufnahmen der Lehrkraft im Unterricht</span>
               <span style={{ fontSize: '0.66rem', fontWeight: 800, padding: '2px 7px', borderRadius: '6px', background: '#dcfce7', color: '#15803d' }}>
-                Freiwillige Didaktik-Freigabe
+                Freiwillige Didaktik-Freigabe (§ 201 StGB / § 73 UrhG)
               </span>
+              {hlTeacherAudio.badge}
             </div>
             <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, lineHeight: 1.35, marginTop: '2px' }}>
               Erlaubt der Lehrkraft, im Unterricht kurze Tonaufnahmen deines Kindes für gezielte Lernanalysen (Korrektur, Vorspiel-Feedback) aufzunehmen. Diese Freigabe ist freiwillig und kann jederzeit widerrufen werden. Ist dieser Schalter aus, darf die Lehrkraft zum Schutz der Schüler ausschließlich sich selbst vorspielen.
@@ -649,7 +661,7 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
           </div>
           <input
             type="checkbox"
-            checked={curTeacherAudio}
+            checked={Boolean(curTeacherAudio)}
             onChange={(e) => applyAndSaveParentControls({ allowTeacherAudio: e.target.checked })}
             style={{ width: '20px', height: '20px', accentColor: '#16a34a', cursor: 'pointer' }}
           />
