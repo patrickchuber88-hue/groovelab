@@ -159,7 +159,7 @@ function walkDir(dir, filterExt = ['.ts', '.tsx', '.js', '.jsx']) {
 }
 
 // 1. SCAN FRONTEND SOURCE CODE
-process.stdout.write('  📂 [1/5] Frontend Source Scan (apps/groovelab/src)...\n');
+process.stdout.write('  📂 [1/6] Frontend Source Scan (apps/groovelab/src)...\n');
 const frontendFiles = walkDir(SRC_DIR);
 
 for (const filePath of frontendFiles) {
@@ -191,7 +191,7 @@ process.stdout.write(
 );
 
 // 2. SCAN SQL MIGRATIONS FOR RLS DEFICIENCIES & DML SHIELDS
-process.stdout.write('  📂 [2/5] SQL Migration Invariants (supabase/migrations)...\n');
+process.stdout.write('  📂 [2/6] SQL Migration Invariants (supabase/migrations)...\n');
 const migrationFiles = walkDir(MIGRATIONS_DIR, ['.sql']);
 
 let latestDmlMigration = null;
@@ -257,7 +257,7 @@ process.stdout.write(
 );
 
 // 3. FINOPS ARCHITECTURAL INVARIANT & BILLING SUITE
-process.stdout.write('  📂 [3/5] FinOps Billing Invariants (runBillingInvariantTests.ts)...\n');
+process.stdout.write('  📂 [3/6] FinOps Billing Invariants (runBillingInvariantTests.ts)...\n');
 try {
   const out = execSync('npx tsx src/domain/__tests__/runBillingInvariantTests.ts', {
     cwd: path.join(ROOT_DIR, 'apps', 'groovelab'),
@@ -273,7 +273,7 @@ try {
 }
 
 // 4. FORENSIC RLS & SCHEMA CATALOG INVARIANTS
-process.stdout.write('  📂 [4/5] Forensic RLS & Schema Catalog Invariants...\n');
+process.stdout.write('  📂 [4/6] Forensic RLS & Schema Catalog Invariants...\n');
 try {
   const out = execSync('npx tsx scripts/verify_rls_catalog_invariants.ts', {
     cwd: ROOT_DIR,
@@ -289,7 +289,7 @@ try {
 }
 
 // 5. TEACHER NAME COMMUNICATION INVARIANTS ("Vorname Nachname")
-process.stdout.write('  📂 [5/5] Teacher Name Communication Invariants (runTeacherNameInvariantTests.ts)...\n');
+process.stdout.write('  📂 [5/6] Teacher Name Communication Invariants (runTeacherNameInvariantTests.ts)...\n');
 try {
   const out = execSync('npx tsx src/tests/runTeacherNameInvariantTests.ts', {
     cwd: path.join(ROOT_DIR, 'apps', 'groovelab'),
@@ -300,6 +300,21 @@ try {
   process.stdout.write('     ✅ Teacher Name Communication Suite: PASSED — Vorname Nachname Doktrin bestätigt.\n\n');
 } catch (err) {
   process.stderr.write('  🚨 Teacher Name Communication Check FAILED: Invariant violation detected!\n');
+  process.stderr.write((err.stdout || err.message) + '\n');
+  violationsCount++;
+}
+
+// 6. STATIC PERIMETER & MOZILLA OBSERVATORY A+ HEADER INVARIANTS
+process.stdout.write('  📂 [6/6] Static Perimeter & Mozilla Observatory A+ Header Invariants...\n');
+try {
+  const out = execSync('node scripts/verify_static_security_headers.mjs', {
+    cwd: ROOT_DIR,
+    encoding: 'utf-8',
+    stdio: ['pipe', 'pipe', 'pipe']
+  });
+  process.stdout.write('     ✅ Static Perimeter Suite: PASSED — 100% Mozilla Observatory A+ & SecurityHeaders.com Konformität bestätigt.\n\n');
+} catch (err) {
+  process.stderr.write('  🚨 Static Perimeter Header Check FAILED: Security header degradation detected!\n');
   process.stderr.write((err.stdout || err.message) + '\n');
   violationsCount++;
 }
