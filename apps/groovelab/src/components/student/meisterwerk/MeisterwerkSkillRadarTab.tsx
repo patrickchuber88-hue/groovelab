@@ -1,9 +1,10 @@
 import React, { useRef, useState } from "react";
 import { 
   Target, ChevronDown, BarChart2, Info, Award, Compass, Sparkles, Scale, 
-  Clock3, Zap, Music, BookOpen, Calendar, Edit3 
+  Clock3, Zap, Music, BookOpen, Calendar, Edit3, CheckCircle2, HelpCircle, 
+  Mic, FileText, Check 
 } from "lucide-react";
-import { getISOWeek } from "../studentDateUtils";
+import { getISOWeek, getSimulatedNow, getItemWeek, getSongColor, getLehrwerkColor } from "../studentDateUtils";
 import { SKILL_TAGS } from "../meisterwerk.types";
 import { cleanNotesText, isInternalMetadataNote } from "../../../domain/stickersAndTresor";
 import { SkillRadarPentagon } from "../../common/SkillRadarPentagon";
@@ -266,29 +267,286 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
 
           {/* VORWOCHEN-RÜCKBLICK & LEHRER-STUNDENEINSTIEG */}
           {(!readOnly || isTeacherTools) && (() => {
-            const now = new Date();
-            const prevWeekDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            const prevWeekISO = getISOWeek(prevWeekDate);
-            const prevWeekNum = prevWeekISO.split('-W')[1] || '';
+            const now = getSimulatedNow();
+            const currentWeekStr = getISOWeek(now);
 
-            const prevWeekItem = (progressItems || []).find((item: any) => {
-              if (!item.homework_notes) return false;
-              const isMatch = (item.updated_at && getISOWeek(item.updated_at) === prevWeekISO) ||
-                              (item.created_at && getISOWeek(item.created_at) === prevWeekISO);
-              if (!isMatch) return false;
-              const clean = item.homework_notes.replace(/\["STICKER:[^\]]+"\]/g, '').trim();
-              return clean.length > 0 && clean !== '[]';
+            // 1. Alle Hausaufgaben-Snapshots sammeln
+            const allHwItems = (progressItems || []).filter((item: any) => 
+              item?.topic_name && item.topic_name.startsWith('Hausaufgabe KW ')
+            );
+
+            // 2. Chronologisch absteigend sortieren
+            allHwItems.sort((a: any, b: any) => {
+              const wA = getItemWeek(a);
+              const wB = getItemWeek(b);
+              if (wA !== wB) return (wB || '').localeCompare(wA || '');
+              const tA = new Date(a.updated_at || a.created_at || 0).getTime();
+              const tB = new Date(b.updated_at || b.created_at || 0).getTime();
+              return tB - tA;
             });
 
-            let prevWeekText = '';
-            if (prevWeekItem?.homework_notes) {
-              try {
-                const parsed = JSON.parse(prevWeekItem.homework_notes);
-                if (Array.isArray(parsed)) {
-                  prevWeekText = parsed.filter((n: string) => !n.startsWith('STICKER:')).join(' ');
+            // 3. Letzte Hausaufgabe vor der aktuellen Woche suchen (pastItem)
+            const pastItem = allHwItems.find((item: any) => getItemWeek(item) < currentWeekStr);
+            const prevWeekItem = pastItem || allHwItems[0] || null;
+
+            if (!prevWeekItem) {
+              return (
+                <div style={{
+                  width: '100%',
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '18px',
+                  padding: '14px 16px',
+                  marginTop: '10px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                  boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)',
+                  zIndex: 5
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.86rem', fontWeight: 800, color: '#0f172a' }}>
+                    <Calendar size={16} className="text-slate-800" />
+                    <span>Vorwochen-Check-In & Stundeneinstieg</span>
+                  </div>
+                  <div style={{
+                    background: '#f8fafc',
+                    border: '1px solid #f1f5f9',
+                    borderRadius: '12px',
+                    padding: '12px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px'
+                  }}>
+                    <Music size={18} className="text-slate-500 shrink-0" />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>
+                        Bereit für den neuen Stundeneinstieg
+                      </span>
+                      <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 550 }}>
+                        Wähle ein Stück oder Lehrwerk aus, um die heutige Einheit zu beginnen.
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {SKILL_TAGS.map(t => {
+                      const isTarget = activeWeeklyTargetTags.includes(t.key);
+                      return (
+                        <button
+                          key={t.key}
+                          type="button"
+                          onClick={() => handleTriggerSkillQuest(t.key)}
+                          aria-label={`Fokus ${t.label} für heute setzen`}
+                          style={{
+                            background: isTarget ? '#fefce8' : '#f8fafc',
+                            border: `1px solid ${isTarget ? '#fde047' : '#e2e8f0'}`,
+                            color: isTarget ? '#854d0e' : '#475569',
+                            borderRadius: '100px',
+                            padding: '6px 12px',
+                            minHeight: '34px',
+                            fontSize: '0.70rem',
+                            fontWeight: 750,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transition: 'all 0.15s ease'
+                          }}
+                          className="hover-scale-mini"
+                        >
+                          <span>{getSkillMonochromeIcon(t.key, 12)}</span>
+                          <span>{t.shortLabel}</span>
+                          {isTarget && <Target size={11} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            }
+
+            const kwMatch = prevWeekItem.topic_name?.match(/Hausaufgabe KW\s*(\d+)/i);
+            const prevWeekNum = kwMatch ? kwMatch[1] : (getItemWeek(prevWeekItem).split('-W')[1] || '');
+            const isMastered = prevWeekItem.status === 'MASTERED' || prevWeekItem.status === 'COMPLETED';
+
+            const rawHomeworkNotes = String(prevWeekItem.homework_notes || '');
+
+            // 1. Array-Elemente entpacken (falls JSON-Array)
+            let parsedArray: string[] = [];
+            try {
+              const parsed = typeof prevWeekItem.homework_notes === 'string' 
+                ? JSON.parse(prevWeekItem.homework_notes) 
+                : prevWeekItem.homework_notes;
+              if (Array.isArray(parsed)) {
+                parsedArray = parsed.map(String);
+              }
+            } catch {}
+
+            // Helper: Extrahiert ein JSON-Array via Klammer-Zählung (depth-matching), immun gegen verschachtelte Klammern
+            const extractJsonArrayFrom = (source: string, prefix: string): any[] | null => {
+              const idx = source.indexOf(prefix);
+              if (idx === -1) return null;
+              const after = source.substring(idx + prefix.length).trim();
+              if (!after.startsWith('[')) return null;
+              let depth = 0;
+              let endIdx = -1;
+              for (let i = 0; i < after.length; i++) {
+                if (after[i] === '[') depth++;
+                else if (after[i] === ']') {
+                  depth--;
+                  if (depth === 0) { endIdx = i; break; }
                 }
-              } catch (e) {
-                prevWeekText = String(prevWeekItem.homework_notes).replace(/STICKER:[^|]+\|[^|]+\|[^|]+/, '').trim();
+              }
+              if (endIdx === -1) return null;
+              try {
+                return JSON.parse(after.substring(0, endIdx + 1));
+              } catch {
+                return null;
+              }
+            };
+
+            // 2. SNAPSHOT_LEHRWERKE parsen
+            let assignedLehrwerke: Array<{ title: string; pages: number[] }> = [];
+            const lwEntry = parsedArray.find(n => n.includes('SNAPSHOT_LEHRWERKE:')) || (rawHomeworkNotes.includes('SNAPSHOT_LEHRWERKE:') ? rawHomeworkNotes : '');
+            if (lwEntry) {
+              const parsedLw = extractJsonArrayFrom(lwEntry, 'SNAPSHOT_LEHRWERKE:');
+              if (Array.isArray(parsedLw)) {
+                assignedLehrwerke = parsedLw.map((lw: any) => ({
+                  title: lw.title || 'Lehrwerk',
+                  pages: Array.isArray(lw.pages) ? lw.pages : []
+                }));
+              }
+            }
+
+            // 3. SNAPSHOT_SONGS parsen
+            let assignedSongs: Array<{ title: string; status?: string }> = [];
+            const songEntry = parsedArray.find(n => n.includes('SNAPSHOT_SONGS:')) || (rawHomeworkNotes.includes('SNAPSHOT_SONGS:') ? rawHomeworkNotes : '');
+            if (songEntry) {
+              const parsedSongs = extractJsonArrayFrom(songEntry, 'SNAPSHOT_SONGS:');
+              if (Array.isArray(parsedSongs)) {
+                assignedSongs = parsedSongs.map((s: any) => ({
+                  title: s.topic_name || s.title || 'Song',
+                  status: s.status || 'IN_PROGRESS'
+                }));
+              }
+            }
+
+            // Fallback Songs aus progressItems wenn SNAPSHOT_SONGS leer
+            if (assignedSongs.length === 0) {
+              const activeSongs = (progressItems || []).filter((p: any) =>
+                !p.topic_name?.startsWith('Hausaufgabe KW ') &&
+                !p.topic_name?.includes(' - Seite ') &&
+                p.is_current_homework
+              );
+              if (activeSongs.length > 0) {
+                assignedSongs = activeSongs.slice(0, 3).map((p: any) => ({
+                  title: p.topic_name,
+                  status: p.status
+                }));
+              }
+            }
+
+            // 4. STUDENT_QUESTION parsen
+            let studentQuestion: { text: string; date?: string } | null = null;
+            const qEntry = parsedArray.find(n => n.includes('STUDENT_QUESTION:') || n.includes('❓ Frage für den Unterricht:')) || 
+                           (rawHomeworkNotes.includes('STUDENT_QUESTION:') || rawHomeworkNotes.includes('❓ Frage für den Unterricht:') ? rawHomeworkNotes : '');
+            if (qEntry) {
+              if (qEntry.includes('STUDENT_QUESTION:')) {
+                const after = qEntry.substring(qEntry.indexOf('STUDENT_QUESTION:') + 'STUDENT_QUESTION:'.length).trim();
+                const pipeIdx = after.indexOf('|');
+                if (pipeIdx !== -1) {
+                  let qText = after.slice(pipeIdx + 1).trim();
+                  const stopMatch = qText.match(/(AUDIO:|SNAPSHOT_|LATENCY:|STICKER:)/);
+                  if (stopMatch && stopMatch.index !== undefined) {
+                    qText = qText.substring(0, stopMatch.index).trim();
+                  }
+                  studentQuestion = {
+                    date: after.slice(0, pipeIdx).trim(),
+                    text: qText
+                  };
+                } else {
+                  let qText = after;
+                  const stopMatch = qText.match(/(AUDIO:|SNAPSHOT_|LATENCY:|STICKER:)/);
+                  if (stopMatch && stopMatch.index !== undefined) {
+                    qText = qText.substring(0, stopMatch.index).trim();
+                  }
+                  studentQuestion = { text: qText };
+                }
+              } else if (qEntry.includes('❓ Frage für den Unterricht:')) {
+                const after = qEntry.substring(qEntry.indexOf('❓ Frage für den Unterricht:') + '❓ Frage für den Unterricht:'.length).trim();
+                let qText = after;
+                const stopMatch = qText.match(/(AUDIO:|SNAPSHOT_|LATENCY:|STICKER:)/);
+                if (stopMatch && stopMatch.index !== undefined) {
+                  qText = qText.substring(0, stopMatch.index).trim();
+                }
+                studentQuestion = { text: qText };
+              }
+            }
+
+            // 5. AUDIO-Aufnahmen Zähler
+            let audioCount = 0;
+            if (parsedArray.length > 0) {
+              audioCount = parsedArray.filter(n => n.startsWith('AUDIO:') || n.includes('AUDIO:https:')).length;
+            } else {
+              const audioMatches = Array.from(rawHomeworkNotes.matchAll(/AUDIO:https:[^\s,|]+/g));
+              audioCount = audioMatches.length;
+            }
+
+            // 6. Didaktische Notiz (Aufgabenstellung)
+            let didacticNote = (prevWeekItem.teacher_notes || '').trim();
+            if (!didacticNote) {
+              if (parsedArray.length > 0) {
+                // Bei geparstem Array: Alle didaktischen Texte filtern, die KEIN internes Protokoll-Token sind
+                const validLines = parsedArray.filter(n => {
+                  if (typeof n !== 'string') return false;
+                  const s = n.trim();
+                  if (!s) return false;
+                  if (isInternalMetadataNote(s)) return false;
+                  if (s.startsWith('AUDIO:')) return false;
+                  if (s.startsWith('SNAPSHOT_')) return false;
+                  if (s.startsWith('STUDENT_')) return false;
+                  if (s.startsWith('STICKER:')) return false;
+                  if (s.startsWith('LATENCY:')) return false;
+                  if (s.startsWith('LOOP:')) return false;
+                  if (s.startsWith('SYSTEM:')) return false;
+                  if (s.startsWith('FEEDBACK:')) return false;
+                  if (s.startsWith('❓')) return false;
+                  return true;
+                });
+                didacticNote = validLines.map(cleanNotesText).filter(Boolean).join(' ').trim();
+              } else {
+                // Bei unstrukturiertem String: Tokens sauber extrahieren und entfernen
+                let cleaned = rawHomeworkNotes;
+                ['SNAPSHOT_LEHRWERKE:', 'SNAPSHOT_SONGS:'].forEach(pfx => {
+                  const pIdx = cleaned.indexOf(pfx);
+                  if (pIdx !== -1) {
+                    const afterP = cleaned.substring(pIdx + pfx.length).trim();
+                    if (afterP.startsWith('[')) {
+                      let d = 0;
+                      let endI = -1;
+                      for (let i = 0; i < afterP.length; i++) {
+                        if (afterP[i] === '[') d++;
+                        else if (afterP[i] === ']') {
+                          d--;
+                          if (d === 0) { endI = i; break; }
+                        }
+                      }
+                      if (endI !== -1) {
+                        cleaned = cleaned.substring(0, pIdx) + ' ' + afterP.substring(endI + 1);
+                      }
+                    }
+                  }
+                });
+                cleaned = cleaned
+                  .replace(/STUDENT_QUESTION:[^|\s]+\|[^]*?(?=(AUDIO:|SNAPSHOT_|LATENCY:|STICKER:|\s{2,}|$))/g, '')
+                  .replace(/STUDENT_QUESTION:[^]*?(?=(AUDIO:|SNAPSHOT_|LATENCY:|STICKER:|\s{2,}|$))/g, '')
+                  .replace(/❓\s*Frage für den Unterricht:[^]*?(?=(AUDIO:|SNAPSHOT_|LATENCY:|STICKER:|\s{2,}|$))/g, '')
+                  .replace(/AUDIO:[^\s,|]+(?:\|[^|\s]*){0,7}/g, '')
+                  .replace(/STICKER:[^\s|]+(?:\|[^|\s]*){0,3}/g, '')
+                  .replace(/\["STICKER:[^\]]+"\]/g, '')
+                  .replace(/LATENCY:[^\s]+/g, '')
+                  .replace(/\[\s*\]/g, '')
+                  .trim();
+                didacticNote = cleanNotesText(cleaned);
               }
             }
 
@@ -312,118 +570,224 @@ export const MeisterwerkSkillRadarTab: React.FC<MeisterwerkSkillRadarTabProps> =
                     <Calendar size={16} className="text-slate-800" />
                     <span>Vorwochen-Check-In & Stundeneinstieg</span>
                   </div>
-                  {prevWeekText && (
-                    <span style={{
-                      fontSize: '0.74rem',
-                      fontWeight: 800,
-                      color: '#0369a1',
-                      background: '#f0f9ff',
-                      border: '1px solid #e0f2fe',
-                      padding: '3px 9px',
-                      borderRadius: '100px'
-                    }}>
-                      KW {prevWeekNum}
-                    </span>
-                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {isMastered && (
+                      <span style={{
+                        fontSize: '0.70rem',
+                        fontWeight: 800,
+                        color: '#15803d',
+                        background: '#dcfce7',
+                        border: '1px solid #bbf7d0',
+                        padding: '2px 8px',
+                        borderRadius: '100px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}>
+                        <CheckCircle2 size={11} />
+                        Quittiert
+                      </span>
+                    )}
+                    {prevWeekNum && (
+                      <span style={{
+                        fontSize: '0.74rem',
+                        fontWeight: 800,
+                        color: '#0369a1',
+                        background: '#f0f9ff',
+                        border: '1px solid #e0f2fe',
+                        padding: '3px 9px',
+                        borderRadius: '100px'
+                      }}>
+                        KW {prevWeekNum}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                {prevWeekText ? (
-                  <>
-                    {/* Vorwochen-Hausaufgabe (Kompakte Apple-Infozeile) */}
+                {/* Didaktische Inhalte */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {/* A. Schüler-Frage für den Unterricht (Pädagogisches Highlight) */}
+                  {studentQuestion && (
+                    <div style={{
+                      background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+                      border: '1.5px solid #fde68a',
+                      borderRadius: '12px',
+                      padding: '10px 12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', fontWeight: 800, color: '#92400e' }}>
+                        <HelpCircle size={13} className="text-amber-700 shrink-0" />
+                        <span>Schüler-Frage für heute:</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.82rem', fontWeight: 750, color: '#78350f', lineHeight: 1.4 }}>
+                        »{studentQuestion.text}«
+                      </p>
+                    </div>
+                  )}
+
+                  {/* B. Songs & Lehrwerke Badges */}
+                  {(assignedSongs.length > 0 || assignedLehrwerke.length > 0) && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {assignedSongs.map((s, idx) => {
+                        const c = getSongColor(s.title);
+                        return (
+                          <span
+                            key={`song-${idx}`}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              fontSize: '0.74rem',
+                              fontWeight: 750,
+                              background: c.from,
+                              color: '#0f172a',
+                              border: `1px solid ${c.to}`,
+                              padding: '4px 9px',
+                              borderRadius: '8px'
+                            }}
+                          >
+                            <Music size={12} style={{ color: c.text }} />
+                            <span>{s.title}</span>
+                          </span>
+                        );
+                      })}
+
+                      {assignedLehrwerke.map((lw, idx) => {
+                        const c = getLehrwerkColor(lw.title);
+                        return (
+                          <span
+                            key={`lw-${idx}`}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              fontSize: '0.74rem',
+                              fontWeight: 750,
+                              background: c.from,
+                              color: '#0f172a',
+                              border: `1px solid ${c.to}`,
+                              padding: '4px 9px',
+                              borderRadius: '8px'
+                            }}
+                          >
+                            <BookOpen size={12} style={{ color: c.text }} />
+                            <span>{lw.title}{lw.pages.length > 0 ? ` (S. ${lw.pages.join(', ')})` : ''}</span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* C. Aufgabenstellung / Notiz der Lehrkraft */}
+                  {didacticNote && (
                     <div style={{
                       background: '#f8fafc',
                       border: '1px solid #f1f5f9',
-                      borderRadius: '12px',
-                      padding: '10px 14px',
-                      fontSize: '0.82rem',
+                      borderRadius: '10px',
+                      padding: '8px 12px',
+                      fontSize: '0.80rem',
                       color: '#334155',
-                      lineHeight: '1.45'
+                      lineHeight: '1.4',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '7px'
                     }}>
-                      <strong style={{ color: '#0f172a' }}>{prevWeekItem?.topic_name || `Hausaufgabe KW ${prevWeekNum}`}:</strong> {prevWeekText}
-                    </div>
-
-                    {/* 1-Tap Quittierung & Fokus-Ziele */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <button
-                        type="button"
-                        onClick={handleMasterAllSkills}
-                        style={{
-                          background: 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
-                          border: 'none',
-                          color: '#ffffff',
-                          borderRadius: '12px',
-                          padding: '10px 16px',
-                          fontSize: '0.82rem',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '8px',
-                          boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)',
-                          transition: 'all 0.15s ease'
-                        }}
-                        className="hover-scale"
-                      >
-                        <Sparkles size={15} />
-                        <span>Vorwoche super gemeistert (+100 XP)</span>
-                      </button>
-
-                      {/* 5 Säulen Quick Focus Selector */}
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                        {SKILL_TAGS.map(t => {
-                          const isTarget = activeWeeklyTargetTags.includes(t.key);
-                          return (
-                            <button
-                              key={t.key}
-                              type="button"
-                              onClick={() => handleTriggerSkillQuest(t.key)}
-                              style={{
-                                background: isTarget ? '#fefce8' : '#f8fafc',
-                                border: `1px solid ${isTarget ? '#fde047' : '#e2e8f0'}`,
-                                color: isTarget ? '#854d0e' : '#475569',
-                                borderRadius: '100px',
-                                padding: '4px 10px',
-                                fontSize: '0.68rem',
-                                fontWeight: 750,
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                transition: 'all 0.15s ease'
-                              }}
-                              className="hover-scale-mini"
-                            >
-                              <span>{getSkillMonochromeIcon(t.key, 12)}</span>
-                              <span>{t.shortLabel}</span>
-                              {isTarget && <Target size={11} />}
-                            </button>
-                          );
-                        })}
+                      <FileText size={13} className="text-slate-500 mt-0.5 shrink-0" />
+                      <div>
+                        <strong style={{ color: '#0f172a' }}>Aufgabe: </strong>
+                        <span>{didacticNote}</span>
                       </div>
                     </div>
-                  </>
-                ) : (
-                  <div style={{
-                    background: '#f8fafc',
-                    border: '1px solid #f1f5f9',
-                    borderRadius: '10px',
-                    padding: '10px 12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px'
-                  }}>
-                    <Music size={16} className="text-slate-600" />
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a' }}>
-                        Bereit für den neuen Stundeneinstieg
-                      </span>
-                      <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 550 }}>
-                        Wähle ein Stück oder Lehrwerk aus, um die heutige Einheit zu beginnen.
-                      </span>
+                  )}
+
+                  {/* D. Schüler-Aktivität (Audios) */}
+                  {audioCount > 0 && (
+                    <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '0.72rem',
+                      fontWeight: 750,
+                      color: '#0369a1',
+                      background: '#f0f9ff',
+                      padding: '4px 9px',
+                      borderRadius: '6px',
+                      width: 'fit-content'
+                    }}>
+                      <Mic size={12} />
+                      <span>{audioCount} {audioCount === 1 ? 'Übe-Aufnahme' : 'Übe-Aufnahmen'} vom Schüler eingereicht</span>
                     </div>
+                  )}
+                </div>
+
+                {/* E. 1-Tap Quittierung & Fokus-Ziele */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '2px' }}>
+                  <button
+                    type="button"
+                    onClick={handleMasterAllSkills}
+                    aria-label="Vorwoche als super gemeistert quittieren und 100 XP vergeben"
+                    style={{
+                      background: isMastered
+                        ? 'linear-gradient(180deg, #15803d 0%, #166534 100%)'
+                        : 'linear-gradient(180deg, #16a34a 0%, #15803d 100%)',
+                      border: 'none',
+                      color: '#ffffff',
+                      borderRadius: '12px',
+                      padding: '10px 16px',
+                      minHeight: '44px',
+                      fontSize: '0.82rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)',
+                      transition: 'all 0.15s ease'
+                    }}
+                    className="hover-scale"
+                  >
+                    {isMastered ? <CheckCircle2 size={16} /> : <Sparkles size={16} />}
+                    <span>{isMastered ? 'Vorwoche quittiert (+100 XP vergeben)' : 'Vorwoche super gemeistert (+100 XP)'}</span>
+                  </button>
+
+                  {/* 5 Säulen Quick Focus Selector */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {SKILL_TAGS.map(t => {
+                      const isTarget = activeWeeklyTargetTags.includes(t.key);
+                      return (
+                        <button
+                          key={t.key}
+                          type="button"
+                          onClick={() => handleTriggerSkillQuest(t.key)}
+                          aria-label={`Fokus ${t.label} für heute setzen`}
+                          style={{
+                            background: isTarget ? '#fefce8' : '#f8fafc',
+                            border: `1px solid ${isTarget ? '#fde047' : '#e2e8f0'}`,
+                            color: isTarget ? '#854d0e' : '#475569',
+                            borderRadius: '100px',
+                            padding: '6px 12px',
+                            minHeight: '34px',
+                            fontSize: '0.70rem',
+                            fontWeight: 750,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transition: 'all 0.15s ease'
+                          }}
+                          className="hover-scale-mini"
+                        >
+                          <span>{getSkillMonochromeIcon(t.key, 12)}</span>
+                          <span>{t.shortLabel}</span>
+                          {isTarget && <Target size={11} />}
+                        </button>
+                      );
+                    })}
                   </div>
-                )}
+                </div>
               </div>
             );
           })()}

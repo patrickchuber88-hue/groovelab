@@ -1507,28 +1507,71 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   };
 
   const handleMasterAllSkills = () => {
-    const updated: { [k: string]: number } = {};
-    SKILL_TAGS.forEach(t => {
-      updated[t.key] = 5; // Level 5 Meister
-      if (t.legacyKey) updated[t.legacyKey] = 5;
+    // 1. Didaktische Steigerung der Kompetenz-Säulen (+1 Stufe auf Fokus-Pillars bzw. aktive Skills, max. 5)
+    setSkillOverrides(prev => {
+      const updated: { [k: string]: number } = { ...prev };
+      const focusTags = pendingTargetFocusTags.length > 0 ? pendingTargetFocusTags : SKILL_TAGS.map(t => t.key);
+      focusTags.forEach(tKey => {
+        const currentLvl = prev[tKey] ?? 1;
+        const nextLvl = Math.min(5, currentLvl + 1);
+        updated[tKey] = nextLvl;
+        const tagObj = SKILL_TAGS.find(t => t.key === tKey);
+        if (tagObj?.legacyKey) updated[tagObj.legacyKey] = nextLvl;
+      });
+      if (updated.klang && !updated.intonation) updated.intonation = updated.klang;
+      if (updated.intonation && !updated.klang) updated.klang = updated.intonation;
+
+      try {
+        localStorage.setItem(`groovelab_skill_overrides_${student?.id || 'default'}`, JSON.stringify(updated));
+        localStorage.setItem(`student_pillars_${student?.id || 'default'}`, JSON.stringify(updated));
+      } catch (e) {}
+
+      if (student?.id) {
+        window.dispatchEvent(new CustomEvent('skill_radar_levels_changed', {
+          detail: { studentId: student.id, levels: updated, weeklyFocus: pendingTargetFocusTags[0] || 'ausgeglichen' }
+        }));
+        const payload = {
+          ...updated,
+          intonation: updated.klang || updated.intonation || 5,
+          weekly_focus: pendingTargetFocusTags[0] || 'ausgeglichen'
+        };
+        student.skill_radar_levels = payload;
+        supabase.from('users').update({ skill_radar_levels: payload }).eq('id', student.id).then(() => {});
+      }
+      return updated;
     });
-    setSkillOverrides(updated);
-    try {
-      localStorage.setItem(`groovelab_skill_overrides_${student?.id || 'default'}`, JSON.stringify(updated));
-      localStorage.setItem(`student_pillars_${student?.id || 'default'}`, JSON.stringify(updated));
-    } catch (e) {}
+
+    // 2. Autoritativer XP-Bonus (+100 XP) auf Schülerprofil & Datenbank
+    setStudentXP(prev => {
+      const nextXp = (prev || 0) + 100;
+      if (student?.id && student.id !== 'teacher-self') {
+        supabase
+          .from('avatars')
+          .select('xp')
+          .eq('user_id', student.id)
+          .maybeSingle()
+          .then(({ data: avData }) => {
+            const currentDbXp = avData?.xp ?? prev ?? 0;
+            supabase.from('avatars').update({ xp: currentDbXp + 100 }).eq('user_id', student.id).then(() => {});
+          });
+      }
+      return nextXp;
+    });
+
+    // 3. Vorwochen-Eintrag in progress_matrix und State als MASTERED quittieren
+    const pastHwItem = (progressItems || []).find(p => p.topic_name?.startsWith('Hausaufgabe KW '));
+    if (pastHwItem) {
+      supabase
+        .from('progress_matrix')
+        .update({ status: 'MASTERED', updated_at: new Date().toISOString() })
+        .eq('id', pastHwItem.id)
+        .then(() => {});
+      setProgressItems(prev => (prev || []).map(p => p.id === pastHwItem.id ? { ...p, status: 'MASTERED' } : p));
+    }
 
     if (student?.id) {
-      window.dispatchEvent(new CustomEvent('skill_radar_levels_changed', {
-        detail: { studentId: student.id, levels: updated, weeklyFocus: pendingTargetFocusTags[0] || 'ausgeglichen' }
-      }));
-      const payload = {
-        ...updated,
-        intonation: 5,
-        weekly_focus: pendingTargetFocusTags[0] || 'ausgeglichen'
-      };
-      student.skill_radar_levels = payload;
-      supabase.from('users').update({ skill_radar_levels: payload }).eq('id', student.id).then(() => {});
+      window.dispatchEvent(new CustomEvent('campus_xp_awarded', { detail: { xp: 100, studentId: student.id } }));
+      window.dispatchEvent(new CustomEvent('homework-updated', { detail: { studentId: student.id } }));
     }
 
     triggerImmediateAutoSave();

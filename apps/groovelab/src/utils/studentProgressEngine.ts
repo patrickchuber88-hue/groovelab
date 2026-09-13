@@ -319,8 +319,8 @@ export function computeGroundTruthMetrics({
   } catch (e) {}
 
   let computedStreak = 0;
-  let checkDate = new Date(now);
-  let checkDateStr = toEngineYYYYMMDD(checkDate);
+  const checkDate = new Date(now);
+  const checkDateStr = toEngineYYYYMMDD(checkDate);
 
   if (masteredDatesSet.has(checkDateStr)) {
     computedStreak = 1;

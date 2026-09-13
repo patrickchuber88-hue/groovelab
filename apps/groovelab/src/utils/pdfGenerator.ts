@@ -1564,7 +1564,7 @@ export const generateGdprDataReportPDF = async (data: GdprReportData) => {
   doc.setFontSize(7.5);
   doc.setTextColor(slateBody[0], slateBody[1], slateBody[2]);
 
-  let rightsY = y2 + 15;
+  const rightsY = y2 + 15;
   doc.text('• Recht auf Berichtigung (Art. 16 DSGVO): Unverzügliche Korrektur unrichtiger Schüler- oder Stammdaten.', 25, rightsY);
   doc.text('• Recht auf Löschung (Art. 17 DSGVO): Vollständige Entfernung des Profils und aller Aufnahmen („Vergessenwerden").', 25, rightsY + 6);
   doc.text('• Recht auf Einschränkung der Verarbeitung (Art. 18 DSGVO) & Widerspruchsrecht (Art. 21 DSGVO).', 25, rightsY + 12);
@@ -2260,7 +2260,7 @@ export const generateStudentHomeworkPrintoutPDF = async (params: StudentHomework
       .trim();
     rawItems = rawClean
       .split('\n')
-      .map(line => line.replace(/^[•\-\*\d\.\)]\s*/, '').trim())
+      .map(line => line.replace(/^[-•*\d.)]\s*/, '').trim())
       .filter(Boolean)
       .map(title => ({ type: 'note' as const, title }));
   }

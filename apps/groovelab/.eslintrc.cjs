@@ -14,7 +14,14 @@ module.exports = {
       'warn',
       { allowConstantExport: true },
     ],
-    '@typescript-eslint/no-unused-vars': 'warn',
+    '@typescript-eslint/no-unused-vars': [
+      'warn',
+      {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_',
+      },
+    ],
     '@typescript-eslint/no-explicit-any': 'off',
     '@typescript-eslint/ban-ts-comment': 'off',
     'react-hooks/rules-of-hooks': 'error',
@@ -22,4 +29,12 @@ module.exports = {
     'no-empty': 'off',
     'no-constant-condition': 'off'
   },
-}
+  overrides: [
+    {
+      files: ['src/tests/**', 'src/**/__tests__/**', 'src/tests/**/*.ts'],
+      rules: {
+        '@typescript-eslint/no-unused-vars': 'off',
+      },
+    },
+  ],
+};

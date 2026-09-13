@@ -48,7 +48,7 @@ export const GERMAN_NEURAL_VOICES: NeuralVoiceOption[] = [
 
 export type TtsEngineMode = 'neural_thorsten' | 'neural_kerstin' | 'cheerful' | 'classic';
 
-let piperModule: any = null;
+const piperModule: any = null;
 let isPiperLoading = false;
 let currentAudio: HTMLAudioElement | null = null;
 let currentAudioUrl: string | null = null;
@@ -267,7 +267,7 @@ const NUMBER_WORDS_DE: Record<number, string> = {
  */
 export function formatPageNumbersGerman(pageNums?: number[] | string, formattedPages?: string): string {
   let pagesStr = formattedPages;
-  let pagesArr = Array.isArray(pageNums) ? pageNums : undefined;
+  const pagesArr = Array.isArray(pageNums) ? pageNums : undefined;
   if (typeof pageNums === 'string' && !pagesStr) {
     pagesStr = pageNums;
   }

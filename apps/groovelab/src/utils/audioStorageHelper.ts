@@ -240,7 +240,7 @@ export async function uploadAudioWithIntegrityVerification(
     const pathParts = filePath.split('/');
     let schoolId: string | null = null;
     let context = 'audio';
-    let filename = pathParts[pathParts.length - 1];
+    const filename = pathParts[pathParts.length - 1];
 
     if (pathParts[0] === 'schools' && pathParts.length >= 4) {
       schoolId = pathParts[1];

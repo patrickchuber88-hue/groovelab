@@ -182,9 +182,9 @@ export function extractBaseTopic(
   if (rawLabel) {
     let candidate = rawLabel
       .replace(/^AUDIO:[^|]*\|/i, '')
-      .replace(/[\[\]"]/g, '')
+      .replace(/[[\]"]/g, '')
       // Strip bullet/dash/middle-dot date patterns (e.g. " • 22. Aug.", " · 17. Aug. #1", " - 17. Aug.")
-      .replace(/\s*[•·\-]\s*(?:Mo|Di|Mi|Do|Fr|Sa|So)?[,\.]?\s*\d{1,2}\.?\s*(?:Aug|Sep|Sept|Okt|Nov|Dez|Jan|Feb|Mär|Apr|Mai|Jun|Jul|\d{1,2}\.?)[a-zäöü]*\s*(?:#\d+)?\s*[\)\.]?/gi, '')
+      .replace(/\s*[-•·]\s*(?:Mo|Di|Mi|Do|Fr|Sa|So)?[,.]?\s*\d{1,2}\.?\s*(?:Aug|Sep|Sept|Okt|Nov|Dez|Jan|Feb|Mär|Apr|Mai|Jun|Jul|\d{1,2}\.?)[a-zäöü]*\s*(?:#\d+)?\s*[).]?/gi, '')
       // Strip parenthesized dates, times or week numbers (e.g. "(KW 36 • 13:46)", "(17.08.)")
       .replace(/\s*\(\s*(?:KW\s*\d+|\d{1,2}\.\d{1,2}\.?|[^)]*(?:Uhr|\d{1,2}:\d{2}))\s*\)\s*$/gi, '')
       // Strip trailing "#1", "#2"

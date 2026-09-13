@@ -308,7 +308,7 @@ export function cleanHomeworkNotesText(text: string | null | undefined): string 
            .replace(/STICKER:[^\s\n·]*/gi, '')
            .replace(/\s*:\s*(?=·|$|\n)/g, '')
            .replace(/\s*·\s*·\s*/g, ' · ')
-           .replace(/^\s*[·\s:•\-\*]+/, '')
+           .replace(/^\s*[-·\s:•*]+/, '')
            .replace(/[·\s:]+$/, '')
            .trim();
       return l;
@@ -457,7 +457,7 @@ export function formatDisplaySubjectOrInstrument(
   item?: any,
   teacher?: any
 ): string {
-  let rawItemInst = (
+  const rawItemInst = (
     item?.instrument ||
     item?.student?.instrument ||
     item?.subject ||

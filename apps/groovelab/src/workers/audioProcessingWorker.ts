@@ -153,7 +153,9 @@ self.onmessage = (event: MessageEvent<AudioWorkerMessage>) => {
         if (!audioData) throw new Error('No audio data provided');
         const sampleRate = payload.sampleRate || 44100;
         const SIZE = audioData.length;
-        let r1 = 0, r2 = SIZE - 1, threshold = 0.2;
+        const threshold = 0.2;
+        let r1 = 0;
+        let r2 = SIZE - 1;
         
         for (let i = 0; i < SIZE / 2; i++) {
           if (Math.abs(audioData[i]) < threshold) { r1 = i; break; }
