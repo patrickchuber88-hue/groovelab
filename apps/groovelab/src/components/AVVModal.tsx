@@ -446,7 +446,7 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
           <p style={{ margin: '4px 0 8px 0' }}>
             Der Auftraggeber genehmigt ausdrücklich die Einbindung der folgenden Unterauftragsverarbeiter:
           </p>
-          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 12px', fontSize: '0.74rem', marginBottom: '12px' }}>
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 12px', fontSize: '0.74rem', marginBottom: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px solid #cbd5e1', fontWeight: 800, color: '#0f172a' }}>
               <span>Dienstleister &amp; Standort</span>
               <span>Leistungsumfang &amp; Zertifizierung</span>
@@ -456,6 +456,9 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
               <span>Dedizierte Cloud-, Datenbank- &amp; Speicher-Infrastruktur (ISO 27001)</span>
             </div>
           </div>
+          <p style={{ margin: '0 0 12px 0', fontSize: '0.74rem', color: '#475569', lineHeight: 1.45 }}>
+            <strong>Änderungsverfahren &amp; 14-Tage-Widerspruchsfrist (Art. 28 Abs. 2 DSGVO):</strong> Beabsichtigt der Auftragnehmer, weitere Unterauftragnehmer hinzuzuziehen oder bestehende zu ersetzen, wird er den Auftraggeber mindestens vierzehn (14) Kalendertage vorab in Textform (per E-Mail oder System-Benachrichtigung) informieren. Dem Auftraggeber steht das Recht zu, der beabsichtigten Änderung innerhalb dieser 14-tägigen Frist aus wichtigem datenschutzrechtlichem Grund schriftlich zu widersprechen.
+          </p>
 
           <h4 style={{ fontSize: '0.88rem', fontWeight: 800, marginTop: '14px', color: '#0f172a' }}>
             § 5 Technisch-Organisatorische Maßnahmen / TOMs (Art. 32 DSGVO)

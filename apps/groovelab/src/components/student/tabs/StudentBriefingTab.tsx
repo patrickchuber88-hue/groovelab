@@ -4,7 +4,7 @@ import {
   Clock, Timer, Flame, BookOpen, Play, Pause, Square, RotateCcw, Volume2, VolumeX, X,
   Zap, Music, School, Calendar, CalendarX, Check, Target, MessageSquare, Pencil, User,
   Phone, Users, Shield, Palmtree, Settings, FileText, ThumbsUp, Heart, AlertTriangle,
-  Mic, Disc, Download, Key, Headphones, Sliders, Bell
+  Mic, Disc, Download, Key, Headphones, Sliders, Bell, Crown
 } from 'lucide-react';
 import { ALL_STICKERS } from '../../../domain/stickersAndTresor';
 import { UpdateAnnouncementHero } from '../../common/UpdateAnnouncementHero';
@@ -2207,6 +2207,23 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 }}>
                                   {requiredMins} Min. Sternen-Ziel
                                 </span>
+                              </div>
+
+                              {/* 3 Zauber-Schilde Puffer-Schutz */}
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '8px 12px',
+                                background: '#ecfdf5',
+                                borderRadius: '12px',
+                                border: '1px solid #a7f3d0',
+                                fontSize: isMusicStandMode ? '0.86rem' : '0.78rem',
+                                fontWeight: 800,
+                                color: '#065f46'
+                              }}>
+                                <Shield size={14} color="#059669" fill="#059669" style={{ flexShrink: 0 }} />
+                                <span>3 Zauber-Schilde halten Wache • Dein Stern ist sicher!</span>
                               </div>
 
                               <button
@@ -4948,15 +4965,15 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         <div style={{ 
                           background: '#ffffff', 
                           borderRadius: '24px', 
-                          padding: '24px', 
+                          padding: isMobile ? '18px' : '18px 20px', 
                           boxShadow: '0 10px 30px rgba(15, 23, 42, 0.03)',
                           border: '1px solid rgba(0, 0, 0, 0.04)',
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'space-between',
-                          gap: '16px'
+                          gap: '12px'
                         }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                                 <div style={{ 
@@ -5326,15 +5343,15 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         <div style={{ 
                           background: '#ffffff', 
                           borderRadius: '24px', 
-                          padding: '24px', 
+                          padding: isMobile ? '18px' : '18px 20px', 
                           boxShadow: '0 10px 30px rgba(15, 23, 42, 0.03)',
                           border: isGoalAchieved ? '1px solid rgba(52, 168, 83, 0.25)' : '1px solid rgba(0, 0, 0, 0.04)',
                           display: 'flex',
                           flexDirection: 'column',
                           justifyContent: 'space-between',
-                          gap: '16px'
+                          gap: '12px'
                         }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                             {/* Header: Icon + Title + Status Pill */}
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -5468,69 +5485,92 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       const isTier1Unlocked = streak >= 1;
                       const isTier2Unlocked = streak >= 4;
                       const isTier3Unlocked = streak >= 9;
+                      const currentTier = isTier3Unlocked ? 3 : isTier2Unlocked ? 2 : isTier1Unlocked ? 1 : 0;
 
                       const weekMetrics = getDeterministicWeekMetrics();
-                      const currentWeek = getISOWeek(getSimulatedNow());
                       const availableShields = weekMetrics.availableShields;
                       const weekShieldedCount = weekMetrics.weekShieldedCount;
+
+                      const instName = studentInstrumentName || 'an deinem Instrument';
+                      const instPrep = ['Gitarre', 'Blockflöte', 'Querflöte', 'Violine', 'Geige', 'Bratsche', 'Posaune', 'Trompete', 'Harfe', 'Ukulele'].some(w => instName.toLowerCase().includes(w.toLowerCase()))
+                        ? `an der ${instName}`
+                        : ['Klavier', 'Schlagzeug', 'Cello', 'Saxophon', 'Akkordeon', 'Keyboard', 'Horn', 'Fagott'].some(w => instName.toLowerCase().includes(w.toLowerCase()))
+                        ? `am ${instName}`
+                        : `an deinem Instrument`;
 
                       return (
                         <div style={{ 
                           background: '#ffffff', 
                           borderRadius: '24px', 
-                          padding: '24px', 
+                          padding: isMobile ? '18px' : '18px 20px', 
                           boxShadow: '0 10px 30px rgba(15, 23, 42, 0.03)',
                           border: '1px solid rgba(0, 0, 0, 0.04)',
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: '14px'
+                          justifyContent: 'space-between',
+                          gap: '12px'
                         }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ fontSize: '0.8rem', fontWeight: 950, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                🔥 Flammen-Pfad
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {/* Header: Title + Rules Button + Dynamic Tier Badge */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ fontSize: isMusicStandMode ? '0.96rem' : '0.86rem', fontWeight: 950, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                  🔥 Flammen-Pfad
+                                </span>
+                                <button 
+                                  onClick={() => setShowRulesModal(true)}
+                                  style={{ background: 'none', border: 'none', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#94a3b8', transition: 'color 0.15s' }}
+                                  onMouseOver={e => e.currentTarget.style.color = '#64748b'}
+                                  onMouseOut={e => e.currentTarget.style.color = '#94a3b8'}
+                                  title="Spielregeln anzeigen"
+                                  aria-label="Spielregeln anzeigen"
+                                >
+                                  <HelpCircle size={14} />
+                                </button>
+                              </div>
+                              <span style={{ 
+                                background: streak === 0 
+                                  ? '#fef3c7' 
+                                  : 'linear-gradient(135deg, #ff4b4b 0%, #dc2626 100%)', 
+                                color: streak === 0 ? '#92400e' : '#ffffff', 
+                                fontSize: '0.72rem', 
+                                fontWeight: 950, 
+                                padding: '3px 10px', 
+                                borderRadius: '100px',
+                                border: streak === 0 ? '1px solid #fde68a' : '1px solid rgba(255, 255, 255, 0.3)',
+                                boxShadow: streak === 0 ? 'none' : '0 3px 10px rgba(220, 38, 38, 0.22)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}>
+                                {streak === 0 ? (
+                                  <>Bereit zum Start ✨</>
+                                ) : (
+                                  <>{streak} {streak === 1 ? 'Tag' : 'Tage'} • Stufe {currentTier} 🔥</>
+                                )}
                               </span>
-                              <button 
-                                onClick={() => setShowRulesModal(true)}
-                                style={{ background: 'none', border: 'none', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#94a3b8' }}
-                                title="Spielregeln anzeigen"
-                              >
-                                <HelpCircle size={14} />
-                              </button>
                             </div>
-                            <span style={{ 
-                              background: streak === 0 ? 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)' : 'linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%)', 
-                              color: streak === 0 ? '#991b1b' : '#ea580c', 
-                              fontSize: '0.75rem', 
-                              fontWeight: 950, 
-                              padding: '4px 10px', 
-                              borderRadius: '100px',
-                              border: streak === 0 ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(249, 115, 22, 0.2)'
-                            }}>
-                              {streak === 0 ? 'Startklar 🔥' : `${streak} ${streak === 1 ? 'Tag' : 'Tage'} 🔥`}
-                            </span>
-                          </div>
 
-                          {/* FERIEN-FREEZE ODER 3 SCHUTZSCHILDE */}
-                          {isTodayHoliday ? (
-                            <div style={{
-                              background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
-                              border: '1.5px solid #a7f3d0',
-                              borderRadius: '14px',
-                              padding: '10px 12px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '4px'
-                            }}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            {/* FERIEN-FREEZE ODER SCHLANKE INLINE-SCHUTZSCHILDE */}
+                            {isTodayHoliday ? (
+                              <div style={{
+                                background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+                                border: '1px solid #a7f3d0',
+                                borderRadius: '12px',
+                                padding: '6px 10px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '6px'
+                              }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <Palmtree size={15} color="#059669" />
-                                  <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#065f46' }}>
-                                    Ferienpause aktiv
+                                  <Palmtree size={14} color="#059669" />
+                                  <span style={{ fontSize: '0.74rem', fontWeight: 900, color: '#065f46' }}>
+                                    Ferienpause: Flamme gesichert
                                   </span>
                                 </div>
                                 <span style={{
-                                  fontSize: '0.65rem',
+                                  fontSize: '0.66rem',
                                   fontWeight: 900,
                                   background: '#059669',
                                   color: '#ffffff',
@@ -5540,123 +5580,214 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                   ✨ 2× XP-Booster
                                 </span>
                               </div>
-                              <p style={{ margin: 0, fontSize: '0.70rem', color: '#047857', lineHeight: 1.35 }}>
-                                Ferienpause: Streak ist gesichert. Üben bringt heute <strong>2× XP</strong>! ✨
-                              </p>
-                            </div>
-                          ) : (
-                            <div style={{
-                              background: '#f8fafc',
-                              borderRadius: '14px',
-                              padding: '10px 12px',
-                              border: '1px solid #e2e8f0',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '6px'
-                            }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: isMusicStandMode ? '0.86rem' : '0.78rem', fontWeight: 850, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <Shield size={14} color="#7c3aed" />
-                                  Wochen-Schutzschilde:
-                                </span>
-                                <span style={{ fontSize: isMusicStandMode ? '0.86rem' : '0.78rem', fontWeight: 900, color: availableShields > 0 ? '#7c3aed' : '#b91c1c' }}>
-                                  {availableShields}/3 bereit
-                                </span>
-                              </div>
-                              <div style={{ display: 'flex', gap: '6px' }}>
-                                {[1, 2, 3].map((shieldNum) => {
-                                  const isConsumed = shieldNum <= weekShieldedCount;
-                                  const isShieldActive = shieldNum > weekShieldedCount;
-                                  const shieldedDay = weekMetrics.weekDays.find(d => d.shieldNumber === shieldNum);
-                                  const dayLabel = shieldedDay ? shieldedDay.dayName : '';
+                            ) : (
+                              <div style={{
+                                background: 'linear-gradient(135deg, #f8f7ff 0%, #f1f0fb 100%)',
+                                borderRadius: '12px',
+                                padding: '6px 10px',
+                                border: '1px solid #e0e7ff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '8px'
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <Shield size={13} color="#7c3aed" fill="#7c3aed" />
+                                  <span style={{ fontSize: '0.74rem', fontWeight: 900, color: '#4338ca' }}>
+                                    Schutzschilde:
+                                  </span>
+                                  <span style={{ fontSize: '0.74rem', fontWeight: 950, color: availableShields > 0 ? '#6d28d9' : '#b91c1c' }}>
+                                    {availableShields}/3 bereit
+                                  </span>
+                                </div>
+                                <div style={{ display: 'flex', gap: '5px' }}>
+                                  {[1, 2, 3].map((shieldNum) => {
+                                    const isConsumed = shieldNum <= weekShieldedCount;
+                                    const isShieldActive = shieldNum > weekShieldedCount;
+                                    const shieldedDay = weekMetrics.weekDays.find(d => d.shieldNumber === shieldNum);
+                                    const dayLabel = shieldedDay ? shieldedDay.dayName : '';
 
-                                  return (
-                                    <div key={`teen-shield-${shieldNum}`} style={{
-                                      flex: 1,
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      gap: '4px',
-                                      padding: '5px 6px',
-                                      borderRadius: '6px',
-                                      background: isConsumed ? '#f1f5f9' : (isShieldActive ? 'rgba(124, 58, 237, 0.08)' : 'rgba(217, 119, 6, 0.08)'),
-                                      border: isConsumed ? '1px solid #cbd5e1' : (isShieldActive ? '1px solid rgba(124, 58, 237, 0.28)' : '1px dashed rgba(217, 119, 6, 0.3)'),
-                                      color: isConsumed ? '#475569' : (isShieldActive ? '#6d28d9' : '#9a3412'),
-                                      fontSize: isMusicStandMode ? '0.78rem' : '0.72rem',
-                                      fontWeight: 800
+                                    return (
+                                      <span key={`teen-shield-${shieldNum}`} style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '3px',
+                                        padding: '2px 7px',
+                                        borderRadius: '6px',
+                                        background: isConsumed ? '#f1f5f9' : '#ffffff',
+                                        border: isConsumed ? '1px solid #cbd5e1' : '1px solid #8b5cf6',
+                                        boxShadow: isShieldActive ? '0 1px 4px rgba(124, 58, 237, 0.12)' : 'none',
+                                        fontSize: '0.66rem',
+                                        fontWeight: 900,
+                                        color: isConsumed ? '#64748b' : '#6d28d9',
+                                        whiteSpace: 'nowrap'
+                                      }}>
+                                        <Shield size={10} color={isConsumed ? '#64748b' : '#7c3aed'} fill={isConsumed ? '#cbd5e1' : '#7c3aed'} />
+                                        <span>{isConsumed ? `${dayLabel} ✓` : 'Bereit'}</span>
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* SKILL-TREE: GESTRAFFTER ENERGIEFLUSS MIT MEHR RAUM FÜR DIE STUFEN */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', position: 'relative' }}>
+                              {/* Background conduit */}
+                              <div style={{ position: 'absolute', left: '19px', top: '18px', bottom: '18px', width: '2px', background: '#e2e8f0', zIndex: 1, borderRadius: '4px' }} />
+                              {/* Glowing progression fill */}
+                              <div style={{ 
+                                position: 'absolute', 
+                                left: '19px', 
+                                top: '18px', 
+                                height: streak >= 9 ? '100%' : streak >= 4 ? '58%' : streak >= 1 ? '16%' : '0%', 
+                                width: '2px', 
+                                background: 'linear-gradient(to bottom, #f59e0b 0%, #f97316 50%, #ef4444 100%)', 
+                                zIndex: 1, 
+                                borderRadius: '4px',
+                                transition: 'height 0.6s cubic-bezier(0.4, 0, 0.2, 1)' 
+                              }} />
+
+                              {/* Stufe 1: Start-Funke */}
+                              {(() => {
+                                const isCurrentTier = isTier1Unlocked && !isTier2Unlocked;
+                                return (
+                                  <div style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '12px', 
+                                    background: isCurrentTier ? '#ffffff' : '#f8fafc', 
+                                    padding: '8px 12px', 
+                                    borderRadius: '14px', 
+                                    border: isCurrentTier ? '1.5px solid rgba(245, 158, 11, 0.45)' : '1px solid rgba(0,0,0,0.04)', 
+                                    boxShadow: isCurrentTier ? '0 3px 12px rgba(245, 158, 11, 0.14)' : 'none', 
+                                    zIndex: 2, 
+                                    opacity: isTier1Unlocked ? 1 : 0.7,
+                                    transition: 'all 0.25s ease'
+                                  }}>
+                                    <div style={{ 
+                                      width: '28px', 
+                                      height: '28px', 
+                                      borderRadius: '50%', 
+                                      background: isTier1Unlocked ? 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)' : '#e2e8f0', 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      justifyContent: 'center', 
+                                      flexShrink: 0, 
+                                      boxShadow: isTier1Unlocked ? '0 2px 6px rgba(245, 158, 11, 0.25)' : 'none'
                                     }}>
-                                      <Shield size={11} color={isConsumed ? '#64748b' : (isShieldActive ? '#7c3aed' : '#d97706')} fill={isConsumed ? '#94a3b8' : (isShieldActive ? '#7c3aed' : 'none')} />
-                                      <span>{isConsumed ? `Schild ${shieldNum} (${dayLabel})` : `Schild ${shieldNum}`}</span>
+                                      <Flame size={15} color={isTier1Unlocked ? '#d97706' : '#94a3b8'} fill={isTier1Unlocked ? '#f59e0b' : 'none'} />
                                     </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{ fontSize: isMusicStandMode ? '0.98rem' : '0.88rem', fontWeight: 950, color: isTier1Unlocked ? '#92400e' : '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                          Stufe 1: Start-Funke
+                                        </span>
+                                        <span style={{ fontSize: isMusicStandMode ? '0.80rem' : '0.74rem', fontWeight: 900, color: isTier1Unlocked ? '#b45309' : '#64748b', flexShrink: 0 }}>
+                                          1–3 Tage • {kleineMins} Min. täglich
+                                        </span>
+                                      </div>
+                                      <div style={{ fontSize: isMusicStandMode ? '0.78rem' : '0.72rem', color: isTier2Unlocked ? '#64748b' : isTier1Unlocked ? '#15803d' : '#64748b', fontWeight: 750, marginTop: '2px' }}>
+                                        {isTier2Unlocked ? '✓ Gemeistert' : isTier1Unlocked ? '✨ Aktiv: Dein Funke brennt!' : 'Bereit für deinen ersten Funken'}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
 
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', position: 'relative', flex: 1, justifyContent: 'center' }}>
-                            <div style={{ position: 'absolute', left: '17px', top: '20px', bottom: '20px', width: '2px', background: '#e2e8f0', zIndex: 1 }} />
-                            <div style={{ position: 'absolute', left: '17px', top: '20px', height: streak >= 9 ? '100%' : streak >= 4 ? '50%' : '0%', width: '2px', background: 'linear-gradient(to bottom, #f97316 0%, #ef4444 100%)', zIndex: 1, transition: 'height 0.5s ease' }} />
+                              {/* Stufe 2: Power-Flamme */}
+                              {(() => {
+                                const isCurrentTier = isTier2Unlocked && !isTier3Unlocked;
+                                return (
+                                  <div style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '12px', 
+                                    background: isCurrentTier ? '#ffffff' : '#f8fafc', 
+                                    padding: '8px 12px', 
+                                    borderRadius: '14px', 
+                                    border: isCurrentTier ? '1.5px solid rgba(249, 115, 22, 0.45)' : '1px solid rgba(0,0,0,0.04)', 
+                                    boxShadow: isCurrentTier ? '0 3px 12px rgba(249, 115, 22, 0.16)' : 'none', 
+                                    zIndex: 2, 
+                                    opacity: isTier2Unlocked ? 1 : 0.7,
+                                    transition: 'all 0.25s ease'
+                                  }}>
+                                    <div style={{ 
+                                      width: '28px', 
+                                      height: '28px', 
+                                      borderRadius: '50%', 
+                                      background: isTier2Unlocked ? 'linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%)' : '#e2e8f0', 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      justifyContent: 'center', 
+                                      flexShrink: 0, 
+                                      boxShadow: isTier2Unlocked ? '0 2px 6px rgba(249, 115, 22, 0.25)' : 'none'
+                                    }}>
+                                      <Zap size={15} color={isTier2Unlocked ? '#ea580c' : '#94a3b8'} fill={isTier2Unlocked ? '#f97316' : 'none'} />
+                                    </div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{ fontSize: isMusicStandMode ? '0.98rem' : '0.88rem', fontWeight: 950, color: isTier2Unlocked ? '#9a3412' : '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                          Stufe 2: Power-Flamme
+                                        </span>
+                                        <span style={{ fontSize: isMusicStandMode ? '0.80rem' : '0.74rem', fontWeight: 900, color: isTier2Unlocked ? '#c2410c' : '#64748b', flexShrink: 0 }}>
+                                          4–8 Tage • {mittlereMins} Min. täglich
+                                        </span>
+                                      </div>
+                                      <div style={{ fontSize: isMusicStandMode ? '0.78rem' : '0.72rem', color: isTier3Unlocked ? '#64748b' : isTier2Unlocked ? '#15803d' : '#64748b', fontWeight: 750, marginTop: '2px' }}>
+                                        {isTier3Unlocked ? '✓ Gemeistert' : isTier2Unlocked ? '⚡ Aktiv: Volle Power!' : `Noch ${Math.max(1, 4 - streak)}${Math.max(1, 4 - streak) === 1 ? ' Tag' : ' Tage'} bis Stufe 2`}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
 
-                            {/* Tier 1 */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '10px 14px', borderRadius: '14px', border: '1px solid rgba(0,0,0,0.03)', zIndex: 2, opacity: isTier1Unlocked ? 1 : 0.6 }}>
-                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isTier1Unlocked ? '#eab308' : '#cbd5e1', boxShadow: isTier1Unlocked ? '0 0 8px #eab308' : 'none', zIndex: 3 }} />
-                              <div style={{ color: isTier1Unlocked ? '#eab308' : '#64748b', display: 'flex', alignItems: 'center' }}>
-                                <Flame size={18} fill={isTier1Unlocked ? 'currentColor' : 'none'} />
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', fontWeight: 950, color: isTier1Unlocked ? '#854d0e' : '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    Stufe 1: Start-Flamme
-                                  </span>
-                                  <span style={{ fontSize: isMusicStandMode ? '0.86rem' : '0.78rem', fontWeight: 900, color: isTier1Unlocked ? '#854d0e' : '#475569', flexShrink: 0 }}>
-                                    1–3 Tage • {kleineMins}m
-                                  </span>
-                                </div>
-                                <div style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: streak > 0 ? '#15803d' : '#475569', fontWeight: 700, marginTop: '2px' }}>{streak > 0 ? '🎉 Aktiv!' : 'Bereit zum Start!'}</div>
-                              </div>
-                            </div>
-
-                            {/* Tier 2 */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '10px 14px', borderRadius: '14px', border: '1px solid rgba(0,0,0,0.03)', zIndex: 2, opacity: isTier2Unlocked ? 1 : 0.6 }}>
-                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isTier2Unlocked ? '#f97316' : '#cbd5e1', boxShadow: isTier2Unlocked ? '0 0 8px #f97316' : 'none', zIndex: 3 }} />
-                              <div style={{ color: isTier2Unlocked ? '#f97316' : '#64748b', display: 'flex', alignItems: 'center' }}>
-                                <Flame size={18} fill={isTier2Unlocked ? 'currentColor' : 'none'} />
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', fontWeight: 950, color: isTier2Unlocked ? '#9a3412' : '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    Stufe 2: Power-Flamme
-                                  </span>
-                                  <span style={{ fontSize: isMusicStandMode ? '0.86rem' : '0.78rem', fontWeight: 900, color: isTier2Unlocked ? '#9a3412' : '#475569', flexShrink: 0 }}>
-                                    4–8 Tage • {mittlereMins}m
-                                  </span>
-                                </div>
-                                <div style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: isTier2Unlocked ? '#15803d' : '#475569', fontWeight: 700, marginTop: '2px' }}>
-                                  {isTier2Unlocked ? '🎉 Aktiv!' : `Noch ${Math.max(1, 4 - streak)}${Math.max(1, 4 - streak) === 1 ? ' Tag' : ' Tage'} bis Stufe 2`}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Tier 3 */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '10px 14px', borderRadius: '14px', border: '1px solid rgba(0,0,0,0.03)', zIndex: 2, opacity: isTier3Unlocked ? 1 : 0.6 }}>
-                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isTier3Unlocked ? '#ef4444' : '#cbd5e1', boxShadow: isTier3Unlocked ? '0 0 8px #ef4444' : 'none', zIndex: 3 }} />
-                              <div style={{ color: isTier3Unlocked ? '#ef4444' : '#64748b', display: 'flex', alignItems: 'center' }}>
-                                <Flame size={18} fill={isTier3Unlocked ? 'currentColor' : 'none'} />
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', fontWeight: 950, color: isTier3Unlocked ? '#991b1b' : '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    Stufe 3: Meister-Flamme
-                                  </span>
-                                  <span style={{ fontSize: isMusicStandMode ? '0.86rem' : '0.78rem', fontWeight: 900, color: isTier3Unlocked ? '#991b1b' : '#475569', flexShrink: 0 }}>
-                                    9+ Tage • {heldenMins}m
-                                  </span>
-                                </div>
-                                <div style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: isTier3Unlocked ? '#ea580c' : '#475569', fontWeight: 700, marginTop: '2px' }}>
-                                  {isTier3Unlocked ? '🔥 Meister-Flamme aktiv!' : `Noch ${Math.max(1, 9 - streak)}${Math.max(1, 9 - streak) === 1 ? ' Tag' : ' Tage'} bis Meister-Flamme`}
-                                </div>
-                              </div>
+                              {/* Stufe 3: Meister-Feuer */}
+                              {(() => {
+                                const isCurrentTier = isTier3Unlocked;
+                                return (
+                                  <div style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '12px', 
+                                    background: isCurrentTier ? '#ffffff' : '#f8fafc', 
+                                    padding: '8px 12px', 
+                                    borderRadius: '14px', 
+                                    border: isCurrentTier ? '1.5px solid rgba(239, 68, 68, 0.45)' : '1px solid rgba(0,0,0,0.04)', 
+                                    boxShadow: isCurrentTier ? '0 3px 12px rgba(239, 68, 68, 0.18)' : 'none', 
+                                    zIndex: 2, 
+                                    opacity: isTier3Unlocked ? 1 : 0.7,
+                                    transition: 'all 0.25s ease'
+                                  }}>
+                                    <div style={{ 
+                                      width: '28px', 
+                                      height: '28px', 
+                                      borderRadius: '50%', 
+                                      background: isTier3Unlocked ? 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)' : '#e2e8f0', 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      justifyContent: 'center', 
+                                      flexShrink: 0, 
+                                      boxShadow: isTier3Unlocked ? '0 2px 6px rgba(239, 68, 68, 0.25)' : 'none'
+                                    }}>
+                                      <Crown size={15} color={isTier3Unlocked ? '#dc2626' : '#94a3b8'} fill={isTier3Unlocked ? '#ef4444' : 'none'} />
+                                    </div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{ fontSize: isMusicStandMode ? '0.98rem' : '0.88rem', fontWeight: 950, color: isTier3Unlocked ? '#991b1b' : '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                          Stufe 3: Meister-Feuer
+                                        </span>
+                                        <span style={{ fontSize: isMusicStandMode ? '0.80rem' : '0.74rem', fontWeight: 900, color: isTier3Unlocked ? '#b91c1c' : '#64748b', flexShrink: 0 }}>
+                                          9+ Tage • {heldenMins} Min. täglich
+                                        </span>
+                                      </div>
+                                      <div style={{ fontSize: isMusicStandMode ? '0.78rem' : '0.72rem', color: isTier3Unlocked ? '#dc2626' : '#64748b', fontWeight: 750, marginTop: '2px' }}>
+                                        {isTier3Unlocked ? '👑 Meister-Level aktiv!' : `Noch ${Math.max(1, 9 - streak)}${Math.max(1, 9 - streak) === 1 ? ' Tag' : ' Tage'} bis Meister-Level`}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
                             </div>
                           </div>
                         </div>
@@ -7248,7 +7379,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       );
                     })()}
 
-                    {/* Spalte 3: Flammen-Pfad */}
+                    {/* Spalte 3: Übe-Kontinuität & Wochen-Puffer (Pro Mode) */}
                     {flamesActive && (() => {
                       const streak = avatar?.streak_flame || 0;
                       const levelKey = `level${effectiveLevel}` as 'level1' | 'level2' | 'level3';
@@ -7260,11 +7391,18 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       const isTier1Unlocked = streak >= 1;
                       const isTier2Unlocked = streak >= 4;
                       const isTier3Unlocked = streak >= 9;
+                      const currentTier = isTier3Unlocked ? 3 : isTier2Unlocked ? 2 : isTier1Unlocked ? 1 : 0;
 
                       const weekMetrics = getDeterministicWeekMetrics();
-                      const currentWeek = getISOWeek(getSimulatedNow());
                       const availableShields = weekMetrics.availableShields;
                       const weekShieldedCount = weekMetrics.weekShieldedCount;
+
+                      const instName = studentInstrumentName || 'an deinem Instrument';
+                      const instPrep = ['Gitarre', 'Blockflöte', 'Querflöte', 'Violine', 'Geige', 'Bratsche', 'Posaune', 'Trompete', 'Harfe', 'Ukulele'].some(w => instName.toLowerCase().includes(w.toLowerCase()))
+                        ? `an der ${instName}`
+                        : ['Klavier', 'Schlagzeug', 'Cello', 'Saxophon', 'Akkordeon', 'Keyboard', 'Horn', 'Fagott'].some(w => instName.toLowerCase().includes(w.toLowerCase()))
+                        ? `am ${instName}`
+                        : `an deinem Instrument`;
 
                       return (
                         <div style={{ 
@@ -7275,181 +7413,307 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           border: '1px solid rgba(0, 0, 0, 0.04)',
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: '14px'
+                          justifyContent: 'space-between',
+                          gap: '16px'
                         }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ fontSize: '0.8rem', fontWeight: 950, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                🔥 Flammen-Pfad
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                            {/* Header: Title + Rules + Minimalist Badge */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ fontSize: isMusicStandMode ? '0.96rem' : '0.84rem', fontWeight: 950, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                  ÜBE-KONTINUITÄT
+                                </span>
+                                <button 
+                                  onClick={() => setShowRulesModal(true)}
+                                  style={{ background: 'none', border: 'none', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#94a3b8', transition: 'color 0.15s' }}
+                                  onMouseOver={e => e.currentTarget.style.color = '#64748b'}
+                                  onMouseOut={e => e.currentTarget.style.color = '#94a3b8'}
+                                  title="Regeln & Meilensteine anzeigen"
+                                  aria-label="Regeln & Meilensteine anzeigen"
+                                >
+                                  <HelpCircle size={15} />
+                                </button>
+                              </div>
+                              <span style={{ 
+                                background: streak === 0 ? '#f1f5f9' : '#ecfdf5', 
+                                color: streak === 0 ? '#475569' : '#047857', 
+                                fontSize: '0.74rem', 
+                                fontWeight: 950, 
+                                padding: '4px 12px', 
+                                borderRadius: '100px',
+                                border: streak === 0 ? '1px solid #e2e8f0' : '1px solid #a7f3d0',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}>
+                                {streak === 0 ? 'Startklar' : `${streak} ${streak === 1 ? 'Tag' : 'Tage'} Serie • Stufe ${currentTier}`}
                               </span>
-                              <button 
-                                onClick={() => setShowRulesModal(true)}
-                                style={{ background: 'none', border: 'none', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#94a3b8' }}
-                                title="Spielregeln anzeigen"
-                              >
-                                <HelpCircle size={14} />
-                              </button>
                             </div>
-                            <span style={{ 
-                              background: streak === 0 ? 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)' : 'linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%)', 
-                              color: streak === 0 ? '#991b1b' : '#ea580c', 
-                              fontSize: '0.75rem', 
-                              fontWeight: 950, 
-                              padding: '4px 10px', 
-                              borderRadius: '100px',
-                              border: streak === 0 ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(249, 115, 22, 0.2)'
-                            }}>
-                              {streak} {streak === 1 ? 'Tag' : 'Tage'} 🔥
-                            </span>
+
+                            {/* FERIEN-FREEZE ODER WOCHEN-PUFFER */}
+                            {isTodayHoliday ? (
+                              <div style={{
+                                background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+                                border: '1.5px solid #a7f3d0',
+                                borderRadius: '16px',
+                                padding: '12px 14px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '5px'
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <Palmtree size={16} color="#059669" />
+                                    <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#065f46' }}>
+                                      Ferienpause aktiv
+                                    </span>
+                                  </div>
+                                  <span style={{
+                                    fontSize: '0.68rem',
+                                    fontWeight: 900,
+                                    background: '#059669',
+                                    color: '#ffffff',
+                                    padding: '2px 9px',
+                                    borderRadius: '100px'
+                                  }}>
+                                    ✨ 2× XP-Booster
+                                  </span>
+                                </div>
+                                <p style={{ margin: 0, fontSize: '0.72rem', color: '#047857', lineHeight: 1.35, fontWeight: 600 }}>
+                                  Ferienzeit: Deine Serie ist gesichert. Freiwilliges Üben bringt <strong>2× XP</strong>.
+                                </p>
+                              </div>
+                            ) : (
+                              <div style={{
+                                background: '#f8fafc',
+                                borderRadius: '16px',
+                                padding: '12px 14px',
+                                border: '1px solid #e2e8f0',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px'
+                              }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', fontWeight: 900, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <Shield size={14} color="#059669" fill="#059669" />
+                                    Wochen-Puffer (Ruhetage):
+                                  </span>
+                                  <span style={{ fontSize: isMusicStandMode ? '0.86rem' : '0.78rem', fontWeight: 950, color: availableShields > 0 ? '#059669' : '#b91c1c' }}>
+                                    {availableShields}/3 Tage verfügbar
+                                  </span>
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  {[1, 2, 3].map((shieldNum) => {
+                                    const isConsumed = shieldNum <= weekShieldedCount;
+                                    const isShieldActive = shieldNum > weekShieldedCount;
+                                    const shieldedDay = weekMetrics.weekDays.find(d => d.shieldNumber === shieldNum);
+                                    const dayLabel = shieldedDay ? shieldedDay.dayName : '';
+
+                                    return (
+                                      <div key={`pro-shield-${shieldNum}`} style={{
+                                        flex: 1,
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '3px',
+                                        padding: '7px 4px',
+                                        borderRadius: '10px',
+                                        background: isConsumed ? '#f1f5f9' : '#ffffff',
+                                        border: isConsumed ? '1px solid #cbd5e1' : '1.5px solid #10b981',
+                                        boxShadow: isShieldActive ? '0 1px 4px rgba(16, 185, 129, 0.12)' : 'none',
+                                        transition: 'all 0.2s ease'
+                                      }}>
+                                        <Shield size={14} color={isConsumed ? '#64748b' : '#059669'} fill={isConsumed ? '#cbd5e1' : '#10b981'} />
+                                        <span style={{
+                                          fontSize: isMusicStandMode ? '0.74rem' : '0.68rem',
+                                          fontWeight: 900,
+                                          color: isConsumed ? '#475569' : '#047857',
+                                          letterSpacing: '0.02em',
+                                          whiteSpace: 'nowrap'
+                                        }}>
+                                          {isConsumed ? `${dayLabel} ✓` : 'Puffer'}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                <p style={{ margin: 0, fontSize: '0.68rem', color: '#64748b', lineHeight: 1.35, fontWeight: 650 }}>
+                                  Musikergesundheit: Bis zu 3 Ruhetage pro Woche sichern deine Serie automatisch.
+                                </p>
+                              </div>
+                            )}
+
+                            {/* MEILENSTEINE: 3 PLATEAUS */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', position: 'relative' }}>
+                              <div style={{ position: 'absolute', left: '19px', top: '24px', bottom: '24px', width: '2px', background: '#e2e8f0', zIndex: 1 }} />
+                              <div style={{ 
+                                position: 'absolute', 
+                                left: '19px', 
+                                top: '24px', 
+                                height: streak >= 9 ? '100%' : streak >= 4 ? '58%' : streak >= 1 ? '16%' : '0%', 
+                                width: '2px', 
+                                background: 'linear-gradient(to bottom, #10b981 0%, #059669 100%)', 
+                                zIndex: 1, 
+                                transition: 'height 0.6s cubic-bezier(0.4, 0, 0.2, 1)' 
+                              }} />
+
+                              {/* Tier 1 */}
+                              {(() => {
+                                const isCurrent = isTier1Unlocked && !isTier2Unlocked;
+                                return (
+                                  <div style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '12px', 
+                                    background: isCurrent ? '#ffffff' : '#f8fafc', 
+                                    padding: '10px 14px', 
+                                    borderRadius: '16px', 
+                                    border: isCurrent ? '1.5px solid #10b981' : '1px solid rgba(0,0,0,0.04)', 
+                                    boxShadow: isCurrent ? '0 4px 14px rgba(16, 185, 129, 0.10)' : 'none',
+                                    zIndex: 2, 
+                                    opacity: isTier1Unlocked ? 1 : 0.65 
+                                  }}>
+                                    <div style={{ 
+                                      width: '28px', 
+                                      height: '28px', 
+                                      borderRadius: '50%', 
+                                      background: isTier1Unlocked ? '#ecfdf5' : '#e2e8f0', 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      justifyContent: 'center',
+                                      flexShrink: 0 
+                                    }}>
+                                      <Flame size={16} color={isTier1Unlocked ? '#059669' : '#94a3b8'} fill={isTier1Unlocked ? '#10b981' : 'none'} />
+                                    </div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{ fontSize: isMusicStandMode ? '1.02rem' : '0.90rem', fontWeight: 950, color: isTier1Unlocked ? '#065f46' : '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                          Stufe 1: Basis-Fokus
+                                        </span>
+                                        <span style={{ fontSize: isMusicStandMode ? '0.84rem' : '0.76rem', fontWeight: 900, color: isTier1Unlocked ? '#047857' : '#64748b', flexShrink: 0 }}>
+                                          1–3 Tage • {kleineMins} Min. täglich
+                                        </span>
+                                      </div>
+                                      <div style={{ fontSize: isMusicStandMode ? '0.84rem' : '0.76rem', color: isTier2Unlocked ? '#64748b' : isTier1Unlocked ? '#15803d' : '#64748b', fontWeight: 750, marginTop: '2px' }}>
+                                        {isTier2Unlocked ? '✓ Erreicht' : isTier1Unlocked ? '● Aktiv: Kontinuität gesichert' : 'Bereit zum Start'}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+
+                              {/* Tier 2 */}
+                              {(() => {
+                                const isCurrent = isTier2Unlocked && !isTier3Unlocked;
+                                return (
+                                  <div style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '12px', 
+                                    background: isCurrent ? '#ffffff' : '#f8fafc', 
+                                    padding: '10px 14px', 
+                                    borderRadius: '16px', 
+                                    border: isCurrent ? '1.5px solid #10b981' : '1px solid rgba(0,0,0,0.04)', 
+                                    boxShadow: isCurrent ? '0 4px 14px rgba(16, 185, 129, 0.10)' : 'none',
+                                    zIndex: 2, 
+                                    opacity: isTier2Unlocked ? 1 : 0.65 
+                                  }}>
+                                    <div style={{ 
+                                      width: '28px', 
+                                      height: '28px', 
+                                      borderRadius: '50%', 
+                                      background: isTier2Unlocked ? '#ecfdf5' : '#e2e8f0', 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      justifyContent: 'center',
+                                      flexShrink: 0 
+                                    }}>
+                                      <Zap size={16} color={isTier2Unlocked ? '#059669' : '#94a3b8'} fill={isTier2Unlocked ? '#10b981' : 'none'} />
+                                    </div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{ fontSize: isMusicStandMode ? '1.02rem' : '0.90rem', fontWeight: 950, color: isTier2Unlocked ? '#065f46' : '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                          Stufe 2: Flow-Fokus
+                                        </span>
+                                        <span style={{ fontSize: isMusicStandMode ? '0.84rem' : '0.76rem', fontWeight: 900, color: isTier2Unlocked ? '#047857' : '#64748b', flexShrink: 0 }}>
+                                          4–8 Tage • {mittlereMins} Min. täglich
+                                        </span>
+                                      </div>
+                                      <div style={{ fontSize: isMusicStandMode ? '0.84rem' : '0.76rem', color: isTier3Unlocked ? '#64748b' : isTier2Unlocked ? '#15803d' : '#64748b', fontWeight: 750, marginTop: '2px' }}>
+                                        {isTier3Unlocked ? '✓ Erreicht' : isTier2Unlocked ? '● Aktiv: Flow-Phase' : `Noch ${Math.max(1, 4 - streak)}${Math.max(1, 4 - streak) === 1 ? ' Tag' : ' Tage'} bis Stufe 2`}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+
+                              {/* Tier 3 */}
+                              {(() => {
+                                const isCurrent = isTier3Unlocked;
+                                return (
+                                  <div style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '12px', 
+                                    background: isCurrent ? '#ffffff' : '#f8fafc', 
+                                    padding: '10px 14px', 
+                                    borderRadius: '16px', 
+                                    border: isCurrent ? '1.5px solid #10b981' : '1px solid rgba(0,0,0,0.04)', 
+                                    boxShadow: isCurrent ? '0 4px 14px rgba(16, 185, 129, 0.10)' : 'none',
+                                    zIndex: 2, 
+                                    opacity: isTier3Unlocked ? 1 : 0.65 
+                                  }}>
+                                    <div style={{ 
+                                      width: '28px', 
+                                      height: '28px', 
+                                      borderRadius: '50%', 
+                                      background: isTier3Unlocked ? '#ecfdf5' : '#e2e8f0', 
+                                      display: 'flex', 
+                                      alignItems: 'center', 
+                                      justifyContent: 'center',
+                                      flexShrink: 0 
+                                    }}>
+                                      <Crown size={16} color={isTier3Unlocked ? '#059669' : '#94a3b8'} fill={isTier3Unlocked ? '#10b981' : 'none'} />
+                                    </div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{ fontSize: isMusicStandMode ? '1.02rem' : '0.90rem', fontWeight: 950, color: isTier3Unlocked ? '#065f46' : '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                          Stufe 3: Meister-Fokus
+                                        </span>
+                                        <span style={{ fontSize: isMusicStandMode ? '0.84rem' : '0.76rem', fontWeight: 900, color: isTier3Unlocked ? '#047857' : '#64748b', flexShrink: 0 }}>
+                                          9+ Tage • {heldenMins} Min. täglich
+                                        </span>
+                                      </div>
+                                      <div style={{ fontSize: isMusicStandMode ? '0.84rem' : '0.76rem', color: isTier3Unlocked ? '#059669' : '#64748b', fontWeight: 750, marginTop: '2px' }}>
+                                        {isTier3Unlocked ? '★ Meister-Fokus aktiv' : `Noch ${Math.max(1, 9 - streak)}${Math.max(1, 9 - streak) === 1 ? ' Tag' : ' Tage'} bis Meister-Fokus`}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+                            </div>
                           </div>
 
-                          {/* FERIEN-FREEZE ODER 3 SCHUTZSCHILDE */}
-                          {isTodayHoliday ? (
-                            <div style={{
-                              background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
-                              border: '1.5px solid #a7f3d0',
-                              borderRadius: '14px',
-                              padding: '10px 12px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '4px'
-                            }}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <Palmtree size={15} color="#059669" />
-                                  <span style={{ fontSize: '0.75rem', fontWeight: 900, color: '#065f46' }}>
-                                    Ferienpause aktiv
-                                  </span>
-                                </div>
-                                <span style={{
-                                  fontSize: '0.65rem',
-                                  fontWeight: 900,
-                                  background: '#059669',
-                                  color: '#ffffff',
-                                  padding: '2px 8px',
-                                  borderRadius: '100px'
-                                }}>
-                                  ✨ 2× XP-Booster
-                                </span>
-                              </div>
-                              <p style={{ margin: 0, fontSize: '0.70rem', color: '#047857', lineHeight: 1.35 }}>
-                                Ferienpause: Streak ist gesichert. Üben bringt heute <strong>2× XP</strong>! ✨
-                              </p>
-                            </div>
-                          ) : (
-                            <div style={{
-                              background: '#f8fafc',
-                              borderRadius: '14px',
-                              padding: '10px 12px',
-                              border: '1px solid #e2e8f0',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '6px'
-                            }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: isMusicStandMode ? '0.86rem' : '0.78rem', fontWeight: 850, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <Shield size={14} color="#7c3aed" />
-                                  Wochen-Schutzschilde:
-                                </span>
-                                <span style={{ fontSize: isMusicStandMode ? '0.86rem' : '0.78rem', fontWeight: 900, color: availableShields > 0 ? '#7c3aed' : '#b91c1c' }}>
-                                  {availableShields}/3 bereit
-                                </span>
-                              </div>
-                              <div style={{ display: 'flex', gap: '6px' }}>
-                                {[1, 2, 3].map((shieldNum) => {
-                                  const isConsumed = shieldNum <= weekShieldedCount;
-                                  const isShieldActive = shieldNum > weekShieldedCount;
-                                  const shieldedDay = weekMetrics.weekDays.find(d => d.shieldNumber === shieldNum);
-                                  const dayLabel = shieldedDay ? shieldedDay.dayName : '';
-
-                                  return (
-                                    <div key={`pro-shield-${shieldNum}`} style={{
-                                      flex: 1,
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      gap: '4px',
-                                      padding: '5px 6px',
-                                      borderRadius: '6px',
-                                      background: isConsumed ? '#f1f5f9' : (isShieldActive ? 'rgba(124, 58, 237, 0.08)' : 'rgba(217, 119, 6, 0.08)'),
-                                      border: isConsumed ? '1px solid #cbd5e1' : (isShieldActive ? '1px solid rgba(124, 58, 237, 0.28)' : '1px dashed rgba(217, 119, 6, 0.3)'),
-                                      color: isConsumed ? '#475569' : (isShieldActive ? '#6d28d9' : '#9a3412'),
-                                      fontSize: isMusicStandMode ? '0.78rem' : '0.72rem',
-                                      fontWeight: 800
-                                    }}>
-                                      <Shield size={11} color={isConsumed ? '#64748b' : (isShieldActive ? '#7c3aed' : '#d97706')} fill={isConsumed ? '#94a3b8' : (isShieldActive ? '#7c3aed' : 'none')} />
-                                      <span>{isConsumed ? `Schild ${shieldNum} (${dayLabel})` : `Schild ${shieldNum}`}</span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', position: 'relative', flex: 1, justifyContent: 'center' }}>
-                            <div style={{ position: 'absolute', left: '17px', top: '20px', bottom: '20px', width: '2px', background: '#e2e8f0', zIndex: 1 }} />
-                            <div style={{ position: 'absolute', left: '17px', top: '20px', height: streak >= 9 ? '100%' : streak >= 4 ? '50%' : '0%', width: '2px', background: 'linear-gradient(to bottom, #f97316 0%, #ef4444 100%)', zIndex: 1, transition: 'height 0.5s ease' }} />
-
-                            {/* Tier 1 */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '10px 14px', borderRadius: '14px', border: '1px solid rgba(0,0,0,0.03)', zIndex: 2, opacity: isTier1Unlocked ? 1 : 0.6 }}>
-                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isTier1Unlocked ? '#eab308' : '#cbd5e1', boxShadow: isTier1Unlocked ? '0 0 8px #eab308' : 'none', zIndex: 3 }} />
-                              <div style={{ color: isTier1Unlocked ? '#eab308' : '#64748b', display: 'flex', alignItems: 'center' }}>
-                                <Flame size={18} fill={isTier1Unlocked ? 'currentColor' : 'none'} />
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', fontWeight: 950, color: isTier1Unlocked ? '#854d0e' : '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    Stufe 1: Basis-Fokus
-                                  </span>
-                                  <span style={{ fontSize: isMusicStandMode ? '0.86rem' : '0.78rem', fontWeight: 900, color: isTier1Unlocked ? '#854d0e' : '#475569', flexShrink: 0 }}>
-                                    1–3 Tage • {kleineMins}m
-                                  </span>
-                                </div>
-                                <div style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: streak > 0 ? '#15803d' : '#475569', fontWeight: 700, marginTop: '2px' }}>{streak > 0 ? '● Aktiv' : 'Bereit zum Start'}</div>
-                              </div>
-                            </div>
-
-                            {/* Tier 2 */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '10px 14px', borderRadius: '14px', border: '1px solid rgba(0,0,0,0.03)', zIndex: 2, opacity: isTier2Unlocked ? 1 : 0.6 }}>
-                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isTier2Unlocked ? '#f97316' : '#cbd5e1', boxShadow: isTier2Unlocked ? '0 0 8px #f97316' : 'none', zIndex: 3 }} />
-                              <div style={{ color: isTier2Unlocked ? '#f97316' : '#64748b', display: 'flex', alignItems: 'center' }}>
-                                <Flame size={18} fill={isTier2Unlocked ? 'currentColor' : 'none'} />
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', fontWeight: 950, color: isTier2Unlocked ? '#9a3412' : '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    Stufe 2: Flow-Fokus
-                                  </span>
-                                  <span style={{ fontSize: isMusicStandMode ? '0.86rem' : '0.78rem', fontWeight: 900, color: isTier2Unlocked ? '#9a3412' : '#475569', flexShrink: 0 }}>
-                                    4–8 Tage • {mittlereMins}m
-                                  </span>
-                                </div>
-                                <div style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: isTier2Unlocked ? '#15803d' : '#475569', fontWeight: 700, marginTop: '2px' }}>
-                                  {isTier2Unlocked ? '● Aktiv' : `Noch ${Math.max(1, 4 - streak)}${Math.max(1, 4 - streak) === 1 ? ' Tag' : ' Tage'} bis Stufe 2`}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Tier 3 */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '10px 14px', borderRadius: '14px', border: '1px solid rgba(0,0,0,0.03)', zIndex: 2, opacity: isTier3Unlocked ? 1 : 0.6 }}>
-                              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isTier3Unlocked ? '#ef4444' : '#cbd5e1', boxShadow: isTier3Unlocked ? '0 0 8px #ef4444' : 'none', zIndex: 3 }} />
-                              <div style={{ color: isTier3Unlocked ? '#ef4444' : '#64748b', display: 'flex', alignItems: 'center' }}>
-                                <Flame size={18} fill={isTier3Unlocked ? 'currentColor' : 'none'} />
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', fontWeight: 950, color: isTier3Unlocked ? '#991b1b' : '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    Stufe 3: Meister-Fokus
-                                  </span>
-                                  <span style={{ fontSize: isMusicStandMode ? '0.86rem' : '0.78rem', fontWeight: 900, color: isTier3Unlocked ? '#991b1b' : '#475569', flexShrink: 0 }}>
-                                    9+ Tage • {heldenMins}m
-                                  </span>
-                                </div>
-                                <div style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: isTier3Unlocked ? '#ea580c' : '#475569', fontWeight: 700, marginTop: '2px' }}>
-                                  {isTier3Unlocked ? '★ Meister-Fokus aktiv' : `Noch ${Math.max(1, 9 - streak)}${Math.max(1, 9 - streak) === 1 ? ' Tag' : ' Tage'} bis Meister-Fokus`}
-                                </div>
-                              </div>
-                            </div>
+                          {/* Action-Footer: Höhenausrichtung für Pro View */}
+                          <div style={{
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '14px',
+                            padding: '12px 14px',
+                            minHeight: '44px',
+                            boxSizing: 'border-box',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                            color: '#334155',
+                            fontSize: isMusicStandMode ? '0.88rem' : '0.80rem',
+                            fontWeight: 800,
+                            textAlign: 'center'
+                          }}>
+                            <Sparkles size={14} color="#10b981" style={{ flexShrink: 0 }} />
+                            <span>Heute 1 Fokus-Session {instPrep} sichert deine Kontinuität.</span>
                           </div>
                         </div>
                       );

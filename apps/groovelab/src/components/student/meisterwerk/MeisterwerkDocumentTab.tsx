@@ -856,11 +856,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
             justifyContent: 'flex-start',
             gap: '16px',
             background: useNotebookLayout ? '#faf8f2' : '#ffffff',
-            borderRadius: '0',
-            boxShadow: 'none',
             borderRight: useNotebookLayout ? '1px dashed #e5e0d4' : '1px solid #e8e8ed',
             position: 'relative',
-            padding: isMobileView ? '8px 4px calc(140px + env(safe-area-inset-bottom, 20px)) 4px' : '0px',
+            padding: isMobileView ? '8px 4px var(--mobile-scroll-clearance-bottom, calc(96px + env(safe-area-inset-bottom, 20px))) 4px' : '0px',
             boxSizing: 'border-box'
           }}>
             
@@ -3981,7 +3979,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
             height: isMobileView ? 'auto' : '100%',
             minHeight: '0',
             maxHeight: isMobileView ? 'none' : '100%',
-            padding: useNotebookLayout ? (isMobileView ? '8px 4px calc(140px + env(safe-area-inset-bottom, 20px)) 4px' : '24px 24px 24px 60px') : (isMobileView ? '8px 4px calc(140px + env(safe-area-inset-bottom, 20px)) 4px' : '24px'),
+            padding: useNotebookLayout ? (isMobileView ? '8px 4px var(--mobile-scroll-clearance-bottom, calc(96px + env(safe-area-inset-bottom, 20px))) 4px' : '24px 24px 24px 60px') : (isMobileView ? '8px 4px var(--mobile-scroll-clearance-bottom, calc(96px + env(safe-area-inset-bottom, 20px))) 4px' : '24px'),
             overflowY: isMobileView ? 'visible' : 'auto',
             display: isMobileView ? (mobileProtokollTab === 'homework' ? 'flex' : 'none') : 'flex',
             flexDirection: 'column',
@@ -6979,20 +6977,27 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             )}
 
                             {/* 3. Schülervorschau-Bühne (Master Stage Box: Der gerahmte Wochen-Fahrplan) */}
-                            <div style={{
-                              flex: 1,
-                              minHeight: !hasActiveItems ? (isMobileView ? '200px' : '260px') : (isMobileView ? '120px' : '160px'),
-                              background: !hasActiveItems ? 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)' : 'linear-gradient(180deg, #fcfdfe 0%, #f8fafc 100%)',
-                              border: !hasActiveItems ? '1px solid #e2e8f0' : '1px solid #f1f5f9',
-                              borderRadius: !hasActiveItems ? (isMobileView ? '14px' : '18px') : (isMobileView ? '14px' : '18px'),
-                              padding: !hasActiveItems ? (isMobileView ? '24px 14px' : '32px 24px') : (isMobileView ? '14px 12px' : '18px 20px'),
-                              display: 'flex',
-                              flexDirection: 'column',
-                              justifyContent: !hasActiveItems ? 'center' : 'flex-start',
-                              alignItems: !hasActiveItems ? 'center' : 'stretch',
-                              gap: isMobileView ? '12px' : '16px',
-                              boxShadow: !hasActiveItems ? '0 1px 3px rgba(0, 0, 0, 0.02)' : 'inset 0 1px 3px rgba(0, 0, 0, 0.02)'
-                            }}>
+                            <div 
+                              className="custom-scrollbar"
+                              style={{
+                                flex: 1,
+                                minHeight: !hasActiveItems ? (isMobileView ? '200px' : '260px') : (isMobileView ? '120px' : '160px'),
+                                maxHeight: isMobileView ? 'none' : 'calc(100vh - 280px)',
+                                overflowY: 'auto',
+                                overflowX: 'hidden',
+                                WebkitOverflowScrolling: 'touch',
+                                background: !hasActiveItems ? 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)' : 'linear-gradient(180deg, #fcfdfe 0%, #f8fafc 100%)',
+                                border: !hasActiveItems ? '1px solid #e2e8f0' : '1px solid #f1f5f9',
+                                borderRadius: !hasActiveItems ? (isMobileView ? '14px' : '18px') : (isMobileView ? '14px' : '18px'),
+                                padding: !hasActiveItems ? (isMobileView ? '24px 14px' : '32px 24px') : (isMobileView ? '14px 12px' : '18px 20px'),
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: !hasActiveItems ? 'center' : 'flex-start',
+                                alignItems: !hasActiveItems ? 'center' : 'stretch',
+                                gap: isMobileView ? '12px' : '16px',
+                                boxShadow: !hasActiveItems ? '0 1px 3px rgba(0, 0, 0, 0.02)' : 'inset 0 1px 3px rgba(0, 0, 0, 0.02)'
+                              }}
+                            >
                               {!hasActiveItems ? (
                                 <div style={{
                                   display: 'flex',
@@ -8072,7 +8077,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         isFutureWeek={isFutureWeek}
                                         isTeacher={!readOnly}
                                         activeTopicContext={topicName}
-                                        defaultExpanded={readOnly}
+                                        defaultExpanded={false}
                                         isCarriedOver={isAudioCarriedOver}
                                         hideCarriedOverBadge={true}
                                       />

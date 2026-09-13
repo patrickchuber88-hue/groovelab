@@ -465,12 +465,155 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
       doc.setTextColor(100, 116, 139);
       doc.text('Gesetzliches Widerrufsrecht (§ 312g i. V. m. § 355 BGB / Art. 246a EGBGB): 14 Tage ab Vertragsschluss, im 1. Schnuppermonat jederzeit kostenfrei widerrufbar.', 22, 254);
 
-      // Legal note
+      // Legal note & Page 1 footer
       doc.setFontSize(7.5);
       doc.setTextColor(148, 163, 184);
       doc.text('Campus-Groovelab • Reines Cloud- & Infrastruktur-Hosting statt teurer Software-Lizenzen. (UWG / GoBD konform).', 22, 260);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.setTextColor(100, 116, 139);
+      doc.text('Seite 1 von 2 (Zahlungsanweisung) • Gesetzliche Vertragsbestätigung gem. § 312f Abs. 2 BGB siehe Seite 2', 22, 266);
 
-      doc.save(`Campus-Groovelab_Zahlungsanweisung_${referenceCode}.pdf`);
+      // ==============================================================================
+      // SEITE 2: Gesetzliche Vertragsbestätigung auf dauerhaftem Datenträger (§ 312f Abs. 2 BGB)
+      // ==============================================================================
+      doc.addPage();
+      
+      // Page 2 Background
+      doc.setFillColor(248, 250, 252);
+      doc.rect(0, 0, 210, 297, 'F');
+
+      // Top Banner Page 2
+      doc.setFillColor(15, 23, 42); // Dark Slate 900
+      doc.roundedRect(15, 12, 180, 24, 4, 4, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Campus-Groovelab • Gesetzliche Vertragsbestätigung', 22, 23);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(226, 232, 240);
+      doc.text('Bestätigung eines Verbrauchervertrags auf dauerhaftem Datenträger gem. § 312f Abs. 2 BGB / Art. 246a EGBGB', 22, 30);
+
+      // Main Content Box Page 2
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(15, 40, 180, 242, 4, 4, 'F');
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(15, 40, 180, 242, 4, 4, 'S');
+
+      let p2Y = 48;
+
+      // 1. Vertragsdaten-Box
+      doc.setFillColor(241, 245, 249);
+      doc.roundedRect(20, p2Y, 170, 32, 3, 3, 'F');
+      
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(71, 85, 105);
+      doc.text('VERTRAGSPARTNER & KERNLEISTUNG', 25, p2Y + 6);
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(15, 23, 42);
+      doc.text(`Anbieter: Patrick Huber – Softwareentwicklung & Cloud-Dienstleistungen, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden`, 25, p2Y + 11);
+      doc.text(`Kunde: Erziehungsberechtigte / gesetzl. Vertreter für ${studentDisplayName} • Musikschule: ${schoolData?.name || 'Musikschule'}`, 25, p2Y + 16);
+      doc.text(`Vertragsgegenstand: Bereitstellung des digitalen Campus-Zugangs (Hausaufgabenheft, Übe-Timer, Stundenplansync)`, 25, p2Y + 21);
+      doc.text(`Laufzeit & Entgelt: ${periodDescription} (${remainingMonths} Monate) • Gesamtpreis: ${totalAmountStr} ${currencySuffix} (inkl. 1 Probemonat kostenfrei)`, 25, p2Y + 26);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(22, 101, 52);
+      doc.text(`Keine automatische Verlängerung / Kein Abo: Der Vertrag endet mit Ablauf des Schuljahres automatisch am 31.07.`, 25, p2Y + 30);
+
+      p2Y += 38;
+
+      // 2. Gesetzliche Widerrufsbelehrung
+      doc.setFillColor(239, 246, 255); // Blue 50
+      doc.roundedRect(20, p2Y, 170, 72, 3, 3, 'F');
+      doc.setDrawColor(191, 219, 254); // Blue 200
+      doc.roundedRect(20, p2Y, 170, 72, 3, 3, 'S');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(30, 64, 175);
+      doc.text('WIDERRUFSBELEHRUNG FÜR VERBRAUCHER (B2C)', 25, p2Y + 6);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(15, 23, 42);
+      doc.text('Widerrufsrecht:', 25, p2Y + 12);
+      doc.setFont('helvetica', 'normal');
+      const wLines1 = doc.splitTextToSize('Sie haben das Recht, binnen vierzehn Tagen ohne Angabe von Gründen diesen Vertrag zu widerrufen. Die Widerrufsfrist beträgt vierzehn Tage ab dem Tag des Vertragsschlusses (Aktivierung).', 160);
+      doc.text(wLines1, 25, p2Y + 16);
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('Ausübung des Widerrufs:', 25, p2Y + 24);
+      doc.setFont('helvetica', 'normal');
+      const wLines2 = doc.splitTextToSize('Um Ihr Widerrufsrecht auszuüben, müssen Sie uns (Patrick Huber – Softwareentwicklung & Cloud-Dienstleistungen, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden, E-Mail: kontakt@campus-groovelab.de) mittels einer eindeutigen Erklärung (z. B. ein mit der Post versandter Brief oder E-Mail) über Ihren Entschluss, diesen Vertrag zu widerrufen, informieren. Sie können dafür das untenstehende Muster-Widerrufsformular verwenden, das jedoch nicht vorgeschrieben ist.', 160);
+      doc.text(wLines2, 25, p2Y + 28);
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('Folgen des Widerrufs & Kostenfreier Probemonat:', 25, p2Y + 44);
+      doc.setFont('helvetica', 'normal');
+      const wLines3 = doc.splitTextToSize('Wenn Sie diesen Vertrag widerrufen, haben wir Ihnen alle Zahlungen, die wir von Ihnen erhalten haben, unverzüglich und spätestens binnen vierzehn Tagen ab Eingang Ihrer Widerrufserklärung zurückzuzahlen. Da der erste Monat stets als unverbindlicher Probemonat kostenfrei gewährt wird, schulden Sie bei Ausübung des Widerrufs keinerlei Wertersatz oder Nutzungsentschädigung.', 160);
+      doc.text(wLines3, 25, p2Y + 48);
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('Freiwillige Geltung für die Schweiz:', 25, p2Y + 62);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Für Kunden mit Wohnsitz in der Schweiz gewähren wir dieses 14-tägige Widerrufsrecht auf freiwilliger vertraglicher Basis im selben Umfang.', 25, p2Y + 66);
+
+      p2Y += 78;
+
+      // 3. Muster-Widerrufsformular
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(20, p2Y, 170, 56, 3, 3, 'F');
+      doc.setDrawColor(203, 213, 225);
+      doc.roundedRect(20, p2Y, 170, 56, 3, 3, 'S');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(71, 85, 105);
+      doc.text('MUSTER-WIDERRUFSFORMULAR (gemäß Anlage 2 zu Art. 246a § 1 Abs. 2 EGBGB)', 25, p2Y + 6);
+
+      doc.setFont('courier', 'normal');
+      doc.setFontSize(6.8);
+      doc.setTextColor(30, 41, 59);
+      doc.text('An: Patrick Huber – Softwareentwicklung, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden (kontakt@campus-groovelab.de)', 25, p2Y + 12);
+      doc.text(`Hiermit widerrufe(n) ich/wir (*) den Vertrag über die Bereitstellung des Campus-Moduls (Kassenzeichen: ${referenceCode}).`, 25, p2Y + 17);
+      doc.text(`- Schüler/Kind: ${studentDisplayName} • Musikschule: ${schoolData?.name || 'Musikschule'}`, 25, p2Y + 22);
+      doc.text('- Name des/der Verbraucher(s): ____________________________________________________________________', 25, p2Y + 27);
+      doc.text('- Anschrift des/der Verbraucher(s): _________________________________________________________________', 25, p2Y + 32);
+      doc.text('- Unterschrift (nur bei Mitteilung auf Papier): __________________________   Datum: __________________', 25, p2Y + 37);
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(6.2);
+      doc.setTextColor(100, 116, 139);
+      doc.text('(*) Unzutreffendes streichen. Zur Fristwahrung genügt die rechtzeitige Absendung der Erklärung.', 25, p2Y + 44);
+      doc.text('Der Widerruf kann auch formlos per E-Mail unter Nennung des Verwendungszwecks/Kassenzeichens erfolgen.', 25, p2Y + 49);
+
+      p2Y += 61;
+
+      // 4. AGB-Auszug & Schlichtungshinweis
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.2);
+      doc.setTextColor(15, 23, 42);
+      doc.text('Wesentliche Vertragsbestimmungen (AGB Teil B) & Streitschlichtung (§ 36 VSBG):', 20, p2Y);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.4);
+      doc.setTextColor(100, 116, 139);
+      doc.text('1. Reines Cloud-Hosting: Campus-Groovelab stellt ausschließlich die technische Infrastruktur für das didaktische Üben und das Hausaufgabenheft bereit.', 20, p2Y + 4);
+      doc.text('2. Keine Unterrichtsverträge: Verträge über Musikunterricht und Aufsichtspflichten vor Ort bestehen ausschließlich mit der Musikschule.', 20, p2Y + 8);
+      doc.text('3. Botenstatus: Mitteilungen in der Plattform fungieren technisch als elektronischer Bote; formelle Vertragskündigungen an die Musikschule sind hierüber ausgeschlossen.', 20, p2Y + 12);
+      doc.text('4. Schlichtung (§ 36 VSBG): Wir sind weder verpflichtet noch bereit, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.', 20, p2Y + 16);
+
+      // Page 2 Footer Seal
+      doc.setFont('courier', 'normal');
+      doc.setFontSize(6.4);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Elektronischer Prüfungsnachweis & GoBD-Archivierungs-Hash: SHA256-${sha256Seal}`, 20, 276);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.text('Seite 2 von 2 (Gesetzliche Vertragsbestätigung & Widerrufsbelehrung)', 20, 280);
+
+      doc.save(`Campus-Groovelab_Vertragsbestaetigung_Zahlungsanweisung_${referenceCode}.pdf`);
     } catch (e: any) {
       alert('Fehler beim PDF-Export: ' + e.message);
     }
@@ -1219,9 +1362,10 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                 }}
                 onMouseOver={(e) => { e.currentTarget.style.borderColor = '#0f172a'; }}
                 onMouseOut={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; }}
+                title="Vertragsbestätigung gem. § 312f Abs. 2 BGB mit Zahlungsanweisung als PDF speichern"
               >
                 <Download size={14} />
-                <span>PDF-Beleg sichern</span>
+                <span>Vertragsbeleg &amp; PDF</span>
               </button>
 
               {/* Hardship button */}

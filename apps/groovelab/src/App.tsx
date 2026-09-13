@@ -42,7 +42,6 @@ const StudentOnboardingPage = lazy(() => import('./components/StudentOnboardingP
 const DeviceOnboardingPage = lazy(() => import('./components/DeviceOnboardingPage').then(m => ({ default: m.DeviceOnboardingPage })));
 const SchoolSelfOnboardingModal = lazy(() => import('./components/SchoolSelfOnboardingModal').then(m => ({ default: m.SchoolSelfOnboardingModal })));
 const CampusPinUnlockModal = lazy(() => import('./components/CampusPinUnlockModal').then(m => ({ default: m.CampusPinUnlockModal })));
-const PilotOnboardingModal = lazy(() => import('./components/PilotOnboardingModal').then(m => ({ default: m.PilotOnboardingModal })));
 const GhostSupportCapsule = lazy(() => import('./components/masterAdmin/GhostSupportCapsule').then(m => ({ default: m.GhostSupportCapsule })));
 const SharedAudioBiographyPage = lazy(() => import('./components/campus/SharedAudioBiographyPage').then(m => ({ default: m.SharedAudioBiographyPage })));
 const HelpCenterModal = lazy(() => import('./components/help/HelpCenterModal').then(m => ({ default: m.HelpCenterModal })));
@@ -1006,7 +1005,6 @@ function App() {
   const [showImpressum, setShowImpressum] = useState(false);
   const [showCancellation, setShowCancellation] = useState(false);
   const [showAccessibility, setShowAccessibility] = useState(false);
-  const [showPilotAgreementModal, setShowPilotAgreementModal] = useState(false);
   const [showTrialInfoModal, setShowTrialInfoModal] = useState(false);
   const [stationIdFromStorage, setStationIdFromStorage] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('groovelab_station_id') : null);
   const [isCampusUnlocked, setIsCampusUnlocked] = useState(false);
@@ -3197,61 +3195,8 @@ function App() {
         return;
       }
 
-      // Check if user needs to accept the pilot phase onboarding agreement
-      const userRole = (userData.role || '').toLowerCase();
-      const userRolesArr = userData.roles || [];
-      const isAdminOrSecUser = userRole === 'admin' || userRole === 'secretary' || userRolesArr.includes('admin') || userRolesArr.includes('secretary');
-      let schoolId = userData.school_id || (Array.isArray(userData.schools) ? userData.schools[0]?.id : userData.schools?.id);
-      
-      if (isAdminOrSecUser && schoolId) {
-        try {
-          const localSignedTimestamp = typeof window !== 'undefined'
-            ? (localStorage.getItem(`groovelab_avv_signed_${schoolId}`) || localStorage.getItem('groovelab_avv_signed_all') || localStorage.getItem('campus_avv_signed'))
-            : null;
-
-          if (localSignedTimestamp) {
-            setShowPilotAgreementModal(false);
-          } else {
-            // 1. Check if school already accepted terms during signup / self-onboarding (avv_signed_at)
-            const { data: schoolRecord } = await supabase
-              .from('schools')
-              .select('avv_signed_at, status')
-              .eq('id', schoolId)
-              .maybeSingle();
-
-            if (schoolRecord?.avv_signed_at) {
-              if (typeof window !== 'undefined') {
-                localStorage.setItem(`groovelab_avv_signed_${schoolId}`, schoolRecord.avv_signed_at);
-              }
-              setShowPilotAgreementModal(false);
-            } else {
-              const { data: agreementData, error: agreementError } = await supabase
-                .from('pilot_agreements')
-                .select('id')
-                .eq('school_id', schoolId)
-                .maybeSingle();
-
-              if (agreementError) {
-                console.error('[Dashboard] Error querying pilot agreements:', agreementError);
-              } else if (!agreementData) {
-                console.log('[Dashboard] No pilot agreement found for school. Displaying onboarding modal.');
-                setShowPilotAgreementModal(true);
-              } else {
-                if (typeof window !== 'undefined') {
-                  localStorage.setItem(`groovelab_avv_signed_${schoolId}`, new Date().toISOString());
-                }
-                setShowPilotAgreementModal(false);
-              }
-            }
-          }
-        } catch (err) {
-          console.error('[Dashboard] Catch exception querying pilot agreements:', err);
-        }
-      }
-
-
-
       // STRICT DB SESSION VERIFICATION (Closing the backdoor):
+      let schoolId = userData.school_id || (Array.isArray(userData.schools) ? userData.schools[0]?.id : userData.schools?.id);
       const isStudent = userData.role?.toLowerCase() === 'student';
       if (isStudent && locationMode === 'lab' && activePlatform === 'groovelab') {
         const storedStationId = localStorage.getItem('groovelab_station_id');
@@ -10384,8 +10329,11 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
         flex: 1, 
         display: 'flex', 
         flexDirection: 'column', 
-        height: (windowWidth <= 768 || activeStudentTab !== 'live') ? 'auto' : '100%',
-        padding: windowWidth <= 768 ? '4px 4px 100px 4px' : '10px',
+        padding: windowWidth <= 768 
+          ? (activeStudentTab === 'live' ? '4px 4px 0 4px' : '4px 4px var(--mobile-scroll-clearance-bottom, calc(96px + env(safe-area-inset-bottom, 16px))) 4px') 
+          : '10px',
+        scrollPaddingTop: windowWidth <= 768 ? 'var(--mobile-scroll-clearance-top, calc(56px + env(safe-area-inset-top, 0px)))' : undefined,
+        scrollPaddingBottom: windowWidth <= 768 ? 'var(--mobile-scroll-clearance-bottom, calc(96px + env(safe-area-inset-bottom, 16px)))' : undefined,
         boxSizing: 'border-box',
         minWidth: 0,
         width: '100%'
@@ -14556,19 +14504,6 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
             onClose={() => {
               setShowCampusPinPrompt(false);
             }}
-          />
-        </Suspense>
-      )}
-
-      {/* Pilot Phase Onboarding Agreement Modal */}
-      {showPilotAgreementModal && user?.school_id && user?.id && (
-        <Suspense fallback={null}>
-          <PilotOnboardingModal
-            schoolId={user.school_id}
-            userId={user.id}
-            onComplete={() => setShowPilotAgreementModal(false)}
-            onShowPrivacy={() => setShowPrivacy(true)}
-            onShowAgb={() => setShowAgb(true)}
           />
         </Suspense>
       )}

@@ -1,5 +1,5 @@
-const CACHE_NAME = 'groovelab-pwa-v208';
-const DYNAMIC_CACHE = 'groovelab-dynamic-v208';
+const CACHE_NAME = 'groovelab-pwa-v209';
+const DYNAMIC_CACHE = 'groovelab-dynamic-v209';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -243,45 +243,24 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
-  // Navigate mode (HTML documents) -> Network First with Cache Fallback
-  // Navigate mode (HTML documents) -> Stale-While-Revalidate with root /index.html (SPA app-shell offline-first pattern)
+  // Navigate mode (HTML documents) -> Network First with Cache Fallback (prevents PWA stale cache poisoning)
   if (event.request.mode === 'navigate') {
-    const isReload = url.searchParams.has('reload_cb') || url.searchParams.has('reload_manual');
-
-    if (isReload) {
-      // Hard reload requested: fetch index.html from network, update cache, bypass local cache
-      event.respondWith(
-        fetch('/index.html')
-          .then(function(response) {
-            if (response && response.status === 200) {
-              const cloneForIndex = response.clone();
-              const cloneForRoot = response.clone();
-              caches.open(CACHE_NAME).then(function(cache) {
-                cache.put('/index.html', cloneForIndex);
-                cache.put('/', cloneForRoot);
-              });
-            }
-            return response;
-          })
-          .catch(function() {
-            return caches.match('/index.html').then(function(cachedResponse) {
-              if (cachedResponse) return cachedResponse;
-              return caches.match('/').then(function(rootCached) {
-                return rootCached || new Response('Du bist offline. Bitte überprüfe deine Internetverbindung.', {
-                  headers: { 'Content-Type': 'text/html; charset=utf-8' }
-                });
-              });
-            });
-          })
-      );
-      return;
-    }
-
-    // Normal navigate mode: serve index.html shell from cache immediately, and fetch updates in background
     event.respondWith(
-      caches.match('/index.html').then(function(cachedResponse) {
-        const networkFetch = fetch('/index.html')
+      new Promise(function(resolve) {
+        let hasResolved = false;
+        const networkTimeout = setTimeout(function() {
+          // If network takes longer than 2.5s, fall back to cached shell
+          caches.match('/index.html').then(function(cached) {
+            if (cached && !hasResolved) {
+              hasResolved = true;
+              resolve(cached);
+            }
+          });
+        }, 2500);
+
+        fetch(event.request)
           .then(function(networkResponse) {
+            clearTimeout(networkTimeout);
             if (networkResponse && networkResponse.status === 200) {
               const cloneForIndex = networkResponse.clone();
               const cloneForRoot = networkResponse.clone();
@@ -290,27 +269,28 @@ self.addEventListener('fetch', function(event) {
                 cache.put('/', cloneForRoot);
               });
             }
-            return networkResponse;
+            if (!hasResolved) {
+              hasResolved = true;
+              resolve(networkResponse);
+            }
           })
-          .catch(function(err) {
-            console.warn('Background navigate sync failed:', err);
-            return new Response('Du bist offline. Bitte überprüfe deine Internetverbindung.', {
-              headers: { 'Content-Type': 'text/html; charset=utf-8' }
-            });
+          .catch(function() {
+            clearTimeout(networkTimeout);
+            if (!hasResolved) {
+              hasResolved = true;
+              caches.match('/index.html').then(function(cachedResponse) {
+                if (cachedResponse) {
+                  resolve(cachedResponse);
+                  return;
+                }
+                caches.match('/').then(function(rootCached) {
+                  resolve(rootCached || new Response('Du bist offline. Bitte überprüfe deine Internetverbindung.', {
+                    headers: { 'Content-Type': 'text/html; charset=utf-8' }
+                  }));
+                });
+              });
+            }
           });
-
-        if (cachedResponse) {
-          event.waitUntil(networkFetch);
-          return cachedResponse;
-        }
-
-        return caches.match('/').then(function(rootCached) {
-          if (rootCached) {
-            event.waitUntil(networkFetch);
-            return rootCached;
-          }
-          return networkFetch;
-        });
       })
     );
     return;

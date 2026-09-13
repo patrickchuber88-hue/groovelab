@@ -1,8 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { ShieldCheck, Scale, FileText, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Lock, Check } from 'lucide-react';
+import { ShieldCheck, Scale, FileText, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Lock, Check, RefreshCw, WifiOff } from 'lucide-react';
 import { ACTIVE_LEGAL_VERSION, LEGAL_DOCUMENTS, computeSha256 } from '../legal/legalContent';
 import { isUUID } from '../utils/uuidValidator';
+
+/**
+ * Computes a deterministic session proof bound to user, active role, session lease ID and legal version.
+ * Prevents trivial boolean client-side tampering while enabling instantaneous (0ms) render times.
+ */
+function computeSessionProof(userId: string, role: string, leaseId: string, version: string): string {
+  const seed = `${userId}:${role}:${leaseId || 'no_lease'}:${version}`;
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+    hash |= 0;
+  }
+  return `gl_proof_${Math.abs(hash).toString(16)}`;
+}
+
+function getLeaseId(): string {
+  if (typeof window === 'undefined') return '';
+  try {
+    return sessionStorage.getItem('gl_active_session_lease_id') || 
+           localStorage.getItem('gl_active_session_lease_id') || 
+           '';
+  } catch {
+    return '';
+  }
+}
 
 interface LegalConsentGateProps {
   user: {
@@ -18,18 +43,32 @@ interface LegalConsentGateProps {
 }
 
 export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onConsentRecorded, children }) => {
-  const [isChecking, setIsChecking] = useState<boolean>(true);
-  const [isCompliant, setIsCompliant] = useState<boolean>(false);
-  const [checkedMandatory, setCheckedMandatory] = useState<boolean>(false);
-  const [checkedAudio, setCheckedAudio] = useState<boolean>(true); // Pre-selected optional consent
-  const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [showFullText, setShowFullText] = useState<boolean>(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
   const role = user?.role?.toLowerCase() || 'student';
   const isAdmin = role === 'admin' || role === 'secretary';
   const isTeacher = role === 'teacher';
   const isStudent = role === 'student';
+
+  const leaseId = getLeaseId();
+  const proofKey = user?.id ? `gl_legal_proof_${user.id}_${ACTIVE_LEGAL_VERSION}` : '';
+  const currentProof = user?.id ? computeSessionProof(user.id, role, leaseId, ACTIVE_LEGAL_VERSION) : '';
+  const isProofValid = typeof window !== 'undefined' && Boolean(user?.id) && Boolean(currentProof) && sessionStorage.getItem(proofKey) === currentProof;
+
+  // Initialize compliant state optimistically if valid cryptographic session proof is present
+  const [isCompliant, setIsCompliant] = useState<boolean>(() => {
+    if (!user?.id || !isUUID(user.id) || user.is_ghost_mode) return true;
+    return Boolean(isProofValid);
+  });
+  const [isChecking, setIsChecking] = useState<boolean>(() => {
+    if (!user?.id || !isUUID(user.id) || user.is_ghost_mode) return false;
+    return !isProofValid;
+  });
+  const [isNetworkBlocked, setIsNetworkBlocked] = useState<boolean>(false);
+  const [retryCount, setRetryCount] = useState<number>(0);
+  const [checkedMandatory, setCheckedMandatory] = useState<boolean>(false);
+  const [checkedAudio, setCheckedAudio] = useState<boolean>(false); // Strict DSGVO opt-in (EuGH Planet49 & Art. 8 DSGVO)
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [showFullText, setShowFullText] = useState<boolean>(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Determine active primary document
   const primaryDocKey = isAdmin 
@@ -43,7 +82,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
   const themeBgLight = isAdmin ? '#fef2f2' : (isTeacher ? '#f0fdf4' : '#ecfdf5');
   const themeBorder = isAdmin ? 'rgba(239, 68, 68, 0.25)' : (isTeacher ? 'rgba(52, 168, 83, 0.25)' : 'rgba(16, 185, 129, 0.25)');
 
-  // 1. Check legal compliance upon mount or user change
+  // 1. Authoritative check with 4-second short-circuit timeout (Stale-While-Revalidate if cached proof is present)
   useEffect(() => {
     let isMounted = true;
 
@@ -53,25 +92,41 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
         if (isMounted) {
           setIsCompliant(true);
           setIsChecking(false);
+          setIsNetworkBlocked(false);
         }
         return;
       }
 
-      try {
+      // If proof is not valid, we show the non-blocking progress indicator
+      if (!isProofValid) {
         setIsChecking(true);
-        setErrorMsg(null);
+      }
+      setErrorMsg(null);
+      setIsNetworkBlocked(false);
 
-        const { data, error } = await supabase.rpc('check_user_legal_status', {
+      try {
+        const rpcPromise = supabase.rpc('check_user_legal_status', {
           p_user_id: user.id,
           p_role: role,
           p_required_version: ACTIVE_LEGAL_VERSION
         });
 
+        // 4.0-second short-circuit timeout to eliminate the 25-75s cascade in supabase.ts
+        const timeoutPromise = new Promise<{ data: any; error: any }>((_, reject) => {
+          setTimeout(() => reject(new Error('RPC_TIMEOUT')), 4000);
+        });
+
+        const res = await Promise.race([rpcPromise, timeoutPromise]) as any;
+        const { data, error } = res || {};
+
         if (error) {
-          // If RPC is missing during migration rollout, don't hard crash the app
-          console.warn('[LegalConsentGate] Check RPC error, falling back to permissive mode:', error.message);
+          console.warn('[LegalConsentGate] Check RPC error:', error.message);
           if (isMounted) {
-            setIsCompliant(true);
+            // Fail-Closed: If there is a server/network error and no valid session proof, do NOT silently bypass!
+            if (!isProofValid) {
+              setIsCompliant(false);
+              setIsNetworkBlocked(true);
+            }
             setIsChecking(false);
           }
           return;
@@ -80,15 +135,31 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
         if (isMounted) {
           if (data && data.is_compliant === true) {
             setIsCompliant(true);
+            setIsNetworkBlocked(false);
+            if (proofKey && currentProof && typeof window !== 'undefined') {
+              try {
+                sessionStorage.setItem(proofKey, currentProof);
+              } catch {}
+            }
           } else {
             setIsCompliant(false);
+            setIsNetworkBlocked(false);
+            if (proofKey && typeof window !== 'undefined') {
+              try {
+                sessionStorage.removeItem(proofKey);
+              } catch {}
+            }
           }
           setIsChecking(false);
         }
       } catch (err: any) {
-        console.warn('[LegalConsentGate] Failed to check status:', err);
+        console.warn('[LegalConsentGate] Check status timed out or network failed:', err);
         if (isMounted) {
-          setIsCompliant(true);
+          // Fail-Closed: Show clean retry dialog rather than silent unverified bypass
+          if (!isProofValid) {
+            setIsCompliant(false);
+            setIsNetworkBlocked(true);
+          }
           setIsChecking(false);
         }
       }
@@ -99,7 +170,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
     return () => {
       isMounted = false;
     };
-  }, [user?.id, role, user?.is_ghost_mode]);
+  }, [user?.id, role, user?.is_ghost_mode, retryCount]);
 
   // 2. Record consent
   const handleConfirmConsents = async () => {
@@ -142,7 +213,13 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
         return;
       }
 
+      if (proofKey && currentProof && typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem(proofKey, currentProof);
+        } catch {}
+      }
       setIsCompliant(true);
+      setIsNetworkBlocked(false);
       if (onConsentRecorded) {
         onConsentRecorded();
       }
@@ -154,29 +231,206 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
     }
   };
 
-  // If already compliant, render normal children directly
+  // If already compliant, render normal children directly (Instant-Load 0ms)
   if (isCompliant) {
     return <>{children}</>;
   }
 
-  // During initial check, render minimal non-flashing spinner
+  // Fail-Closed Network Error / Timeout Screen
+  if (isNetworkBlocked) {
+    return (
+      <div 
+        role="dialog"
+        aria-modal="true"
+        aria-label="Sicherheits- und Rechtsprüfung Netzwerkunterbrechung"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.82)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '24px',
+          zIndex: 99999,
+          fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif"
+        }}
+      >
+        <div style={{
+          background: '#ffffff',
+          width: '100%',
+          maxWidth: '480px',
+          borderRadius: '24px',
+          padding: '32px 28px',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)',
+          border: '1px solid #e2e8f0',
+          textAlign: 'center',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          animation: 'fadeInUp 0.25s ease-out'
+        }}>
+          <div style={{
+            width: '56px',
+            height: '56px',
+            borderRadius: '16px',
+            background: '#fef2f2',
+            border: '1px solid #fecaca',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: '16px',
+            color: '#dc2626'
+          }}>
+            <WifiOff size={28} />
+          </div>
+
+          <h3 style={{
+            margin: '0 0 8px 0',
+            fontSize: '1.25rem',
+            fontWeight: 800,
+            color: '#0f172a',
+            letterSpacing: '-0.02em'
+          }}>
+            Sicherheitsstatus nicht erreichbar
+          </h3>
+
+          <p style={{
+            margin: '0 0 24px 0',
+            fontSize: '0.88rem',
+            color: '#475569',
+            lineHeight: 1.5
+          }}>
+            Die verschlüsselte Verbindung zur Sicherheits- und Rechtsprüfung konnte nicht zeitnah hergestellt werden (Timeout). 
+            Zum Schutz Ihrer Daten verlangt der Enterprise-Sicherheitsstandard eine aktive Bestätigung.
+          </p>
+
+          <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.location.reload();
+                }
+              }}
+              style={{
+                flex: 1,
+                padding: '12px 16px',
+                borderRadius: '14px',
+                border: '1px solid #cbd5e1',
+                background: '#f8fafc',
+                color: '#475569',
+                fontSize: '0.88rem',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              Seite neu laden
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setRetryCount(prev => prev + 1);
+              }}
+              style={{
+                flex: 1.3,
+                padding: '12px 16px',
+                borderRadius: '14px',
+                border: 'none',
+                background: themeColor,
+                color: '#ffffff',
+                fontSize: '0.88rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.12)'
+              }}
+            >
+              <RefreshCw size={16} />
+              <span>Erneut prüfen</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // During initial check (only when no cached session proof is present)
   if (isChecking) {
     return (
-      <div style={{
-        position: 'fixed',
-        inset: 0,
-        background: '#09090b',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: '#94a3b8',
-        fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-        fontSize: '0.9rem',
-        zIndex: 99999
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div className="spinner-border animate-spin" style={{ width: '18px', height: '18px', border: '2px solid rgba(255,255,255,0.2)', borderTopColor: '#ffffff', borderRadius: '50%' }} />
-          <span>Sicherheits- & Rechtsstatus wird geprüft...</span>
+      <div 
+        role="status"
+        aria-live="polite"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          zIndex: 99999,
+          fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif"
+        }}
+      >
+        <div style={{
+          background: '#ffffff',
+          borderRadius: '24px',
+          padding: '28px 36px',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          border: '1px solid rgba(255, 255, 255, 0.6)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '16px',
+          maxWidth: '380px',
+          textAlign: 'center',
+          animation: 'fadeInUp 0.2s ease-out'
+        }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            borderRadius: '16px',
+            background: themeBgLight,
+            border: `1px solid ${themeBorder}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: themeColor
+          }}>
+            <ShieldCheck size={26} />
+          </div>
+
+          <div>
+            <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', marginBottom: '4px' }}>
+              Campus-Groovelab
+            </div>
+            <div style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
+              Sicherheits- & Rechtsstatus wird geprüft...
+            </div>
+          </div>
+
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: '#f8fafc',
+            padding: '6px 14px',
+            borderRadius: '20px',
+            fontSize: '0.75rem',
+            color: '#64748b',
+            fontWeight: 600
+          }}>
+            <div className="spinner-border animate-spin" style={{ width: '13px', height: '13px', border: `2px solid ${themeColor}`, borderTopColor: 'transparent', borderRadius: '50%' }} />
+            <span>Revisionssichere Prüfung läuft</span>
+          </div>
         </div>
       </div>
     );

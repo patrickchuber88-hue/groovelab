@@ -3,7 +3,7 @@
 // Standards: OWASP ASVS Level 3 / Art. 7, 8, 28 DSGVO / § 307 BGB / § 1631 BGB
 // ==============================================================================
 
-export const ACTIVE_LEGAL_VERSION = '2026.1';
+export const ACTIVE_LEGAL_VERSION = '2026.2';
 
 export interface LegalDocumentDefinition {
   type: 'terms_b2b_avv' | 'terms_teacher_conduct' | 'terms_student_platform' | 'consent_media_audio';
@@ -54,33 +54,40 @@ export const LEGAL_DOCUMENTS: Record<string, LegalDocumentDefinition> = {
       '0,00 € Software-Lizenzkaufgebühren (Bereitstellung & Miete reiner Cloud-Infrastruktur)',
       'Schule ist die datenschutzrechtlich „Verantwortliche“ (Art. 4 Nr. 7 DSGVO)',
       'Campus-Groovelab fungiert als geprüfter, weisungsgebundener Auftragsverarbeiter (Art. 28 DSGVO)',
-      'Strikte Multi-Tenancy-Mandantentrennung & Rechenzentren in Deutschland (Hetzner Falkenstein/Vogtland & Nürnberg)',
-      'Freistellungsklausel für von der Schule eingepflegte Schüler-Stammdaten',
+      'ISO 27001 Rechenzentren in Deutschland (Hetzner Falkenstein & Nürnberg) • 14 Tage Widerspruchsfrist bei Subdienstleistern',
+      '48-Stunden-Meldepflicht bei Datenschutzverletzungen (Art. 33 DSGVO)',
       'Reine Didaktik & Kommunikation: Keine Übernahme behördlicher Dokumentation (iMikel) oder physischer Aufsicht',
-      'Raumanfragen & Terminabsagen als Voranfrage unter Vorbehalt / Botenmodell ohne ERP-Automatik'
+      'Raumanfragen & Terminabsagen als Voranfrage unter Vorbehalt / Botenmodell ohne ERP-Automatik',
+      'BGH-konformes Aufrechnungsverbot, 2 Mio. € IT-Haftpflichtdeckung & Salvatorische Klausel (§ 306 Abs. 2 BGB)'
     ],
     checkboxLabel: 'Ich bestätige als vertretungsberechtigte Person der Musikschule den B2B-Infrastrukturvertrag sowie den Auftragsverarbeitungsvertrag (Art. 28 DSGVO) inklusive der Technisch-Organisatorischen Maßnahmen (TOMs).',
     fullTextMarkdown: `
 ### 1. Vertragsgegenstand & Bereitstellungsmodell
 (1) Campus-Groovelab stellt der Musikschule eine hochverfügbare, mandantenisolierte Cloud-Infrastruktur für Schulverwaltung, Stundenplanung, Raumorganisation und didaktische Begleitung zur Verfügung.
 (2) Das Basissystem wird ohne gesonderte Software-Lizenzkaufgebühren bereitgestellt (0,00 € inklusive). Die Vergütung bemisst sich ausschließlich nach den vereinbarten Server-Hosting-, Bereitstellungs- und Infrastrukturpauschalen.
+(3) Ein Rechtsanspruch auf Abschluss eines Nutzungsvertrages besteht nicht; der Betreiber behält sich vor, Registrierungen bei Kapazitätsengpässen oder Sicherheitsbedenken abzulehnen.
 
 ### 2. Auftragsverarbeitungsvertrag gem. Art. 28 DSGVO
 (1) Die Musikschule ist und bleibt datenschutzrechtlich die alleinige „Verantwortliche“ (Art. 4 Nr. 7 DSGVO) für alle von ihr verarbeiteten Schüler-, Lehrer- und Verwaltungsdaten.
 (2) Campus-Groovelab verarbeitet personenbezogene Daten ausschließlich im Auftrag und auf dokumentierte Weisung der Musikschule.
 (3) Sämtliche Datenverarbeitungen erfolgen ausnahmslos auf ISO-27001-zertifizierten Servern innerhalb der Bundesrepublik Deutschland (Standort Hetzner Online GmbH, Falkenstein/Vogtland & Nürnberg, Deutschland).
-(4) Die Einhaltung strenger Technisch-Organisatorischer Maßnahmen (TOMs gem. Art. 32 DSGVO) – einschließlich AES-256-Verschlüsselung, Pseudonymisierung von Minderjährigendaten und automatischer Kündigungs-Purge-Routinen – wird garantiert.
+(4) Die Einhaltung strenger Technisch-Organisatorischer Maßnahmen (TOMs gem. Art. 32 DSGVO) – einschließlich AES-256-Verschlüsselung, Pseudonymisierung von Minderjährigendaten und automatischer Kündigungs-Purge-Routinen nach DIN 66398 – wird garantiert.
+(5) Unterauftragsverarbeiter & Widerspruchsfrist: Der Betreiber setzt Hetzner Online GmbH als Hosting-Provider ein. Bei beabsichtigten Änderungen an Unterauftragnehmern wird die Schule mindestens 14 Tage vorab informiert; der Schule steht ein Widerspruchsrecht aus wichtigem datenschutzrechtlichem Grund zu.
+(6) Vorfallsmeldung binnen 48 Stunden: Der Betreiber meldet Verletzungen des Schutzes personenbezogener Daten (Art. 33 Abs. 2 DSGVO) unverzüglich, spätestens binnen 48 Stunden nach Bekanntwerden, an die Schule.
 
-### 3. Pflichten der Musikschule & Freistellung
-(1) Die Musikschule versichert, dass die Erhebung und Übermittlung der Schülerdaten an die Plattform auf einer rechtmäßigen Grundlage (z. B. Schulunterrichtsvertrag, berechtigtes Interesse, schulgesetzliche Befugnisse) beruht.
-(2) Die Musikschule stellt Campus-Groovelab von etwaigen Ansprüchen Dritter frei, die auf einer unbefugten oder fehlerhaften Datenübermittlung durch die Musikschule beruhen.
+### 3. Pflichten der Musikschule, Haftungsbegrenzung & Aufrechnung
+(1) Die Musikschule versichert, dass die Erhebung und Übermittlung der Schülerdaten an die Plattform auf einer rechtmäßigen Grundlage beruht, und stellt den Betreiber von Ansprüchen Dritter bei unbefugter Datenübermittlung frei.
+(2) Aufrechnungsverbot (BGH-konform): Die Musikschule kann nur mit unbestrittenen oder rechtskräftig festgestellten Forderungen aufrechnen. Dies gilt nicht für synallagmatische Gegenforderungen aus Leistungsverweigerung oder Mängeln desselben Vertrags.
+(3) Cyber-Security & Zero-Day-Exploits: Der Betreiber haftet nicht für Sicherheitsvorfälle durch zuvor unbekannte Schwachstellen, sofern er den aktuellen Stand der Technik (Art. 32 DSGVO / BSI / OWASP ASVS Level 3) nachweislich eingehalten hat.
+(4) Versicherungsschutz: Der Betreiber unterhält eine IT- und Cyber-Haftpflichtversicherung mit mindestens 2.000.000,00 € Deckungssumme je Versicherungsfall.
 
 ### 4. Zweckbestimmung & Abgrenzung zu behördlichen Schul-ERPs (iMikel)
 (1) Campus-Groovelab ist ein didaktisches Begleit-, Motivations- und Kommunikationswerkzeug zur Unterstützung des zeitgemäßen Musikunterrichts.
-(2) Die Plattform ersetzt nicht die primären Verwaltungs-, Buchhaltungs- und Dokumentationssysteme der Musikschule (wie z. B. iMikel, Win-Musikschule o. ä.). Amtliche Dokumentations- und Nachweispflichten (insbesondere für kommunale/staatliche Fördergelder, Verbandsstatistiken, Prüfungsämter sowie arbeitsrechtliche TVöD-Deputatsnachweise) obliegen weiterhin vollumfänglich den herkömmlichen Systemen und Prozessen der Musikschule.
+(2) Die Plattform ersetzt nicht die primären Verwaltungs-, Buchhaltungs- und Dokumentationssysteme der Musikschule (wie z. B. iMikel, Win-Musikschule o. ä.). Amtliche Dokumentations- und Nachweispflichten obliegen weiterhin vollumfänglich den herkömmlichen Systemen der Schule.
 (3) Die physische Aufsichtspflicht (§ 832 BGB i.V.m. § 1631 BGB) verbleibt personell und räumlich ausnahmslos beim Personal der Musikschule vor Ort.
-(4) Raumbuchungsanfragen, Terminverschiebungen und Absagen über die Plattform stellen unverbindliche Voranfragen („unter Vorbehalt“) bzw. organisatorische Botennachrichten dar. Sie entfalten erst nach Freigabe und Einpflege in das führende Schulverwaltungssystem (ERP) der Musikschule Verbindlichkeit. Die Plattform übernimmt keine Gewähr für die tatsächliche Verfügbarkeit von Schulräumen vor Ort.
-(5) Didaktisches Assistenz-Prinzip & Subsidiarität (Herrenberg-Compliance): Campus-Groovelab dient den Lehrkräften für einen optimalen Unterrichtsalltag und nicht die Lehrkräfte dem Schulalltag. Die Plattform ist ein didaktisches Zusatz-, Erleichterungs- und Übermittlungswerkzeug („Convenience-Tool / Fast-Track-Option“) zur Beschleunigung und Erleichterung des Musikunterrichts. Sie stellt zu keinem Zeitpunkt den ausschließlichen oder verbindlich vorgeschriebenen Dienst-, Weisungs- oder Kommunikationskanal der Musikschule dar. Jede Lehrkraft entscheidet selbstständig und freiwillig über die Nutzung und den didaktischen Umfang.
+(4) Raumbuchungsanfragen und Terminabstimmungen stellen unverbindliche Voranfragen („unter Vorbehalt“) dar.
+(5) Didaktisches Assistenz-Prinzip & Subsidiarität (Herrenberg-Compliance): Campus-Groovelab dient den Lehrkräften für einen optimalen Unterrichtsalltag und nicht die Lehrkräfte dem Schulalltag. Die Plattform begründet zu keinem Zeitpunkt eine Weisungs- oder Direktionsgewalt gegenüber Honorardozenten.
+(6) Salvatorische Erhaltungsklausel: Sollten Bestimmungen unwirksam sein, gelten die gesetzlichen Vorschriften (§ 306 Abs. 2 BGB).
     `.trim()
   },
 
@@ -94,25 +101,26 @@ export const LEGAL_DOCUMENTS: Record<string, LegalDocumentDefinition> = {
     summaryPoints: [
       'Didaktische Assistenz-Technologie für den optimalen Unterrichtsalltag der Lehrkraft',
       'Freiwillige Nutzung („Fast-Track-Option“) ohne Weisungs- oder Direktionswirkung',
-      'Gesetzliche Aufsichtspflicht (§ 1631 BGB / § 832 BGB): Verbleibt personell bei der Lehrkraft',
+      'Gesetzliche Aufsichtspflicht (§ 1631 BGB / § 832 BGB): Verbleibt personell bei der Lehrkraft vor Ort',
       'Stundenplan-Entwürfe als didaktisches Vorschlagsrecht unter Genehmigungsvorbehalt (§ 106 GewO)',
-      'Audio-Loops & Aufnahmen ausschließlich für geschütztes didaktisches Schüler-Feedback'
+      'Vollständiger Verbleib der Urheberrechte an eigenen Übe-Loops und Notizen bei der Lehrkraft'
     ],
     checkboxLabel: 'Ich erkenne die dienstlichen Nutzungsbedingungen sowie den Didaktik-Kodex an und nehme ausdrücklich zur Kenntnis, dass die gesetzliche Aufsichtspflicht (§ 1631 BGB) personell bei der Lehrkraft verbleibt.',
     fullTextMarkdown: `
 ### 1. Präambel, didaktische Autonomie & Assistenz-Prinzip
-(1) Campus-Groovelab versteht sich als didaktische und organisatorische Assistenz-Technologie, die den Lehrkräften zur optimalen und zeitsparenden Gestaltung ihres individuellen Unterrichtsalltags dient. Sie dient ausdrücklich nicht dazu, Lehrkräfte in vorgegebene Schulleitungsabläufe einzugliedern oder ihr pädagogisches Wirken fremdzubestimmen. Die didaktische und methodische Freiheit der Lehrkraft bleibt in vollem Umfang gewahrt.
+(1) Campus-Groovelab versteht sich als didaktische und organisatorische Assistenz-Technologie, die den Lehrkräften zur optimalen Gestaltung ihres individuellen Unterrichtsalltags dient. Sie dient ausdrücklich nicht dazu, Lehrkräfte in vorgegebene Schulleitungsabläufe einzugliedern oder ihr pädagogisches Wirken fremdzubestimmen. Die didaktische und methodische Freiheit der Lehrkraft bleibt in vollem Umfang gewahrt.
 (2) Die Nutzung von Campus-Groovelab ist für die Lehrkraft freiwillig („Convenience-Tool / Fast-Track-Option“) und stellt keinen verpflichtenden Dienst- oder Weisungskanal dar. Der Lehrkraft steht es frei, Unterrichtsinhalte, Hausaufgaben und Terminabsprachen über andere Kanäle (z. B. analoges Hausaufgabenheft, Telefon, E-Mail) zu organisieren.
 (3) Der Zugang wird der Lehrkraft von ihrer Musikschule zur Vorbereitung, Durchführung und didaktischen Nachbereitung des Instrumental- und Ensembleunterrichts bereitgestellt. Die Plattform darf nicht für unterrichtsfremde, rein private oder gewerbliche Zwecke außerhalb des Musikschulbetriebs genutzt werden.
 
 ### 2. Gesetzliche Aufsichtspflicht (§ 1631 BGB / § 832 BGB)
-(1) **Wichtiger rechtlicher Hinweis**: Campus-Groovelab ist ein didaktisches und organisatorisches Übungsbegleitungs- und Kommunikationswerkzeug.
+(1) Campus-Groovelab ist ein didaktisches und organisatorisches Übungsbegleitungs- und Kommunikationswerkzeug.
 (2) Die Plattform entfaltet zu keinem Zeitpunkt eine personelle Aufsichts- oder Überwachungswirkung. Die gesetzliche und vertragliche Aufsichtspflicht über minderjährige Schülerinnen und Schüler verbleibt vollumfänglich und persönlich bei der Lehrkraft im Rahmen des Präsenz- oder Online-Unterrichts vor Ort.
 (3) Für das Erscheinen, den Aufenthalt im Schulgebäude sowie die ordnungsgemäße Beaufsichtigung von Minderjährigen gelten die herkömmlichen gesetzlichen, tariflichen und schulordnungsrechtlichen Bestimmungen der Musikschule.
 
-### 3. Didaktische Audioaufnahmen & Loopstation
+### 3. Didaktische Audioaufnahmen, Urheberrechte & Loopstation
 (1) Über die Plattform angefertigte oder übermittelte Audioaufnahmen (Hausaufgaben-Audios, Loopstation-Spuren) dienen ausschließlich dem individuellen Lernfortschritt des jeweiligen Schülers.
-(2) Eine Veröffentlichung oder Weitergabe von Schüleraufnahmen an Dritte außerhalb des geschützten Unterrichtskontexts ist der Lehrkraft streng untersagt.
+(2) Sämtliche Urheber- und Nutzungsrechte an von der Lehrkraft selbst erstellten Übungsmaterialien und Audio-Loops verbleiben uneingeschränkt bei der Lehrkraft.
+(3) Eine Veröffentlichung oder Weitergabe von Schüleraufnahmen an Dritte außerhalb des geschützten Unterrichtskontexts ist der Lehrkraft streng untersagt.
 
 ### 4. Datengeheimnis & Vertraulichkeit
 Die Lehrkraft verpflichtet sich, alle Schüler- und Kollegendaten vertraulich zu behandeln und Zugangsdaten vor dem Zugriff unbefugter Dritter zu schützen.
@@ -133,10 +141,11 @@ Die Lehrkraft verpflichtet sich, alle Schüler- und Kollegendaten vertraulich zu
     summaryPoints: [
       'Kostenfreie Nutzung der didaktischen Lern-App für Musikschüler',
       'Hausaufgabenheft, digitaler Übe-Timer und persönlicher Stundenplan-Sync',
-      'DSGVO-Datenminimierung: Keine Speicherung von Bank-, Vertrags- oder E-Mail-Daten',
+      'DSGVO-Datenminimierung: Keine Speicherung von Bank-, Vertrags- oder E-Mail-Daten im Schülerprofil',
       'Didaktische Terminübersicht & Botenmodell: Unterrichtsverträge & Aufsicht verbleiben bei der Schule',
+      'Vollständiges geistiges Eigentum an eigenen Audioaufnahmen und Notizen',
       'Ausschluss von Art. 9 DSGVO Gesundheitsdaten: Angabe „verhindert“ genügt vollkommen',
-      'Jederzeit kündbar bzw. deaktivierbar'
+      'Verbraucherschlichtungshinweis (§ 36 VSBG) & Jederzeitige Kündbarkeit'
     ],
     checkboxLabel: 'Ich akzeptiere die kostenfreien Plattform-Nutzungsbedingungen für Campus-Groovelab (bei Minderjährigen durch die Erziehungsberechtigten).',
     fullTextMarkdown: `
@@ -149,16 +158,21 @@ Die Lehrkraft verpflichtet sich, alle Schüler- und Kollegendaten vertraulich zu
 (1) Der Schutz von Minderjährigen hat höchste Priorität. Im Schülerprofil werden aus Datenschutzgründen keine Bankdaten, keine E-Mail-Adressen und keine sensiblen Vertragsdaten gespeichert.
 (2) Schülernamen werden im Lehrerbereich datensparsam pseudonymisiert dargestellt.
 (3) Die Plattform ist zu 100 % werbefrei. Es findet keinerlei Tracking für kommerzielle Zwecke statt.
+(4) Verdachtsmeldungen & Kinderschutz: Bei Hinweisen auf Grenzverletzungen steht die Clearing-Adresse kinderschutz@campus-groovelab.de zur Verfügung.
 
-### 3. Pflichten bei der Nutzung
-Die Zugangsdaten (QR-Code, Ausweis-PIN) sind sorgfältig aufzubewahren und dürfen nicht an Schulfremde weitergegeben werden.
+### 3. Geistiges Eigentum an eigenen Beiträgen
+Schülerinnen, Schüler und Eltern behalten das uneingeschränkte Urheberrecht an allen selbst eingespielten Audio-Aufnahmen, Loopstation-Spuren und Notizen.
 
 ### 4. Didaktischer Charakter der Stunden- und Terminübersichten
 (1) Die in Campus-Groovelab dargestellten Termine, Stundenpläne und Hausaufgaben dienen der pädagogischen Orientierung und der didaktischen Kommunikation zwischen Lehrkraft und Schüler.
 (2) Verbindliche Unterrichtsverträge, offizielle Schulbescheinigungen sowie rechtlich bindende Unterrichtsvereinbarungen richten sich nach den Bestimmungen des Vertrags mit der Musikschule.
 (3) Die Aufsichtspflicht der Musikschule und ihrer Lehrkräfte vor Ort beginnt und endet ausschließlich mit dem tatsächlichen Antritt und Verlassen des Präsenzunterrichts gemäß der Haus- und Schulordnung der Musikschule, nicht durch die digitale Zeitanzeige in der App.
-(4) Botenstatus & Ausschluss von Hauptvertragskündigungen: Mitteilungen über Absagen oder Terminabstimmungen in der termingekoppelten Shoutbox fungieren technisch rein als elektronischer Bote zur zeitgleichen Information von Lehrkraft und Schulsekretariat. Die Plattform begründet keine Genehmigungsfiktion. Formelle Kündigungen des Unterrichtsvertrags mit der Musikschule können über die App nicht erklärt werden und bedürfen der in der Schulordnung festgelegten Form direkt gegenüber der Musikschule.
-(5) Ausschluss von Gesundheitsdaten (Art. 9 DSGVO): Die Shoutbox dient rein organisatorischen Zwecken. Die Eingabe von medizinischen Diagnosen, Attesten oder detaillierten Gesundheitsdaten ist untersagt; bei Verhinderung genügt der Vermerk „verhindert“.
+(4) Botenstatus & Ausschluss von Hauptvertragskündigungen: Mitteilungen über Absagen oder Terminabstimmungen in der termingekoppelten Shoutbox fungieren technisch rein als elektronischer Bote. Formelle Kündigungen des Unterrichtsvertrags mit der Musikschule können über die App nicht erklärt werden.
+(5) Ausschluss von Gesundheitsdaten (Art. 9 DSGVO): Bei Verhinderung genügt die neutrale Angabe „verhindert“; die Angabe von Diagnosen oder Attestdetails ist unzulässig.
+
+### 5. Verbraucherstreitbeilegung (§ 36 VSBG) & Salvatorische Klausel
+(1) Wir sind weder verpflichtet noch bereit, an einem Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen. Die OS-Plattform der EU ist erreichbar unter: https://ec.europa.eu/consumers/odr.
+(2) Sollten Bestimmungen unwirksam sein, gelten die gesetzlichen Vorschriften.
     `.trim()
   },
 
@@ -192,3 +206,4 @@ Die Zugangsdaten (QR-Code, Ausweis-PIN) sind sorgfältig aufzubewahren und dürf
     `.trim()
   }
 };
+

@@ -633,6 +633,62 @@ export const formatStudentPossessive = (name?: string): string => {
   return `${trimmed}s`;
 };
 
+export interface SmartInstrumentConfig {
+  id: string;
+  name: string;
+  profile: MasteringProfile;
+  emoji: string;
+  category: string;
+}
+
+export const SMART_INSTRUMENT_FAMILIES: SmartInstrumentConfig[] = [
+  { id: 'smart_universal', name: 'Smart Universal', profile: 'acoustic_audiophile', emoji: '✨', category: 'Alle Instrumente' },
+  { id: 'guitar_strings', name: 'Gitarre & Saiten', profile: 'acoustic_audiophile', emoji: '🎸', category: 'Zupfinstrumente' },
+  { id: 'violin_strings', name: 'Violine & Streicher', profile: 'acoustic_audiophile', emoji: '🎻', category: 'Streicher' },
+  { id: 'piano_keys', name: 'Klavier & Tasten', profile: 'grand_piano', emoji: '🎹', category: 'Tasten' },
+  { id: 'brass_winds', name: 'Blasinstrumente', profile: 'brass_vocals', emoji: '🎺', category: 'Bläser' },
+  { id: 'vocals', name: 'Gesang & Voice', profile: 'brass_vocals', emoji: '🎤', category: 'Gesang' },
+  { id: 'drums_percussion', name: 'Drums & Cajón', profile: 'drums_percussion', emoji: '🥁', category: 'Schlagwerk' },
+];
+
+export function detectSmartProfileFromInstrument(instrumentName?: string): SmartInstrumentConfig {
+  if (!instrumentName) return SMART_INSTRUMENT_FAMILIES[0];
+  const lower = instrumentName.toLowerCase().trim();
+
+  // 1. Tasten
+  if (lower.includes('klavier') || lower.includes('piano') || lower.includes('flügel') || lower.includes('keyboard') || lower.includes('tasten') || lower.includes('akkordeon') || lower.includes('organ') || lower.includes('orgel')) {
+    return SMART_INSTRUMENT_FAMILIES[3]; // Klavier & Tasten
+  }
+
+  // 2. Streicher
+  if (lower.includes('geige') || lower.includes('violine') || lower.includes('cello') || lower.includes('violoncello') || lower.includes('bratsche') || lower.includes('viola') || lower.includes('kontrabass') || lower.includes('streich')) {
+    return SMART_INSTRUMENT_FAMILIES[2]; // Violine & Streicher
+  }
+
+  // 3. Zupfinstrumente
+  if (lower.includes('gitarre') || lower.includes('guitar') || lower.includes('ukulele') || lower.includes('harfe') || lower.includes('bass') || lower.includes('banjo') || lower.includes('mandoline') || lower.includes('zupf')) {
+    return SMART_INSTRUMENT_FAMILIES[1]; // Gitarre & Saiten
+  }
+
+  // 4. Drums / Perkussion
+  if (lower.includes('drum') || lower.includes('schlagzeug') || lower.includes('cajon') || lower.includes('cajón') || lower.includes('percussion') || lower.includes('perkussion') || lower.includes('pauke') || lower.includes('marimba') || lower.includes('vibraphon')) {
+    return SMART_INSTRUMENT_FAMILIES[6]; // Drums & Cajón
+  }
+
+  // 5. Gesang
+  if (lower.includes('gesang') || lower.includes('stimme') || lower.includes('vocal') || lower.includes('voice') || lower.includes('sing')) {
+    return SMART_INSTRUMENT_FAMILIES[5]; // Gesang & Voice
+  }
+
+  // 6. Blasinstrumente
+  if (lower.includes('flöte') || lower.includes('flute') || lower.includes('klarinette') || lower.includes('sax') || lower.includes('trompete') || lower.includes('posaune') || lower.includes('horn') || lower.includes('tuba') || lower.includes('oboe') || lower.includes('fagott') || lower.includes('blockflöte') || lower.includes('querflöte')) {
+    return SMART_INSTRUMENT_FAMILIES[4]; // Blasinstrumente
+  }
+
+  // Fallback: Smart Universal
+  return SMART_INSTRUMENT_FAMILIES[0];
+}
+
 const DEFAULT_MILESTONES: Omit<MilestoneData, 'id' | 'visibility' | 'version'>[] = [
   {
     type: 'first_tone',
@@ -839,8 +895,33 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   const [recordSeconds, setRecordSeconds] = useState<number>(0);
   const [isProcessingMastering, setIsProcessingMastering] = useState<boolean>(false);
   const [activeUploadModalMilestone, setActiveUploadModalMilestone] = useState<MilestoneData | null>(null);
-  const [selectedProfile, setSelectedProfile] = useState<MasteringProfile>('acoustic_audiophile');
+  
+  // 🎻 Smart Instrument & Audio Mastering Profile (Auto-detected & customizable via Apple Pill)
+  const defaultSmartInstrument = useMemo(() => {
+    const rawInstr = student?.instrument || student?.main_instrument;
+    return detectSmartProfileFromInstrument(rawInstr);
+  }, [student?.instrument, student?.main_instrument]);
+
+  const [activeInstrumentConfig, setActiveInstrumentConfig] = useState<SmartInstrumentConfig>(defaultSmartInstrument);
+  const [selectedProfile, setSelectedProfile] = useState<MasteringProfile>(defaultSmartInstrument.profile);
+  const [showInstrumentPicker, setShowInstrumentPicker] = useState<boolean>(false);
   const isDrumPadMode = selectedProfile === 'drums_percussion';
+
+  // Automatically sync profile when activeInstrumentConfig changes
+  useEffect(() => {
+    setSelectedProfile(activeInstrumentConfig.profile);
+  }, [activeInstrumentConfig]);
+
+  // When modal opens, auto-detect student instrument if not manually changed
+  useEffect(() => {
+    if (activeUploadModalMilestone || recordingPlaylistId) {
+      const detected = detectSmartProfileFromInstrument(student?.instrument || student?.main_instrument);
+      setActiveInstrumentConfig(detected);
+      setSelectedProfile(detected.profile);
+      setShowInstrumentPicker(false);
+    }
+  }, [activeUploadModalMilestone, recordingPlaylistId, student?.instrument, student?.main_instrument]);
+
   const [tempSongTitle, setTempSongTitle] = useState<string>('');
   const [tempArtist, setTempArtist] = useState<string>('');
   const [tempNote, setTempNote] = useState<string>('');
@@ -905,6 +986,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
   const [wizardStep, setWizardStep] = useState<number>(1);
   const [wizardTitle, setWizardTitle] = useState<string>('');
   const [wizardDesc, setWizardDesc] = useState<string>('');
+  const [showDedicationInput, setShowDedicationInput] = useState<boolean>(false);
   const [wizardTheme, setWizardTheme] = useState<CustomPlaylist['vibeTheme']>('sunset_gold');
   const [wizardIcon, setWizardIcon] = useState<string>('music');
   const [wizardCoverPresetId, setWizardCoverPresetId] = useState<string>('cov_chart_hits');
@@ -9343,7 +9425,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
             border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
             borderRadius: '28px',
             padding: isMobileOrSim ? '20px' : '28px',
-            maxWidth: wizardStep === 2 ? '780px' : '520px',
+            maxWidth: wizardStep === 2 ? '780px' : '560px',
             maxHeight: '92vh',
             overflowY: 'auto',
             width: '100%',
@@ -9354,154 +9436,317 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
             boxShadow: '0 25px 60px rgba(0, 0, 0, 0.7)',
             transition: 'max-width 0.25s ease'
           }}>
-            {/* Header & Step Indicator */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#f59e0b', background: '#fef3c7', padding: '2px 8px', borderRadius: '100px' }}>
-                    SCHRITT {wizardStep} VON 3
-                  </span>
-                </div>
-                <h3 style={{ margin: '4px 0 0 0', fontSize: '1.25rem', fontWeight: 900 }}>
-                  {wizardStep === 1 && '1. Playlist-Name & Thema'}
-                  {wizardStep === 2 && '2. Playlist-Cover wählen'}
-                  {wizardStep === 3 && '3. Tracks zusammenstellen'}
-                </h3>
+            {/* Apple HIG Header with 2-Segment Progress Indicator & Ergonomic Squircle Close Button */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Progress Segments */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%' }}>
+                {[1, 2].map((stepIdx) => {
+                  const isDone = wizardStep > stepIdx;
+                  const isCurrent = wizardStep === stepIdx;
+                  return (
+                    <div
+                      key={`wizard-progress-${stepIdx}`}
+                      style={{
+                        flex: 1,
+                        height: '4px',
+                        borderRadius: '100px',
+                        background: isDone || isCurrent
+                          ? 'linear-gradient(90deg, #10b981 0%, #059669 100%)'
+                          : (isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.12)'),
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                      }}
+                    />
+                  );
+                })}
               </div>
-              <button
-                onClick={() => setShowPlaylistWizard(false)}
-                style={{ background: 'none', border: 'none', color: colors.textSecondary, fontSize: '1.2rem', cursor: 'pointer' }}
-              >
-                ✕
-              </button>
+
+              {/* Header Title & Close Button */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                <div>
+                  <div style={{
+                    fontSize: '0.70rem',
+                    fontWeight: 900,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.08em',
+                    color: '#059669'
+                  }}>
+                    Schritt {wizardStep} von 2
+                  </div>
+                  <h3 style={{
+                    margin: '2px 0 0 0',
+                    fontSize: isMobileOrSim ? '1.20rem' : '1.35rem',
+                    fontWeight: 950,
+                    fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    color: colors.textPrimary,
+                    letterSpacing: '-0.02em'
+                  }}>
+                    {wizardStep === 1 && 'Wie soll deine Playlist heißen?'}
+                    {wizardStep === 2 && 'Wähle dein Lieblings-Cover'}
+                  </h3>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowPlaylistWizard(false)}
+                  style={{
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '12px',
+                    background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.08)',
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: colors.textSecondary,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    flexShrink: 0
+                  }}
+                  className="hover-scale"
+                  title="Schließen"
+                  aria-label="Schließen"
+                >
+                  <X size={18} strokeWidth={2.4} />
+                </button>
+              </div>
             </div>
 
-            {/* STEP 1: TITLE & DESC */}
+            {/* STEP 1: TITLE & DESC (KIDS GOLDSTANDARD) */}
             {wizardStep === 1 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {/* 💡 Didaktische Vorlagen (1-Klick-Auswahl) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* 🌟 1-Klick Themen-Ideen (Apple Cards: Knackig & ohne Text-Abschneiden) */}
                 <div>
-                  <span style={{ display: 'block', fontSize: '0.74rem', fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
-                    💡 Didaktische Vorlagen & Entwürfe (1-Klick-Auswahl):
+                  <span style={{
+                    display: 'block',
+                    fontSize: '0.78rem',
+                    fontWeight: 900,
+                    color: colors.textSecondary,
+                    letterSpacing: '0.02em',
+                    marginBottom: '10px'
+                  }}>
+                    Wähle ein Thema oder tippe selbst:
                   </span>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '8px' }}>
-                    {PEDAGOGICAL_PLAYLIST_TEMPLATES.map((tpl) => {
-                      const isChosen = wizardTitle === tpl.title;
+
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: isMobileOrSim ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
+                    gap: '10px'
+                  }}>
+                    {[
+                      { id: 'sommer', emoji: '🌸', shortLabel: 'Sommerkonzert', fullTitle: '🌸 Sommerkonzert', theme: 'sunset_gold' as const, icon: 'trophy', desc: 'Vorspielstücke für den Sommer', coverId: 'cov_spring_summer_concert' },
+                      { id: 'vorspiel', emoji: '🏛️', shortLabel: 'Klassenvorspiel', fullTitle: '🏛️ Klassenvorspiel', theme: 'forest_emerald' as const, icon: 'award', desc: 'Gemeinsames Vorspielen vor Eltern & Freunden', coverId: 'cov_class_recital' },
+                      { id: 'eltern', emoji: '💝', shortLabel: 'Mama & Papa', fullTitle: '💝 Musik-Geschenk für Mama & Papa', theme: 'royal_ruby' as const, icon: 'heart', desc: 'Persönliche Aufnahme für die Eltern', coverId: 'cov_gift_parents' },
+                      { id: 'geburtstag', emoji: '🎂', shortLabel: 'Geburtstag', fullTitle: '🎂 Geburtstags-Ständchen', theme: 'vintage_tape' as const, icon: 'gift', desc: 'Glückwünsche & Stücke von Herzen', coverId: 'cov_gift_grandparents' },
+                      { id: 'weihnachten', emoji: '🎄', shortLabel: 'Weihnachten', fullTitle: '🎄 Mein Weihnachtsalbum', theme: 'christmas_gold' as const, icon: 'gift', desc: 'Festliche Klänge für Heiligabend', coverId: 'cov_christmas_festive' },
+                      { id: 'lieblinge', emoji: '⭐', shortLabel: 'Lieblingsstücke', fullTitle: '⭐ Meine Lieblingsstücke', theme: 'royal_velvet' as const, icon: 'heart', desc: 'Meine aktuellen Lieblingsstücke', coverId: 'cov_favorites_heart' }
+                    ].map((item) => {
+                      const isChosen = wizardTitle === item.fullTitle || wizardTitle === item.shortLabel;
                       return (
                         <button
-                          key={tpl.id}
+                          key={item.id}
                           type="button"
                           onClick={() => {
-                            setWizardTitle(tpl.title);
-                            setWizardDesc(tpl.description);
-                            setWizardTheme(tpl.vibeTheme);
-                            setWizardIcon(tpl.iconName);
+                            setWizardTitle(item.fullTitle);
+                            setWizardDesc(item.desc);
+                            setWizardTheme(item.theme);
+                            setWizardIcon(item.icon);
+                            setWizardCoverPresetId(item.coverId);
                           }}
                           style={{
-                            padding: '8px 10px',
-                            borderRadius: '14px',
-                            border: isChosen ? '1.5px solid #10b981' : `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.1)'}`,
-                            background: isChosen ? (isLight ? '#ecfdf5' : 'rgba(16, 185, 129, 0.18)') : (isLight ? '#f8fafc' : 'rgba(255, 255, 255, 0.04)'),
+                            padding: '12px 14px',
+                            borderRadius: '16px',
+                            border: isChosen
+                              ? '2px solid #10b981'
+                              : `1.5px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.08)'}`,
+                            background: isChosen
+                              ? (isLight ? '#ecfdf5' : 'rgba(16, 185, 129, 0.16)')
+                              : (isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.03)'),
                             color: colors.textPrimary,
-                            fontSize: '0.74rem',
-                            fontWeight: 700,
                             cursor: 'pointer',
                             display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'flex-start',
-                            gap: '3px',
+                            alignItems: 'center',
+                            gap: '10px',
                             textAlign: 'left',
-                            boxShadow: isChosen ? '0 2px 8px rgba(16, 185, 129, 0.25)' : 'none',
-                            transition: 'all 0.15s ease'
+                            boxShadow: isChosen
+                              ? '0 4px 14px rgba(16, 185, 129, 0.22)'
+                              : '0 2px 6px rgba(0, 0, 0, 0.02)',
+                            transition: 'all 0.18s cubic-bezier(0.4, 0, 0.2, 1)',
+                            touchAction: 'manipulation'
                           }}
                           className="hover-scale"
                         >
-                          <span style={{ fontSize: '1.05rem', lineHeight: 1 }}>{tpl.emoji}</span>
-                          <strong style={{ fontSize: '0.74rem', color: isChosen ? '#10b981' : colors.textPrimary }}>
-                            {tpl.title.replace(/^[^\s]+\s/, '')}
-                          </strong>
-                          <span style={{ fontSize: '0.64rem', color: colors.textSecondary }}>{tpl.tag}</span>
+                          <span style={{
+                            fontSize: '1.45rem',
+                            lineHeight: 1,
+                            filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.08))',
+                            flexShrink: 0
+                          }}>
+                            {item.emoji}
+                          </span>
+                          <span style={{
+                            fontSize: '0.86rem',
+                            fontWeight: 900,
+                            color: isChosen ? '#059669' : colors.textPrimary,
+                            lineHeight: 1.2,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}>
+                            {item.shortLabel}
+                          </span>
                         </button>
                       );
                     })}
                   </div>
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, marginBottom: '6px' }}>
-                    Titel der Playlist:
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="z. B. Mein Sommerkonzert 2026, Akustik-Sessions..."
-                    value={wizardTitle}
-                    onChange={(e) => setWizardTitle(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '12px 14px',
-                      borderRadius: '14px',
-                      border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
-                      background: isLight ? '#f8fafc' : 'rgba(0, 0, 0, 0.35)',
+                {/* Eingabefelder: Minimalistisch mit dezentem Widmungs-Link (Zero Mental Load) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '0.80rem',
+                      fontWeight: 850,
                       color: colors.textPrimary,
-                      fontSize: '0.9rem',
-                      fontWeight: 700,
-                      boxSizing: 'border-box'
-                    }}
-                    autoFocus
-                  />
+                      marginBottom: '6px'
+                    }}>
+                      Name deiner Playlist:
+                    </label>
+                    <input
+                      type="text"
+                      name="playlist_title"
+                      autoComplete="off"
+                      placeholder="z. B. Meine besten Songs..."
+                      value={wizardTitle}
+                      onChange={(e) => setWizardTitle(e.target.value)}
+                      style={{
+                        width: '100%',
+                        height: '46px',
+                        padding: '0 16px',
+                        borderRadius: '14px',
+                        border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
+                        background: isLight ? '#f8fafc' : 'rgba(0, 0, 0, 0.3)',
+                        color: colors.textPrimary,
+                        fontSize: '0.94rem',
+                        fontWeight: 750,
+                        boxSizing: 'border-box',
+                        outline: 'none',
+                        transition: 'border-color 0.15s ease'
+                      }}
+                      onFocus={(e) => e.currentTarget.style.borderColor = '#10b981'}
+                      onBlur={(e) => e.currentTarget.style.borderColor = isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}
+                      autoFocus
+                    />
+                  </div>
+
+                  {/* Progressive Disclosure: Widmungs-Toggle für Kinder */}
+                  {!showDedicationInput && !wizardDesc ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowDedicationInput(true)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: '4px 0',
+                        color: '#059669',
+                        fontSize: '0.78rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        alignSelf: 'flex-start',
+                        transition: 'opacity 0.15s ease'
+                      }}
+                      className="hover-opacity"
+                    >
+                      <span>+ Widmung oder Notiz hinzufügen</span>
+                    </button>
+                  ) : (
+                    <div style={{ marginTop: '4px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <label style={{
+                          fontSize: '0.76rem',
+                          fontWeight: 750,
+                          color: colors.textSecondary
+                        }}>
+                          Widmung oder Notiz (optional):
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setWizardDesc('');
+                            setShowDedicationInput(false);
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#94a3b8',
+                            fontSize: '0.72rem',
+                            cursor: 'pointer',
+                            padding: 0
+                          }}
+                        >
+                          Entfernen
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        name="playlist_desc"
+                        autoComplete="off"
+                        placeholder="z. B. Für Familie & Freunde..."
+                        value={wizardDesc}
+                        onChange={(e) => setWizardDesc(e.target.value)}
+                        style={{
+                          width: '100%',
+                          height: '42px',
+                          padding: '0 14px',
+                          borderRadius: '12px',
+                          border: `1px solid ${isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.15)'}`,
+                          background: isLight ? '#f8fafc' : 'rgba(0, 0, 0, 0.25)',
+                          color: colors.textPrimary,
+                          fontSize: '0.86rem',
+                          boxSizing: 'border-box',
+                          outline: 'none'
+                        }}
+                        autoFocus
+                      />
+                    </div>
+                  )}
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, marginBottom: '6px' }}>
-                    Beschreibung / Widmung (optional):
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="z. B. Für Familie & Freunde zusammengestellt"
-                    value={wizardDesc}
-                    onChange={(e) => setWizardDesc(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '12px 14px',
-                      borderRadius: '14px',
-                      border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.2)'}`,
-                      background: isLight ? '#f8fafc' : 'rgba(0, 0, 0, 0.35)',
-                      color: colors.textPrimary,
-                      fontSize: '0.84rem',
-                      boxSizing: 'border-box'
-                    }}
-                  />
-                </div>
-
+                {/* Apple Action Button */}
                 <button
                   type="button"
                   onClick={() => {
                     if (!wizardTitle.trim()) {
-                      alert('Bitte gib einen Playlist-Namen ein.');
+                      alert('Bitte gib einen Namen für deine Playlist ein.');
                       return;
                     }
                     setWizardStep(2);
                   }}
                   style={{
                     width: '100%',
-                    padding: '13px',
+                    height: '48px',
                     borderRadius: '100px',
                     border: 'none',
                     background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                     color: 'white',
-                    fontWeight: 900,
-                    fontSize: '0.88rem',
+                    fontWeight: 950,
+                    fontSize: '0.92rem',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '8px',
-                    marginTop: '8px'
+                    marginTop: '4px',
+                    boxShadow: '0 6px 20px rgba(16, 185, 129, 0.3)',
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
                   }}
                   className="hover-scale"
                 >
-                  <span>Weiter: Playlist-Cover wählen</span>
-                  <ChevronRight size={16} />
+                  <span>Weiter zum Cover</span>
+                  <ChevronRight size={18} strokeWidth={2.5} />
                 </button>
               </div>
             )}
@@ -9654,109 +9899,11 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                     })}
                 </div>
 
-                {/* Footer buttons */}
+                {/* Footer buttons: Instant 1-Tap Completion */}
                 <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
                   <button
                     type="button"
                     onClick={() => setWizardStep(1)}
-                    style={{
-                      flex: 1,
-                      padding: '12px',
-                      borderRadius: '100px',
-                      border: `1px solid ${isLight ? '#cbd5e1' : 'rgba(255,255,255,0.2)'}`,
-                      background: 'transparent',
-                      color: colors.textPrimary,
-                      fontWeight: 800,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Zurück
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setWizardStep(3)}
-                    style={{
-                      flex: 2,
-                      padding: '12px',
-                      borderRadius: '100px',
-                      border: 'none',
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                      color: 'white',
-                      fontWeight: 900,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px'
-                    }}
-                    className="hover-scale"
-                  >
-                    <span>Weiter: Tracks wählen</span>
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* STEP 3: SELECT TRACKS & FINALIZE */}
-            {wizardStep === 3 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <span style={{ fontSize: '0.82rem', color: colors.textSecondary }}>
-                  Möchtest du bereits aufgenommene Meilensteine direkt in diese Playlist übernehmen?
-                </span>
-
-                <div style={{ maxHeight: '200px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {milestones.filter(m => m.audioUrl).length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '16px', color: colors.textSecondary, fontSize: '0.78rem' }}>
-                      Bisher keine Meilenstein-Aufnahmen vorhanden. Du kannst nach der Erstellung direkt eigene Songs aufnehmen!
-                    </div>
-                  ) : (
-                    milestones.filter(m => m.audioUrl).map(ms => {
-                      const isChecked = wizardSelectedMilestones.includes(ms.id);
-                      return (
-                        <label
-                          key={ms.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '10px 12px',
-                            borderRadius: '12px',
-                            background: isChecked ? (isLight ? '#dcfce7' : 'rgba(16,185,129,0.15)') : (isLight ? '#f8fafc' : 'rgba(255,255,255,0.04)'),
-                            border: `1px solid ${isChecked ? '#10b981' : (isLight ? '#e2e8f0' : 'rgba(255,255,255,0.08)')}`,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setWizardSelectedMilestones([...wizardSelectedMilestones, ms.id]);
-                                } else {
-                                  setWizardSelectedMilestones(wizardSelectedMilestones.filter(id => id !== ms.id));
-                                }
-                              }}
-                              style={{ accentColor: '#10b981', width: '16px', height: '16px' }}
-                            />
-                            <span style={{ fontSize: '0.82rem', fontWeight: 800, color: colors.textPrimary }}>
-                              {ms.title}
-                            </span>
-                          </div>
-                          <span style={{ fontSize: '0.72rem', color: colors.textSecondary }}>
-                            {ms.recordedAt}
-                          </span>
-                        </label>
-                      );
-                    })
-                  )}
-                </div>
-
-                <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setWizardStep(2)}
                     style={{
                       flex: 1,
                       padding: '12px',
@@ -9833,11 +9980,11 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <Disc size={22} color="#10b981" />
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1.18rem', fontWeight: 900 }}>
-                    {activeUploadModalMilestone ? `${activeUploadModalMilestone.title} verewigen` : 'Neuen Song für Playlist aufnehmen'}
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, letterSpacing: '-0.01em' }}>
+                    {activeUploadModalMilestone ? `${activeUploadModalMilestone.title}` : 'Neuen Song aufnehmen'}
                   </h3>
-                  <span style={{ fontSize: '0.78rem', color: colors.textSecondary, fontWeight: 600 }}>
-                    {activeUploadModalMilestone ? activeUploadModalMilestone.subtitle : 'Studio Mastering Chain wird automatisch angewendet'}
+                  <span style={{ fontSize: '0.80rem', color: colors.textSecondary, fontWeight: 600 }}>
+                    {activeUploadModalMilestone ? activeUploadModalMilestone.subtitle : 'Kristallklarer Studio-Klang & automatische Aussteuerung'}
                   </span>
                 </div>
               </div>
@@ -9865,180 +10012,120 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
               </button>
             </div>
 
-            {/* Instrument & Source Profile Selector (Shown during capture) */}
+            {/* 🎻 Apple HIG Kids Smart-Instrument Pill & Selection Popover */}
             {!isProcessingMastering && !pendingDualResult && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {/* 🎛️ Audiophile Instrument & Source Profile Selector */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(4, 1fr)',
-                  gap: '4px',
-                  background: isLight ? '#f8fafc' : 'rgba(0, 0, 0, 0.3)',
-                  borderRadius: '14px',
-                  padding: '4px',
-                  border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.1)'}`
-                }}>
-                  {/* Option 1: Acoustic */}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedProfile('acoustic_audiophile')}
-                    style={{
-                      padding: '8px 6px',
-                      borderRadius: '10px',
-                      border: 'none',
-                      background: selectedProfile === 'acoustic_audiophile' 
-                        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
-                        : 'transparent',
-                      color: selectedProfile === 'acoustic_audiophile' ? '#ffffff' : colors.textSecondary,
-                      fontSize: '0.72rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '5px',
-                      boxShadow: selectedProfile === 'acoustic_audiophile' ? '0 2px 8px rgba(16, 185, 129, 0.3)' : 'none',
-                      transition: 'all 0.15s ease',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    <Music size={13} />
-                    <span>Akustik</span>
-                  </button>
-
-                  {/* Option 2: Grand Piano */}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedProfile('grand_piano')}
-                    style={{
-                      padding: '8px 6px',
-                      borderRadius: '10px',
-                      border: 'none',
-                      background: selectedProfile === 'grand_piano' 
-                        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
-                        : 'transparent',
-                      color: selectedProfile === 'grand_piano' ? '#ffffff' : colors.textSecondary,
-                      fontSize: '0.72rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '5px',
-                      boxShadow: selectedProfile === 'grand_piano' ? '0 2px 8px rgba(16, 185, 129, 0.3)' : 'none',
-                      transition: 'all 0.15s ease',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    <Layers size={13} />
-                    <span>Klavier</span>
-                  </button>
-
-                  {/* Option 3: Brass & Vocals */}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedProfile('brass_vocals')}
-                    style={{
-                      padding: '8px 6px',
-                      borderRadius: '10px',
-                      border: 'none',
-                      background: selectedProfile === 'brass_vocals' 
-                        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
-                        : 'transparent',
-                      color: selectedProfile === 'brass_vocals' ? '#ffffff' : colors.textSecondary,
-                      fontSize: '0.72rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '5px',
-                      boxShadow: selectedProfile === 'brass_vocals' ? '0 2px 8px rgba(16, 185, 129, 0.3)' : 'none',
-                      transition: 'all 0.15s ease',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    <Zap size={13} />
-                    <span>Gesang / Bläser</span>
-                  </button>
-
-                  {/* Option 4: Drums */}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedProfile('drums_percussion')}
-                    style={{
-                      padding: '8px 6px',
-                      borderRadius: '10px',
-                      border: 'none',
-                      background: selectedProfile === 'drums_percussion' 
-                        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
-                        : 'transparent',
-                      color: selectedProfile === 'drums_percussion' ? '#ffffff' : colors.textSecondary,
-                      fontSize: '0.72rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '5px',
-                      boxShadow: selectedProfile === 'drums_percussion' ? '0 2px 8px rgba(16, 185, 129, 0.3)' : 'none',
-                      transition: 'all 0.15s ease',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    <Volume2 size={13} />
-                    <span>Drums</span>
-                  </button>
-                </div>
-
-                {selectedProfile === 'drums_percussion' && (
-                  <div style={{
-                    background: isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.10)',
-                    border: `1px solid ${isLight ? '#bbf7d0' : 'rgba(16, 185, 129, 0.25)'}`,
-                    borderRadius: '12px',
-                    padding: '8px 12px',
-                    display: 'flex',
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', width: '100%' }}>
+                {/* 🌟 Compact Apple Squircle Pill */}
+                <button
+                  type="button"
+                  onClick={() => setShowInstrumentPicker(prev => !prev)}
+                  aria-label={`Instrument wählen: ${activeInstrumentConfig.name}`}
+                  style={{
+                    display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '8px'
-                  }}>
-                    <Volume2 size={14} color="#10b981" style={{ flexShrink: 0 }} />
-                    <span style={{ fontSize: '0.72rem', color: isLight ? '#166534' : '#a7f3d0', fontWeight: 600, lineHeight: 1.35 }}>
-                      <b>Schlagzeug-Modus:</b> Headroom-Schutz & Kick-Tiefbass aktiv. (Empfehlung: Smartphone 1,5 bis 2 Meter vor das Drumkit stellen).
-                    </span>
-                  </div>
-                )}
+                    gap: '8px',
+                    padding: '8px 16px',
+                    borderRadius: '999px',
+                    background: isLight ? '#f1f5f9' : 'rgba(255, 255, 255, 0.08)',
+                    border: `1.5px solid ${showInstrumentPicker ? '#10b981' : (isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.15)')}`,
+                    color: colors.textPrimary,
+                    cursor: 'pointer',
+                    transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                    boxShadow: showInstrumentPicker ? '0 0 0 3px rgba(16, 185, 129, 0.2)' : '0 2px 6px rgba(0,0,0,0.06)'
+                  }}
+                  className="hover-scale"
+                >
+                  <span style={{ fontSize: '1.15rem', lineHeight: 1 }}>{activeInstrumentConfig.emoji}</span>
+                  <span style={{ fontSize: '0.84rem', fontWeight: 800, letterSpacing: '-0.01em' }}>
+                    {activeInstrumentConfig.name}
+                  </span>
+                  <ChevronDown
+                    size={14}
+                    color={colors.textSecondary}
+                    style={{
+                      transform: showInstrumentPicker ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.2s ease'
+                    }}
+                  />
+                </button>
 
-                {selectedProfile === 'grand_piano' && (
-                  <div style={{
-                    background: isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.10)',
-                    border: `1px solid ${isLight ? '#bbf7d0' : 'rgba(16, 185, 129, 0.25)'}`,
-                    borderRadius: '12px',
-                    padding: '8px 12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}>
-                    <Music size={14} color="#10b981" style={{ flexShrink: 0 }} />
-                    <span style={{ fontSize: '0.72rem', color: isLight ? '#166534' : '#a7f3d0', fontWeight: 600, lineHeight: 1.35 }}>
-                      <b>Flügel-Modus:</b> Warme Stereobreite und transparente Bass-Entzerrung für Klavieraufnahmen.
-                    </span>
-                  </div>
-                )}
+                {/* 📋 Clean Apple-Style Instrument Dropdown Popover */}
+                {showInstrumentPicker && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '48px',
+                      zIndex: 100,
+                      width: '100%',
+                      maxWidth: '380px',
+                      background: isLight ? '#ffffff' : '#1e293b',
+                      border: `1.5px solid ${isLight ? '#cbd5e1' : 'rgba(255, 255, 255, 0.15)'}`,
+                      borderRadius: '18px',
+                      padding: '8px',
+                      boxShadow: '0 16px 36px rgba(0, 0, 0, 0.45)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                      animation: 'fadeIn 0.15s ease-out'
+                    }}
+                  >
+                    <div style={{ padding: '6px 10px 4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        Instrumenten-Familie
+                      </span>
+                      <span style={{ fontSize: '0.68rem', color: '#10b981', fontWeight: 700 }}>
+                        Auto-Klang-Optimierung
+                      </span>
+                    </div>
 
-                {selectedProfile === 'brass_vocals' && (
-                  <div style={{
-                    background: isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.10)',
-                    border: `1px solid ${isLight ? '#bbf7d0' : 'rgba(16, 185, 129, 0.25)'}`,
-                    borderRadius: '12px',
-                    padding: '8px 12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}>
-                    <Zap size={14} color="#10b981" style={{ flexShrink: 0 }} />
-                    <span style={{ fontSize: '0.72rem', color: isLight ? '#166534' : '#a7f3d0', fontWeight: 600, lineHeight: 1.35 }}>
-                      <b>Präsenz-Modus:</b> Klare Stimm- und Bläserpräsenz mit aktivem Zischlaut-Schutz.
-                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', maxHeight: '240px', overflowY: 'auto' }}>
+                      {SMART_INSTRUMENT_FAMILIES.map(family => {
+                        const isSelected = activeInstrumentConfig.id === family.id;
+                        return (
+                          <button
+                            key={family.id}
+                            type="button"
+                            onClick={() => {
+                              setActiveInstrumentConfig(family);
+                              setSelectedProfile(family.profile);
+                              setShowInstrumentPicker(false);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '10px 12px',
+                              borderRadius: '12px',
+                              border: 'none',
+                              background: isSelected 
+                                ? (isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.18)') 
+                                : 'transparent',
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                              transition: 'background 0.15s ease'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <span style={{ fontSize: '1.25rem', lineHeight: 1 }}>{family.emoji}</span>
+                              <div>
+                                <span style={{ 
+                                  fontSize: '0.84rem', 
+                                  fontWeight: isSelected ? 900 : 700, 
+                                  color: isSelected ? '#10b981' : colors.textPrimary, 
+                                  display: 'block' 
+                                }}>
+                                  {family.name}
+                                </span>
+                                <span style={{ fontSize: '0.68rem', color: colors.textSecondary }}>
+                                  {family.category}
+                                </span>
+                              </div>
+                            </div>
+                            {isSelected && <Check size={16} color="#10b981" strokeWidth={3} />}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
@@ -10571,52 +10658,72 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                       </div>
                     ) : (
                       <>
-                        <button
-                          type="button"
-                          onClick={recordingMilestoneId ? () => stopRecording(false) : triggerRecordingCountIn}
-                          style={{
-                            width: '90px',
-                            height: '90px',
-                            borderRadius: '50%',
-                            background: recordingMilestoneId 
-                              ? 'rgba(239, 68, 68, 0.18)' 
-                              : (isLight ? '#ecfdf5' : 'rgba(16, 185, 129, 0.18)'),
-                            border: `3px solid ${recordingMilestoneId ? '#ef4444' : '#10b981'}`,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            boxShadow: recordingMilestoneId 
-                              ? '0 0 24px rgba(239, 68, 68, 0.4)' 
-                              : '0 6px 20px rgba(16, 185, 129, 0.25)',
-                            animation: recordingMilestoneId ? 'pulse 1.5s infinite' : 'none',
-                            transition: 'all 0.18s ease'
-                          }}
-                          className="hover-scale"
-                          title={recordingMilestoneId ? 'Klicken zum Beenden' : 'Klicken zum Starten'}
-                        >
-                          {recordingMilestoneId ? (
-                            <Square size={34} fill="#ef4444" color="#ef4444" />
-                          ) : (
-                            <Mic size={40} color="#10b981" />
+                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {/* Animated Ripple Wave for active recording */}
+                          {recordingMilestoneId && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                width: '120px',
+                                height: '120px',
+                                borderRadius: '50%',
+                                border: '2px solid rgba(239, 68, 68, 0.4)',
+                                animation: 'pulse 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                                pointerEvents: 'none'
+                              }}
+                            />
                           )}
-                        </button>
 
-                        <div style={{ textAlign: 'center', width: '100%' }}>
+                          <button
+                            type="button"
+                            onClick={recordingMilestoneId ? () => stopRecording(false) : triggerRecordingCountIn}
+                            aria-label={recordingMilestoneId ? 'Aufnahme beenden' : 'Aufnahme starten'}
+                            style={{
+                              width: '92px',
+                              height: '92px',
+                              borderRadius: '50%',
+                              background: recordingMilestoneId 
+                                ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' 
+                                : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                              border: `4px solid ${recordingMilestoneId ? 'rgba(239, 68, 68, 0.3)' : (isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.2)')}`,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              boxShadow: recordingMilestoneId 
+                                ? '0 10px 28px rgba(239, 68, 68, 0.5)' 
+                                : '0 10px 28px rgba(16, 185, 129, 0.4)',
+                              transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                              zIndex: 2
+                            }}
+                            className="hover-scale"
+                            title={recordingMilestoneId ? 'Klicken zum Beenden' : 'Klicken zum Starten'}
+                          >
+                            {recordingMilestoneId ? (
+                              <Square size={32} fill="#ffffff" color="#ffffff" />
+                            ) : (
+                              <Mic size={38} color="#ffffff" strokeWidth={2.4} />
+                            )}
+                          </button>
+                        </div>
+
+                        <div style={{ textAlign: 'center', width: '100%', marginTop: '4px' }}>
                           <span style={{ 
-                            fontSize: '1.35rem', 
+                            fontSize: '1.45rem', 
                             fontWeight: 900, 
                             color: recordingMilestoneId ? (recordSeconds >= 390 ? '#f59e0b' : '#ef4444') : colors.textPrimary,
-                            display: 'block'
+                            display: 'block',
+                            letterSpacing: '-0.02em',
+                            fontVariantNumeric: 'tabular-nums'
                           }}>
-                            {recordingMilestoneId ? `${formatSeconds(recordSeconds)} / 7:00 Min.` : 'Bereit zur Aufnahme'}
+                            {recordingMilestoneId ? `${formatSeconds(recordSeconds)}` : 'Bereit zur Aufnahme'}
                           </span>
-                          <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem', color: (recordingMilestoneId && recordSeconds >= 390) ? '#f59e0b' : colors.textSecondary, fontWeight: 600 }}>
+                          <p style={{ margin: '4px 0 0 0', fontSize: '0.80rem', color: (recordingMilestoneId && recordSeconds >= 390) ? '#f59e0b' : colors.textSecondary, fontWeight: 600 }}>
                             {recordingMilestoneId 
                               ? (recordSeconds >= 390 
                                   ? `⏳ Noch ${420 - recordSeconds}s bis zum automatischen Speichern...` 
                                   : 'Aufnahme läuft... Spiele deinen Song!') 
-                              : 'Klicke auf das Mikrofon oder den Button für 3s Einzählen.'}
+                              : 'Ein Tap aufs Mikrofon startet 3 Sekunden Einzählen.'}
                           </p>
                         </div>
 
@@ -10625,13 +10732,13 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                             type="button"
                             onClick={() => stopRecording(false)}
                             style={{
-                              padding: '11px 26px',
+                              padding: '12px 28px',
                               borderRadius: '100px',
                               border: 'none',
                               background: '#ef4444',
                               color: 'white',
                               fontWeight: 900,
-                              fontSize: '0.84rem',
+                              fontSize: '0.86rem',
                               cursor: 'pointer',
                               display: 'flex',
                               alignItems: 'center',
@@ -10641,20 +10748,20 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                             className="hover-scale"
                           >
                             <Square size={15} fill="#fff" />
-                            <span>Aufnahme beenden & mastern</span>
+                            <span>Aufnahme stoppen & mastern</span>
                           </button>
                         ) : (
                           <button
                             type="button"
                             onClick={triggerRecordingCountIn}
                             style={{
-                              padding: '11px 26px',
+                              padding: '12px 28px',
                               borderRadius: '100px',
                               border: 'none',
                               background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                               color: 'white',
                               fontWeight: 900,
-                              fontSize: '0.84rem',
+                              fontSize: '0.86rem',
                               cursor: 'pointer',
                               display: 'flex',
                               alignItems: 'center',
@@ -10663,7 +10770,7 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                             }}
                             className="hover-scale"
                           >
-                            <Mic size={15} />
+                            <Mic size={16} strokeWidth={2.5} />
                             <span>Aufnahme starten (3s Vorlauf)</span>
                           </button>
                         )}
@@ -10675,16 +10782,16 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
                 <div style={{
                   background: isLight ? '#f0fdf4' : 'rgba(16, 185, 129, 0.08)',
                   border: `1px solid ${isLight ? '#bbf7d0' : 'rgba(16, 185, 129, 0.2)'}`,
-                  borderRadius: '12px',
-                  padding: '8px 12px',
+                  borderRadius: '14px',
+                  padding: '9px 14px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px'
                 }}>
-                  <SlidersHorizontal size={14} color="#10b981" />
-                  <span style={{ fontSize: '0.72rem', color: isLight ? '#166534' : '#a7f3d0', fontWeight: 700 }}>
-                    Automatisches Studio-Mastering & Lautheits-Abgleich aktiv
+                  <Sparkles size={15} color="#10b981" />
+                  <span style={{ fontSize: '0.74rem', color: isLight ? '#166534' : '#a7f3d0', fontWeight: 700 }}>
+                    Studio-Mastering, Rauschfilter & Lautheits-Abgleich aktiv
                   </span>
                 </div>
               </>

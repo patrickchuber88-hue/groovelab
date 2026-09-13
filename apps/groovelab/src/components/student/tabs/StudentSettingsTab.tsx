@@ -3066,6 +3066,55 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                           </button>
                         </div>
 
+                        {/* Gesetzliche Vertragsbestätigung (§ 312f Abs. 2 BGB) */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '16px', padding: '16px 18px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <ShieldCheck size={20} color="#15803d" style={{ flexShrink: 0 }} />
+                            <div>
+                              <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a' }}>
+                                Gesetzliche Vertragsbestätigung &amp; Widerrufsbelehrung (§ 312f BGB)
+                              </div>
+                              <div style={{ fontSize: '0.72rem', color: '#166534', fontWeight: 500, marginTop: '2px' }}>
+                                2-seitiger amtlicher Beleg auf dauerhaftem Datenträger inkl. Widerrufsbelehrung &amp; GoBD-Siegel.
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const { generateB2CParentContractPDF } = await import('../../../utils/pdfGenerator');
+                              const studentName = `${studentUser?.first_name || 'Schüler'} ${(studentUser?.last_name ? studentUser.last_name.slice(0, 1) + '.' : '')}`.trim();
+                              generateB2CParentContractPDF({
+                                studentName,
+                                studentId: studentId || studentUser?.id || 'schueler',
+                                schoolName: studentUser?.school_name || 'Musikschule',
+                                isDirectBilled: studentUser?.is_direct_billed,
+                                isHardship: studentUser?.is_hardship_exempt
+                              });
+                            }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '8px 14px',
+                              borderRadius: '10px',
+                              background: '#15803d',
+                              color: '#ffffff',
+                              border: 'none',
+                              fontSize: '0.78rem',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              flexShrink: 0,
+                              boxShadow: '0 2px 6px rgba(21, 128, 61, 0.2)'
+                            }}
+                            className="hover-scale"
+                            title="Vertragsurkunde und Widerrufsbelehrung als PDF herunterladen"
+                          >
+                            <Download size={14} />
+                            <span>PDF Beleg</span>
+                          </button>
+                        </div>
+
                         {/* Impressum */}
                         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <span style={{ fontSize: '0.76rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>

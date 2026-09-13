@@ -112,7 +112,7 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
         <div style={{
           flex: 1,
           width: '100%',
-          padding: isMobileOrSim ? '20px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '28px 32px',
+          padding: isMobileOrSim ? '20px 16px var(--mobile-scroll-clearance-bottom, calc(96px + env(safe-area-inset-bottom, 20px))) 16px' : '28px 32px',
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
@@ -3006,9 +3006,6 @@ export const MeisterwerkStickerAlbumTab: React.FC<MeisterwerkStickerAlbumTabProp
               onStickInAlbum={() => setAwardedStickerToAnimate(null)}
             />
           )}
-
-          {/* Safe-Area Spacer for Mobile / Gestures Bar */}
-          <div style={{ height: 'calc(84px + env(safe-area-inset-bottom, 24px))', width: '100%', flexShrink: 0 }} />
         </div>
   );
 };

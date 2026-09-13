@@ -101,10 +101,11 @@ export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
   if (!tracks || tracks.length === 0) return null;
 
   if (layoutMode === 'vertical-list') {
-    const shouldShowAll = readOnly || defaultExpanded || isExpanded || harmonizedTracks.length <= 2;
+    const INITIAL_LIMIT = 3;
+    const shouldShowAll = defaultExpanded || isExpanded || harmonizedTracks.length <= INITIAL_LIMIT;
     const visibleTracks = shouldShowAll
       ? harmonizedTracks
-      : harmonizedTracks.slice(0, 2);
+      : harmonizedTracks.slice(0, INITIAL_LIMIT);
 
     return (
       <div style={{
@@ -115,15 +116,25 @@ export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
         boxSizing: 'border-box'
       }}>
         <div 
-          onClick={() => !readOnly && harmonizedTracks.length > 2 && setIsExpanded(prev => !prev)}
+          role={harmonizedTracks.length > INITIAL_LIMIT ? "button" : undefined}
+          tabIndex={harmonizedTracks.length > INITIAL_LIMIT ? 0 : undefined}
+          onClick={() => harmonizedTracks.length > INITIAL_LIMIT && setIsExpanded(prev => !prev)}
+          onKeyDown={(e) => {
+            if (harmonizedTracks.length > INITIAL_LIMIT && (e.key === 'Enter' || e.key === ' ')) {
+              e.preventDefault();
+              setIsExpanded(prev => !prev);
+            }
+          }}
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '0 2px 2px 2px',
-            cursor: (!readOnly && harmonizedTracks.length > 2) ? 'pointer' : 'default',
-            userSelect: 'none'
+            cursor: harmonizedTracks.length > INITIAL_LIMIT ? 'pointer' : 'default',
+            userSelect: 'none',
+            borderRadius: '6px'
           }}
+          title={harmonizedTracks.length > INITIAL_LIMIT ? (isExpanded ? "Aufnahmen einklappen" : "Alle Aufnahmen anzeigen") : undefined}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Mic size={12} style={{ color: '#16a34a' }} />
@@ -154,7 +165,7 @@ export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
               </span>
             )}
           </div>
-          {harmonizedTracks.length > 2 && !readOnly && (
+          {harmonizedTracks.length > INITIAL_LIMIT && (
             <span style={{
               fontSize: '0.68rem',
               fontWeight: 750,
@@ -170,7 +181,7 @@ export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
                 </>
               ) : (
                 <>
-                  <span>+{harmonizedTracks.length - 2} weitere</span>
+                  <span>+{harmonizedTracks.length - INITIAL_LIMIT} weitere</span>
                   <ChevronDown size={11} strokeWidth={2.5} />
                 </>
               )}
@@ -197,7 +208,7 @@ export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
           );
         })}
 
-        {harmonizedTracks.length > 2 && !readOnly && (
+        {harmonizedTracks.length > INITIAL_LIMIT && (
           <button
             type="button"
             onClick={() => setIsExpanded(prev => !prev)}
@@ -208,28 +219,28 @@ export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
               border: '1px solid #e2e8f0',
               color: '#334155',
               borderRadius: '100px',
-              padding: '4px 12px',
-              fontSize: '0.72rem',
+              padding: '5px 14px',
+              fontSize: '0.74rem',
               fontWeight: 800,
               cursor: 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '5px',
+              gap: '6px',
               boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
               transition: 'all 0.15s ease'
             }}
             className="hover-scale-mini"
-            title={isExpanded ? "Aufnahmen reduzieren" : "Alle Aufnahmen anzeigen"}
+            title={isExpanded ? "Aufnahmen reduzieren" : `Alle ${harmonizedTracks.length} Aufnahmen anzeigen`}
           >
             {isExpanded ? (
               <>
-                <ChevronUp size={12} strokeWidth={2.4} color="#64748b" />
-                <span>Weniger anzeigen (2 von {harmonizedTracks.length})</span>
+                <ChevronUp size={13} strokeWidth={2.4} color="#64748b" />
+                <span>Weniger anzeigen ({INITIAL_LIMIT} von {harmonizedTracks.length})</span>
               </>
             ) : (
               <>
-                <ChevronDown size={12} strokeWidth={2.4} color="#16a34a" />
-                <span>+ {harmonizedTracks.length - 2} weitere Aufnahmen ausklappen</span>
+                <ChevronDown size={13} strokeWidth={2.4} color="#16a34a" />
+                <span>+ {harmonizedTracks.length - INITIAL_LIMIT} weitere Aufnahmen ausklappen (insgesamt {harmonizedTracks.length})</span>
               </>
             )}
           </button>

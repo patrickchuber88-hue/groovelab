@@ -16,6 +16,7 @@ import { isWebAuthnSupported, registerBiometrics } from '../utils/webauthn';
 import { SmartAppInstallPrompt } from './ui/SmartAppInstallPrompt';
 import { LegalTextModal } from './LegalTextModal';
 import { logSecurityEvent } from '../services/auditLogService';
+import { ACTIVE_LEGAL_VERSION, LEGAL_DOCUMENTS, computeSha256 } from '../legal/legalContent';
 import Confetti from 'react-confetti';
 
 interface StudentOnboardingPageProps {
@@ -231,6 +232,40 @@ export const StudentOnboardingPage: React.FC<StudentOnboardingPageProps> = ({ to
           });
         } catch (auditErr) {
           console.warn('[Onboarding] Audit event note:', auditErr);
+        }
+
+        // 🔒 Authoritative Legal Consent Recording (OWASP ASVS Level 3 / Art. 7 & 8 DSGVO)
+        try {
+          const consentTypes: string[] = ['terms_student_platform'];
+          const docHashes: Record<string, string> = {
+            terms_student_platform: await computeSha256(LEGAL_DOCUMENTS.terms_student_platform.fullTextMarkdown)
+          };
+
+          if (parentAllowAudio) {
+            consentTypes.push('consent_media_audio');
+            docHashes['consent_media_audio'] = await computeSha256(LEGAL_DOCUMENTS.consent_media_audio.fullTextMarkdown);
+          }
+
+          const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown';
+
+          await supabase.rpc('record_user_legal_consent', {
+            p_user_id: student.id,
+            p_school_id: student.school_id || null,
+            p_role: 'student',
+            p_consent_types: consentTypes,
+            p_version: ACTIVE_LEGAL_VERSION,
+            p_document_hashes: docHashes,
+            p_user_agent: userAgent,
+            p_ip_hash: null,
+            p_metadata: {
+              client_timestamp: timestamp,
+              is_student_minor_flow: true,
+              campus_usage_mode: campusUsageMode,
+              source: 'student_onboarding_wizard'
+            }
+          });
+        } catch (legalRpcErr) {
+          console.warn('[Onboarding] record_user_legal_consent note:', legalRpcErr);
         }
       }
 

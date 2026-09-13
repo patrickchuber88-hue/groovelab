@@ -43,7 +43,6 @@ const SecretaryEmployeesView = lazy(() => import('./secretary/SecretaryEmployees
 const SecretaryBriefingView = lazy(() => import('./secretary/SecretaryBriefingView').then(m => ({ default: m.SecretaryBriefingView })));
 const AdminDashboard = lazy(() => import('./AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 const CampusEventsBoard = lazy(() => import('./CampusEventsBoard').then(m => ({ default: m.CampusEventsBoard })));
-const PilotOnboardingModal = lazy(() => import('./PilotOnboardingModal').then(m => ({ default: m.PilotOnboardingModal })));
 const AVVModal = lazy(() => import('./AVVModal').then(m => ({ default: m.AVVModal })));
 const StudentDetailModal = lazy(() => import('./StudentDetailModal').then(m => ({ default: m.StudentDetailModal })));
 const TeacherDetailModal = lazy(() => import('./TeacherDetailModal').then(m => ({ default: m.TeacherDetailModal })));
@@ -2398,7 +2397,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
   // School Data & Subscription
   const [isAvvSigned, setIsAvvSigned] = useState<boolean>(true);
-  const [showPilotAgreementModalFromDashboard, setShowPilotAgreementModalFromDashboard] = useState<boolean>(false);
   const [showAvvModal, setShowAvvModal] = useState<boolean>(false);
   const [schoolName, setSchoolName] = useState<string>('');
   const [schoolYearStartMonth, setSchoolYearStartMonth] = useState<number>(9);
@@ -4478,22 +4476,22 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       fetchPendingBookings();
       fetchTariffBookings();
 
-      // Check pilot agreement status
-      let hasPilotAgreement = false;
+      // Check B2B AVV legal consent status (Single Source of Truth)
+      let hasB2bAvvConsent = false;
       try {
-        const { data: agreementData, error: agreementError } = await supabase
-          .from('pilot_agreements')
+        const { data: consentData, error: consentError } = await supabase
+          .from('legal_consents')
           .select('id')
           .eq('school_id', schoolId)
+          .eq('consent_type', 'terms_b2b_avv')
+          .eq('is_revoked', false)
           .maybeSingle();
 
-        if (agreementError) {
-          console.error('[Dashboard] Error querying pilot agreement:', agreementError);
-        } else {
-          hasPilotAgreement = !!agreementData;
+        if (!consentError && consentData) {
+          hasB2bAvvConsent = true;
         }
       } catch (err) {
-        console.error('[Dashboard] Error in pilot agreement check:', err);
+        console.error('[Dashboard] Error in B2B AVV legal consent check:', err);
       }
 
       // Parallelized fetch of school settings, users, student contract statuses, pending students, activation days, and schedules
@@ -4610,7 +4608,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
         setCurrentSchoolProfile(schoolData);
         fetchTariffBookings(schoolData);
-        setIsAvvSigned(Boolean(schoolData.avv_signed_at || hasPilotAgreement || localSignedTimestamp));
+        setIsAvvSigned(Boolean(schoolData.avv_signed_at || hasB2bAvvConsent || localSignedTimestamp));
         if (storageAddonGbFromSource > 0 && schoolData.storage_addon_status !== 'cancelled') {
           localStorage.setItem('groovelab_storage_addon_active', 'true');
           localStorage.setItem('campus_storage_addon_active', 'true');
@@ -12383,8 +12381,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               userMap={userMap}
               roomMap={roomMap}
               isAvvSigned={isAvvSigned}
-              showPilotAgreementModalFromDashboard={showPilotAgreementModalFromDashboard}
-              setShowPilotAgreementModalFromDashboard={setShowPilotAgreementModalFromDashboard}
+              setShowAvvModal={setShowAvvModal}
               showLogbookModal={showLogbookModal}
               setShowLogbookModal={setShowLogbookModal}
               showStorageManagerModal={showStorageManagerModal}
@@ -22700,20 +22697,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               setShowOwnQrModal(false);
               setQrModalUser(null);
             }} 
-          />
-        </Suspense>
-      )}
-      {showPilotAgreementModalFromDashboard && userId && (
-        <Suspense fallback={null}>
-          <PilotOnboardingModal
-            schoolId={schoolId}
-            userId={userId}
-            onComplete={() => {
-              setShowPilotAgreementModalFromDashboard(false);
-              fetchDashboardData();
-            }}
-            onShowPrivacy={() => setShowPrivacy(true)}
-            onShowAgb={() => setShowAgb(true)}
           />
         </Suspense>
       )}

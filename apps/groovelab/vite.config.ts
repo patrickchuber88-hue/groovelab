@@ -95,6 +95,14 @@ export default defineConfig({
           if (id.includes('utils/userDisplayName') || id.includes('utils/nameHelper') || id.includes('utils/adminColorHelpers') || id.includes('utils/instruments') || id.includes('constants/instruments')) {
             return 'shared-identity-utils';
           }
+          // Shared avatar, musician and instrument resolution engine (prevents pulling heavy teacher-suite into entry bundle)
+          if (id.includes('components/StudioAvatar') || id.includes('utils/avatarResolutionEngine')) {
+            return 'shared-avatar-suite';
+          }
+          // Shared gamification, stickers and student audio tresor domain (eliminates cyclic TDZ dependency between teacher & meisterwerk)
+          if (id.includes('domain/stickersAndTresor')) {
+            return 'shared-stickers-tresor';
+          }
           if (id.includes('components/IDBadgeCard')) {
             return 'id-badge-card';
           }

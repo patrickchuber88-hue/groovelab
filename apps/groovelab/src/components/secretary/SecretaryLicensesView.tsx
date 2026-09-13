@@ -18,6 +18,7 @@ import { generateStaffCouncilDeclarationPDF } from '../../utils/staffCouncilDecl
 import { generateDpoComplianceDossierPDF } from '../../utils/dpoComplianceDossierGenerator';
 import { generateEnterpriseSecurityWhitepaperPDF } from '../../utils/securityWhitepaperGenerator';
 import { generateMessengerSafetyCertificatePDF } from '../../utils/messengerSafetyCertificateGenerator';
+import { generateB2BContractCertificatePDF } from '../../utils/pdfGenerator';
 
 export interface SecretaryLicensesViewProps {
   schoolId: string;
@@ -4434,6 +4435,80 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                             gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
                             gap: '16px'
                           }}>
+                            {/* Card 0: Amtliches B2B-Vertragszertifikat (SaaS-Mietvertrag & AVV) */}
+                            <div style={{
+                              background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
+                              borderRadius: '20px',
+                              border: '1.5px solid #86efac',
+                              padding: '22px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'space-between',
+                              boxShadow: '0 4px 12px -2px rgba(22, 101, 52, 0.06)'
+                            }}>
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                                  <div style={{
+                                    width: '38px',
+                                    height: '38px',
+                                    borderRadius: '10px',
+                                    background: '#15803d',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: '#ffffff',
+                                    boxShadow: '0 2px 6px rgba(21, 128, 61, 0.25)'
+                                  }}>
+                                    <Award size={20} />
+                                  </div>
+                                  <div>
+                                    <h4 style={{ margin: 0, fontSize: '0.94rem', fontWeight: 900, color: '#0f172a' }}>
+                                      B2B-SaaS-Vertragszertifikat
+                                    </h4>
+                                    <span style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 800 }}>
+                                      Mietvertrag § 535 BGB &amp; AVV Art. 28 DSGVO
+                                    </span>
+                                  </div>
+                                </div>
+                                <p style={{ fontSize: '0.78rem', color: '#334155', lineHeight: 1.45, margin: '0 0 18px' }}>
+                                  Amtliche Vertragsurkunde für Rechnungsprüfungsamt, Gemeinderat und Schulträger mit Gebührenordnung, SLA-Zusagen, Revisions-Hash und Zeichnungsnachweis.
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  generateB2BContractCertificatePDF({
+                                    schoolName: currentSchoolProfile?.name || schoolName || 'Musikschule',
+                                    schoolAddress: `${currentSchoolProfile?.street || schoolStreet || ''} ${currentSchoolProfile?.house_number || schoolHouseNumber || ''}`.trim(),
+                                    schoolCity: `${currentSchoolProfile?.zip_code || schoolZipCode || ''} ${currentSchoolProfile?.city || schoolCity || ''}`.trim(),
+                                    schoolSigneeName: currentSchoolProfile?.avv_signee_name || (currentSchoolProfile as any)?.signeeName,
+                                    schoolId: schoolId,
+                                    avvSignedAt: currentSchoolProfile?.avv_signed_at
+                                  });
+                                }}
+                                aria-label="Amtliches B2B-Vertragszertifikat als PDF herunterladen"
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '6px',
+                                  padding: '11px 16px',
+                                  borderRadius: '12px',
+                                  background: '#15803d',
+                                  color: '#ffffff',
+                                  fontSize: '0.80rem',
+                                  fontWeight: 800,
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  boxShadow: '0 2px 6px rgba(21, 128, 61, 0.25)',
+                                  transition: 'all 0.15s'
+                                }}
+                              >
+                                <Download size={14} />
+                                B2B-Vertragszertifikat (PDF) herunterladen
+                              </button>
+                            </div>
+
                             {/* Card 1: AVV & TOMs */}
                             <div style={{
                               background: '#ffffff',
@@ -4445,6 +4520,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                               justifyContent: 'space-between',
                               boxShadow: '0 2px 8px -2px rgba(0,0,0,0.03)'
                             }}>
+
                               <div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
                                   <div style={{

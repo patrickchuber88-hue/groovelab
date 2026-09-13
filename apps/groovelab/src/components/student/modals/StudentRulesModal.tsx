@@ -46,35 +46,35 @@ export const StudentRulesModal: React.FC<StudentRulesModalProps> = ({
             Die Flammen-Stufen:
           </span>
           
-          {/* Kleine Flamme */}
+          {/* Start-Funke */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '12px 16px', borderRadius: '16px', border: '1px solid rgba(0,0,0,0.02)' }}>
             <div style={{ color: '#eab308', display: 'flex', alignItems: 'center' }}>
               <Flame size={20} fill="currentColor" />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>Kleine Flamme</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>Stufe 1: Start-Funke</div>
               <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Streak von 1 - 3 Tagen • Ziel: <strong style={{ color: '#854d0e' }}>{evolutionLevel === 3 ? 10 : evolutionLevel === 2 ? 5 : 3} Min.</strong> Üben täglich</div>
             </div>
           </div>
 
-          {/* Mittlere Flamme */}
+          {/* Power-Flamme */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '12px 16px', borderRadius: '16px', border: '1px solid rgba(0,0,0,0.02)' }}>
             <div style={{ color: '#f97316', display: 'flex', alignItems: 'center' }}>
               <Flame size={20} fill="currentColor" />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>Mittlere Flamme</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>Stufe 2: Power-Flamme</div>
               <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Streak von 4 - 8 Tagen • Ziel: <strong style={{ color: '#a21caf' }}>{evolutionLevel === 3 ? 15 : evolutionLevel === 2 ? 10 : 5} Min.</strong> Üben täglich</div>
             </div>
           </div>
 
-          {/* Helden-Feuer */}
+          {/* Meister-Feuer */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#f8fafc', padding: '12px 16px', borderRadius: '16px', border: '1px solid rgba(0,0,0,0.02)' }}>
             <div style={{ color: '#ef4444', display: 'flex', alignItems: 'center' }}>
               <Flame size={20} fill="currentColor" />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>Helden-Feuer</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>Stufe 3: Meister-Feuer</div>
               <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>Streak ab 9 Tagen • Ziel: <strong style={{ color: '#b91c1c' }}>{evolutionLevel === 3 ? 20 : evolutionLevel === 2 ? 15 : 10} Min.</strong> Üben täglich</div>
             </div>
           </div>

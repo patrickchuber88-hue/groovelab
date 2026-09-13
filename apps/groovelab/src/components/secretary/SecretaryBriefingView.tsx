@@ -44,8 +44,7 @@ export interface SecretaryBriefingViewProps {
   userMap: Record<string, any>;
   roomMap: Record<string, any>;
   isAvvSigned: boolean;
-  showPilotAgreementModalFromDashboard: boolean;
-  setShowPilotAgreementModalFromDashboard: (show: boolean) => void;
+  setShowAvvModal?: (show: boolean) => void;
   showLogbookModal: boolean;
   setShowLogbookModal: (show: boolean) => void;
   showStorageManagerModal: boolean;
@@ -111,8 +110,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
   userMap,
   roomMap,
   isAvvSigned,
-  showPilotAgreementModalFromDashboard,
-  setShowPilotAgreementModalFromDashboard,
+  setShowAvvModal,
   showLogbookModal,
   setShowLogbookModal,
   showStorageManagerModal,
@@ -620,7 +618,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                       <button
                         type="button"
                         aria-label="Auftragsverarbeitungsvertrag (AVV) jetzt unterzeichnen"
-                        onClick={() => setShowPilotAgreementModalFromDashboard(true)}
+                        onClick={() => { if (setShowAvvModal) setShowAvvModal(true); }}
                         style={{
                           background: '#dc2626',
                           color: '#ffffff',

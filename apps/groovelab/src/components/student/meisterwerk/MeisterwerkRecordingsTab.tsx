@@ -334,7 +334,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                 borderRadius: isTeacherTools ? '0 0 20px 20px' : (useNotebookLayout ? '0 0 0 20px' : '0'),
                 boxShadow: useNotebookLayout ? '-10px 10px 20px rgba(0,0,0,0.15)' : 'none',
                 borderRight: isTeacherTools || isMobileOrSim ? 'none' : (useNotebookLayout ? '1px dashed #e5e0d4' : '1px solid #e8e8ed'),
-                padding: isMobileOrSim ? '20px 16px calc(140px + env(safe-area-inset-bottom, 20px)) 16px' : '24px 20px'
+                padding: isMobileOrSim ? '20px 16px var(--mobile-scroll-clearance-bottom, calc(96px + env(safe-area-inset-bottom, 20px))) 16px' : '24px 20px'
               }}>
                 {useNotebookLayout && !isTeacherTools && (
                   <div style={{
@@ -1885,7 +1885,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                 borderRadius: useNotebookLayout ? '0 0 20px 0' : '0',
                 boxShadow: useNotebookLayout ? '10px 10px 20px rgba(0,0,0,0.15)' : 'none',
                 position: 'relative',
-                padding: isMobileOrSim ? '20px 16px calc(140px + env(safe-area-inset-bottom, 20px)) 16px' : '24px 20px'
+                padding: isMobileOrSim ? '20px 16px var(--mobile-scroll-clearance-bottom, calc(96px + env(safe-area-inset-bottom, 20px))) 16px' : '24px 20px'
               }}>
                 {useNotebookLayout && (
                   <div style={{
