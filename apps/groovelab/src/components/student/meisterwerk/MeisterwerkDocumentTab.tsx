@@ -625,6 +625,55 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     prevUiLevelRef.current = uiLevel;
   }, [uiLevel, handleResetModuleLayout]);
 
+  // 📝 Berechne die aktuell angezeigten Schüler-Hausaufgabennotizen für das aktive Wochen-Offset
+  const activeViewingStudentNotes = useMemo(() => {
+    if (viewingWeekOffset === 0) {
+      return generalHomeworkNotes || '';
+    }
+    const toolboxViewingWeekIso = (() => {
+      const d = new Date();
+      d.setDate(d.getDate() + (viewingWeekOffset * 7));
+      return getISOWeek(d);
+    })();
+    const toolboxViewingWeekNum = toolboxViewingWeekIso.split('-W')[1] || '';
+
+    const histWeekItem = (progressItems || []).find((item: any) => {
+      return item.topic_name === `Hausaufgabe KW ${toolboxViewingWeekNum}` ||
+             (item.created_at && getISOWeek(item.created_at) === toolboxViewingWeekIso) ||
+             (item.updated_at && getISOWeek(item.updated_at) === toolboxViewingWeekIso && item.topic_name.startsWith('Hausaufgabe KW '));
+    });
+
+    if (!histWeekItem || !histWeekItem.homework_notes) return '';
+    try {
+      const parsed = typeof histWeekItem.homework_notes === 'string'
+        ? JSON.parse(histWeekItem.homework_notes)
+        : histWeekItem.homework_notes;
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((n: string) => typeof n === 'string' && !isInternalMetadataNote(n))
+          .join('\n')
+          .trim();
+      } else if (typeof parsed === 'string') {
+        return parsed.split('\n').filter((s: string) => !isInternalMetadataNote(s)).join('\n').trim();
+      }
+    } catch (e) {
+      return cleanNotesText(histWeekItem.homework_notes);
+    }
+    return '';
+  }, [viewingWeekOffset, generalHomeworkNotes, progressItems, getISOWeek]);
+
+  // 🎯 Cursor-Preservation für Hausaufgaben-Bemerkung: Verhindert Cursor-Sprünge beim Tippen & Zeilenumbrüchen
+  React.useLayoutEffect(() => {
+    if (typeof document !== 'undefined' && studentNotesTextareaRef.current && document.activeElement === studentNotesTextareaRef.current) {
+      const pos = studentNotesSelectionRef.current;
+      if (pos && typeof pos.start === 'number' && typeof pos.end === 'number') {
+        try {
+          studentNotesTextareaRef.current.setSelectionRange(pos.start, pos.end);
+        } catch {}
+      }
+    }
+  }, [activeViewingStudentNotes]);
+
   // 📱 Long-Press Handlers for iPads / Tablets (500ms)
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const handleTouchStartTile = useCallback(() => {
@@ -5805,7 +5854,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                 )}
 
                 {/* The Main Input Form Card */}
-                <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, gap: readOnly ? '0px' : '20px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, gap: readOnly ? '0px' : '20px' }}>
                   <div style={{
                     flex: 1,
                     minHeight: 0,
@@ -6517,8 +6566,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               maxWidth: '100%',
                               boxSizing: 'border-box',
                               overflow: 'hidden',
-                              flex: 1,
-                              minHeight: isMobileView ? '220px' : '280px'
+                              flex: '0 0 auto',
+                              flexShrink: 0,
+                              minHeight: 'auto'
                             }}>
                               {/* 1. Responsive Header Bar (Desktop: 1-Line, Mobile: Adaptive Wrap) */}
                             <div style={{ 
@@ -6666,13 +6716,56 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 )}
                               </div>
 
-                              {/* 🍏 Right: Smartphone-Optimized Compact Action Hub (Icon-First Goldstandard) */}
+                              {/* 🎛️ Center: Lehrer-Schnellzugriff (Single Unified Row, 32px Slim) */}
+                              {!readOnly && (
+                                <div style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  flexWrap: 'wrap'
+                                }}>
+                                   {/* ⮂ Vorwoche */}
+                                  {hasTransferableHomework && (
+                                    <button
+                                      type="button"
+                                      role="button"
+                                      tabIndex={0}
+                                      onClick={() => setIsTransferModalOpen(true)}
+                                      style={{
+                                        background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                                        color: '#ffffff',
+                                        border: 'none',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 800,
+                                        padding: isMobileView ? '0 8px' : '0 11px',
+                                        height: '32px',
+                                        borderRadius: '100px',
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        boxShadow: '0 1px 3px rgba(22, 163, 74, 0.20)',
+                                        transition: 'all 0.15s ease',
+                                        touchAction: 'manipulation'
+                                      }}
+                                      className="hover-scale"
+                                      title="Hausaufgaben aus der Vorwoche übernehmen"
+                                      aria-label="Hausaufgaben aus der Vorwoche übernehmen"
+                                    >
+                                      <ArrowRightLeft size={12} strokeWidth={2.5} />
+                                      <span>{!isMobileView ? 'Vorwoche' : ''}</span>
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* 🍏 Right: Compact Action Hub (32px Slim Icons) */}
                               <div 
                                 ref={shareMenuRef}
                                 style={{
                                   display: 'flex',
                                   alignItems: 'center',
-                                  gap: '6px',
+                                  gap: '5px',
                                   flexShrink: 0,
                                   width: 'auto',
                                   justifyContent: 'flex-end',
@@ -6680,7 +6773,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   boxSizing: 'border-box'
                                 }}
                               >
-                                {/* ❓ 1. Student Question Button / Teacher Live Status Pill */}
+                                {/* ❓ 1. Student Question Button */}
                                 {readOnly ? (
                                   effectiveViewingQuestion.hasQuestion ? (
                                     <button
@@ -6698,14 +6791,14 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         gap: isMobileView ? '4px' : '6px',
-                                        padding: isMobileView ? '0 8px' : '0 12px',
-                                        height: '38px',
-                                        minHeight: '38px',
+                                        padding: isMobileView ? '0 8px' : '0 10px',
+                                        height: '32px',
+                                        minHeight: '32px',
                                         borderRadius: '100px',
                                         border: '1px solid #fde047',
                                         background: '#fef9c3',
                                         color: '#854d0e',
-                                        fontSize: '0.80rem',
+                                        fontSize: '0.75rem',
                                         fontWeight: 750,
                                         cursor: 'pointer',
                                         boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
@@ -6719,7 +6812,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       title="Deine Frage ansehen oder ändern"
                                       aria-label="1 Frage notiert - ansehen oder ändern"
                                     >
-                                      <HelpCircle size={isMobileView ? 16 : 15} strokeWidth={2.4} color="#854d0e" />
+                                      <HelpCircle size={14} strokeWidth={2.4} color="#854d0e" />
                                       {isMobileView ? (
                                         <span style={{
                                           background: '#ca8a04',
@@ -6746,10 +6839,10 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        width: '38px',
-                                        height: '38px',
-                                        minWidth: '38px',
-                                        minHeight: '38px',
+                                        width: '32px',
+                                        height: '32px',
+                                        minWidth: '32px',
+                                        minHeight: '32px',
                                         borderRadius: '100px',
                                         border: '1px solid #cbd5e1',
                                         background: '#f8fafc',
@@ -6766,94 +6859,78 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       title={`Frage an ${effectiveTeacherFullName} stellen`}
                                       aria-label={`Frage an ${effectiveTeacherFullName} stellen`}
                                     >
-                                      <HelpCircle size={16} strokeWidth={2.3} color="#475569" />
+                                      <HelpCircle size={15} strokeWidth={2.3} color="#475569" />
                                     </button>
                                   )
-                                ) : (
-                                  <span 
-                                    style={{
-                                      fontSize: '0.74rem',
-                                      color: '#15803d',
-                                      background: '#dcfce7',
-                                      border: '1px solid #bbf7d0',
-                                      padding: isMobileView ? '0 8px' : '0 10px',
-                                      height: '38px',
-                                      minHeight: '38px',
-                                      borderRadius: '100px',
-                                      fontWeight: 800,
-                                      letterSpacing: '0.02em',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '5px',
-                                      boxSizing: 'border-box',
-                                      flexShrink: 0
-                                    }}
-                                    title="Live-Schülersicht aktiv"
-                                    aria-label="Live-Schülersicht aktiv"
-                                  >
-                                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a' }} />
-                                    <span>{isMobileView ? 'Live' : 'Live-Schülersicht'}</span>
-                                  </span>
-                                )}
+                                ) : null}
 
-                                {/* 🔊 2. Global TTS Audio Assistant (38px Icon Pill mit Stopp-/Equalizer-Zustand) */}
-                                <button
-                                  type="button"
-                                  role="button"
-                                  tabIndex={0}
-                                  onClick={() => {
-                                    if (isTtsSpeaking && activeTtsKey === 'global_homework') {
-                                      handleStopSpeaking();
-                                    } else {
-                                      const speechPhrases = buildCompleteWeeklyHomeworkSpeechPhrases(
-                                        viewingWeekNum,
-                                        lehrwerkeList,
-                                        otherHWs.map(s => ({
-                                          title: s.topic_name?.replace(/\s*\([^)]*\)\s*$/, '') || '',
-                                          note: getCleanPageNotes(s.homework_notes)
-                                        })),
-                                        audioNotes,
-                                        generalHomeworkNotes
-                                      );
-                                      handleSpeakText(speechPhrases, 'global_homework');
-                                    }
-                                  }}
-                                  style={{
-                                    background: (isTtsSpeaking && activeTtsKey === 'global_homework') 
-                                      ? '#ef4444' 
-                                      : '#f8fafc',
-                                    border: (isTtsSpeaking && activeTtsKey === 'global_homework') ? '1px solid #dc2626' : '1px solid #cbd5e1',
-                                    color: (isTtsSpeaking && activeTtsKey === 'global_homework') ? '#ffffff' : '#334155',
-                                    borderRadius: '100px',
-                                    width: '38px',
-                                    height: '38px',
-                                    minWidth: '38px',
-                                    minHeight: '38px',
-                                    cursor: 'pointer',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    transition: 'all 0.15s ease',
-                                    boxShadow: (isTtsSpeaking && activeTtsKey === 'global_homework') 
-                                      ? '0 0 0 3px rgba(239, 68, 68, 0.25)' 
-                                      : '0 1px 2px rgba(0,0,0,0.02)',
-                                    touchAction: 'manipulation',
-                                    WebkitTapHighlightColor: 'transparent',
-                                    boxSizing: 'border-box',
-                                    flexShrink: 0
-                                  }}
-                                  className="hover-scale-mini"
-                                  title={isTtsSpeaking && activeTtsKey === 'global_homework' ? "Vorlesen stoppen" : "Gesamte Hausaufgabe vorlesen lassen"}
-                                  aria-label={isTtsSpeaking && activeTtsKey === 'global_homework' ? "Vorlesen stoppen" : "Gesamte Hausaufgabe vorlesen lassen"}
-                                >
-                                  {isTtsSpeaking && activeTtsKey === 'global_homework' ? (
-                                    <VolumeX size={16} strokeWidth={2.4} />
-                                  ) : (
-                                    <Volume2 size={16} color="#334155" strokeWidth={2.2} />
-                                  )}
-                                </button>
+                                 {/* 🔊 0. Didaktischer Audio-Vorlese-Assistent (32px Pill im Header) */}
+                                 <button
+                                   type="button"
+                                   role="button"
+                                   tabIndex={0}
+                                   onClick={() => {
+                                     if (isTtsSpeaking && activeTtsKey === 'global_homework') {
+                                       handleStopSpeaking();
+                                     } else {
+                                       if (hasActiveItems) {
+                                         const speechPhrases = buildCompleteWeeklyHomeworkSpeechPhrases(
+                                           viewingWeekNum,
+                                           lehrwerkeList,
+                                           otherHWs.map(s => ({
+                                             title: s.topic_name?.replace(/\s*\([^)]*\)\s*$/, '') || '',
+                                             note: getCleanPageNotes(s.homework_notes)
+                                           })),
+                                           audioNotes,
+                                           generalHomeworkNotes
+                                         );
+                                         handleSpeakText(speechPhrases, 'global_homework');
+                                       } else {
+                                         const speechPhrases = [
+                                           'Bühne frei für deine Musik! Für diese Woche sind noch keine Aufgaben eingetragen. Zeit für freies Üben!'
+                                         ];
+                                         handleSpeakText(speechPhrases, 'global_homework');
+                                       }
+                                     }
+                                   }}
+                                   style={{
+                                     background: (isTtsSpeaking && activeTtsKey === 'global_homework') ? '#ef4444' : '#f0fdf4',
+                                     border: (isTtsSpeaking && activeTtsKey === 'global_homework') ? '1px solid #dc2626' : '1.5px solid #86efac',
+                                     color: (isTtsSpeaking && activeTtsKey === 'global_homework') ? '#ffffff' : '#15803d',
+                                     borderRadius: '100px',
+                                     height: '32px',
+                                     padding: isMobileView ? '0 8px' : '0 11px',
+                                     cursor: 'pointer',
+                                     display: 'inline-flex',
+                                     alignItems: 'center',
+                                     gap: '5px',
+                                     fontSize: '0.74rem',
+                                     fontWeight: 800,
+                                     transition: 'all 0.15s ease',
+                                     boxShadow: (isTtsSpeaking && activeTtsKey === 'global_homework') 
+                                       ? '0 0 0 3px rgba(239, 68, 68, 0.25)' 
+                                       : '0 1px 2px rgba(0,0,0,0.02)',
+                                     touchAction: 'manipulation',
+                                     flexShrink: 0
+                                   }}
+                                   className="hover-scale-mini"
+                                   title={isTtsSpeaking && activeTtsKey === 'global_homework' ? "Vorlesen stoppen" : "Hausaufgabe vorlesen lassen"}
+                                   aria-label={isTtsSpeaking && activeTtsKey === 'global_homework' ? "Vorlesen stoppen" : "Hausaufgabe vorlesen lassen"}
+                                 >
+                                   {isTtsSpeaking && activeTtsKey === 'global_homework' ? (
+                                     <>
+                                       <VolumeX size={14} strokeWidth={2.4} />
+                                       {!isMobileView && <span>Stopp</span>}
+                                     </>
+                                   ) : (
+                                     <>
+                                       <Volume2 size={14} color="#15803d" strokeWidth={2.3} />
+                                       {!isMobileView && <span>Vorlesen</span>}
+                                     </>
+                                   )}
+                                 </button>
 
-                                {/* ✉️ 3. Direct E-Mail Send Button (38px Icon Pill) */}
+                                {/* ✉️ 1. Direct E-Mail Send Button (32px Icon Pill) */}
                                 <button
                                   type="button"
                                   role="button"
@@ -6864,10 +6941,10 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     border: '1px solid #cbd5e1',
                                     color: '#16a34a',
                                     borderRadius: '100px',
-                                    width: '38px',
-                                    height: '38px',
-                                    minWidth: '38px',
-                                    minHeight: '38px',
+                                    width: '32px',
+                                    height: '32px',
+                                    minWidth: '32px',
+                                    minHeight: '32px',
                                     cursor: 'pointer',
                                     display: 'inline-flex',
                                     alignItems: 'center',
@@ -6883,10 +6960,10 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   title="Wochenplan per E-Mail versenden"
                                   aria-label="Wochenplan per E-Mail versenden"
                                 >
-                                  <Mail size={16} color="#16a34a" strokeWidth={2.2} />
+                                  <Mail size={15} color="#16a34a" strokeWidth={2.2} />
                                 </button>
 
-                                {/* 📋 4. Quick-Copy Icon Button mit Inline-Feedback */}
+                                {/* 📋 2. Quick-Copy Icon Button mit Inline-Feedback */}
                                 <button
                                   type="button"
                                   role="button"
@@ -6897,10 +6974,10 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     border: isLinkCopied ? '1px solid #86efac' : '1px solid #cbd5e1',
                                     color: isLinkCopied ? '#16a34a' : '#475569',
                                     borderRadius: '100px',
-                                    width: '38px',
-                                    height: '38px',
-                                    minWidth: '38px',
-                                    minHeight: '38px',
+                                    width: '32px',
+                                    height: '32px',
+                                    minWidth: '32px',
+                                    minHeight: '32px',
                                     cursor: 'pointer',
                                     display: 'inline-flex',
                                     alignItems: 'center',
@@ -6917,53 +6994,61 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   aria-label={isLinkCopied ? 'In Zwischenablage kopiert!' : 'Wochenplan-Text in Zwischenablage kopieren'}
                                 >
                                   {isLinkCopied ? (
-                                    <Check size={16} color="#16a34a" strokeWidth={2.5} />
+                                    <Check size={15} color="#16a34a" strokeWidth={2.5} />
                                   ) : (
-                                    <Copy size={15} color="#475569" strokeWidth={2.2} />
+                                    <Copy size={14} color="#475569" strokeWidth={2.2} />
                                   )}
                                 </button>
 
-                                {/* 🔄 5. Optionales Lehrer-Reset (Hausaufgaben leeren) */}
+                                {/* 🔄 3. Destruktives Lehrer-Reset (Hausaufgaben leeren mit Sicherheits-Trenner) */}
                                 {(progressItems.some(item => item.is_current_homework) || generalHomeworkNotes.trim() !== '' || isCarriedOverPlan) && !readOnly && (
-                                  <button 
-                                    type="button" 
-                                    role="button"
-                                    tabIndex={0}
-                                    onClick={async () => {
-                                      await handleResetAllCurrentHomework();
-                                      setGeneralHomeworkNotes('');
-                                      setIsCarriedOverDismissed(true);
-                                    }}
-                                    style={{ 
-                                      border: '1px solid #fee2e2', 
-                                      background: '#fff1f2', 
-                                      color: '#ef4444', 
-                                      cursor: 'pointer', 
-                                      borderRadius: '100px',
-                                      width: isMobileView ? '38px' : 'auto',
-                                      height: '38px',
-                                      minWidth: '38px',
-                                      minHeight: '38px',
-                                      padding: isMobileView ? 0 : '0 10px',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      gap: '4px',
-                                      fontSize: '0.76rem',
-                                      fontWeight: 750,
-                                      transition: 'all 0.15s ease',
-                                      touchAction: 'manipulation',
-                                      WebkitTapHighlightColor: 'transparent',
-                                      boxSizing: 'border-box',
-                                      flexShrink: 0
-                                    }}
-                                    className="hover-scale-mini"
-                                    title="Hausaufgaben für diese Woche zurücksetzen"
-                                    aria-label="Hausaufgaben für diese Woche zurücksetzen"
-                                  >
-                                    <RotateCcw size={13} color="#ef4444" strokeWidth={2.3} />
-                                    {!isMobileView && <span>Leeren</span>}
-                                  </button>
+                                  <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    borderLeft: '1px solid #e2e8f0',
+                                    paddingLeft: '5px',
+                                    marginLeft: '2px'
+                                  }}>
+                                    <button 
+                                      type="button" 
+                                      role="button"
+                                      tabIndex={0}
+                                      onClick={async () => {
+                                        await handleResetAllCurrentHomework();
+                                        setGeneralHomeworkNotes('');
+                                        setIsCarriedOverDismissed(true);
+                                      }}
+                                      style={{ 
+                                        border: '1px solid #fee2e2', 
+                                        background: '#fff1f2', 
+                                        color: '#ef4444', 
+                                        cursor: 'pointer', 
+                                        borderRadius: '100px',
+                                        width: isMobileView ? '32px' : 'auto',
+                                        height: '32px',
+                                        minWidth: '32px',
+                                        minHeight: '32px',
+                                        padding: isMobileView ? 0 : '0 9px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '4px',
+                                        fontSize: '0.74rem',
+                                        fontWeight: 750,
+                                        transition: 'all 0.15s ease',
+                                        touchAction: 'manipulation',
+                                        WebkitTapHighlightColor: 'transparent',
+                                        boxSizing: 'border-box',
+                                        flexShrink: 0
+                                      }}
+                                      className="hover-scale-mini"
+                                      title="Hausaufgaben für diese Woche zurücksetzen"
+                                      aria-label="Hausaufgaben für diese Woche zurücksetzen"
+                                    >
+                                      <RotateCcw size={12} color="#ef4444" strokeWidth={2.3} />
+                                      {!isMobileView && <span>Leeren</span>}
+                                    </button>
+                                  </div>
                                 )}
                               </div>
                             </div>
@@ -7016,272 +7101,158 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               className="custom-scrollbar"
                               style={{
                                 flex: 1,
-                                minHeight: !hasActiveItems ? (isMobileView ? '200px' : '260px') : (isMobileView ? '120px' : '160px'),
+                                minHeight: !hasActiveItems ? (isMobileView ? '160px' : '180px') : (isMobileView ? '120px' : '160px'),
                                 maxHeight: isMobileView ? 'none' : 'calc(100vh - 280px)',
                                 overflowY: 'auto',
                                 overflowX: 'hidden',
                                 WebkitOverflowScrolling: 'touch',
                                 background: !hasActiveItems ? 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)' : 'linear-gradient(180deg, #fcfdfe 0%, #f8fafc 100%)',
                                 border: !hasActiveItems ? '1px solid #e2e8f0' : '1px solid #f1f5f9',
-                                borderRadius: !hasActiveItems ? (isMobileView ? '14px' : '18px') : (isMobileView ? '14px' : '18px'),
-                                padding: !hasActiveItems ? (isMobileView ? '24px 14px' : '32px 24px') : (isMobileView ? '14px 12px' : '18px 20px'),
+                                borderRadius: isMobileView ? '14px' : '18px',
+                                padding: isMobileView ? '12px 10px' : '14px 16px',
                                 display: 'flex',
                                 flexDirection: 'column',
-                                justifyContent: !hasActiveItems ? 'center' : 'flex-start',
-                                alignItems: !hasActiveItems ? 'center' : 'stretch',
-                                gap: isMobileView ? '12px' : '16px',
+                                justifyContent: 'flex-start',
+                                alignItems: 'stretch',
+                                gap: isMobileView ? '8px' : '10px',
                                 boxShadow: !hasActiveItems ? '0 1px 3px rgba(0, 0, 0, 0.02)' : 'inset 0 1px 3px rgba(0, 0, 0, 0.02)'
                               }}
                             >
+                              {/* 🎛️ Bühnen-Kopf: Minimaler Corner-Badge ohne Datumsdopplung */}
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '8px',
+                                width: '100%',
+                                flexShrink: 0
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  {!readOnly ? (
+                                    <span 
+                                      style={{
+                                        fontSize: '0.70rem',
+                                        color: '#15803d',
+                                        background: '#dcfce7',
+                                        border: '1px solid #bbf7d0',
+                                        padding: '2px 8px',
+                                        height: '24px',
+                                        borderRadius: '100px',
+                                        fontWeight: 800,
+                                        letterSpacing: '0.02em',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}
+                                      title="Live-Schülersicht aktiv"
+                                      aria-label="Live-Schülersicht aktiv"
+                                    >
+                                      <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#16a34a' }} />
+                                      <span>Live-Schülersicht</span>
+                                    </span>
+                                  ) : (
+                                    <span style={{
+                                      fontSize: '0.76rem',
+                                      fontWeight: 800,
+                                      color: '#16a34a',
+                                      letterSpacing: '-0.01em',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '5px'
+                                    }}>
+                                      <Music size={13} color="#16a34a" />
+                                      <span>Dein Wochen-Fahrplan</span>
+                                    </span>
+                                  )}
+                                 </div>
+                              </div>
+
                               {!hasActiveItems ? (
                                 <div style={{
                                   display: 'flex',
                                   flexDirection: 'column',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  gap: isMobileView ? '14px' : '18px',
-                                  padding: 0,
+                                  flex: 1,
+                                  gap: isMobileView ? '8px' : '10px',
+                                  padding: isMobileView ? '16px 8px' : '20px 12px',
                                   width: '100%',
-                                  maxWidth: '560px',
+                                  maxWidth: '460px',
                                   margin: '0 auto',
                                   textAlign: 'center'
                                 }}>
-                                  {/* Center Icon + Information */}
-                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '100%' }}>
-                                    <div style={{
-                                      width: '42px',
-                                      height: '42px',
-                                      borderRadius: '12px',
-                                      background: '#f8fafc',
-                                      border: '1px solid #e2e8f0',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
-                                      flexShrink: 0
-                                    }}>
-                                      <BookOpen size={20} color="#64748b" strokeWidth={1.8} />
-                                    </div>
-
-                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                                      <span style={{
-                                        fontSize: isMobileView ? '0.90rem' : '1.02rem',
-                                        color: '#0f172a',
-                                        fontWeight: 850,
-                                        letterSpacing: '-0.015em',
-                                        lineHeight: 1.3
-                                      }}>
-                                        {isPastWeek
-                                          ? (isMobileView ? `Keine Hausaufgaben (${weekRange.dateSpan})` : `Keine Hausaufgaben archiviert (${weekRange.dateSpan})`)
-                                          : `Wochen-Fahrplan festlegen (${weekRange.dateSpan})`}
-                                      </span>
-                                      <span style={{
-                                        fontSize: isMobileView ? '0.74rem' : '0.80rem',
-                                        color: '#64748b',
-                                        fontWeight: 500,
-                                        lineHeight: 1.45,
-                                        maxWidth: '460px'
-                                      }}>
-                                        {isPastWeek
-                                          ? 'Unterrichtsfreie Zeit oder keine Notizen hinterlegt.'
-                                          : (hasTransferableHomework
-                                            ? 'Aus Vorwoche übernehmen oder neue Übungen und Aufgaben starten.'
-                                            : 'Lehrwerk, Songs oder neue Übe-Ziele für diese Woche bereitstellen.')}
-                                      </span>
-                                    </div>
+                                  {/* Campus Musik-Bühne Visual: Kompaktes 46x46px Campus-Notenheft */}
+                                  <div style={{
+                                    width: '46px',
+                                    height: '46px',
+                                    borderRadius: '14px',
+                                    background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
+                                    border: '1px solid #86efac',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: '0 2px 8px rgba(22, 163, 74, 0.15)'
+                                  }}>
+                                    <Music size={22} color="#15803d" strokeWidth={2.4} />
                                   </div>
 
-                                  {/* Sleek Centered Action Pills */}
-                                  {!isPastWeek && !readOnly && (
-                                    <div style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      gap: '8px',
-                                      flexWrap: 'wrap',
-                                      width: '100%'
+                                  {/* Motivierendes Wording im Campus-Modul */}
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', maxWidth: '420px' }}>
+                                    <span style={{
+                                      fontSize: isMobileView ? '0.92rem' : '0.98rem',
+                                      color: '#0f172a',
+                                      fontWeight: 800,
+                                      letterSpacing: '-0.01em',
+                                      lineHeight: 1.25
                                     }}>
-                                      {hasTransferableHomework && (
-                                        <button
-                                          type="button"
-                                          onClick={() => setIsTransferModalOpen(true)}
-                                          style={{
-                                            background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                                            color: '#ffffff',
-                                            border: 'none',
-                                            fontSize: '0.78rem',
-                                            fontWeight: 800,
-                                            padding: '8px 16px',
-                                            minHeight: '38px',
-                                            borderRadius: '100px',
-                                            cursor: 'pointer',
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: '6px',
-                                            boxShadow: '0 2px 8px rgba(22, 163, 74, 0.25)',
-                                            transition: 'all 0.15s ease'
-                                          }}
-                                          className="hover-scale"
-                                          title="Hausaufgaben aus der Vorwoche übernehmen, abhaken oder pausieren"
-                                        >
-                                          <ArrowRightLeft size={13} strokeWidth={2.4} />
-                                          <span>Aus Vorwoche übertragen</span>
-                                        </button>
-                                      )}
-
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setActiveSubView('hub');
-                                          setActiveInputTab('free');
-                                        }}
-                                        style={{
-                                          background: '#ffffff',
-                                          border: '1px solid #cbd5e1',
-                                          color: '#334155',
-                                          fontSize: '0.78rem',
-                                          fontWeight: 750,
-                                          padding: '8px 15px',
-                                          minHeight: '38px',
-                                          borderRadius: '100px',
-                                          cursor: 'pointer',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '6px',
-                                          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                                          transition: 'all 0.15s ease'
-                                        }}
-                                        className="hover-scale"
-                                      >
-                                        <BookOpen size={13} color="#16a34a" />
-                                        <span>Lehrwerk aufschlagen</span>
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setActiveSubView('hub');
-                                          setActiveInputTab('free');
-                                        }}
-                                        style={{
-                                          background: '#ffffff',
-                                          border: '1px solid #cbd5e1',
-                                          color: '#334155',
-                                          fontSize: '0.78rem',
-                                          fontWeight: 750,
-                                          padding: '8px 15px',
-                                          minHeight: '38px',
-                                          borderRadius: '100px',
-                                          cursor: 'pointer',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '6px',
-                                          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                                          transition: 'all 0.15s ease'
-                                        }}
-                                        className="hover-scale"
-                                      >
-                                        <Music size={13} color="#4f46e5" />
-                                        <span>Song zuweisen</span>
-                                      </button>
-                                    </div>
-                                  )}
+                                      {isPastWeek
+                                        ? (isMobileView ? `Unterrichtsfreie Woche` : `Keine Aufgaben archiviert`)
+                                        : `Bühne frei für deine Musik! 🎶`}
+                                    </span>
+                                    <span style={{
+                                      fontSize: isMobileView ? '0.72rem' : '0.76rem',
+                                      color: '#64748b',
+                                      fontWeight: 550,
+                                      lineHeight: 1.4
+                                    }}>
+                                      {isPastWeek
+                                        ? 'In dieser Woche wurden keine Übungen oder Notizen hinterlegt.'
+                                        : 'Für diese Woche sind noch keine Aufgaben eingetragen. Zeit für freies Üben!'}
+                                    </span>
+                                  </div>
 
                                   {isPastWeek && (
                                     <button
                                       type="button"
+                                      role="button"
+                                      tabIndex={0}
                                       onClick={() => setViewingWeekOffset(0)}
                                       style={{
-                                        padding: '5px 12px',
+                                        padding: '0 12px',
+                                        height: '28px',
                                         borderRadius: '100px',
                                         background: '#0f172a',
                                         color: '#ffffff',
                                         border: 'none',
-                                        fontSize: '0.74rem',
-                                        fontWeight: 800,
+                                        fontSize: '0.72rem',
+                                        fontWeight: 750,
                                         cursor: 'pointer',
-                                        flexShrink: 0
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '5px',
+                                        boxShadow: '0 1px 3px rgba(15, 23, 42, 0.18)',
+                                        transition: 'all 0.15s ease',
+                                        touchAction: 'manipulation'
                                       }}
-                                      className="hover-scale"
+                                      className="hover-scale-mini"
                                     >
-                                      Zurück zur aktuellen Woche
+                                      <RotateCcw size={11} strokeWidth={2.4} />
+                                      <span>Zurück zur aktuellen Woche</span>
                                     </button>
                                   )}
                                 </div>
                               ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-
-                                  {/* Stage Header */}
-                                  <div style={{
-                                    display: 'none',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    paddingBottom: '8px',
-                                    borderBottom: '1px solid rgba(0,0,0,0.05)',
-                                    gap: '8px',
-                                    flexWrap: 'wrap'
-                                  }}>
-                                    <span style={{
-                                      fontSize: '0.84rem',
-                                      fontWeight: 850,
-                                      color: '#64748b',
-                                      textTransform: 'uppercase',
-                                      letterSpacing: '0.04em',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '6px'
-                                    }}>
-                                      <BookOpen size={14} color="#64748b" />
-                                      <span>Wochen-Fahrplan • {weekRange.label.toUpperCase()}</span>
-                                      <span style={{ fontSize: '0.76rem', fontWeight: 650, color: '#94a3b8', textTransform: 'none', letterSpacing: '0' }}>
-                                        ({weekRange.dateSpan})
-                                      </span>
-                                    </span>
-                                    {readOnly ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          if (!isQuestionEditorOpen && effectiveViewingQuestion.hasQuestion) {
-                                            setQuestionDraftText(effectiveViewingQuestion.text);
-                                          }
-                                          setIsQuestionEditorOpen(prev => !prev);
-                                        }}
-                                        style={{
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '6px',
-                                          padding: '5px 12px',
-                                          minHeight: '32px',
-                                          borderRadius: '100px',
-                                          border: effectiveViewingQuestion.hasQuestion ? '1px solid #fde047' : '1px solid #bbf7d0',
-                                          background: effectiveViewingQuestion.hasQuestion ? '#fef9c3' : '#f0fdf4',
-                                          color: effectiveViewingQuestion.hasQuestion ? '#854d0e' : '#15803d',
-                                          fontSize: '0.80rem',
-                                          fontWeight: 800,
-                                          cursor: 'pointer',
-                                          boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                                          transition: 'all 0.15s ease'
-                                        }}
-                                        className="hover-scale-mini"
-                                        title={effectiveViewingQuestion.hasQuestion ? "Deine Frage ansehen oder ändern" : `Frage an ${effectiveTeacherFullName} stellen`}
-                                      >
-                                        <HelpCircle size={14} strokeWidth={2.4} />
-                                        <span>{effectiveViewingQuestion.hasQuestion ? '1 Frage notiert' : 'Frage an Lehrkraft'}</span>
-                                      </button>
-                                    ) : (
-                                      <span style={{
-                                        fontSize: '0.78rem',
-                                        color: '#15803d',
-                                        background: '#dcfce7',
-                                        padding: '4px 10px',
-                                        borderRadius: '100px',
-                                        fontWeight: 850,
-                                        letterSpacing: '0.02em'
-                                      }}>
-                                        Live-Schülersicht
-                                      </span>
-                                    )}
-                                  </div>
 
                                   {/* 💬 SCHÜLER-FRAGE FÜR DEN UNTERRICHT (KIDS GOLDSTANDARD) */}
                                   {readOnly && isQuestionEditorOpen && (
@@ -8545,26 +8516,26 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           {/* KÖRPER 1 SCHLUSS */}
 
                             {/* ========================================================================= */}
-                            {/* KÖRPER 2: DAS PLAY-ALONG STUDIO (Akustik-Werkzeugbank)                    */}
+                            {/* KÖRPER 2: DIE AUDIO-AUFNAHME (Akustik-Werkzeugbank)                       */}
                             {/* ========================================================================= */}
                             {!readOnly && (
                               <div style={{
                                 background: '#f8fafc',
                                 border: '1px solid #e2e8f0',
-                                borderRadius: '18px',
-                                padding: '14px 18px',
+                                borderRadius: '16px',
+                                padding: '8px 12px',
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: '10px',
+                                gap: '6px',
                                 boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
                                 flexShrink: 0
                               }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     <div style={{
-                                      width: '24px',
-                                      height: '24px',
-                                      borderRadius: '7px',
+                                      width: '20px',
+                                      height: '20px',
+                                      borderRadius: '6px',
                                       background: '#e6f4ea',
                                       color: '#16a34a',
                                       display: 'flex',
@@ -8572,49 +8543,50 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       justifyContent: 'center',
                                       flexShrink: 0
                                     }}>
-                                      <Mic size={13} strokeWidth={2.4} />
+                                      <Mic size={11} strokeWidth={2.4} />
                                     </div>
-                                    <span style={{ fontSize: '0.78rem', fontWeight: 850, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                      Play-Along & Audio-Aufnahme
+                                    <span style={{ fontSize: '0.74rem', fontWeight: 850, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                      Audio-Aufnahme
                                     </span>
                                   </div>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                                     <span 
                                       style={{ 
-                                        fontSize: '0.68rem', 
+                                        fontSize: '0.64rem', 
                                         color: '#475569', 
                                         fontWeight: 750,
                                         background: '#f1f5f9',
                                         border: '1px solid #e2e8f0',
-                                        padding: '3px 8px',
+                                        padding: '2px 6px',
                                         borderRadius: '100px',
                                         display: 'inline-flex',
                                         alignItems: 'center',
-                                        gap: '4px'
+                                        gap: '3px'
                                       }}
                                       title="Didaktisches Hörbeispiel gem. § 60a UrhG: Dient ausschließlich dem persönlichen 1:1-Übungsgebrauch dieses Schülers."
                                     >
-                                      <Lock size={10} color="#64748b" />
-                                      <span>§ 60a UrhG Didaktik</span>
+                                      <Lock size={9} color="#64748b" />
+                                      <span>§ 60a UrhG</span>
                                     </span>
-                                    <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 650 }}>
-                                      {hasTresorStorage ? 'Tresor aktiv (bis 7 Min.)' : 'Direktaufnahme (bis 60s)'}
+                                    <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 650 }}>
+                                      {hasTresorStorage ? 'Tresor (7 Min.)' : 'Direkt (60s)'}
                                     </span>
                                   </div>
                                 </div>
 
                                 {/* 🎙️ Didaktisches Hörbeispiel & 1:1-Übungs-Track (§ 60a Abs. 1 UrhG) Micro-Disclosure */}
                                 <div style={{
-                                  fontSize: '0.67rem',
+                                  fontSize: '0.63rem',
                                   color: '#64748b',
                                   display: 'flex',
                                   alignItems: 'center',
-                                  gap: '6px',
-                                  padding: '0 2px'
+                                  gap: '4px',
+                                  padding: '0 2px',
+                                  lineHeight: 1.2
                                 }}>
-                                  <span style={{ fontSize: '0.70rem' }}>🔒</span>
-                                  <span style={{ lineHeight: 1.35 }}>
-                                    <strong>Didaktischer Audio-Tresor (§ 60a UrhG):</strong> Dient rein dem persönlichen 1:1-Übungsgebrauch. Öffentliche Weitergabe ist unzulässig.
+                                  <span style={{ fontSize: '0.65rem' }}>🔒</span>
+                                  <span>
+                                    <strong>Didaktischer Audio-Tresor (§ 60a UrhG):</strong> Nur für den 1:1-Übungsgebrauch. Keine öffentliche Weitergabe.
                                   </span>
                                 </div>
 
@@ -8622,19 +8594,19 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 {isTeacherTools && isStudentAudioForbiddenForTeacher && (
                                   <div style={{
                                     background: '#fffbeb',
-                                    border: '1.5px solid #fef3c7',
-                                    borderRadius: '12px',
-                                    padding: '10px 14px',
+                                    border: '1px solid #fef3c7',
+                                    borderRadius: '10px',
+                                    padding: '6px 10px',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'space-between',
-                                    gap: '12px',
+                                    gap: '8px',
                                     flexWrap: 'wrap'
                                   }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '220px' }}>
-                                      <span style={{ fontSize: '1rem' }}>⚠️</span>
-                                      <div style={{ fontSize: '0.72rem', color: '#92400e', lineHeight: 1.35 }}>
-                                        <strong>Eltern-Veto aktiv:</strong> Erziehungsberechtigte untersagen Tonaufnahmen des Schülers. Bitte <strong>ausschließlich eigenes Lehrkraft-Vorspiel</strong> aufnehmen (§ 201 StGB)!
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: '200px' }}>
+                                      <span style={{ fontSize: '0.85rem' }}>⚠️</span>
+                                      <div style={{ fontSize: '0.68rem', color: '#92400e', lineHeight: 1.25 }}>
+                                        <strong>Eltern-Veto:</strong> Keine Schüleraufnahmen erlaubt. Nur <strong>Lehrkraft-Vorspiel</strong> aufnehmen (§ 201 StGB).
                                       </div>
                                     </div>
                                     <button
@@ -8645,21 +8617,21 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         background: teacherConsentRequested ? '#f1f5f9' : '#ffffff',
                                         border: '1px solid #f59e0b',
                                         color: teacherConsentRequested ? '#64748b' : '#b45309',
-                                        fontSize: '0.72rem',
+                                        fontSize: '0.68rem',
                                         fontWeight: 800,
-                                        padding: '6px 12px',
-                                        borderRadius: '8px',
+                                        padding: '4px 8px',
+                                        borderRadius: '6px',
                                         cursor: teacherConsentRequested ? 'default' : 'pointer',
                                         display: 'inline-flex',
                                         alignItems: 'center',
-                                        gap: '6px',
-                                        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                        gap: '4px',
+                                        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
                                         flexShrink: 0
                                       }}
                                       className={teacherConsentRequested ? '' : 'hover-scale'}
                                     >
-                                      <Mail size={12} />
-                                      <span>{teacherConsentRequested ? '✓ Anfrage gesendet' : 'Eltern-Freigabe anfragen'}</span>
+                                      <Mail size={11} />
+                                      <span>{teacherConsentRequested ? '✓ Gesendet' : 'Freigabe anfragen'}</span>
                                     </button>
                                   </div>
                                 )}
@@ -8667,10 +8639,10 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 <div style={{
                                   display: 'inline-flex',
                                   alignItems: 'center',
-                                  gap: '6px',
+                                  gap: '5px',
                                   background: '#f8fafc',
                                   border: '1px solid #e2e8f0',
-                                  padding: '4px',
+                                  padding: '3px',
                                   borderRadius: '100px',
                                   boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)',
                                   flexWrap: 'wrap',
@@ -8685,21 +8657,22 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                                         color: '#ffffff',
                                         border: 'none',
-                                        padding: '8px 16px',
-                                        minHeight: '38px',
+                                        padding: '0 12px',
+                                        height: '32px',
+                                        minHeight: '32px',
                                         borderRadius: '100px',
-                                        fontSize: '0.80rem',
+                                        fontSize: '0.75rem',
                                         fontWeight: 900,
                                         cursor: 'pointer',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: '6px',
+                                        gap: '5px',
                                         boxShadow: '0 0 12px rgba(245, 158, 11, 0.4)',
                                         flexShrink: 0
                                       }}
                                       title="Einzähler abbrechen"
                                     >
-                                      <Timer size={14} />
+                                      <Timer size={13} />
                                       <span>Einzählen: {playAlongCountInRemaining} (Stopp)</span>
                                     </button>
                                   ) : !isRecordingAudio ? (
@@ -8711,21 +8684,22 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         background: '#0f172a',
                                         color: '#ffffff',
                                         border: 'none',
-                                        padding: '8px 16px',
-                                        minHeight: '38px',
+                                        padding: '0 12px',
+                                        height: '32px',
+                                        minHeight: '32px',
                                         borderRadius: '100px',
-                                        fontSize: '0.80rem',
+                                        fontSize: '0.75rem',
                                         fontWeight: 800,
                                         cursor: 'pointer',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: '6px',
-                                        boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
+                                        gap: '5px',
+                                        boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
                                         flexShrink: 0
                                       }}
                                       className="hover-scale"
                                     >
-                                      <Mic size={14} color="#22c55e" strokeWidth={2.4} style={{ filter: 'drop-shadow(0 0 4px rgba(34, 197, 94, 0.35))' }} />
+                                      <Mic size={13} color="#22c55e" strokeWidth={2.4} style={{ filter: 'drop-shadow(0 0 4px rgba(34, 197, 94, 0.35))' }} />
                                       <span>Aufnahme</span>
                                     </button>
                                   ) : (
@@ -8736,20 +8710,21 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         background: '#ef4444',
                                         color: '#ffffff',
                                         border: 'none',
-                                        padding: '8px 16px',
-                                        minHeight: '38px',
+                                        padding: '0 12px',
+                                        height: '32px',
+                                        minHeight: '32px',
                                         borderRadius: '100px',
-                                        fontSize: '0.80rem',
+                                        fontSize: '0.75rem',
                                         fontWeight: 800,
                                         cursor: 'pointer',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: '6px',
+                                        gap: '5px',
                                         boxShadow: '0 0 12px rgba(239, 68, 68, 0.4)',
                                         flexShrink: 0
                                       }}
                                     >
-                                      <Square size={13} fill="#ffffff" />
+                                      <Square size={12} fill="#ffffff" />
                                       <span>Stopp ({hasTresorStorage ? `${formatRecordTime(audioDuration)} / 7:00` : `${audioDuration}s / 60s`})</span>
                                     </button>
                                   )}
@@ -8764,21 +8739,21 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                           background: isCountInEnabled ? '#ecfdf5' : '#ffffff',
                                           color: isCountInEnabled ? '#15803d' : '#64748b',
                                           border: isCountInEnabled ? '1.5px solid #86efac' : '1px solid #cbd5e1',
-                                          padding: '0 11px',
-                                          height: '38px',
+                                          padding: '0 9px',
+                                          height: '32px',
                                           borderRadius: '100px',
-                                          fontSize: '0.74rem',
+                                          fontSize: '0.72rem',
                                           fontWeight: 800,
                                           cursor: 'pointer',
                                           display: 'flex',
                                           alignItems: 'center',
-                                          gap: '5px',
+                                          gap: '4px',
                                           flexShrink: 0,
                                           transition: 'all 0.15s ease'
                                         }}
                                         title={isCountInEnabled ? 'Einzählen aktiv (4 Klicks vor Start)' : 'Einzählen vor Aufnahme aktivieren'}
                                       >
-                                        <Timer size={13} strokeWidth={isCountInEnabled ? 2.5 : 2} />
+                                        <Timer size={12} strokeWidth={isCountInEnabled ? 2.5 : 2} />
                                         <span>Einzählen</span>
                                       </button>
 
@@ -8791,23 +8766,23 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                             background: isRecordingMetronomeActive ? '#ecfdf5' : '#ffffff',
                                             color: isRecordingMetronomeActive ? '#15803d' : '#64748b',
                                             border: isRecordingMetronomeActive ? '1.5px solid #86efac' : '1px solid #cbd5e1',
-                                            padding: '0 11px',
-                                            height: '38px',
+                                            padding: '0 9px',
+                                            height: '32px',
                                             borderRadius: '100px',
-                                            fontSize: '0.74rem',
+                                            fontSize: '0.72rem',
                                             fontWeight: 800,
                                             cursor: 'pointer',
                                             display: 'flex',
                                             alignItems: 'center',
-                                            gap: '5px',
-                                            boxShadow: isRecordingMetronomeActive ? '0 2px 6px rgba(22, 163, 74, 0.15)' : 'none',
+                                            gap: '4px',
+                                            boxShadow: isRecordingMetronomeActive ? '0 1px 4px rgba(22, 163, 74, 0.15)' : 'none',
                                             transition: 'all 0.15s ease'
                                           }}
                                           title="Klick & Tempo (BPM) einstellen"
                                         >
-                                          <MechanicalMetronomeIcon size={14} color={isRecordingMetronomeActive ? '#15803d' : '#64748b'} strokeWidth={isRecordingMetronomeActive ? 2.5 : 2} />
+                                          <MechanicalMetronomeIcon size={13} color={isRecordingMetronomeActive ? '#15803d' : '#64748b'} strokeWidth={isRecordingMetronomeActive ? 2.5 : 2} />
                                           <span>{recordingBpm} BPM</span>
-                                          <ChevronDown size={12} strokeWidth={2.5} style={{ transform: showPlayAlongMetronomePopup ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
+                                          <ChevronDown size={11} strokeWidth={2.5} style={{ transform: showPlayAlongMetronomePopup ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
                                         </button>
 
                                         {/* Popover Flyout */}
@@ -8921,21 +8896,21 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   {playAlongCountInRemaining !== null ? (
                                     <div style={{
                                       flex: 1,
-                                      fontSize: '0.78rem',
+                                      fontSize: '0.75rem',
                                       color: '#d97706',
                                       fontWeight: 750,
                                       display: 'flex',
                                       alignItems: 'center',
-                                      gap: '8px',
+                                      gap: '6px',
                                       paddingLeft: '4px'
                                     }}>
-                                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', animation: 'pulse 0.5s infinite' }} />
-                                      <span>Einzähler läuft ({recordingBpm} BPM)... Aufnahme startet bei 1.</span>
+                                      <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#f59e0b', animation: 'pulse 0.5s infinite' }} />
+                                      <span>Einzähler läuft ({recordingBpm} BPM)...</span>
                                     </div>
                                   ) : !isRecordingAudio ? (
                                     <input
                                       type="text"
-                                      placeholder="Titel der Begleitspur (optional, z. B. Play-Along Tempo 70)..."
+                                      placeholder="Titel der Begleitspur (optional)..."
                                       value={audioLabel}
                                       onChange={(e) => setAudioLabel(e.target.value)}
                                       onKeyDown={(e) => {
@@ -8946,11 +8921,12 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       }}
                                       style={{
                                         flex: 1,
-                                        minWidth: '130px',
-                                        fontSize: '0.82rem',
-                                        padding: '8px 12px',
-                                        minHeight: '38px',
-                                        borderRadius: '10px',
+                                        minWidth: '120px',
+                                        fontSize: '0.78rem',
+                                        padding: '0 10px',
+                                        height: '32px',
+                                        minHeight: '32px',
+                                        borderRadius: '8px',
                                         border: '1px solid #e2e8f0',
                                         background: '#ffffff',
                                         color: '#0f172a',
@@ -8961,16 +8937,16 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   ) : (
                                     <div style={{
                                       flex: 1,
-                                      fontSize: '0.78rem',
+                                      fontSize: '0.75rem',
                                       color: '#dc2626',
                                       fontWeight: 750,
                                       display: 'flex',
                                       alignItems: 'center',
-                                      gap: '8px',
+                                      gap: '6px',
                                       paddingLeft: '4px'
                                     }}>
-                                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', animation: 'pulse 1s infinite' }} />
-                                      <span>Audioaufnahme läuft... {isRecordingMetronomeActive ? `(Klick: ${recordingBpm} BPM)` : 'Sprich oder spiele dein Instrument.'}</span>
+                                      <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#ef4444', animation: 'pulse 1s infinite' }} />
+                                      <span>Audioaufnahme läuft... {isRecordingMetronomeActive ? `(Klick: ${recordingBpm} BPM)` : ''}</span>
                                     </div>
                                   )}
                                 </div>
@@ -8988,37 +8964,6 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 return getISOWeek(d);
                               })();
                               const toolboxViewingWeekNum = toolboxViewingWeekIso.split('-W')[1] || '';
-
-                              const getViewingNotesForCurrentOffset = (): string => {
-                                if (viewingWeekOffset === 0) {
-                                  return generalHomeworkNotes;
-                                }
-                                const histWeekItem = (progressItems || []).find((item: any) => {
-                                  return item.topic_name === `Hausaufgabe KW ${toolboxViewingWeekNum}` ||
-                                         (item.created_at && getISOWeek(item.created_at) === toolboxViewingWeekIso) ||
-                                         (item.updated_at && getISOWeek(item.updated_at) === toolboxViewingWeekIso && item.topic_name.startsWith('Hausaufgabe KW '));
-                                });
-
-                                if (!histWeekItem || !histWeekItem.homework_notes) return '';
-                                try {
-                                  const parsed = typeof histWeekItem.homework_notes === 'string'
-                                    ? JSON.parse(histWeekItem.homework_notes)
-                                    : histWeekItem.homework_notes;
-                                  if (Array.isArray(parsed)) {
-                                    return parsed
-                                      .filter((n: string) => typeof n === 'string' && !isInternalMetadataNote(n))
-                                      .join('\n')
-                                      .trim();
-                                  } else if (typeof parsed === 'string') {
-                                    return parsed.split('\n').filter((s: string) => !isInternalMetadataNote(s)).join('\n').trim();
-                                  }
-                                } catch (e) {
-                                  return cleanNotesText(histWeekItem.homework_notes);
-                                }
-                                return '';
-                              };
-
-                              const activeViewingStudentNotes = getViewingNotesForCurrentOffset();
 
                               return (
                                 <div style={{
@@ -9233,8 +9178,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                               const nextText = currentText.slice(0, cursor) + (currentText.length > 0 && !currentText.endsWith('\n') ? '\n' : '') + tagToInsert + currentText.slice(cursor);
                                               latestGeneralHomeworkNotesRef.current = nextText;
                                               setGeneralHomeworkNotes(nextText);
-                                              const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && isInternalMetadataNote(n));
-                                              const noteLines = nextText.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
+                                              const specialNotes = (homeworkNotesList || []).filter((n: string) => typeof n === 'string' && isInternalMetadataNote(n));
+                                              const noteLines = nextText.split('\n').map((s: string) => s.trim()).filter((s: string) => s.length > 0 && !isInternalMetadataNote(s));
                                               const combined = [...specialNotes, ...noteLines];
                                               setHomeworkNotesList(combined);
                                               try { localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(combined)); } catch {}
@@ -9343,6 +9288,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                             ? `Keine Notizen in KW ${toolboxViewingWeekNum} archiviert.`
                                             : `Noch keine Notizen für KW ${toolboxViewingWeekNum} geplant.`)}
                                         value={activeViewingStudentNotes}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.stopPropagation();
+                                          }
+                                        }}
                                         onInput={(e) => {
                                           adjustTextareaHeight(e.currentTarget);
                                           studentNotesSelectionRef.current = {
@@ -9382,12 +9332,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                           if (viewingWeekOffset === 0) {
                                             latestGeneralHomeworkNotesRef.current = val;
                                             setGeneralHomeworkNotes(val);
-                                            const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && isInternalMetadataNote(n));
-                                            const noteLines = val.split('\n').map(s => s.trim()).filter(s => s.length > 0 && !isInternalMetadataNote(s));
-                                            const combined = [...specialNotes, ...noteLines];
-                                            setHomeworkNotesList(combined);
-                                            try { localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(combined)); } catch {}
-                                            triggerDebouncedAutoSave(350);
+                                            triggerDebouncedAutoSave(500);
                                           }
                                         }}
                                         onFocus={(e) => {
@@ -9405,6 +9350,14 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                             start: target.selectionStart ?? target.value.length,
                                             end: target.selectionEnd ?? target.value.length
                                           };
+                                          if (viewingWeekOffset === 0) {
+                                            const currentVal = latestGeneralHomeworkNotesRef.current || target.value || '';
+                                            const specialNotes = (homeworkNotesList || []).filter((n: string) => typeof n === 'string' && isInternalMetadataNote(n));
+                                            const noteLines = currentVal.split('\n').map((s: string) => s.trim()).filter((s: string) => s.length > 0 && !isInternalMetadataNote(s));
+                                            const combined = [...specialNotes, ...noteLines];
+                                            setHomeworkNotesList(combined);
+                                            try { localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(combined)); } catch {}
+                                          }
                                           triggerImmediateAutoSave();
                                           if (!activeViewingStudentNotes.trim()) setIsNotesFocused(false);
                                         }}
@@ -9423,7 +9376,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                           background: 'transparent',
                                           color: '#0f172a',
                                           boxSizing: 'border-box',
-                                          display: 'block'
+                                          display: 'block',
+                                          whiteSpace: 'pre-wrap',
+                                          wordBreak: 'break-word'
                                         }}
                                       />
                                     ) : (
@@ -9431,6 +9386,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         ref={teacherNotesTextareaRef}
                                         placeholder="Vertrauliche Notizen zum Schüler (nur für dich sichtbar)..."
                                         value={teacherNotes}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.stopPropagation();
+                                          }
+                                        }}
                                         onInput={(e) => {
                                           adjustTextareaHeight(e.currentTarget);
                                         }}
@@ -9458,7 +9418,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                           background: 'transparent',
                                           color: '#78350f',
                                           boxSizing: 'border-box',
-                                          display: 'block'
+                                          display: 'block',
+                                          whiteSpace: 'pre-wrap',
+                                          wordBreak: 'break-word'
                                         }}
                                       />
                                     )}
@@ -9528,7 +9490,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                   </div>
                   {/* Clean Bottom Spacing */}
                   <div style={{ paddingBottom: (isMobileView || isInsideSim || isFullscreen) ? '24px' : '8px' }} />
-                </form>
+                </div>
               </>
             )}
           </div>

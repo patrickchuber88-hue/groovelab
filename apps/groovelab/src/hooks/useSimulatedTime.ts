@@ -22,9 +22,7 @@ export function getSimulatedNow(): Date {
     const parts = simStr.split('-').map(Number);
     if (parts.length !== 3 || isNaN(parts[0])) return new Date();
 
-    const simDate = new Date(parts[0], parts[1] - 1, parts[2]);
-    const realNow = new Date();
-    simDate.setHours(realNow.getHours(), realNow.getMinutes(), realNow.getSeconds(), realNow.getMilliseconds());
+    const simDate = new Date(parts[0], parts[1] - 1, parts[2], 14, 0, 0, 0);
     return new Date(simDate.getTime() + elapsed);
   } catch {
     return new Date();

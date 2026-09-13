@@ -13235,64 +13235,102 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       </div>
 
       {visitedTabs.has('practice_board') && (
-        <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Lade Übepfad...</div>}>
-          <StudentPracticeTab
-            activeTab={activeTab}
-            studentUiLevel={studentUiLevel}
-            juniorMissionPhase={juniorMissionPhase}
-            preStartCountdown={preStartCountdown}
-            studentId={studentId}
-            studentUser={studentUser}
-            avatar={avatar}
-            effectivePracticeMinutes={effectivePracticeMinutes}
-            secondsElapsedRef={secondsElapsedRef}
-            isJuniorMissionPausedRef={isJuniorMissionPausedRef}
-            startJuniorMissionImmediately={startJuniorMissionImmediately}
-            handleFinishJuniorMission={handleFinishJuniorMission}
-            handleEmergencyExitJuniorMission={handleEmergencyExitJuniorMission}
-            handleCloseJuniorCelebration={handleCloseJuniorCelebration}
-            handleStartPracticeSession={handleStartPracticeSession}
-            finishPracticeSession={finishPracticeSession}
-            logParentGuidedPractice={logParentGuidedPractice}
-            handleOpenHomeworkBookWithView={handleOpenHomeworkBookWithView}
-            playMilestoneSound={playMilestoneSound}
-            playStarChimeSound={playStarChimeSound}
-            getDeterministicWeekMetrics={getDeterministicWeekMetrics}
-            getGroupedLogs={getGroupedLogs}
-            getJuniorMissionDetails={getJuniorMissionDetails}
-            getTargetMinutes={getTargetMinutes}
-            sessionActive={sessionActive}
-            isPhoneFlat={isPhoneFlat}
-            secondsElapsed={secondsElapsed}
-            isMobile={isMobile}
-            isMusicStandMode={isMusicStandMode}
-            flamesActive={flamesActive}
-            xpActive={xpActive}
-            assignedCampusSongs={assignedCampusSongs}
-            lehrwerke={lehrwerke}
-            progressItems={progressItems}
-            fokusLogs={fokusLogs}
-            activeSongSkills={activeSongSkills}
-            showJuniorPracticeSettingsModal={showJuniorPracticeSettingsModal}
-            setShowJuniorPracticeSettingsModal={setShowJuniorPracticeSettingsModal}
-            showJuniorStickerModal={showJuniorStickerModal}
-            setShowJuniorStickerModal={setShowJuniorStickerModal}
-            practiceAnchor={practiceAnchor}
-            setPracticeAnchor={setPracticeAnchor}
-            juniorMissionTier={juniorMissionTier}
-            juniorMissionCountdown={juniorMissionCountdown}
-            isJuniorMissionPaused={isJuniorMissionPaused}
-            setIsJuniorMissionPaused={setIsJuniorMissionPaused}
-            showJuniorCheatSheet={showJuniorCheatSheet}
-            setShowJuniorCheatSheet={setShowJuniorCheatSheet}
-            juniorSelectedTrackIndex={juniorSelectedTrackIndex}
-            isJuniorTabPaused={isJuniorTabPaused}
-            juniorCelebrationSummary={juniorCelebrationSummary}
-            juniorLaunchStage={juniorLaunchStage}
-            expandedMonths={expandedMonths}
-            setExpandedMonths={setExpandedMonths}
-          />
-        </Suspense>
+        studentUiLevel === 'junior' ? (
+          <div style={{ display: activeTab === 'practice_board' ? 'block' : 'none', padding: isMobile ? '12px' : '24px' }}>
+            <CampusJuniorDashboard
+              studentUser={studentUser}
+              studentId={studentId}
+              avatar={avatar}
+              currentXp={currentXp}
+              progressItems={progressItems}
+              lehrwerke={lehrwerke}
+              localProgress={localProgress}
+              briefingData={briefingData}
+              scheduleOccurrences={scheduleOccurrences}
+              onCompletePracticeSession={(mins, xp) => finishPracticeSession(xp)}
+              totalPracticeMinutes={effectivePracticeMinutes}
+              fokusLogs={fokusLogs}
+              schoolFokusLevels={schoolFokusLevels}
+            />
+          </div>
+        ) : studentUiLevel === 'teen' ? (
+          <div style={{ display: activeTab === 'practice_board' ? 'block' : 'none', padding: isMobile ? '12px' : '24px' }}>
+            <CampusTeenDashboard
+              studentUser={studentUser}
+              studentId={studentId}
+              avatar={avatar}
+              currentXp={currentXp}
+              progressItems={progressItems}
+              lehrwerke={lehrwerke}
+              localProgress={localProgress}
+              briefingData={briefingData}
+              scheduleOccurrences={scheduleOccurrences}
+              onCompletePracticeSession={(mins, xp) => finishPracticeSession(xp)}
+              totalPracticeMinutes={effectivePracticeMinutes}
+              fokusLogs={fokusLogs}
+              schoolFokusLevels={schoolFokusLevels}
+            />
+          </div>
+        ) : (
+          <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Lade Übepfad...</div>}>
+            <StudentPracticeTab
+              activeTab={activeTab}
+              studentUiLevel={studentUiLevel}
+              juniorMissionPhase={juniorMissionPhase}
+              preStartCountdown={preStartCountdown}
+              studentId={studentId}
+              studentUser={studentUser}
+              avatar={avatar}
+              effectivePracticeMinutes={effectivePracticeMinutes}
+              secondsElapsedRef={secondsElapsedRef}
+              isJuniorMissionPausedRef={isJuniorMissionPausedRef}
+              startJuniorMissionImmediately={startJuniorMissionImmediately}
+              handleFinishJuniorMission={handleFinishJuniorMission}
+              handleEmergencyExitJuniorMission={handleEmergencyExitJuniorMission}
+              handleCloseJuniorCelebration={handleCloseJuniorCelebration}
+              handleStartPracticeSession={handleStartPracticeSession}
+              finishPracticeSession={finishPracticeSession}
+              logParentGuidedPractice={logParentGuidedPractice}
+              handleOpenHomeworkBookWithView={handleOpenHomeworkBookWithView}
+              playMilestoneSound={playMilestoneSound}
+              playStarChimeSound={playStarChimeSound}
+              getDeterministicWeekMetrics={getDeterministicWeekMetrics}
+              getGroupedLogs={getGroupedLogs}
+              getJuniorMissionDetails={getJuniorMissionDetails}
+              getTargetMinutes={getTargetMinutes}
+              sessionActive={sessionActive}
+              isPhoneFlat={isPhoneFlat}
+              secondsElapsed={secondsElapsed}
+              isMobile={isMobile}
+              isMusicStandMode={isMusicStandMode}
+              flamesActive={flamesActive}
+              xpActive={xpActive}
+              assignedCampusSongs={assignedCampusSongs}
+              lehrwerke={lehrwerke}
+              progressItems={progressItems}
+              fokusLogs={fokusLogs}
+              activeSongSkills={activeSongSkills}
+              showJuniorPracticeSettingsModal={showJuniorPracticeSettingsModal}
+              setShowJuniorPracticeSettingsModal={setShowJuniorPracticeSettingsModal}
+              showJuniorStickerModal={showJuniorStickerModal}
+              setShowJuniorStickerModal={setShowJuniorStickerModal}
+              practiceAnchor={practiceAnchor}
+              setPracticeAnchor={setPracticeAnchor}
+              juniorMissionTier={juniorMissionTier}
+              juniorMissionCountdown={juniorMissionCountdown}
+              isJuniorMissionPaused={isJuniorMissionPaused}
+              setIsJuniorMissionPaused={setIsJuniorMissionPaused}
+              showJuniorCheatSheet={showJuniorCheatSheet}
+              setShowJuniorCheatSheet={setShowJuniorCheatSheet}
+              juniorSelectedTrackIndex={juniorSelectedTrackIndex}
+              isJuniorTabPaused={isJuniorTabPaused}
+              juniorCelebrationSummary={juniorCelebrationSummary}
+              juniorLaunchStage={juniorLaunchStage}
+              expandedMonths={expandedMonths}
+              setExpandedMonths={setExpandedMonths}
+            />
+          </Suspense>
+        )
       )}
 
       {visitedTabs.has('songs') && (

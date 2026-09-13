@@ -83,7 +83,7 @@ const getSimulatedNow = (): Date => {
   const elapsed = Date.now() - (isNaN(startTs) ? Date.now() : startTs);
   const parts = simStr.split('-').map(Number);
   if (parts.length !== 3 || isNaN(parts[0])) return new Date();
-  const base = new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0);
+  const base = new Date(parts[0], parts[1] - 1, parts[2], 14, 0, 0, 0);
   return new Date(base.getTime() + elapsed);
 };
 
@@ -8968,9 +8968,23 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                 />
                 <span style={{ fontSize: '0.78rem', color: '#475569', lineHeight: '1.4' }}>
                   Ich bestätige, dass ich volljährig bin bzw. als Erziehungsberechtigter des Schülers handle, stimme den{' '}
-                  <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowParentAgb(true); }} style={{ textDecoration: 'underline', color: '#34a853', cursor: 'pointer', fontWeight: 700 }}>AGB</span>{' '}
+                  <span 
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowParentAgb(true); }} 
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setShowParentAgb(true); } }}
+                    style={{ textDecoration: 'underline', color: '#34a853', cursor: 'pointer', fontWeight: 700, outline: 'none' }}
+                    aria-label="Allgemeine Geschäftsbedingungen anzeigen"
+                  >AGB</span>{' '}
                   sowie der{' '}
-                  <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowPrivacy(true); }} style={{ textDecoration: 'underline', color: '#34a853', cursor: 'pointer', fontWeight: 700 }}>Datenschutzerklärung</span>{' '}
+                  <span 
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowPrivacy(true); }} 
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setShowPrivacy(true); } }}
+                    style={{ textDecoration: 'underline', color: '#34a853', cursor: 'pointer', fontWeight: 700, outline: 'none' }}
+                    aria-label="Datenschutzerklärung anzeigen"
+                  >Datenschutzerklärung</span>{' '}
                   zu und willige in die Bereitstellung des Campus-Moduls für das laufende Schuljahr ein.
                 </span>
               </label>

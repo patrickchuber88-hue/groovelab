@@ -3,6 +3,7 @@ import { Mic, Square, Play, Pause, RotateCcw, Check, Loader2, Volume2 } from 'lu
 import { supabase } from '../../lib/supabase';
 import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RAW_LIMITER_GR_DB } from '../../utils/audioMasteringEngine';
 import { acquireAudioStream, releaseAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
+import { saveOfflineAudioRecord } from '../../utils/offlineAudioVault';
 
 interface SimpleVoiceRecorderProps {
   studentId: string;
@@ -28,6 +29,7 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [isOfflineSaved, setIsOfflineSaved] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -200,34 +202,74 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
       const isWav = blobToUpload.type.includes('wav');
       const fileExt = isWav ? 'wav' : (blobToUpload.type.includes('mp4') ? 'mp4' : 'webm');
       const contentType = isWav ? 'audio/wav' : (blobToUpload.type || 'audio/webm');
-      const targetSchoolId = localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
+      const targetSchoolId = localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id') || '';
       const schoolPathPrefix = targetSchoolId ? `schools/${targetSchoolId}/` : '';
-      const fileName = `${schoolPathPrefix}audio/memo_${studentId}_${Date.now()}.${fileExt}`;
+      // 🛡️ DIN 66398 / Art. 17 DSGVO Harmonisierung: ID als Ordner für verlässliches Löschen
+      const fileName = `${schoolPathPrefix}audio/${studentId}/memo_${Date.now()}.${fileExt}`;
 
-      const { data, error } = await supabase.storage
-        .from('campus-assets')
-        .upload(fileName, blobToUpload, {
-          contentType,
-          upsert: true
+      // 🛡️ Keller-Resilienz: Wenn offline, sofort im lokalen IndexedDB-Tresor puffern
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        await saveOfflineAudioRecord({
+          blob: blobToUpload,
+          mimeType: contentType,
+          durationSeconds: recordingDuration,
+          studentId,
+          schoolId: targetSchoolId,
+          context: 'voice_memo',
+          title: topicName || 'Übeaufnahme'
         });
-
-      if (error) throw error;
-
-      const { data: publicUrlData } = supabase.storage
-        .from('campus-assets')
-        .getPublicUrl(fileName);
-
-      const publicUrl = publicUrlData?.publicUrl || '';
-      setUploadSuccess(true);
-      if (onRecordingComplete) {
-        onRecordingComplete(publicUrl);
+        const localBlobUrl = URL.createObjectURL(blobToUpload);
+        setIsOfflineSaved(true);
+        setUploadSuccess(true);
+        if (onRecordingComplete) onRecordingComplete(localBlobUrl);
+        if (onAudioSaved) onAudioSaved(localBlobUrl);
+        return;
       }
-      if (onAudioSaved) {
-        onAudioSaved(publicUrl);
+
+      try {
+        const { data, error } = await supabase.storage
+          .from('campus-assets')
+          .upload(fileName, blobToUpload, {
+            contentType,
+            upsert: true
+          });
+
+        if (error) throw error;
+
+        const { data: publicUrlData } = supabase.storage
+          .from('campus-assets')
+          .getPublicUrl(fileName);
+
+        const publicUrl = publicUrlData?.publicUrl || '';
+        setUploadSuccess(true);
+        setIsOfflineSaved(false);
+        if (onRecordingComplete) {
+          onRecordingComplete(publicUrl);
+        }
+        if (onAudioSaved) {
+          onAudioSaved(publicUrl);
+        }
+      } catch (uploadErr) {
+        // Ausweichpfad bei Netzwerkabbruch während des Uploads: Verlustfreies Sichern im Tresor
+        console.warn('[SimpleVoiceRecorder] Cloud-Upload fehlgeschlagen, speichere im lokalen Audio-Tresor:', uploadErr);
+        await saveOfflineAudioRecord({
+          blob: blobToUpload,
+          mimeType: contentType,
+          durationSeconds: recordingDuration,
+          studentId,
+          schoolId: targetSchoolId,
+          context: 'voice_memo',
+          title: topicName || 'Übeaufnahme'
+        });
+        const localBlobUrl = URL.createObjectURL(blobToUpload);
+        setIsOfflineSaved(true);
+        setUploadSuccess(true);
+        if (onRecordingComplete) onRecordingComplete(localBlobUrl);
+        if (onAudioSaved) onAudioSaved(localBlobUrl);
       }
     } catch (e) {
-      console.error('Upload failed:', e);
-      alert('Upload fehlgeschlagen. Bitte versuche es noch einmal.');
+      console.error('Critical audio save error:', e);
+      alert('Aufnahme konnte weder online noch offline gespeichert werden.');
     } finally {
       setIsUploading(false);
     }
@@ -241,6 +283,7 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
     setAudioUrl(null);
     setIsPlaying(false);
     setUploadSuccess(false);
+    setIsOfflineSaved(false);
     setRecordingDuration(0);
   };
 
@@ -395,7 +438,7 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
               ) : uploadSuccess ? (
                 <>
                   <Check size={16} strokeWidth={3} />
-                  <span>Gespeichert! 🎉</span>
+                  <span>{isOfflineSaved ? 'Im Tresor gesichert 📦' : 'Gespeichert! 🎉'}</span>
                 </>
               ) : (
                 <>
@@ -405,6 +448,24 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
               )}
             </button>
           </div>
+          {isOfflineSaved && (
+            <div style={{
+              marginTop: '10px',
+              padding: '8px 12px',
+              borderRadius: '10px',
+              background: '#eff6ff',
+              border: '1px solid #bfdbfe',
+              color: '#1e40af',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <span>📦</span>
+              <span>Aufnahme offline im Tresor gesichert. Wird übertragen, sobald WLAN verfügbar ist.</span>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -8,17 +8,23 @@
  */
 
 import { getEffectiveInstrument, isGenericInstrument } from '../utils/avatarResolutionEngine';
+import {
+  DbUserRosterRecord,
+  DbTeacherRosterRecord,
+  DbPendingStudentDecrypted,
+  TeacherSummary
+} from '../types/databaseRoster';
 
 export interface RosterStudent {
   id: string;
   school_id: string;
   teacher_id: string | null;
-  teacher?: any;
+  teacher?: TeacherSummary | DbTeacherRosterRecord | null;
   resolved_instrument?: string;
   role: 'student';
   first_name: string;
   last_name: string;
-  email?: string;
+  email?: string | null;
   instrument?: string;
   is_active: boolean;
   is_campus_active: boolean;
@@ -29,14 +35,14 @@ export interface RosterStudent {
   birth_date?: string | null;
   contract_ends_at?: string | null;
   trial_ends_at?: string | null;
-  is_trial?: boolean;
+  is_trial?: boolean | null;
   group_id?: string | null;
   sibling_group_id?: string | null;
-  lesson_duration?: number;
+  lesson_duration?: number | null;
   photo_url?: string | null;
   avatar_url?: string | null;
   qr_token?: string | null;
-  ausweis_nummer?: string;
+  ausweis_nummer?: string | null;
   created_at: string;
   [key: string]: any;
 }
@@ -183,8 +189,8 @@ export async function fetchSchoolRoster(schoolId: string, supabaseClient: any, f
 
   return dedupeQuery(`school_roster_${schoolId}`, async () => {
     // 1. Fetch registered students AND school teachers in parallel
-    let regUsers: any[] = [];
-    let teachers: any[] = [];
+    let regUsers: DbUserRosterRecord[] = [];
+    let teachers: DbTeacherRosterRecord[] = [];
     try {
       const [regUsersRes, teachersRes] = await Promise.all([
         supabaseClient
@@ -208,9 +214,9 @@ export async function fetchSchoolRoster(schoolId: string, supabaseClient: any, f
           .eq('school_id', schoolId)
           .eq('role', 'student')
           .order('first_name');
-        regUsers = fallbackRes.data || [];
+        regUsers = (fallbackRes.data as DbUserRosterRecord[]) || [];
       } else {
-        regUsers = regUsersRes.data || [];
+        regUsers = (regUsersRes.data as DbUserRosterRecord[]) || [];
       }
 
       if (teachersRes.error) {
@@ -220,23 +226,24 @@ export async function fetchSchoolRoster(schoolId: string, supabaseClient: any, f
           .select('id, first_name, last_name, instrument')
           .eq('school_id', schoolId)
           .in('role', ['teacher', 'admin', 'secretary']);
-        teachers = fbTeachers.data || [];
+        teachers = (fbTeachers.data as DbTeacherRosterRecord[]) || [];
       } else {
-        teachers = teachersRes.data || [];
+        teachers = (teachersRes.data as DbTeacherRosterRecord[]) || [];
       }
     } catch (e) {
       console.error('[StudentRosterService] Error fetching students/teachers:', e);
     }
 
-    const teacherMap = new Map<string, any>(teachers.map((t: any) => [t.id, t]));
+    const teacherMap = new Map<string, DbTeacherRosterRecord>(teachers.map((t: DbTeacherRosterRecord) => [t.id, t]));
 
-    const registeredStudents: RosterStudent[] = regUsers.map((u: any) => {
+    const registeredStudents: RosterStudent[] = regUsers.map((u: DbUserRosterRecord) => {
       const assignedTeacher = u.teacher_id ? teacherMap.get(u.teacher_id) : null;
       const effectiveInst = getEffectiveInstrument(u, assignedTeacher);
       const resolvedInst = effectiveInst || u.resolved_instrument || u.instrument || 'Gitarre';
       return {
         ...u,
         role: 'student',
+        teacher_id: u.teacher_id ?? null,
         teacher: assignedTeacher,
         resolved_instrument: resolvedInst,
         instrument: (!isGenericInstrument(u.instrument) && u.instrument) ? u.instrument : resolvedInst,
@@ -267,8 +274,8 @@ export async function fetchSchoolRoster(schoolId: string, supabaseClient: any, f
       if (!pError && pendingData) {
         const seenPendingNormNames = new Set<string>();
 
-        pendingMapped = pendingData
-          .filter((ps: any) => {
+        pendingMapped = (pendingData as DbPendingStudentDecrypted[])
+          .filter((ps: DbPendingStudentDecrypted) => {
             if (!ps) return false;
             const fName = (ps.first_name || '').trim();
             const lName = (ps.last_name || '').trim();
@@ -282,14 +289,14 @@ export async function fetchSchoolRoster(schoolId: string, supabaseClient: any, f
             }
             return true;
           })
-          .map((ps: any) => {
+          .map((ps: DbPendingStudentDecrypted) => {
             const assignedTeacher = ps.teacher_id ? teacherMap.get(ps.teacher_id) : null;
             const effectiveInst = getEffectiveInstrument(ps, assignedTeacher);
             const finalInst = (!isGenericInstrument(ps.instrument) && ps.instrument) ? ps.instrument : (effectiveInst || 'Gitarre');
             return {
               id: ps.id,
               school_id: ps.school_id,
-              teacher_id: ps.teacher_id,
+              teacher_id: ps.teacher_id ?? null,
               teacher: assignedTeacher,
               role: 'student' as const,
               first_name: (ps.first_name || '').trim(),

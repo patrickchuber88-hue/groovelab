@@ -2497,7 +2497,8 @@ export function CampusEventsBoard({
 
         if (students) {
           students.forEach((s: any) => {
-            results.push({ id: s.id, name: `${s.first_name} ${s.last_name}`, type: 'student', detail: s.instrument || undefined });
+            const studentDisplayName = formatSingleStudentAnonymized(s.first_name, s.last_name, s.id, true);
+            results.push({ id: s.id, name: studentDisplayName, type: 'student', detail: s.instrument || undefined });
           });
         }
 
@@ -2971,7 +2972,7 @@ export function CampusEventsBoard({
     }
     try {
       const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
-      const now = simStr ? new Date(simStr + 'T00:00:00') : new Date();
+      const now = simStr ? new Date(simStr + 'T14:00:00') : new Date();
       const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       
       // Tier-1 Enterprise Sliding Window: 70 days rolling ahead for instant initial render, 365 days for full year
@@ -4311,12 +4312,12 @@ export function CampusEventsBoard({
   const handleUndoCancel = async (occ: any, skipPinCheck = false) => {
     // Vergangene Termine können nicht mehr reaktiviert werden
     const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
-    const d = simStr ? new Date(simStr + 'T00:00:00') : new Date();
+    const d = simStr ? new Date(simStr + 'T14:00:00') : new Date();
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
     const todayStr = `${yyyy}-${mm}-${dd}`;
-    const nowTimeStr = simStr ? '00:00:00' : d.toTimeString().substring(0, 8);
+    const nowTimeStr = simStr ? '14:00:00' : d.toTimeString().substring(0, 8);
     const isPastOcc = occ.date < todayStr || (occ.date === todayStr && (occ.start_time || '00:00') < nowTimeStr);
     if (isPastOcc) {
       alert('Vergangene Termine können nicht mehr reaktiviert werden.');
@@ -4615,12 +4616,12 @@ export function CampusEventsBoard({
 
     // Vergangene Termine können nicht mehr abgesagt oder geändert werden
     const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
-    const d = simStr ? new Date(simStr + 'T00:00:00') : new Date();
+    const d = simStr ? new Date(simStr + 'T14:00:00') : new Date();
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
     const todayStr = `${yyyy}-${mm}-${dd}`;
-    const nowTimeStr = simStr ? '00:00:00' : d.toTimeString().substring(0, 8);
+    const nowTimeStr = simStr ? '14:00:00' : d.toTimeString().substring(0, 8);
     const isPastOcc = occ.date < todayStr || (occ.date === todayStr && (occ.start_time || '00:00') < nowTimeStr);
     if (isPastOcc) {
       alert('Vergangene Termine können nicht mehr abgesagt oder geändert werden.');
@@ -4653,12 +4654,12 @@ export function CampusEventsBoard({
   const handleCancelOccurrence = async (occ: any, skipPinCheck = false) => {
     // Vergangene Termine absichern (Fail-Closed)
     const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
-    const d = simStr ? new Date(simStr + 'T00:00:00') : new Date();
+    const d = simStr ? new Date(simStr + 'T14:00:00') : new Date();
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
     const todayStr = `${yyyy}-${mm}-${dd}`;
-    const nowTimeStr = simStr ? '00:00:00' : d.toTimeString().substring(0, 8);
+    const nowTimeStr = simStr ? '14:00:00' : d.toTimeString().substring(0, 8);
     const isPastOcc = occ.date < todayStr || (occ.date === todayStr && (occ.start_time || '00:00') < nowTimeStr);
     if (isPastOcc) {
       alert('Vergangene Termine können nicht mehr abgesagt werden.');
@@ -4863,12 +4864,12 @@ export function CampusEventsBoard({
   // Split lesson list for Column 1 (Tier-1 Memoized to prevent render-blocking)
   const filteredLessons = useMemo(() => {
     const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
-    const d = simStr ? new Date(simStr + 'T00:00:00') : new Date();
+    const d = simStr ? new Date(simStr + 'T14:00:00') : new Date();
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
     const todayStr = `${yyyy}-${mm}-${dd}`;
-    const nowTimeStr = simStr ? '00:00:00' : d.toTimeString().substring(0, 8);
+    const nowTimeStr = simStr ? '14:00:00' : d.toTimeString().substring(0, 8);
 
     if (lessonTab === 'cancelled') {
       return lessons.filter(occ => {
@@ -5859,12 +5860,12 @@ export function CampusEventsBoard({
 
     // Date & Time reference for past occurrence check
     const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
-    const d = simStr ? new Date(simStr + 'T00:00:00') : new Date();
+    const d = simStr ? new Date(simStr + 'T14:00:00') : new Date();
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
     const todayStr = `${yyyy}-${mm}-${dd}`;
-    const nowTimeStr = simStr ? '00:00:00' : d.toTimeString().substring(0, 8);
+    const nowTimeStr = simStr ? '14:00:00' : d.toTimeString().substring(0, 8);
 
     return groupedSlotItems.map(occ => {
       const isPastOcc = lessonTab === 'past' || occ.date < todayStr || (occ.date === todayStr && (occ.start_time || '00:00') < nowTimeStr);
@@ -6561,7 +6562,7 @@ export function CampusEventsBoard({
           ) : (() => {
             const { grouped, monthKeys } = groupedLessonsByMonth;
             const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
-            const simNow = simStr ? new Date(simStr + 'T00:00:00') : new Date();
+            const simNow = simStr ? new Date(simStr + 'T14:00:00') : new Date();
             const currentMonthKey = `${simNow.getFullYear()}-${String(simNow.getMonth() + 1).padStart(2, '0')}`;
 
             return monthKeys.map((monthKey, idx) => {

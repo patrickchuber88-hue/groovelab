@@ -302,15 +302,33 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                   gap: '12px',
                   zIndex: 1001
                 }}>
-                  <div style={{ cursor: 'pointer' }} onClick={() => scrollToSection('usps')}>
+                  <div 
+                    role="button"
+                    tabIndex={0}
+                    style={{ cursor: 'pointer' }} 
+                    onClick={() => scrollToSection('usps')}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToSection('usps'); } }}
+                  >
                     <div style={{ fontWeight: 600, fontSize: '14px', color: '#000000' }}>Stundenplan-Designer</div>
                     <div style={{ fontSize: '12px', color: '#7d7d82' }}>Die interaktive Kalenderzentrale.</div>
                   </div>
-                  <div style={{ cursor: 'pointer' }} onClick={() => scrollToSection('usps')}>
+                  <div 
+                    role="button"
+                    tabIndex={0}
+                    style={{ cursor: 'pointer' }} 
+                    onClick={() => scrollToSection('usps')}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToSection('usps'); } }}
+                  >
                     <div style={{ fontWeight: 600, fontSize: '14px', color: '#000000' }}>Smart Room Engine</div>
                     <div style={{ fontSize: '12px', color: '#7d7d82' }}>Konfliktfreie, akustische Raumplanung.</div>
                   </div>
-                  <div style={{ cursor: 'pointer' }} onClick={() => scrollToSection('usps')}>
+                  <div 
+                    role="button"
+                    tabIndex={0}
+                    style={{ cursor: 'pointer' }} 
+                    onClick={() => scrollToSection('usps')}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToSection('usps'); } }}
+                  >
                     <div style={{ fontWeight: 600, fontSize: '14px', color: '#000000' }}>Lernfortschritt &amp; Gamification</div>
                     <div style={{ fontSize: '12px', color: '#7d7d82' }}>Digitales Ringbuch mit Übe-Streaks.</div>
                   </div>
@@ -356,15 +374,33 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                   gap: '12px',
                   zIndex: 1001
                 }}>
-                  <div style={{ cursor: 'pointer' }} onClick={() => scrollToSection('target-audiences')}>
+                  <div 
+                    role="button"
+                    tabIndex={0}
+                    style={{ cursor: 'pointer' }} 
+                    onClick={() => scrollToSection('target-audiences')}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToSection('target-audiences'); } }}
+                  >
                     <div style={{ fontWeight: 600, fontSize: '14px', color: '#ea4335' }}>Für Schulleiter &amp; Admins</div>
                     <div style={{ fontSize: '12px', color: '#7d7d82' }}>Konfliktfreie Raumverwaltung &amp; Stundenpläne.</div>
                   </div>
-                  <div style={{ cursor: 'pointer' }} onClick={() => scrollToSection('target-audiences')}>
+                  <div 
+                    role="button"
+                    tabIndex={0}
+                    style={{ cursor: 'pointer' }} 
+                    onClick={() => scrollToSection('target-audiences')}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToSection('target-audiences'); } }}
+                  >
                     <div style={{ fontWeight: 600, fontSize: '14px', color: '#34a853' }}>Für Musiklehrer</div>
                     <div style={{ fontSize: '12px', color: '#7d7d82' }}>Direktes Feedback &amp; einfaches Zuweisen.</div>
                   </div>
-                  <div style={{ cursor: 'pointer' }} onClick={() => scrollToSection('target-audiences')}>
+                  <div 
+                    role="button"
+                    tabIndex={0}
+                    style={{ cursor: 'pointer' }} 
+                    onClick={() => scrollToSection('target-audiences')}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToSection('target-audiences'); } }}
+                  >
                     <div style={{ fontWeight: 600, fontSize: '14px', color: '#34a853' }}>Für Schüler &amp; Eltern</div>
                     <div style={{ fontSize: '12px', color: '#7d7d82' }}>Übersichtliche Hausaufgaben &amp; Motivation.</div>
                   </div>

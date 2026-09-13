@@ -15,7 +15,7 @@ export const getSchoolYearEndInfo = (simDate?: string | Date | null, existingEnd
     };
   }
   const now = simDate 
-    ? (typeof simDate === 'string' && !simDate.includes('T') ? new Date(simDate + 'T19:30:38+02:00') : new Date(simDate)) 
+    ? (typeof simDate === 'string' && !simDate.includes('T') ? new Date(simDate + 'T14:00:00') : new Date(simDate)) 
     : new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1; // 1-12

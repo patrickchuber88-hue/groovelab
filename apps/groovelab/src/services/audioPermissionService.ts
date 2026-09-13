@@ -91,7 +91,7 @@ export async function requestMicrophonePermissionOnce(): Promise<boolean> {
     localStorage.setItem(STORAGE_KEY, 'true');
     console.info('[AudioPermission] Microphone permission successfully granted and cached.');
     return true;
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.warn('[AudioPermission] User denied or dismissed microphone access:', err);
     localStorage.removeItem(STORAGE_KEY);
     return false;

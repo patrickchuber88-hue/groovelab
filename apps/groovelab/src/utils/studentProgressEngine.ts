@@ -103,15 +103,13 @@ export const getEngineSimulatedNow = (): Date => {
         const y = parseInt(parts[0], 10);
         const m = parseInt(parts[1], 10) - 1;
         const d = parseInt(parts[2], 10);
-        const simDate = new Date(y, m, d);
+        const simDate = new Date(y, m, d, 14, 0, 0, 0);
         const startTsStr = localStorage.getItem('groovelab_simulated_start_timestamp');
         const startTs = startTsStr ? parseInt(startTsStr, 10) : null;
         if (startTs) {
           const elapsed = Date.now() - startTs;
           return new Date(simDate.getTime() + elapsed);
         }
-        const realNow = new Date();
-        simDate.setHours(realNow.getHours(), realNow.getMinutes(), realNow.getSeconds(), realNow.getMilliseconds());
         return simDate;
       }
     }

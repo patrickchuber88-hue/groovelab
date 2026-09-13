@@ -6,6 +6,8 @@
 
 import { supabase } from '../lib/supabase';
 import { isUUID } from '../utils/uuidValidator';
+import { LehrwerkReference, SongReference, AudioReference } from '../types/databaseRoster';
+import { getErrorMessage } from '../utils/errorHelper';
 
 export interface TeacherSandboxEntry {
   id: string;
@@ -48,9 +50,9 @@ export interface AssignTeacherHomeworkParams {
   targetWeekIso: string;
   topicName?: string;
   notesContent?: string;
-  lehrwerke?: any[];
-  songs?: any[];
-  audios?: any[];
+  lehrwerke?: LehrwerkReference[];
+  songs?: SongReference[];
+  audios?: AudioReference[];
   appendMode?: boolean;
 }
 
@@ -301,13 +303,13 @@ export async function assignTeacherHomeworkToStudents(
       assigned_count: data?.assigned_count || targetStudentIds.length,
       topic_name: data?.topic_name || topicName || 'Hausaufgabe'
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[teacherStudioService] Unexpected assignment error:', err);
     return {
       success: false,
       assigned_count: 0,
       topic_name: topicName || 'Hausaufgabe',
-      error: err?.message || 'Unbekannter Fehler bei der Zuweisung.'
+      error: getErrorMessage(err, 'Unbekannter Fehler bei der Zuweisung.')
     };
   }
 }

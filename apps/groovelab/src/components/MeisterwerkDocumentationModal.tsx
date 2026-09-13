@@ -4384,10 +4384,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       }
 
       setHomeworkNotesList(loadedHomeworkNotesList);
+      const isStudentNotesFocused = typeof document !== 'undefined' && studentNotesTextareaRef.current && document.activeElement === studentNotesTextareaRef.current;
+      const isTeacherNotesFocused = typeof document !== 'undefined' && teacherNotesTextareaRef.current && document.activeElement === teacherNotesTextareaRef.current;
       if (!hasChanges) {
-        setGeneralHomeworkNotes(loadedHomeworkNotes);
-        setHomeworkNotes(loadedHomeworkNotes);
-        setTeacherNotes(loadedTeacherNotes);
+        if (!isStudentNotesFocused) {
+          setGeneralHomeworkNotes(loadedHomeworkNotes);
+          setHomeworkNotes(loadedHomeworkNotes);
+        }
+        if (!isTeacherNotesFocused) {
+          setTeacherNotes(loadedTeacherNotes);
+        }
       }
     } catch (err: any) {
       console.error('Error fetching progress:', err);
@@ -4415,12 +4421,17 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     // 2. Broadcast on Supabase channel for cross-browser / cross-device real-time websocket sync
     try {
       const channel = supabase.channel(`realtime_student_progress_${student.id}`);
-      await channel.send({
-        type: 'broadcast',
-        event: 'homework-changed',
-        payload: { studentId: student.id }
-      });
-      setTimeout(() => supabase.removeChannel(channel), 1000);
+      const fallbackTimer = setTimeout(() => supabase.removeChannel(channel), 5000);
+      try {
+        await channel.send({
+          type: 'broadcast',
+          event: 'homework-changed',
+          payload: { studentId: student.id }
+        });
+      } finally {
+        clearTimeout(fallbackTimer);
+        setTimeout(() => supabase.removeChannel(channel), 1000);
+      }
     } catch (e) {
       console.warn('Realtime broadcast error:', e);
     }

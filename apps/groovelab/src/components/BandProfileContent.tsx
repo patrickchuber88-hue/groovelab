@@ -2203,7 +2203,20 @@ const BandProfileContent: React.FC<BandProfileContentProps> = ({
                                   else if (isTopMatch) { bg = brandColor; color = "black"; }
                                   else if (count > 0) { bg = "rgba(255,255,255,0.1)"; color = "white"; }
                                   return (
-                                    <div key={time} onClick={() => isOpen && toggleFixedRehearsal(day.id, time)} style={{ height: "22px", background: bg, borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", color: color, fontSize: "0.6rem", fontWeight: 950, cursor: (canEdit && isOpen) ? "pointer" : "default", opacity: isOpen ? 1 : 0.2, transition: 'all 0.2s ease-in-out' }}>
+                                    <div 
+                                      key={time} 
+                                      role="button"
+                                      tabIndex={(canEdit && isOpen) ? 0 : -1}
+                                      aria-label={`Probezeit ${day.label || day.id} um ${time} Uhr`}
+                                      onClick={() => isOpen && toggleFixedRehearsal(day.id, time)}
+                                      onKeyDown={(e) => {
+                                        if ((e.key === 'Enter' || e.key === ' ') && canEdit && isOpen) {
+                                          e.preventDefault();
+                                          toggleFixedRehearsal(day.id, time);
+                                        }
+                                      }}
+                                      style={{ height: "22px", background: bg, borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", color: color, fontSize: "0.6rem", fontWeight: 950, cursor: (canEdit && isOpen) ? "pointer" : "default", opacity: isOpen ? 1 : 0.2, transition: 'all 0.2s ease-in-out' }}
+                                    >
                                       {isOpen && (isFixed ? <Zap size={8} fill="currentColor" /> : count > 0 ? count : null)}
                                     </div>
                                   );

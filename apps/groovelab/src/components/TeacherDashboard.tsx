@@ -17,6 +17,7 @@ import { notesService, UserNote } from '../services/notesService';
 import { formatCleanNoteContent } from './notes/notesConstants';
 import { checkIsAudioTresorActive, checkIsAudioTresorReadOnly } from '../domain/stickersAndTresor';
 import { computeSchoolDunningStatus, SchoolDunningStatus, getDunningVisualConfig } from '../domain/schoolDunningEngine';
+import { isTestUser } from '../domain/schoolMetricsAggregator';
 import { UpdateAnnouncementHero } from './common/UpdateAnnouncementHero';
 import { renderInstrumentIcon } from '../utils/instruments';
 import { getDistanceFromLatLonInM } from '../utils/geo';
@@ -2492,7 +2493,7 @@ export function TeacherDashboard({
     if (scheduleChangesTimeWindow === 'all') return myChangedAppointments;
     
     const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
-    const today = simStr ? new Date(simStr + 'T00:00:00') : new Date();
+    const today = simStr ? new Date(simStr + 'T14:00:00') : new Date();
     today.setHours(0, 0, 0, 0);
     const sevenDaysLater = new Date(today);
     sevenDaysLater.setDate(today.getDate() + 7);
@@ -3988,7 +3989,7 @@ export function TeacherDashboard({
         };
 
         const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
-        const today = simStr ? new Date(simStr + 'T00:00:00') : new Date();
+        const today = simStr ? new Date(simStr + 'T14:00:00') : new Date();
         today.setHours(0, 0, 0, 0);
         const todayStr = getLocalYYYYMMDD(today);
         
@@ -6360,11 +6361,7 @@ export function TeacherDashboard({
         const activePlat = activePlatform || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'groovelab');
 
         let filteredStudData = (studData || []).filter((student: any) => {
-          const fn = (student.first_name || '').trim().toLowerCase();
-          const ln = (student.last_name || '').trim().toLowerCase();
-          const email = (student.email || '').trim().toLowerCase();
-          const isTest = fn.startsWith('test') || fn.startsWith('jane') || fn.startsWith('bob') || ln === 't.' || ln === 'test' || email.includes('test');
-          if (isTest) return false;
+          if (isTestUser(student)) return false;
 
           if (activePlat === 'groovelab') {
             const isActivatedBySchool = student.is_groovelab_active === true || student.isGroovelabActive === true;
@@ -7360,6 +7357,10 @@ useEffect(() => {
       // Send a realtime broadcast to the student's dashboard!
       const songTitle = Array.isArray((sub as any).songs) ? ((sub as any).songs[0] as any)?.title : ((sub as any).songs as any)?.title;
       const channel = supabase.channel(`realtime_student_progress_${sub.user_id}`);
+      const safetyTimeout = setTimeout(() => {
+        supabase.removeChannel(channel);
+      }, 5000);
+
       channel.subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           channel.send({
@@ -7372,6 +7373,7 @@ useEffect(() => {
               difficultyLevel: sub.difficulty_level
             }
           });
+          clearTimeout(safetyTimeout);
           setTimeout(() => supabase.removeChannel(channel), 1000);
         }
       });

@@ -2657,7 +2657,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       };
     }
     const now = simDate 
-      ? (typeof simDate === 'string' && !simDate.includes('T') ? new Date(simDate + 'T19:30:38+02:00') : new Date(simDate)) 
+      ? (typeof simDate === 'string' && !simDate.includes('T') ? new Date(simDate + 'T14:00:00') : new Date(simDate)) 
       : new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1; // 1-12
@@ -12633,7 +12633,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
                   {/* Overdue Activation Invoice Alerts */}
                   {(() => {
-                    const today = simulatedToday ? new Date(simulatedToday + 'T12:00:00') : new Date();
+                    const today = simulatedToday ? new Date(simulatedToday + 'T14:00:00') : new Date();
                     const prevMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
                     const diffDays = Math.floor((today.getTime() - prevMonthEnd.getTime()) / (1000 * 60 * 60 * 24));
                     const isSchoolPaid = billingPayer === 'school' && (studentBillingOption === 'option2' || studentBillingOption === 'option3_2');

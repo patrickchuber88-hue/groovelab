@@ -3654,41 +3654,33 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                                (typeof window !== 'undefined' ? (localStorage.getItem('groovelab_last_school_id') || localStorage.getItem('groovelab_school_id')) : null) ||
                                '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
 
-        // 1. Call public.get_dev_bypass_users_for_school RPC
-        const { data: rpcRes, error: rpcErr } = await supabase.rpc('get_dev_bypass_users_for_school', { p_school_id: targetSchoolId });
-
-        if (!rpcErr && rpcRes) {
-          const adminUser = rpcRes.admin || {
+        // 1. In Local Dev: Safe Local Mock User Profiles (Avoid calling dropped get_dev_bypass_users_for_school RPC)
+        const schoolName = schoolData?.name || 'Musäk Bad Säckingen';
+        setBypassUserCounts({
+          hasAdmin: true,
+          hasTeacher: true,
+          hasStudent: true,
+          adminUser: {
             id: '11079eae-664a-49a4-8692-771d83a3193c',
             name: 'Severin L.',
             role: 'admin',
             school_id: targetSchoolId
-          };
-          const teacherUser = rpcRes.teacher || {
+          },
+          teacherUser: {
             id: '98b6a599-7ff7-4f99-b51d-b6a4c348a0a0',
             name: 'Mateo B.',
             role: 'teacher',
             school_id: targetSchoolId
-          };
-          const studentUser = rpcRes.student || {
+          },
+          studentUser: {
             id: '15102f5e-c504-4c33-93ab-436285197c8c',
             name: 'Linus K.',
             role: 'student',
             school_id: targetSchoolId
-          };
-          const schoolName = rpcRes.school_name || schoolData?.name || 'Musäk Bad Säckingen';
-
-          setBypassUserCounts({
-            hasAdmin: true,
-            hasTeacher: true,
-            hasStudent: true,
-            adminUser,
-            teacherUser,
-            studentUser,
-            schoolName
-          });
-          return;
-        }
+          },
+          schoolName
+        });
+        return;
 
         // 2. Direct fallback
         setBypassUserCounts({
@@ -6124,7 +6116,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               style={{ width: '16px', height: '16px', marginTop: '2px', cursor: 'pointer' }}
             />
             <label htmlFor="login-consent-checkbox" style={{ fontSize: '11px', color: isGroovelabKiosk ? 'rgba(0, 0, 0, 0.7)' : 'rgba(255, 255, 255, 0.7)', textAlign: 'left', cursor: 'pointer', lineHeight: '1.4' }}>
-              Ich bin mit der <span style={{ textDecoration: 'underline', color: isGroovelabKiosk ? '#854d0e' : '#e6f4ea' }} onClick={(e) => { e.preventDefault(); e.stopPropagation(); alert("Unsere Datenschutzerklärung finden Sie unter der Datenschutz-Schaltfläche im Hauptmenü."); }}>Datenschutzerklärung</span> einverstanden.
+              Ich bin mit der <span 
+                role="button"
+                tabIndex={0}
+                style={{ textDecoration: 'underline', color: isGroovelabKiosk ? '#854d0e' : '#e6f4ea', cursor: 'pointer', outline: 'none' }} 
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLegalModalTab('privacy'); }}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setLegalModalTab('privacy'); } }}
+                aria-label="Datenschutzerklärung öffnen"
+              >Datenschutzerklärung</span> einverstanden.
             </label>
           </div>
         </form>
@@ -7015,12 +7014,19 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           
           {(!geoDebug.isWithinAnyRoom || !geoDebug.withinHours) && (
             <button 
-              onClick={() => {
+              onClick={async () => {
                 const uid = sessionStorage.getItem('groovelab_user_id');
                 if (uid) {
-                   supabase.from('users').select('*, schools(*)').eq('id', uid).single().then(({data}) => {
-                     if (data) finalizeLogin(data, loginStationId, true);
-                   });
+                  const targetSchoolId = schoolData?.id || localStorage.getItem('groovelab_school_id') || '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
+                  const { data, error } = await supabase.rpc('authenticate_by_credential', {
+                    p_credential: uid,
+                    p_school_id: targetSchoolId
+                  });
+                  if (!error && data?.success && data?.user) {
+                    finalizeLogin(data.user, loginStationId, true);
+                  } else {
+                    alert('Labor-Modus Override fehlgeschlagen: Autorisierung abgewiesen.');
+                  }
                 } else {
                   alert('Bitte erst einmal scannen, damit ich weiß, wer du bist!');
                 }

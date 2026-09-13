@@ -4844,6 +4844,10 @@ export function AdminDashboard({
         // Send a realtime broadcast to the student's dashboard!
         const songTitle = Array.isArray((sub as any).songs) ? ((sub as any).songs[0] as any)?.title : ((sub as any).songs as any)?.title;
         const channel = supabase.channel(`realtime_student_progress_${sub.user_id}`);
+        const safetyTimeout = setTimeout(() => {
+          supabase.removeChannel(channel);
+        }, 5000);
+
         channel.subscribe((status) => {
           if (status === 'SUBSCRIBED') {
             channel.send({
@@ -4856,6 +4860,7 @@ export function AdminDashboard({
                 difficultyLevel: sub.difficulty_level
               }
             });
+            clearTimeout(safetyTimeout);
             setTimeout(() => supabase.removeChannel(channel), 1000);
           }
         });

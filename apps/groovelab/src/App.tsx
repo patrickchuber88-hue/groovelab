@@ -5848,6 +5848,9 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
               }
             });
             console.log('[Founding] Sent band-founded broadcast for', newBand.name);
+            setTimeout(() => {
+              supabase.removeChannel(liveLabChannel);
+            }, 1500);
           }
         });
       } catch (bcErr) {

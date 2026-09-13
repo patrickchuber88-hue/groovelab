@@ -356,7 +356,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
               {(() => {
                 const effectiveContractStartDateStr = isBillingBooked
                   ? contractStartDate
-                  : (simulatedToday ? simulatedToday + 'T12:00:00' : new Date().toISOString());
+                  : (simulatedToday ? simulatedToday + 'T14:00:00' : new Date().toISOString());
                 const contractDateObj = effectiveContractStartDateStr ? new Date(effectiveContractStartDateStr) : new Date('2026-06-12T19:30:38+02:00');
                 const cMonth = contractDateObj.getMonth() + 1;
                 const isStarterFlat = false;
@@ -1556,7 +1556,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                           {checkoutStep === 5 && (() => {
                             const effectiveContractStartDateStr = isBillingBooked
                               ? contractStartDate
-                              : (simulatedToday ? simulatedToday + 'T12:00:00' : new Date().toISOString());
+                              : (simulatedToday ? simulatedToday + 'T14:00:00' : new Date().toISOString());
 
                             const getRemainingMonths = () => {
                               const refDate = effectiveContractStartDateStr ? new Date(effectiveContractStartDateStr) : new Date();
@@ -2394,7 +2394,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                           const cashCount = activatedStudents.filter((s: any) => s.student_billing_payment_method === 'cash').length;
 
                           const now = simulatedToday 
-                            ? (simulatedToday.includes('T') ? new Date(simulatedToday) : new Date(simulatedToday + 'T19:30:38+02:00')) 
+                            ? (simulatedToday.includes('T') ? new Date(simulatedToday) : new Date(simulatedToday + 'T14:00:00')) 
                             : new Date();
                           const currentMonthVal = now.getMonth() + 1;
                           const currentYearVal = now.getFullYear();
@@ -3615,7 +3615,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                 const startYear = contractDateObj.getFullYear();
                                 const startMonth = contractDateObj.getMonth() + 1; // 1-indexed
 
-                                const systemDate = simulatedToday ? new Date(simulatedToday + 'T19:30:38+02:00') : new Date();
+                                const systemDate = simulatedToday ? new Date(simulatedToday + 'T14:00:00') : new Date();
                                 const currentYear = systemDate.getFullYear();
                                 const currentMonth = systemDate.getMonth() + 1;
 

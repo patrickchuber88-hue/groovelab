@@ -6,9 +6,10 @@ import { supabase } from '../../lib/supabase';
 
 import {
   Activity, BookOpen, Calendar, Clock, Edit3, Flame,
-  Mic, Music, Sparkles, Sun, User, Users, Zap
+  Mic, Music, Sparkles, Sun, User, Users, Zap, Send, Loader2
 } from 'lucide-react';
 import { isTeacherCurrentlyAbsent } from '../../utils/teacherAbsenceHelper';
+import { SimpleVoiceRecorder } from '../campus/SimpleVoiceRecorder';
 
 export interface TeacherHausaufgabenWidgetProps {
   teacher: any;
@@ -66,6 +67,79 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
   onOpenStudio,
 }) => {
   const [isCopyingPrevWeek, setIsCopyingPrevWeek] = useState(false);
+  const [quickHomeworkText, setQuickHomeworkText] = useState('');
+  const [isSavingQuickHw, setIsSavingQuickHw] = useState(false);
+  const [showQuickAudioRecorder, setShowQuickAudioRecorder] = useState(false);
+
+  const handleSaveQuickHomework = async (currentPrep: any, customNote?: string) => {
+    const textToSave = (customNote || quickHomeworkText).trim();
+    if (!textToSave || !currentPrep?.studentId) return;
+    setIsSavingQuickHw(true);
+    try {
+      const curWkNum = currentPrep.currentWeekNum;
+      if (!curWkNum) return;
+
+      const activeTId = teacher?.id;
+      const currentNotes = Array.isArray(currentPrep.currentWeekNotes) ? [...currentPrep.currentWeekNotes] : [];
+      currentNotes.push(textToSave);
+      const notesJson = JSON.stringify(currentNotes);
+
+      const { data: existingRows, error: fetchErr } = await supabase
+        .from('progress_matrix')
+        .select('id')
+        .eq('student_id', currentPrep.studentId)
+        .eq('topic_name', `Hausaufgabe KW ${curWkNum}`)
+        .limit(1);
+
+      if (fetchErr) console.warn('[quickHw] fetch warning:', fetchErr);
+
+      if (existingRows && existingRows.length > 0) {
+        const { error: updErr } = await supabase
+          .from('progress_matrix')
+          .update({
+            homework_notes: notesJson,
+            is_current_homework: true,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingRows[0].id);
+        if (updErr) throw updErr;
+      } else {
+        const { error: insErr } = await supabase
+          .from('progress_matrix')
+          .insert({
+            student_id: currentPrep.studentId,
+            teacher_id: activeTId,
+            topic_name: `Hausaufgabe KW ${curWkNum}`,
+            status: 'IN_PROGRESS',
+            is_current_homework: true,
+            homework_notes: notesJson,
+            teacher_notes: '',
+            updated_at: new Date().toISOString()
+          });
+        if (insErr) throw insErr;
+      }
+
+      setDynamicPrepMirror((prev: any) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          currentWeekNotes: currentNotes
+        };
+      });
+
+      setQuickHomeworkText('');
+      setShowQuickAudioRecorder(false);
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('campus_homework_updated', { detail: { studentId: currentPrep.studentId } }));
+      }
+    } catch (err: any) {
+      console.error('[quickHw] Error saving quick homework:', err);
+      alert('Fehler beim Speichern der Schnell-Hausaufgabe: ' + (err?.message || err));
+    } finally {
+      setIsSavingQuickHw(false);
+    }
+  };
 
   const handleCopyPrevWeekToCurrent = async (currentPrep: any) => {
     if (!currentPrep?.studentId || !currentPrep?.prevWeekNotes || currentPrep.prevWeekNotes.length === 0) return;
@@ -1078,6 +1152,140 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
                       )}
                     </div>
                   )}
+                </div>
+
+                {/* ⚡ 60-Sekunden-Blitz-Workflow für Lehrkräfte */}
+                <div style={{
+                  marginTop: '8px',
+                  padding: '12px 14px',
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Zap size={14} color="#f59e0b" fill="#f59e0b" />
+                      <span>Schnell-Hausaufgabe (60s-Blitz)</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowQuickAudioRecorder(prev => !prev)}
+                      style={{
+                        border: '1px solid #cbd5e1',
+                        background: showQuickAudioRecorder ? '#fee2e2' : '#ffffff',
+                        color: showQuickAudioRecorder ? '#dc2626' : '#475569',
+                        padding: '4px 10px',
+                        borderRadius: '100px',
+                        fontSize: '0.74rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px'
+                      }}
+                      title="Audio-Vorspielbeispiel direkt aufnehmen"
+                      aria-label="Audio-Vorspielbeispiel direkt aufnehmen"
+                    >
+                      <Mic size={13} color={showQuickAudioRecorder ? '#dc2626' : '#16a34a'} />
+                      <span>{showQuickAudioRecorder ? 'Audio schließen' : 'Audio-Memo 🎙️'}</span>
+                    </button>
+                  </div>
+
+                  {showQuickAudioRecorder && (
+                    <div style={{ padding: '8px', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                      <SimpleVoiceRecorder
+                        studentId={prep.studentId}
+                        colorTheme="#16a34a"
+                        buttonLabel="Takt kurz vorspielen"
+                        topicName={`KW ${prep.currentWeekNum} Vorspiel-Memo`}
+                        onAudioSaved={(url) => {
+                          const todayStr = new Date().toISOString().split('T')[0];
+                          const audioTag = `AUDIO:${url}|30|${todayStr}|Vorspiel-Beispiel|teacher`;
+                          handleSaveQuickHomework(prep, audioTag);
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Input & Zuweisen */}
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="text"
+                      value={quickHomeworkText}
+                      onChange={(e) => setQuickHomeworkText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleSaveQuickHomework(prep);
+                        }
+                      }}
+                      placeholder="Aufgabe eingeben (z. B. Takt 1–8 Tempo 80)..."
+                      style={{
+                        flex: 1,
+                        padding: '10px 14px',
+                        borderRadius: '12px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '0.86rem',
+                        color: '#0f172a',
+                        fontWeight: 600,
+                        outline: 'none',
+                        background: '#ffffff'
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleSaveQuickHomework(prep)}
+                      disabled={isSavingQuickHw || !quickHomeworkText.trim()}
+                      style={{
+                        padding: '10px 16px',
+                        background: !quickHomeworkText.trim() ? '#e2e8f0' : '#16a34a',
+                        color: !quickHomeworkText.trim() ? '#94a3b8' : '#ffffff',
+                        border: 'none',
+                        borderRadius: '12px',
+                        fontWeight: 900,
+                        fontSize: '0.82rem',
+                        cursor: (!quickHomeworkText.trim() || isSavingQuickHw) ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        flexShrink: 0
+                      }}
+                    >
+                      {isSavingQuickHw ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                      <span>Zuweisen</span>
+                    </button>
+                  </div>
+
+                  {/* Quick-Tags */}
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {[
+                      'Takt 1–8 mit Metronom bpm 80',
+                      'Akkordwechsel G-C-D flüssig',
+                      'Blattlese-Übung S. 14',
+                      'Dynamik & Phrasierung beachten'
+                    ].map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => setQuickHomeworkText(prev => prev ? `${prev}, ${tag}` : tag)}
+                        style={{
+                          border: '1px solid #e2e8f0',
+                          background: '#ffffff',
+                          color: '#475569',
+                          padding: '3px 8px',
+                          borderRadius: '8px',
+                          fontSize: '0.70rem',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        + {tag}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Primary Action */}

@@ -25,7 +25,7 @@ export interface IdempotentExecutionResult<T> {
 export async function executeIdempotentMutation<T>(
   endpoint: string,
   idempotencyKey: string,
-  mutationFn: () => Promise<{ data: T | null; error: any }>
+  mutationFn: () => Promise<{ data: T | null; error: unknown }>
 ): Promise<IdempotentExecutionResult<T>> {
   try {
     // 1. Acquire Idempotency Lock
@@ -87,7 +87,7 @@ export async function executeIdempotentMutation<T>(
       error: null,
       isCached: false,
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     return {
       data: null,
       error: parseApiError(err, endpoint),
