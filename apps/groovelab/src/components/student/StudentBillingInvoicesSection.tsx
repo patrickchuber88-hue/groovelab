@@ -90,6 +90,77 @@ export function StudentBillingInvoicesSection({ studentUser, studentId }: { stud
         </div>
       </div>
 
+      {/* 📅 Transparente Schuljahres-Laufzeit (Befristeter Festbeitrag ohne Abo) */}
+      <div style={{
+        background: '#ffffff',
+        border: '1.5px solid #e2e8f0',
+        borderRadius: '16px',
+        padding: '18px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '1.2rem' }}>📅</span>
+            <div>
+              <div style={{ fontSize: '0.88rem', fontWeight: 850, color: '#0f172a' }}>
+                Befristeter Schuljahres-Zugang (Kein Abo)
+              </div>
+              <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 550 }}>
+                Laufzeit endet automatisch zum Ende des laufenden Schuljahres (31. August).
+              </div>
+            </div>
+          </div>
+          <span style={{
+            background: '#f0fdf4',
+            color: '#166534',
+            padding: '4px 10px',
+            borderRadius: '100px',
+            fontSize: '0.72rem',
+            fontWeight: 800,
+            border: '1px solid #bbf7d0'
+          }}>
+            Endet automatisch
+          </span>
+        </div>
+
+        <p style={{ margin: 0, fontSize: '0.78rem', color: '#475569', lineHeight: 1.5 }}>
+          Es gibt <strong>keine automatische Vertragsverlängerung und keine Kündigungsfristen</strong>. Der Zugang läuft nach Ablauf des Schuljahres automatisch aus. Eine Kündigung ist daher nicht erforderlich.
+        </p>
+
+        <div style={{
+          background: '#f8fafc',
+          border: '1px dashed #cbd5e1',
+          borderRadius: '12px',
+          padding: '12px',
+          fontSize: '0.74rem',
+          color: '#64748b',
+          lineHeight: 1.45,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '8px'
+        }}>
+          <span>Du ziehst um oder möchtest den Unterricht vorzeitig beenden?</span>
+          <a
+            href={`mailto:${studentUser?.school_email || 'sekretariat@musikschule.de'}?subject=Abmeldung%20Unterricht%20${encodeURIComponent(studentUser?.first_name || 'Schueler')}`}
+            style={{
+              color: '#0284c7',
+              fontWeight: 800,
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}
+          >
+            Vorzeitige Abmeldung an das Sekretariat melden →
+          </a>
+        </div>
+      </div>
+
       {/* Info Card */}
       <div style={{
         background: '#f8fafc',

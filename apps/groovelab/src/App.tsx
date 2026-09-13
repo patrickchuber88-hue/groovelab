@@ -1388,6 +1388,32 @@ function App() {
     }
   }, [user?.campus_ui_level, user?.id]);
 
+  // 🛡️ REVISIONSSICHERE ECHTZEIT-SYNCHRONISATION (PWA <-> Localhost <-> Online)
+  // Reagiert sofort und ohne Reload auf UI-Level-Änderungen aus dem Elternbereich anderer Clients
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase.channel(`realtime_student_progress_${user.id}`);
+    channel
+      .on('broadcast', { event: 'ui-level-changed' }, (payload: any) => {
+        const newLevel = payload?.payload?.uiLevel;
+        if (newLevel && (newLevel === 'junior' || newLevel === 'teen' || newLevel === 'pro')) {
+          console.log('[Realtime-Root] UI-Level update broadcast received:', newLevel);
+          setCampusStudentUiLevel(newLevel);
+          setUser((prev: any) => prev ? { ...prev, campus_ui_level: newLevel } : prev);
+          try {
+            localStorage.setItem(`campus_student_ui_level_${user.id}`, newLevel);
+            localStorage.setItem('campus_student_ui_level', newLevel);
+          } catch {}
+          window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: newLevel }));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
+
   const { isShielded, dismissShield } = usePrivacyShield(false);
 
   useEffect(() => {
@@ -3387,7 +3413,8 @@ function App() {
         const substantiveKeys = [
           'id', 'school_id', 'role', 'is_active', 'is_campus_active', 'is_groovelab_active',
           'token_version', 'is_master_admin', 'first_name', 'last_name', 'instrument',
-          'nickname', 'avatar_url', 'photo_url', 'sick_until', 'sick_start', 'student_level'
+          'nickname', 'avatar_url', 'photo_url', 'sick_until', 'sick_start', 'student_level',
+          'campus_ui_level'
         ];
         const hasChange = substantiveKeys.some(key => (prev as any)[key] !== (userData as any)[key]);
         return hasChange ? userData : prev;

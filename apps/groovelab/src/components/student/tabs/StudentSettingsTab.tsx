@@ -6,7 +6,8 @@ import {
   RotateCcw, Volume2, Moon, QrCode, X, Eye, EyeOff, Zap, Music, Library, School,
   Calendar, CalendarX, Check, CheckCircle, Target, Pencil, User, Mail, Phone, Users,
   Shield, Settings, Bell, FileText, AlertTriangle, ShieldCheck, CheckCheck, Mic, Download,
-  Key, Delete, Sliders, Compass, Lightbulb, Copy, Fingerprint, Headphones, ChevronLeft
+  Key, Delete, Sliders, Compass, Lightbulb, Copy, Fingerprint, Headphones, ChevronLeft,
+  HeartHandshake
 } from 'lucide-react';
 import { formatTeacherFullName } from '../../../utils/nameHelper';
 import { CampusGroovelabText } from '../../CampusGroovelabBrand';
@@ -23,6 +24,8 @@ import { ParentPracticeReportSettingsView } from '../settings/ParentPracticeRepo
 import { ParentCancellationLogSettingsView } from '../settings/ParentCancellationLogSettingsView';
 import { ParentFamilyProfilesSettingsView } from '../settings/ParentFamilyProfilesSettingsView';
 import { ParentDataVaultSettingsView } from '../settings/ParentDataVaultSettingsView';
+import { ParentConsentSettingsView } from '../settings/ParentConsentSettingsView';
+import { ParentCoParentingSettingsView } from '../settings/ParentCoParentingSettingsView';
 import { ParentDevelopmentGridSettingsView } from '../settings/ParentDevelopmentGridSettingsView';
 
 export interface StudentSettingsTabProps {
@@ -1226,6 +1229,24 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         icon: Users
                       },
                       {
+                        id: 'coparenting',
+                        title: 'Co-Parenting & Vormund',
+                        subtitle: 'Beide Elternteile mit separaten Rechten verknüpfen',
+                        badge: 'Multi-Eltern',
+                        gradient: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                        shadowColor: 'rgba(2, 132, 199, 0.40)',
+                        icon: HeartHandshake
+                      },
+                      {
+                        id: 'consents',
+                        title: 'Medien & Einwilligungen',
+                        subtitle: 'Foto-, Video- & Programmheft-Freigaben (Art. 8 DSGVO)',
+                        badge: 'DSGVO Art. 8',
+                        gradient: 'linear-gradient(135deg, #10b981 0%, #047857 100%)',
+                        shadowColor: 'rgba(16, 185, 129, 0.40)',
+                        icon: ShieldCheck
+                      },
+                      {
                         id: 'skills_radar',
                         title: (() => {
                           const lvl = ((draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') : null)) || 'junior');
@@ -1706,6 +1727,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             {activeStudentSettingsModal === 'practice_report' && 'Übe-Report & Insights'}
                             {activeStudentSettingsModal === 'cancellations' && 'Gemeldete Abwesenheiten'}
                             {activeStudentSettingsModal === 'family_profiles' && 'Familien-Profile'}
+                            {activeStudentSettingsModal === 'coparenting' && 'Co-Parenting & Vormund'}
+                            {activeStudentSettingsModal === 'consents' && 'Medien-Einwilligungen'}
                             {activeStudentSettingsModal === 'skills_radar' && (() => {
                               const lvl = ((draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') : null)) || 'junior');
                               return lvl === 'junior' ? 'Musik-Stern & Raster' : (lvl === 'pro' ? 'Kompetenzen-Radar' : 'Skill-Radar & Raster');
@@ -1781,6 +1804,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             {activeStudentSettingsModal === 'practice_report' && <Clock size={20} color="#ffffff" />}
                             {activeStudentSettingsModal === 'cancellations' && <CalendarX size={20} color="#ffffff" />}
                             {activeStudentSettingsModal === 'family_profiles' && <Users size={20} color="#ffffff" />}
+                            {activeStudentSettingsModal === 'coparenting' && <HeartHandshake size={20} color="#ffffff" />}
+                            {activeStudentSettingsModal === 'consents' && <ShieldCheck size={20} color="#ffffff" />}
                             {activeStudentSettingsModal === 'skills_radar' && <Sparkles size={20} color="#ffffff" />}
                             {activeStudentSettingsModal === 'notifications' && <Bell size={20} color="#ffffff" />}
                             {activeStudentSettingsModal === 'security' && <Lock size={20} color="#ffffff" />}
@@ -1796,6 +1821,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                               {activeStudentSettingsModal === 'practice_report' && 'Wöchentlicher Übe-Report & Fortschritt'}
                               {activeStudentSettingsModal === 'cancellations' && 'Gemeldete Abwesenheiten'}
                               {activeStudentSettingsModal === 'family_profiles' && 'Familien-Profile & Geschwister'}
+                              {activeStudentSettingsModal === 'coparenting' && 'Co-Parenting & Erziehungsberechtigte'}
+                              {activeStudentSettingsModal === 'consents' && 'Medien-Einwilligungen & Art. 8 DSGVO'}
                               {activeStudentSettingsModal === 'skills_radar' && (() => {
                                 const lvl = ((draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') : null)) || 'junior');
                                 return lvl === 'junior' ? 'Mein Musik-Stern · Entwicklungsraster' : (lvl === 'pro' ? 'Kompetenzen-Radar · Entwicklungsraster' : 'Skill-Radar & Entwicklungsraster');
@@ -1813,6 +1840,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                               {activeStudentSettingsModal === 'practice_report' && '100% datenschutzkonforme Zusammenfassung der Übe-Einheiten zu Hause.'}
                               {activeStudentSettingsModal === 'cancellations' && 'Übersicht aller Unterrichtsstunden, die durch dein Kind oder die Familie abgesagt wurden.'}
                               {activeStudentSettingsModal === 'family_profiles' && 'Mehrere Kinder auf einem Gerät verwalten und per Fingertipp wechseln.'}
+                              {activeStudentSettingsModal === 'coparenting' && 'Getrennte Zugänge für beide Elternteile mit individuellen Berechtigungen.'}
+                              {activeStudentSettingsModal === 'consents' && 'Freigaben für Fotos, Videos und Programmhefte jederzeit frei verwalten.'}
                               {activeStudentSettingsModal === 'skills_radar' && 'Persönliche, behutsame Förderung durch die Musiklehrkraft (ohne Noten, ohne Leistungsdruck).'}
                               {activeStudentSettingsModal === 'notifications' && 'Passe an, worüber und wie wir dich informieren.'}
                               {activeStudentSettingsModal === 'security' && (isAdultStudent ? '4-stellige persönliche PIN für schnellen und sicheren Login.' : (securityPinTarget === 'parent' ? '6-stellige Eltern-PIN zum Schutz des Kontrollzentrums & der Ruhezeiten.' : '4-stellige Schüler-PIN für dein Kind (schützt Stundenplan & Profil).'))}
@@ -1822,24 +1851,69 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             </p>
                           </div>
                         </div>
-                        <button
-                          onClick={handleCloseSettingsModal}
-                          style={{
-                            background: '#f1f5f9',
-                            border: 'none',
-                            borderRadius: '50%',
-                            width: '36px',
-                            height: '36px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            color: '#64748b'
-                          }}
-                          className="hover-scale"
-                        >
-                          <X size={18} />
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {isParentUnlocked && !isAdultStudent && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                try {
+                                  sessionStorage.removeItem('groovelab_parent_unlocked_global');
+                                  if (studentId) {
+                                    sessionStorage.removeItem(`groovelab_parent_unlocked_${studentId}`);
+                                    sessionStorage.removeItem(`groovelab_parent_session_${studentId}`);
+                                  }
+                                  window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: false }));
+                                } catch (e) {}
+                                handleCloseSettingsModal();
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                background: '#fef2f2',
+                                border: '1.5px solid #fecaca',
+                                borderRadius: '12px',
+                                padding: '8px 12px',
+                                minHeight: '44px',
+                                color: '#b91c1c',
+                                fontSize: '0.78rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                touchAction: 'manipulation'
+                              }}
+                              className="hover-scale"
+                              title="Elternbereich sofort sperren &amp; Session beenden"
+                              aria-label="Elternbereich sofort sperren und Session beenden"
+                            >
+                              <Lock size={15} />
+                              <span>Sperren</span>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleCloseSettingsModal();
+                            }}
+                            style={{
+                              background: '#f1f5f9',
+                              border: 'none',
+                              borderRadius: '50%',
+                              width: '44px',
+                              height: '44px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              color: '#64748b',
+                              touchAction: 'manipulation'
+                            }}
+                            className="hover-scale"
+                            title="Schließen"
+                            aria-label="Fenster schließen"
+                          >
+                            <X size={20} />
+                          </button>
+                        </div>
                       </>
                     )}
                   </div>
@@ -1933,6 +2007,20 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         handleSwitchFamilyStudent={handleSwitchFamilyStudent}
                         handleRemoveFamilyProfile={handleRemoveFamilyProfile}
                         setIsAddSiblingModalOpen={setIsAddSiblingModalOpen}
+                      />
+                    )}
+
+                    {activeStudentSettingsModal === 'coparenting' && (
+                      <ParentCoParentingSettingsView
+                        studentUser={studentUser}
+                        studentId={studentId}
+                      />
+                    )}
+
+                    {activeStudentSettingsModal === 'consents' && (
+                      <ParentConsentSettingsView
+                        studentUser={studentUser}
+                        studentId={studentId}
                       />
                     )}
 

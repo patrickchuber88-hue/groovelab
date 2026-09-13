@@ -27,11 +27,80 @@ export const GlobalParentPinModal: React.FC<GlobalParentPinModalProps> = ({
   isVerifyingBiometric,
   onClose,
 }) => {
+  const modalContainerRef = React.useRef<HTMLDivElement>(null);
+
+  // WAI-ARIA Focus Trap & Escape Key Listener (BFSG 2025 / WCAG 2.1.1 & 2.1.2)
+  React.useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+
+      // Keyboard entry for numbers
+      if (/^[0-9]$/.test(e.key)) {
+        e.preventDefault();
+        setGlobalPinError('');
+        if (globalPinInput.length < 6) {
+          const nextVal = globalPinInput + e.key;
+          setGlobalPinInput(nextVal);
+          if (nextVal.length === 6) {
+            onVerify(nextVal);
+          }
+        }
+        return;
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        setGlobalPinError('');
+        setGlobalPinInput(prev => prev.slice(0, -1));
+        return;
+      }
+
+      // Focus-Trap Tab Circulation
+      if (e.key === 'Tab' && modalContainerRef.current) {
+        const focusableElements = modalContainerRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusableElements.length === 0) return;
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey && document.activeElement === firstElement) {
+          e.preventDefault();
+          lastElement.focus();
+        } else if (!e.shiftKey && document.activeElement === lastElement) {
+          e.preventDefault();
+          firstElement.focus();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    // Initial focus into container
+    const timer = setTimeout(() => {
+      if (modalContainerRef.current) {
+        const firstBtn = modalContainerRef.current.querySelector<HTMLElement>('button');
+        if (firstBtn) firstBtn.focus();
+      }
+    }, 50);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      clearTimeout(timer);
+    };
+  }, [isOpen, globalPinInput, onClose, onVerify, setGlobalPinError, setGlobalPinInput]);
+
   if (!isOpen) return null;
 
   return (
     <div
       onClick={onClose}
+      role="presentation"
       style={{
         position: 'fixed',
         inset: 0,
@@ -46,6 +115,11 @@ export const GlobalParentPinModal: React.FC<GlobalParentPinModalProps> = ({
       }}
     >
       <div
+        ref={modalContainerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="global-parent-pin-title"
+        aria-describedby="global-parent-pin-desc"
         onClick={e => e.stopPropagation()}
         style={{
           background: '#ffffff',
@@ -75,10 +149,10 @@ export const GlobalParentPinModal: React.FC<GlobalParentPinModalProps> = ({
         </div>
 
         <div>
-          <h3 style={{ margin: '0 0 6px 0', fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
+          <h3 id="global-parent-pin-title" style={{ margin: '0 0 6px 0', fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
             {studentUiLevel === 'junior' ? '👨‍👩‍👧 Geschützter Elternbereich' : 'Eltern Master-PIN'}
           </h3>
-          <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b', lineHeight: 1.4, fontWeight: 500 }}>
+          <p id="global-parent-pin-desc" style={{ margin: 0, fontSize: '0.8rem', color: '#64748b', lineHeight: 1.4, fontWeight: 500 }}>
             {studentUiLevel === 'junior'
               ? 'Möchtest du eine Musikstunde absagen oder Einstellungen ändern? Gib bitte deinen Eltern Bescheid – Termine können nur Erwachsene mit der 6-stelligen Eltern-PIN verwalten.'
               : 'Diese Funktion ist durch den Elternbereich geschützt. Bitte gib deine 6-stellige Eltern-Master-PIN ein.'}
@@ -86,15 +160,19 @@ export const GlobalParentPinModal: React.FC<GlobalParentPinModalProps> = ({
         </div>
 
         {globalPinError && (
-          <div style={{
-            width: '100%',
-            padding: '8px 12px',
-            borderRadius: '10px',
-            background: '#fee2e2',
-            color: '#dc2626',
-            fontSize: '0.78rem',
-            fontWeight: 700
-          }}>
+          <div 
+            role="alert" 
+            aria-live="assertive"
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              borderRadius: '10px',
+              background: '#fee2e2',
+              color: '#dc2626',
+              fontSize: '0.78rem',
+              fontWeight: 750
+            }}
+          >
             {globalPinError}
           </div>
         )}

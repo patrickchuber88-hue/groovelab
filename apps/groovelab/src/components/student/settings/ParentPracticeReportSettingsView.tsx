@@ -1,5 +1,6 @@
 import React from 'react';
 import { Clock, Sparkles, ShieldCheck } from 'lucide-react';
+import { supabase } from '../../../lib/supabase';
 
 export interface ParentPracticeReportSettingsViewProps {
   currentLvlKey: 'junior' | 'teen' | 'pro';
@@ -21,15 +22,30 @@ export const ParentPracticeReportSettingsView: React.FC<ParentPracticeReportSett
   getTargetMinutes,
 }) => {
   const studentId = studentUser?.id;
+  const serverMinutes = studentUser?.parent_permissions?.max_screen_minutes;
   const [parentMaxMinutes, setParentMaxMinutes] = React.useState<number>(() => {
-    if (typeof window === 'undefined' || !studentId) return 45;
-    return Number(localStorage.getItem(`cg_parent_max_screen_minutes_${studentId}`) || 45);
+    if (typeof serverMinutes === 'number' && serverMinutes > 0) return serverMinutes;
+    return currentLvlKey === 'junior' ? 30 : (currentLvlKey === 'teen' ? 45 : 60);
   });
 
-  const handleSetMaxMinutes = (mins: number) => {
+  const handleSetMaxMinutes = async (mins: number) => {
     setParentMaxMinutes(mins);
     if (studentId) {
-      localStorage.setItem(`cg_parent_max_screen_minutes_${studentId}`, String(mins));
+      try {
+        const existingPermissions = studentUser?.parent_permissions || {};
+        await supabase
+          .from('users')
+          .update({
+            parent_permissions: {
+              ...existingPermissions,
+              max_screen_minutes: mins,
+              updated_at: new Date().toISOString()
+            }
+          })
+          .eq('id', studentId);
+      } catch (e) {
+        console.warn('Fehler beim Speichern der maximalen Übezeit:', e);
+      }
     }
   };
 

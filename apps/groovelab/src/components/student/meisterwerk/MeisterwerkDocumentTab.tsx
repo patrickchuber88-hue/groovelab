@@ -6040,6 +6040,41 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               }
                             }
                           });
+
+                          // 🛡️ Enterprise+ Cold-Cache & Mobile PWA Hydration: Unpack SNAPSHOT_SONGS from weekly snapshot item
+                          const curWeekSnapshotItem = deduplicatedItems.find(item => 
+                            item.topic_name?.startsWith('Hausaufgabe KW ') && 
+                            (getItemWeek(item) === viewingWeekIso || (item.updated_at && getISOWeek(item.updated_at) === viewingWeekIso))
+                          );
+                          if (curWeekSnapshotItem && curWeekSnapshotItem.homework_notes) {
+                            try {
+                              const parsedSnap = typeof curWeekSnapshotItem.homework_notes === 'string'
+                                ? JSON.parse(curWeekSnapshotItem.homework_notes)
+                                : curWeekSnapshotItem.homework_notes;
+                              if (Array.isArray(parsedSnap)) {
+                                const snapSongEntry = parsedSnap.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_SONGS:'));
+                                if (snapSongEntry) {
+                                  const rawJson = snapSongEntry.substring('SNAPSHOT_SONGS:'.length);
+                                  const parsedSongs = JSON.parse(rawJson);
+                                  if (Array.isArray(parsedSongs)) {
+                                    parsedSongs.forEach((song: any) => {
+                                      const cleanTopic = getNormalizedSongTitle(song);
+                                      const canKey = getCanonicalSongKey(song);
+                                      if (cleanTopic && !otherHWs.some(existing => getCanonicalSongKey(existing) === canKey || getNormalizedSongTitle(existing) === cleanTopic)) {
+                                        otherHWs.push({
+                                          ...song,
+                                          is_current_homework: true,
+                                          homework_notes: getCleanPageNotes(song.homework_notes)
+                                        });
+                                      }
+                                    });
+                                  }
+                                }
+                              }
+                            } catch (snapErr) {
+                              console.warn('[MeisterwerkDocumentTab] Error unpacking SNAPSHOT_SONGS in current week:', snapErr);
+                            }
+                          }
                           
                           lehrwerkeList = Object.entries(groupedLehrwerke).map(([title, info]) => {
                             info.pages.sort((a: number, b: number) => a - b);

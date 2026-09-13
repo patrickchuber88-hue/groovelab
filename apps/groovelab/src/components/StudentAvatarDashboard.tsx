@@ -441,6 +441,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         isSwitchingUiLevelRef.current = true;
         setJuniorAwardedStickerToCelebrate(null);
         setStudentUiLevel(e.detail);
+        setDraftUiLevel(e.detail);
         setTimeout(() => {
           isSwitchingUiLevelRef.current = false;
         }, 1500);
@@ -449,6 +450,31 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     window.addEventListener('campus_ui_level_changed', handleGlobalLevelChange);
     return () => window.removeEventListener('campus_ui_level_changed', handleGlobalLevelChange);
   }, []);
+
+  // 🛡️ REVISIONSSICHERE ECHTZEIT-SYNCHRONISATION (PWA <-> Localhost <-> Online)
+  const broadcastStudentUiLevelChange = (targetStudentId: string, newLevel: CampusUiLevel) => {
+    try {
+      const ch = supabase.channel(`realtime_student_progress_${targetStudentId}`);
+      ch.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          ch.send({
+            type: 'broadcast',
+            event: 'ui-level-changed',
+            payload: { uiLevel: newLevel, studentId: targetStudentId }
+          });
+        }
+      });
+      if ((ch as any).state === 'joined') {
+        ch.send({
+          type: 'broadcast',
+          event: 'ui-level-changed',
+          payload: { uiLevel: newLevel, studentId: targetStudentId }
+        });
+      }
+    } catch (bcErr) {
+      console.warn('[Realtime] Failed to broadcast ui-level-changed:', bcErr);
+    }
+  };
 
   const handleLevelChange = async (newLevel: CampusUiLevel) => {
     isSwitchingUiLevelRef.current = true;
@@ -462,6 +488,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     localStorage.setItem('campus_student_ui_level', newLevel);
     window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: newLevel }));
     setShowLevelModal(false);
+
+    if (effectiveId) {
+      broadcastStudentUiLevelChange(effectiveId, newLevel);
+    }
 
     // Geräuschlose Entprellung: Unterdrückt Sticker-Popups beim Rendern des neuen Levels
     setTimeout(() => {
@@ -1257,6 +1287,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       }
       localStorage.setItem('campus_student_ui_level', updates.uiLevel);
       window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: updates.uiLevel }));
+      if (targetStudentId) {
+        broadcastStudentUiLevelChange(targetStudentId, updates.uiLevel as any);
+      }
     }
     if (updates.allowAbsences !== undefined || isJuniorLevel) {
       const finalAbsences = isJuniorLevel ? false : (updates.allowAbsences ?? nextAllowAbsences);
@@ -4437,6 +4470,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const [juniorSelectedPreviewSticker, setJuniorSelectedPreviewSticker] = useState<any | null>(null);
   const [juniorCheckedPages, setJuniorCheckedPages] = useState<Record<string, boolean>>({});
   const [welcomeToast, setWelcomeToast] = useState<string | null>(null);
+  const [uiLevelToast, setUiLevelToast] = useState<string | null>(null);
 
   useEffect(() => {
     if (!welcomeToast) return;
@@ -4445,6 +4479,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     }, 4500);
     return () => clearTimeout(timer);
   }, [welcomeToast]);
+
+  useEffect(() => {
+    if (!uiLevelToast) return;
+    const timer = setTimeout(() => {
+      setUiLevelToast(null);
+    }, 4500);
+    return () => clearTimeout(timer);
+  }, [uiLevelToast]);
 
   // 🚀 Junior Zen Space Mission: Reizentzug, Tab-Detox & Treibstoff-Physik
   const [juniorMissionPhase, setJuniorMissionPhase] = useState<'idle' | 'zen' | 'celebrating'>('idle');
@@ -6704,6 +6746,65 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       }
     });
 
+    // 4. Unpack SNAPSHOT_SONGS from progressItems snapshots (Fail-Safe Server Hydration)
+    (progressItems || []).forEach((item: any) => {
+      if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return;
+      const rawNotes = item.homework_notes;
+      if (!rawNotes) return;
+      let parsedNotes: any = null;
+      try {
+        parsedNotes = typeof rawNotes === 'string' ? JSON.parse(rawNotes) : rawNotes;
+      } catch {}
+      if (!Array.isArray(parsedNotes)) {
+        if (typeof rawNotes === 'string' && rawNotes.startsWith('SNAPSHOT_SONGS:')) {
+          parsedNotes = [rawNotes];
+        } else {
+          return;
+        }
+      }
+      const snapSongEntry = parsedNotes.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_SONGS:'));
+      if (snapSongEntry) {
+        try {
+          const rawJson = snapSongEntry.substring('SNAPSHOT_SONGS:'.length);
+          const parsedSongs = JSON.parse(rawJson);
+          if (Array.isArray(parsedSongs)) {
+            parsedSongs.forEach((song: any) => {
+              const sTitle = song.topic_name || song.title || '';
+              if (!sTitle) return;
+              const normKey = sTitle.toLowerCase().trim();
+              const existing = songsMap.get(normKey);
+              if (existing) {
+                existing.is_current_homework = true;
+                if (song.homework_notes && !existing.homework_notes) {
+                  existing.homework_notes = song.homework_notes;
+                }
+              } else {
+                let artist = 'Unbekannt';
+                let cleanT = sTitle;
+                if (sTitle.includes(' - ')) {
+                  const parts = sTitle.split(' - ');
+                  artist = parts[0].trim();
+                  cleanT = parts.slice(1).join(' - ').trim();
+                }
+                songsMap.set(normKey, {
+                  id: song.id || normKey,
+                  title: cleanT,
+                  artist,
+                  is_campus_active: true,
+                  progress_percent: 0,
+                  status: song.status || 'IN_PROGRESS',
+                  is_current_homework: true,
+                  homework_notes: song.homework_notes || ''
+                });
+              }
+            });
+          }
+        } catch (snapErr) {
+          console.warn('[assignedCampusSongs] Error parsing SNAPSHOT_SONGS:', snapErr);
+        }
+      }
+    });
+
     return Array.from(songsMap.values());
   }, [activeSongSkills, progressItems, songs]);
 
@@ -7260,6 +7361,30 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
               });
             }
           } catch (e) {}
+        }
+      })
+      .on('broadcast', { event: 'ui-level-changed' }, (payload: any) => {
+        const newLevel = payload?.payload?.uiLevel;
+        if (newLevel && (newLevel === 'junior' || newLevel === 'teen' || newLevel === 'pro')) {
+          console.log('[Realtime-Dashboard] UI-Level update broadcast received:', newLevel);
+          isSwitchingUiLevelRef.current = true;
+          setStudentUiLevel(newLevel);
+          setDraftUiLevel(newLevel);
+          if (studentId) {
+            localStorage.setItem(`campus_student_ui_level_${studentId}`, newLevel);
+          }
+          localStorage.setItem('campus_student_ui_level', newLevel);
+          window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: newLevel }));
+          const levelLabels: Record<string, string> = {
+            junior: 'Junior (Campus Kids)',
+            teen: 'Teen (Interaktiv)',
+            pro: 'Pro (Vollansicht)'
+          };
+          const label = levelLabels[newLevel] || newLevel.toUpperCase();
+          setUiLevelToast(`Didaktischer UI-Level wurde von den Eltern auf „${label}“ aktualisiert 🛡️`);
+          setTimeout(() => {
+            isSwitchingUiLevelRef.current = false;
+          }, 1500);
         }
       })
       .subscribe();
@@ -14055,6 +14180,36 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
               to { opacity: 1; transform: translate(-50%, 0); }
             }
           `}} />
+        </div>
+      )}
+
+      {/* 🛡️ REVISIONSSICHERE ECHTZEIT-SYNCHRONISATION TOAST */}
+      {uiLevelToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed',
+            top: '24px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 99999,
+            background: '#0f172a',
+            color: '#ffffff',
+            padding: '12px 24px',
+            borderRadius: '100px',
+            fontSize: '0.95rem',
+            fontWeight: 800,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            boxShadow: '0 12px 32px rgba(0,0,0,0.3)',
+            animation: 'toastSlideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+            fontFamily: "'Plus Jakarta Sans', sans-serif"
+          }}
+        >
+          <Shield size={18} className="text-emerald-400" />
+          <span>{uiLevelToast}</span>
         </div>
       )}
 

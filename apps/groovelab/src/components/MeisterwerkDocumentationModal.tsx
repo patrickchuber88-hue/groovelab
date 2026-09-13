@@ -837,6 +837,77 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   React.useEffect(() => {
     if (initialProgressItems && initialProgressItems.length > 0) {
       setProgressItems(initialProgressItems);
+
+      // 🛡️ Enterprise+ Cold-Cache Hydration: Extract audios, notes & snapshot songs from server snapshot row (KW item)
+      try {
+        const curWeekIso = getISOWeek();
+        const candidateSnapshots = initialProgressItems.filter((item: any) => {
+          if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
+          return getItemWeek(item) === curWeekIso || (item.updated_at && getISOWeek(item.updated_at) === curWeekIso);
+        });
+
+        // Fallback to latest past snapshot if current week has no homework_notes yet
+        if (candidateSnapshots.length === 0) {
+          const pastSnapshots = initialProgressItems.filter((item: any) => item.topic_name?.startsWith('Hausaufgabe KW '));
+          pastSnapshots.sort((a: any, b: any) => {
+            const wA = getItemWeek(a) || '';
+            const wB = getItemWeek(b) || '';
+            if (wA !== wB) return wB.localeCompare(wA);
+            const tA = new Date(a.updated_at || a.created_at || 0).getTime();
+            const tB = new Date(b.updated_at || b.created_at || 0).getTime();
+            return tB - tA;
+          });
+          if (pastSnapshots.length > 0) {
+            candidateSnapshots.push(pastSnapshots[0]);
+          }
+        }
+
+        const activeSnap = candidateSnapshots[0];
+        if (activeSnap && activeSnap.homework_notes) {
+          let parsedNotes: any[] = [];
+          const rawNotes = activeSnap.homework_notes;
+          try {
+            if (typeof rawNotes === 'string' && rawNotes.startsWith('[') && rawNotes.endsWith(']')) {
+              const p = JSON.parse(rawNotes);
+              if (Array.isArray(p)) parsedNotes = p;
+            } else if (typeof rawNotes === 'string' && rawNotes.trim()) {
+              parsedNotes = [rawNotes.trim()];
+            } else if (Array.isArray(rawNotes)) {
+              parsedNotes = rawNotes;
+            }
+          } catch {}
+
+          if (parsedNotes.length > 0) {
+            setHomeworkNotesList(prev => {
+              const merged = [...prev];
+              parsedNotes.forEach(pItem => {
+                if (!pItem || typeof pItem !== 'string') return;
+                if (pItem.includes('AUDIO:')) {
+                  const pParts = pItem.substring(pItem.indexOf('AUDIO:') + 6).split('|');
+                  const pUrl = pParts[0]?.trim();
+                  const exists = merged.some(m => typeof m === 'string' && m.includes('AUDIO:') && m.includes(pUrl));
+                  if (!exists) merged.push(pItem);
+                } else if (!merged.includes(pItem)) {
+                  if (pItem.trim()) merged.push(pItem);
+                }
+              });
+              return merged;
+            });
+
+            const textNotes = parsedNotes.filter(n => typeof n === 'string' && !isInternalMetadataNote(n)).join('\n\n');
+            if (textNotes) {
+              setGeneralHomeworkNotes(prev => prev.trim() ? prev : textNotes);
+              setHomeworkNotes(prev => prev.trim() ? prev : textNotes);
+            }
+          }
+
+          if (activeSnap.teacher_notes) {
+            setTeacherNotes(prev => prev.trim() ? prev : activeSnap.teacher_notes);
+          }
+        }
+      } catch (syncErr) {
+        console.warn('[MeisterwerkDocumentationModal] Error hydrating snapshot from initialProgressItems:', syncErr);
+      }
     }
   }, [initialProgressItems]);
 
@@ -4166,20 +4237,36 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       });
       setCustomTags(customFound);
 
-      // Pre-populate homeworkNotes with the active general homework notes (KW item only)
+      // Pre-populate homeworkNotes with the active general homework notes (KW item)
       const currentWeek = getISOWeek();
-      const currentWeekHomework = (data || []).find(item => 
+      let activeWeeklyItem = (data || []).find(item => 
         item.topic_name.startsWith('Hausaufgabe KW ') && 
         (getItemWeek(item) === currentWeek || (item.updated_at && getISOWeek(item.updated_at) === currentWeek))
       );
+
+      // Fallback to latest past snapshot row if current week has no homework notes yet
+      if (!activeWeeklyItem || !activeWeeklyItem.homework_notes) {
+        const pastSnapshots = (data || []).filter(item => item.topic_name?.startsWith('Hausaufgabe KW '));
+        pastSnapshots.sort((a: any, b: any) => {
+          const wA = getItemWeek(a) || '';
+          const wB = getItemWeek(b) || '';
+          if (wA !== wB) return wB.localeCompare(wA);
+          const tA = new Date(a.updated_at || a.created_at || 0).getTime();
+          const tB = new Date(b.updated_at || b.created_at || 0).getTime();
+          return tB - tA;
+        });
+        if (pastSnapshots.length > 0) {
+          activeWeeklyItem = pastSnapshots[0];
+        }
+      }
 
       let loadedHomeworkNotes = '';
       let loadedHomeworkNotesList: string[] = [];
       let loadedTeacherNotes = '';
 
-      if (currentWeekHomework) {
-        if (currentWeekHomework.homework_notes) {
-          const rawNotes = currentWeekHomework.homework_notes;
+      if (activeWeeklyItem) {
+        if (activeWeeklyItem.homework_notes) {
+          const rawNotes = activeWeeklyItem.homework_notes;
           try {
             if (rawNotes.startsWith('[') && rawNotes.endsWith(']')) {
               const parsed = JSON.parse(rawNotes);
@@ -4200,8 +4287,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             loadedHomeworkNotesList = [rawNotes];
           }
         }
-        if (currentWeekHomework.teacher_notes) {
-          loadedTeacherNotes = currentWeekHomework.teacher_notes;
+        if (activeWeeklyItem.teacher_notes) {
+          loadedTeacherNotes = activeWeeklyItem.teacher_notes;
         }
       }
 
@@ -5292,7 +5379,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     (activeSongSkills || []).forEach((skill: any) => {
       const isHwInLs = localStorage.getItem(`song_hw_${student.id}_${skill.id}`) === 'true' ||
                        localStorage.getItem(`song_hw_${student.id}_${skill.song_id}`) === 'true';
-      if (isHwInLs) {
+      const isMarkedHw = isHwInLs || skill.is_current_homework === true || skill.is_homework === true;
+      if (isMarkedHw) {
         const cleanTopic = getNormalizedSongTitle(skill);
         const canKey = getCanonicalSongKey(skill);
         if (!sourceS.some(x => getCanonicalSongKey(x) === canKey || getNormalizedSongTitle(x) === cleanTopic)) {

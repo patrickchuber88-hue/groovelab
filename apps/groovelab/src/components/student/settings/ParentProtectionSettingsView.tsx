@@ -52,33 +52,57 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
 
   const curAbsences = currentLvlKey === 'junior' 
     ? false 
-    : (draftAllowAbsences !== null ? draftAllowAbsences : ((studentUser as any)?.parent_allow_absences !== undefined && (studentUser as any)?.parent_allow_absences !== null ? Boolean((studentUser as any)?.parent_allow_absences) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_absences_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_absences_${studentId}`) === 'true' : (currentLvlKey === 'pro'))));
+    : (draftAllowAbsences !== null 
+        ? draftAllowAbsences 
+        : ((studentUser as any)?.parent_allow_absences !== undefined && (studentUser as any)?.parent_allow_absences !== null 
+            ? Boolean((studentUser as any)?.parent_allow_absences) 
+            : standard.allowAbsences));
   
   const curReschedule = currentLvlKey === 'junior'
     ? false
-    : (draftAllowReschedule !== null ? draftAllowReschedule : ((studentUser as any)?.parent_allow_reschedule_confirm !== undefined && (studentUser as any)?.parent_allow_reschedule_confirm !== null ? Boolean((studentUser as any)?.parent_allow_reschedule_confirm) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_reschedule_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_reschedule_${studentId}`) === 'true' : true)));
+    : (draftAllowReschedule !== null 
+        ? draftAllowReschedule 
+        : ((studentUser as any)?.parent_allow_reschedule_confirm !== undefined && (studentUser as any)?.parent_allow_reschedule_confirm !== null 
+            ? Boolean((studentUser as any)?.parent_allow_reschedule_confirm) 
+            : standard.allowRescheduleConfirm));
   
-  const curChat = draftAllowChat !== null ? draftAllowChat : ((studentUser as any)?.parent_allow_chat !== undefined && (studentUser as any)?.parent_allow_chat !== null ? Boolean((studentUser as any)?.parent_allow_chat) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_chat_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_chat_${studentId}`) === 'true' : (currentLvlKey !== 'junior')));
+  const curChat = draftAllowChat !== null 
+    ? draftAllowChat 
+    : ((studentUser as any)?.parent_allow_chat !== undefined && (studentUser as any)?.parent_allow_chat !== null 
+        ? Boolean((studentUser as any)?.parent_allow_chat) 
+        : standard.allowChat);
   
-  const curTimer = draftAllowTimer !== null ? draftAllowTimer : ((studentUser as any)?.parent_allow_timer !== undefined && (studentUser as any)?.parent_allow_timer !== null ? Boolean((studentUser as any)?.parent_allow_timer) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_timer_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_timer_${studentId}`) === 'true' : true));
+  const curTimer = draftAllowTimer !== null 
+    ? draftAllowTimer 
+    : ((studentUser as any)?.parent_allow_timer !== undefined && (studentUser as any)?.parent_allow_timer !== null 
+        ? Boolean((studentUser as any)?.parent_allow_timer) 
+        : standard.allowTimer);
   
-  const curLeaderboard = draftAllowLeaderboard !== null ? draftAllowLeaderboard : ((studentUser as any)?.parent_allow_leaderboard !== undefined && (studentUser as any)?.parent_allow_leaderboard !== null ? Boolean((studentUser as any)?.parent_allow_leaderboard) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_leaderboard_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_leaderboard_${studentId}`) === 'true' : (currentLvlKey !== 'junior')));
+  const curLeaderboard = draftAllowLeaderboard !== null 
+    ? draftAllowLeaderboard 
+    : ((studentUser as any)?.parent_allow_leaderboard !== undefined && (studentUser as any)?.parent_allow_leaderboard !== null 
+        ? Boolean((studentUser as any)?.parent_allow_leaderboard) 
+        : standard.allowLeaderboard);
   
-  const curAudio = draftAllowAudio !== null ? draftAllowAudio : ((studentUser as any)?.parent_allow_audio !== undefined && (studentUser as any)?.parent_allow_audio !== null ? Boolean((studentUser as any)?.parent_allow_audio) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_audio_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_audio_${studentId}`) === 'true' : (draftBoardOverrides.recordings ?? false)));
+  const curAudio = draftAllowAudio !== null 
+    ? draftAllowAudio 
+    : ((studentUser as any)?.parent_allow_audio !== undefined && (studentUser as any)?.parent_allow_audio !== null 
+        ? Boolean((studentUser as any)?.parent_allow_audio) 
+        : (draftBoardOverrides.recordings ?? standard.allowAudio));
   
   const curTeacherAudio = (studentUser as any)?.parent_permissions?.allow_teacher_audio !== undefined
     ? Boolean((studentUser as any)?.parent_permissions?.allow_teacher_audio)
-    : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_teacher_audio_${studentId}`) !== null
-        ? localStorage.getItem(`groovelab_parent_allow_teacher_audio_${studentId}`) === 'true'
-        : false);
+    : standard.allowTeacherAudio;
   
   const curStudentAudio = (studentUser as any)?.parent_permissions?.allow_student_audio !== undefined
     ? Boolean((studentUser as any)?.parent_permissions?.allow_student_audio)
-    : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_student_audio_${studentId}`) !== null
-        ? localStorage.getItem(`groovelab_parent_allow_student_audio_${studentId}`) === 'true'
-        : false);
+    : standard.allowStudentAudio;
   
-  const curTts = draftAllowTts !== null ? draftAllowTts : ((studentUser as any)?.parent_allow_tts !== undefined && (studentUser as any)?.parent_allow_tts !== null ? Boolean((studentUser as any)?.parent_allow_tts) : (studentId && typeof window !== 'undefined' && localStorage.getItem(`groovelab_parent_allow_tts_${studentId}`) !== null ? localStorage.getItem(`groovelab_parent_allow_tts_${studentId}`) === 'true' : (currentLvlKey === 'junior')));
+  const curTts = draftAllowTts !== null 
+    ? draftAllowTts 
+    : ((studentUser as any)?.parent_allow_tts !== undefined && (studentUser as any)?.parent_allow_tts !== null 
+        ? Boolean((studentUser as any)?.parent_allow_tts) 
+        : standard.allowTts);
 
   const isDeviating = 
     curAbsences !== standard.allowAbsences ||

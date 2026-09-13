@@ -2934,26 +2934,64 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                      )}
 
                                     {/* Student Question */}
-                                    {studentQuestionText && (
-                                      <div style={{
-                                        marginTop: '4px',
-                                        padding: '12px 14px',
-                                        background: '#eff6ff',
-                                        borderRadius: '14px',
-                                        border: '1px solid #bfdbfe',
-                                        display: 'flex',
-                                        alignItems: 'flex-start',
-                                        gap: '8px',
-                                        fontSize: '0.86rem',
-                                        color: '#1e40af',
-                                        fontWeight: 600
-                                      }}>
-                                        <HelpCircle size={16} color="#2563eb" style={{ flexShrink: 0, marginTop: '2px' }} />
-                                        <div>
-                                          <strong style={{ color: '#2563eb', fontWeight: 850 }}>Deine Frage für den Unterricht:</strong> {studentQuestionText}
+                                    {studentQuestionText && (() => {
+                                      const effectiveTeacherName = formatTeacherFullName(studentUser?.teacher_name || studentUser?.teacher || briefingData?.todayLesson?.teacher_name || briefingData?.todayLesson?.teacher);
+                                      return (
+                                        <div style={{
+                                          marginTop: '4px',
+                                          background: '#fefce8',
+                                          border: '1px solid #fef08a',
+                                          borderRadius: '14px',
+                                          padding: '10px 14px',
+                                          boxShadow: '0 2px 6px rgba(234, 179, 8, 0.06)',
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          gap: '5px'
+                                        }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                                            <span style={{
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '4px',
+                                              background: '#fef08a',
+                                              border: '1px solid #fde047',
+                                              color: '#854d0e',
+                                              fontSize: '0.70rem',
+                                              fontWeight: 850,
+                                              textTransform: 'uppercase',
+                                              letterSpacing: '0.03em',
+                                              padding: '2px 7px',
+                                              borderRadius: '100px',
+                                              flexShrink: 0
+                                            }}>
+                                              <HelpCircle size={12} color="#ca8a04" strokeWidth={2.5} />
+                                              Frage
+                                            </span>
+                                            <span style={{
+                                              fontSize: '0.90rem',
+                                              fontWeight: 700,
+                                              color: '#0f172a',
+                                              lineHeight: 1.35,
+                                              wordBreak: 'break-word'
+                                            }}>
+                                              „{studentQuestionText}“
+                                            </span>
+                                          </div>
+                                          <div style={{
+                                            fontSize: '0.74rem',
+                                            fontWeight: 650,
+                                            color: '#854d0e',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            paddingLeft: '2px'
+                                          }}>
+                                            <Sparkles size={11} color="#ca8a04" />
+                                            <span>Für {effectiveTeacherName} zur nächsten Stunde vorgemerkt</span>
+                                          </div>
                                         </div>
-                                      </div>
-                                    )}
+                                      );
+                                    })()}
                                   </div>
                                 </>
                               ) : (
