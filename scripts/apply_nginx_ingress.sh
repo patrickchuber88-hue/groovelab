@@ -10,14 +10,16 @@ set -euo pipefail
 SERVER="${SERVER:-root@178.105.10.2}"
 REMOTE_AVAIL="/etc/nginx/sites-available"
 REMOTE_ENAB="/etc/nginx/sites-enabled"
+REMOTE_SNIPPETS="/etc/nginx/snippets"
 
 echo "🛡️  Deploye Nginx Ingress Konfigurationen..."
 echo "   Ziel: $SERVER"
 
 # 1. Sicherstellen, dass Verzeichnisse auf dem Server existieren
-ssh "$SERVER" "mkdir -p $REMOTE_AVAIL $REMOTE_ENAB /var/www/certbot /var/www/groovelab"
+ssh "$SERVER" "mkdir -p $REMOTE_AVAIL $REMOTE_ENAB $REMOTE_SNIPPETS /var/www/certbot /var/www/groovelab"
 
-# 2. Synchronisiere Site-Konfigurationen
+# 2. Synchronisiere Site-Konfigurationen & Security Header Snippet
+scp deploy/nginx/security-headers.conf "$SERVER:$REMOTE_SNIPPETS/"
 scp deploy/nginx/campus-groovelab.de.conf "$SERVER:$REMOTE_AVAIL/"
 scp deploy/nginx/supabase.campus-groovelab.de.conf "$SERVER:$REMOTE_AVAIL/"
 

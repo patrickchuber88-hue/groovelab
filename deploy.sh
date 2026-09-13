@@ -52,9 +52,17 @@ rsync -avz --delete \
   "$SERVER:$REMOTE_DIR/"
 
 # 4. Atomare Nginx-Aktualisierung (Zero-Downtime, 100% Reboot-resistent)
-echo "🚀 Validiere und aktualisiere Live-Webserver..."
+echo "🚀 Validiere und aktualisiere Live-Webserver & Security Headers..."
+ssh "$SERVER" "mkdir -p /tmp/nginx_sync"
+scp deploy/nginx/security-headers.conf deploy/nginx/campus-groovelab.de.conf deploy/nginx/supabase.campus-groovelab.de.conf "$SERVER:/tmp/nginx_sync/" || true
 ssh "$SERVER" "if command -v nginx >/dev/null 2>&1; then \
-  sudo nginx -t && sudo systemctl reload nginx && echo '  ✓ Host Nginx Ingress erfolgreich reloaded.'; \
+  sudo mkdir -p /etc/nginx/snippets /etc/nginx/sites-available /etc/nginx/sites-enabled && \
+  sudo cp /tmp/nginx_sync/security-headers.conf /etc/nginx/snippets/ 2>/dev/null || true; \
+  sudo cp /tmp/nginx_sync/campus-groovelab.de.conf /etc/nginx/sites-available/ 2>/dev/null || true; \
+  sudo cp /tmp/nginx_sync/supabase.campus-groovelab.de.conf /etc/nginx/sites-available/ 2>/dev/null || true; \
+  sudo ln -sf /etc/nginx/sites-available/campus-groovelab.de.conf /etc/nginx/sites-enabled/ 2>/dev/null || true; \
+  sudo ln -sf /etc/nginx/sites-available/supabase.campus-groovelab.de.conf /etc/nginx/sites-enabled/ 2>/dev/null || true; \
+  sudo nginx -t && sudo systemctl reload nginx && echo '  ✓ Host Nginx Ingress & Security Headers erfolgreich reloaded.'; \
 else \
   WEB_CONTAINER=\$(docker ps --format '{{.Names}}' | grep -v 'supabase\|coolify\|groovelab-bff' | head -n 1); \
   if [ -n \"\$WEB_CONTAINER\" ]; then \

@@ -54,7 +54,7 @@ export default defineConfig({
             dep.includes('admin-') ||
             dep.includes('secretary') ||
             dep.includes('meisterwerk') ||
-            dep.includes('schedule-designer') ||
+            dep.includes('schedule-') ||
             dep.includes('campus-events') ||
             dep.includes('audio-loopstation') ||
             dep.includes('billing-dashboard') ||
@@ -101,8 +101,23 @@ export default defineConfig({
           if (id.includes('CampusEventsBoard')) {
             return 'campus-events-suite';
           }
-          if (id.includes('ScheduleBoard') || id.includes('ScheduleCalendarView')) {
-            return 'schedule-designer-suite';
+          if (id.includes('Schedule15StageSolverEngine')) {
+            return 'schedule-solver-engine';
+          }
+          if (id.includes('ScheduleBoardMobile')) {
+            return 'schedule-designer-mobile';
+          }
+          if (id.includes('ScheduleBoardDesktop')) {
+            return 'schedule-designer-desktop';
+          }
+          if (id.includes('ScheduleCalendarViewDesktop')) {
+            return 'schedule-calendar-desktop';
+          }
+          if (id.includes('ScheduleCalendarView')) {
+            return 'schedule-calendar-mobile';
+          }
+          if (id.includes('ScheduleBoard')) {
+            return 'schedule-designer-core';
           }
           if (id.includes('BillingDashboard')) {
             return 'billing-dashboard-suite';
