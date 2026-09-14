@@ -1803,22 +1803,21 @@ function App() {
 
     React.startTransition(() => {
       setActivePlatformRaw(targetVal);
+      // Auto-switch the active tab to the saved tab of the target platform atomically within the same transition
+      if (targetVal === 'campus') {
+        const savedTab = (typeof window !== 'undefined' ? (sessionStorage.getItem('campus_active_tab') || localStorage.getItem('campus_active_tab')) : null) || 'briefing';
+        setActiveStudentTabRaw(savedTab === 'live' ? 'briefing' : savedTab);
+      } else if (targetVal === 'ensembles') {
+        const savedTab = (typeof window !== 'undefined' ? (sessionStorage.getItem('ensembles_active_tab') || localStorage.getItem('ensembles_active_tab')) : null) || 'overview';
+        setActiveStudentTabRaw(savedTab);
+      } else {
+        const savedTab = (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_tab') || localStorage.getItem('groovelab_active_tab')) : null) || 'live';
+        setActiveStudentTabRaw(savedTab);
+      }
     });
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('groovelab_active_platform', targetVal);
       localStorage.setItem('groovelab_active_platform', targetVal);
-    }
-    
-    // Auto-switch the active tab to the saved tab of the target platform to load flawlessly
-    if (targetVal === 'campus') {
-      const savedTab = (typeof window !== 'undefined' ? (sessionStorage.getItem('campus_active_tab') || localStorage.getItem('campus_active_tab')) : null) || 'briefing';
-      setActiveStudentTabRaw(savedTab);
-    } else if (targetVal === 'ensembles') {
-      const savedTab = (typeof window !== 'undefined' ? (sessionStorage.getItem('ensembles_active_tab') || localStorage.getItem('ensembles_active_tab')) : null) || 'overview';
-      setActiveStudentTabRaw(savedTab);
-    } else {
-      const savedTab = (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_tab') || localStorage.getItem('groovelab_active_tab')) : null) || 'live';
-      setActiveStudentTabRaw(savedTab);
     }
   }, [locationMode, user?.role, user?.schools]);
 
@@ -10601,14 +10600,14 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
         {/* Live Lab Tab for Students (Kept mounted for instant platform switching) */}
         {user.role?.toLowerCase() === 'student' && (
           <div style={{ 
-            display: (activePlatform !== 'ensembles' && activeStudentTab === 'live') ? 'flex' : 'none', 
+            display: (activePlatform === 'groovelab' || (activePlatform !== 'ensembles' && activePlatform !== 'campus' && activeStudentTab === 'live')) ? 'flex' : 'none', 
             flexDirection: 'column', 
             flex: 1, 
             minHeight: 0,
             width: '100%' 
           }}>
             <ErrorBoundary>
-              <div className="animation-slide-up" style={{ width: '100%', padding: '24px 16px 16px 16px', display: 'flex', flexDirection: 'column', flex: 1, height: '100%' }}>
+              <div className="animation-slide-up" style={{ width: '100%', padding: windowWidth <= 768 ? '8px 4px 4px 4px' : '24px 16px 16px 16px', display: 'flex', flexDirection: 'column', flex: 1, height: '100%' }}>
                 <Suspense fallback={<DashboardLoader />}>
                   <TeacherDashboard 
                     key="student-live-dashboard"

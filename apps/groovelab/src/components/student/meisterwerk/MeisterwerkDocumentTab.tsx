@@ -282,6 +282,103 @@ export interface MeisterwerkDocumentTabProps {
   viewingWeekOffset: number;
 }
 
+// 🛡️ Enterprise+ Song Deduplication & Fuzzy Matcher Goldstandard
+export const levenshteinDistance = (s1: string, s2: string): number => {
+  if (s1 === s2) return 0;
+  if (!s1.length) return s2.length;
+  if (!s2.length) return s1.length;
+  const track = Array(s2.length + 1).fill(null).map(() =>
+    Array(s1.length + 1).fill(null));
+  for (let i = 0; i <= s1.length; i += 1) {
+    track[0][i] = i;
+  }
+  for (let j = 0; j <= s2.length; j += 1) {
+    track[j][0] = j;
+  }
+  for (let j = 1; j <= s2.length; j += 1) {
+    for (let i = 1; i <= s1.length; i += 1) {
+      const indicator = s1[i - 1] === s2[j - 1] ? 0 : 1;
+      track[j][i] = Math.min(
+        track[j][i - 1] + 1,
+        track[j - 1][i] + 1,
+        track[j - 1][i - 1] + indicator
+      );
+    }
+  }
+  return track[s2.length][s1.length];
+};
+
+export const normalizeSongStr = (str: string | undefined | null): string => {
+  if (!str) return '';
+  return str
+    .toLowerCase()
+    .replace(/[\u2010-\u2015\u2212\uFF0D]/g, '-') // Normalize en-dash, em-dash etc. to standard hyphen
+    .replace(/\s*\([^)]*\)\s*/g, '') // Strip trailing or inline parenthesis like (Akustik), (Live)
+    .replace(/[^\w\s-]/g, '') // Remove non-alphanumeric except space and hyphen
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+export const extractSongArtistAndTitle = (songOrItem: any): { artist: string; title: string; canonical: string } => {
+  if (!songOrItem) return { artist: '', title: '', canonical: '' };
+
+  let rawArtist = (songOrItem.songs?.artist || songOrItem.artist || '').trim();
+  let rawTitle = (songOrItem.songs?.title || songOrItem.song_title || songOrItem.title || '').trim();
+
+  const rawTopic = songOrItem.topic_name || '';
+  if (rawTopic && !rawTopic.includes(' - Seite ') && !rawTopic.startsWith('Hausaufgabe KW ')) {
+    const normTopic = rawTopic.replace(/[\u2010-\u2015\u2212\uFF0D]/g, '-');
+    if (normTopic.includes(' - ')) {
+      const parts = normTopic.split(' - ');
+      if (!rawArtist) rawArtist = parts[0]?.trim() || '';
+      if (!rawTitle) rawTitle = parts.slice(1).join(' - ').trim() || '';
+    } else if (!rawTitle) {
+      rawTitle = rawTopic.trim();
+    }
+  }
+
+  const artist = normalizeSongStr(rawArtist);
+  const title = normalizeSongStr(rawTitle);
+  const canonical = title || artist;
+  return { artist, title, canonical };
+};
+
+export const areSongsIdentical = (a: any, b: any): boolean => {
+  if (!a || !b) return false;
+  if (a === b) return true;
+
+  // 1. Direct ID match (database primary key or song_id foreign key)
+  const aId = String(a.song_id || a.id || '').trim();
+  const bId = String(b.song_id || b.id || '').trim();
+  if (aId && bId && aId === bId) return true;
+
+  const infoA = extractSongArtistAndTitle(a);
+  const infoB = extractSongArtistAndTitle(b);
+
+  if (!infoA.canonical || !infoB.canonical) return false;
+
+  // 2. Exact match of canonical titles (e.g. "numb" === "numb")
+  if (infoA.title && infoB.title && infoA.title === infoB.title) {
+    if (infoA.artist && infoB.artist) {
+      if (infoA.artist === infoB.artist) return true;
+      if (infoA.artist.includes(infoB.artist) || infoB.artist.includes(infoA.artist)) return true;
+      // Fuzzy match: Levenshtein distance <= 2 for artist typos ("linken park" vs "linkin park" diff is 1)
+      if (levenshteinDistance(infoA.artist, infoB.artist) <= 2) return true;
+    } else {
+      return true;
+    }
+  }
+
+  // 3. Full combined strings match (e.g. "linkin park - numb" vs "linken park - numb")
+  const fullA = infoA.artist ? `${infoA.artist} - ${infoA.title}` : infoA.title;
+  const fullB = infoB.artist ? `${infoB.artist} - ${infoB.title}` : infoB.title;
+  if (fullA === fullB) return true;
+  if (fullA.includes(fullB) || fullB.includes(fullA)) return true;
+  if (levenshteinDistance(fullA, fullB) <= 2) return true;
+
+  return false;
+};
+
 export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
   const {
     DIDACTIC_QUICK_TAGS,
@@ -896,6 +993,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
 
           <div style={{
             flex: isMobileView ? 'none' : '1 1 0%',
+            width: isMobileView ? '100%' : 'auto',
+            minWidth: 0,
+            overflowX: isMobileView ? 'clip' : 'visible',
             height: isMobileView ? 'auto' : '100%',
             minHeight: '0',
             maxHeight: isMobileView ? 'none' : '100%',
@@ -4022,7 +4122,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
           
           <div style={{
             flex: isMobileView ? 'none' : '1 1 0%',
-            width: 'auto',
+            width: isMobileView ? '100%' : 'auto',
+            minWidth: 0,
+            overflowX: isMobileView ? 'clip' : 'visible',
             maxWidth: 'none',
             margin: '0',
             height: isMobileView ? 'auto' : '100%',
@@ -4161,8 +4263,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       const parsedSongs = JSON.parse(rawJson);
                       if (Array.isArray(parsedSongs)) {
                         parsedSongs.forEach((song: any) => {
-                          const songName = song.topic_name || song.title;
-                          if (songName && !otherHWs.some(existing => (existing.topic_name || existing.title) === songName)) {
+                          if (!otherHWs.some(existing => areSongsIdentical(existing, song))) {
                             otherHWs.push(song);
                           }
                         });
@@ -4364,27 +4465,36 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 })()}
                               </div>
                             ))}
-                            {otherHWs.length > 0 && (
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', borderTop: '1px solid rgba(251, 191, 36, 0.2)', paddingTop: '8px' }}>
-                                {otherHWs.map((item, idx) => (
-                                  <div key={idx} style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '5px',
-                                    background: '#ffffff',
-                                    color: '#475569',
-                                    padding: '4px 10px',
-                                    borderRadius: '999px',
-                                    fontSize: '0.82rem',
-                                    fontWeight: 900,
-                                    border: '1px solid rgba(251, 191, 36, 0.3)',
-                                    boxShadow: '0 3px 8px rgba(0,0,0,0.03), 0 0 12px rgba(251, 191, 36, 0.32)'
-                                  }}>
-                                    <span>🎵 {item.topic_name}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                            {(() => {
+                              const dedupedHWs = otherHWs.reduce<any[]>((acc, cur) => {
+                                if (!acc.some(existing => areSongsIdentical(existing, cur))) {
+                                  acc.push(cur);
+                                }
+                                return acc;
+                              }, []);
+                              if (dedupedHWs.length === 0) return null;
+                              return (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', borderTop: '1px solid rgba(251, 191, 36, 0.2)', paddingTop: '8px' }}>
+                                  {dedupedHWs.map((item, idx) => (
+                                    <div key={idx} style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '5px',
+                                      background: '#ffffff',
+                                      color: '#475569',
+                                      padding: '4px 10px',
+                                      borderRadius: '999px',
+                                      fontSize: '0.82rem',
+                                      fontWeight: 900,
+                                      border: '1px solid rgba(251, 191, 36, 0.3)',
+                                      boxShadow: '0 3px 8px rgba(0,0,0,0.03), 0 0 12px rgba(251, 191, 36, 0.32)'
+                                    }}>
+                                      <span>🎵 {item.topic_name}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })()}
                           </div>
                         )}
                       </div>
@@ -6019,6 +6129,22 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             });
                           });
 
+                          const addSongToOtherHWs = (candidateSong: any) => {
+                            if (!candidateSong) return;
+                            const existingIdx = otherHWs.findIndex(existing => areSongsIdentical(existing, candidateSong));
+                            if (existingIdx === -1) {
+                              otherHWs.push(candidateSong);
+                            } else {
+                              const existing = otherHWs[existingIdx];
+                              if (!existing.homework_notes && candidateSong.homework_notes) {
+                                existing.homework_notes = candidateSong.homework_notes;
+                              }
+                              if (!existing.topic_name && candidateSong.topic_name) {
+                                existing.topic_name = candidateSong.topic_name;
+                              }
+                            }
+                          };
+
                           const allActive = [...activeHWs, ...activeTheories];
                           allActive.forEach(item => {
                             if (item.topic_name && item.topic_name.includes(' - Seite ')) {
@@ -6042,19 +6168,15 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 }
                               }
                             } else {
-                              const cleanTopic = getNormalizedSongTitle(item);
-                              const canKey = getCanonicalSongKey(item);
-                              if (cleanTopic && !otherHWs.some(existing => getCanonicalSongKey(existing) === canKey || getNormalizedSongTitle(existing) === cleanTopic)) {
-                                const cachedNote = localStorage.getItem(`song_note_${student.id}_${item.id}`) ||
-                                                   localStorage.getItem(`song_note_${student.id}_${item.song_id}`) ||
-                                                   item.homework_notes ||
-                                                   item.teacher_notes ||
-                                                   '';
-                                otherHWs.push({
-                                  ...item,
-                                  homework_notes: cachedNote
-                                });
-                              }
+                              const cachedNote = localStorage.getItem(`song_note_${student.id}_${item.id}`) ||
+                                                 localStorage.getItem(`song_note_${student.id}_${item.song_id}`) ||
+                                                 item.homework_notes ||
+                                                 item.teacher_notes ||
+                                                 '';
+                              addSongToOtherHWs({
+                                ...item,
+                                homework_notes: cachedNote
+                              });
                             }
                           });
 
@@ -6064,67 +6186,27 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                              localStorage.getItem(`song_hw_${student.id}_${skill.song_id}`) === 'true' ||
                                              Boolean(skill.is_current_homework);
                             if (isHwInLs) {
-                              const cleanTopic = getNormalizedSongTitle(skill);
-                              const canKey = getCanonicalSongKey(skill);
-                              const alreadyExists = otherHWs.some(existing => 
-                                getCanonicalSongKey(existing) === canKey || getNormalizedSongTitle(existing) === cleanTopic
-                              );
-                              if (!alreadyExists) {
-                                const songArtist = skill.songs?.artist || skill.artist || '';
-                                const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
-                                const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
-                                const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
-                                const cachedNote = localStorage.getItem(`song_note_${student.id}_${skill.id}`) ||
-                                                   localStorage.getItem(`song_note_${student.id}_${skill.song_id}`) ||
-                                                   skill.homework_notes ||
-                                                   skill.teacher_notes ||
-                                                   '';
-                                otherHWs.push({
-                                  id: skill.id,
-                                  topic_name: fullTitle,
-                                  is_current_homework: true,
-                                  status: 'IN_PROGRESS',
-                                  homework_notes: cachedNote
-                                });
-                              }
+                              const songArtist = skill.songs?.artist || skill.artist || '';
+                              const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
+                              const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
+                              const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
+                              const cachedNote = localStorage.getItem(`song_note_${student.id}_${skill.id}`) ||
+                                                 localStorage.getItem(`song_note_${student.id}_${skill.song_id}`) ||
+                                                 skill.homework_notes ||
+                                                 skill.teacher_notes ||
+                                                 '';
+                              addSongToOtherHWs({
+                                id: skill.id,
+                                song_id: skill.song_id,
+                                topic_name: fullTitle,
+                                is_current_homework: true,
+                                status: 'IN_PROGRESS',
+                                homework_notes: cachedNote,
+                                songs: skill.songs
+                              });
                             }
                           });
 
-                          // 🛡️ Enterprise+ Cold-Cache & Mobile PWA Hydration: Unpack SNAPSHOT_SONGS from weekly snapshot item
-                          const curWeekSnapshotItem = deduplicatedItems.find(item => 
-                            item.topic_name?.startsWith('Hausaufgabe KW ') && 
-                            (getItemWeek(item) === viewingWeekIso || (item.updated_at && getISOWeek(item.updated_at) === viewingWeekIso))
-                          );
-                          if (curWeekSnapshotItem && curWeekSnapshotItem.homework_notes) {
-                            try {
-                              const parsedSnap = typeof curWeekSnapshotItem.homework_notes === 'string'
-                                ? JSON.parse(curWeekSnapshotItem.homework_notes)
-                                : curWeekSnapshotItem.homework_notes;
-                              if (Array.isArray(parsedSnap)) {
-                                const snapSongEntry = parsedSnap.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_SONGS:'));
-                                if (snapSongEntry) {
-                                  const rawJson = snapSongEntry.substring('SNAPSHOT_SONGS:'.length);
-                                  const parsedSongs = JSON.parse(rawJson);
-                                  if (Array.isArray(parsedSongs)) {
-                                    parsedSongs.forEach((song: any) => {
-                                      const cleanTopic = getNormalizedSongTitle(song);
-                                      const canKey = getCanonicalSongKey(song);
-                                      if (cleanTopic && !otherHWs.some(existing => getCanonicalSongKey(existing) === canKey || getNormalizedSongTitle(existing) === cleanTopic)) {
-                                        otherHWs.push({
-                                          ...song,
-                                          is_current_homework: true,
-                                          homework_notes: getCleanPageNotes(song.homework_notes)
-                                        });
-                                      }
-                                    });
-                                  }
-                                }
-                              }
-                            } catch (snapErr) {
-                              console.warn('[MeisterwerkDocumentTab] Error unpacking SNAPSHOT_SONGS in current week:', snapErr);
-                            }
-                          }
-                          
                           lehrwerkeList = Object.entries(groupedLehrwerke).map(([title, info]) => {
                             info.pages.sort((a: number, b: number) => a - b);
                             return { title, pages: info.pages, notes: info.notes };
@@ -6151,12 +6233,129 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
 
                           homeworkNoteItems = getHomeworkNoteItems(generalHomeworkNotes);
 
+                          // 🛡️ Enterprise+ Cold-Cache & Mobile PWA Hydration: Symmetrical Snapshot Unpacking (Lehrwerke, Songs, Audios & Notes)
+                          const curWeekSnapshotItem = deduplicatedItems.find(item => {
+                            if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
+                            const itWeek = getItemWeek(item);
+                            if (itWeek && itWeek === viewingWeekIso) return true;
+                            if (item.updated_at && getISOWeek(item.updated_at) === viewingWeekIso) return true;
+                            if (item.created_at && getISOWeek(item.created_at) === viewingWeekIso) return true;
+                            if (viewingWeekNum) {
+                              const matchNum = item.topic_name.match(/Hausaufgabe KW\s*(\d+)/i);
+                              if (matchNum && parseInt(matchNum[1], 10) === parseInt(viewingWeekNum, 10)) return true;
+                            }
+                            return false;
+                          });
+
+                          if (curWeekSnapshotItem && curWeekSnapshotItem.homework_notes) {
+                            try {
+                              const parsedSnap = typeof curWeekSnapshotItem.homework_notes === 'string'
+                                ? JSON.parse(curWeekSnapshotItem.homework_notes)
+                                : curWeekSnapshotItem.homework_notes;
+                              if (Array.isArray(parsedSnap)) {
+                                // 1. Lehrwerke snapshot unpacking (if lehrwerkeList is empty)
+                                if (lehrwerkeList.length === 0) {
+                                  const snapLwEntry = parsedSnap.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_LEHRWERKE:'));
+                                  if (snapLwEntry) {
+                                    try {
+                                      const rawJson = snapLwEntry.substring('SNAPSHOT_LEHRWERKE:'.length);
+                                      const parsedLw = JSON.parse(rawJson);
+                                      if (Array.isArray(parsedLw) && parsedLw.length > 0) {
+                                        lehrwerkeList = parsedLw;
+                                      }
+                                    } catch (lwErr) {
+                                      console.warn('[MeisterwerkDocumentTab] Error unpacking SNAPSHOT_LEHRWERKE:', lwErr);
+                                    }
+                                  }
+                                }
+
+                                // 2. Songs snapshot unpacking with deduplication
+                                const snapSongEntry = parsedSnap.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_SONGS:'));
+                                if (snapSongEntry) {
+                                  try {
+                                    const rawJson = snapSongEntry.substring('SNAPSHOT_SONGS:'.length);
+                                    const parsedSongs = JSON.parse(rawJson);
+                                    if (Array.isArray(parsedSongs)) {
+                                      parsedSongs.forEach((song: any) => {
+                                        addSongToOtherHWs({
+                                          ...song,
+                                          is_current_homework: true,
+                                          homework_notes: getCleanPageNotes(song.homework_notes)
+                                        });
+                                      });
+                                    }
+                                  } catch (sErr) {
+                                    console.warn('[MeisterwerkDocumentTab] Error unpacking SNAPSHOT_SONGS in current week:', sErr);
+                                  }
+                                }
+
+                                // 3. Audio recordings unpacking (guarantees all 6 recordings show on Mobile PWA)
+                                const snapAudios = parsedSnap
+                                  .filter((n: any) => typeof n === 'string' && n.includes('AUDIO:'))
+                                  .map((cleanStr: string, index: number) => {
+                                    const parts = cleanStr.substring(cleanStr.indexOf('AUDIO:') + 6).split('|');
+                                    return {
+                                      url: parts[0]?.trim(),
+                                      duration: parseInt(parts[1] || '0', 10),
+                                      date: parts[2]?.trim(),
+                                      label: parts[3]?.trim() || `Aufnahme #${index + 1}`,
+                                      author: parts[4]?.trim() || 'teacher',
+                                      songTag: parts[7]?.trim() || undefined,
+                                      originalIdx: index,
+                                      idx: index
+                                    };
+                                  })
+                                  .filter(a => !!a.url);
+
+                                if (snapAudios.length > 0) {
+                                  if (audioNotes.length === 0) {
+                                    audioNotes = snapAudios;
+                                  } else {
+                                    snapAudios.forEach(sa => {
+                                      if (!audioNotes.some(ea => ea.url === sa.url)) {
+                                        audioNotes.push(sa);
+                                      }
+                                    });
+                                  }
+                                }
+
+                                // 4. Didactic teacher remarks / text notes unpacking ("zusätzliche bemerkung")
+                                if (homeworkNoteItems.length === 0) {
+                                  const snapTextNotes = parsedSnap
+                                    .filter((n: any) => {
+                                      if (typeof n !== 'string') return false;
+                                      return !isInternalMetadataNote(n) &&
+                                             !n.startsWith('AUDIO:') &&
+                                             !n.startsWith('STICKER:') &&
+                                             !n.startsWith('LOOP:') &&
+                                             !n.startsWith('SNAPSHOT_') &&
+                                             !n.startsWith('FEEDBACK:') &&
+                                             !n.startsWith('STUDENT_NOTE_');
+                                    })
+                                    .map((s: string) => s.trim())
+                                    .filter(Boolean);
+                                  if (snapTextNotes.length > 0) {
+                                    homeworkNoteItems = snapTextNotes;
+                                  }
+                                }
+
+                                // 5. Student question bridging if present
+                                const candidateQ = parseStudentQuestionFromNotes(parsedSnap);
+                                if (candidateQ && candidateQ.hasQuestion && !pastBridgedQuestion) {
+                                  pastBridgedQuestion = candidateQ;
+                                }
+                              }
+                            } catch (snapErr) {
+                              console.warn('[MeisterwerkDocumentTab] Error unpacking curWeekSnapshotItem in current week:', snapErr);
+                            }
+                          }
+
                           // 🌉 SMART VORWOCHEN-FALLBACK & AUDIO/NOTE BRIDGE: Pädagogische Kontinuität (Zero-LocalStorage)
                           // Wenn für die aktuelle Woche noch keine neuen Hausaufgaben eingetragen sind (oder auf Mobile/Cold Cache),
                           // übernehme nahtlos Lehrwerke, Songs, Audioaufnahmen und Notizen der vorherigen Unterrichtsstunde
                           // aus dem jüngsten Wochen-Snapshot.
                           const hasActiveCurrentHomework = (lehrwerkeList.length > 0 || otherHWs.length > 0 || audioNotes.length > 0 || homeworkNoteItems.length > 0);
-                          if (isCurrentWeek && (!hasActiveCurrentHomework || audioNotes.length === 0 || homeworkNoteItems.length === 0)) {
+                          if (isCurrentWeek && (!hasActiveCurrentHomework || audioNotes.length === 0 || homeworkNoteItems.length === 0 || otherHWs.length === 0 || lehrwerkeList.length === 0)) {
                             const pastWeekSnapshots = (progressItems || []).filter((item: any) => {
                               if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
                               const itWeekIso = getItemWeek(item);
@@ -6214,7 +6413,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         const rawJson = snapSongEntry.substring('SNAPSHOT_SONGS:'.length);
                                         const parsedSongs = JSON.parse(rawJson);
                                         if (Array.isArray(parsedSongs) && parsedSongs.length > 0) {
-                                          otherHWs = parsedSongs;
+                                          parsedSongs.forEach((song: any) => addSongToOtherHWs(song));
                                           isSongsCarriedOver = true;
                                         }
                                       } catch (e) {
@@ -6373,7 +6572,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     const rawJson = snapSongEntry.substring('SNAPSHOT_SONGS:'.length);
                                     const parsedSongs = JSON.parse(rawJson);
                                     if (Array.isArray(parsedSongs)) {
-                                      otherHWs = parsedSongs;
+                                      parsedSongs.forEach((song: any) => {
+                                        if (!otherHWs.some(existing => areSongsIdentical(existing, song))) {
+                                          otherHWs.push(song);
+                                        }
+                                      });
                                     }
                                   } catch (e) {
                                     console.warn('Error parsing SNAPSHOT_SONGS:', e);
@@ -6416,8 +6619,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 }
                               }
                             } else if (item.topic_name) {
-                              const cleanTopic = getNormalizedSongTitle(item);
-                              if (cleanTopic && !otherHWs.some(existing => getNormalizedSongTitle(existing) === cleanTopic)) {
+                              if (!otherHWs.some(existing => areSongsIdentical(existing, item))) {
                                 otherHWs.push({
                                   ...item,
                                   homework_notes: getCleanPageNotes(item.homework_notes)
@@ -6464,9 +6666,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             const recoveredSongs: any[] = [];
                             (progressItems || []).forEach((item: any) => {
                               if (item.is_current_homework && !item.topic_name?.includes(' - Seite ') && !item.topic_name?.startsWith('Hausaufgabe KW ')) {
-                                const cleanTopic = getNormalizedSongTitle(item);
-                                const canKey = getCanonicalSongKey(item);
-                                if (cleanTopic && !recoveredSongs.some(existing => getCanonicalSongKey(existing) === canKey || getNormalizedSongTitle(existing) === cleanTopic)) {
+                                if (!recoveredSongs.some(existing => areSongsIdentical(existing, item))) {
                                   recoveredSongs.push({
                                     ...item,
                                     homework_notes: getCleanPageNotes(item.homework_notes)
@@ -6480,20 +6680,21 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                localStorage.getItem(`song_hw_${student.id}_${skill.song_id}`) === 'true' ||
                                                Boolean(skill.is_current_homework);
                               if (isHwInLs) {
-                                const cleanTopic = getNormalizedSongTitle(skill);
-                                const canKey = getCanonicalSongKey(skill);
-                                if (!recoveredSongs.some(x => getCanonicalSongKey(x) === canKey || getNormalizedSongTitle(x) === cleanTopic)) {
-                                  const songArtist = skill.songs?.artist || skill.artist || '';
-                                  const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
-                                  const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
-                                  const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
-                                  recoveredSongs.push({
-                                    id: skill.id,
-                                    topic_name: fullTitle,
-                                    is_current_homework: true,
-                                    status: 'IN_PROGRESS',
-                                    homework_notes: skill.homework_notes || ''
-                                  });
+                                const songArtist = skill.songs?.artist || skill.artist || '';
+                                const songTitle = skill.songs?.title || skill.title || skill.song_title || 'Song';
+                                const songInstrument = skill.instrument ? ` (${skill.instrument})` : '';
+                                const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
+                                const candidate = {
+                                  id: skill.id,
+                                  song_id: skill.song_id,
+                                  topic_name: fullTitle,
+                                  is_current_homework: true,
+                                  status: 'IN_PROGRESS',
+                                  homework_notes: skill.homework_notes || '',
+                                  songs: skill.songs
+                                };
+                                if (!recoveredSongs.some(x => areSongsIdentical(x, candidate))) {
+                                  recoveredSongs.push(candidate);
                                 }
                               }
                             });
@@ -7912,19 +8113,27 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   })}
 
                                   {/* Songs List */}
-                                  {otherHWs.length > 0 && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                      {otherHWs.map((item, idx) => {
-                                        const songNote = getCleanPageNotes(item.homework_notes);
-                                        const isSpeakingThisSong = isTtsSpeaking && activeTtsKey === `song_note_${idx}`;
-                                        return (
-                                          <div key={`song-hw-${idx}`} style={{
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            gap: '6px',
-                                            paddingBottom: idx < otherHWs.length - 1 ? '10px' : '0',
-                                            borderBottom: idx < otherHWs.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none'
-                                          }}>
+                                  {(() => {
+                                    const deduplicatedOtherHWs = otherHWs.reduce<any[]>((acc, cur) => {
+                                      if (!acc.some(existing => areSongsIdentical(existing, cur))) {
+                                        acc.push(cur);
+                                      }
+                                      return acc;
+                                    }, []);
+                                    if (deduplicatedOtherHWs.length === 0) return null;
+                                    return (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                        {deduplicatedOtherHWs.map((item, idx) => {
+                                          const songNote = getCleanPageNotes(item.homework_notes);
+                                          const isSpeakingThisSong = isTtsSpeaking && activeTtsKey === `song_note_${idx}`;
+                                          return (
+                                            <div key={`song-hw-${idx}`} style={{
+                                              display: 'flex',
+                                              flexDirection: 'column',
+                                              gap: '6px',
+                                              paddingBottom: idx < deduplicatedOtherHWs.length - 1 ? '10px' : '0',
+                                              borderBottom: idx < deduplicatedOtherHWs.length - 1 ? '1px solid rgba(0,0,0,0.06)' : 'none'
+                                            }}>
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
                                               <div style={{
                                                 display: 'flex',
@@ -8071,7 +8280,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         );
                                       })}
                                     </div>
-                                  )}
+                                  );
+                                })()}
 
                                   {/* Audio Badges in Live Preview */}
                                   {audioNotes.length > 0 && (

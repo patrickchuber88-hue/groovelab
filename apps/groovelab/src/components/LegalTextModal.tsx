@@ -734,6 +734,7 @@ Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig u
                 Zur strikten Einhaltung europäischer Datenschutzstandards (Schrems II / DSGVO) verzichtet Campus-Groovelab vollständig auf US-Cloud-Dienste, Tracking-Netzwerke oder externe Hilfsdienste:<br />
                 - Sämtliche QR-Codes für physische Ausweise, Stundenpläne und Kiosk-Stationen werden zu 100 % lokal und offline im Webbrowser des Endgeräts gerendert (Zero-Data-Transmission). Es werden zu keinem Zeitpunkt Daten an externe QR-Dienste übertragen.<br />
                 - Die Protokollierung von Administrator-IPs beim B2B-Onboarding erfolgt ausnahmslos serverintern im ISO 27001-zertifizierten Hetzner-Rechenzentrum in Deutschland. Es werden keine externen IP-Dienste oder US-Abfrage-APIs genutzt.<br />
+                - <strong>Missbrauchsschutz &amp; Abwehr automatisierter Angriffe (Proof-of-Work):</strong> Zur Abwehr von Brute-Force-Angriffen und automatisierten Bot-Attacken beim Anmeldevorgang setzen wir ein vollständig serverseitiges, datensparsames kryptografisches Nachweisverfahren (Proof-of-Work) ein. Hierbei werden weder Cookies gesetzt noch gerätespezifische Merkmale ausgelesen (kein Device-Fingerprinting) und keine Daten an Dritte oder US-Server übertragen (Art. 6 Abs. 1 lit. f DSGVO i. V. m. Art. 32 DSGVO).<br />
                 - Kalendersynchronisationen und Ferienabfragen erfolgen direkt und ohne Zwischenschaltung ungesicherter Drittanbieter-Proxies.
               </div>
 

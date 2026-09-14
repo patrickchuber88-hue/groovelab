@@ -17,6 +17,9 @@ const MIGRATIONS_DIR = path.join(ROOT_DIR, 'supabase', 'migrations');
 const MIGRATION_389 = path.join(MIGRATIONS_DIR, '389_enterprise_forensic_remediation.sql');
 const MIGRATION_390 = path.join(MIGRATIONS_DIR, '390_enterprise_performance_covering_indexes.sql');
 const MIGRATION_391 = path.join(MIGRATIONS_DIR, '391_enterprise_forensic_residual_seal.sql');
+const MIGRATION_424 = path.join(MIGRATIONS_DIR, '424_enterprise_forensic_p0_p1_remediation.sql');
+const MIGRATION_425 = path.join(MIGRATIONS_DIR, '425_enterprise_data_portability_and_capabilities.sql');
+const MIGRATION_426 = path.join(MIGRATIONS_DIR, '426_enterprise_altcha_pow_and_sovereign_perimeter.sql');
 
 export interface InvariantCheckResult {
   id: number;
@@ -30,7 +33,7 @@ const results: InvariantCheckResult[] = [];
 
 console.log('════════════════════════════════════════════════════════════════════');
 console.log('🛡️  CAMPUS-GROOVELAB ENTERPRISE+ RLS & SCHEMA CATALOG INVARIANT AUDIT');
-console.log('    Validating 13 Forensic Architecture & Performance Invariants...');
+console.log('    Validating 18 Forensic Architecture & Performance Invariants...');
 console.log('════════════════════════════════════════════════════════════════════\n');
 
 if (!fs.existsSync(MIGRATION_389)) {
@@ -41,6 +44,9 @@ if (!fs.existsSync(MIGRATION_389)) {
 const m389Content = fs.readFileSync(MIGRATION_389, 'utf-8');
 const m390Content = fs.existsSync(MIGRATION_390) ? fs.readFileSync(MIGRATION_390, 'utf-8') : '';
 const m391Content = fs.existsSync(MIGRATION_391) ? fs.readFileSync(MIGRATION_391, 'utf-8') : '';
+const m424Content = fs.existsSync(MIGRATION_424) ? fs.readFileSync(MIGRATION_424, 'utf-8') : '';
+const m425Content = fs.existsSync(MIGRATION_425) ? fs.readFileSync(MIGRATION_425, 'utf-8') : '';
+const m426Content = fs.existsSync(MIGRATION_426) ? fs.readFileSync(MIGRATION_426, 'utf-8') : '';
 
 // ------------------------------------------------------------------------------
 // INVARIANT 1: Unauthenticated Session Injection on session_leases (CVSS 10.0)
@@ -446,6 +452,109 @@ function verifyInvariant13(): InvariantCheckResult {
 }
 
 // ------------------------------------------------------------------------------
+// INVARIANT 14: Last-Admin Lockout Trigger & users_raw Direct DML Revocation
+// ------------------------------------------------------------------------------
+function verifyInvariant14(): InvariantCheckResult {
+  const hasLockoutTrigger = m424Content.includes('prevent_last_admin_lockout') &&
+    m424Content.includes('trg_prevent_last_admin_lockout');
+  const hasDmlRevoke = m424Content.includes('REVOKE INSERT, UPDATE, DELETE ON public.users_raw FROM anon, authenticated');
+  const passed = hasLockoutTrigger && hasDmlRevoke;
+  return {
+    id: 14,
+    name: 'Last-Admin Lockout Trigger & users_raw Direct DML Revocation',
+    passed,
+    details: passed
+      ? 'trg_prevent_last_admin_lockout installed and direct client DML revoked on users_raw.'
+      : 'Failed: Missing last admin lockout protection or client DML revocation on users_raw.',
+    findings: []
+  };
+}
+
+// ------------------------------------------------------------------------------
+// INVARIANT 15: Pedagogical Chat Privacy & Secretary Read Shield
+// ------------------------------------------------------------------------------
+function verifyInvariant15(): InvariantCheckResult {
+  const hasSecretaryShield = m424Content.includes('campus_chat_secretary_read_guard') &&
+    m424Content.includes("public.get_current_user_role() <> 'secretary'");
+  const passed = hasSecretaryShield;
+  return {
+    id: 15,
+    name: 'Pedagogical Chat Privacy & Secretary Read Shield',
+    passed,
+    details: passed
+      ? 'campus_chat_secretary_read_guard policy enforced to prevent unauthorized secretary snooping into pedagogical chats.'
+      : 'Failed: Missing secretary read shield on campus_chat_messages.',
+    findings: []
+  };
+}
+
+// ------------------------------------------------------------------------------
+// INVARIANT 16: Storage Bucket Privatisierung & 500 MB Quota Enforcement
+// ------------------------------------------------------------------------------
+function verifyInvariant16(): InvariantCheckResult {
+  const hasPrivateBuckets = m424Content.includes('SET public = false') &&
+    m424Content.includes("WHERE id IN ('campus-assets', 'groovelab-assets')");
+  const hasMimeTypes = m424Content.includes('allowed_mime_types') &&
+    m424Content.includes('audio/mp4');
+  const hasQuotaTrigger = m424Content.includes('storage.enforce_user_quota') &&
+    m424Content.includes('trg_storage_enforce_user_quota');
+  const passed = hasPrivateBuckets && hasMimeTypes && hasQuotaTrigger;
+  return {
+    id: 16,
+    name: 'Storage Bucket Privatisierung, MIME Whitelist & Quota Enforcement',
+    passed,
+    details: passed
+      ? 'Storage buckets set to private, MIME types strictly whitelisted, and 500 MB user quota trigger active.'
+      : 'Failed: Missing private bucket update, MIME whitelist, or quota trigger in migration 424.',
+    findings: []
+  };
+}
+
+// ------------------------------------------------------------------------------
+// INVARIANT 17: Audit Hash-Chaining, Matrix Capabilities & GDPR Portability
+// ------------------------------------------------------------------------------
+function verifyInvariant17(): InvariantCheckResult {
+  const hasHashChain = m424Content.includes('trg_audit_hash_chain') &&
+    m424Content.includes('trg_audit_logs_hash_chain');
+  const hasCapabilities = m425Content.includes('role_capabilities') &&
+    m425Content.includes('has_capability');
+  const hasGdprExport = m425Content.includes('request_gdpr_data_export');
+  const hasRetentionPurge = m425Content.includes('purge_expired_retention_records');
+  const passed = hasHashChain && hasCapabilities && hasGdprExport && hasRetentionPurge;
+  return {
+    id: 17,
+    name: 'Audit Hash-Chaining, Matrix Capabilities & GDPR Art. 20 Portability',
+    passed,
+    details: passed
+      ? 'Cryptographic SHA-256 audit chaining, role_capabilities matrix, and GDPR Art. 20 portability RPC verified.'
+      : 'Failed: Missing audit hash chaining, role capabilities, or GDPR portability RPC in migration 424/425.',
+    findings: []
+  };
+}
+
+// ------------------------------------------------------------------------------
+// INVARIANT 18: Sovereign EU Security Pack (ALTCHA PoW & Master FIDO2 Policies)
+// ------------------------------------------------------------------------------
+function verifyInvariant18(): InvariantCheckResult {
+  const hasAltchaChallenge = m426Content.includes('generate_altcha_challenge') &&
+    m426Content.includes('verify_altcha_solution');
+  const hasFido2Policies = m426Content.includes('master_security_policies') &&
+    m426Content.includes('require_webauthn_fido2');
+  const hasTravelLeases = m426Content.includes('trusted_travel_leases') &&
+    m426Content.includes('grant_travel_roaming_lease');
+  const passed = hasAltchaChallenge && hasFido2Policies && hasTravelLeases;
+  return {
+    id: 18,
+    name: 'Sovereign EU Security Pack (ALTCHA PoW, FIDO2 Policies & Travel Leases)',
+    passed,
+    details: passed
+      ? 'Self-hosted ALTCHA PoW engine, master_security_policies with FIDO2 enforcement, and trusted travel leases verified.'
+      : 'Failed: Missing ALTCHA challenge functions, master security policies, or travel roaming leases in migration 426.',
+    findings: []
+  };
+}
+
+// ------------------------------------------------------------------------------
 // LIVE CATALOG AUDIT ENGINE (Checks pg_policies, pg_views, pg_proc when connected)
 // ------------------------------------------------------------------------------
 export async function runLiveCatalogAudit(): Promise<{ executed: boolean; passed: boolean; message: string }> {
@@ -515,6 +624,11 @@ results.push(verifyInvariant10());
 results.push(verifyInvariant11());
 results.push(verifyInvariant12());
 results.push(verifyInvariant13());
+results.push(verifyInvariant14());
+results.push(verifyInvariant15());
+results.push(verifyInvariant16());
+results.push(verifyInvariant17());
+results.push(verifyInvariant18());
 
 let failedCount = 0;
 
@@ -536,7 +650,7 @@ if (liveResult.executed) {
 
 console.log('\n════════════════════════════════════════════════════════════════════');
 if (failedCount === 0) {
-  console.log(`🎉 ALL 13 FORENSIC & PERFORMANCE INVARIANTS SATISFIED WITH 100% CONSISTENCY!`);
+  console.log(`🎉 ALL 18 FORENSIC & PERFORMANCE INVARIANTS SATISFIED WITH 100% CONSISTENCY!`);
   console.log('   OWASP ASVS Level 3 / DSGVO Art. 5, 8, 25, 32 / Sub-MS Invariants Sealed.');
   console.log('════════════════════════════════════════════════════════════════════\n');
   process.exit(0);

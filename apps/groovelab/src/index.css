@@ -2416,6 +2416,11 @@ a:focus-visible,
   to { transform: translateY(0); }
 }
 
+@keyframes scaleUpDialog {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
 @keyframes fadeInOverlay {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -2511,8 +2516,17 @@ a:focus-visible,
     border: none;
     cursor: pointer;
     border-radius: 12px;
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
     scroll-snap-align: center;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .cg-bottom-nav-item:active {
+    transform: scale(0.95);
+    opacity: 0.85;
   }
 
   .cg-bottom-nav-item.active-campus {
@@ -3074,6 +3088,15 @@ input[type="range"]::-moz-range-thumb {
       height: var(--mobile-scroll-clearance-bottom, calc(96px + env(safe-area-inset-bottom, 20px))) !important;
       width: 100% !important;
       flex-shrink: 0 !important;
+    }
+
+    /* ── 11. Universal Dialog Containment Guard (Anti-Viewport-Blowout) ── */
+    div[role="dialog"] > div:not(.mobile-modal-shell),
+    .pwa-modal-card {
+      max-height: calc(100dvh - env(safe-area-inset-top, 16px) - env(safe-area-inset-bottom, 20px) - 24px) !important;
+      display: flex !important;
+      flex-direction: column !important;
+      box-sizing: border-box !important;
     }
   }
 

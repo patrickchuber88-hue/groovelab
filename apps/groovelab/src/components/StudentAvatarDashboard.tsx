@@ -7288,7 +7288,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
               }
             });
             if (hasNewEntries) {
-              localStorage.setItem(hwStorageKey, JSON.stringify(mergedHwList));
+              const allCandidateIds = Array.from(new Set([
+                targetId,
+                studentId,
+                studentUser?.id,
+                (studentUser as any)?.student_id
+              ].filter(Boolean))) as string[];
+              allCandidateIds.forEach(cid => {
+                localStorage.setItem(`campus_homework_notes_${cid}`, JSON.stringify(mergedHwList));
+              });
             }
           }
         } catch (hwHealErr) {
@@ -12937,7 +12945,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         maxWidth: '100%', 
         margin: '0 auto', 
         width: '100%', 
-        padding: isMobile ? '0 0 140px 0' : '0 0 40px 0', 
+        overflowX: 'clip',
+        padding: isMobile ? '0 0 var(--mobile-scroll-clearance-bottom, 140px) 0' : '0 0 40px 0', 
         boxSizing: 'border-box',
         ...(isMusicStandMode ? {
           fontSize: '115%',

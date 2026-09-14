@@ -179,30 +179,33 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
             display: 'inline-flex',
             alignItems: 'center',
             gap: '6px',
-            padding: '5px 12px',
+            padding: '6px 14px',
             borderRadius: '100px',
             background: activePlatform === 'campus' ? '#e6f4ea' : '#fef9c3',
             border: activePlatform === 'campus' ? '1.5px solid #34a853' : '1.5px solid #eab308',
             color: activePlatform === 'campus' ? '#166534' : '#854d0e',
-            fontSize: '0.76rem',
+            fontSize: '0.78rem',
             fontWeight: 800,
             cursor: 'pointer',
             boxShadow: '0 2px 6px rgba(0, 0, 0, 0.04)',
-            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+            transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
             outline: 'none',
-            whiteSpace: 'nowrap'
+            whiteSpace: 'nowrap',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent'
           }}
+          className="hover-scale"
           title="Tippen für 1-Tap Direktwechsel zwischen Campus und GrooveLab"
         >
           {activePlatform === 'campus' ? (
             <>
-              <GraduationCap size={13} color="#166534" />
+              <GraduationCap size={14} color="#166534" />
               <span>Campus</span>
               <span style={{ fontSize: '0.72rem', color: '#34a853', fontWeight: 900, marginLeft: '2px' }}>⇄</span>
             </>
           ) : (
             <>
-              <Music size={13} color="#854d0e" />
+              <Music size={14} color="#854d0e" />
               <span>GrooveLab</span>
               <span style={{ fontSize: '0.72rem', color: '#ca8a04', fontWeight: 900, marginLeft: '2px' }}>⇄</span>
             </>

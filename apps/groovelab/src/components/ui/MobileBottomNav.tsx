@@ -364,7 +364,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                   <button
                     type="button"
-                    onClick={() => setActivePlatform('campus')}
+                    onClick={() => {
+                      setActivePlatform('campus');
+                      setDrawerOpen(false);
+                    }}
                     style={{
                       padding: '10px 8px',
                       borderRadius: '14px',
@@ -379,15 +382,20 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                       justifyContent: 'center',
                       gap: '6px',
                       transition: 'all 0.2s',
+                      touchAction: 'manipulation',
                       boxShadow: activePlatform === 'campus' ? '0 3px 10px rgba(52, 168, 83, 0.25)' : 'none'
                     }}
+                    className="hover-scale"
                   >
                     <GraduationCap size={16} /> Campus
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => setActivePlatform('groovelab')}
+                    onClick={() => {
+                      setActivePlatform('groovelab');
+                      setDrawerOpen(false);
+                    }}
                     style={{
                       padding: '10px 8px',
                       borderRadius: '14px',
@@ -402,8 +410,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                       justifyContent: 'center',
                       gap: '6px',
                       transition: 'all 0.2s',
+                      touchAction: 'manipulation',
                       boxShadow: activePlatform === 'groovelab' ? '0 3px 10px rgba(234, 179, 8, 0.25)' : 'none'
                     }}
+                    className="hover-scale"
                   >
                     <Music size={16} /> GrooveLab
                   </button>
@@ -472,7 +482,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               marginTop: 'auto'
             }}>
               <div
-                onClick={() => setActivePlatform('campus')}
+                onClick={() => {
+                  setActivePlatform('campus');
+                  setDrawerOpen(false);
+                }}
                 style={{
                   width: activePlatform === 'campus' ? '22px' : '8px',
                   height: '8px',
@@ -484,7 +497,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 title="Karte 1: Campus Modul"
               />
               <div
-                onClick={() => setActivePlatform('groovelab')}
+                onClick={() => {
+                  setActivePlatform('groovelab');
+                  setDrawerOpen(false);
+                }}
                 style={{
                   width: activePlatform === 'groovelab' ? '22px' : '8px',
                   height: '8px',
@@ -524,7 +540,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         {displayedTabs.map(item => {
           const TabIcon = item.icon;
           const isActive = activeTab === item.id || 
-            (item.id === 'briefing' && (activeTab === 'live' || activeTab === 'compass')) ||
+            (item.id === 'briefing' && activePlatform === 'campus' && (activeTab === 'live' || activeTab === 'compass')) ||
             (item.id === 'homework_book' && (activeTab === 'tasks' || activeTab === 'homework')) ||
             (item.id === 'practice_board' && (activeTab === 'practice' || activeTab === 'focus_timer' || activeTab === 'loopstation')) ||
             (item.id === 'mediathek' && (activeTab === 'songs' || activeTab === 'library')) ||

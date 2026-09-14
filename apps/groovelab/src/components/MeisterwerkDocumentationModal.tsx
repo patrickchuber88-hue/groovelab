@@ -84,7 +84,13 @@ import { MeisterwerkStickerAlbumTab } from './student/meisterwerk/MeisterwerkSti
 import { MeisterwerkSkillRadarTab } from './student/meisterwerk/MeisterwerkSkillRadarTab';
 import { MeisterwerkRecordingsTab } from './student/meisterwerk/MeisterwerkRecordingsTab';
 import { MeisterwerkLogbuchTab } from './student/meisterwerk/MeisterwerkLogbuchTab';
-import { MeisterwerkDocumentTab } from './student/meisterwerk/MeisterwerkDocumentTab';
+import { 
+  MeisterwerkDocumentTab,
+  areSongsIdentical,
+  levenshteinDistance,
+  normalizeSongStr,
+  extractSongArtistAndTitle
+} from './student/meisterwerk/MeisterwerkDocumentTab';
 
 export type { Student, MeisterwerkDocumentationModalProps, ProgressItem, ParsedStudentQuestion, ParsedStudentAnnotation };
 export { 
@@ -841,9 +847,17 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       // 🛡️ Enterprise+ Cold-Cache Hydration: Extract audios, notes & snapshot songs from server snapshot row (KW item)
       try {
         const curWeekIso = getISOWeek();
+        const curWeekNum = curWeekIso.split('-W')[1] || '';
         const candidateSnapshots = initialProgressItems.filter((item: any) => {
           if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
-          return getItemWeek(item) === curWeekIso || (item.updated_at && getISOWeek(item.updated_at) === curWeekIso);
+          if (getItemWeek(item) === curWeekIso) return true;
+          if (item.updated_at && getISOWeek(item.updated_at) === curWeekIso) return true;
+          if (item.created_at && getISOWeek(item.created_at) === curWeekIso) return true;
+          if (curWeekNum) {
+            const m = item.topic_name.match(/Hausaufgabe KW\s*(\d+)/i);
+            if (m && parseInt(m[1], 10) === parseInt(curWeekNum, 10)) return true;
+          }
+          return false;
         });
 
         // Fallback to latest past snapshot if current week has no homework_notes yet
@@ -891,6 +905,20 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                   if (pItem.trim()) merged.push(pItem);
                 }
               });
+
+              // 🛡️ Auto-healing: Persist across candidate IDs for immediate cold-cache parity
+              try {
+                const candIds = Array.from(new Set([
+                  student.id,
+                  (student as any)?.student_id,
+                  (student as any)?.studentId,
+                  (student as any)?.canonical_uuid
+                ].filter(Boolean))) as string[];
+                candIds.forEach(cid => {
+                  localStorage.setItem(`campus_homework_notes_${cid}`, JSON.stringify(merged));
+                });
+              } catch {}
+
               return merged;
             });
 
@@ -1607,7 +1635,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const getNormalizedSongTitle = (skillOrItem: any): string => {
     if (!skillOrItem) return '';
     if (typeof skillOrItem === 'string') {
-      return skillOrItem.replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase();
+      return normalizeSongStr(skillOrItem);
     }
     
     // Check if it's a textbook page or general homework note
@@ -1616,40 +1644,19 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       return '';
     }
 
-    if (topic) {
-      return topic.replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase();
-    }
-
-    const artist = (skillOrItem.songs?.artist || skillOrItem.artist || '').trim();
-    const title = (skillOrItem.songs?.title || skillOrItem.song_title || skillOrItem.title || '').trim();
-    if (artist && title) return `${artist} - ${title}`.toLowerCase();
-    return (title || artist).toLowerCase();
+    const info = extractSongArtistAndTitle(skillOrItem);
+    if (info.artist && info.title) return `${info.artist} - ${info.title}`;
+    return info.canonical;
   };
 
   const getCanonicalSongKey = (skillOrItem: any): string => {
-    const raw = getNormalizedSongTitle(skillOrItem);
-    if (!raw) return '';
-    if (raw.includes(' - ')) {
-      return raw.split(' - ')[1].trim().toLowerCase();
-    }
-    return raw.trim().toLowerCase();
+    if (!skillOrItem) return '';
+    const info = extractSongArtistAndTitle(skillOrItem);
+    return info.canonical;
   };
 
   const isSongMatch = (itemA: any, itemB: any): boolean => {
-    if (!itemA || !itemB) return false;
-    const titleA = getNormalizedSongTitle(itemA);
-    const titleB = getNormalizedSongTitle(itemB);
-    if (!titleA || !titleB) return false;
-    if (titleA === titleB) return true;
-    
-    const keyA = getCanonicalSongKey(itemA);
-    const keyB = getCanonicalSongKey(itemB);
-    if (keyA && keyB && keyA === keyB) return true;
-
-    // Check if one contains the other (e.g. "Seven Nation Army" matches "The White Stripes - Seven Nation Army")
-    if (titleA.includes(titleB) || titleB.includes(titleA)) return true;
-
-    return false;
+    return areSongsIdentical(itemA, itemB);
   };
 
   const [simStickerContext, setSimStickerContext] = useState<string>('Simulation');
@@ -4430,6 +4437,17 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       }
 
       setHomeworkNotesList(loadedHomeworkNotesList);
+      try {
+        const candIds = Array.from(new Set([
+          student.id,
+          (student as any)?.student_id,
+          (student as any)?.studentId,
+          (student as any)?.canonical_uuid
+        ].filter(Boolean))) as string[];
+        candIds.forEach(cid => {
+          localStorage.setItem(`campus_homework_notes_${cid}`, JSON.stringify(loadedHomeworkNotesList));
+        });
+      } catch {}
       const isStudentNotesFocused = typeof document !== 'undefined' && studentNotesTextareaRef.current && document.activeElement === studentNotesTextareaRef.current;
       const isTeacherNotesFocused = typeof document !== 'undefined' && teacherNotesTextareaRef.current && document.activeElement === teacherNotesTextareaRef.current;
       if (!hasChanges) {

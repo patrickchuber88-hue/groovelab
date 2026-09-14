@@ -596,17 +596,19 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
           {/* MAIN LAYOUT (Full-width for Junior Level 1 or when Right Sidebar is Collapsed, 2-column when Open) */}
           <div style={{ 
             display: 'grid', 
-            gridTemplateColumns: (isMobile || studentUiLevel === 'junior' || isRightSidebarCollapsed) ? '1fr' : '1fr 340px', 
+            gridTemplateColumns: (isMobile || studentUiLevel === 'junior' || isRightSidebarCollapsed) ? 'minmax(0, 1fr)' : 'minmax(0, 1fr) 340px', 
             gap: isRightSidebarCollapsed ? '0px' : '32px', 
             paddingRight: (isRightSidebarCollapsed && studentUiLevel !== 'junior' && !isMobile) ? '56px' : '0px',
             alignItems: 'start',
             boxSizing: 'border-box',
             width: '100%',
+            minWidth: 0,
+            overflowX: 'clip',
             transition: 'grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1), gap 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
           }}>
             
             {/* MAIN COLUMN */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', minWidth: 0, width: '100%' }}>
               {/* Community Update & Helden-Moment Hero */}
               <UpdateAnnouncementHero userId={studentId} activePlatform={currentPlatform} />
               
@@ -711,7 +713,14 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
               {studentUiLevel === 'junior' && (
                 <>
                   {/* JUNIOR: 2 GROSSE HERO-KPIS (Zauber-XP & Flammen-Serie) */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '18px', width: '100%' }}>
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(auto-fit, minmax(180px, 1fr))', 
+                    gap: isMobile ? '10px' : '18px', 
+                    width: '100%',
+                    minWidth: 0,
+                    boxSizing: 'border-box'
+                  }}>
                     {/* KPI 1: Zauber-XP */}
                     {xpActive && (
                       <div style={{ 
@@ -4054,9 +4063,11 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                   {/* TEEN: 4 HARMONISCHE KPIS */}
                   <div style={{ 
                     display: 'grid', 
-                    gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fit, minmax(180px, 1fr))', 
+                    gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(auto-fit, minmax(180px, 1fr))', 
                     gap: isMobile ? '10px' : '16px', 
-                    width: '100%' 
+                    width: '100%',
+                    minWidth: 0,
+                    boxSizing: 'border-box'
                   }}>
                     {/* KPI 1: XP-Punkte */}
                     {xpActive && (
@@ -5432,22 +5443,6 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     </div>
                                   ))}
 
-                                  {/* 🎧 Unterrichtsaufnahmen Audio Track Carousel */}
-                                  {audioTracks.length > 0 && (
-                                    <div style={{
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      gap: '8px',
-                                      paddingTop: (formattedActiveBooks.length > 0 || otherActiveHWItems.length > 0) ? '4px' : '0'
-                                    }}>
-                                      <div style={{ fontSize: '0.74rem', fontWeight: 900, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <Headphones size={13} />
-                                        <span>Unterrichtsaufnahmen ({audioTracks.length})</span>
-                                      </div>
-                                      <AudioTrackCarousel tracks={audioTracks} isTeacher={false} readOnly={true} />
-                                    </div>
-                                  )}
-
                                   {/* Zusätzliche Bemerkung / Notizen */}
                                   {generalNotesList && generalNotesList.length > 0 && (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
@@ -6099,9 +6094,10 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                   {/* TOP 4 KPIs ROW */}
                   <div style={{ 
                     display: 'grid', 
-                    gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fit, minmax(180px, 1fr))', 
+                    gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(auto-fit, minmax(180px, 1fr))', 
                     gap: isMobile ? '10px' : '16px', 
-                    width: '100%' 
+                    width: '100%',
+                    minWidth: 0
                   }}>
                     {/* KPI 1: XP (Vibrant Indigo-Blue) */}
                     {xpActive && (
@@ -7577,22 +7573,6 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     </div>
                                   ))}
 
-                                  {/* 🎧 Unterrichtsaufnahmen Audio Track Carousel */}
-                                  {audioTracks.length > 0 && (
-                                    <div style={{
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      gap: '8px',
-                                      paddingTop: (formattedActiveBooks.length > 0 || otherActiveHWItems.length > 0) ? '4px' : '0'
-                                    }}>
-                                      <div style={{ fontSize: '0.74rem', fontWeight: 900, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <Headphones size={13} />
-                                        <span>Unterrichtsaufnahmen ({audioTracks.length})</span>
-                                      </div>
-                                      <AudioTrackCarousel tracks={audioTracks} isTeacher={false} readOnly={true} />
-                                    </div>
-                                  )}
-
                                   {/* Zusätzliche Bemerkung / Notizen */}
                                   {generalNotesList && generalNotesList.length > 0 && (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingTop: '6px', borderTop: '1px dashed #e2e8f0' }}>
@@ -7834,13 +7814,6 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       const weekMetrics = getDeterministicWeekMetrics();
                       const availableShields = weekMetrics.availableShields;
                       const weekShieldedCount = weekMetrics.weekShieldedCount;
-
-                      const instName = studentInstrumentName || 'an deinem Instrument';
-                      const instPrep = ['Gitarre', 'Blockflöte', 'Querflöte', 'Violine', 'Geige', 'Bratsche', 'Posaune', 'Trompete', 'Harfe', 'Ukulele'].some(w => instName.toLowerCase().includes(w.toLowerCase()))
-                        ? `an der ${instName}`
-                        : ['Klavier', 'Schlagzeug', 'Cello', 'Saxophon', 'Akkordeon', 'Keyboard', 'Horn', 'Fagott'].some(w => instName.toLowerCase().includes(w.toLowerCase()))
-                        ? `am ${instName}`
-                        : `an deinem Instrument`;
 
                       return (
                         <div style={{ 
@@ -8131,27 +8104,6 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 );
                               })()}
                             </div>
-                          </div>
-
-                          {/* Action-Footer: Höhenausrichtung für Pro View */}
-                          <div style={{
-                            background: '#f8fafc',
-                            border: '1px solid #e2e8f0',
-                            borderRadius: '14px',
-                            padding: '12px 14px',
-                            minHeight: '44px',
-                            boxSizing: 'border-box',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '8px',
-                            color: '#334155',
-                            fontSize: isMusicStandMode ? '0.88rem' : '0.80rem',
-                            fontWeight: 800,
-                            textAlign: 'center'
-                          }}>
-                            <Sparkles size={14} color="#10b981" style={{ flexShrink: 0 }} />
-                            <span>Heute 1 Fokus-Session {instPrep} sichert deine Kontinuität.</span>
                           </div>
                         </div>
                       );
