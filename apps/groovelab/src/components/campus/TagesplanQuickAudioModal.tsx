@@ -18,6 +18,7 @@ interface RecordedClip {
   title: string;
   tag?: string;
   isExisting?: boolean;
+  metronomeBpm?: number;
 }
 
 interface TagesplanQuickAudioModalProps {
@@ -257,12 +258,15 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
             seenUrls.add(url);
             const dur = parseInt(parts[1] || '0', 10) || 0;
             const title = parts[3]?.trim() || `Aufnahme #${idx + 1}`;
+            const bpmPart = parts.find(p => typeof p === 'string' && p.trim().startsWith('BPM:'));
+            const clipBpm = bpmPart ? parseInt(bpmPart.trim().replace('BPM:', ''), 10) : undefined;
             loadedClips.push({
               id: `existing_${encodeURIComponent(url)}`,
               url,
               durationSeconds: dur,
               title,
               isExisting: true,
+              metronomeBpm: clipBpm && clipBpm > 0 ? clipBpm : undefined,
               blob: new Blob()
             });
           }
@@ -298,7 +302,7 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
           .limit(1)
           .maybeSingle()
           .then(({ data }) => {
-            if (data?.homework_notes) {
+            if (data && data.homework_notes) {
               try {
                 let dbList: string[] = [];
                 const p = JSON.parse(data.homework_notes);
@@ -316,12 +320,15 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
                       dbSeen.add(url);
                       const dur = parseInt(parts[1] || '0', 10) || 0;
                       const title = parts[3]?.trim() || `Aufnahme #${idx + 1}`;
+                      const dbBpmPart = parts.find(p => typeof p === 'string' && p.trim().startsWith('BPM:'));
+                      const dbClipBpm = dbBpmPart ? parseInt(dbBpmPart.trim().replace('BPM:', ''), 10) : undefined;
                       dbClips.push({
                         id: `existing_${encodeURIComponent(url)}`,
                         url,
                         durationSeconds: dur,
                         title,
                         isExisting: true,
+                        metronomeBpm: dbClipBpm && dbClipBpm > 0 ? dbClipBpm : undefined,
                         blob: new Blob()
                       });
                     }
@@ -641,12 +648,14 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
         
         const currentCount = recordedClips.length;
         const clipTitle = `Aufnahme ${currentCount + 1} (${todayFormatted})`;
+        const effectiveClipBpm = metronomeActive && metronomeBpm > 0 ? metronomeBpm : undefined;
         const newClip: RecordedClip = {
           id: `clip_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
           blob: finalBlob,
           url: finalUrl,
           durationSeconds: durationSec,
-          title: clipTitle
+          title: clipTitle,
+          metronomeBpm: effectiveClipBpm
         };
 
         setRecordedClips(prev => [...prev, newClip]);
@@ -894,7 +903,8 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
         }
 
         if (!firstSavedUrl) firstSavedUrl = finalUrl;
-        const formattedEntry = `AUDIO:${finalUrl}|${clip.durationSeconds}|${isoNow}|${clip.title.replace(/\|/g, '-')}|teacher|shared_with_teacher`;
+        const bpmSuffix = clip.metronomeBpm ? `||||BPM:${clip.metronomeBpm}` : '';
+        const formattedEntry = `AUDIO:${finalUrl}|${clip.durationSeconds}|${isoNow}|${clip.title.replace(/\|/g, '-')}|teacher|shared_with_teacher${bpmSuffix}`;
         finalNotesList.push(formattedEntry);
         newAudioVaultTakes.push(formattedEntry);
       }

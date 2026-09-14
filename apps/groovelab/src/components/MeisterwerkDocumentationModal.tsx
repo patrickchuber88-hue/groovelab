@@ -2461,6 +2461,16 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const recordingMetronomeAudioCtxRef = useRef<AudioContext | null>(null);
   const recordingMetronomeRef = useRef<HTMLDivElement | null>(null);
   const isStoppingAudioRef = useRef<boolean>(false);
+  const isRecordingMetronomeActiveRef = useRef<boolean>(isRecordingMetronomeActive);
+  const recordingBpmRef = useRef<number>(recordingBpm);
+
+  useEffect(() => {
+    isRecordingMetronomeActiveRef.current = isRecordingMetronomeActive;
+  }, [isRecordingMetronomeActive]);
+
+  useEffect(() => {
+    recordingBpmRef.current = recordingBpm;
+  }, [recordingBpm]);
 
   useEffect(() => {
     if (!showRecordingMetronomePopup) return;
@@ -3185,7 +3195,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             (student as any)?.slot_id
           ].filter(Boolean))) as string[];
 
-          const metronomeBpmToSave = isRecordingMetronomeActive ? recordingBpm : undefined;
+          const metronomeBpmToSave = isRecordingMetronomeActiveRef.current ? recordingBpmRef.current : undefined;
 
           const newRec = {
             id: uniqueRecId,
@@ -3195,7 +3205,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             title: smartTitle,
             label: currentAudioLabel,
             visibility: 'private',
-            metronomeBpm: metronomeBpmToSave
+            metronomeBpm: metronomeBpmToSave,
+            bpm: metronomeBpmToSave
           };
 
           candidateStudentIds.forEach(cid => {
@@ -3220,7 +3231,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           const activeSong = (activeSongSkills || []).find(s => (currentSongId && s.id === currentSongId) || (selectedActiveSongId && s.id === selectedActiveSongId));
           const songTitle = activeSong?.songs?.title || activeSong?.title || activeSong?.song_title;
           const assignedTag = songTitle || cleanSongOrBookTitle(currentAudioLabel) || '';
-          const metronomeBpmToSave = isRecordingMetronomeActive ? recordingBpm : undefined;
+          const metronomeBpmToSave = isRecordingMetronomeActiveRef.current ? recordingBpmRef.current : undefined;
           const bpmSuffix = metronomeBpmToSave ? `||||BPM:${metronomeBpmToSave}` : '';
           const audioMetaStr = `AUDIO:${localBlobKey}|${recDuration}|${new Date().toISOString()}|${smartTitle}|${creatorRole}|${initialVisibility}|${uniqueRecId}|${assignedTag}${bpmSuffix}`;
           

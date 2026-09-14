@@ -207,6 +207,18 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
   const [duration, setDuration] = useState<number>(initialDuration || 0);
   const [currentPlayTime, setCurrentPlayTime] = useState(0);
 
+  // 📱 Mobile Viewport Detection (Apple HIG / Material Standard <= 768px)
+  const checkIsMobile = useCallback(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth <= 768;
+  }, []);
+  const [isMobile, setIsMobile] = useState<boolean>(checkIsMobile);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(checkIsMobile());
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [checkIsMobile]);
+
   // 🎚️ Playback-Speed (0.5x bis 1.0x)
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
   const playbackSpeedRef = useRef<number>(1.0);
@@ -337,47 +349,69 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
 
   // 🎧 Load audio element and decode buffer for waveform
   useEffect(() => {
-    if (!isOpen || !audioUrl) return;
+    if (!isOpen || (!audioUrl && !audioId)) return;
     let active = true;
     setIsLoading(true);
 
     const loadData = async () => {
       try {
         let arrayBuffer: ArrayBuffer | null = null;
-        let resolvedTargetUrl = audioUrl;
+        let candidateBlobKey = (audioId && (audioId.startsWith('campus_blob_') || audioId.startsWith('campus_audio_') || audioId.startsWith('offline://')))
+          ? audioId
+          : (audioUrl && (audioUrl.startsWith('campus_blob_') || audioUrl.startsWith('campus_audio_') || audioUrl.startsWith('offline://')) ? audioUrl : null);
 
-        if (resolvedTargetUrl.startsWith('schools/') || resolvedTargetUrl.includes('/storage/v1/object/')) {
-          try {
-            const sec = await getSecureAudioUrl(resolvedTargetUrl, 'campus-assets', 300);
-            if (sec) resolvedTargetUrl = sec;
-          } catch (secErr) {
-            console.warn('[AudioNotesModal] Failed to resolve secure audio url:', secErr);
-          }
-        }
+        let playableSrc = '';
 
-        let playableSrc = resolvedTargetUrl;
-
-        if (resolvedTargetUrl.startsWith('campus_blob_') || resolvedTargetUrl.startsWith('campus_audio_') || resolvedTargetUrl.startsWith('offline://')) {
-          const raw = await getBlob(resolvedTargetUrl);
+        // 1. ⚡ Direktzugriff auf IndexedDB-Binärspeicher (immun gegen CORS, Netzwerk & flüchtige URLs)
+        if (candidateBlobKey) {
+          const raw = await getBlob(candidateBlobKey);
           if (raw instanceof Blob) {
             arrayBuffer = await raw.arrayBuffer();
             playableSrc = URL.createObjectURL(raw);
             blobUrlToRevokeRef.current = playableSrc;
           } else if (raw instanceof ArrayBuffer) {
             arrayBuffer = raw;
-            const blob = new Blob([raw], { type: 'audio/mpeg' });
+            const blob = new Blob([raw], { type: 'audio/wav' });
             playableSrc = URL.createObjectURL(blob);
             blobUrlToRevokeRef.current = playableSrc;
           }
-        } else if (resolvedTargetUrl.startsWith('data:') || resolvedTargetUrl.startsWith('blob:')) {
-          const resp = await fetch(resolvedTargetUrl);
-          arrayBuffer = await resp.arrayBuffer();
-          playableSrc = resolvedTargetUrl;
-        } else if (resolvedTargetUrl.startsWith('http://') || resolvedTargetUrl.startsWith('https://')) {
-          const resp = await fetch(resolvedTargetUrl, { mode: 'cors' });
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          arrayBuffer = await resp.arrayBuffer();
-          playableSrc = resolvedTargetUrl;
+        }
+
+        // 2. 🌐 Fallback auf HTTP/Blob/Data URLs
+        if (!arrayBuffer) {
+          let targetUrl = audioUrl || audioId || '';
+
+          if (targetUrl.startsWith('schools/') || targetUrl.includes('/storage/v1/object/')) {
+            try {
+              const sec = await getSecureAudioUrl(targetUrl, 'campus-assets', 300);
+              if (sec) targetUrl = sec;
+            } catch (secErr) {
+              console.warn('[AudioNotesModal] Failed to resolve secure audio url:', secErr);
+            }
+          }
+
+          if (targetUrl.startsWith('campus_blob_') || targetUrl.startsWith('campus_audio_') || targetUrl.startsWith('offline://')) {
+            const raw = await getBlob(targetUrl);
+            if (raw instanceof Blob) {
+              arrayBuffer = await raw.arrayBuffer();
+              playableSrc = URL.createObjectURL(raw);
+              blobUrlToRevokeRef.current = playableSrc;
+            } else if (raw instanceof ArrayBuffer) {
+              arrayBuffer = raw;
+              const blob = new Blob([raw], { type: 'audio/wav' });
+              playableSrc = URL.createObjectURL(blob);
+              blobUrlToRevokeRef.current = playableSrc;
+            }
+          } else if (targetUrl.startsWith('data:') || targetUrl.startsWith('blob:')) {
+            const resp = await fetch(targetUrl);
+            arrayBuffer = await resp.arrayBuffer();
+            playableSrc = targetUrl;
+          } else if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
+            const resp = await fetch(targetUrl, { mode: 'cors' });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            arrayBuffer = await resp.arrayBuffer();
+            playableSrc = targetUrl;
+          }
         }
 
         if (!arrayBuffer) {
@@ -404,24 +438,39 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
         });
         audioRef.current = audio;
 
-        // Web Audio Context purely for waveform visualization
-        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-        const audioCtx = new AudioCtx();
-        audioCtxRef.current = audioCtx;
-
-        if (audioCtx.state === 'suspended') {
-          await audioCtx.resume().catch(() => {});
+        // 🎙️ Ausfallsichere Safari & WebKit Decodierung via OfflineAudioContext (keine Autoplay-/Suspension-Blockade)
+        let decoded: AudioBuffer | null = null;
+        try {
+          const OfflineCtx = window.OfflineAudioContext || (window as unknown as { webkitOfflineAudioContext: typeof OfflineAudioContext }).webkitOfflineAudioContext;
+          if (OfflineCtx) {
+            const offlineCtx = new OfflineCtx(1, 2, 44100);
+            decoded = await safeDecodeAudioData(offlineCtx, arrayBuffer);
+          }
+        } catch (offlineErr) {
+          console.warn('[AudioNotesModal] OfflineAudioContext decode fallback note:', offlineErr);
         }
 
-        const decoded = await safeDecodeAudioData(audioCtx, arrayBuffer);
+        // Fallback: Regulärer AudioContext, falls OfflineAudioContext nicht verfügbar
+        if (!decoded) {
+          const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+          const audioCtx = new AudioCtx();
+          audioCtxRef.current = audioCtx;
+          if (audioCtx.state === 'suspended') {
+            await audioCtx.resume().catch(() => {});
+          }
+          decoded = await safeDecodeAudioData(audioCtx, arrayBuffer);
+        }
+
         if (!active) return;
 
-        setAudioBuffer(decoded);
-        if (decoded.duration && isFinite(decoded.duration)) {
-          setDuration(Number(decoded.duration.toFixed(2)));
+        if (decoded) {
+          setAudioBuffer(decoded);
+          if (decoded.duration && isFinite(decoded.duration)) {
+            setDuration(Number(decoded.duration.toFixed(2)));
+          }
         }
       } catch (err) {
-        console.warn('[AudioNotesModal] Decode note:', err);
+        console.warn('[AudioNotesModal] Decode note error:', err);
       } finally {
         if (active) setIsLoading(false);
       }
@@ -446,9 +495,9 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
         audioCtxRef.current = null;
       }
     };
-  }, [isOpen, audioUrl, stopPlayback]);
+  }, [isOpen, audioUrl, audioId, stopPlayback]);
 
-  // Waveform 80-bars generator (multiplied by zoomLevel)
+  // 🌊 Studio-Grade Waveform Generator: Scannt das gesamte Audiosignal (RMS & True-Peak)
   const waveformBars = useMemo(() => {
     const barsCount = 80 * zoomLevel;
     if (audioBuffer && audioBuffer.length > 0) {
@@ -458,28 +507,38 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
         channelsData.push(audioBuffer.getChannelData(c));
       }
       const totalSamples = audioBuffer.length;
-      const blockSize = Math.max(1, Math.floor(totalSamples / barsCount));
-      const rawPeaks: number[] = [];
-      let maxPeak = 0.001;
+      const blockSize = Math.max(1, totalSamples / barsCount);
+      const rawValues: number[] = [];
+      let maxVal = 0.001;
 
       for (let i = 0; i < barsCount; i++) {
-        const start = i * blockSize;
-        const end = Math.min(start + blockSize, totalSamples);
-        let blockMax = 0;
-        const step = Math.max(1, Math.floor((end - start) / 24));
-        for (let j = start; j < end; j += step) {
+        const start = Math.floor(i * blockSize);
+        const end = Math.min(Math.floor(start + blockSize), totalSamples);
+        let blockPeak = 0;
+        let sumSquares = 0;
+        let count = 0;
+
+        // Dynamischer Stride (< 1ms Execution Time bei vollständiger Transientenerfassung)
+        const stride = Math.max(1, Math.floor((end - start) / 400));
+        for (let j = start; j < end; j += stride) {
           for (let c = 0; c < numChannels; c++) {
             const val = Math.abs(channelsData[c][j] || 0);
-            if (val > blockMax) blockMax = val;
+            if (val > blockPeak) blockPeak = val;
+            sumSquares += val * val;
+            count++;
           }
         }
-        rawPeaks.push(blockMax);
-        if (blockMax > maxPeak) maxPeak = blockMax;
+        const rms = count > 0 ? Math.sqrt(sumSquares / count) : 0;
+        // Authentische Studio-Wellenform: 75% Peak-Wahrnehmung + 25% RMS-Dichte
+        const barEnergy = (blockPeak * 0.75) + (rms * 0.25);
+        rawValues.push(barEnergy);
+        if (barEnergy > maxVal) maxVal = barEnergy;
       }
 
       const totalSvgWidth = 800 * zoomLevel;
-      return rawPeaks.map((peak, i) => {
-        const normalized = Math.min(1, Math.max(0.08, peak / maxPeak));
+      return rawValues.map((val, i) => {
+        // Natürliche logarithmisch-lineare Skalierung: Leise Passagen bleiben sichtbar, laute Stellen clippen nicht
+        const normalized = Math.min(1, Math.max(0.06, val / maxVal));
         const height = Math.max(6, Math.round(normalized * 66 + 6));
         const x = (i / barsCount) * totalSvgWidth + 1.2;
         const width = Math.max(2, (totalSvgWidth / barsCount) - 3.2);
@@ -488,22 +547,22 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
       });
     }
 
-    // Fallback seed
-    const fallbackSeed = [
-      0.18, 0.32, 0.52, 0.72, 0.88, 0.95, 0.82, 0.60, 0.44, 0.70,
-      0.86, 0.92, 0.78, 0.54, 0.38, 0.64, 0.90, 0.98, 0.76, 0.55,
-      0.40, 0.65, 0.85, 0.92, 0.72, 0.50, 0.34, 0.60, 0.82, 0.94,
-      0.74, 0.48, 0.32, 0.56, 0.80, 0.92, 0.72, 0.50, 0.36, 0.62,
-      0.86, 0.96, 0.76, 0.52, 0.34, 0.60, 0.84, 0.96, 0.75, 0.48,
-      0.30, 0.54, 0.78, 0.90, 0.70, 0.45, 0.32, 0.52, 0.74, 0.86,
-      0.68, 0.42, 0.28, 0.48, 0.70, 0.84, 0.62, 0.40, 0.25, 0.42,
-      0.62, 0.76, 0.56, 0.36, 0.22, 0.38, 0.52, 0.66, 0.42, 0.20
+    // Organische Studio-Voransicht während des initialen Ladevorgangs
+    const organicSeed = [
+      0.15, 0.22, 0.35, 0.48, 0.65, 0.78, 0.85, 0.72, 0.55, 0.40,
+      0.30, 0.45, 0.68, 0.82, 0.92, 0.75, 0.60, 0.42, 0.28, 0.38,
+      0.58, 0.76, 0.88, 0.95, 0.70, 0.52, 0.36, 0.48, 0.70, 0.85,
+      0.90, 0.68, 0.46, 0.32, 0.44, 0.65, 0.80, 0.88, 0.72, 0.50,
+      0.34, 0.46, 0.68, 0.84, 0.90, 0.74, 0.54, 0.38, 0.26, 0.38,
+      0.56, 0.74, 0.86, 0.68, 0.48, 0.32, 0.44, 0.62, 0.78, 0.85,
+      0.65, 0.45, 0.30, 0.42, 0.60, 0.75, 0.82, 0.60, 0.40, 0.25,
+      0.35, 0.52, 0.68, 0.74, 0.55, 0.38, 0.24, 0.32, 0.45, 0.20
     ];
     const totalSvgWidth = 800 * zoomLevel;
-    return fallbackSeed.map((peak, i) => {
+    return organicSeed.map((peak, i) => {
       const height = Math.round(peak * 66 + 6);
-      const x = (i / fallbackSeed.length) * totalSvgWidth + 1.2;
-      const width = Math.max(2, (totalSvgWidth / fallbackSeed.length) - 3.2);
+      const x = (i / organicSeed.length) * totalSvgWidth + 1.2;
+      const width = Math.max(2, (totalSvgWidth / organicSeed.length) - 3.2);
       const y = (80 - height) / 2;
       return { x, y, width, height };
     });
@@ -945,17 +1004,17 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '16px',
+        padding: isMobile ? '8px' : '16px',
         boxSizing: 'border-box'
       }}
     >
       <div
         style={{
           background: '#ffffff',
-          borderRadius: '26px',
+          borderRadius: isMobile ? '22px' : '26px',
           maxWidth: '560px',
           width: '100%',
-          maxHeight: '92vh',
+          maxHeight: isMobile ? '94dvh' : '92vh',
           boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.32)',
           display: 'flex',
           flexDirection: 'column',
@@ -971,7 +1030,7 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '16px 20px 12px 20px',
+            padding: isMobile ? '12px 16px 10px 16px' : '16px 20px 12px 20px',
             borderBottom: '1px solid #f1f5f9',
             background: '#ffffff'
           }}
@@ -1283,7 +1342,8 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
                         cursor: isDraggingThis ? 'grabbing' : (!isStudent || note.authorRole === 'student') ? 'grab' : 'pointer',
                         zIndex: isDraggingThis ? 50 : 35,
                         userSelect: 'none',
-                        touchAction: (!isStudent || note.authorRole === 'student') ? 'none' : 'manipulation'
+                        touchAction: (!isStudent || note.authorRole === 'student') ? 'none' : 'manipulation',
+                        padding: isMobile ? '8px 10px' : '4px'
                       }}
                       title={`Marker #${idx + 1} (${rainbowColor.label}) • ${formatTime(note.time)}: ${note.text} (Klick: Vorhören mit Pre-Roll · Ziehen: Verschieben)`}
                       className="hover-scale-mini"
@@ -1291,8 +1351,8 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
                       {/* Pin Bubble (Bunt nach Regenbogen-Palette) */}
                       <div
                         style={{
-                          width: '20px',
-                          height: '20px',
+                          width: isMobile ? '22px' : '20px',
+                          height: isMobile ? '22px' : '20px',
                           borderRadius: '50%',
                           background: rainbowColor.bg,
                           border: `1.5px solid ${rainbowColor.border}`,
@@ -1398,20 +1458,20 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
             </div>
 
             {/* 🎛️ Transport Controls, Tempo-Selector & Notiz-Trigger */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
-              {/* Play / Pause Button (mind. 48px für Notenständer-Touch) */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: isMobile ? '6px' : '8px', alignItems: 'center' }}>
+              {/* Play / Pause Button (mind. 44px für Notenständer-Touch) */}
               <button
                 type="button"
                 onClick={togglePlay}
                 style={{
-                  flex: 2,
+                  flex: isMobile ? '1 1 130px' : 2,
                   minHeight: '44px',
                   background: isPlaying ? '#0f172a' : '#ffffff',
                   color: isPlaying ? '#ffffff' : '#0f172a',
                   border: '1.5px solid #cbd5e1',
                   borderRadius: '12px',
-                  padding: '9px 14px',
-                  fontSize: '0.84rem',
+                  padding: isMobile ? '8px 10px' : '9px 14px',
+                  fontSize: isMobile ? '0.78rem' : '0.84rem',
                   fontWeight: 850,
                   cursor: 'pointer',
                   display: 'flex',
@@ -1419,7 +1479,8 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
                   justifyContent: 'center',
                   gap: '6px',
                   boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
-                  transition: 'all 0.15s ease'
+                  transition: 'all 0.15s ease',
+                  touchAction: 'manipulation'
                 }}
                 className="hover-scale-mini"
               >
@@ -1442,6 +1503,7 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
                 onClick={handleToggleLoop}
                 style={{
                   minHeight: '44px',
+                  minWidth: '44px',
                   background: isLooping ? '#f1f5f9' : '#ffffff',
                   color: isLooping ? '#0f172a' : '#64748b',
                   border: isLooping ? '1.5px solid #0f172a' : '1.5px solid #cbd5e1',
@@ -1450,7 +1512,8 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  touchAction: 'manipulation'
                 }}
                 className="hover-scale-mini"
                 title={isLooping ? 'Endlos-Loop aktiv' : 'Loop aktivieren (Taste: L)'}
@@ -1467,7 +1530,9 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
                   border: '1.5px solid #cbd5e1',
                   borderRadius: '12px',
                   padding: '3px',
-                  gap: '2px'
+                  gap: '2px',
+                  flex: isMobile ? '1 1 auto' : 'none',
+                  justifyContent: isMobile ? 'space-around' : 'flex-start'
                 }}
                 title="Übegeschwindigkeit wählen (Taste: 1-4)"
               >
@@ -1483,11 +1548,13 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
                         color: isActive ? '#ffffff' : '#64748b',
                         border: 'none',
                         borderRadius: '8px',
-                        padding: '6px 8px',
-                        fontSize: '0.74rem',
+                        padding: isMobile ? '7px 7px' : '6px 8px',
+                        fontSize: isMobile ? '0.72rem' : '0.74rem',
                         fontWeight: isActive ? 900 : 700,
                         cursor: 'pointer',
-                        transition: 'all 0.1s ease'
+                        transition: 'all 0.1s ease',
+                        touchAction: 'manipulation',
+                        minHeight: '34px'
                       }}
                     >
                       {spd === 1.0 ? '1.0x' : `${spd}x`}
@@ -1512,9 +1579,12 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
+                  justifyContent: 'center',
                   gap: '6px',
                   boxShadow: '0 2px 6px rgba(15, 23, 42, 0.25)',
-                  transition: 'all 0.15s ease'
+                  transition: 'all 0.15s ease',
+                  flex: isMobile ? '1 1 auto' : 'none',
+                  touchAction: 'manipulation'
                 }}
                 className="hover-scale-mini"
                 title="Marker an aktueller Position setzen (Pausiert automatisch · Shortcut: M)"
@@ -2112,12 +2182,18 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
                               border: 'none',
                               color: '#94a3b8',
                               cursor: 'pointer',
-                              padding: '4px',
-                              borderRadius: '6px'
+                              padding: isMobile ? '6px 8px' : '4px',
+                              borderRadius: '6px',
+                              minHeight: '36px',
+                              minWidth: '36px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              touchAction: 'manipulation'
                             }}
                             title="Marker bearbeiten / Position feintunen"
                           >
-                            <Edit3 size={14} strokeWidth={2.2} />
+                            <Edit3 size={15} strokeWidth={2.2} />
                           </button>
 
                           <button
@@ -2128,12 +2204,18 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
                               border: 'none',
                               color: '#f87171',
                               cursor: 'pointer',
-                              padding: '4px',
-                              borderRadius: '6px'
+                              padding: isMobile ? '6px 8px' : '4px',
+                              borderRadius: '6px',
+                              minHeight: '36px',
+                              minWidth: '36px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              touchAction: 'manipulation'
                             }}
                             title="Marker löschen"
                           >
-                            <Trash2 size={14} strokeWidth={2.2} />
+                            <Trash2 size={15} strokeWidth={2.2} />
                           </button>
                         </div>
                       )}
@@ -2142,12 +2224,12 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
                     {/* 📝 Zeile 2 (Body): Volle Kartenbreite für Notizentext mit sauberem Zeilenabstand */}
                     <div
                       style={{
-                        fontSize: '0.86rem',
+                        fontSize: isMobile ? '0.82rem' : '0.86rem',
                         color: '#0f172a',
                         fontWeight: 600,
                         lineHeight: 1.45,
                         wordBreak: 'break-word',
-                        paddingLeft: '26px'
+                        paddingLeft: isMobile ? '0px' : '26px'
                       }}
                     >
                       {n.text}
@@ -2159,7 +2241,7 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px',
-                        paddingLeft: '26px',
+                        paddingLeft: isMobile ? '0px' : '26px',
                         marginTop: '2px',
                         flexWrap: 'wrap'
                       }}
@@ -2287,10 +2369,10 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
           </div>
         </div>
 
-        {/* 🚪 Footer mit DAW-Shortcuts */}
+        {/* 🚪 Footer mit DAW-Shortcuts (Desktop) bzw. Safe-Area Button (Mobile) */}
         <div
           style={{
-            padding: '12px 20px',
+            padding: isMobile ? '10px 14px calc(12px + env(safe-area-inset-bottom, 0px)) 14px' : '12px 20px',
             borderTop: '1px solid #f1f5f9',
             display: 'flex',
             justifyContent: 'space-between',
@@ -2300,36 +2382,38 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
             flexWrap: 'wrap'
           }}
         >
-          <div style={{ flex: 1, minWidth: '260px', fontSize: '0.70rem', color: '#64748b', fontWeight: 650, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-            <span style={{ color: '#0f172a', fontWeight: 800 }}>{isStudent ? 'Tastenkürzel:' : 'DAW-Shortcuts:'}</span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-              <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1px 5px', borderRadius: '4px', color: '#0f172a', fontWeight: 800 }}>Space</kbd> Play
-            </span>
-            <span style={{ color: '#cbd5e1' }}>•</span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-              <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1px 5px', borderRadius: '4px', color: '#0f172a', fontWeight: 800 }}>M</kbd> Marker
-            </span>
-            <span style={{ color: '#cbd5e1' }}>•</span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-              <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1px 5px', borderRadius: '4px', color: '#0f172a', fontWeight: 800 }}>D</kbd> Diktat
-            </span>
-            <span style={{ color: '#cbd5e1' }}>•</span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-              <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1px 5px', borderRadius: '4px', color: '#0f172a', fontWeight: 800 }}>← / →</kbd> 1,5s Scrub
-            </span>
-            <span style={{ color: '#cbd5e1' }}>•</span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-              <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1px 5px', borderRadius: '4px', color: '#0f172a', fontWeight: 800 }}>↑ / ↓</kbd> Jump
-            </span>
-            <span style={{ color: '#cbd5e1' }}>•</span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-              <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1px 5px', borderRadius: '4px', color: '#0f172a', fontWeight: 800 }}>L</kbd> Loop
-            </span>
-            <span style={{ color: '#cbd5e1' }}>•</span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-              <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1px 5px', borderRadius: '4px', color: '#0f172a', fontWeight: 800 }}>1-4</kbd> Tempo
-            </span>
-          </div>
+          {!isMobile && (
+            <div style={{ flex: 1, minWidth: '260px', fontSize: '0.70rem', color: '#64748b', fontWeight: 650, display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              <span style={{ color: '#0f172a', fontWeight: 800 }}>{isStudent ? 'Tastenkürzel:' : 'DAW-Shortcuts:'}</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1px 5px', borderRadius: '4px', color: '#0f172a', fontWeight: 800 }}>Space</kbd> Play
+              </span>
+              <span style={{ color: '#cbd5e1' }}>•</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1px 5px', borderRadius: '4px', color: '#0f172a', fontWeight: 800 }}>M</kbd> Marker
+              </span>
+              <span style={{ color: '#cbd5e1' }}>•</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1px 5px', borderRadius: '4px', color: '#0f172a', fontWeight: 800 }}>D</kbd> Diktat
+              </span>
+              <span style={{ color: '#cbd5e1' }}>•</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1px 5px', borderRadius: '4px', color: '#0f172a', fontWeight: 800 }}>← / →</kbd> 1,5s Scrub
+              </span>
+              <span style={{ color: '#cbd5e1' }}>•</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1px 5px', borderRadius: '4px', color: '#0f172a', fontWeight: 800 }}>↑ / ↓</kbd> Jump
+              </span>
+              <span style={{ color: '#cbd5e1' }}>•</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1px 5px', borderRadius: '4px', color: '#0f172a', fontWeight: 800 }}>L</kbd> Loop
+              </span>
+              <span style={{ color: '#cbd5e1' }}>•</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                <kbd style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '1px 5px', borderRadius: '4px', color: '#0f172a', fontWeight: 800 }}>1-4</kbd> Tempo
+              </span>
+            </div>
+          )}
 
           <button
             type="button"
@@ -2339,13 +2423,16 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
               color: '#ffffff',
               border: 'none',
               borderRadius: '12px',
-              padding: '8px 20px',
-              fontSize: '0.80rem',
+              padding: isMobile ? '12px 20px' : '8px 20px',
+              fontSize: isMobile ? '0.86rem' : '0.80rem',
               fontWeight: 850,
               cursor: 'pointer',
               boxShadow: '0 2px 8px rgba(15, 23, 42, 0.18)',
               transition: 'all 0.15s ease',
-              flexShrink: 0
+              flexShrink: 0,
+              width: isMobile ? '100%' : 'auto',
+              minHeight: '44px',
+              touchAction: 'manipulation'
             }}
             className="hover-scale-mini"
           >

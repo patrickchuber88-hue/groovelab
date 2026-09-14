@@ -1065,6 +1065,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                   const renderTeacherPlayer = (aud: any, key: string, isHero = false, customThemeColor = "#15803d", customThemeBg = "#e6f4ea") => (
                     <InlineAudioPlayer 
                       key={key}
+                      id={aud.id || aud.url}
                       url={aud.url} 
                       label={aud.label} 
                       duration={aud.duration}
@@ -1084,12 +1085,13 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                       originalDuration={aud.originalDuration}
                       onRevertToOriginal={!readOnly && aud.originalUrl && handleRevertTeacherAudioToOriginal ? () => handleRevertTeacherAudioToOriginal(aud.originalIdx, aud.url) : undefined}
                       onSaveEdited={!readOnly && handleSaveEditedTeacherAudio ? (res) => handleSaveEditedTeacherAudio(res, aud.originalIdx, aud.url) : undefined}
-                      onOpenDuettDeck={() => setDuettModalData({
+                      metronomeBpm={aud.metronomeBpm && Number(aud.metronomeBpm) > 0 ? Number(aud.metronomeBpm) : undefined}
+                      onOpenDuettDeck={aud.metronomeBpm && Number(aud.metronomeBpm) > 0 ? () => setDuettModalData({
                         teacherUrl: aud.url,
                         teacherTitle: aud.label || 'Lehrer-Aufnahme',
-                        teacherBpm: aud.metronomeBpm || 100,
+                        teacherBpm: Number(aud.metronomeBpm),
                         songTag: aud.songTag
-                      })}
+                      }) : undefined}
                     />
                   );
 
@@ -2646,6 +2648,9 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                                 seenIds.add(recId);
                                 const rawSongTag = rec.songTag || rec.song || rec.songTitle || undefined;
                                 const songTag = (rec.url && audioSongTags[rec.url] !== undefined) ? (audioSongTags[rec.url] || undefined) : rawSongTag;
+                                const rawBpmCandidate = rec.metronomeBpm ?? rec.bpm ?? rec.teacherBpm;
+                                const parsedBpmNum = rawBpmCandidate !== undefined && rawBpmCandidate !== null ? parseInt(String(rawBpmCandidate), 10) : undefined;
+                                const validatedBpm = (parsedBpmNum && !isNaN(parsedBpmNum) && parsedBpmNum > 0) ? parsedBpmNum : undefined;
                                 studentAudios.push({
                                   id: recId,
                                   url: rec.url,
@@ -2657,13 +2662,13 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                                   songTag,
                                   originalIdx: -1,
                                   source: rec.source || 'local_junior',
-                                  bpm: rec.bpm || rec.metronomeBpm,
+                                  bpm: validatedBpm,
                                   style: rec.style,
                                   cloudSyncStatus: rec.cloudSyncStatus,
                                   cloudPath: rec.cloudPath,
                                   checksumSha256: rec.checksumSha256,
                                   isCustomTitle: rec.isCustomTitle || (rec.source === 'practice_companion'),
-                                  metronomeBpm: rec.metronomeBpm || rec.bpm,
+                                  metronomeBpm: validatedBpm,
                                   original_url: rec.original_url || rec.originalUrl,
                                   original_duration: rec.original_duration || rec.originalDuration
                                 });
@@ -2716,6 +2721,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                         {sharedAudios.map((aud, idx) => (
                           <InlineAudioPlayer 
                             key={aud.id || aud.blobKey || aud.url || `shared-aud-${idx}`}
+                            id={aud.id || aud.blobKey || aud.url}
                             url={aud.url} 
                             label={aud.label} 
                             duration={aud.duration}
@@ -2733,13 +2739,13 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                             badgeBg="#dcfce7"
                             badgeColor="#15803d"
                             onRename={(newTitle) => handleRenameStudentAudio(aud.url, newTitle, aud.id)}
-                            metronomeBpm={aud.metronomeBpm}
-                            onOpenDuettDeck={() => setDuettModalData({
+                            metronomeBpm={(aud.metronomeBpm && Number(aud.metronomeBpm) > 0) ? Number(aud.metronomeBpm) : ((aud.bpm && Number(aud.bpm) > 0) ? Number(aud.bpm) : undefined)}
+                            onOpenDuettDeck={Boolean((aud.metronomeBpm && Number(aud.metronomeBpm) > 0) || (aud.bpm && Number(aud.bpm) > 0)) ? () => setDuettModalData({
                               teacherUrl: aud.url,
                               teacherTitle: aud.label || 'Schüler-Aufnahme',
-                              teacherBpm: aud.metronomeBpm || 100,
+                              teacherBpm: Number(aud.metronomeBpm || aud.bpm),
                               songTag: aud.songTag
-                            })}
+                            }) : undefined}
                           />
                         ))}
                       </div>
@@ -2940,9 +2946,16 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                     const isShared = aud.visibility === "shared_with_teacher";
                     const isPracticeTake = aud.source === 'practice_companion' || (typeof aud.label === 'string' && aud.label.includes('Übe-Begleiter'));
                     const playerKey = aud.id || aud.blobKey || aud.url || `${idxKey}-${aud.date || ''}`;
+                    const effectiveBpm = (aud.metronomeBpm && Number(aud.metronomeBpm) > 0) 
+                      ? Number(aud.metronomeBpm) 
+                      : ((aud.bpm && Number(aud.bpm) > 0) 
+                        ? Number(aud.bpm) 
+                        : ((aud.teacherBpm && Number(aud.teacherBpm) > 0) ? Number(aud.teacherBpm) : undefined));
+                    const hasValidBpm = Boolean(effectiveBpm && effectiveBpm > 0);
                     return (
                       <InlineAudioPlayer 
                         key={playerKey}
+                        id={playerKey}
                         url={aud.url} 
                         label={aud.label} 
                         duration={aud.duration}
@@ -2962,13 +2975,13 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                         badgeBg={aud.isDuettTake ? "#dcfce7" : (aud.cloudSyncStatus === 'synced' ? "#fef3c7" : (isShared ? "#dcfce7" : "#f1f5f9"))}
                         badgeColor={aud.isDuettTake ? "#15803d" : (aud.cloudSyncStatus === 'synced' ? "#b45309" : (isShared ? "#15803d" : "#475569"))}
                         onRename={(newTitle) => handleRenameStudentAudio(aud.url, newTitle, aud.id)}
-                        metronomeBpm={aud.metronomeBpm}
-                        onOpenDuettDeck={() => setDuettModalData({
+                        metronomeBpm={hasValidBpm ? effectiveBpm : undefined}
+                        onOpenDuettDeck={hasValidBpm ? () => setDuettModalData({
                           teacherUrl: aud.teacherAudioUrl || aud.url,
                           teacherTitle: aud.teacherTitle || aud.label || 'Duett-Aufnahme',
-                          teacherBpm: aud.teacherBpm || aud.metronomeBpm || 100,
+                          teacherBpm: effectiveBpm,
                           songTag: aud.songTag
-                        })}
+                        }) : undefined}
                         onBadgeClick={!isTeacherMode ? () => {
                           if (student?.id) {
                             try {
@@ -3090,7 +3103,9 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                                     date: new Date().toISOString(),
                                     title: res.label,
                                     label: res.label,
-                                    visibility: aud.visibility || "private"
+                                    visibility: aud.visibility || "private",
+                                    metronomeBpm: hasValidBpm ? effectiveBpm : undefined,
+                                    bpm: hasValidBpm ? effectiveBpm : undefined
                                   };
                                   recs = [newRecord, ...recs];
                                 }

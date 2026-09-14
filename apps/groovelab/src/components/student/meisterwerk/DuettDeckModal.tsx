@@ -506,7 +506,9 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
         latencyOffsetMs: latencyOffsetMs,
         teacherAudioUrl: teacherAudioUrl,
         teacherTitle: teacherTitle,
-        teacherBpm: teacherBpm
+        teacherBpm: teacherBpm,
+        metronomeBpm: teacherBpm,
+        bpm: teacherBpm
       };
 
       const juniorKey = `campus_junior_recordings_${studentId}`;

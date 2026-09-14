@@ -4,6 +4,12 @@ import { getBlob, storeBlob } from '../utils/blobStorage';
 import { harmonizeAudioList, formatHarmonizedAudioTitle } from '../utils/audioNamingHelper';
 import { getAudioNotesCount, fetchAudioNotesFromServer } from '../utils/audioNotesStorage';
 import { getSecureAudioUrl } from '../utils/audioStorageHelper';
+import { SharedAudioEngine } from '../utils/sharedAudioEngine';
+
+const isPlayableUrl = (u?: string): boolean => {
+  if (!u) return false;
+  return u.startsWith('http://') || u.startsWith('https://') || u.startsWith('blob:') || u.startsWith('data:');
+};
 
 const AudioEditorModal = lazy(() => import('./campus/AudioEditorModal').then(m => ({ default: m.AudioEditorModal })));
 const AudioNotesModal = lazy(() => import('./campus/AudioNotesModal').then(m => ({ default: m.AudioNotesModal })));
@@ -40,9 +46,11 @@ interface AudioTrackCarouselProps {
 // Lightweight WebAudio beep helper for 4-beat count-in
 const playCountInBeep = (isAccent: boolean) => {
   try {
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
+    const ctx = SharedAudioEngine.getContext();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'sine';
@@ -413,7 +421,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
   const [countInStep, setCountInStep] = useState<number | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
-  const [resolvedUrl, setResolvedUrl] = useState<string>(url);
+  const [resolvedUrl, setResolvedUrl] = useState<string>(() => isPlayableUrl(url) ? url : '');
   const [notesCount, setNotesCount] = useState<number>(() => getAudioNotesCount(url || ''));
 
   // 🔔 Reaktiv synchronisierte Notizen-Anzahl (SoundCloud-Style Marker)
@@ -480,10 +488,10 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
       getSecureAudioUrl(url, 'campus-assets', 300).then((secUrl: string) => {
         if (active && secUrl) setResolvedUrl(secUrl);
       }).catch(() => {
-        if (active) setResolvedUrl(url);
+        if (active && isPlayableUrl(url)) setResolvedUrl(url);
       });
     } else {
-      setResolvedUrl(url);
+      if (isPlayableUrl(url)) setResolvedUrl(url);
     }
 
     return () => {
@@ -502,6 +510,9 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
 
   const togglePlay = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    // 🔓 Safari AudioContext Unlock on user gesture
+    SharedAudioEngine.getContext().resume().catch(() => {});
+
     if (countInTimerRef.current) {
       clearTimeout(countInTimerRef.current);
       countInTimerRef.current = null;
@@ -514,9 +525,22 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
       setIsPlaying(false);
     } else {
       notifyGlobalPlay();
-      if (audioRef.current.ended || (duration > 0 && audioRef.current.currentTime >= duration)) {
-        audioRef.current.currentTime = 0;
-      }
+
+      const playNative = () => {
+        if (!audioRef.current) return;
+        if (audioRef.current.ended || (duration > 0 && audioRef.current.currentTime >= duration)) {
+          audioRef.current.currentTime = 0;
+        }
+        if (audioRef.current.readyState === 0) {
+          audioRef.current.load();
+        }
+        audioRef.current.loop = isLooping;
+        audioRef.current.play().then(() => setIsPlaying(true)).catch(err => {
+          console.warn('[CompactAudioStrip] Play error:', err);
+          setIsPlaying(false);
+        });
+      };
+
       if (countInActive) {
         let step = 4;
         setCountInStep(step);
@@ -531,19 +555,12 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
           } else {
             setCountInStep(null);
             countInTimerRef.current = null;
-            if (audioRef.current) {
-              if (audioRef.current.ended || (duration > 0 && audioRef.current.currentTime >= duration)) {
-                audioRef.current.currentTime = 0;
-              }
-              audioRef.current.loop = isLooping;
-              audioRef.current.play().then(() => setIsPlaying(true)).catch(err => console.warn('[CompactAudioStrip] Play error:', err));
-            }
+            playNative();
           }
         };
         countInTimerRef.current = setTimeout(runCount, 550);
       } else {
-        audioRef.current.loop = isLooping;
-        audioRef.current.play().then(() => setIsPlaying(true)).catch(err => console.warn('[CompactAudioStrip] Play error:', err));
+        playNative();
       }
     }
   };
@@ -827,7 +844,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
         position: 'relative'
       }}
     >
-      <audio ref={audioRef} src={resolvedUrl} preload="none" />
+      <audio ref={audioRef} src={resolvedUrl || undefined} preload="metadata" playsInline />
 
       {/* Media Playback & Primary Row Controls */}
       <div style={{
@@ -1055,7 +1072,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
   const [countInStep, setCountInStep] = useState<number | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
-  const [resolvedUrl, setResolvedUrl] = useState<string>(url);
+  const [resolvedUrl, setResolvedUrl] = useState<string>(() => isPlayableUrl(url) ? url : '');
   const [notesCount, setNotesCount] = useState<number>(() => getAudioNotesCount(url || ''));
 
   // 🔔 Reaktiv synchronisierte Notizen-Anzahl (SoundCloud-Style Marker)
@@ -1123,10 +1140,10 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
       getSecureAudioUrl(url, 'campus-assets', 300).then((secUrl: string) => {
         if (active && secUrl) setResolvedUrl(secUrl);
       }).catch(() => {
-        if (active) setResolvedUrl(url);
+        if (active && isPlayableUrl(url)) setResolvedUrl(url);
       });
     } else {
-      setResolvedUrl(url);
+      if (isPlayableUrl(url)) setResolvedUrl(url);
     }
 
     return () => {
@@ -1145,6 +1162,9 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
 
   const togglePlay = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    // 🔓 Safari AudioContext Unlock on user gesture
+    SharedAudioEngine.getContext().resume().catch(() => {});
+
     if (countInTimerRef.current) {
       clearTimeout(countInTimerRef.current);
       countInTimerRef.current = null;
@@ -1157,6 +1177,22 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
       setIsPlaying(false);
     } else {
       notifyGlobalPlay();
+
+      const playNative = () => {
+        if (!audioRef.current) return;
+        if (audioRef.current.ended || (duration > 0 && audioRef.current.currentTime >= duration)) {
+          audioRef.current.currentTime = 0;
+        }
+        if (audioRef.current.readyState === 0) {
+          audioRef.current.load();
+        }
+        audioRef.current.loop = isLooping;
+        audioRef.current.play().then(() => setIsPlaying(true)).catch(err => {
+          console.warn('[Audio] Play error:', err);
+          setIsPlaying(false);
+        });
+      };
+
       if (countInActive) {
         let step = 4;
         setCountInStep(step);
@@ -1171,16 +1207,12 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
           } else {
             setCountInStep(null);
             countInTimerRef.current = null;
-            if (audioRef.current) {
-              audioRef.current.loop = isLooping;
-              audioRef.current.play().then(() => setIsPlaying(true)).catch(err => console.warn('[Audio] Play error:', err));
-            }
+            playNative();
           }
         };
         countInTimerRef.current = setTimeout(runCount, 550);
       } else {
-        audioRef.current.loop = isLooping;
-        audioRef.current.play().then(() => setIsPlaying(true)).catch(err => console.warn('[Audio] Play error:', err));
+        playNative();
       }
     }
   };
@@ -1458,7 +1490,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
         transform: isTransitioning ? 'scale(0.992)' : 'scale(1)'
       }}
     >
-      <audio ref={audioRef} src={resolvedUrl} preload="none" />
+      <audio ref={audioRef} src={resolvedUrl || undefined} preload="metadata" playsInline />
 
       <div style={{
         display: 'flex',

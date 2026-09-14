@@ -127,6 +127,18 @@ export function addAudioNote(
       text: newNote.text,
       tag: newNote.tag,
       loopDuration: newNote.loopDuration
+    }).then(serverMarker => {
+      if (serverMarker && serverMarker.id) {
+        // 🏛️ ID von temporärer 'note_...'-ID auf autoritative Datenbank-UUID anheben
+        const current = getAudioNotes(audioUrlOrKey);
+        const withServerId = current.map(n => n.id === newNote.id ? { ...n, id: serverMarker.id } : n);
+        localStorage.setItem(key, JSON.stringify(withServerId));
+        window.dispatchEvent(
+          new CustomEvent('campus-audio-notes-changed', {
+            detail: { audioUrlOrKey, count: withServerId.length }
+          })
+        );
+      }
     }).catch(err => console.warn('[audioNotesStorage] Background server sync error (add):', err));
 
     window.dispatchEvent(
@@ -284,6 +296,8 @@ export async function fetchAudioNotesFromServer(
   const canonicalKey = extractCanonicalAudioKey(audioUrlOrKey);
   if (!canonicalKey || canonicalKey === 'unknown') return getAudioNotes(audioUrlOrKey);
 
+  const localNotes = getAudioNotes(audioUrlOrKey);
+
   try {
     const { data, error } = await supabase.rpc('get_audio_timeline_markers', {
       p_audio_key: canonicalKey,
@@ -292,7 +306,7 @@ export async function fetchAudioNotesFromServer(
 
     if (error) {
       console.warn('[audioNotesStorage] Failed to fetch markers from server:', error.message);
-      return getAudioNotes(audioUrlOrKey);
+      return localNotes;
     }
 
     if (Array.isArray(data)) {
@@ -309,22 +323,48 @@ export async function fetchAudioNotesFromServer(
         loopDuration: typeof item.loopDuration === 'number' ? item.loopDuration : parseFloat(item.loopDuration) || 4.0
       })).sort((a, b) => a.time - b.time);
 
+      // 🛡️ OFFLINE-FIRST SCHUTZ: Wenn der Server leer ist (neue/lokale Aufnahme), lokale Notizen NIEMALS überschreiben!
+      if (serverNotes.length === 0 && localNotes.length > 0) {
+        return localNotes;
+      }
+
+      // 🔄 Smart-Merge: Server-Notizen haben Autorität, aber lokale ungesyncte Entwürfe (note_...) bleiben erhalten
+      const mergedMap = new Map<string, AudioTimelineNote>();
+      localNotes.forEach(ln => {
+        if (ln.id.startsWith('note_')) {
+          mergedMap.set(ln.id, ln);
+        }
+      });
+
+      serverNotes.forEach(sn => {
+        // Lokalen Entwurf mit gleichem Inhalt & Zeitstempel ersetzen
+        for (const [tempId, ln] of mergedMap.entries()) {
+          if (Math.abs(ln.time - sn.time) < 0.2 && ln.text.trim() === sn.text.trim()) {
+            mergedMap.delete(tempId);
+            break;
+          }
+        }
+        mergedMap.set(sn.id, sn);
+      });
+
+      const mergedNotes = Array.from(mergedMap.values()).sort((a, b) => a.time - b.time);
+
       // Lokalen Cache aktualisieren
       const localKey = normalizeAudioKey(audioUrlOrKey);
-      localStorage.setItem(localKey, JSON.stringify(serverNotes));
+      localStorage.setItem(localKey, JSON.stringify(mergedNotes));
 
       window.dispatchEvent(
         new CustomEvent('campus-audio-notes-changed', {
-          detail: { audioUrlOrKey, count: serverNotes.length }
+          detail: { audioUrlOrKey, count: mergedNotes.length }
         })
       );
-      return serverNotes;
+      return mergedNotes;
     }
   } catch (err) {
     console.warn('[audioNotesStorage] Network error during server fetch:', err);
   }
 
-  return getAudioNotes(audioUrlOrKey);
+  return localNotes;
 }
 
 /**
