@@ -1,5 +1,5 @@
 import { formatCleanNoteContent } from '../notes/notesConstants';
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import {
   CalendarX, Check, Clock, Coffee, DoorOpen, Eye, EyeOff,
   HelpCircle, MessageSquare, Mic, Sparkles, Users
@@ -643,7 +643,10 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
   userId,
   onOpenUrgentModal,
   onOpenMakeupModal,
-}) => (
+}) => {
+  const [scrollTop, setScrollTop] = useState(0);
+
+  return (
     isTourDemoScheduleActive ? (
       <TeacherTourDemoSchedule isFreeDay={isFreeDay} getSimulatedNow={getSimulatedNow} windowWidth={windowWidth} showRealNames={showRealNames} toggleRealNames={toggleRealNames} />
     ) : !(isWeekend || isFreeDay) ? (
@@ -735,7 +738,12 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
             </div>
           </div>
 
-          <div style={{ 
+          <div 
+            onScroll={(e) => {
+              const target = e.currentTarget;
+              setScrollTop(target.scrollTop);
+            }}
+            style={{ 
             display: 'flex', 
             flexDirection: 'column', 
             gap: '8px', 
@@ -894,7 +902,23 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                     }
                   }
 
+                  const estimatedItemHeight = 90;
+                  const totalSlots = timelineWithGaps.length;
+                  const viewportHeight = 600;
+                  const startIndex = totalSlots > 12 ? Math.max(0, Math.floor(scrollTop / estimatedItemHeight) - 4) : 0;
+                  const endIndex = totalSlots > 12 ? Math.min(totalSlots - 1, Math.ceil((scrollTop + viewportHeight) / estimatedItemHeight) + 4) : totalSlots - 1;
+
                   return timelineWithGaps.map((slot: any, idx: number) => {
+                    if (totalSlots > 12 && (idx < startIndex || idx > endIndex)) {
+                      return (
+                        <div 
+                          key={slot.id || idx} 
+                          style={{ height: `${estimatedItemHeight}px`, width: '100%' }} 
+                          aria-hidden="true" 
+                        />
+                      );
+                    }
+
                     const slotStart = slot.timeSlot;
                     const slotEnd = (() => {
                       const [sh, sm] = slotStart.split(':').map(Number);
@@ -1772,4 +1796,5 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
       </div>
     )
   ) : null
-);
+  );
+};

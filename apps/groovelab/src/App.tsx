@@ -81,6 +81,7 @@ import { initGlobalErrorSanitizer } from './utils/errorSanitizer';
 import { initAntiTamperShield } from './utils/antiTamper';
 import { runStorageJanitor, runClientStorageJanitor } from './services/storageJanitorService';
 import { verifyMasterSessionLease, revokeMasterSessionLease, createMasterSessionLease } from './utils/masterAuditLogger';
+import { isLocalDevEnvironment } from './utils/devEnvironment';
 import { scrubSensitiveUrlParams, scrubSensitiveUrlPath } from './utils/urlSecurityScrubber';
 import { executeSessionZeroize } from './utils/sessionZeroize';
 import { initAuthBroadcastListener } from './utils/authBroadcastSync';
@@ -7773,6 +7774,10 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
       if (!userId) return;
 
       if (newRole === 'master_admin') {
+        if (!isLocalDevEnvironment()) {
+          console.warn('[Security] Master Admin workspace bypass is strictly prohibited in production environments.');
+          return;
+        }
         if (typeof window !== 'undefined') {
           sessionStorage.setItem('groovelab_is_master_admin', 'true');
           sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
@@ -9007,11 +9012,17 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                     ...(user?.parent_permissions || {}),
                     [`board_${boardId}`]: next
                   };
-                  (async () => {
+                    (async () => {
                     try {
+                      const activeLeaseToken = typeof window !== 'undefined'
+                        ? (sessionStorage.getItem('gl_parent_session_lease') || sessionStorage.getItem('gl_active_session_lease_id') || localStorage.getItem('gl_active_session_lease_id'))
+                        : null;
                       const { error } = await supabase.rpc('save_parent_controls', {
                         p_student_id: user.id,
-                        p_settings: { parent_permissions: nextPerms }
+                        p_settings: {
+                          parent_permissions: nextPerms,
+                          ...(activeLeaseToken ? { lease_token: activeLeaseToken } : {})
+                        }
                       });
                       if (error) throw error;
                     } catch {
@@ -10502,9 +10513,15 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                     };
                     (async () => {
                       try {
+                        const activeLeaseToken = typeof window !== 'undefined'
+                          ? (sessionStorage.getItem('gl_parent_session_lease') || sessionStorage.getItem('gl_active_session_lease_id') || localStorage.getItem('gl_active_session_lease_id'))
+                          : null;
                         const { error } = await supabase.rpc('save_parent_controls', {
                           p_student_id: user.id,
-                          p_settings: { parent_permissions: nextPerms }
+                          p_settings: {
+                            parent_permissions: nextPerms,
+                            ...(activeLeaseToken ? { lease_token: activeLeaseToken } : {})
+                          }
                         });
                         if (error) throw error;
                       } catch {

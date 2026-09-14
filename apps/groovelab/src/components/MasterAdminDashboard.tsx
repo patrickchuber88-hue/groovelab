@@ -20,7 +20,7 @@ const SchoolDetailDrawer = React.lazy(() => import('./masterAdmin/drawers/School
 import { ClientErrorTelemetryPanel } from './masterAdmin/components/ClientErrorTelemetryPanel';
 import { generateResilienceAuditPDF } from '../utils/pdfGenerator';
 import { isMasterPasskeyRegistered, registerMasterPasskey, authenticateMasterPasskey, isWebAuthnSupported } from '../utils/webauthn';
-import { getMasterAuditLogs, verifyMasterSessionLease, createMasterSessionLease, revokeMasterSessionLease, MasterAuditEvent } from '../utils/masterAuditLogger';
+import { getMasterAuditLogs, verifyMasterSessionLease, createMasterSessionLease, revokeMasterSessionLease, MasterAuditEvent, fetchMasterAuditLogsFromDb } from '../utils/masterAuditLogger';
 import { subscribeLatency, measureDatabasePing, LatencyMetric } from '../utils/latencyMonitor';
 import { verifyTOTP } from '../utils/totp';
 import { setVaultItem, getVaultItem } from '../utils/aesStorageVault';
@@ -127,7 +127,7 @@ import { ExecutiveTab } from './masterAdmin/tabs/ExecutiveTab';
 import { ReconciliationTab } from './masterAdmin/tabs/ReconciliationTab';
 import { BackupResetTab } from './masterAdmin/tabs/BackupResetTab';
 import { calculateCampusGroovelabBilling } from '../domain/billingCalculator';
-import { aggregateSchoolMetrics, getSchoolCanonicalBilling } from '../domain/schoolMetricsAggregator';
+import { aggregateSchoolMetrics, getSchoolCanonicalBilling, resolveStorageAddonFee } from '../domain/schoolMetricsAggregator';
 
 import { School } from './masterAdmin/MasterAdminTypes';
 import { StorageTier, DEFAULT_STORAGE_TIERS, getStorageTierByGb } from '../domain/pricingEngine';
@@ -311,10 +311,13 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   const [registeringPasskey, setRegisteringPasskey] = useState(false);
   const [passkeySuccessMessage, setPasskeySuccessMessage] = useState<string | null>(null);
 
+  const [idleFailedAttempts, setIdleFailedAttempts] = useState(0);
+
   useEffect(() => {
     setWebAuthnSupportedOnDevice(isWebAuthnSupported());
     setMasterPasskeyActive(isMasterPasskeyRegistered());
     setAuditLogsList(getMasterAuditLogs());
+    fetchMasterAuditLogsFromDb().then(setAuditLogsList).catch(() => {});
 
     const updateLeaseTimer = async () => {
       const { remainingMinutes } = await verifyMasterSessionLease();
@@ -372,16 +375,58 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         await authenticateMasterPasskey();
         setIsIdleLocked(false);
         setIdlePinInput('');
+        setIdleFailedAttempts(0);
         setIdleUnlockLoading(false);
         return;
       }
-      if (idlePinInput.trim()) {
+
+      const pinOrPass = idlePinInput.trim();
+      if (!pinOrPass) {
+        throw new Error('Bitte Passkey, Master-Passwort oder PIN eingeben.');
+      }
+
+      // 1. Authoritative Server-Side Verification (Fail-Closed)
+      const currentUserId = currentUser?.id || adminUser?.id;
+      let isVerified = false;
+
+      // Check Master Admin credentials via login_master_admin RPC
+      const { data: authData, error: authErr } = await supabase.rpc('login_master_admin', {
+        p_username: adminUsername || 'admin',
+        p_password: pinOrPass
+      });
+
+      if (!authErr && authData && (authData.id || authData.requires_2fa || authData.is_master_admin)) {
+        isVerified = true;
+      } else if (currentUserId) {
+        // Fallback: Verify personal PIN via secure RPC
+        const { data: pinValid, error: pinErr } = await supabase.rpc('verify_personal_pin', {
+          user_uuid: currentUserId,
+          input_pin: pinOrPass
+        });
+        if (!pinErr && pinValid === true) {
+          isVerified = true;
+        }
+      }
+
+      if (isVerified) {
         setIsIdleLocked(false);
         setIdlePinInput('');
+        setIdleFailedAttempts(0);
         setIdleUnlockLoading(false);
         return;
       }
-      throw new Error('Bitte Passkey oder PIN verwenden.');
+
+      const nextFailures = idleFailedAttempts + 1;
+      setIdleFailedAttempts(nextFailures);
+
+      if (nextFailures >= 3) {
+        // Hard lockout on 3 consecutive failed unlock attempts
+        await revokeMasterSessionLease(currentUserId || 'master_admin', 'master_logout');
+        window.location.reload();
+        return;
+      }
+
+      throw new Error(`Ungültige Anmeldedaten. Noch ${3 - nextFailures} Versuch(e) verbleibend.`);
     } catch (err: any) {
       setIdleError(err?.message || 'Entsperrung fehlgeschlagen.');
       setIdleUnlockLoading(false);
@@ -415,6 +460,21 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       alert('Fehler beim Verlängern der Sitzung: ' + e.message);
     }
   };
+
+  // BFSG 2025 / WCAG 2.2 AA Global Modal Keyboard Accessibility (Escape-Key Handler)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (ghostGateSchool) setGhostGateSchool(null);
+        if (archiveModalSchool) setArchiveModalSchool(null);
+        if (commandPaletteOpen) setCommandPaletteOpen(false);
+        if (drawerOpen) setDrawerOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [ghostGateSchool, archiveModalSchool, commandPaletteOpen, drawerOpen]);
+
 
     // Pricing States
   const [priceCampus, setPriceCampus] = useState<number | string>(14.90);
@@ -2561,36 +2621,6 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         });
       } catch (e) {}
 
-      try {
-        const overridesStr = localStorage.getItem('groovelab_school_overrides');
-        if (overridesStr) {
-          const overrides = JSON.parse(overridesStr);
-          let updatedOverrides = false;
-          Object.keys(overrides).forEach(id => {
-            if (Number(overrides[id]?.storage_addon_gb) === 25 && Number(overrides[id]?.storage_addon_monthly_fee) === 3.5) {
-              overrides[id].storage_addon_monthly_fee = 3.99;
-              updatedOverrides = true;
-            }
-          });
-          if (updatedOverrides) {
-            localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
-          }
-          mergedSchools = mergedSchools.map(s => {
-            if (!overrides[s.id]) return s;
-            return {
-              ...s,
-              ...overrides[s.id],
-              opening_hours: {
-                ...(s.opening_hours || {}),
-                ...(overrides[s.id].opening_hours || {})
-              }
-            };
-          });
-        }
-      } catch (e) {
-        console.warn('Could not load localStorage school overrides:', e);
-      }
-
       // Auto-heal database & in-memory models if school has 25GB with legacy 3.50 fee
       mergedSchools.forEach(s => {
         const addonGb = Number(s.storage_addon_gb || s.extra_storage_gb || 0);
@@ -2612,24 +2642,33 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         return fresh ? { ...prev, ...fresh } : prev;
       });
 
+      // 1. Authoritative Server-Side Aggregated School Stats (Zero-Knowledge, Zero PII Leaks, O(1) Performance)
       const [
+        { data: rpcStats, error: rpcStatsErr },
         { data: statsData },
-        { data: allUsersDb },
-        { data: pendingStudentsDb },
-        { data: songs },
-        { data: bands },
         { count: sessionCount }
       ] = await Promise.all([
+        supabase.rpc('get_master_school_stats'),
         supabase.from('school_user_statistics').select('*'),
-        supabase.from('users').select('id, first_name, last_name, role, roles, school_id, is_active, is_campus_active, is_groovelab_active, ausweis_nummer, teacher_qr_token, is_pin_activated'),
-        supabase.from('pending_students_decrypted').select('id, school_id, first_name, last_name'),
-        supabase.from('songs').select('school_id'),
-        supabase.from('bands').select('school_id, name'),
         supabase.from('sessions').select('*', { count: 'exact', head: true })
       ]);
 
-      const totalTeachersSum = statsData?.reduce((acc, curr) => acc + (curr.teachers || 0), 0) || 0;
-      const totalStudentsSum = statsData?.reduce((acc, curr) => acc + (curr.students || 0), 0) || 0;
+      const rpcMap = new Map<string, any>(
+        (!rpcStatsErr && Array.isArray(rpcStats)) ? rpcStats.map((r: any) => [r.school_id, r]) : []
+      );
+
+      let totalTeachersSum = 0;
+      let totalStudentsSum = 0;
+
+      if (rpcMap.size > 0) {
+        rpcMap.forEach((r) => {
+          totalTeachersSum += Number(r.active_teachers || r.total_teachers || 0);
+          totalStudentsSum += Number(r.total_students || 0);
+        });
+      } else {
+        totalTeachersSum = statsData?.reduce((acc, curr) => acc + (curr.teachers || 0), 0) || 0;
+        totalStudentsSum = statsData?.reduce((acc, curr) => acc + (curr.students || 0), 0) || 0;
+      }
 
       setStats({
         totalSchools: schoolData?.length || 0,
@@ -2641,31 +2680,50 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       const sStats: Record<string, any> = {};
       schoolData?.forEach(school => {
         const schId = school.id;
-        const schoolStatsRow: any = statsData?.find((s: any) => s.school_id === schId) || {};
-        const stats = aggregateSchoolMetrics(
-          school,
-          allUsersDb || [],
-          pendingStudentsDb || [],
-          songs || [],
-          bands || []
-        );
+        const rpcRow = rpcMap.get(schId);
+        const fallbackRow: any = statsData?.find((s: any) => s.school_id === schId) || {};
+        const addonGb = Number(school.storage_addon_gb || school.extra_storage_gb || 0);
+        const addonFee = resolveStorageAddonFee(addonGb, school.storage_addon_monthly_fee);
 
-        sStats[schId] = {
-          teachers: stats.activeTeachers !== undefined ? stats.activeTeachers : (schoolStatsRow.teachers || 0),
-          totalTeachers: stats.totalTeachers || schoolStatsRow.teachers || 0,
-          students: stats.totalStudents || schoolStatsRow.students || 0,
-          activeStudents: stats.activeStudents,
-          passiveStudents: stats.passiveStudents,
-          teachersCampus: stats.activeTeachers !== undefined ? stats.activeTeachers : (schoolStatsRow.teachers_campus || 0),
-          teachersGroovelab: stats.activeTeachers !== undefined ? stats.activeTeachers : (schoolStatsRow.teachers_groovelab || 0),
-          studentsCampus: stats.campusStudents || schoolStatsRow.students_campus || 0,
-          studentsGroovelab: stats.groovelabStudents || schoolStatsRow.students_groovelab || 0,
-          storageAddonGb: stats.storageAddonGb,
-          storageAddonMonthlyFee: stats.storageAddonMonthlyFee,
-          songs: stats.songsCount,
-          bands: stats.bandsCount,
-          adminUsers: stats.adminUsers
-        };
+        if (rpcRow) {
+          sStats[schId] = {
+            teachers: Number(rpcRow.active_teachers ?? fallbackRow.teachers ?? 0),
+            totalTeachers: Number(rpcRow.total_teachers ?? fallbackRow.teachers ?? 0),
+            students: Number(rpcRow.total_students ?? fallbackRow.students ?? 0),
+            activeStudents: Number(rpcRow.active_students ?? fallbackRow.students ?? 0),
+            passiveStudents: Number(rpcRow.passive_students ?? 0),
+            teachersCampus: Number(rpcRow.active_teachers ?? fallbackRow.teachers_campus ?? 0),
+            teachersGroovelab: Number(rpcRow.active_teachers ?? fallbackRow.teachers_groovelab ?? 0),
+            studentsCampus: Number(rpcRow.campus_students ?? fallbackRow.students_campus ?? 0),
+            studentsGroovelab: Number(rpcRow.groovelab_students ?? fallbackRow.students_groovelab ?? 0),
+            exemptActiveStudents: Number(rpcRow.exempt_active_students ?? 0),
+            parentPaidStudents: Number(rpcRow.parent_paid_students ?? 0),
+            storageAddonGb: addonGb,
+            storageAddonMonthlyFee: addonFee,
+            songs: Number(rpcRow.songs_count ?? 0),
+            bands: Number(rpcRow.bands_count ?? 0),
+            adminUsers: []
+          };
+        } else {
+          sStats[schId] = {
+            teachers: fallbackRow.teachers || 0,
+            totalTeachers: fallbackRow.teachers || 0,
+            students: fallbackRow.students || 0,
+            activeStudents: fallbackRow.students || 0,
+            passiveStudents: 0,
+            teachersCampus: fallbackRow.teachers_campus || 0,
+            teachersGroovelab: fallbackRow.teachers_groovelab || 0,
+            studentsCampus: fallbackRow.students_campus || 0,
+            studentsGroovelab: fallbackRow.students_groovelab || 0,
+            exemptActiveStudents: 0,
+            parentPaidStudents: 0,
+            storageAddonGb: addonGb,
+            storageAddonMonthlyFee: addonFee,
+            songs: 0,
+            bands: 0,
+            adminUsers: []
+          };
+        }
       });
       setSchoolStats(sStats);
       setGlobalFetchError(null);
@@ -3254,7 +3312,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
             </div>
 
             {/* Sidebar Navigation */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <nav role="tablist" aria-label="Master-Admin Hauptnavigation" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {/* Cmd+K Quick Search Trigger */}
               <button
                 onClick={() => setCommandPaletteOpen(true)}
@@ -3310,6 +3368,11 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 return (
                   <button
                     key={tab.id}
+                    id={`master-tab-${tab.id}`}
+                    role="tab"
+                    aria-selected={isActive}
+                    aria-controls={`master-panel-${tab.id}`}
+                    tabIndex={0}
                     onClick={() => setActivePortalTab(tab.id as any)}
                     style={{
                       display: 'flex',
@@ -3388,7 +3451,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   </button>
                 );
               })}
-            </div>
+            </nav>
           </div>
 
           {/* Sidebar Footer (Profile / Logout) */}
@@ -3893,34 +3956,38 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           )}
 
           {activePortalTab === 'executive' && (
-            <ExecutiveTab
-              schools={schools}
-              schoolStats={schoolStats}
-              loading={loading}
-              serverMetrics={serverMetrics}
-              pendingUsers={pendingUsers}
-              masterPricing={masterPricing}
-              onRefresh={fetchSchoolsAndStats}
-              onOpenCommandPalette={() => setCommandPaletteOpen(true)}
-              onNavigateTab={(tab) => setActivePortalTab(tab)}
-              onSelectSchool={handleOpenSchoolModal}
-            />
+            <div role="tabpanel" id="master-panel-executive" aria-labelledby="master-tab-executive" tabIndex={0} className="animate-fade-in">
+              <ExecutiveTab
+                schools={schools}
+                schoolStats={schoolStats}
+                loading={loading}
+                serverMetrics={serverMetrics}
+                pendingUsers={pendingUsers}
+                masterPricing={masterPricing}
+                onRefresh={fetchSchoolsAndStats}
+                onOpenCommandPalette={() => setCommandPaletteOpen(true)}
+                onNavigateTab={(tab) => setActivePortalTab(tab)}
+                onSelectSchool={handleOpenSchoolModal}
+              />
+            </div>
           )}
 
           {activePortalTab === 'briefing' && (
-            <ReconciliationTab
-              pendingUsers={pendingUsers}
-              schools={schools}
-              masterPricing={masterPricing}
-              loadingPending={loadingPending}
-              onRefresh={fetchPendingUsers}
-              onBatchActivate={handleBatchActivateUsers}
-              onSingleActivate={handleActivateUser}
-            />
+            <div role="tabpanel" id="master-panel-briefing" aria-labelledby="master-tab-briefing" tabIndex={0} className="animate-fade-in">
+              <ReconciliationTab
+                pendingUsers={pendingUsers}
+                schools={schools}
+                masterPricing={masterPricing}
+                loadingPending={loadingPending}
+                onRefresh={fetchPendingUsers}
+                onBatchActivate={handleBatchActivateUsers}
+                onSingleActivate={handleActivateUser}
+              />
+            </div>
           )}
 
           {activePortalTab === 'billing' && (
-            <div className="animate-fade-in">
+            <div role="tabpanel" id="master-panel-billing" aria-labelledby="master-tab-billing" tabIndex={0} className="animate-fade-in">
               <Suspense fallback={<div className="p-8 text-center text-slate-400 font-medium">Lade Abrechnungs-Zentrale...</div>}>
                 <BillingDashboard />
               </Suspense>
@@ -3928,7 +3995,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           )}
 
           {activePortalTab === 'telemetry' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
+            <div role="tabpanel" id="master-panel-telemetry" aria-labelledby="master-tab-telemetry" tabIndex={0} style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
               {/* Header with Live Signal Controls */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
                 <div>
@@ -4232,7 +4299,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           {/* 🏷️ BOARD 1: PREISE & KAMPAGNEN (activePortalTab === 'pricing')          */}
           {/* ═══════════════════════════════════════════════════════════════════════ */}
           {activePortalTab === 'pricing' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
+            <div role="tabpanel" id="master-panel-pricing" aria-labelledby="master-tab-pricing" tabIndex={0} style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
               {/* Header Panel */}
               <div style={{
                 display: 'flex',
@@ -6191,7 +6258,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           {/* 🛡️ BOARD: TRUST & SAFETY / LEGAL TAKEDOWN SUITE (activePortalTab === 'trust_safety') */}
           {/* ═══════════════════════════════════════════════════════════════════════ */}
           {activePortalTab === 'trust_safety' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
+            <div role="tabpanel" id="master-panel-trust_safety" aria-labelledby="master-tab-trust_safety" tabIndex={0} style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
               <TrustSafetyTab />
             </div>
           )}
@@ -6200,7 +6267,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           {/* 💡 BOARD: COMMUNITY IDEEN & FEEDBACK (activePortalTab === 'feedback') */}
           {/* ═══════════════════════════════════════════════════════════════════════ */}
           {activePortalTab === 'feedback' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
+            <div role="tabpanel" id="master-panel-feedback" aria-labelledby="master-tab-feedback" tabIndex={0} style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
               <FeedbackTab />
             </div>
           )}
@@ -6209,7 +6276,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           {/* 🛠️ BOARD 3: WARTUNG & BETRIEB (activePortalTab === 'maintenance')       */}
           {/* ═══════════════════════════════════════════════════════════════════════ */}
           {activePortalTab === 'maintenance' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
+            <div role="tabpanel" id="master-panel-maintenance" aria-labelledby="master-tab-maintenance" tabIndex={0} style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
               <MaintenanceTab 
                 schools={schools}
                 saveSuccessToast={saveSuccessToast}
@@ -6222,7 +6289,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           {/* 💾 BOARD: BACKUP, DISASTER RECOVERY & RESET (activePortalTab === 'backup') */}
           {/* ═══════════════════════════════════════════════════════════════════════ */}
           {activePortalTab === 'backup' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
+            <div role="tabpanel" id="master-panel-backup" aria-labelledby="master-tab-backup" tabIndex={0} style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
               <BackupResetTab 
                 schools={schools}
                 onRefreshSchools={fetchSchoolsAndStats}
@@ -6234,7 +6301,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           {/* 🏛️ BOARD 2: BETREIBER & ZUGANG (activePortalTab === 'operator')         */}
           {/* ═══════════════════════════════════════════════════════════════════════ */}
           {activePortalTab === 'operator' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
+            <div role="tabpanel" id="master-panel-operator" aria-labelledby="master-tab-operator" tabIndex={0} style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
               {/* Header Panel */}
               <div style={{
                 display: 'flex',
@@ -7639,7 +7706,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           {/* 🏢 BOARD: SCHULEN & TENANTS REGISTER (activePortalTab === 'schools')    */}
           {/* ═══════════════════════════════════════════════════════════════════════ */}
           {activePortalTab === 'schools' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
+            <div role="tabpanel" id="master-panel-schools" aria-labelledby="master-tab-schools" tabIndex={0} style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
               <SchoolsTab
                 schools={schools}
                 schoolStats={schoolStats}
@@ -7874,6 +7941,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       {/* 👻 Apple HIG Ghost Support-Gate Modal (DSGVO Art. 28 / OWASP ASVS L3) */}
       {ghostGateSchool && (
         <div
+          role="presentation"
+          aria-hidden="true"
           style={{
             position: 'fixed',
             inset: 0,
@@ -7889,6 +7958,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           onClick={() => setGhostGateSchool(null)}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ghost-gate-title"
             style={{
               background: '#ffffff',
               borderRadius: '24px',
@@ -7925,7 +7997,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                   <Eye size={22} />
                 </div>
                 <div>
-                  <div style={{ fontSize: '1.02rem', fontWeight: 900, color: '#0f172a' }}>
+                  <div id="ghost-gate-title" style={{ fontSize: '1.02rem', fontWeight: 900, color: '#0f172a' }}>
                     Support-Ghost Autorisierung
                   </div>
                   <div style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 650 }}>
@@ -8105,6 +8177,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       {/* 🗑️ Schule Archivieren / Löschen Modal */}
       {archiveModalSchool && (
         <div
+          role="presentation"
+          aria-hidden="true"
           style={{
             position: 'fixed',
             inset: 0,
@@ -8120,6 +8194,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           onClick={() => setArchiveModalSchool(null)}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="archive-modal-title"
             style={{
               background: '#ffffff',
               borderRadius: '24px',
@@ -8150,7 +8227,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 <Trash2 size={24} />
               </div>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
+                <h3 id="archive-modal-title" style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
                   Schule verwalten / löschen
                 </h3>
                 <p style={{ margin: '2px 0 0 0', fontSize: '0.82rem', color: '#64748b' }}>
@@ -8259,6 +8336,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
             {/* Cmd+K Command Palette Modal */}
       {commandPaletteOpen && (
         <div
+          role="presentation"
+          aria-hidden="true"
           style={{
             position: 'fixed',
             inset: 0,
@@ -8274,6 +8353,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           onClick={() => setCommandPaletteOpen(false)}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Befehlspalette und Schnellsuche"
             style={{
               width: '640px',
               maxWidth: '92vw',
@@ -8405,6 +8487,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
       {drawerOpen && drawerData && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999 }}>
           <div
+            role="presentation"
+            aria-hidden="true"
             style={{
               position: 'fixed',
               inset: 0,
@@ -8415,6 +8499,9 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           />
 
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="detail-drawer-title"
             style={{
               position: 'fixed',
               top: 0,
@@ -8435,7 +8522,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 <span style={{ fontSize: '0.7rem', color: '#059669', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                   {drawerData.type === 'school' ? 'Schul-Inspektion' : 'Detailansicht'}
                 </span>
-                <h3 style={{ margin: '2px 0 0 0', fontSize: '1.3rem', fontWeight: 900, color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
+                <h3 id="detail-drawer-title" style={{ margin: '2px 0 0 0', fontSize: '1.3rem', fontWeight: 900, color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
                   {drawerData.item.name || drawerData.item.title || 'Details'}
                 </h3>
               </div>

@@ -20,6 +20,12 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
+    // Extract authorization bearer token if present
+    const authHeader = req.headers.get("authorization") || "";
+    const bearerToken = authHeader.toLowerCase().startsWith("bearer ")
+      ? authHeader.substring(7).trim()
+      : authHeader.trim();
+
     // Enterprise Auth-Guard: Verify caller has service role or active session lease
     let isAuthorized = false;
     if (bearerToken && bearerToken === supabaseServiceRoleKey) {
@@ -29,8 +35,9 @@ serve(async (req) => {
       if (leaseToken) {
         const { data: lease } = await supabase
           .from("session_leases")
-          .select("id, user_id, revoked_at")
+          .select("id, user_id, revoked_at, is_revoked")
           .eq("id", leaseToken)
+          .eq("is_revoked", false)
           .is("revoked_at", null)
           .maybeSingle();
         if (lease && lease.id) {

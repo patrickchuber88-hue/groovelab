@@ -285,6 +285,32 @@ export const supabase = createClient(
 );
 
 /**
+ * Safely extracts relative storage file paths from public, signed, or authenticated URLs.
+ * Strips query parameters (e.g. ?token=...) to ensure Supabase remove() succeeds.
+ */
+function extractStorageFilePath(url: string, bucket: string): string | null {
+  if (!url || typeof url !== 'string') return null;
+  const markers = [
+    `/storage/v1/object/public/${bucket}/`,
+    `/storage/v1/object/sign/${bucket}/`,
+    `/storage/v1/object/authenticated/${bucket}/`,
+    `/${bucket}/`
+  ];
+  for (const marker of markers) {
+    const idx = url.indexOf(marker);
+    if (idx !== -1) {
+      let rawPath = url.substring(idx + marker.length);
+      const qIdx = rawPath.indexOf('?');
+      if (qIdx !== -1) {
+        rawPath = rawPath.substring(0, qIdx);
+      }
+      return decodeURIComponent(rawPath);
+    }
+  }
+  return null;
+}
+
+/**
  * Helper to physically and fully delete all storage assets associated with users (e.g. custom avatars and homework audio files)
  * from Supabase Storage buckets to ensure absolute GDPR/COPPA compliance when deleting a user/student.
  */
@@ -305,20 +331,12 @@ export const deleteUserStorageAssets = async (userIds: string[]) => {
 
       users.forEach(user => {
         const url = user.photo_url;
-        if (url && url.startsWith('http')) {
-          // Check groovelab-assets
-          const glMarker = '/storage/v1/object/public/groovelab-assets/';
-          const glIdx = url.indexOf(glMarker);
-          if (glIdx !== -1) {
-            groovelabFiles.push(url.substring(glIdx + glMarker.length));
-          }
+        if (url) {
+          const glPath = extractStorageFilePath(url, 'groovelab-assets');
+          if (glPath) groovelabFiles.push(glPath);
 
-          // Check campus-assets
-          const cpMarker = '/storage/v1/object/public/campus-assets/';
-          const cpIdx = url.indexOf(cpMarker);
-          if (cpIdx !== -1) {
-            campusFiles.push(url.substring(cpIdx + cpMarker.length));
-          }
+          const cpPath = extractStorageFilePath(url, 'campus-assets');
+          if (cpPath) campusFiles.push(cpPath);
         }
       });
 
@@ -351,11 +369,10 @@ export const deleteUserStorageAssets = async (userIds: string[]) => {
                 if (note && note.startsWith('AUDIO:')) {
                   const parts = note.substring(6).split('|');
                   const audioUrl = parts[0];
-                  if (audioUrl && audioUrl.startsWith('http')) {
-                    const marker = '/storage/v1/object/public/campus-assets/';
-                    const markerIdx = audioUrl.indexOf(marker);
-                    if (markerIdx !== -1) {
-                      audioFilesToDelete.push(audioUrl.substring(markerIdx + marker.length));
+                  if (audioUrl) {
+                    const audioPath = extractStorageFilePath(audioUrl, 'campus-assets');
+                    if (audioPath) {
+                      audioFilesToDelete.push(audioPath);
                     }
                   }
                 }

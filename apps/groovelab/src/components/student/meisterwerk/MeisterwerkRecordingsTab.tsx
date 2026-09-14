@@ -2089,8 +2089,8 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                       const isLimitReached = !effectiveTresorAvailable && studentRecordingsTotalSec >= monthlyLimit;
 
                       const isAudioAllowed = !readOnly || (
-                        (student as any)?.parent_allow_audio !== false && 
-                        ((student as any)?.parent_permissions?.allow_student_audio !== false)
+                        (student as any)?.parent_allow_audio === true && 
+                        ((student as any)?.parent_permissions?.allow_student_audio === true)
                       );
 
                       if (!isAudioAllowed) {

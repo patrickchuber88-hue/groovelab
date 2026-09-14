@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Compass, Sliders, Volume2, Zap, Mic, Headphones, Calendar, RotateCcw,
-  Mail, Trophy, Sparkles, Check, ShieldCheck, AlertTriangle, Star, Target, BookOpen
+  Mail, Trophy, Sparkles, Check, ShieldCheck, AlertTriangle, Star, Target, BookOpen, Lock
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { CAMPUS_AGE_STANDARDS } from '../studentAgeStandards';
@@ -25,6 +25,8 @@ export interface ParentProtectionSettingsViewProps {
   setRecentlyChangedDiff: React.Dispatch<React.SetStateAction<any>>;
   cancelledSchoolYearOccurrences: any[];
   scheduleOccurrences: any[];
+  onLockSession?: () => void;
+  parentSessionSecondsRemaining?: number;
 }
 
 export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsViewProps> = ({
@@ -46,6 +48,8 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
   setRecentlyChangedDiff,
   cancelledSchoolYearOccurrences,
   scheduleOccurrences,
+  onLockSession,
+  parentSessionSecondsRemaining,
 }) => {
   const currentLvlKey = ((draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') : null)) || 'junior') as 'junior' | 'teen' | 'pro';
   const standard = CAMPUS_AGE_STANDARDS[currentLvlKey] || CAMPUS_AGE_STANDARDS.junior;
@@ -115,79 +119,86 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
     curTeacherAudio !== standard.allowTeacherAudio ||
     curTts !== standard.allowTts;
 
+  const [isSwitchingLevel, setIsSwitchingLevel] = useState<boolean>(false);
+
   const handleSwitchAgeLevelWithStandard = async (targetLevelId: 'junior' | 'teen' | 'pro') => {
-    if (targetLevelId === currentLvlKey) return;
-    const targetStandard = CAMPUS_AGE_STANDARDS[targetLevelId] || CAMPUS_AGE_STANDARDS.junior;
+    if (targetLevelId === currentLvlKey || isSwitchingLevel) return;
+    setIsSwitchingLevel(true);
+    try {
+      const targetStandard = CAMPUS_AGE_STANDARDS[targetLevelId] || CAMPUS_AGE_STANDARDS.junior;
 
-    const currentValues: Record<string, boolean> = {
-      allowAbsences: curAbsences,
-      allowRescheduleConfirm: curReschedule,
-      allowChat: curChat,
-      allowTimer: curTimer,
-      allowLeaderboard: curLeaderboard,
-      allowAudio: curAudio,
-      allowStudentAudio: curStudentAudio,
-      allowTeacherAudio: curTeacherAudio,
-      allowTts: curTts,
-    };
+      const currentValues: Record<string, boolean> = {
+        allowAbsences: curAbsences,
+        allowRescheduleConfirm: curReschedule,
+        allowChat: curChat,
+        allowTimer: curTimer,
+        allowLeaderboard: curLeaderboard,
+        allowAudio: curAudio,
+        allowStudentAudio: curStudentAudio,
+        allowTeacherAudio: curTeacherAudio,
+        allowTts: curTts,
+      };
 
-    const targetValues: Record<string, boolean> = {
-      allowAbsences: targetStandard.allowAbsences,
-      allowRescheduleConfirm: targetStandard.allowRescheduleConfirm,
-      allowChat: targetStandard.allowChat,
-      allowTimer: targetStandard.allowTimer,
-      allowLeaderboard: targetStandard.allowLeaderboard,
-      allowAudio: targetStandard.allowAudio,
-      allowStudentAudio: targetStandard.allowStudentAudio,
-      allowTeacherAudio: targetStandard.allowTeacherAudio,
-      allowTts: targetStandard.allowTts,
-    };
+      const targetValues: Record<string, boolean> = {
+        allowAbsences: targetStandard.allowAbsences,
+        allowRescheduleConfirm: targetStandard.allowRescheduleConfirm,
+        allowChat: targetStandard.allowChat,
+        allowTimer: targetStandard.allowTimer,
+        allowLeaderboard: targetStandard.allowLeaderboard,
+        allowAudio: targetStandard.allowAudio,
+        allowStudentAudio: targetStandard.allowStudentAudio,
+        allowTeacherAudio: targetStandard.allowTeacherAudio,
+        allowTts: targetStandard.allowTts,
+      };
 
-    const diffKeys: string[] = [];
-    const changesRecord: Record<string, { from: boolean; to: boolean }> = {};
+      const diffKeys: string[] = [];
+      const changesRecord: Record<string, { from: boolean; to: boolean }> = {};
 
-    Object.keys(targetValues).forEach((key) => {
-      if (currentValues[key] !== targetValues[key]) {
-        diffKeys.push(key);
-        changesRecord[key] = {
-          from: currentValues[key],
-          to: targetValues[key],
-        };
-      }
-    });
-
-    if (diffKeys.length > 0) {
-      setRecentlyChangedDiff({
-        keys: diffKeys,
-        targetLevelLabel: targetStandard.label,
-        targetLevelId,
-        changes: changesRecord,
+      Object.keys(targetValues).forEach((key) => {
+        if (currentValues[key] !== targetValues[key]) {
+          diffKeys.push(key);
+          changesRecord[key] = {
+            from: currentValues[key],
+            to: targetValues[key],
+          };
+        }
       });
 
-      setTimeout(() => {
-        setRecentlyChangedDiff((prev: any) => (prev?.targetLevelId === targetLevelId ? null : prev));
-      }, 4500);
-    } else {
-      setRecentlyChangedDiff(null);
-    }
+      if (diffKeys.length > 0) {
+        setRecentlyChangedDiff({
+          keys: diffKeys,
+          targetLevelLabel: targetStandard.label,
+          targetLevelId,
+          changes: changesRecord,
+        });
 
-    await applyAndSaveParentControls({
-      uiLevel: targetLevelId,
-      allowAbsences: targetStandard.allowAbsences,
-      allowRescheduleConfirm: targetStandard.allowRescheduleConfirm,
-      allowChat: targetStandard.allowChat,
-      allowTimer: targetStandard.allowTimer,
-      allowLeaderboard: targetStandard.allowLeaderboard,
-      allowProposals: true,
-      allowAudio: targetStandard.allowAudio,
-      allowStudentAudio: targetStandard.allowStudentAudio,
-      allowTeacherAudio: targetStandard.allowTeacherAudio,
-      allowTts: targetStandard.allowTts,
-      boardOverrides: { ...targetStandard.boardOverrides, mediathek: true },
-      bedtimeEnabled: targetStandard.bedtimeEnabled,
-      bedtimeStart: targetStandard.bedtimeStart,
-      bedtimeEnd: targetStandard.bedtimeEnd,
-    });
+        setTimeout(() => {
+          setRecentlyChangedDiff((prev: any) => (prev?.targetLevelId === targetLevelId ? null : prev));
+        }, 4500);
+      } else {
+        setRecentlyChangedDiff(null);
+      }
+
+      await applyAndSaveParentControls({
+        uiLevel: targetLevelId,
+        allowAbsences: targetStandard.allowAbsences,
+        allowRescheduleConfirm: targetStandard.allowRescheduleConfirm,
+        allowChat: targetStandard.allowChat,
+        allowTimer: targetStandard.allowTimer,
+        allowLeaderboard: targetStandard.allowLeaderboard,
+        allowProposals: true,
+        allowAudio: targetStandard.allowAudio,
+        allowStudentAudio: targetStandard.allowStudentAudio,
+        allowTeacherAudio: targetStandard.allowTeacherAudio,
+        allowTts: targetStandard.allowTts,
+        boardOverrides: { ...targetStandard.boardOverrides, mediathek: true },
+        bedtimeEnabled: targetStandard.bedtimeEnabled,
+        bedtimeStart: targetStandard.bedtimeStart,
+        bedtimeEnd: targetStandard.bedtimeEnd,
+      });
+    } finally {
+      setIsSwitchingLevel(false);
+    }
   };
 
   const getHighlightProps = (featureKey: string) => {
@@ -248,6 +259,83 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* 🛡️ TIER 1 SAAS ENTERPRISE+ PARENT SESSION STATUS BANNER */}
+      <div style={{
+        background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+        borderRadius: '18px',
+        padding: '14px 18px',
+        border: '1.5px solid #86efac',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '12px',
+        flexWrap: 'wrap',
+        boxShadow: '0 4px 14px rgba(22, 163, 74, 0.08)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            width: '36px',
+            height: '36px',
+            borderRadius: '12px',
+            background: '#16a34a',
+            color: '#ffffff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <ShieldCheck size={20} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#14532d', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>Eltern-Sitzung aktiv & autorisiert</span>
+              {parentSessionSecondsRemaining !== undefined && parentSessionSecondsRemaining > 0 && (
+                <span style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  background: 'rgba(22, 163, 74, 0.15)',
+                  color: '#15803d',
+                  padding: '2px 8px',
+                  borderRadius: '20px'
+                }}>
+                  {Math.floor(parentSessionSecondsRemaining / 60)}:{(parentSessionSecondsRemaining % 60).toString().padStart(2, '0')} Min.
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: '0.74rem', color: '#166534', fontWeight: 600 }}>
+              Änderungen werden sofort revisionssicher gespeichert (ohne erneute PIN-Eingabe).
+            </div>
+          </div>
+        </div>
+
+        {onLockSession && (
+          <button
+            type="button"
+            onClick={onLockSession}
+            style={{
+              background: '#ffffff',
+              border: '1px solid #86efac',
+              borderRadius: '10px',
+              padding: '7px 14px',
+              fontSize: '0.76rem',
+              fontWeight: 800,
+              color: '#15803d',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s ease',
+              touchAction: 'manipulation'
+            }}
+            className="hover-scale"
+            title="Elternbereich jetzt kindersicher sperren"
+          >
+            <Lock size={13} />
+            Jetzt sperren
+          </button>
+        )}
+      </div>
+
       {/* 💡 DIDAKTISCHE EMPFEHLUNG DER LEHRKRAFT */}
       {(() => {
         const rec = (studentUser as any)?.parent_permissions?.teacher_recommendation;
@@ -464,6 +552,7 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
               <button
                 key={lvl.id}
                 type="button"
+                disabled={isSwitchingLevel}
                 onClick={() => {
                   handleSwitchAgeLevelWithStandard(lvl.id as any);
                 }}
@@ -475,7 +564,8 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
                   color: active ? '#0284c7' : '#64748b',
                   fontWeight: active ? 850 : 650,
                   fontSize: '0.82rem',
-                  cursor: 'pointer',
+                  cursor: isSwitchingLevel ? 'wait' : 'pointer',
+                  opacity: isSwitchingLevel && !active ? 0.5 : 1,
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',

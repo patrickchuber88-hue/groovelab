@@ -6,6 +6,9 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || 'http://supabase-kong:8000'
 const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
 
 export const silentRefreshMiddleware = async (req: Request, res: Response, next: NextFunction) => {
+  // 🛡️ Strip any client-supplied internal header to prevent token spoofing
+  delete req.headers['x-bff-access-token'];
+
   const sessionCookie = req.cookies['__Host-session'];
 
   if (!sessionCookie) {

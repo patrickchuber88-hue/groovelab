@@ -108,6 +108,11 @@ const parseICS = (icsText: string): any[] => {
   return events;
 };
 
+// In-Memory Rate Limiter (Token-Bucket / Sliding Window)
+const rateLimitMap = new Map<string, number[]>();
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const MAX_REQUESTS_PER_WINDOW = 30; // Max 30 requests per 15 minutes per IP/Token
+
 // Main Edge Function Handler
 Deno.serve(async (req) => {
   // Handle CORS Preflight
@@ -124,6 +129,36 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: 'Missing token parameter' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
+    }
+
+    // 🛡️ TIER-1 DoS & Resource-Exhaustion Guard (Max 30 requests per 15m)
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown';
+    const rateLimitKey = `${clientIp}:${token.substring(0, 16)}`;
+    const nowTime = Date.now();
+    const timestamps = (rateLimitMap.get(rateLimitKey) || []).filter(t => nowTime - t < RATE_LIMIT_WINDOW_MS);
+
+    if (timestamps.length >= MAX_REQUESTS_PER_WINDOW) {
+      return new Response(
+        JSON.stringify({ error: 'Too many requests. Rate limit active (max 30 requests per 15 minutes).' }),
+        {
+          status: 429,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json; charset=utf-8',
+            'Retry-After': '900'
+          }
+        }
+      );
+    }
+    timestamps.push(nowTime);
+    rateLimitMap.set(rateLimitKey, timestamps);
+
+    if (rateLimitMap.size > 1000) {
+      for (const [k, v] of rateLimitMap.entries()) {
+        if (v.every(t => nowTime - t >= RATE_LIMIT_WINDOW_MS)) {
+          rateLimitMap.delete(k);
+        }
+      }
     }
 
     // Initialize Supabase Client with service role key to bypass RLS and fetch user by token
@@ -300,6 +335,7 @@ Deno.serve(async (req) => {
           const { data, error } = await supabase
             .from('campus_event_program_points')
             .select('*, event:event_id(*)')
+            .eq('school_id', schoolId)
             .eq('teacher_id', userId)
             .eq('status', 'approved');
           if (!error && data) {
@@ -309,10 +345,11 @@ Deno.serve(async (req) => {
             });
           }
         } else {
-          // For students, fetch approved program points
+          // For students, fetch approved program points scoped to the school
           const { data, error } = await supabase
             .from('campus_event_program_points')
             .select('*, event:event_id(*)')
+            .eq('school_id', schoolId)
             .eq('status', 'approved');
           if (!error && data) {
             // Filter locally where user is in assigned_students & within date range

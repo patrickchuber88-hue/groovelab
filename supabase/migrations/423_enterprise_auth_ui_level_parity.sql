@@ -238,12 +238,3 @@ FROM public.users_raw u
 WHERE s.id = u.id 
   AND u.campus_ui_level IS NOT NULL 
   AND (s.campus_ui_level IS NULL OR s.campus_ui_level != u.campus_ui_level);
-
--- Specifically ensure Linus is 'pro'
-UPDATE public.students
-SET campus_ui_level = 'pro'
-WHERE id = '15102f5e-c504-4c33-93ab-436285197c8c';
-
-UPDATE public.users_raw
-SET campus_ui_level = 'pro'
-WHERE id = '15102f5e-c504-4c33-93ab-436285197c8c';

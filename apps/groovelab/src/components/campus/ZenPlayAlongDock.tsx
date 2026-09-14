@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, Repeat, Headphones, Timer } from 'lucide-react';
 import { getBlob } from '../../utils/blobStorage';
+import { getSecureAudioUrl } from '../../utils/audioStorageHelper';
 import { AudioTrackItem } from '../AudioTrackCarousel';
 import { formatHarmonizedAudioTitle } from '../../utils/audioNamingHelper';
 
@@ -106,6 +107,36 @@ export const getTrackPedagogicalType = (label?: string, index: number = 0) => {
   return { icon: '🎧', tag: `Spur ${index + 1}`, type: 'audio', color: '#6366f1', border: '#a5b4fc' };
 };
 
+// 🛡️ Enterprise+ OWASP ASVS L3 / UrhG § 19a Audio Resolver
+async function resolveAudioSourceUrl(rawUrl: string): Promise<{ url: string; isBlobUrl: boolean }> {
+  if (!rawUrl) return { url: '', isBlobUrl: false };
+  if (rawUrl.startsWith('campus_blob_') || rawUrl.startsWith('campus_audio_') || rawUrl.startsWith('offline://')) {
+    try {
+      const raw = await getBlob(rawUrl);
+      if (raw) {
+        const finalBlob = raw instanceof Blob ? raw : new Blob([raw], { type: 'audio/webm' });
+        const blobUrl = URL.createObjectURL(finalBlob);
+        return { url: blobUrl, isBlobUrl: true };
+      }
+    } catch (err) {
+      console.warn('[ZenPlayAlongDock] Failed to resolve indexedDB blob:', err);
+    }
+    return { url: rawUrl, isBlobUrl: false };
+  }
+  if (rawUrl.startsWith('blob:') || rawUrl.startsWith('data:')) {
+    return { url: rawUrl, isBlobUrl: false };
+  }
+  try {
+    const secUrl = await getSecureAudioUrl(rawUrl, 'campus-assets', 300);
+    if (secUrl) {
+      return { url: secUrl, isBlobUrl: false };
+    }
+  } catch (err) {
+    console.warn('[ZenPlayAlongDock] Failed to sign secure audio URL:', err);
+  }
+  return { url: rawUrl, isBlobUrl: false };
+}
+
 export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
   tracks,
   initialIndex = 0,
@@ -147,7 +178,7 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
 
   const currentTrack = tracks && tracks.length > 0 ? (tracks[activeIndex] || tracks[0]) : null;
 
-  // Resolve Blob URL for current track
+  // Resolve Blob / Signed URL for current track
   useEffect(() => {
     if (!currentTrack?.url) return;
 
@@ -157,23 +188,16 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
       currentBlobUrlRef.current = null;
     }
 
-    const rawUrl = currentTrack.url;
-    if (rawUrl.startsWith('campus_blob_') || rawUrl.startsWith('campus_audio_')) {
-      getBlob(rawUrl)
-        .then((raw: any) => {
-          if (!isMounted || !raw) return;
-          const blob = raw instanceof Blob ? raw : new Blob([raw], { type: 'audio/webm' });
-          const objectUrl = URL.createObjectURL(blob);
-          currentBlobUrlRef.current = objectUrl;
-          setResolvedUrl(objectUrl);
-        })
-        .catch(err => {
-          console.warn('[ZenPlayAlongDock] Failed to resolve blob:', err);
-          if (isMounted) setResolvedUrl(rawUrl);
-        });
-    } else {
-      setResolvedUrl(rawUrl);
-    }
+    resolveAudioSourceUrl(currentTrack.url).then(({ url, isBlobUrl }) => {
+      if (!isMounted) {
+        if (isBlobUrl) URL.revokeObjectURL(url);
+        return;
+      }
+      if (isBlobUrl) {
+        currentBlobUrlRef.current = url;
+      }
+      setResolvedUrl(url);
+    });
 
     return () => {
       isMounted = false;
@@ -256,6 +280,18 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
         })
       );
 
+      if (audioRef.current.ended || (duration > 0 && audioRef.current.currentTime >= duration)) {
+        audioRef.current.currentTime = 0;
+        setCurrentTime(0);
+      }
+
+      if (resolvedUrl && (!audioRef.current.src || audioRef.current.src !== resolvedUrl)) {
+        audioRef.current.src = resolvedUrl;
+        audioRef.current.load();
+      }
+
+      audioRef.current.loop = isLooping;
+
       // Falls Einzählen aktiv ist: 4 -> 3 -> 2 -> 1 (akustisch & optisch im Button)
       if (isCountInActive) {
         let step = 4;
@@ -312,8 +348,8 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
           : isAmber
           ? '1.5px solid rgba(245, 158, 11, 0.35)'
           : '1.5px solid rgba(165, 180, 252, 0.35)',
-        borderRadius: '32px',
-        padding: isMusicStandMode ? '16px 24px' : '14px 20px',
+        borderRadius: '28px',
+        padding: isMusicStandMode ? '12px 18px' : '10px 16px',
         boxShadow: isLight
           ? '0 20px 45px rgba(0, 113, 227, 0.08), 0 4px 15px rgba(0, 0, 0, 0.04)'
           : isAmber
@@ -321,7 +357,7 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
           : '0 24px 50px rgba(0, 0, 0, 0.75), 0 0 24px rgba(99, 102, 241, 0.22)',
         display: 'flex',
         flexDirection: 'column',
-        gap: '12px',
+        gap: '9px',
         boxSizing: 'border-box',
         zIndex: 10,
         animation: 'fadeIn 0.3s ease'
@@ -337,6 +373,9 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
 
       <audio
         ref={audioRef}
+        src={resolvedUrl || undefined}
+        preload="auto"
+        playsInline
         onTimeUpdate={() => {
           if (audioRef.current) {
             const cur = audioRef.current.currentTime;
@@ -361,6 +400,10 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
             setIsPlaying(false);
             setCurrentTime(0);
           }
+        }}
+        onError={(e) => {
+          console.warn('[ZenPlayAlongDock] Audio playback error:', e);
+          setIsPlaying(false);
         }}
       />
 
@@ -401,9 +444,9 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
                 }}
                 style={{
                   flex: '1 1 0',
-                  minWidth: '44px',
-                  maxWidth: '68px',
-                  height: '44px',
+                  minWidth: '40px',
+                  maxWidth: '64px',
+                  height: '38px',
                   background: isLight
                     ? isSel
                       ? 'linear-gradient(135deg, #0071e3 0%, #0284c7 100%)'
@@ -445,8 +488,11 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '5px',
+                  gap: '4px',
                   cursor: 'pointer',
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent',
+                  userSelect: 'none',
                   boxShadow: isLight
                     ? isSel
                       ? '0 4px 14px rgba(0, 113, 227, 0.35)'
@@ -467,16 +513,16 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
               >
                 {ped.icon === '🎧' ? (
                   <Headphones
-                    size={13}
+                    size={12}
                     color={isSel ? '#ffffff' : isLight ? '#64748b' : isAmber ? '#fbbf24' : '#a5b4fc'}
                     style={{ flexShrink: 0 }}
                   />
                 ) : (
-                  <span style={{ fontSize: '1.15rem', lineHeight: 1 }}>{ped.icon}</span>
+                  <span style={{ fontSize: '1.05rem', lineHeight: 1 }}>{ped.icon}</span>
                 )}
                 <span
                   style={{
-                    fontSize: '0.86rem',
+                    fontSize: '0.82rem',
                     fontWeight: 950,
                     color: isLight
                       ? isSel ? '#ffffff' : hasListened ? '#15803d' : '#475569'
@@ -519,12 +565,12 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
       )}
 
       {/* 2. VOLLBREITER SPUL-FORTSCHRITTSBALKEN MIT TITEL & ZEIT (APPLE DYNAMIC MEDIA DOCK) */}
-      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: '4px' }}>
+      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '5px', paddingTop: '2px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-            <Headphones size={14} color={isPlaying ? (isLight ? '#0071e3' : '#4ade80') : (isLight ? '#64748b' : isAmber ? '#fbbf24' : '#a5b4fc')} style={{ flexShrink: 0 }} />
+            <Headphones size={13} color={isPlaying ? (isLight ? '#0071e3' : '#4ade80') : (isLight ? '#64748b' : isAmber ? '#fbbf24' : '#a5b4fc')} style={{ flexShrink: 0 }} />
             <span style={{
-              fontSize: '0.88rem',
+              fontSize: '0.84rem',
               fontWeight: 850,
               color: isLight ? '#0f172a' : '#ffffff',
               overflow: 'hidden',
@@ -537,7 +583,7 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
           </div>
 
           <span style={{
-            fontSize: '0.78rem',
+            fontSize: '0.76rem',
             fontWeight: 800,
             color: isLight ? '#64748b' : '#cbd5e1',
             fontVariantNumeric: 'tabular-nums',
@@ -559,7 +605,7 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
           }}
           style={{
             width: '100%',
-            height: '8px',
+            height: '6px',
             borderRadius: '100px',
             background: isLight ? '#e2e8f0' : 'rgba(255, 255, 255, 0.16)',
             cursor: 'pointer',
@@ -603,7 +649,7 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
           }}
           style={{
             flex: '1 1 0',
-            height: '44px',
+            height: '38px',
             background: isLight
               ? isCountInActive
                 ? 'rgba(245, 158, 11, 0.14)'
@@ -617,17 +663,20 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
             borderRadius: '100px',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
-            padding: '0 14px',
+            padding: '0 12px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '7px',
+            gap: '6px',
             color: isLight
               ? isCountInActive ? '#b45309' : '#334155'
               : isCountInActive ? '#fef08a' : '#f1f5f9',
-            fontSize: '0.86rem',
+            fontSize: '0.82rem',
             fontWeight: 900,
             cursor: 'pointer',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            userSelect: 'none',
             boxShadow: isLight
               ? isCountInActive ? '0 0 16px rgba(245, 158, 11, 0.25)' : '0 2px 6px rgba(0, 0, 0, 0.04)'
               : isCountInActive
@@ -637,8 +686,9 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
           }}
           className="hover-scale"
           title={isCountInActive ? '4-Beat Einzähler aktiv' : '4-Beat Einzähler aktivieren (3s Vorbereitung)'}
+          aria-label={isCountInActive ? '4-Beat Einzähler aktiv' : '4-Beat Einzähler aktivieren'}
         >
-          <Timer size={15} strokeWidth={isCountInActive ? 2.8 : 2.2} />
+          <Timer size={14} strokeWidth={isCountInActive ? 2.8 : 2.2} />
           <span>4-Beat</span>
         </button>
 
@@ -683,13 +733,16 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
                 ? '2px solid rgba(134, 239, 172, 0.85)'
                 : '2px solid rgba(165, 180, 252, 0.85)',
             borderRadius: '50%',
-            width: isMusicStandMode ? '64px' : '58px',
-            height: isMusicStandMode ? '64px' : '58px',
+            width: isMusicStandMode ? '54px' : '50px',
+            height: isMusicStandMode ? '54px' : '50px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
             flexShrink: 0,
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            userSelect: 'none',
             boxShadow: isLight
               ? countInStep !== null
                 ? '0 0 24px rgba(245, 158, 11, 0.4)'
@@ -715,7 +768,7 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
           {countInStep !== null ? (
             <span
               style={{
-                fontSize: isMusicStandMode ? '2.1rem' : '1.9rem',
+                fontSize: isMusicStandMode ? '1.85rem' : '1.7rem',
                 fontWeight: 950,
                 color: '#ffffff',
                 lineHeight: 1,
@@ -726,9 +779,9 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
               {countInStep}
             </span>
           ) : isPlaying ? (
-            <Pause size={isMusicStandMode ? 26 : 24} fill="#ffffff" />
+            <Pause size={isMusicStandMode ? 22 : 20} fill="#ffffff" />
           ) : (
-            <Play size={isMusicStandMode ? 26 : 24} fill="#ffffff" style={{ marginLeft: '3px' }} />
+            <Play size={isMusicStandMode ? 22 : 20} fill="#ffffff" style={{ marginLeft: '2px' }} />
           )}
         </button>
 
@@ -741,7 +794,7 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
           }}
           style={{
             flex: '1 1 0',
-            height: '44px',
+            height: '38px',
             background: isLight
               ? isLooping
                 ? 'rgba(34, 197, 94, 0.14)'
@@ -755,17 +808,20 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
             borderRadius: '100px',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
-            padding: '0 14px',
+            padding: '0 12px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '7px',
+            gap: '6px',
             color: isLight
               ? isLooping ? '#15803d' : '#334155'
               : isLooping ? '#bbf7d0' : '#f1f5f9',
-            fontSize: '0.86rem',
+            fontSize: '0.82rem',
             fontWeight: 900,
             cursor: 'pointer',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            userSelect: 'none',
             boxShadow: isLight
               ? isLooping ? '0 0 16px rgba(34, 197, 94, 0.25)' : '0 2px 6px rgba(0, 0, 0, 0.04)'
               : isLooping
@@ -775,8 +831,9 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
           }}
           className="hover-scale"
           title={isLooping ? 'Loop aktiv: Endlose Wiederholung' : 'Loop aktivieren'}
+          aria-label={isLooping ? 'Loop aktiv' : 'Loop aktivieren'}
         >
-          <Repeat size={15} strokeWidth={isLooping ? 2.8 : 2.2} />
+          <Repeat size={14} strokeWidth={isLooping ? 2.8 : 2.2} />
           <span>Loop</span>
         </button>
       </div>
@@ -797,26 +854,25 @@ export const PreFlightAudioPreviewButton: React.FC<{
   useEffect(() => {
     if (!track?.url) return;
     let active = true;
-    const rawUrl = track.url;
-    if (rawUrl.startsWith('campus_blob_') || rawUrl.startsWith('campus_audio_')) {
-      getBlob(rawUrl)
-        .then((raw: any) => {
-          if (!active || !raw) return;
-          const blob = raw instanceof Blob ? raw : new Blob([raw], { type: 'audio/webm' });
-          const url = URL.createObjectURL(blob);
-          blobUrlRef.current = url;
-          setResolvedUrl(url);
-        })
-        .catch(() => {
-          if (active) setResolvedUrl(rawUrl);
-        });
-    } else {
-      setResolvedUrl(rawUrl);
+
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
     }
+
+    resolveAudioSourceUrl(track.url).then(({ url, isBlobUrl }) => {
+      if (!active) {
+        if (isBlobUrl) URL.revokeObjectURL(url);
+        return;
+      }
+      if (isBlobUrl) {
+        blobUrlRef.current = url;
+      }
+      setResolvedUrl(url);
+    });
 
     return () => {
       active = false;
-      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
     };
   }, [track?.url]);
 
@@ -913,32 +969,26 @@ export const PreFlightAudioPlayerSection: React.FC<PreFlightAudioPlayerSectionPr
   const safeIndex = Math.max(0, Math.min(selectedIndex, tracks.length - 1));
   const currentTrack = tracks[safeIndex] || tracks[0];
 
-  // Resolve Blob URL for current selected track
+  // Resolve Blob / Signed URL for current selected track
   useEffect(() => {
     if (!currentTrack?.url) return;
     let active = true;
-    const rawUrl = currentTrack.url;
 
     if (blobUrlRef.current) {
       URL.revokeObjectURL(blobUrlRef.current);
       blobUrlRef.current = null;
     }
 
-    if (rawUrl.startsWith('campus_blob_') || rawUrl.startsWith('campus_audio_')) {
-      getBlob(rawUrl)
-        .then((raw: any) => {
-          if (!active || !raw) return;
-          const blob = raw instanceof Blob ? raw : new Blob([raw], { type: 'audio/webm' });
-          const url = URL.createObjectURL(blob);
-          blobUrlRef.current = url;
-          setResolvedUrl(url);
-        })
-        .catch(() => {
-          if (active) setResolvedUrl(rawUrl);
-        });
-    } else {
-      setResolvedUrl(rawUrl);
-    }
+    resolveAudioSourceUrl(currentTrack.url).then(({ url, isBlobUrl }) => {
+      if (!active) {
+        if (isBlobUrl) URL.revokeObjectURL(url);
+        return;
+      }
+      if (isBlobUrl) {
+        blobUrlRef.current = url;
+      }
+      setResolvedUrl(url);
+    });
 
     return () => {
       active = false;

@@ -18,11 +18,6 @@ export interface StudentHeroTabProps {
   studentMissionProgress: any;
   progressItems: any[];
   studentUser: any;
-  pinInput: string;
-  setPinInput: React.Dispatch<React.SetStateAction<string>>;
-  setCustomAvatarFile: React.Dispatch<React.SetStateAction<File | null>>;
-  handleUploadAvatarWithPin: (e: React.FormEvent) => void | Promise<void>;
-  isUploadingCustomAvatar: boolean;
   startTour: () => void;
 }
 
@@ -41,11 +36,6 @@ export function StudentHeroTab({
   studentMissionProgress,
   progressItems,
   studentUser,
-  pinInput,
-  setPinInput,
-  setCustomAvatarFile,
-  handleUploadAvatarWithPin,
-  isUploadingCustomAvatar,
   startTour
 }: StudentHeroTabProps) {
   if (activeTab !== 'hero') return null;
@@ -261,7 +251,7 @@ export function StudentHeroTab({
                       {lvl}
                     </div>
                     <span style={{ fontSize: '0.68rem', fontWeight: 800, color: isCurrent ? '#34a853' : '#64748b', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                      {lvl === 1 ? 'Start 1 Song' : lvl === 2 ? 'Upload PIN' : lvl === 3 ? '3 Songs' : `Level ${lvl}`}
+                      {lvl === 1 ? 'Start 1 Song' : lvl === 2 ? '7-Tage-Streak' : lvl === 3 ? '3 Songs' : `Level ${lvl}`}
                     </span>
                   </div>
                 );
@@ -299,83 +289,6 @@ export function StudentHeroTab({
                 )}
               </div>
             </div>
-
-            {/* PIN Code Verification Card (Level 2 specific upload unlock) */}
-            {(studentMissionProgress?.current_level || 1) >= 2 && (
-              <div style={{ border: '2px dashed #e6f4ea', background: '#e6f4ea', borderRadius: '20px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div>
-                  <h4 style={{ margin: '0 0 4px 0', fontWeight: 900, color: '#34a853', fontSize: '1rem' }}>
-                    🔓 Custom Avatar / Instrument Upload freigeschaltet!
-                  </h4>
-                  <p style={{ margin: 0, fontSize: '0.78rem', color: '#34a853', lineHeight: 1.4 }}>
-                    Trage deine einmalige PIN ein, die du von deinem Lehrer erhalten hast, um dein eigenes Profilbild/Instrumenten-Foto hochzuladen.
-                  </p>
-                </div>
-
-                {/* AI Prompt Assistant helper */}
-                <div style={{ background: '#ffffff', border: '1px solid #e6f4ea', padding: '12px', borderRadius: '12px' }}>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#34a853', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
-                    💡 Prompt-Assistent für KI-Generatoren (z.B. Midjourney, DALL-E)
-                  </span>
-                  <div style={{ fontSize: '0.75rem', color: '#1e293b', fontStyle: 'italic', background: '#f8fafc', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
-                    <span id="promptText">"Ein cooler Musik-Hero im Comic-Stil mit einem {studentUser?.instrument || 'Gitarre'}, leuchtende Farben, Profilbild, quadratisch"</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const txt = document.getElementById('promptText')?.innerText || '';
-                        navigator.clipboard.writeText(txt);
-                        alert('Prompt kopiert!');
-                      }}
-                      style={{ background: '#e2e8f0', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '0.65rem', fontWeight: 800, cursor: 'pointer' }}
-                    >
-                      Kopieren
-                    </button>
-                  </div>
-                </div>
-
-                <form onSubmit={handleUploadAvatarWithPin} style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'flex-end' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: '160px' }}>
-                    <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#34a853' }}>6-stellige Einmal-PIN</label>
-                    <input
-                      type="text"
-                      placeholder="z.B. 123456"
-                      value={pinInput}
-                      onChange={e => setPinInput(e.target.value)}
-                      maxLength={8}
-                      style={{ padding: '8px 12px', borderRadius: '10px', border: '1.5px solid #e6f4ea', fontWeight: 700 }}
-                    />
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1.5, minWidth: '200px' }}>
-                    <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#34a853' }}>Foto auswählen</label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={e => setCustomAvatarFile(e.target.files?.[0] || null)}
-                      style={{ fontSize: '0.75rem', color: '#475569' }}
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isUploadingCustomAvatar}
-                    style={{
-                      background: '#34a853',
-                      color: 'white',
-                      border: 'none',
-                      padding: '10px 18px',
-                      borderRadius: '12px',
-                      fontWeight: 800,
-                      fontSize: '0.8rem',
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 12px rgba(52, 168, 83, 0.2)'
-                    }}
-                  >
-                    {isUploadingCustomAvatar ? 'Wird hochgeladen...' : 'Bild hochladen'}
-                  </button>
-                </form>
-              </div>
-            )}
           </div>
         )}
       </div>

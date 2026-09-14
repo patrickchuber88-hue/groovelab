@@ -7,7 +7,6 @@ const router = Router();
 // Configuration
 const supabaseUrl = process.env.VITE_SUPABASE_URL || 'http://supabase-kong:8000';
 const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || supabaseAnonKey;
 
 // Allowed MIME types for Zero-Memory Media Ingestion
 const ALLOWED_MIME_TYPES = new Set([
@@ -85,6 +84,31 @@ router.post('/presign-upload', async (req: Request, res: Response) => {
       }
     }
 
+    // 🛡️ FAIL-CLOSED AUTHENTICATION GUARD (Zero unauthenticated uploads)
+    if (!accessToken) {
+      return res.status(401).json({
+        error: 'UNAUTHORIZED',
+        message: 'Authentifizierung erforderlich. Kein gültiger Sitzungs-Token vorhanden.'
+      });
+    }
+
+    // 🛡️ Authoritatively verify user token with Supabase
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false },
+      global: {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      }
+    });
+
+    const { data: userData, error: userError } = await userClient.auth.getUser(accessToken);
+    if (userError || !userData?.user) {
+      return res.status(401).json({
+        error: 'UNAUTHORIZED',
+        message: 'Ungültiger oder abgelaufener Authentifizierungs-Token.'
+      });
+    }
+    const authUser = userData.user;
+
     const {
       context = 'audio',
       extension = 'webm',
@@ -135,6 +159,15 @@ router.post('/presign-upload', async (req: Request, res: Response) => {
     const cleanSchoolId = sanitizePathSegment(schoolId, '');
     const cleanStudentId = sanitizePathSegment(studentId, '');
 
+    // 🛡️ BOLA / IDOR Protection: Non-staff users cannot write into another user's folder
+    const userRole = authUser.user_metadata?.role || authUser.app_metadata?.role;
+    if (cleanStudentId && userRole === 'student' && authUser.id !== cleanStudentId) {
+      return res.status(403).json({
+        error: 'FORBIDDEN',
+        message: 'Zugriff verweigert: Sie können nur Dateien in Ihr eigenes Verzeichnis hochladen.'
+      });
+    }
+
     // Canonical Campus-Groovelab storage path:
     // schools/<schoolId>/students/<studentId>/<context>/<uniqueId>.<ext> or schools/<schoolId>/<context>/<uniqueId>.<ext>
     let storagePath: string;
@@ -146,21 +179,18 @@ router.post('/presign-upload', async (req: Request, res: Response) => {
       storagePath = `${cleanContext}/${cleanUniqueId}.${cleanExt}`;
     }
 
-    // 5. Generate authenticated storage client
-    const signingKey = accessToken || supabaseServiceRoleKey;
-    const clientOptions: any = {
+    // 5. Ephemeral upload signing client scoped to authenticated caller
+    const storageClient = createClient(supabaseUrl, supabaseAnonKey, {
       auth: { persistSession: false },
       global: {
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined
+        headers: { Authorization: `Bearer ${accessToken}` }
       }
-    };
+    });
 
-    const storageClient = createClient(supabaseUrl, signingKey, clientOptions);
-
-    // 6. Generate signed upload URL with 5 minutes (300s) TTL
+    // 6. Generate signed upload URL with 5 minutes (300s) TTL (upsert: false to protect integrity)
     const { data, error } = await storageClient.storage
       .from(targetBucket)
-      .createSignedUploadUrl(storagePath, { upsert: true });
+      .createSignedUploadUrl(storagePath, { upsert: false });
 
     if (error || !data) {
       console.error('[BFF Storage] Failed to generate signed upload URL:', error);

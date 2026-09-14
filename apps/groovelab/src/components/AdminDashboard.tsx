@@ -198,7 +198,7 @@ const getInstrumentTypeKey = (instrument: string | null | undefined): string => 
   return 'guitarist';
 };
 const brandColor = "#ea4335";
-import { TeacherDashboard } from './TeacherDashboard';
+const TeacherDashboard = lazy(() => import('./TeacherDashboard').then(m => ({ default: m.TeacherDashboard })));
 import QRCode from 'react-qr-code';
 
 
@@ -4170,23 +4170,25 @@ export function AdminDashboard({
 
   const renderLiveTab = () => (
     <div style={{ marginTop: '0px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-      <TeacherDashboard 
-        key={`teacher-dashboard-view-${activePlatform}`}
-        userId={userId} 
-        initialTeacher={admin}
-        hideHeader={activePlatform === 'campus' ? false : true} 
-        hideSidebar={true}
-        viewMode="admin" 
-        activePlatform={activePlatform as any}
-        initialTab={activeTab === 'live' ? 'live' : (activeTab === 'briefing' ? 'briefing' : (activePlatform === 'campus' ? 'briefing' : 'live'))}
-        onTabChange={(id) => onTabChange?.(id)}
-        isSidebarCollapsed={isSidebarCollapsed}
-        setIsSidebarCollapsed={setIsSidebarCollapsed}
-        session={session}
-        onSessionChange={onSessionChange}
-        locationMode={locationMode}
-        onLocationModeChange={onLocationModeChange}
-      />
+      <Suspense fallback={<div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>Lehrer-Dashboard wird geladen...</div>}>
+        <TeacherDashboard 
+          key={`teacher-dashboard-view-${activePlatform}`}
+          userId={userId} 
+          initialTeacher={admin}
+          hideHeader={activePlatform === 'campus' ? false : true} 
+          hideSidebar={true}
+          viewMode="admin" 
+          activePlatform={activePlatform as any}
+          initialTab={activeTab === 'live' ? 'live' : (activeTab === 'briefing' ? 'briefing' : (activePlatform === 'campus' ? 'briefing' : 'live'))}
+          onTabChange={(id) => onTabChange?.(id)}
+          isSidebarCollapsed={isSidebarCollapsed}
+          setIsSidebarCollapsed={setIsSidebarCollapsed}
+          session={session}
+          onSessionChange={onSessionChange}
+          locationMode={locationMode}
+          onLocationModeChange={onLocationModeChange}
+        />
+      </Suspense>
     </div>
   );
 

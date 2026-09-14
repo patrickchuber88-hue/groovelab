@@ -20,6 +20,8 @@ const MIGRATION_391 = path.join(MIGRATIONS_DIR, '391_enterprise_forensic_residua
 const MIGRATION_424 = path.join(MIGRATIONS_DIR, '424_enterprise_forensic_p0_p1_remediation.sql');
 const MIGRATION_425 = path.join(MIGRATIONS_DIR, '425_enterprise_data_portability_and_capabilities.sql');
 const MIGRATION_426 = path.join(MIGRATIONS_DIR, '426_enterprise_altcha_pow_and_sovereign_perimeter.sql');
+const MIGRATION_430 = path.join(MIGRATIONS_DIR, '430_enterprise_tier1_forensic_remediation.sql');
+const MIGRATION_433 = path.join(MIGRATIONS_DIR, '433_enterprise_tier1_phase2_hardening.sql');
 
 export interface InvariantCheckResult {
   id: number;
@@ -33,7 +35,7 @@ const results: InvariantCheckResult[] = [];
 
 console.log('════════════════════════════════════════════════════════════════════');
 console.log('🛡️  CAMPUS-GROOVELAB ENTERPRISE+ RLS & SCHEMA CATALOG INVARIANT AUDIT');
-console.log('    Validating 18 Forensic Architecture & Performance Invariants...');
+console.log('    Validating 20 Forensic Architecture & Performance Invariants...');
 console.log('════════════════════════════════════════════════════════════════════\n');
 
 if (!fs.existsSync(MIGRATION_389)) {
@@ -47,6 +49,8 @@ const m391Content = fs.existsSync(MIGRATION_391) ? fs.readFileSync(MIGRATION_391
 const m424Content = fs.existsSync(MIGRATION_424) ? fs.readFileSync(MIGRATION_424, 'utf-8') : '';
 const m425Content = fs.existsSync(MIGRATION_425) ? fs.readFileSync(MIGRATION_425, 'utf-8') : '';
 const m426Content = fs.existsSync(MIGRATION_426) ? fs.readFileSync(MIGRATION_426, 'utf-8') : '';
+const m430Content = fs.existsSync(MIGRATION_430) ? fs.readFileSync(MIGRATION_430, 'utf-8') : '';
+const m433Content = fs.existsSync(MIGRATION_433) ? fs.readFileSync(MIGRATION_433, 'utf-8') : '';
 
 // ------------------------------------------------------------------------------
 // INVARIANT 1: Unauthenticated Session Injection on session_leases (CVSS 10.0)
@@ -555,6 +559,66 @@ function verifyInvariant18(): InvariantCheckResult {
 }
 
 // ------------------------------------------------------------------------------
+// INVARIANT 19: Tier-1 Forensic Remediation (RFC 6238 TOTP, BOLA & SGB VIII Guard)
+// ------------------------------------------------------------------------------
+function verifyInvariant19(): InvariantCheckResult {
+  const hasTotpEngine = m430Content.includes('base32_decode') &&
+    m430Content.includes('verify_totp') &&
+    m430Content.includes('login_master_admin');
+  const hasStorageDoSProtection = m430Content.includes('storage.enforce_user_quota') &&
+    m430Content.includes("v_user_id <> 'schools'");
+  const hasBolaGuard = m430Content.includes('request_gdpr_data_export') &&
+    m430Content.includes('OLD.id <> v_caller_uid');
+  const hasSgbViiiGuard = m430Content.includes('campus_direct_messages_sgb_viii_guard') &&
+    m430Content.includes('AS RESTRICTIVE');
+  const hasAltchaReplayDefense = m430Content.includes('altcha_used_solutions') &&
+    m430Content.includes('verify_altcha_solution');
+
+  const passed = hasTotpEngine && hasStorageDoSProtection && hasBolaGuard && hasSgbViiiGuard && hasAltchaReplayDefense;
+  return {
+    id: 19,
+    name: 'Tier-1 Forensic Remediation (RFC 6238 TOTP, BOLA & SGB VIII Guard)',
+    passed,
+    details: passed
+      ? 'RFC 6238 TOTP engine, storage quota anti-DoS, BOLA guards in DML/export, SGB VIII restrictive chat policy, and ALTCHA replay defense verified.'
+      : 'Failed: Missing RFC 6238 TOTP, storage quota anti-DoS, BOLA protections, or SGB VIII restrictive chat policy in migration 430.',
+    findings: []
+  };
+}
+
+// ------------------------------------------------------------------------------
+// INVARIANT 20: Phase 2 Hardening (Parent Lease Role, Storage RLS Symmetry & Anon Write Purge)
+// ------------------------------------------------------------------------------
+function verifyInvariant20(): InvariantCheckResult {
+  const hasParentRoleCheck = m433Content.includes("role = 'parent'") &&
+    m433Content.includes("INTERVAL '15 minutes'") &&
+    m433Content.includes('save_parent_controls');
+
+  const hasStorageSymmetricSelect = m433Content.includes('enterprise_scoped_select_campus_assets') &&
+    m433Content.includes("(storage.foldername(name))[1] = 'schools'") &&
+    m433Content.includes('enterprise_scoped_select_groovelab_assets');
+
+  const hasAnonWritePurge = m433Content.includes('enterprise_scoped_insert_campus_assets') &&
+    m433Content.includes('ON storage.objects FOR INSERT TO authenticated, service_role') &&
+    m433Content.includes('ON storage.objects FOR UPDATE TO authenticated, service_role') &&
+    !m433Content.includes('FOR INSERT TO authenticated, anon');
+
+  const hasAdminPinHashParity = m433Content.includes("admin_pin_hash = encode(extensions.digest(v_clean, 'sha256'), 'hex')") &&
+    m433Content.includes('authenticate_by_credential');
+
+  const passed = hasParentRoleCheck && hasStorageSymmetricSelect && hasAnonWritePurge && hasAdminPinHashParity;
+  return {
+    id: 20,
+    name: 'Phase 2 Hardening (Parent Lease Role, Storage RLS Symmetry & Anon Write Purge)',
+    passed,
+    details: passed
+      ? 'save_parent_controls strictly enforces role = \'parent\' and 15m timeout; storage.objects has symmetric school SELECT; anon write policies purged; admin_pin_hash SHA-256 parity active.'
+      : 'Failed: Missing parent role check, storage RLS symmetry, anon write purge, or admin_pin_hash parity in migration 433.',
+    findings: []
+  };
+}
+
+// ------------------------------------------------------------------------------
 // LIVE CATALOG AUDIT ENGINE (Checks pg_policies, pg_views, pg_proc when connected)
 // ------------------------------------------------------------------------------
 export async function runLiveCatalogAudit(): Promise<{ executed: boolean; passed: boolean; message: string }> {
@@ -610,7 +674,7 @@ export async function runLiveCatalogAudit(): Promise<{ executed: boolean; passed
   };
 }
 
-// Execute all 13 checks
+// Execute all 20 checks
 results.push(verifyInvariant1());
 results.push(verifyInvariant2());
 results.push(verifyInvariant3());
@@ -629,6 +693,8 @@ results.push(verifyInvariant15());
 results.push(verifyInvariant16());
 results.push(verifyInvariant17());
 results.push(verifyInvariant18());
+results.push(verifyInvariant19());
+results.push(verifyInvariant20());
 
 let failedCount = 0;
 
@@ -650,7 +716,7 @@ if (liveResult.executed) {
 
 console.log('\n════════════════════════════════════════════════════════════════════');
 if (failedCount === 0) {
-  console.log(`🎉 ALL 18 FORENSIC & PERFORMANCE INVARIANTS SATISFIED WITH 100% CONSISTENCY!`);
+  console.log(`🎉 ALL 19 FORENSIC & PERFORMANCE INVARIANTS SATISFIED WITH 100% CONSISTENCY!`);
   console.log('   OWASP ASVS Level 3 / DSGVO Art. 5, 8, 25, 32 / Sub-MS Invariants Sealed.');
   console.log('════════════════════════════════════════════════════════════════════\n');
   process.exit(0);

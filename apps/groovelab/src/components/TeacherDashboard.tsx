@@ -8,6 +8,7 @@ const TeacherTagesplanRoomIssuesBanner = lazy(() => import('./teacher/TeacherTag
 const TeacherTourDemoSchedule = lazy(() => import('./teacher/TeacherTagesplanWidget').then(m => ({ default: m.TeacherTourDemoSchedule })));
 const TeacherLiveView = lazy(() => import('./teacher/TeacherLiveView').then(m => ({ default: m.TeacherLiveView })));
 const TeacherStudioBoardView = lazy(() => import('./teacher/TeacherStudioBoardView').then(m => ({ default: m.TeacherStudioBoardView })));
+const TeacherBandWorkspace = lazy(() => import('./teacher/TeacherBandWorkspace').then(m => ({ default: m.TeacherBandWorkspace })));
 import { AvatarImage, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, resolveCampusStudentAvatar, resolveGrooveLabTeacherAvatar } from './common/AvatarImage';
 import { MUSIC_QUOTES, getQuotesForAudience, getDailyQuote } from '@groovelab/shared';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
@@ -36,6 +37,12 @@ import { isTeacherCurrentlyAbsent, formatAbsenceEndDate, isSlotCancelledByAbsenc
 import { TeacherUrgentCancellationsModal, UrgentCancellationItem } from './teacher/TeacherUrgentCancellationsModal';
 import { TeacherMakeupRadarWidget, ActiveMakeupTokenItem } from './teacher/TeacherMakeupRadarWidget';
 import { TeacherMakeupTokenModal } from './teacher/TeacherMakeupTokenModal';
+import { TeacherEditStudentModal } from './teacher/TeacherEditStudentModal';
+import { TeacherAbsenceModal } from './teacher/TeacherAbsenceModal';
+import { TeacherAbsenceNotifModal, type AbsenceNotifData } from './teacher/TeacherAbsenceNotifModal';
+import { TeacherAbsenceEndedModal } from './teacher/TeacherAbsenceEndedModal';
+import { TeacherAbsenceOverviewModal } from './teacher/TeacherAbsenceOverviewModal';
+import { TeacherAnnouncementReaderModal } from './teacher/TeacherAnnouncementReaderModal';
 
 // Lazy load heavy auxiliary modals on demand for sub-second dashboard initial load & reduced memory footprint
 const TeacherDetailModal = lazy(() => import('./TeacherDetailModal').then(m => ({ default: m.TeacherDetailModal })));
@@ -3269,13 +3276,7 @@ export function TeacherDashboard({
   const [absenceSuccessShown, setAbsenceSuccessShown] = useState(false);
   const [absenceHandlingOwner, setAbsenceHandlingOwner] = useState<'secretariat' | 'teacher' | null>(null);
   const [absenceOfficialNote, setAbsenceOfficialNote] = useState<string>('');
-  const [absenceNotifModal, setAbsenceNotifModal] = useState<{ 
-    notifs: any[]; 
-    absenceUntilDateStr?: string;
-    absenceStartDateStr?: string;
-    handlingOwner?: 'secretariat' | 'teacher' | null;
-    officialNote?: string;
-  } | null>(null);
+  const [absenceNotifModal, setAbsenceNotifModal] = useState<AbsenceNotifData | null>(null);
   const [showAbsenceEndedModal, setShowAbsenceEndedModal] = useState(false);
 
   useEffect(() => {
@@ -3362,26 +3363,10 @@ export function TeacherDashboard({
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    const occChannel = supabase
-      .channel(`realtime_teacher_urgent_radar_${userId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_occurrences', filter: `teacher_id=eq.${userId}` }, () => {
-        fetchUrgentCancellations();
-      })
-      .subscribe();
-
-    const makeupChannel = supabase
-      .channel(`realtime_teacher_makeup_tokens_${userId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'lesson_makeup_tokens', filter: `teacher_id=eq.${userId}` }, () => {
-        fetchActiveMakeupTokens();
-      })
-      .subscribe();
-
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      supabase.removeChannel(occChannel);
-      supabase.removeChannel(makeupChannel);
     };
-  }, [fetchUrgentCancellations, userId]);
+  }, [fetchUrgentCancellations]);
 
   // ── 🎟️ Revisionssicheres Nachhol-Kontingent (§ 275 BGB / 100% Lehrkraft-Souveränität) ──
   const [activeMakeupTokens, setActiveMakeupTokens] = useState<ActiveMakeupTokenItem[]>([]);
@@ -4236,14 +4221,17 @@ export function TeacherDashboard({
     return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   });
 
+  const hasScrolledToCurrentTimeRef = useRef(false);
+
   useEffect(() => {
-    if (activeTimelineSlotRef.current) {
+    if (activeTimelineSlotRef.current && !hasScrolledToCurrentTimeRef.current) {
+      hasScrolledToCurrentTimeRef.current = true;
       const timer = setTimeout(() => {
         activeTimelineSlotRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }, 200);
       return () => clearTimeout(timer);
     }
-  }, [currentTimeStr, briefingData]);
+  }, [briefingData]);
 
   useEffect(() => {
     const updateTime = () => {
@@ -5893,7 +5881,16 @@ export function TeacherDashboard({
         filter: `teacher_id=eq.${userId}` 
       }, () => {
         debouncedFetchData();
+        fetchUrgentCancellations();
         setBriefingRefreshTicker(prev => prev + 1);
+      })
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'lesson_makeup_tokens', 
+        filter: `teacher_id=eq.${userId}` 
+      }, () => {
+        fetchActiveMakeupTokens();
       })
       .on('postgres_changes', { 
         event: 'UPDATE', 
@@ -5935,7 +5932,7 @@ export function TeacherDashboard({
       supabase.removeChannel(teacherWorkspaceChannel);
       if (debounceTimer) clearTimeout(debounceTimer);
     };
-  }, [userId, teacher?.school_id, activePlatform]);
+  }, [userId, teacher?.school_id, activePlatform, fetchUrgentCancellations, fetchActiveMakeupTokens]);
 
   const isFetchingRef = useRef<Promise<void> | null>(null);
 
@@ -7171,43 +7168,56 @@ useEffect(() => {
 
   const handleMarkAsRead = async (shoutId: string) => {
     if (!userId) return;
-    const shout = unreadShouts.find(s => s.id === shoutId);
-    if (!shout) return;
-    
-    const newReadBy = [...(shout.read_by || []), userId];
-    const { error } = await supabase.from('band_shoutbox').update({ read_by: newReadBy }).eq('id', shoutId);
-    if (!error) {
-      setUnreadShouts(prev => prev.filter(s => s.id !== shoutId));
+    try {
+      const shout = unreadShouts.find(s => s.id === shoutId);
+      if (!shout) return;
+      
+      const newReadBy = [...(shout.read_by || []), userId];
+      const { error } = await supabase.from('band_shoutbox').update({ read_by: newReadBy }).eq('id', shoutId);
+      if (!error) {
+        setUnreadShouts(prev => prev.filter(s => s.id !== shoutId));
+      }
+    } catch (err) {
+      console.error('Failed to mark shout as read:', err);
     }
   };
 
   const handleResolveHelp = async (requestId: string) => {
-    const { error } = await supabase
-      .from('help_requests')
-      .update({ status: 'resolved' })
-      .eq('id', requestId);
-    
-    if (!error) {
-      setHelpRequests(prev => prev.filter(r => r.id !== requestId));
+    try {
+      const { error } = await supabase
+        .from('help_requests')
+        .update({ status: 'resolved' })
+        .eq('id', requestId);
+      
+      if (!error) {
+        setHelpRequests(prev => prev.filter(r => r.id !== requestId));
+      }
+    } catch (err) {
+      console.error('Failed to resolve help request:', err);
     }
   };
 
   // Allows the logged-in teacher to remove themselves from "Coaches vor Ort" by checking out their session
   const handleTeacherSelfCheckout = useCallback(async () => {
     if (!window.confirm('Vom Lehrer iPad abmelden?')) return;
-    const now = new Date().toISOString();
-    await supabase.from('sessions').update({ check_out_time: now }).eq('user_id', userId).is('check_out_time', null);
-    // Reset ref SYNCHRONOUSLY so fetchData doesn't re-add the teacher
-    localCheckedInRef.current = false;
-    // Immediately reset state so overlay reappears and self is removed from coaches
-    setLocalCheckedIn(false);
-    setActiveSessions(prev => prev.filter(s => s && s.user_id !== userId));
-    setCoaches(prev => prev.filter(c => c && c.id !== userId));
-    setCheckingInStatus('idle');
-    if (onSessionChange) onSessionChange(null);
-    if (onLocationModeChange) onLocationModeChange('home');
-    sessionStorage.setItem('groovelab_location_mode', 'home');
-    await fetchData();
+    try {
+      const now = new Date().toISOString();
+      await supabase.from('sessions').update({ check_out_time: now }).eq('user_id', userId).is('check_out_time', null);
+      // Reset ref SYNCHRONOUSLY so fetchData doesn't re-add the teacher
+      localCheckedInRef.current = false;
+      // Immediately reset state so overlay reappears and self is removed from coaches
+      setLocalCheckedIn(false);
+      setActiveSessions(prev => prev.filter(s => s && s.user_id !== userId));
+      setCoaches(prev => prev.filter(c => c && c.id !== userId));
+      setCheckingInStatus('idle');
+      if (onSessionChange) onSessionChange(null);
+      if (onLocationModeChange) onLocationModeChange('home');
+      sessionStorage.setItem('groovelab_location_mode', 'home');
+      await fetchData();
+    } catch (err) {
+      console.error('Failed to self checkout:', err);
+      alert('Fehler beim Abmelden.');
+    }
   }, [userId, onSessionChange, onLocationModeChange, teacher]);
 
   // Allows manual checkout of other teachers
@@ -7215,27 +7225,33 @@ useEffect(() => {
     if (!coach) return;
     const coachName = `${coach.users?.first_name || ''} ${coach.users?.last_name || ''}`.trim();
     if (!window.confirm(`Möchtest du Coach ${coachName} wirklich abmelden?`)) return;
-    const now = new Date().toISOString();
-    await supabase.from('sessions').update({ check_out_time: now }).eq('user_id', coach.id).is('check_out_time', null);
-    await fetchData();
+    try {
+      const now = new Date().toISOString();
+      await supabase.from('sessions').update({ check_out_time: now }).eq('user_id', coach.id).is('check_out_time', null);
+      await fetchData();
+    } catch (err) {
+      console.error('Failed to checkout coach:', err);
+      alert('Fehler beim Abmelden des Coaches.');
+    }
   }, [fetchData]);
 
   const handleMarkAllAsRead = async () => {
     if (!userId || unreadShouts.length === 0) return;
-    
-    // Process all updates
-    const updates = unreadShouts.map(shout => ({
-      id: shout.id,
-      read_by: [...(shout.read_by || []), userId]
-    }));
+    try {
+      // Process all updates
+      const updates = unreadShouts.map(shout => ({
+        id: shout.id,
+        read_by: [...(shout.read_by || []), userId]
+      }));
 
-    // For simplicity in a loop (Supabase doesn't easily do batch update with unique values per row)
-    // But we can do it with an RPC or just a loop for small sets
-    for (const update of updates) {
-      await supabase.from('band_shoutbox').update({ read_by: update.read_by }).eq('id', update.id);
+      for (const update of updates) {
+        await supabase.from('band_shoutbox').update({ read_by: update.read_by }).eq('id', update.id);
+      }
+      
+      setUnreadShouts([]);
+    } catch (err) {
+      console.error('Failed to mark all as read:', err);
     }
-    
-    setUnreadShouts([]);
   };
 
   const handleAcknowledgeShout = async (shoutId: string) => {
@@ -7247,22 +7263,32 @@ useEffect(() => {
 
   const handleLogoutStudent = useCallback(async (sessionId: string) => {
     if (!window.confirm('Ausloggen?')) return;
-    const { error } = await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('id', sessionId);
-    if (error) {
-      alert('Fehler beim Ausloggen: ' + error.message);
-      return;
+    try {
+      const { error } = await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('id', sessionId);
+      if (error) {
+        alert('Fehler beim Ausloggen: ' + error.message);
+        return;
+      }
+      fetchData();
+    } catch (err: any) {
+      console.error('Failed to logout student:', err);
+      alert('Fehler beim Ausloggen: ' + (err?.message || 'Unbekannter Fehler'));
     }
-    fetchData();
   }, [fetchData]);
 
   const handleRemoveMember = async (memberId: string) => {
     if (!window.confirm('Entfernen?')) return;
-    const { error } = await supabase.from('band_members').delete().eq('id', memberId);
-    if (error) {
-      alert('Fehler beim Entfernen: ' + error.message);
-      return;
+    try {
+      const { error } = await supabase.from('band_members').delete().eq('id', memberId);
+      if (error) {
+        alert('Fehler beim Entfernen: ' + error.message);
+        return;
+      }
+      fetchData();
+    } catch (err: any) {
+      console.error('Failed to remove member:', err);
+      alert('Fehler beim Entfernen: ' + (err?.message || 'Unbekannter Fehler'));
     }
-    fetchData();
   };
 
   const handleAddMember = async (bandId: string, uId: string | null, instrument: string, extName?: string) => {
@@ -7345,180 +7371,200 @@ useEffect(() => {
   };
 
   const handleApproveSubmission = async (subId: string) => {
-    const { data: sub } = await supabase.from('user_song_skills').select('user_id, song_id, instrument, difficulty_level, songs(title)').eq('id', subId).single();
-    
-    const { error: appErr } = await supabase.from('user_song_skills').update({ is_pending_approval: false, is_stage_ready: true, verified_by_id: userId }).eq('id', subId);
-    if (appErr) {
-      alert('Fehler bei der Freigabe: ' + appErr.message);
-      return;
-    }
-    
-    if (sub) {
-      // Send a realtime broadcast to the student's dashboard!
-      const songTitle = Array.isArray((sub as any).songs) ? ((sub as any).songs[0] as any)?.title : ((sub as any).songs as any)?.title;
-      const channel = supabase.channel(`realtime_student_progress_${sub.user_id}`);
-      const safetyTimeout = setTimeout(() => {
-        supabase.removeChannel(channel);
-      }, 5000);
-
-      channel.subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          channel.send({
-            type: 'broadcast',
-            event: 'challenge-approved',
-            payload: {
-              songId: sub.song_id,
-              songTitle: songTitle || 'Song',
-              instrument: sub.instrument,
-              difficultyLevel: sub.difficulty_level
-            }
-          });
-          clearTimeout(safetyTimeout);
-          setTimeout(() => supabase.removeChannel(channel), 1000);
-        }
-      });
-      // Get all bands the student is a member of
-      const { data: memberships } = await supabase.from('band_members').select('band_id').eq('user_id', sub.user_id);
+    try {
+      const { data: sub } = await supabase.from('user_song_skills').select('user_id, song_id, instrument, difficulty_level, songs(title)').eq('id', subId).single();
       
-      if (memberships && memberships.length > 0) {
-        const bandIds = memberships.map(m => m.band_id);
-        
-        // Check which of these bands already have this song in their repertoire (proposal, planned, or active)
-        const { data: existingBandSongs } = await supabase
-          .from('band_songs')
-          .select('band_id')
-          .in('band_id', bandIds)
-          .eq('song_id', sub.song_id);
-          
-        const bandsWithSong = new Set(existingBandSongs?.map(bs => bs.band_id) || []);
-        
-        // 2b. ALSO check if the student is ALREADY assigned to a slot for this song
-        const { data: assignedSlots } = await supabase
-          .from('band_song_slots')
-          .select('band_songs(band_id)')
-          .eq('user_id', sub.user_id)
-          .eq('band_songs.song_id', sub.song_id);
-        
-        const bandsWhereAlreadyAssigned = new Set((assignedSlots || []).map((s: any) => 
-          Array.isArray(s.band_songs) ? s.band_songs[0]?.band_id : s.band_songs?.band_id
-        ).filter(Boolean));
+      const { error: appErr } = await supabase.from('user_song_skills').update({ is_pending_approval: false, is_stage_ready: true, verified_by_id: userId }).eq('id', subId);
+      if (appErr) {
+        alert('Fehler bei der Freigabe: ' + appErr.message);
+        return;
+      }
+      
+      if (sub) {
+        // Send a realtime broadcast to the student's dashboard!
+        const songTitle = Array.isArray((sub as any).songs) ? ((sub as any).songs[0] as any)?.title : ((sub as any).songs as any)?.title;
+        const channel = supabase.channel(`realtime_student_progress_${sub.user_id}`);
+        const safetyTimeout = setTimeout(() => {
+          supabase.removeChannel(channel);
+        }, 5000);
 
-        // Only trigger the proposal popup if there is at least one band where the song is NOT yet present AND student is NOT assigned
-        const hasEligibleBands = bandIds.some(id => !bandsWithSong.has(id) && !bandsWhereAlreadyAssigned.has(id));
+        channel.subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            channel.send({
+              type: 'broadcast',
+              event: 'challenge-approved',
+              payload: {
+                songId: sub.song_id,
+                songTitle: songTitle || 'Song',
+                instrument: sub.instrument,
+                difficultyLevel: sub.difficulty_level
+              }
+            });
+            clearTimeout(safetyTimeout);
+            setTimeout(() => supabase.removeChannel(channel), 1000);
+          }
+        });
+        // Get all bands the student is a member of
+        const { data: memberships } = await supabase.from('band_members').select('band_id').eq('user_id', sub.user_id);
         
-        if (hasEligibleBands) {
-          await supabase.from('users').update({ 
-            pending_repertoire_proposal: {
-              song_id: sub.song_id,
-              difficulty_level: sub.difficulty_level,
-              instrument: sub.instrument
-            }
-          }).eq('id', sub.user_id);
+        if (memberships && memberships.length > 0) {
+          const bandIds = memberships.map(m => m.band_id);
+          
+          // Check which of these bands already have this song in their repertoire (proposal, planned, or active)
+          const { data: existingBandSongs } = await supabase
+            .from('band_songs')
+            .select('band_id')
+            .in('band_id', bandIds)
+            .eq('song_id', sub.song_id);
+            
+          const bandsWithSong = new Set(existingBandSongs?.map(bs => bs.band_id) || []);
+          
+          // 2b. ALSO check if the student is ALREADY assigned to a slot for this song
+          const { data: assignedSlots } = await supabase
+            .from('band_song_slots')
+            .select('band_songs(band_id)')
+            .eq('user_id', sub.user_id)
+            .eq('band_songs.song_id', sub.song_id);
+          
+          const bandsWhereAlreadyAssigned = new Set((assignedSlots || []).map((s: any) => 
+            Array.isArray(s.band_songs) ? s.band_songs[0]?.band_id : s.band_songs?.band_id
+          ).filter(Boolean));
+
+          // Only trigger the proposal popup if there is at least one band where the song is NOT yet present AND student is NOT assigned
+          const hasEligibleBands = bandIds.some(id => !bandsWithSong.has(id) && !bandsWhereAlreadyAssigned.has(id));
+          
+          if (hasEligibleBands) {
+            await supabase.from('users').update({ 
+              pending_repertoire_proposal: {
+                song_id: sub.song_id,
+                difficulty_level: sub.difficulty_level,
+                instrument: sub.instrument
+              }
+            }).eq('id', sub.user_id);
+          }
         }
       }
+      
+      fetchData();
+    } catch (err: any) {
+      console.error('Failed to approve submission:', err);
+      alert('Fehler bei der Freigabe: ' + (err?.message || 'Unbekannter Fehler'));
     }
-    
-    fetchData();
   };
 
   const handleRejectSubmission = async (subId: string) => {
-    const { error: rejErr } = await supabase.from('user_song_skills').update({ is_pending_approval: false, progress_percent: 85 }).eq('id', subId);
-    if (rejErr) {
-      alert('Fehler beim Ablehnen: ' + rejErr.message);
-      return;
+    try {
+      const { error: rejErr } = await supabase.from('user_song_skills').update({ is_pending_approval: false, progress_percent: 85 }).eq('id', subId);
+      if (rejErr) {
+        alert('Fehler beim Ablehnen: ' + rejErr.message);
+        return;
+      }
+      fetchData();
+    } catch (err: any) {
+      console.error('Failed to reject submission:', err);
+      alert('Fehler beim Ablehnen: ' + (err?.message || 'Unbekannter Fehler'));
     }
-    fetchData();
   };
 
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStudent.firstName) return;
     
-    if (teacher?.schools?.limits_enabled) {
-      const maxStudents = teacher.schools.max_students ?? 6;
-      if (allStudents.length >= maxStudents) {
-        alert(`Limit erreicht! Deine Schule darf maximal ${maxStudents} Schüler registrieren. Kontaktiere deinen Master-Admin.`);
-        return;
+    try {
+      if (teacher?.schools?.limits_enabled) {
+        const maxStudents = teacher.schools.max_students ?? 6;
+        if (allStudents.length >= maxStudents) {
+          alert(`Limit erreicht! Deine Schule darf maximal ${maxStudents} Schüler registrieren. Kontaktiere deinen Master-Admin.`);
+          return;
+        }
       }
-    }
-    
-    const studentId = crypto.randomUUID();
-    const qrToken = crypto.randomUUID();
-    
-    const activeSchool = schoolData || (Array.isArray(teacher?.schools) ? teacher?.schools[0] : teacher?.schools);
-    const hasCampus = activePlatform === 'campus' && activeSchool?.has_campus_subscription !== false;
-    const finalLastName = hasCampus ? newStudent.lastName : (newStudent.lastName?.trim() ? newStudent.lastName.trim().charAt(0).toUpperCase() + '.' : '');
-    const finalBirthDate = hasCampus ? sanitizeBirthDateToDayOnly(newStudent.birthDate) : null;
-    
-    const { data, error } = await supabase.from('users').insert({
-      id: studentId,
-      school_id: teacher.school_id, 
-      role: 'student', 
-      first_name: newStudent.firstName, 
-      last_name: finalLastName,
-      email: `student.${studentId}@campus-groovelab.local`,
-      birth_date: finalBirthDate,
-      photo_url: newStudent.photoUrl || '/avatar_ghost.jpg',
-      qr_token: qrToken,
-      is_external_vocalist: newStudent.isExternalVocalist,
-      instrument: newStudent.isExternalVocalist ? 'Vocals' : (teacher?.instrument || 'Gitarre'),
-      status: newStudent.status || 'active',
-      is_trial: newStudent.is_trial || false,
-      trial_ends_at: newStudent.is_trial && newStudent.trial_ends_at ? newStudent.trial_ends_at : null,
-      contract_ends_at: newStudent.contract_ends_at ? newStudent.contract_ends_at : null,
-      is_campus_active: activeSchool?.student_billing_option === 'option3_3' || activeSchool?.student_billing_option === 'all_inclusive',
-      is_groovelab_active: activeSchool?.student_billing_option === 'option3_3' || activeSchool?.student_billing_option === 'all_inclusive',
-      teacher_id: userId,
-      app_usage_mode: newStudent.app_usage_mode || 'student_only'
-    }).select().single();
-    
-    if (error) {
-      alert('Fehler beim Hinzufügen: ' + error.message);
-    } else if (data) { 
-      setAllStudents(prev => [...prev, data]); 
-      setShowAddStudent(false); 
-      setNewStudent({ 
-        firstName: '', 
-        lastName: '', 
-        email: '',
-        birthDate: '', 
-        photoUrl: '/avatar_ghost.jpg', 
-        isExternalVocalist: false,
-        status: 'active',
-        is_trial: false,
-        trial_ends_at: '',
-        contract_ends_at: '',
-        app_usage_mode: 'student_only'
-      }); 
-      fetchData();
+      
+      const studentId = crypto.randomUUID();
+      const qrToken = crypto.randomUUID();
+      
+      const activeSchool = schoolData || (Array.isArray(teacher?.schools) ? teacher?.schools[0] : teacher?.schools);
+      const hasCampus = activePlatform === 'campus' && activeSchool?.has_campus_subscription !== false;
+      const finalLastName = hasCampus ? newStudent.lastName : (newStudent.lastName?.trim() ? newStudent.lastName.trim().charAt(0).toUpperCase() + '.' : '');
+      const finalBirthDate = hasCampus ? sanitizeBirthDateToDayOnly(newStudent.birthDate) : null;
+      
+      const { data, error } = await supabase.from('users').insert({
+        id: studentId,
+        school_id: teacher.school_id, 
+        role: 'student', 
+        first_name: newStudent.firstName, 
+        last_name: finalLastName,
+        email: `student.${studentId}@campus-groovelab.local`,
+        birth_date: finalBirthDate,
+        photo_url: newStudent.photoUrl || '/avatar_ghost.jpg',
+        qr_token: qrToken,
+        is_external_vocalist: newStudent.isExternalVocalist,
+        instrument: newStudent.isExternalVocalist ? 'Vocals' : (teacher?.instrument || 'Gitarre'),
+        status: newStudent.status || 'active',
+        is_trial: newStudent.is_trial || false,
+        trial_ends_at: newStudent.is_trial && newStudent.trial_ends_at ? newStudent.trial_ends_at : null,
+        contract_ends_at: newStudent.contract_ends_at ? newStudent.contract_ends_at : null,
+        is_campus_active: activeSchool?.student_billing_option === 'option3_3' || activeSchool?.student_billing_option === 'all_inclusive',
+        is_groovelab_active: activeSchool?.student_billing_option === 'option3_3' || activeSchool?.student_billing_option === 'all_inclusive',
+        teacher_id: userId,
+        app_usage_mode: newStudent.app_usage_mode || 'student_only'
+      }).select().single();
+      
+      if (error) {
+        alert('Fehler beim Hinzufügen: ' + error.message);
+      } else if (data) { 
+        setAllStudents(prev => [...prev, data]); 
+        setShowAddStudent(false); 
+        setNewStudent({ 
+          firstName: '', 
+          lastName: '', 
+          email: '',
+          birthDate: '', 
+          photoUrl: '/avatar_ghost.jpg', 
+          isExternalVocalist: false,
+          status: 'active',
+          is_trial: false,
+          trial_ends_at: '',
+          contract_ends_at: '',
+          app_usage_mode: 'student_only'
+        }); 
+        fetchData();
+      }
+    } catch (err: any) {
+      console.error('Failed to add student:', err);
+      alert('Fehler beim Hinzufügen: ' + (err?.message || 'Unbekannter Fehler'));
     }
   };
 
   const handleUpdateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingStudent) return;
-    const activeSchool = schoolData || (Array.isArray(teacher?.schools) ? teacher?.schools[0] : teacher?.schools);
-    const hasCampus = activePlatform === 'campus' && activeSchool?.has_campus_subscription !== false;
-    const finalLastName = hasCampus ? (editingStudent.last_name || '') : (editingStudent.last_name?.trim() ? editingStudent.last_name.trim().charAt(0).toUpperCase() + '.' : '');
-    const { error } = await supabase.from('users').update({
-      first_name: editingStudent.first_name,
-      last_name: finalLastName,
-      birth_date: null,
-      status: editingStudent.status || 'active',
-      is_trial: editingStudent.is_trial || false,
-      trial_ends_at: editingStudent.is_trial && editingStudent.trial_ends_at ? editingStudent.trial_ends_at : null,
-      contract_ends_at: editingStudent.contract_ends_at || null,
-      is_external_vocalist: editingStudent.is_external_vocalist || false,
-      instrument: editingStudent.is_external_vocalist ? 'Vocals' : (editingStudent.instrument && editingStudent.instrument !== 'Musiker' ? editingStudent.instrument : (teacher?.instrument || 'Gitarre')),
-      app_usage_mode: editingStudent.app_usage_mode || 'student_only'
-    }).eq('id', editingStudent.id);
-    
-    if (error) {
-      alert('Fehler beim Aktualisieren: ' + error.message);
-    } else {
-      setAllStudents(prev => prev.map(s => s.id === editingStudent.id ? editingStudent : s));
-      setEditingStudent(null);
-      fetchData();
+    try {
+      const activeSchool = schoolData || (Array.isArray(teacher?.schools) ? teacher?.schools[0] : teacher?.schools);
+      const hasCampus = activePlatform === 'campus' && activeSchool?.has_campus_subscription !== false;
+      const finalLastName = hasCampus ? (editingStudent.last_name || '') : (editingStudent.last_name?.trim() ? editingStudent.last_name.trim().charAt(0).toUpperCase() + '.' : '');
+      const { error } = await supabase.from('users').update({
+        first_name: editingStudent.first_name,
+        last_name: finalLastName,
+        birth_date: null,
+        status: editingStudent.status || 'active',
+        is_trial: editingStudent.is_trial || false,
+        trial_ends_at: editingStudent.is_trial && editingStudent.trial_ends_at ? editingStudent.trial_ends_at : null,
+        contract_ends_at: editingStudent.contract_ends_at || null,
+        is_external_vocalist: editingStudent.is_external_vocalist || false,
+        instrument: editingStudent.is_external_vocalist ? 'Vocals' : (editingStudent.instrument && editingStudent.instrument !== 'Musiker' ? editingStudent.instrument : (teacher?.instrument || 'Gitarre')),
+        app_usage_mode: editingStudent.app_usage_mode || 'student_only'
+      }).eq('id', editingStudent.id);
+      
+      if (error) {
+        alert('Fehler beim Aktualisieren: ' + error.message);
+      } else {
+        setAllStudents(prev => prev.map(s => s.id === editingStudent.id ? editingStudent : s));
+        setEditingStudent(null);
+        fetchData();
+      }
+    } catch (err: any) {
+      console.error('Failed to update student:', err);
+      alert('Fehler beim Aktualisieren: ' + (err?.message || 'Unbekannter Fehler'));
     }
   };
 
@@ -8652,7 +8698,7 @@ useEffect(() => {
         className="cg-full-height-board fluid-board-scroll-container"
         style={{
           flex: 1,
-          padding: hideHeader ? ((windowWidth < 768 || isMobileDevice) ? '0 0 100px 0' : '0') : ((windowWidth < 768 || isMobileDevice) ? 'max(48px, env(safe-area-inset-top, 48px)) 0px 100px 0px' : '10px'),
+          padding: hideHeader ? ((windowWidth < 768 || isMobileDevice) ? '0 0 calc(var(--bottom-bar-height, 68px) + env(safe-area-inset-bottom, 0px) + 32px) 0' : '0') : ((windowWidth < 768 || isMobileDevice) ? 'max(48px, env(safe-area-inset-top, 48px)) 0px calc(var(--bottom-bar-height, 68px) + env(safe-area-inset-bottom, 0px) + 32px) 0px' : '10px'),
           boxSizing: 'border-box',
           width: '100%'
         }}
@@ -11673,365 +11719,20 @@ useEffect(() => {
             />
           </Suspense>
       ) : activeTab === 'proposals' ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-          {/* Header row with Back Button */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <button 
-              onClick={() => setActiveTab('live')}
-              style={{
-                background: 'white',
-                border: '1px solid #e2e8f0',
-                padding: '12px 24px',
-                borderRadius: '16px',
-                fontWeight: 800,
-                color: '#64748b',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                alignSelf: 'flex-start',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
-                transition: 'all 0.2s'
-              }}
-              
-              
-            >
-              ← Zurück zum Live Lab
-            </button>
-            <div>
-              <h1 style={{ fontSize: '2.2rem', fontWeight: 950, color: '#1e293b', letterSpacing: '-0.03em', margin: '0 0 8px 0' }}>
-                Offene Band-Projekte
-              </h1>
-              <p style={{ color: '#64748b', fontWeight: 600, fontSize: '0.95rem', margin: 0 }}>
-                Hier findest Du alle Lieder, die Deine Bands aktuell vorschlagen. Stimme in Deinem Band-Board ab und übe Deinen Part, um sie bühnenreif zu machen!
-              </p>
-            </div>
-          </div>
-
-          {openProposals.length === 0 ? (
-            <div className="card" style={{ 
-              padding: '60px 40px', 
-              textAlign: 'center', 
-              display: 'flex', 
-              flexDirection: 'column', 
-              alignItems: 'center', 
-              gap: '16px',
-              background: '#f8fafc',
-              border: '1px dashed #e2e8f0',
-              borderRadius: '32px'
-            }}>
-              <div style={{ background: '#e0e7ff', color: '#4f46e5', padding: '16px', borderRadius: '24px', boxShadow: '0 8px 20px rgba(79, 70, 229, 0.1)' }}>
-                <CheckCircle size={36} />
-              </div>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Alles bereit!</h3>
-              <p style={{ color: '#64748b', fontSize: '0.9rem', maxWidth: '400px', margin: 0, lineHeight: 1.5 }}>
-                Es gibt momentan keine offenen Vorschläge in Deinen Bands. Du bist komplett auf dem Laufenden!
-              </p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-              {(() => {
-                // Group proposals by band
-                const groupedProposals = openProposals.reduce((acc: Record<string, { band: any, proposals: any[] }>, form: any) => {
-                  const bandId = form.band.id;
-                  if (!acc[bandId]) {
-                    acc[bandId] = {
-                      band: form.band,
-                      proposals: []
-                    };
-                  }
-                  acc[bandId].proposals.push(form);
-                  return acc;
-                }, {});
-
-                const bandGroups = Object.values(groupedProposals).sort((a: any, b: any) => a.band.name.localeCompare(b.band.name));
-
-                return bandGroups.map((group: any) => {
-                  const band = group.band;
-                  const proposals = group.proposals;
-                  const isCollapsed = !!collapsedBands[band.id];
-
-                  return (
-                    <div key={band.id} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                      {/* Premium Collapsible Band Header */}
-                      <div 
-                        role="button"
-                        tabIndex={0}
-                        aria-expanded={!isCollapsed}
-                        aria-label={`Band ${band.name}: ${proposals.length} ${proposals.length === 1 ? 'offener Song' : 'offene Songs'} ${isCollapsed ? 'aufklappen' : 'zuklappen'}`}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            setCollapsedBands(prev => ({ ...prev, [band.id]: !prev[band.id] }));
-                          }
-                        }}
-                        onClick={() => setCollapsedBands(prev => ({ ...prev, [band.id]: !prev[band.id] }))}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '16px 28px',
-                          background: 'linear-gradient(90deg, #1e1b4b 0%, #110e3b 100%)',
-                          border: '1px solid rgba(165, 180, 252, 0.15)',
-                          borderRadius: '24px',
-                          cursor: 'pointer',
-                          boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
-                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                        }}
-                        
-                        
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                          {renderBandAvatar(band.name, band.photo_url, '48px', '12px')}
-                          <div>
-                            <h3 style={{ fontSize: '1.2rem', fontWeight: 950, color: 'white', margin: 0, letterSpacing: '-0.01em' }}>
-                              {band.name}
-                            </h3>
-                            <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '2px' }}>
-                              {proposals.length} {proposals.length === 1 ? 'offener Song' : 'offene Songs'}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <span style={{ 
-                            fontSize: '0.65rem', 
-                            fontWeight: 900, 
-                            color: '#a5b4fc', 
-                            textTransform: 'uppercase', 
-                            letterSpacing: '0.1em',
-                            background: 'rgba(165, 180, 252, 0.1)',
-                            padding: '6px 12px',
-                            borderRadius: '12px'
-                          }}>
-                            {isCollapsed ? 'Ausklappen' : 'Einklappen'}
-                          </span>
-                          <div style={{ 
-                            color: '#a5b4fc', 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center',
-                            transition: 'transform 0.3s ease',
-                            transform: isCollapsed ? 'rotate(0deg)' : 'rotate(180deg)'
-                          }}>
-                            <ChevronDown size={20} />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Grouped proposals list */}
-                      {!isCollapsed && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingLeft: '8px' }}>
-                          {proposals.map((form: any) => {
-                            const song = form.song;
-                            const instReq = song.instrumentation || { 'E-Gitarre': 1, 'E-Drums': 1, 'E-Bass': 1 };
-                            const order = ['E-Gitarre', 'E-Drums', 'E-Piano', 'E-Bass'];
-                            const colors: Record<string, string> = {
-                              'E-Gitarre': '#ef4444',
-                              'E-Drums': '#3b82f6',
-                              'E-Piano': '#a855f7',
-                              'E-Bass': '#f59e0b'
-                            };
-
-                            const allRequired: { instrument: string; part: number }[] = [];
-                            order.forEach(instName => {
-                              const count = instReq[instName] || 0;
-                              for(let i=0; i < count; i++) {
-                                allRequired.push({ instrument: instName, part: i + 1 });
-                              }
-                            });
-
-                            const getIcon = (inst: string) => {
-                              return renderInstrumentIcon(inst);
-                            };
-
-                            const isPro = form.band_song?.difficulty_level === 'original' || form.band_song?.difficulty_level === 'pro';
-                      const levelText = isPro ? 'PRO' : 'STARTER';
-
-                            return (
-                              <div key={form.id} style={{ 
-                                background: 'linear-gradient(135deg, #1e1b4b 0%, #0f0728 100%)', 
-                                borderRadius: '28px', 
-                                border: '1px solid rgba(165, 180, 252, 0.1)',
-                                boxShadow: '0 15px 35px rgba(0, 0, 0, 0.2)',
-                                display: 'flex',
-                                flexWrap: 'wrap',
-                                overflow: 'hidden',
-                                minHeight: '260px'
-                              }}>
-                                {/* Left Panel: Band & Song Info */}
-                                <div style={{ 
-                                  flex: '1 1 320px',
-                                  padding: '32px', 
-                                  background: 'rgba(255, 255, 255, 0.03)', 
-                                  borderRight: '1px solid rgba(255, 255, 255, 0.05)',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  justifyContent: 'space-between',
-                                  gap: '24px'
-                                }}>
-                                  <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                                    {renderBandAvatar(form.band.name, form.band.photo_url, '56px', '16px')}
-                                    <div>
-                                      <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '2px' }}>
-                                        Deine Band
-                                      </div>
-                                      <div style={{ fontSize: '1.2rem', fontWeight: 950, color: 'white', letterSpacing: '-0.02em' }}>
-                                        {form.band.name}
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  <div>
-                                    <span style={{ 
-                                      background: 'rgba(168, 85, 247, 0.15)', 
-                                      color: '#c084fc', 
-                                      border: '1px solid rgba(168, 85, 247, 0.3)',
-                                      padding: '4px 10px', 
-                                      borderRadius: '8px', 
-                                      fontSize: '0.6rem', 
-                                      fontWeight: 900,
-                                      textTransform: 'uppercase',
-                                      letterSpacing: '0.08em',
-                                      display: 'inline-block',
-                                      marginBottom: '8px'
-                                    }}>
-                                      Abstimmung läuft
-                                    </span>
-                                    <h3 style={{ fontSize: '1.4rem', fontWeight: 1000, color: 'white', margin: '0 0 4px 0', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-                                      {song.title}
-                                    </h3>
-                                    <p style={{ color: '#94a3b8', fontWeight: 700, fontSize: '0.8rem', margin: 0 }}>
-                                      {song.artist || 'Unbekannt'}
-                                    </p>
-                                  </div>
-
-                                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, lineHeight: 1.4 }}>
-                                    Klicke im Hauptmenü auf <strong style={{ color: 'white' }}>"Deine Bands"</strong>, um an der Abstimmung teilzunehmen!
-                                  </div>
-                                </div>
-
-                                {/* Right Panel: Slot Grid */}
-                                <div style={{ flex: '1 1 400px', padding: '32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <h4 style={{ fontSize: '0.75rem', fontWeight: 950, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>
-                                      Instrumenten-Belegung & Freischaltung
-                                    </h4>
-                                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8' }}>
-                                      Level: <strong style={{ color: isPro ? '#c084fc' : '#f59e0b', textTransform: 'uppercase' }}>{levelText}</strong>
-                                    </span>
-                                  </div>
-
-                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'center', justifyContent: 'flex-start', flex: 1 }}>
-                                    {(() => {
-                                      const APP_INSTRUMENT_ICONS: Record<string, string> = {
-                                        'E-Gitarre': '🎸',
-                                        'E-Bass': '🎸',
-                                        'E-Drums': '🥁',
-                                        'Vocals': '🎤',
-                                        'E-Piano': '🎹',
-                                        'Keyboard': '🎹'
-                                      };
-
-                                      return allRequired.map(({ instrument, part }) => {
-                                        const key = `${instrument}_${part}`;
-                                        const member = form.members.find((m: any) => {
-                                          const mNorm = normalizeInstrument(m.instrument).toLowerCase();
-                                          const targetNorm = normalizeInstrument(instrument).toLowerCase();
-                                          return mNorm === targetNorm && m.part_number === part;
-                                        });
-
-                                        const isMe = member?.user_id === userId;
-                                        const instLabel = (instReq[instrument] || 0) > 1 ? `${instrument} ${part}` : instrument;
-
-                                        return (
-                                          <div key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '80px', position: 'relative' }}>
-                                            <div style={{ 
-                                              width: '64px', height: '64px', borderRadius: '18px', 
-                                              background: member ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.03)', 
-                                              border: (isMe || member?.isMastered) ? `3px solid #ef4444` : (member ? '1px solid rgba(255,255,255,0.1)' : '2px dashed rgba(255,255,255,0.2)'),
-                                              boxShadow: isMe ? '0 0 15px rgba(239, 68, 68, 0.3)' : 'none',
-                                              display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
-                                              filter: member && !member.isMastered ? 'grayscale(100%)' : 'none',
-                                              opacity: member && !member.isMastered ? 0.6 : 1
-                                            }}>
-                                              {member ? (
-                                                <div 
-                                                  role="button"
-                                                  tabIndex={0}
-                                                  aria-label={`Profil von ${member.first_name || 'Mitglied'} ${member.last_name || ''} aufrufen`}
-                                                  onKeyDown={(e) => {
-                                                    if (e.key === 'Enter' || e.key === ' ') {
-                                                      e.preventDefault();
-                                                      e.stopPropagation();
-                                                      setSelectedStudentProfile({
-                                                        id: member.user_id,
-                                                        first_name: member.first_name,
-                                                        last_name: member.last_name,
-                                                        photo_url: member.photo_url,
-                                                        created_at: member.created_at,
-                                                        birth_date: member.birth_date,
-                                                        instrument: member.instrument
-                                                      });
-                                                    }
-                                                  }}
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setSelectedStudentProfile({
-                                                      id: member.user_id,
-                                                      first_name: member.first_name,
-                                                      last_name: member.last_name,
-                                                      photo_url: member.photo_url,
-                                                      created_at: member.created_at,
-                                                      birth_date: member.birth_date,
-                                                      instrument: member.instrument
-                                                    });
-                                                  }}
-                                                  style={{ width: '100%', height: '100%', position: 'relative', cursor: 'pointer' }}
-                                                >
-                                                  <img 
-                                                    src={member.photo_url || '/avatar_ghost.jpg'} 
-                                                    style={{ width: '100%', height: '100%', borderRadius: '15px', objectFit: 'cover' }} 
-                                                    alt={member.first_name ? `${member.first_name} ${member.last_name || ''}` : "Bandmitglied"} 
-                                                  />
-                                                  {member.isMastered && (
-                                                    <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: '#34a853', color: 'white', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', zIndex: 10 }}>
-                                                      <Check size={12} strokeWidth={4} />
-                                                    </div>
-                                                  )}
-                                                </div>
-                                              ) : (
-                                                <div style={{ fontSize: '1.5rem', opacity: 0.2 }}>{APP_INSTRUMENT_ICONS[instrument as keyof typeof APP_INSTRUMENT_ICONS] || '❓'}</div>
-                                              )}
-                                            </div>
-                                            <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px', width: '100%' }}>
-                                              <div style={{ fontSize: '0.65rem', fontWeight: 950, color: member ? 'white' : 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
-                                                {member ? member.first_name : instLabel}
-                                              </div>
-                                              {member && (
-                                                <div style={{ fontSize: '0.45rem', fontWeight: 800, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase' }}>
-                                                  {instLabel}
-                                                </div>
-                                              )}
-                                            </div>
-                                          </div>
-                                        );
-                                      });
-                                    })()}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                });
-              })()}
-            </div>
-          )}
-        </div>
+        <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Band-Projekte werden geladen...</div>}>
+          <TeacherBandWorkspace
+            allBands={allBands}
+            openProposals={openProposals}
+            windowWidth={windowWidth}
+            isMobileDevice={isMobileDevice}
+            userId={userId}
+            onOpenBandProfile={onOpenBandProfile}
+            setSelectedStudentProfile={setSelectedStudentProfile}
+            setActiveTab={setActiveTab}
+            activePlatform={activePlatform}
+            isProposalsView={true}
+          />
+        </Suspense>
       ) : activeTab === 'studio' ? (
         <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Aufgaben-Studio wird geladen...</div>}>
           <TeacherStudioBoardView
@@ -12146,239 +11847,31 @@ useEffect(() => {
           />
         </Suspense>
       ) : (
-        <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start', flexWrap: 'wrap', width: '100%' }}>
-          {/* Main Column */}
-          <div style={{ flex: 3, minWidth: (windowWidth < 768 || isMobileDevice) ? '100%' : '400px', maxWidth: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <input 
-              placeholder="Band suchen..." 
-              value={bandSearch} 
-              onChange={e => setBandSearch(e.target.value)} 
-              style={{ width: '100%', boxSizing: 'border-box', padding: '16px 20px', borderRadius: '24px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', outline: 'none' }} 
-            />
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
-              {allBands.filter(b => b.name.toLowerCase().includes(bandSearch.toLowerCase())).map(band => (
-                <div 
-                  key={band.id} 
-                  onClick={() => onOpenBandProfile?.(band)} 
-                  className="google-card" 
-                  style={{ padding: '24px', borderRadius: '24px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '12px' }}
-                >
-                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 950, color: '#1e293b' }}>{band.name}</h3>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '10px 14px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>Mitglieder</span>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0b57d0' }}>
-                      {(() => { const ids = (band.band_members || []).map((m: any) => m.user_id || m.student_id || m.external_name).filter(Boolean); return new Set(ids).size; })()}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Bands Right Sidebar */}
-          <aside style={{ flex: 1, minWidth: (windowWidth < 768 || isMobileDevice) ? '100%' : '300px', maxWidth: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-              <h3 style={{ margin: '0 0 16px 0', fontSize: '1.1rem', fontWeight: 900, color: '#1e293b' }}>
-                Band-Übersicht
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '12px 16px', borderRadius: '16px' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>Gesamt Bands</span>
-                  <span style={{ fontSize: '1.1rem', fontWeight: 950, color: '#0b57d0' }}>{allBands.length}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '12px 16px', borderRadius: '16px' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>Offene Song-Vorschläge</span>
-                  <span style={{ fontSize: '1.1rem', fontWeight: 950, color: '#b06000' }}>{openProposals.length}</span>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ padding: '24px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-              <h3 style={{ margin: '0 0 12px 0', fontSize: '1rem', fontWeight: 900, color: '#1e293b' }}>
-                Coaching Leitfaden
-              </h3>
-              <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '0.78rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '8px', fontWeight: 600, lineHeight: 1.4 }}>
-                <li>🎸 <b>Fokus auf Rhythmus</b>: Lass die Bands langsam starten und das Timing festigen.</li>
-                <li>🎤 <b>Gesang lauter</b>: Stelle sicher, dass Sänger klar verständlich über der Band liegen.</li>
-                <li>🎹 <b>Klangauswahl</b>: Keys sollten Frequenzlücken füllen, nicht die Gitarren überdecken.</li>
-                <li>📝 <b>Abstimmungen</b>: Überprüfe regelmäßig die ausstehenden Songs im Repertoire Planer.</li>
-              </ul>
-            </div>
-          </aside>
-        </div>
+        <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Bands werden geladen...</div>}>
+          <TeacherBandWorkspace
+            allBands={allBands}
+            openProposals={openProposals}
+            windowWidth={windowWidth}
+            isMobileDevice={isMobileDevice}
+            userId={userId}
+            onOpenBandProfile={onOpenBandProfile}
+            setSelectedStudentProfile={setSelectedStudentProfile}
+            setActiveTab={setActiveTab}
+            activePlatform={activePlatform}
+            isProposalsView={false}
+          />
+        </Suspense>
       )}
 
 
       {/* Edit Student Modal */}
-      {editingStudent && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(255, 255, 255, 0.8)',
-          backdropFilter: 'blur(12px)',
-          zIndex: 1500,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '24px'
-        }}>
-          <div style={{
-            background: 'white',
-            border: '1.5px solid #e2e8f0',
-            borderRadius: '32px',
-            width: '100%',
-            maxWidth: '500px',
-            padding: '32px',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.05)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '24px'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '1.35rem', fontWeight: 950, color: '#1e293b', margin: 0 }}>Schüler bearbeiten</h3>
-              <button 
-                onClick={() => setEditingStudent(null)}
-                style={{ background: '#f1f5f9', border: 'none', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleUpdateStudent} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname</label>
-                <input 
-                  type="text" 
-                  required
-                  value={editingStudent.first_name} 
-                  onChange={e => setEditingStudent({...editingStudent, first_name: e.target.value})} 
-                  style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
-                  {activePlatform === 'campus' && schoolData?.has_campus_subscription !== false ? 'Nachname' : 'Nachname (Initial)'}
-                </label>
-                <input 
-                  type="text" 
-                  required
-                  value={editingStudent.last_name} 
-                  onChange={e => setEditingStudent({...editingStudent, last_name: e.target.value})} 
-                  style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Status</label>
-                <select 
-                  value={editingStudent.status}
-                  onChange={e => setEditingStudent({...editingStudent, status: e.target.value})}
-                  style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem', background: 'white' }}
-                >
-                  <option value="active">Aktiv</option>
-                  <option value="inactive">Inaktiv</option>
-                </select>
-              </div>
-
-              {activePlatform === 'campus' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <input 
-                    type="checkbox" 
-                    id="editIsExternalVocalist"
-                    checked={editingStudent.is_external_vocalist} 
-                    onChange={e => setEditingStudent({...editingStudent, is_external_vocalist: e.target.checked})} 
-                  />
-                  <label htmlFor="editIsExternalVocalist" style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b', cursor: 'pointer' }}>Externer Sänger (Vocals)</label>
-                </div>
-              )}
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <input 
-                  type="checkbox" 
-                  id="editIsTrial"
-                  checked={editingStudent.is_trial} 
-                  onChange={e => setEditingStudent({...editingStudent, is_trial: e.target.checked})} 
-                />
-                <label htmlFor="editIsTrial" style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b', cursor: 'pointer' }}>In Testphase (Trial)</label>
-              </div>
-
-              {editingStudent.is_trial && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Testphase Ende</label>
-                  <input 
-                    type="date" 
-                    value={editingStudent.trial_ends_at ? editingStudent.trial_ends_at.substring(0, 10) : ''} 
-                    onChange={e => setEditingStudent({...editingStudent, trial_ends_at: e.target.value})} 
-                    style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }}
-                  />
-                </div>
-              )}
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vertragsende (optional)</label>
-                <input 
-                  type="date" 
-                  value={editingStudent.contract_ends_at ? editingStudent.contract_ends_at.substring(0, 10) : ''} 
-                  onChange={e => setEditingStudent({...editingStudent, contract_ends_at: e.target.value})} 
-                  style={{ padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', outline: 'none', fontSize: '0.9rem' }}
-                />
-              </div>
-
-              {/* Campus app_usage_mode Toggle (Only for Campus) */}
-              {activePlatform === 'campus' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Campus-Nutzungsmodus</label>
-                  <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '12px', padding: '4px', border: '1px solid #e2e8f0' }}>
-                    <button
-                      type="button"
-                      onClick={() => setEditingStudent({...editingStudent, app_usage_mode: 'student_only'})}
-                      style={{
-                        flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
-                        background: (editingStudent.app_usage_mode || 'student_only') === 'student_only' ? '#ffffff' : 'transparent',
-                        color: (editingStudent.app_usage_mode || 'student_only') === 'student_only' ? '#8b5cf6' : '#64748b',
-                        fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
-                        boxShadow: (editingStudent.app_usage_mode || 'student_only') === 'student_only' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
-                      }}
-                    >
-                      📱 Selbstnutzer
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingStudent({...editingStudent, app_usage_mode: 'parent_hybrid'})}
-                      style={{
-                        flex: 1, padding: '10px', border: 'none', borderRadius: '8px',
-                        background: editingStudent.app_usage_mode === 'parent_hybrid' ? '#ffffff' : 'transparent',
-                        color: editingStudent.app_usage_mode === 'parent_hybrid' ? '#8b5cf6' : '#64748b',
-                        fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
-                        boxShadow: editingStudent.app_usage_mode === 'parent_hybrid' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
-                      }}
-                    >
-                      👪 Eltern-Hybrid
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
-                <button 
-                  type="button" 
-                  onClick={() => setEditingStudent(null)}
-                  style={{ flex: 1, padding: '14px', borderRadius: '16px', border: '1.5px solid #e2e8f0', background: 'white', fontWeight: 800, color: '#475569', cursor: 'pointer' }}
-                >
-                  Abbrechen
-                </button>
-                <button 
-                  type="submit" 
-                  style={{ flex: 1, padding: '14px', borderRadius: '16px', border: 'none', background: '#8b5cf6', color: 'white', fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.2)' }}
-                >
-                  Speichern
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <TeacherEditStudentModal
+        editingStudent={editingStudent}
+        setEditingStudent={setEditingStudent}
+        handleUpdateStudent={handleUpdateStudent}
+        activePlatform={activePlatform}
+        schoolData={schoolData}
+      />
       </div>
       {/* Full Submissions View Overlay */}
       {showAllSubmissions && (
@@ -12509,1570 +12002,60 @@ useEffect(() => {
       )}
 
       {/* ── TIER-1 APPLE BOTTOM SHEET TERMINABSAGE / ABWESENHEIT MODAL ── */}
-      {showAbsenceModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 99999,
-            background: 'rgba(15, 23, 42, 0.65)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-            display: 'flex',
-            alignItems: windowWidth <= 768 ? 'flex-end' : 'center',
-            justifyContent: 'center',
-            padding: windowWidth <= 768 ? '0px' : '16px',
-            animation: 'fadeIn 0.2s ease-out'
-          }}
-          onClick={() => setShowAbsenceModal(false)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="absence-modal-title"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: '#ffffff',
-              borderRadius: windowWidth <= 768 ? '24px 24px 0 0' : '24px',
-              width: '100%',
-              maxWidth: '490px',
-              maxHeight: windowWidth <= 768 ? '94vh' : '92vh',
-              display: 'flex',
-              flexDirection: 'column',
-              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.3)',
-              overflow: 'hidden',
-              boxSizing: 'border-box'
-            }}
-          >
-            {/* Apple Drag Indicator for Mobile Viewports */}
-            {windowWidth <= 768 && (
-              <div style={{ width: '36px', height: '4px', background: '#cbd5e1', borderRadius: '100px', margin: '10px auto 2px auto' }} />
-            )}
-
-            {/* Header */}
-            <div style={{
-              padding: '14px 20px 12px 20px',
-              borderBottom: '1px solid #f1f5f9',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '10px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '12px',
-                  background: isTeacherCurrentlyAbsent(teacher)
-                    ? 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)'
-                    : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                  color: '#ffffff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: isTeacherCurrentlyAbsent(teacher)
-                    ? '0 4px 12px rgba(14, 165, 233, 0.25)'
-                    : '0 4px 12px rgba(239, 68, 68, 0.25)'
-                }}>
-                  {isTeacherCurrentlyAbsent(teacher) ? <Calendar size={19} /> : <AlertTriangle size={19} />}
-                </div>
-                <div>
-                  <h2 id="absence-modal-title" style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                    {isTeacherCurrentlyAbsent(teacher) ? 'Abwesenheit verwalten' : 'Abwesenheit / Ausfall melden'}
-                  </h2>
-                  <p style={{ margin: '1px 0 0 0', fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
-                    {isTeacherCurrentlyAbsent(teacher) ? 'Verfügbarkeit wiederherstellen oder Zeitraum korrigieren' : 'Sagt Termine ab & alarmiert das Sekretariat zur Schülerbetreuung'}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowAbsenceModal(false)}
-                aria-label="Abwesenheitsdialog schließen"
-                style={{
-                  background: '#f1f5f9',
-                  border: 'none',
-                  borderRadius: '10px',
-                  padding: '6px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#64748b',
-                  transition: 'all 0.15s'
-                }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Scrollable Body Content */}
-            <div style={{ padding: '12px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
-              
-              {/* Notice Banner */}
-              {isTeacherCurrentlyAbsent(teacher) ? (
-                <div style={{
-                  background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                  border: '1px solid #86efac',
-                  borderRadius: '12px',
-                  padding: '8px 12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  boxShadow: '0 2px 6px rgba(34, 197, 94, 0.06)'
-                }}>
-                  <span style={{ fontSize: '1rem', lineHeight: 1 }}>🟢</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <strong style={{ fontSize: '0.78rem', color: '#166534', display: 'block', fontWeight: 800 }}>
-                      Aktuell als abwesend gemeldet
-                    </strong>
-                    <span style={{ fontSize: '0.70rem', color: '#15803d', lineHeight: 1.35, fontWeight: 600 }}>
-                      Bis einschließlich {teacher.sick_until ? new Date(teacher.sick_until.substring(0, 10) + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'auf Weiteres'}. Du kannst dich jederzeit vorzeitig wieder verfügbar melden.
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <div style={{
-                  background: '#fff5f5',
-                  border: '1px solid #fecaca',
-                  borderRadius: '12px',
-                  padding: '7px 11px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}>
-                  <span style={{ fontSize: '1rem', lineHeight: 1 }}>ℹ️</span>
-                  <span style={{ fontSize: '0.72rem', color: '#991b1b', lineHeight: 1.35, fontWeight: 550 }}>
-                    Alle betroffenen Stundenplandaten im Zeitraum werden storniert. Das Sekretariat erhält ein Ticket zur Betreuung der Schüler.
-                  </span>
-                </div>
-              )}
-
-              {/* 1-Tap Quick-Selection Chips */}
-              <div>
-                <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '5px' }}>
-                  Schnell-Auswahl (1-Tap):
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const today = new Date().toLocaleDateString('sv-SE');
-                      setAbsenceStartDate(today);
-                      setAbsenceUntilDate(today);
-                      setQuickAbsencePreset('today');
-                      setShowCustomStart(false);
-                    }}
-                    style={{
-                      padding: '7px 10px',
-                      borderRadius: '10px',
-                      border: quickAbsencePreset === 'today' ? '2px solid #ef4444' : '1.5px solid #e2e8f0',
-                      background: quickAbsencePreset === 'today' ? '#fee2e2' : '#f8fafc',
-                      color: quickAbsencePreset === 'today' ? '#b91c1c' : '#334155',
-                      fontWeight: quickAbsencePreset === 'today' ? 800 : 600,
-                      fontSize: '0.78rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s'
-                    }}
-                  >
-                    <span>⚡</span>
-                    <span>Nur Heute</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const today = new Date().toLocaleDateString('sv-SE');
-                      const fri = (() => {
-                        const d = new Date();
-                        const day = d.getDay();
-                        const diffToFri = (5 - day + 7) % 7;
-                        d.setDate(d.getDate() + diffToFri);
-                        return d.toLocaleDateString('sv-SE');
-                      })();
-                      setAbsenceStartDate(today);
-                      setAbsenceUntilDate(fri);
-                      setQuickAbsencePreset('friday');
-                      setShowCustomStart(false);
-                    }}
-                    style={{
-                      padding: '7px 10px',
-                      borderRadius: '10px',
-                      border: quickAbsencePreset === 'friday' ? '2px solid #ef4444' : '1.5px solid #e2e8f0',
-                      background: quickAbsencePreset === 'friday' ? '#fee2e2' : '#f8fafc',
-                      color: quickAbsencePreset === 'friday' ? '#b91c1c' : '#334155',
-                      fontWeight: quickAbsencePreset === 'friday' ? 800 : 600,
-                      fontSize: '0.78rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s'
-                    }}
-                  >
-                    <span>📅</span>
-                    <span>Bis Freitag</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const today = new Date().toLocaleDateString('sv-SE');
-                      const nextFri = (() => {
-                        const d = new Date();
-                        const day = d.getDay();
-                        const diffToFri = (5 - day + 7) % 7;
-                        d.setDate(d.getDate() + diffToFri + 7);
-                        return d.toLocaleDateString('sv-SE');
-                      })();
-                      setAbsenceStartDate(today);
-                      setAbsenceUntilDate(nextFri);
-                      setQuickAbsencePreset('next_friday');
-                      setShowCustomStart(false);
-                    }}
-                    style={{
-                      padding: '7px 10px',
-                      borderRadius: '10px',
-                      border: quickAbsencePreset === 'next_friday' ? '2px solid #ef4444' : '1.5px solid #e2e8f0',
-                      background: quickAbsencePreset === 'next_friday' ? '#fee2e2' : '#f8fafc',
-                      color: quickAbsencePreset === 'next_friday' ? '#b91c1c' : '#334155',
-                      fontWeight: quickAbsencePreset === 'next_friday' ? 800 : 600,
-                      fontSize: '0.78rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s'
-                    }}
-                  >
-                    <span>🗓️</span>
-                    <span>Nächste Woche Fr</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setQuickAbsencePreset('custom');
-                      setShowCustomStart(true);
-                    }}
-                    style={{
-                      padding: '7px 10px',
-                      borderRadius: '10px',
-                      border: quickAbsencePreset === 'custom' ? '2px solid #ef4444' : '1.5px solid #e2e8f0',
-                      background: quickAbsencePreset === 'custom' ? '#fee2e2' : '#f8fafc',
-                      color: quickAbsencePreset === 'custom' ? '#b91c1c' : '#334155',
-                      fontWeight: quickAbsencePreset === 'custom' ? 800 : 600,
-                      fontSize: '0.78rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s'
-                    }}
-                  >
-                    <span>✏️</span>
-                    <span>Individuell</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Visual Period Display Card */}
-              <div style={{
-                background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                border: '1.5px solid #e2e8f0',
-                borderRadius: '14px',
-                padding: '10px 14px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '6px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Gewählter Zeitraum
-                  </span>
-                  <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#ef4444', background: '#fee2e2', padding: '1px 7px', borderRadius: '100px' }}>
-                    {(() => {
-                      if (!absenceStartDate || !absenceUntilDate) return '1 Tag';
-                      const s = new Date(absenceStartDate + 'T00:00:00');
-                      const u = new Date(absenceUntilDate + 'T00:00:00');
-                      s.setHours(0,0,0,0);
-                      u.setHours(0,0,0,0);
-                      const diff = Math.round((u.getTime() - s.getTime()) / (24*3600*1000)) + 1;
-                      return diff > 1 ? `${diff} Tage` : '1 Tag';
-                    })()}
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontSize: '0.64rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Von</span>
-                    <strong style={{ fontSize: '0.84rem', color: '#0f172a', fontWeight: 800 }}>
-                      {absenceStartDate ? new Date(absenceStartDate + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Sofort'}
-                    </strong>
-                  </div>
-                  <div style={{ color: '#cbd5e1', fontSize: '0.82rem' }}>➔</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'right' }}>
-                    <span style={{ fontSize: '0.64rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Bis einschließlich</span>
-                    <strong style={{ fontSize: '0.84rem', color: '#b91c1c', fontWeight: 800 }}>
-                      {absenceUntilDate ? new Date(absenceUntilDate + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Nicht gewählt'}
-                    </strong>
-                  </div>
-                </div>
-
-                {/* Custom Date Pickers */}
-                {(quickAbsencePreset === 'custom' || showCustomStart) && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', paddingTop: '8px', borderTop: '1px solid #e2e8f0', marginTop: '2px' }}>
-                    <div>
-                      <label style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '2px' }}>Startdatum:</label>
-                      <input 
-                        type="date"
-                        value={absenceStartDate}
-                        onChange={(e) => {
-                          setAbsenceStartDate(e.target.value);
-                          setQuickAbsencePreset('custom');
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '6px 8px',
-                          borderRadius: '10px',
-                          border: '1.5px solid #cbd5e1',
-                          background: '#ffffff',
-                          fontSize: '0.78rem',
-                          color: '#0f172a',
-                          fontWeight: 700,
-                          outline: 'none',
-                          boxSizing: 'border-box'
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '2px' }}>Enddatum:</label>
-                      <input 
-                        type="date"
-                        value={absenceUntilDate}
-                        onChange={(e) => {
-                          setAbsenceUntilDate(e.target.value);
-                          setQuickAbsencePreset('custom');
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '6px 8px',
-                          borderRadius: '10px',
-                          border: '1.5px solid #cbd5e1',
-                          background: '#ffffff',
-                          fontSize: '0.78rem',
-                          color: '#0f172a',
-                          fontWeight: 700,
-                          outline: 'none',
-                          boxSizing: 'border-box'
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Live Lesson Impact Counter */}
-              <div style={{
-                background: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                borderRadius: '10px',
-                padding: '6px 10px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
-                <Clock size={14} color="#64748b" />
-                <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 600 }}>
-                  {cancellationsCount > 0 
-                    ? `Heute sind ${cancellationsCount} Unterrichtseinheiten betroffen.` 
-                    : 'Alle geplanten Termine im Zeitraum werden storniert.'}
-                </span>
-              </div>
-
-              {/* ── ZUSTÄNDIGKEIT FÜR SCHÜLER-BENACHRICHTIGUNG (PFLICHTAUSWAHL) ── */}
-              <div>
-                <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                  <span>Wer informiert die Schüler telefonisch?</span>
-                  <span style={{ 
-                    fontSize: '0.62rem', 
-                    fontWeight: 800, 
-                    color: absenceHandlingOwner ? '#15803d' : '#ef4444',
-                    background: absenceHandlingOwner ? '#dcfce7' : '#fee2e2',
-                    padding: '2px 8px',
-                    borderRadius: '100px',
-                    border: `1px solid ${absenceHandlingOwner ? '#bbf7d0' : '#fecaca'}`
-                  }}>
-                    {absenceHandlingOwner ? '✓ Ausgewählt' : 'Pflichtfeld'}
-                  </span>
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                  {/* Option 1: Sekretariat beauftragen */}
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    aria-label="Sekretariat beauftragen: Die Verwaltung übernimmt die telefonische Kontaktaufnahme im Ausfall-Cockpit"
-                    onClick={() => setAbsenceHandlingOwner('secretariat')}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        setAbsenceHandlingOwner('secretariat');
-                      }
-                    }}
-                    style={{
-                      padding: '10px 12px',
-                      borderRadius: '14px',
-                      border: absenceHandlingOwner === 'secretariat' ? '2px solid #ef4444' : '1.5px solid #cbd5e1',
-                      background: absenceHandlingOwner === 'secretariat' ? '#fef2f2' : '#ffffff',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '4px',
-                      boxShadow: absenceHandlingOwner === 'secretariat' ? '0 4px 12px rgba(239, 68, 68, 0.12)' : 'none'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: '1.05rem' }}>🏢</span>
-                      <div style={{
-                        width: '16px',
-                        height: '16px',
-                        borderRadius: '50%',
-                        border: absenceHandlingOwner === 'secretariat' ? '5px solid #ef4444' : '1.5px solid #cbd5e1',
-                        background: '#ffffff',
-                        boxSizing: 'border-box',
-                        transition: 'all 0.15s'
-                      }} />
-                    </div>
-                    <strong style={{ fontSize: '0.80rem', color: absenceHandlingOwner === 'secretariat' ? '#991b1b' : '#0f172a', fontWeight: 850 }}>
-                      Sekretariat beauftragen
-                    </strong>
-                    <span style={{ fontSize: '0.66rem', color: '#64748b', lineHeight: 1.25 }}>
-                      Die Verwaltung übernimmt die telefonische Kontaktaufnahme im Ausfall-Cockpit
-                    </span>
-                  </div>
-
-                  {/* Option 2: Lehrkraft informiert selbst */}
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    aria-label="Ich übernehme selbst: Ich kontaktiere meine Schüler eigenständig"
-                    onClick={() => setAbsenceHandlingOwner('teacher')}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        setAbsenceHandlingOwner('teacher');
-                      }
-                    }}
-                    style={{
-                      padding: '10px 12px',
-                      borderRadius: '14px',
-                      border: absenceHandlingOwner === 'teacher' ? '2px solid #ef4444' : '1.5px solid #cbd5e1',
-                      background: absenceHandlingOwner === 'teacher' ? '#fef2f2' : '#ffffff',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '4px',
-                      boxShadow: absenceHandlingOwner === 'teacher' ? '0 4px 12px rgba(239, 68, 68, 0.12)' : 'none'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: '1.05rem' }}>👤</span>
-                      <div style={{
-                        width: '16px',
-                        height: '16px',
-                        borderRadius: '50%',
-                        border: absenceHandlingOwner === 'teacher' ? '5px solid #ef4444' : '1.5px solid #cbd5e1',
-                        background: '#ffffff',
-                        boxSizing: 'border-box',
-                        transition: 'all 0.15s'
-                      }} />
-                    </div>
-                    <strong style={{ fontSize: '0.80rem', color: absenceHandlingOwner === 'teacher' ? '#991b1b' : '#0f172a', fontWeight: 850 }}>
-                      Ich übernehme selbst
-                    </strong>
-                    <span style={{ fontSize: '0.66rem', color: '#64748b', lineHeight: 1.25 }}>
-                      Ich kontaktiere meine Schüler eigenständig (telefonisch / persönlich)
-                    </span>
-                  </div>
-                </div>
-
-                {!absenceHandlingOwner && (
-                  <div style={{
-                    marginTop: '6px',
-                    padding: '6px 10px',
-                    borderRadius: '10px',
-                    background: '#fff1f2',
-                    border: '1px solid #fecdd3',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontSize: '0.68rem',
-                    color: '#e11d48',
-                    fontWeight: 700
-                  }}>
-                    <span>⚠️</span>
-                    <span>Bitte triff eine Auswahl, wer die Schüler kontaktiert.</span>
-                  </div>
-                )}
-              </div>
-
-              {/* ── FLÜCHTIGE ANMERKUNG FÜR DIE E-MAIL AN DIE SCHULLEITUNG (ZERO-STORAGE PRIVACY) ── */}
-              <div>
-                <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <span>Anmerkung / Grund (optional für E-Mail)</span>
-                  <span style={{ fontSize: '0.64rem', fontWeight: 600, color: '#94a3b8' }}>🔒 Flüchtig / Nicht gespeichert</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="z.B. Konzertreise / Tournee (abgesprochen), Notizen für Vertretung..."
-                  value={absenceOfficialNote}
-                  onChange={(e) => setAbsenceOfficialNote(e.target.value)}
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    padding: '7px 11px',
-                    borderRadius: '10px',
-                    border: '1.5px solid #cbd5e1',
-                    background: '#ffffff',
-                    fontSize: '0.78rem',
-                    color: '#0f172a',
-                    outline: 'none'
-                  }}
-                />
-                <span style={{ fontSize: '0.64rem', color: '#94a3b8', display: 'block', marginTop: '3px', lineHeight: 1.25 }}>
-                  Wird ausschließlich lokal für deinen E-Mail-Entwurf an die Schulleitung verwendet und nicht auf dem Server gespeichert.
-                </span>
-              </div>
-            </div>
-
-            {/* Sticky Bottom Action Footer */}
-            <div style={{
-              padding: '12px 20px',
-              paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))',
-              borderTop: '1px solid #f1f5f9',
-              background: '#ffffff',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '6px'
-            }}>
-              {isTeacherCurrentlyAbsent(teacher) ? (
-                <>
-                  {/* 1. Hauptaktion: Sofort wieder verfügbar melden (Groß & Campus-Grün) */}
-                  <button
-                    onClick={() => {
-                      handleEndAbsence();
-                      setShowAbsenceModal(false);
-                    }}
-                    disabled={submittingAbsence}
-                    style={{
-                      background: 'linear-gradient(135deg, #34a853 0%, #2e8b57 100%)',
-                      color: '#ffffff',
-                      border: 'none',
-                      padding: '11px 16px',
-                      borderRadius: '12px',
-                      fontWeight: 900,
-                      fontSize: '0.88rem',
-                      cursor: submittingAbsence ? 'not-allowed' : 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      boxShadow: '0 4px 14px rgba(52, 168, 83, 0.3)',
-                      letterSpacing: '-0.01em',
-                      transition: 'all 0.15s'
-                    }}
-                    className="hover-scale"
-                  >
-                    <Check size={16} strokeWidth={3} />
-                    <span>{submittingAbsence ? 'Wird aktualisiert...' : 'Wieder verfügbar melden'}</span>
-                  </button>
-
-                  {/* 2. Sekundäraktion: Geänderten Zeitraum speichern */}
-                  <button
-                    onClick={handleReportAbsence}
-                    disabled={submittingAbsence}
-                    style={{
-                      background: '#f8fafc',
-                      color: '#334155',
-                      border: '1.5px solid #cbd5e1',
-                      padding: '9px 12px',
-                      borderRadius: '11px',
-                      fontWeight: 800,
-                      fontSize: '0.80rem',
-                      cursor: submittingAbsence ? 'not-allowed' : 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px',
-                      transition: 'all 0.15s'
-                    }}
-                    className="hover-scale"
-                  >
-                    <CalendarX size={14} color="#64748b" />
-                    <span>{submittingAbsence ? 'Wird übermittelt...' : 'Neuen Zeitraum speichern'}</span>
-                  </button>
-
-                  {/* 3. Schließen */}
-                  <button
-                    type="button"
-                    onClick={() => setShowAbsenceModal(false)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#64748b',
-                      fontSize: '0.78rem',
-                      fontWeight: 700,
-                      padding: '3px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Schließen
-                  </button>
-                </>
-              ) : (
-                <>
-                  {/* Regulärer Erst-Absage Flow */}
-                  <button
-                    onClick={handleReportAbsence}
-                    disabled={submittingAbsence || !absenceHandlingOwner}
-                    title={!absenceHandlingOwner ? 'Bitte wähle zuerst aus, wer die Schüler telefonisch kontaktiert' : undefined}
-                    style={{
-                      background: (!absenceHandlingOwner || submittingAbsence)
-                        ? '#cbd5e1'
-                        : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                      color: (!absenceHandlingOwner || submittingAbsence)
-                        ? '#64748b'
-                        : '#ffffff',
-                      border: 'none',
-                      padding: '11px 16px',
-                      borderRadius: '12px',
-                      fontWeight: 900,
-                      fontSize: '0.88rem',
-                      cursor: (submittingAbsence || !absenceHandlingOwner) ? 'not-allowed' : 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      boxShadow: (!absenceHandlingOwner || submittingAbsence)
-                        ? 'none'
-                        : '0 4px 14px rgba(239, 68, 68, 0.3)',
-                      opacity: submittingAbsence ? 0.7 : 1,
-                      letterSpacing: '-0.01em',
-                      transition: 'all 0.15s'
-                    }}
-                    className={absenceHandlingOwner && !submittingAbsence ? 'hover-scale' : undefined}
-                  >
-                    <CalendarX size={16} />
-                    <span>
-                      {submittingAbsence
-                        ? 'Wird übermittelt...'
-                        : !absenceHandlingOwner
-                        ? 'Zuständigkeit oben auswählen...'
-                        : 'Terminabsage jetzt einreichen'}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowAbsenceModal(false)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#64748b',
-                      fontSize: '0.78rem',
-                      fontWeight: 700,
-                      padding: '3px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Abbrechen
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <TeacherAbsenceModal
+        showAbsenceModal={showAbsenceModal}
+        setShowAbsenceModal={setShowAbsenceModal}
+        windowWidth={windowWidth}
+        teacher={teacher}
+        isTeacherCurrentlyAbsent={isTeacherCurrentlyAbsent}
+        quickAbsencePreset={quickAbsencePreset}
+        setQuickAbsencePreset={setQuickAbsencePreset}
+        absenceStartDate={absenceStartDate}
+        setAbsenceStartDate={setAbsenceStartDate}
+        absenceUntilDate={absenceUntilDate}
+        setAbsenceUntilDate={setAbsenceUntilDate}
+        showCustomStart={showCustomStart}
+        setShowCustomStart={setShowCustomStart}
+        absenceHandlingOwner={absenceHandlingOwner}
+        setAbsenceHandlingOwner={setAbsenceHandlingOwner}
+        absenceOfficialNote={absenceOfficialNote}
+        setAbsenceOfficialNote={setAbsenceOfficialNote}
+        cancellationsCount={cancellationsCount}
+        submittingAbsence={submittingAbsence}
+        handleReportAbsence={handleReportAbsence}
+        handleEndAbsence={handleEndAbsence}
+      />
 
       {/* ── TERMINABSAGE-BESTÄTIGUNG MODAL ── */}
-      {absenceNotifModal && (
-        <div
-          style={{
-            position: 'fixed', inset: 0, zIndex: 9999,
-            background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: '24px',
-          }}
-          onClick={() => setAbsenceNotifModal(null)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="absence-notif-title"
-            onClick={e => e.stopPropagation()}
-            style={{
-              background: 'white', borderRadius: '28px',
-              padding: '32px', width: '100%', maxWidth: '540px',
-              maxHeight: '80vh', overflow: 'hidden',
-              display: 'flex', flexDirection: 'column', gap: '20px',
-              boxShadow: '0 25px 60px rgba(0,0,0,0.2)',
-            }}
-          >
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
-              <div style={{
-                background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-                borderRadius: '16px', padding: '12px', flexShrink: 0,
-                boxShadow: '0 6px 20px rgba(239,68,68,0.3)',
-              }}>
-                <AlertTriangle size={22} color="white" />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <h2 id="absence-notif-title" style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                  Abwesenheit registriert
-                </h2>
-                <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#64748b' }}>
-                  Abwesend gemeldet bis einschließlich{' '}
-                  <strong style={{ color: '#ef4444' }}>
-                    {new Date((absenceNotifModal.absenceUntilDateStr || '') + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
-                  </strong>
-                </p>
-              </div>
-              <button
-                onClick={() => setAbsenceNotifModal(null)}
-                aria-label="Bestätigung schließen"
-                style={{
-                  background: '#f1f5f9', border: 'none', borderRadius: '10px',
-                  padding: '8px', cursor: 'pointer', flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}
-              >
-                <X size={16} color="#64748b" />
-              </button>
-            </div>
-
-            {/* Status bar */}
-            <div style={{
-              background: absenceNotifModal.notifs.length > 0 ? '#fff5f5' : '#e6f4ea',
-              border: `1.5px solid ${absenceNotifModal.notifs.length > 0 ? '#fecaca' : '#e6f4ea'}`,
-              borderRadius: '16px', padding: '14px 16px',
-              display: 'flex', alignItems: 'center', gap: '12px',
-            }}>
-              <span style={{ fontSize: '1.5rem' }}>
-                {absenceNotifModal.notifs.length > 0 ? '🔔' : '🎉'}
-              </span>
-              <div>
-                <strong style={{ fontSize: '0.85rem', color: '#0f172a', display: 'block', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                  {absenceNotifModal.notifs.length > 0
-                    ? `${absenceNotifModal.notifs.length} Unterrichtseinheiten disponiert`
-                    : 'Keine Stunden betroffen'}
-                </strong>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
-                  <span style={{
-                    fontSize: '0.68rem',
-                    fontWeight: 800,
-                    padding: '2px 8px',
-                    borderRadius: '100px',
-                    background: absenceNotifModal.handlingOwner === 'teacher' ? '#eff6ff' : '#fef2f2',
-                    color: absenceNotifModal.handlingOwner === 'teacher' ? '#1d4ed8' : '#dc2626',
-                    border: `1px solid ${absenceNotifModal.handlingOwner === 'teacher' ? '#bfdbfe' : '#fecaca'}`
-                  }}>
-                    {absenceNotifModal.handlingOwner === 'teacher' ? '👤 Ich informiere selbst' : '🏢 Sekretariat beauftragt'}
-                  </span>
-                  <span style={{ fontSize: '0.74rem', color: '#475569' }}>
-                    {absenceNotifModal.handlingOwner === 'teacher'
-                      ? 'Du kontaktierst deine Schüler eigenständig (Push-Meldung ist bereits raus).'
-                      : 'Das Schulsekretariat wurde im Ausfall-Cockpit beauftragt, deine Schüler anzurufen.'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Affected student list */}
-            {absenceNotifModal.notifs.length > 0 && (
-              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <p style={{ margin: 0, fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  Betroffene Stunden ({absenceNotifModal.notifs.length})
-                </p>
-                {absenceNotifModal.notifs.map((n, i) => {
-                  const dt = new Date(n.slot_start_datetime);
-                  const dateStr = dt.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
-                  
-                  const durationMinutes = n.duration || 30;
-                  const dtEnd = new Date(dt.getTime() + durationMinutes * 60 * 1000);
-                  const timeStrStart = dt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-                  const timeStrEnd = dtEnd.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-                  const timeStrRange = `${timeStrStart} - ${timeStrEnd} Uhr`;
-
-                  const studentName = n.student_name || (() => {
-                    const student = allStudents.find(s => s.id === n.student_id);
-                    return student ? `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim() : `Schüler: ${n.student_id?.substring(0, 8)}…`;
-                  })();
-
-                  return (
-                    <div
-                      key={i}
-                      style={{
-                        background: '#f8fafc', border: '1.5px solid #e2e8f0',
-                        borderLeft: '4px solid #ef4444',
-                        borderRadius: '14px', padding: '12px 14px',
-                        display: 'flex', alignItems: 'center', gap: '12px',
-                      }}
-                    >
-                      <div style={{
-                        width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
-                        background: 'linear-gradient(135deg, #fef2f2, #fee2e2)',
-                        border: '2px solid #fecaca',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '0.85rem', fontWeight: 800, color: '#dc2626',
-                        fontFamily: "'Plus Jakarta Sans', sans-serif",
-                      }}>
-                        {String(i + 1).padStart(2, '0')}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 800, fontSize: '0.82rem', color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                          {studentName}
-                        </div>
-                        <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Calendar size={13} style={{ color: '#64748b' }} />
-                            {dateStr}
-                          </span>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Clock size={13} style={{ color: '#64748b' }} />
-                            {timeStrRange}
-                          </span>
-                        </div>
-                      </div>
-                      <span style={{
-                        fontSize: '0.65rem', fontWeight: 800, padding: '3px 10px',
-                        borderRadius: '100px', background: '#fef2f2', color: '#dc2626',
-                        border: '1px solid #fecaca', whiteSpace: 'nowrap',
-                      }}>Storno</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Juristischer Hinweis & Offizielle E-Mail-Vorlage (Tier-1 SaaS Enterprise+ Goldstandard) */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{
-                background: '#f8fafc', border: '1px solid #cbd5e1',
-                borderRadius: '14px', padding: '12px 16px',
-                fontSize: '0.74rem', color: '#475569', lineHeight: 1.45,
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 800, color: '#0f172a', marginBottom: '4px' }}>
-                  <span>⚖️</span>
-                  <span>Organisatorischer Hinweis für Lehrkräfte</span>
-                </div>
-                Die Erfassung in Campus-Groovelab dient der didaktischen Unterrichtsorganisation und Schülerinformation. Bitte informiere deine Musikschulleitung bei Bedarf auch auf dem offiziellen Dienstweg.
-              </div>
-
-              {/* 1-Klick Offizielle E-Mail an Musikschule */}
-              {(() => {
-                const targetSchoolEmail = schoolData?.absence_email || schoolData?.email || '';
-                const teacherName = formatTeacherFullName(teacher) || 'Lehrkraft';
-                const startStr = absenceNotifModal.absenceStartDateStr
-                  ? new Date(absenceNotifModal.absenceStartDateStr + 'T00:00:00').toLocaleDateString('de-DE')
-                  : new Date().toLocaleDateString('de-DE');
-                const untilStr = absenceNotifModal.absenceUntilDateStr
-                  ? new Date(absenceNotifModal.absenceUntilDateStr + 'T00:00:00').toLocaleDateString('de-DE')
-                  : 'auf Weiteres';
-
-                const subject = encodeURIComponent(`Abwesenheitsmitteilung: ${teacherName} (${startStr} – ${untilStr})`);
-                
-                const studentHandlingText = absenceNotifModal.handlingOwner === 'teacher'
-                  ? 'Ich informiere meine Schüler selbst.'
-                  : 'Das Sekretariat übernimmt bitte die telefonische Information der Schüler.';
-
-                const noteBlock = absenceNotifModal.officialNote && absenceNotifModal.officialNote.trim().length > 0
-                  ? `\n• Grund / Anmerkung: ${absenceNotifModal.officialNote.trim()}`
-                  : '';
-
-                const bodyText = `Sehr geehrte Schulleitung, liebes Musikschul-Team,\n\nich melde mich für den Zeitraum von ${startStr} bis voraussichtlich ${untilStr} abwesend.\n\nOrganisatorischer Status (Campus-Groovelab):\n• Schüler-Information: ${studentHandlingText}${noteBlock}\n• Betroffene Stunden: ${absenceNotifModal.notifs.length} Termine disponiert.\n\nSobald ich wieder einsatzbereit bin, gebe ich Bescheid.\n\nMit freundlichen Grüßen,\n${teacherName}`;
-                const mailtoUrl = `mailto:${encodeURIComponent(targetSchoolEmail)}?subject=${subject}&body=${encodeURIComponent(bodyText)}`;
-
-                return (
-                  <a
-                    href={mailtoUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      background: '#ffffff',
-                      color: '#0f172a',
-                      border: '1.5px solid #cbd5e1',
-                      borderRadius: '14px',
-                      padding: '12px 16px',
-                      fontSize: '0.82rem',
-                      fontWeight: 800,
-                      textDecoration: 'none',
-                      fontFamily: "'Plus Jakarta Sans', sans-serif",
-                      transition: 'all 0.15s',
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = '#94a3b8'; e.currentTarget.style.background = '#f8fafc'; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.background = '#ffffff'; }}
-                  >
-                    <span>✉️</span>
-                    <span>Offizielle Dienstmeldung per E-Mail vorbereiten</span>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>({targetSchoolEmail || 'Musikschule'})</span>
-                  </a>
-                );
-              })()}
-
-              <button
-                onClick={() => setAbsenceNotifModal(null)}
-                style={{
-                  background: 'linear-gradient(135deg, #0f172a, #1e293b)',
-                  color: 'white', border: 'none', borderRadius: '14px',
-                  padding: '14px', fontWeight: 900, fontSize: '0.85rem',
-                  cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif",
-                  boxShadow: '0 4px 16px rgba(15,23,42,0.2)',
-                  transition: 'all 0.15s'
-                }}
-              >
-                ✓ Verstanden — Zurück zum Briefing
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <TeacherAbsenceNotifModal
+        absenceNotifModal={absenceNotifModal}
+        setAbsenceNotifModal={setAbsenceNotifModal}
+        schoolData={schoolData}
+        teacher={teacher}
+        allStudents={allStudents}
+        showRealNames={showRealNames}
+      />
 
       {/* ── ABWESENHEIT BEENDET ERFOLGS-MODAL (CAMPUS-GRÜN) ── */}
-      {showAbsenceEndedModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 10000,
-            background: 'rgba(15, 23, 42, 0.65)',
-            backdropFilter: 'blur(8px)',
-            WebkitBackdropFilter: 'blur(8px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '24px'
-          }}
-          onClick={() => setShowAbsenceEndedModal(false)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="absence-ended-title"
-            onClick={e => e.stopPropagation()}
-            style={{
-              background: '#ffffff',
-              borderRadius: '28px',
-              padding: '32px 28px',
-              width: '100%',
-              maxWidth: '420px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              textAlign: 'center',
-              gap: '20px',
-              boxShadow: '0 25px 60px rgba(0,0,0,0.2)'
-            }}
-          >
-            {/* Green Apple Squircle Icon Badge */}
-            <div style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '20px',
-              background: '#e6f4ea',
-              border: '1.5px solid #bbf7d0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 8px 24px rgba(52, 168, 83, 0.18)'
-            }}>
-              <CheckCircle size={32} color="#34a853" strokeWidth={2.5} />
-            </div>
-
-            {/* Content */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <h3
-                id="absence-ended-title"
-                style={{
-                  margin: 0,
-                  fontSize: '1.25rem',
-                  fontWeight: 900,
-                  color: '#0f172a',
-                  fontFamily: "'Plus Jakarta Sans', sans-serif",
-                  letterSpacing: '-0.02em'
-                }}
-              >
-                Abwesenheit beendet!
-              </h3>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: '0.92rem',
-                  color: '#64748b',
-                  fontWeight: 600,
-                  lineHeight: 1.45,
-                  fontFamily: "'Plus Jakarta Sans', sans-serif"
-                }}
-              >
-                Du stehst wieder als regulär verfügbar im System.
-              </p>
-            </div>
-
-            {/* Campus-Grüner OK Button */}
-            <button
-              type="button"
-              onClick={() => setShowAbsenceEndedModal(false)}
-              autoFocus
-              style={{
-                background: '#34a853',
-                color: '#ffffff',
-                border: 'none',
-                borderRadius: '16px',
-                padding: '14px 24px',
-                width: '100%',
-                fontSize: '1rem',
-                fontWeight: 900,
-                fontFamily: "'Plus Jakarta Sans', sans-serif",
-                cursor: 'pointer',
-                boxShadow: '0 4px 16px rgba(52, 168, 83, 0.35)',
-                transition: 'all 0.15s ease'
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = '#2e974a';
-                e.currentTarget.style.transform = 'scale(1.02)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = '#34a853';
-                e.currentTarget.style.transform = 'scale(1)';
-              }}
-            >
-              OK
-            </button>
-          </div>
-        </div>
-      )}
+      <TeacherAbsenceEndedModal
+        showAbsenceEndedModal={showAbsenceEndedModal}
+        setShowAbsenceEndedModal={setShowAbsenceEndedModal}
+      />
 
       {/* ── 🏛️ AUSFALL-STATUS & KENNTNISNAHMEN (§ 130 BGB) REVISIONS-MODAL ── */}
-      {showAbsenceOverviewModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 9999,
-            background: 'rgba(15, 23, 42, 0.65)',
-            backdropFilter: 'blur(8px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px'
-          }}
-          onClick={() => setShowAbsenceOverviewModal(false)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Ausfall-Status & Kenntnisnahmen"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: '#ffffff',
-              borderRadius: '28px',
-              maxWidth: '680px',
-              width: '100%',
-              maxHeight: '90vh',
-              display: 'flex',
-              flexDirection: 'column',
-              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.3)',
-              border: '1px solid #fca5a5',
-              overflow: 'hidden'
-            }}
-          >
-            {/* Modal Header */}
-            <div style={{
-              padding: '24px 28px',
-              borderBottom: '1px solid #f1f5f9',
-              background: 'linear-gradient(135deg, #fff5f5 0%, #ffffff 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '16px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0 }}>
-                <div style={{
-                  width: '46px',
-                  height: '46px',
-                  borderRadius: '14px',
-                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                  color: '#ffffff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                  boxShadow: '0 4px 14px rgba(239, 68, 68, 0.3)'
-                }}>
-                  <Users size={24} />
-                </div>
-                <div>
-                  <h2 style={{
-                    margin: 0,
-                    fontSize: '1.2rem',
-                    fontWeight: 900,
-                    color: '#0f172a',
-                    letterSpacing: '-0.02em',
-                    fontFamily: "'Plus Jakarta Sans', sans-serif"
-                  }}>
-                    Ausfall-Status & Kenntnisnahmen
-                  </h2>
-                  <p style={{
-                    margin: '3px 0 0 0',
-                    fontSize: '0.78rem',
-                    color: '#64748b',
-                    fontWeight: 600
-                  }}>
-                    Volljuristischer Nachweis nach § 130 BGB • Abwesenheitszeitraum aktiv
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAbsenceOverviewModal(false)}
-                aria-label="Modal schließen"
-                style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '10px',
-                  border: '1px solid #e2e8f0',
-                  background: '#f8fafc',
-                  color: '#64748b',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.15s'
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* KPI Summary Banner */}
-            <div style={{
-              padding: '16px 28px',
-              background: '#f8fafc',
-              borderBottom: '1px solid #e2e8f0',
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: '12px'
-            }}>
-              <div style={{
-                background: '#ffffff',
-                border: '1px solid #fca5a5',
-                borderRadius: '16px',
-                padding: '12px 14px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '2px'
-              }}>
-                <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#991b1b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Ausfälle Gesamt
-                </span>
-                <span style={{ fontSize: '1.4rem', fontWeight: 950, color: '#991b1b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                  {totalAbsenceCancellationsCount}
-                </span>
-              </div>
-              <div style={{
-                background: '#ffffff',
-                border: '1px solid #86efac',
-                borderRadius: '16px',
-                padding: '12px 14px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '2px'
-              }}>
-                <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Gelesen (Zugang ✓)
-                </span>
-                <span style={{ fontSize: '1.4rem', fontWeight: 950, color: '#166534', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                  {readCancellationsCount}
-                </span>
-              </div>
-              <div style={{
-                background: '#ffffff',
-                border: unreadCancellationsCount > 0 ? '1px solid #fde047' : '1px solid #e2e8f0',
-                borderRadius: '16px',
-                padding: '12px 14px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '2px'
-              }}>
-                <span style={{ fontSize: '0.68rem', fontWeight: 800, color: unreadCancellationsCount > 0 ? '#854d0e' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Noch Ungelesen
-                </span>
-                <span style={{ fontSize: '1.4rem', fontWeight: 950, color: unreadCancellationsCount > 0 ? '#854d0e' : '#64748b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                  {unreadCancellationsCount}
-                </span>
-              </div>
-            </div>
-
-            {/* List of Affected Lessons - Tageweise gegliedert */}
-            <div style={{
-              flex: 1,
-              overflowY: 'auto',
-              padding: '20px 28px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '14px'
-            }}>
-              {groupedAbsenceCancellations.length === 0 ? (
-                <div style={{
-                  padding: '40px 20px',
-                  textAlign: 'center',
-                  background: '#f8fafc',
-                  borderRadius: '20px',
-                  border: '1px dashed #cbd5e1'
-                }}>
-                  <CheckCircle size={36} color="#34a853" style={{ margin: '0 auto 10px auto' }} />
-                  <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>
-                    Keine betroffenen Unterrichtseinheiten
-                  </h4>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
-                    Im ausgewählten Abwesenheitszeitraum liegen keine stornierten Schüler-Termine vor.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  {/* Global Accordion Control Bar */}
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '2px 4px'
-                  }}>
-                    <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      Ausfälle nach Unterrichtstagen ({groupedAbsenceCancellations.length} {groupedAbsenceCancellations.length === 1 ? 'Tag' : 'Tage'})
-                    </span>
-                    <button
-                      type="button"
-                      onClick={toggleAllAbsenceDates}
-                      style={{
-                        background: '#f1f5f9',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '10px',
-                        padding: '5px 12px',
-                        fontSize: '0.74rem',
-                        fontWeight: 800,
-                        color: '#334155',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        transition: 'all 0.15s'
-                      }}
-                    >
-                      <ChevronsUpDown size={13} />
-                      <span>{areAllAbsenceDatesCollapsed ? 'Alle ausklappen' : 'Alle einklappen'}</span>
-                    </button>
-                  </div>
-
-                  {/* Day Accordions */}
-                  {groupedAbsenceCancellations.map((group) => {
-                    const isCollapsed = !!collapsedAbsenceDates[group.dateStr];
-                    return (
-                      <div
-                        key={group.dateStr}
-                        style={{
-                          borderRadius: '20px',
-                          border: '1.5px solid #e2e8f0',
-                          background: '#ffffff',
-                          overflow: 'hidden',
-                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
-                          transition: 'border-color 0.2s'
-                        }}
-                      >
-                        {/* Accordion Day Header */}
-                        <div
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => toggleAbsenceDateCollapse(group.dateStr)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              toggleAbsenceDateCollapse(group.dateStr);
-                            }
-                          }}
-                          aria-expanded={!isCollapsed}
-                          aria-label={`Tag ${group.formattedDate} ${isCollapsed ? 'ausklappen' : 'einklappen'}`}
-                          style={{
-                            padding: '14px 18px',
-                            background: isCollapsed ? '#ffffff' : 'linear-gradient(135deg, #fff5f5 0%, #ffffff 100%)',
-                            borderBottom: isCollapsed ? 'none' : '1px solid #f1f5f9',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: '12px',
-                            cursor: 'pointer',
-                            userSelect: 'none',
-                            transition: 'all 0.15s'
-                          }}
-                        >
-                          {/* Left: Day Badge & Label */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-                            <div style={{
-                              width: '42px',
-                              height: '42px',
-                              borderRadius: '12px',
-                              background: '#fee2e2',
-                              border: '1.5px solid #fca5a5',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              flexShrink: 0
-                            }}>
-                              <span style={{ fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', color: '#dc2626' }}>
-                                {group.dayOfWeek}
-                              </span>
-                              <span style={{ fontSize: '14px', fontWeight: 900, color: '#991b1b', lineHeight: 1 }}>
-                                {group.dayNum}
-                              </span>
-                            </div>
-
-                            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                              <span style={{ fontSize: '0.94rem', fontWeight: 850, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                {group.formattedDate}
-                              </span>
-                              <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
-                                {group.items.length} {group.items.length === 1 ? 'Unterrichtseinheit' : 'Unterrichtseinheiten'}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Right: KPI Pill + Chevron Toggle */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
-                            <div style={{
-                              padding: '5px 11px',
-                              borderRadius: '100px',
-                              fontSize: '0.72rem',
-                              fontWeight: 800,
-                              background: group.unreadCount > 0 ? '#fef3c7' : '#dcfce7',
-                              color: group.unreadCount > 0 ? '#92400e' : '#166534',
-                              border: group.unreadCount > 0 ? '1px solid #fde047' : '1px solid #86efac',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '5px'
-                            }}>
-                              {group.unreadCount > 0 ? (
-                                <>
-                                  <Clock size={12} color="#ca8a04" />
-                                  <span>{group.unreadCount} unbestätigt</span>
-                                </>
-                              ) : (
-                                <>
-                                  <CheckCheck size={13} color="#16a34a" />
-                                  <span>Alle bestätigt ✓</span>
-                                </>
-                              )}
-                            </div>
-
-                            <div style={{
-                              width: '30px',
-                              height: '30px',
-                              borderRadius: '8px',
-                              background: '#f8fafc',
-                              border: '1px solid #e2e8f0',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: '#64748b'
-                            }}>
-                              {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Collapsible Student Cards */}
-                        {!isCollapsed && (
-                          <div style={{
-                            padding: '12px 14px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '10px',
-                            background: '#f8fafc'
-                          }}>
-                            {group.items.map((item: any, idx: number) => {
-                              const dt = new Date(item.slot_start_datetime);
-                              const timeStr = !isNaN(dt.getTime())
-                                ? dt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
-                                : '14:00';
-                              const isRead = item.status === 'READ';
-
-                              return (
-                                <div
-                                  key={item.id || idx}
-                                  style={{
-                                    padding: '12px 16px',
-                                    borderRadius: '16px',
-                                    background: isRead ? '#ffffff' : 'repeating-linear-gradient(-45deg, #fef2f2 0px, #fef2f2 8px, #ffffff 8px, #ffffff 16px)',
-                                    border: isRead ? '1.5px solid #e2e8f0' : '1.5px solid #fca5a5',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    gap: '12px',
-                                    boxShadow: '0 1px 4px rgba(0, 0, 0, 0.02)'
-                                  }}
-                                >
-                                  {/* Left: Student Info */}
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-                                    <div style={{
-                                      width: '38px',
-                                      height: '38px',
-                                      borderRadius: '11px',
-                                      background: isRead ? '#f1f5f9' : '#fee2e2',
-                                      border: isRead ? '1px solid #e2e8f0' : '1.5px solid #fca5a5',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      color: isRead ? '#64748b' : '#dc2626',
-                                      flexShrink: 0
-                                    }}>
-                                      <User size={18} />
-                                    </div>
-
-                                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                                      <span style={{ fontSize: '0.90rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {item.studentName}
-                                      </span>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px', fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
-                                        <span>{item.instrument}</span>
-                                        <span>•</span>
-                                        <span style={{ fontWeight: 750, color: '#0f172a' }}>{timeStr} Uhr</span>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Right: Status Pill & Action */}
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                                    {isRead ? (
-                                      <div style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '5px',
-                                        background: '#f0fdf4',
-                                        border: '1px solid #86efac',
-                                        padding: '5px 10px',
-                                        borderRadius: '9px',
-                                        color: '#166534',
-                                        fontSize: '0.70rem',
-                                        fontWeight: 800
-                                      }}>
-                                        <CheckCheck size={13} color="#16a34a" />
-                                        <span>Bestätigt</span>
-                                      </div>
-                                    ) : (
-                                      <div style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        background: '#fffbeb',
-                                        border: '1px solid #fde047',
-                                        padding: '5px 10px',
-                                        borderRadius: '9px',
-                                        color: '#854d0e',
-                                        fontSize: '0.70rem',
-                                        fontWeight: 800
-                                      }} title="Zugang nach § 130 BGB noch nicht bestätigt">
-                                        <Clock size={12} color="#ca8a04" />
-                                        <span>Ungelesen</span>
-                                      </div>
-                                    )}
-
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setShowAbsenceOverviewModal(false);
-                                        handleEmergencyShoutbox({
-                                          id: item.id,
-                                          student_id: item.student_id,
-                                          date: item.slot_start_datetime.substring(0, 10),
-                                          startTime: timeStr,
-                                          student: item.student,
-                                          studentName: item.studentName
-                                        });
-                                      }}
-                                      style={{
-                                        background: '#ffffff',
-                                        border: '1px solid #cbd5e1',
-                                        color: '#334155',
-                                        padding: '6px 10px',
-                                        borderRadius: '9px',
-                                        fontSize: '0.72rem',
-                                        fontWeight: 800,
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        transition: 'all 0.15s'
-                                      }}
-                                      title="Shoutbox mit Schüler öffnen"
-                                    >
-                                      <MessageSquare size={12} />
-                                      <span>Nachricht</span>
-                                    </button>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            <div style={{
-              padding: '16px 28px',
-              borderTop: '1px solid #f1f5f9',
-              background: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '12px'
-            }}>
-              <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
-                💡 Schüler ohne Kenntnisnahme bei Bedarf bitte telefonisch oder per Notfall-Nachricht erinnern.
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAbsenceOverviewModal(false)}
-                style={{
-                  background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '14px',
-                  padding: '10px 22px',
-                  fontSize: '0.82rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(15, 23, 42, 0.2)'
-                }}
-              >
-                Schließen
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <TeacherAbsenceOverviewModal
+        showAbsenceOverviewModal={showAbsenceOverviewModal}
+        setShowAbsenceOverviewModal={setShowAbsenceOverviewModal}
+        totalAbsenceCancellationsCount={totalAbsenceCancellationsCount}
+        readCancellationsCount={readCancellationsCount}
+        unreadCancellationsCount={unreadCancellationsCount}
+        groupedAbsenceCancellations={groupedAbsenceCancellations}
+        collapsedAbsenceDates={collapsedAbsenceDates}
+        toggleAbsenceDateCollapse={toggleAbsenceDateCollapse}
+        toggleAllAbsenceDates={toggleAllAbsenceDates}
+        areAllAbsenceDatesCollapsed={areAllAbsenceDatesCollapsed}
+        handleEmergencyShoutbox={handleEmergencyShoutbox}
+      />
 
       {/* 1:1 Shoutbox Overlay Modal */}
       {activeChatOcc && (
@@ -14101,7 +12084,7 @@ useEffect(() => {
             bottom: '24px',
             right: '24px',
             background: 'linear-gradient(135deg, #ca8a04, #eab308)',
-            color: 'white',
+            color: '#0f172a',
             borderRadius: '16px',
             padding: '16px 24px',
             boxShadow: '0 10px 30px rgba(234, 179, 8, 0.4)',
@@ -14118,10 +12101,11 @@ useEffect(() => {
           <span>{toastMessage}</span>
           <button 
             onClick={() => setToastMessage(null)}
+            aria-label="Toast schließen"
             style={{
               background: 'none',
               border: 'none',
-              color: 'white',
+              color: '#0f172a',
               cursor: 'pointer',
               fontSize: '1.2rem',
               fontWeight: 800,
@@ -14208,235 +12192,16 @@ useEffect(() => {
       />
 
       {/* 📢 SCHULMITTEILUNGEN: SCHLIESSBARES LESE- & BESTÄTIGUNGS-MODAL (NON-BLOCKING) */}
-      {openAnnouncementDetailModal && (
-        <div 
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="announcement-reader-modal-title"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setOpenAnnouncementDetailModal(null);
-          }}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(15, 23, 42, 0.55)',
-            backdropFilter: 'blur(8px)',
-            WebkitBackdropFilter: 'blur(8px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: isMobileDevice ? '16px' : '24px'
-          }}
-        >
-          <div style={{
-            background: '#ffffff',
-            borderRadius: '28px',
-            maxWidth: '580px',
-            width: '100%',
-            maxHeight: '90vh',
-            overflowY: 'auto',
-            boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(239, 68, 68, 0.15)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '18px',
-            padding: isMobileDevice ? '22px 18px' : '30px 28px',
-            textAlign: 'left',
-            animation: 'fadeIn 0.2s ease',
-            position: 'relative'
-          }}>
-            {/* Modal Header & Close Button */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ background: '#fef2f2', color: '#ef4444', padding: '10px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <AlertCircle size={24} strokeWidth={2.4} />
-                </div>
-                <div>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 900, background: '#ef4444', color: '#ffffff', padding: '2px 8px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Wichtige Schulmitteilung
-                  </span>
-                  <h3 id="announcement-reader-modal-title" style={{ margin: '4px 0 0 0', fontSize: '1.25rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>
-                    {openAnnouncementDetailModal.title}
-                  </h3>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setOpenAnnouncementDetailModal(null)}
-                style={{ border: 'none', background: '#f1f5f9', color: '#64748b', borderRadius: '12px', padding: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                title="Mitteilung schließen"
-                aria-label="Schließen"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Description / Instructions */}
-            {(openAnnouncementDetailModal.description || openAnnouncementDetailModal.message) && (
-              <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', fontSize: '0.85rem', color: '#334155', lineHeight: '1.55', whiteSpace: 'pre-wrap' }}>
-                {openAnnouncementDetailModal.description || openAnnouncementDetailModal.message}
-              </div>
-            )}
-
-            {/* Attachment */}
-            {openAnnouncementDetailModal.attachment_url && (
-              <a
-                href={openAnnouncementDetailModal.attachment_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: '#eff6ff',
-                  color: '#1d4ed8',
-                  border: '1px solid #bfdbfe',
-                  padding: '10px 14px',
-                  borderRadius: '12px',
-                  fontSize: '0.78rem',
-                  fontWeight: 750,
-                  textDecoration: 'none'
-                }}
-              >
-                <Download size={14} /> Anhang öffnen / herunterladen
-              </a>
-            )}
-
-            {/* If Questionnaire: Render Interactive Questions */}
-            {openAnnouncementDetailModal.questions && openAnnouncementDetailModal.questions.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
-                  Bitte beantworte folgende Fragen:
-                </div>
-                {openAnnouncementDetailModal.questions.map((qItem: any, qIdx: number) => {
-                  const qKey = typeof qItem === 'string' ? qItem : qItem.text;
-                  const qType = typeof qItem === 'string' ? 'text' : (qItem.type || 'text');
-                  const qOptions: string[] = typeof qItem === 'object' && qItem.options ? qItem.options : (qType === 'boolean' ? ['Ja', 'Nein'] : []);
-                  const currentAns = questionnaireAnswers[qKey] || '';
-
-                  return (
-                    <div key={qIdx} style={{ display: 'flex', flexDirection: 'column', gap: '6px', background: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                      <label style={{ fontSize: '0.80rem', fontWeight: 800, color: '#1e293b' }}>
-                        {qIdx + 1}. {qKey}
-                      </label>
-
-                      {qType === 'choice' || qType === 'boolean' ? (
-                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                          {qOptions.map((opt: string) => {
-                            const isSelected = currentAns === opt;
-                            return (
-                              <button
-                                key={opt}
-                                type="button"
-                                onClick={() => setQuestionnaireAnswers(prev => ({ ...prev, [qKey]: opt }))}
-                                style={{
-                                  padding: '6px 14px',
-                                  borderRadius: '10px',
-                                  border: isSelected ? '1.5px solid #ea4335' : '1px solid #cbd5e1',
-                                  background: isSelected ? '#ea4335' : '#ffffff',
-                                  color: isSelected ? '#ffffff' : '#475569',
-                                  fontWeight: isSelected ? 850 : 650,
-                                  fontSize: '0.78rem',
-                                  cursor: 'pointer',
-                                  transition: 'all 0.15s ease'
-                                }}
-                              >
-                                {opt}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <textarea
-                          value={currentAns}
-                          onChange={(e) => setQuestionnaireAnswers(prev => ({ ...prev, [qKey]: e.target.value }))}
-                          placeholder="Deine Antwort hier eingeben..."
-                          rows={2}
-                          style={{
-                            padding: '10px 12px',
-                            borderRadius: '10px',
-                            border: '1px solid #cbd5e1',
-                            fontSize: '0.82rem',
-                            outline: 'none',
-                            fontFamily: 'inherit',
-                            resize: 'vertical'
-                          }}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : null}
-
-            {/* Legal Notice § 130 BGB */}
-            <div style={{ fontSize: '0.72rem', color: '#64748b', fontStyle: 'italic', lineHeight: '1.4', background: '#f8fafc', padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-              ℹ️ Mit deiner Bestätigung wird der Zugang der Mitteilung nach § 130 BGB für die Schulleitung revisionssicher dokumentiert.
-            </div>
-
-            {/* Action Buttons */}
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <button
-                type="button"
-                onClick={() => setOpenAnnouncementDetailModal(null)}
-                style={{
-                  background: '#f1f5f9',
-                  color: '#475569',
-                  border: 'none',
-                  padding: '14px 18px',
-                  borderRadius: '16px',
-                  fontSize: '0.85rem',
-                  fontWeight: 750,
-                  cursor: 'pointer'
-                }}
-              >
-                Später erinnern
-              </button>
-              <button
-                type="button"
-                disabled={submittingFeedback}
-                onClick={async () => {
-                  if (openAnnouncementDetailModal.questions && openAnnouncementDetailModal.questions.length > 0) {
-                    await handleSubmitFeedbackResponse(openAnnouncementDetailModal.id);
-                  } else {
-                    await handleMarkRequestAsDone(openAnnouncementDetailModal.id);
-                  }
-                  setOpenAnnouncementDetailModal(null);
-                }}
-                style={{
-                  flex: 1,
-                  background: '#ea4335',
-                  color: '#ffffff',
-                  border: 'none',
-                  padding: '14px',
-                  borderRadius: '16px',
-                  fontSize: '0.88rem',
-                  fontWeight: 900,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  boxShadow: '0 8px 24px rgba(234, 67, 53, 0.35)',
-                  transition: 'transform 0.15s ease'
-                }}
-              >
-                <CheckCircle size={18} />
-                <span>
-                  {submittingFeedback 
-                    ? 'Wird übermittelt...' 
-                    : (openAnnouncementDetailModal.questions && openAnnouncementDetailModal.questions.length > 0 
-                        ? 'Antworten übermitteln & bestätigen' 
-                        : '✓ Gelesen & zur Kenntnis genommen')}
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <TeacherAnnouncementReaderModal
+        openAnnouncementDetailModal={openAnnouncementDetailModal}
+        setOpenAnnouncementDetailModal={setOpenAnnouncementDetailModal}
+        isMobileDevice={isMobileDevice}
+        questionnaireAnswers={questionnaireAnswers}
+        setQuestionnaireAnswers={setQuestionnaireAnswers}
+        submittingFeedback={submittingFeedback}
+        handleSubmitFeedbackResponse={handleSubmitFeedbackResponse}
+        handleMarkRequestAsDone={handleMarkRequestAsDone}
+      />
     </div>
   );
 }

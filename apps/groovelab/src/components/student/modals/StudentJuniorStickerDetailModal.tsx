@@ -148,24 +148,27 @@ export const StudentJuniorStickerDetailModal: React.FC<StudentJuniorStickerDetai
           </span>
         </div>
 
-        {/* Large 150px Floating Sticker Card (Full color vs Mystery Silhouette) */}
+        {/* Large 150px Floating Sticker Card (Full color vs Apple Frosted Teaser) */}
         <div style={{
           width: '150px',
           height: '150px',
           borderRadius: '34px',
-          background: '#0a0e1a',
+          background: sticker.isUnlocked 
+            ? '#0a0e1a' 
+            : 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
           border: sticker.isUnlocked 
             ? (sticker.rarity === 'legendary' ? '4px solid #facc15' : sticker.rarity === 'epic' ? '4px solid #c084fc' : sticker.rarity === 'rare' ? '4px solid #93c5fd' : '4px solid #34a853')
-            : '3px dashed #64748b',
+            : '2.5px dashed #cbd5e1',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           boxShadow: sticker.isUnlocked 
             ? '0 16px 40px rgba(52, 168, 83, 0.35)' 
-            : '0 12px 30px rgba(15, 23, 42, 0.45)',
+            : '0 10px 28px rgba(15, 23, 42, 0.08)',
           position: 'relative',
           overflow: 'hidden',
-          padding: '10px'
+          padding: '12px',
+          boxSizing: 'border-box'
         }}>
           <img
             src={`/stickers/thumbs/${sticker.id}.png`}
@@ -178,7 +181,8 @@ export const StudentJuniorStickerDetailModal: React.FC<StudentJuniorStickerDetai
               borderRadius: '24px',
               filter: sticker.isUnlocked 
                 ? 'drop-shadow(0 6px 14px rgba(255,255,255,0.2))' 
-                : 'grayscale(100%) contrast(1.1) brightness(0.28)'
+                : 'saturate(0.85) opacity(0.70) drop-shadow(0 6px 14px rgba(15, 23, 42, 0.10))',
+              transition: 'all 0.2s ease'
             }}
             onError={(e) => {
               // Fallback to original path if thumb missing
@@ -198,33 +202,27 @@ export const StudentJuniorStickerDetailModal: React.FC<StudentJuniorStickerDetai
             }}
           />
 
-          {/* Mystery Lock Icon Overlay when locked */}
+          {/* Frosted Corner Lock Badge when locked (Leaves motive 100% visible) */}
           {!sticker.isUnlocked && (
             <div 
               style={{
                 position: 'absolute',
-                inset: 0,
-                borderRadius: '30px',
-                background: 'radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 0.6) 0%, rgba(15, 23, 42, 0.85) 100%)',
+                bottom: '10px',
+                right: '10px',
+                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                width: '34px',
+                height: '34px',
+                borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(217, 119, 6, 0.45)',
+                border: '2.5px solid #ffffff',
                 pointerEvents: 'none'
               }}
+              title="Noch gesperrt"
             >
-              <div style={{
-                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                width: '46px',
-                height: '46px',
-                borderRadius: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 6px 18px rgba(217, 119, 6, 0.5)',
-                border: '2px solid #ffffff'
-              }}>
-                <Lock size={22} color="#ffffff" strokeWidth={2.5} />
-              </div>
+              <Lock size={15} color="#ffffff" strokeWidth={2.8} />
             </div>
           )}
         </div>

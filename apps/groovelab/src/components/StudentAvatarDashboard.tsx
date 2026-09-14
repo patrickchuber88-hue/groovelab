@@ -20,8 +20,6 @@ import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from '
 import { calculateSchoolYearDirectBilling } from '../utils/epcGiroCode';
 import { validateNewPin } from '../utils/pinValidation';
 import { CampusLevelSwitcher, CampusUiLevel } from './campus/CampusLevelSwitcher';
-import { CampusJuniorDashboard } from './campus/CampusJuniorDashboard';
-import { CampusTeenDashboard } from './campus/CampusTeenDashboard';
 import { CampusLevelSelectModal } from './campus/CampusLevelSelectModal';
 import { AudioTrackCarousel, AudioTrackItem } from './AudioTrackCarousel';
 import { ZenPlayAlongDock, PreFlightAudioPreviewButton, PreFlightAudioPlayerSection, getTrackPedagogicalType, playCountInBeep } from './campus/ZenPlayAlongDock';
@@ -464,6 +462,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             type: 'broadcast',
             event: 'ui-level-changed',
             payload: { uiLevel: newLevel, studentId: targetStudentId }
+          }).finally(() => {
+            setTimeout(() => {
+              supabase.removeChannel(ch);
+            }, 1200);
           });
         }
       });
@@ -476,45 +478,6 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       }
     } catch (bcErr) {
       console.warn('[Realtime] Failed to broadcast ui-level-changed:', bcErr);
-    }
-  };
-
-  const handleLevelChange = async (newLevel: CampusUiLevel) => {
-    isSwitchingUiLevelRef.current = true;
-    setJuniorAwardedStickerToCelebrate(null);
-    setStudentUiLevel(newLevel);
-    setDraftUiLevel(newLevel);
-    const effectiveId = studentId || studentUser?.id;
-    if (effectiveId) {
-      localStorage.setItem(`campus_student_ui_level_${effectiveId}`, newLevel);
-    }
-    localStorage.setItem('campus_student_ui_level', newLevel);
-    window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: newLevel }));
-    setShowLevelModal(false);
-
-    if (effectiveId) {
-      broadcastStudentUiLevelChange(effectiveId, newLevel);
-    }
-
-    // Geräuschlose Entprellung: Unterdrückt Sticker-Popups beim Rendern des neuen Levels
-    setTimeout(() => {
-      isSwitchingUiLevelRef.current = false;
-    }, 1500);
-
-    try {
-      if (effectiveId) {
-        // 🛡️ Revisionssichere Persistenz via RPC mit Fallback
-        const { error: rpcErr } = await supabase.rpc('save_parent_controls', {
-          p_student_id: effectiveId,
-          p_settings: { campus_ui_level: newLevel }
-        });
-        if (rpcErr) {
-          console.warn('save_parent_controls RPC failed in handleLevelChange, fallback to users table:', rpcErr);
-          await supabase.from('users').update({ campus_ui_level: newLevel }).eq('id', effectiveId);
-        }
-      }
-    } catch (e) {
-      console.warn('Could not persist campus_ui_level to users table:', e);
     }
   };
 
@@ -825,22 +788,32 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const [parentSetupConfirm, setParentSetupConfirm] = useState('');
   const [parentSetupError, setParentSetupError] = useState('');
 
-  // Reactive Parent Unlocked State (Instant UI Re-render upon unlock)
-  const [isParentUnlocked, setIsParentUnlocked] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    const globalUnlocked = sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true';
-    if (globalUnlocked) return true;
-    const sId = studentId;
-    if (sId) {
-      const exp = sessionStorage.getItem(`groovelab_parent_session_${sId}`);
-      if (exp && Number(exp) > Date.now()) return true;
-      if (sessionStorage.getItem(`groovelab_parent_unlocked_${sId}`) === 'true') return true;
-    }
-    return false;
-  });
-
-  // 🛡️ TIER-1 ENTERPRISE GOLDSTANDARD: Ephemeral in-memory Parent PIN cache (Zero browser storage leaks)
+  // 🛡️ REINES IN-MEMORY VAULTING: Auto-Lock bei Reload
+  // Bei jedem Neuladen der Seite erlischt die Eltern-Session sofort für 100%ige Sicherheit.
+  const [isParentUnlocked, setIsParentUnlocked] = useState<boolean>(false);
   const inMemoryParentPinRef = useRef<string>('');
+  const [parentErrorToast, setParentErrorToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Purge stale sessionStorage parent unlock flags on mount to guarantee 100% memory synchronicity
+    try {
+      const sId = studentId || (initialUser as any)?.id;
+      if (sId) {
+        sessionStorage.removeItem(`groovelab_parent_session_${sId}`);
+        sessionStorage.removeItem(`groovelab_parent_unlocked_${sId}`);
+      }
+      sessionStorage.removeItem('groovelab_parent_unlocked_global');
+      sessionStorage.removeItem('groovelab_parent_session_global');
+    } catch {}
+  }, [studentId]);
+
+  useEffect(() => {
+    if (!parentErrorToast) return;
+    const timer = setTimeout(() => {
+      setParentErrorToast(null);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [parentErrorToast]);
 
   useEffect(() => {
     const handleParentModeChanged = (e: any) => {
@@ -943,6 +916,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
       // 4. Authorized: Set verified session lease (180s)
       const siblingGroupId = (studentUser as any)?.sibling_group_id || (initialUser as any)?.sibling_group_id;
+      const passkeyLeaseToken = authResult?.lease_token || `parent-passkey-${targetId}-${Date.now()}`;
+      sessionStorage.setItem('gl_parent_session_lease', String(passkeyLeaseToken));
+      if (authResult?.lease_token) {
+        sessionStorage.setItem('gl_active_session_lease_id', String(authResult.lease_token));
+      }
       sessionStorage.setItem(`groovelab_parent_session_${targetId}`, String(Date.now() + 180 * 1000));
       if (studentId) {
         sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 180 * 1000));
@@ -1035,7 +1013,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const {
     isWarning: isParentLockWarning,
     remainingSeconds: parentLockRemainingSeconds,
-    extendSession: extendParentSession
+    extendSession: extendParentSession,
+    lockNow: lockParentSession
   } = useParentSessionLock({
     enabled: isParentUnlocked,
     studentId,
@@ -1066,15 +1045,31 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     setIsVerifyingParentGate(true);
     try {
       let isOk = false;
+      let realLeaseToken: string | null = null;
 
-      // 1. Primary: Server-Side verify_parent_pin RPC (Fail-Closed, zero student PIN fallback)
+      // 1. Primary: Server-Side verify_parent_pin_with_lease RPC (Tier-1 Cryptographic Lease)
       try {
-        const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
-          student_id: targetId,
-          input_pin: cleanInput
+        const { data: leaseData, error: leaseErr } = await supabase.rpc('verify_parent_pin_with_lease', {
+          p_student_id: targetId,
+          p_input_pin: cleanInput,
+          p_device_key: `browser-${Date.now()}`
         });
-        if (parentOk === true) isOk = true;
+        if (!leaseErr && leaseData?.success === true) {
+          isOk = true;
+          realLeaseToken = leaseData?.lease_token || null;
+        }
       } catch (e) {}
+
+      // Fallback: verify_parent_pin (legacy boolean RPC)
+      if (!isOk) {
+        try {
+          const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
+            student_id: targetId,
+            input_pin: cleanInput
+          });
+          if (parentOk === true) isOk = true;
+        } catch (e) {}
+      }
 
       if (isOk) {
         inMemoryParentPinRef.current = cleanInput;
@@ -1082,7 +1077,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         setParentGatePinInput('');
         setIsParentUnlocked(true);
         setIsVerifyingParentGate(false);
+        extendParentSession();
 
+        const activeLeaseId = realLeaseToken || ((studentUser as any)?.id ? `parent-lease-${(studentUser as any).id}-${Date.now()}` : `parent-lease-${Date.now()}`);
+        sessionStorage.setItem('gl_parent_session_lease', activeLeaseId);
         sessionStorage.setItem(`groovelab_parent_session_${targetId}`, String(Date.now() + 180 * 1000));
         if (studentId) sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 180 * 1000));
         sessionStorage.setItem(`groovelab_parent_unlocked_${targetId}`, 'true');
@@ -1114,15 +1112,99 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   };
 
   const checkIsParentSessionActive = () => {
-    if (isParentUnlocked) return true;
-    if (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true') return true;
-    const targetId = studentId || (studentUser as any)?.id;
-    if (targetId && typeof window !== 'undefined') {
-      const sessionExpiry = sessionStorage.getItem(`groovelab_parent_session_${targetId}`);
-      if (sessionExpiry && Number(sessionExpiry) > Date.now()) return true;
-      if (sessionStorage.getItem(`groovelab_parent_unlocked_${targetId}`) === 'true') return true;
+    // 🛡️ Enterprise In-Memory & Cryptographic Lease Check:
+    // Aktiv wenn entsperrt UND (PIN im RAM ODER aktiver Eltern-Lease-Token im SessionStorage ODER Schüler volljährig)
+    if (isParentUnlocked) {
+      if (isAdultStudent) return true;
+      if (inMemoryParentPinRef.current && inMemoryParentPinRef.current.length >= 4) return true;
+      if (typeof window !== 'undefined' && sessionStorage.getItem('gl_parent_session_lease')) return true;
     }
     return false;
+  };
+
+  const handleLevelChange = async (newLevel: CampusUiLevel) => {
+    // 🛡️ ZERO-FRICTION SECURITY CHECK:
+    // Wenn Schüler nicht volljährig ist und Eltern-Session NICHT aktiv ist -> erst PIN abfragen!
+    if (!isAdultStudent && !checkIsParentSessionActive()) {
+      setPendingParentTarget('parent_controls');
+      setParentGatePinInput('');
+      setParentGateError('');
+      setShowParentGateModal(true);
+      return;
+    }
+
+    isSwitchingUiLevelRef.current = true;
+    setJuniorAwardedStickerToCelebrate(null);
+    const prevLevel = studentUiLevel;
+    setStudentUiLevel(newLevel);
+    setDraftUiLevel(newLevel);
+    const effectiveId = studentId || studentUser?.id;
+    if (effectiveId) {
+      localStorage.setItem(`campus_student_ui_level_${effectiveId}`, newLevel);
+    }
+    localStorage.setItem('campus_student_ui_level', newLevel);
+    window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: newLevel }));
+    setShowLevelModal(false);
+
+    if (effectiveId) {
+      broadcastStudentUiLevelChange(effectiveId, newLevel);
+    }
+
+    // Geräuschlose Entprellung: Unterdrückt Sticker-Popups beim Rendern des neuen Levels
+    setTimeout(() => {
+      isSwitchingUiLevelRef.current = false;
+    }, 1500);
+
+    try {
+      if (effectiveId) {
+        // 🛡️ Revisionssichere Persistenz via RPC (Fail-Closed: kein unsicherer Tabellen-Fallback)
+        const activeLeaseToken = typeof window !== 'undefined'
+          ? (sessionStorage.getItem('gl_parent_session_lease') || sessionStorage.getItem('gl_active_session_lease_id') || localStorage.getItem('gl_active_session_lease_id'))
+          : null;
+        const parentPin = inMemoryParentPinRef.current || undefined;
+        const { error: rpcErr } = await supabase.rpc('save_parent_controls', {
+          p_student_id: effectiveId,
+          p_settings: {
+            campus_ui_level: newLevel,
+            ...(activeLeaseToken ? { lease_token: activeLeaseToken } : {}),
+            ...(parentPin ? { parent_pin: parentPin } : {})
+          }
+        });
+        if (rpcErr) {
+          console.warn('[Security Fail-Closed] save_parent_controls RPC rejected UI-Level change:', rpcErr);
+          setStudentUiLevel(prevLevel);
+          setDraftUiLevel(prevLevel);
+          if (effectiveId) {
+            localStorage.setItem(`campus_student_ui_level_${effectiveId}`, prevLevel);
+          }
+          localStorage.setItem('campus_student_ui_level', prevLevel);
+          window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: prevLevel }));
+          const isAccessDenied = rpcErr.code === '42501' || rpcErr.message?.includes('Access denied');
+          if (isAccessDenied) {
+            lockParentSession();
+            setParentErrorToast('Sicherheits-Schutz: Stufenwechsel erfordert die Freigabe der Eltern mit PIN.');
+            if (!isAdultStudent) {
+              setPendingParentTarget('parent_controls');
+              setParentGatePinInput('');
+              setParentGateError('');
+              setShowParentGateModal(true);
+            }
+          } else {
+            setParentErrorToast('Stufenwechsel fehlgeschlagen: ' + (rpcErr.message || 'Verbindungsfehler'));
+          }
+        } else {
+          // Success Feedback: extend session rolling window
+          extendParentSession();
+          const labels: Record<string, string> = { junior: 'Junior (6–10 J.)', teen: 'Teen (11–15 J.)', pro: '+16 / Pro' };
+          setUiLevelToast(`Alters-UI erfolgreich auf „${labels[newLevel] || newLevel}“ gespeichert 🛡️`);
+        }
+      }
+    } catch (e) {
+      console.warn('Could not persist campus_ui_level via RPC:', e);
+      setStudentUiLevel(prevLevel);
+      setDraftUiLevel(prevLevel);
+      setParentErrorToast('Verbindungsfehler beim Speichern der Altersstufe.');
+    }
   };
 
   const CAMPUS_AGE_STANDARDS: Record<string, {
@@ -1451,6 +1533,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     // Update in-memory React state immediately for snappy UI
     setStudentUser((prev: any) => prev ? { ...prev, ...payload, parent_allow_tts: nextAllowTts } : prev);
 
+    const prevUiLevel = studentUiLevel;
+    const prevDraftUiLevel = draftUiLevel;
+
     // Propagate to App.tsx root user state so initialUser is 100% synchronized!
     if (onProfileUpdate) {
       try {
@@ -1462,8 +1547,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
     try {
       if (targetStudentId) {
+        const activeLeaseToken = typeof window !== 'undefined'
+          ? (sessionStorage.getItem('gl_parent_session_lease') || sessionStorage.getItem('gl_active_session_lease_id') || localStorage.getItem('gl_active_session_lease_id'))
+          : null;
+
         const settingsPayload = {
           ...payload,
+          ...(activeLeaseToken ? { lease_token: activeLeaseToken } : {}),
           ...(inMemoryParentPinRef.current ? { parent_pin: inMemoryParentPinRef.current } : {})
         };
         // 🛡️ Call immutable RPC for authoritative database storage with GoBD audit trail
@@ -1473,15 +1563,50 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         });
 
         if (rpcErr) {
-          console.warn('save_parent_controls RPC failed, falling back to direct table update:', rpcErr);
-          const { error: userErr } = await supabase.from('users').update(payload).eq('id', targetStudentId);
-          if (userErr) {
-            console.warn('Fallback update on users failed:', userErr);
+          console.warn('[Security Fail-Closed] save_parent_controls RPC rejected update:', rpcErr);
+          // 🛡️ Fail-Closed Rollback: State auf verifizierten Stand zurücksetzen
+          if (updates.uiLevel !== undefined) {
+            setDraftUiLevel(prevDraftUiLevel);
+            setStudentUiLevel(prevUiLevel);
+            if (targetStudentId) {
+              localStorage.setItem(`campus_student_ui_level_${targetStudentId}`, prevUiLevel);
+            }
+            localStorage.setItem('campus_student_ui_level', prevUiLevel);
+            window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: prevUiLevel }));
+          }
+          const isAccessDenied = rpcErr.code === '42501' || rpcErr.message?.includes('Access denied');
+          if (isAccessDenied) {
+            lockParentSession();
+            setParentErrorToast('Sicherheits-Schutz: Änderungen erfordern die Freigabe der Eltern mit PIN.');
+            setPendingParentTarget('parent_controls');
+            setParentGatePinInput('');
+            setParentGateError('');
+            setShowParentGateModal(true);
+          } else {
+            setParentErrorToast('Speichern fehlgeschlagen: ' + (rpcErr.message || 'Verbindungsfehler'));
+          }
+          return;
+        } else {
+          // Success Feedback: extend session rolling window
+          extendParentSession();
+          if (updates.uiLevel !== undefined) {
+            const labels: Record<string, string> = { junior: 'Junior (6–10 J.)', teen: 'Teen (11–15 J.)', pro: '+16 / Pro' };
+            setUiLevelToast(`Alters-UI erfolgreich auf „${labels[updates.uiLevel] || updates.uiLevel}“ gespeichert 🛡️`);
           }
         }
       }
     } catch (err) {
       console.error('Error auto-saving parent controls:', err);
+      if (updates.uiLevel !== undefined) {
+        setDraftUiLevel(prevDraftUiLevel);
+        setStudentUiLevel(prevUiLevel);
+        if (targetStudentId) {
+          localStorage.setItem(`campus_student_ui_level_${targetStudentId}`, prevUiLevel);
+        }
+        localStorage.setItem('campus_student_ui_level', prevUiLevel);
+        window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: prevUiLevel }));
+      }
+      setParentErrorToast('Verbindungsfehler beim Speichern der Eltern-Einstellungen.');
     }
   };
 
@@ -3186,9 +3311,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
   const checkIsParentUnlockedGlobal = () => {
     if (typeof window === 'undefined') return false;
-    const globalUnlocked = sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true';
+    const globalSessionExp = sessionStorage.getItem('groovelab_parent_session_global');
+    const isGlobalActive = globalSessionExp !== null && Number(globalSessionExp) > Date.now();
     const userSession = sessionStorage.getItem(`groovelab_parent_session_${studentId}`);
-    return globalUnlocked || (userSession !== null && Number(userSession) > Date.now());
+    const isUserActive = userSession !== null && Number(userSession) > Date.now();
+    return isGlobalActive || isUserActive;
   };
 
   const isStudentAbsenceAllowed = useMemo(() => {
@@ -3231,14 +3358,31 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       const targetId = studentId || (studentUser as any)?.id;
 
       if (targetId) {
+        // 1. Primary: Server-Side verify_parent_pin_with_lease RPC
         try {
-          // 1. Server-Side verify_parent_pin RPC (Fail-Closed, zero student PIN fallback)
-          const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
-            student_id: targetId,
-            input_pin: cleanInput
+          const { data: leaseData, error: leaseErr } = await supabase.rpc('verify_parent_pin_with_lease', {
+            p_student_id: targetId,
+            p_input_pin: cleanInput,
+            p_device_key: `browser-${Date.now()}`
           });
-          if (parentOk === true) isMatch = true;
+          if (!leaseErr && leaseData?.success === true) {
+            isMatch = true;
+            if (leaseData?.lease_token) {
+              sessionStorage.setItem('gl_parent_session_lease', String(leaseData.lease_token));
+            }
+          }
         } catch (e) {}
+
+        // Fallback: verify_parent_pin (legacy boolean RPC)
+        if (!isMatch) {
+          try {
+            const { data: parentOk } = await supabase.rpc('verify_parent_pin', {
+              student_id: targetId,
+              input_pin: cleanInput
+            });
+            if (parentOk === true) isMatch = true;
+          } catch (e) {}
+        }
       }
 
       if (isMatch) {
@@ -4947,10 +5091,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
     const isStudentActor = !isTeacherSession;
     if (isStudentActor) {
-      const isAudioDenied = (studentUser as any)?.parent_allow_audio === false ||
-        ((studentUser as any)?.parent_permissions?.allow_student_audio === false);
-      if (isAudioDenied) {
-        alert('Die Aufnahme-Funktion für Schüler ist im Eltern-Kontrollzentrum aktuell pausiert. Bitte deine Eltern, sie im Eltern-Bereich zu aktivieren.');
+      const isAudioAllowed = (studentUser as any)?.parent_allow_audio === true &&
+        ((studentUser as any)?.parent_permissions?.allow_student_audio === true);
+      if (!isAudioAllowed) {
+        alert('Die Audioaufnahme erfordert die vorherige, manuelle Freischaltung durch die Eltern im Elternbereich (Art. 8 DSGVO / Kinderschutz). Bitte lasse die Mikrofon-Funktion von deinen Eltern freischalten.');
         setShowJuniorRecordModal(false);
         return;
       }
@@ -11213,11 +11357,6 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             .eq('post_type', 'campus')
         ]);
 
-        // Process interactions
-        if (feedInteractionsRes && feedInteractionsRes.data) {
-          setFeedInteractions(feedInteractionsRes.data);
-        }
-
         // Process announcements
         if (!announcementsRes.error && announcementsRes.data) {
           const parsed = announcementsRes.data.map((ann: any) => ({
@@ -11231,9 +11370,26 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             created_at: ann.created_at,
             user: ann.users
           }));
-          setCampusFeedAnnouncements(parsed.filter((ann: any) => ann.target_type === 'all' || ann.target_type === 'students'));
+          const filteredAnnouncements = parsed.filter((ann: any) => ann.target_type === 'all' || ann.target_type === 'students');
+          setCampusFeedAnnouncements(filteredAnnouncements);
+
+          // 🛡️ Multi-Tenancy Scoping: Fetch interactions strictly for this school's announcements
+          const annIds = filteredAnnouncements.map((a: any) => a.id);
+          if (annIds.length > 0) {
+            const { data: scopedCampusInteractions } = await supabase
+              .from('feed_interactions')
+              .select('*')
+              .eq('post_type', 'campus')
+              .in('post_id', annIds);
+            if (scopedCampusInteractions) {
+              setFeedInteractions(scopedCampusInteractions);
+            }
+          } else {
+            setFeedInteractions([]);
+          }
         } else {
           setCampusFeedAnnouncements([]);
+          setFeedInteractions([]);
         }
 
         // Fetch Class Feed posts
@@ -11247,13 +11403,19 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           setClassFeedPosts(classPosts);
         }
 
-        // Fetch Class Feed interactions
-        const { data: classInterData } = await supabase
-          .from('feed_interactions')
-          .select('*')
-          .eq('post_type', 'class');
-        if (classInterData) {
-          setClassFeedInteractions(classInterData);
+        // 🛡️ Multi-Tenancy Scoping: Fetch Class Feed interactions strictly for this class's posts
+        const classPostIds = (classPosts || []).map((cp: any) => cp.id);
+        if (classPostIds.length > 0) {
+          const { data: classInterData } = await supabase
+            .from('feed_interactions')
+            .select('*')
+            .eq('post_type', 'class')
+            .in('post_id', classPostIds);
+          if (classInterData) {
+            setClassFeedInteractions(classInterData);
+          }
+        } else {
+          setClassFeedInteractions([]);
         }
 
         // Process school targets / class goals
@@ -11448,82 +11610,6 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     }
   };
 
-  const handleUploadAvatarWithPin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customAvatarFile) {
-      alert('Bitte wähle zuerst ein Bild aus.');
-      return;
-    }
-    if (!pinInput.trim()) {
-      alert('Bitte gib die PIN ein.');
-      return;
-    }
-
-    setIsUploadingCustomAvatar(true);
-    try {
-      // 🛡️ Enterprise Media Security & Anti-Malware Ingestion Validation (strictly images only)
-      const validation = await validateMediaBlob(customAvatarFile, 'image');
-      if (!validation.isValid) {
-        alert(validation.reason || 'Sicherheitswarnung: Das Bildformat ist unzulässig oder enthält bedenkliche Binärstrukturen.');
-        setIsUploadingCustomAvatar(false);
-        return;
-      }
-
-      const fileExt = customAvatarFile.name.split('.').pop();
-      const fileName = `${studentId}_avatar_${Date.now()}.${fileExt}`;
-      const filePath = `avatars/${fileName}`;
-
-      const { data: uploadData, error: uploadErr } = await supabase.storage
-        .from('groovelab-assets')
-        .upload(filePath, customAvatarFile);
-      
-      let finalPublicUrl = '';
-      if (uploadErr) {
-        console.warn('Storage upload failed, falling back to data URL:', uploadErr);
-        const reader = new FileReader();
-        finalPublicUrl = await new Promise((resolve) => {
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(customAvatarFile);
-        });
-      } else {
-        const { data: publicUrlData } = supabase.storage
-          .from('groovelab-assets')
-          .getPublicUrl(filePath);
-        finalPublicUrl = publicUrlData.publicUrl;
-      }
-
-      // Call secure RPC to verify pin code and update users/one-time-pins tables
-      const { data: verifyResult, error: verifyErr } = await supabase.rpc('verify_photo_upload_pin', {
-        p_student_id: studentId,
-        p_pin_code: pinInput.trim(),
-        p_photo_url: finalPublicUrl
-      });
-      
-      if (verifyErr || !verifyResult) {
-        alert(verifyErr?.message || 'Ungültige oder bereits verwendete PIN!');
-        setIsUploadingCustomAvatar(false);
-        return;
-      }
-
-      if (studentMissionProgress && studentMissionProgress.current_level === 2) {
-        await supabase
-          .from('student_missions')
-          .update({ current_level: 3, unlocked_at: new Date().toISOString() })
-          .eq('student_id', studentId);
-      }
-
-      alert('Erfolgreich! Dein Bild wurde hochgeladen und dein Level wurde aktualisiert.');
-      setPinInput('');
-      setCustomAvatarFile(null);
-      fetchStudentAndAvatar();
-    } catch (err: any) {
-      console.error('Error during pin upload:', err);
-      alert('Fehler beim Upload: ' + err.message);
-    } finally {
-      setIsUploadingCustomAvatar(false);
-    }
-  };
-
   const handleStartDetox = () => {
     setDetoxSecondsLeft(detoxMinutes * 60);
     setIsDetoxActive(true);
@@ -11538,6 +11624,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     playBeep(523.25, 600); // Success musical tone
 
     try {
+      // 🛡️ SECURITY GOVERNANCE: Authoritative Server-Side Detox Finalization
       const resp = await fetch('/api/complete-detox', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -11548,14 +11635,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       });
 
       if (!resp.ok) {
-        // Fallback local update if server completed offline
-        const newXp = (avatar?.xp || 0) + 10;
-        const currentStreak = (avatar?.streak_flame || 0) + 1;
-        await supabase.from('avatars').update({
-          xp: newXp,
-          streak_flame: currentStreak,
-          last_focus_date: new Date().toISOString().split('T')[0]
-        }).eq('user_id', studentId);
+        console.warn('[Detox] Server finalization returned non-ok status:', resp.status);
       }
 
       fetchStudentAndAvatar();
@@ -11831,6 +11911,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     (studentUser as any).has_parent_pin = true;
                   }
 
+                  // 🛡️ REINES IN-MEMORY VAULTING: Neu gesetzte PIN sofort im flüchtigen RAM-Ref halten
+                  inMemoryParentPinRef.current = nextVal;
+                  setIsParentUnlocked(true);
+
                   sessionStorage.setItem(`groovelab_parent_session_${studentId}`, String(Date.now() + 180 * 1000));
                   sessionStorage.setItem(`groovelab_parent_unlocked_${studentId}`, 'true');
                   sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
@@ -11899,13 +11983,37 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showParentGateModal, handleParentGateKeyInput]);
 
+  // Keyboard Listener to dismiss Recovery Key Modal on Escape
+  useEffect(() => {
+    if (!showRecoveryKeyModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowRecoveryKeyModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showRecoveryKeyModal]);
+
+  // 🛡️ SECURITY HARDENING: Auto-lock Parent Session when navigating away from Settings tab
+  useEffect(() => {
+    if (activeTab !== 'settings' && isParentUnlocked && !showLevelModal && !showParentGateModal) {
+      lockParentSession();
+    }
+  }, [activeTab, isParentUnlocked, lockParentSession, showLevelModal, showParentGateModal]);
+
   // 🛡️ REUSABLE MODALS: Parent Gate Master PIN & Recovery Key
   const renderParentGateModal = () => {
     if (!showParentGateModal) return null;
     const hasConfiguredParentPin = Boolean(studentUser?.has_parent_pin === true);
 
     return (
-      <div style={{
+      <div 
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="parent-gate-modal-title"
+        style={{
         position: 'fixed',
         inset: 0,
         background: 'rgba(15, 23, 42, 0.75)',
@@ -11935,6 +12043,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           color: '#0f172a'
         }}>
           <button
+            type="button"
+            aria-label="Elternbereich schließen"
             onClick={() => {
               setShowParentGateModal(false);
               setPendingParentTarget(null);
@@ -11979,7 +12089,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             <ShieldCheck size={32} />
           </div>
 
-          <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
+          <h3 id="parent-gate-modal-title" style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#0f172a' }}>
             {hasConfiguredParentPin ? 'Eltern-Bereich geschützt 🛡️' : '6-stellige Eltern-Master-PIN vergeben 🛡️'}
           </h3>
           
@@ -12354,6 +12464,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     if (!showRecoveryKeyModal) return null;
     return (
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="recovery-key-modal-title"
         style={{
           position: 'fixed',
           inset: 0,
@@ -12385,11 +12498,35 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             flexDirection: 'column',
             alignItems: 'center',
             textAlign: 'center',
-            color: '#0f172a'
+            color: '#0f172a',
+            position: 'relative'
           }}
           className="animation-slide-up"
           onClick={(e) => e.stopPropagation()}
         >
+          <button
+            type="button"
+            aria-label="Wiederherstellungsdialog schließen"
+            onClick={() => setShowRecoveryKeyModal(false)}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              background: '#f1f5f9',
+              border: 'none',
+              borderRadius: '50%',
+              width: '36px',
+              height: '36px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: '#64748b'
+            }}
+          >
+            <X size={18} />
+          </button>
+
           <div style={{
             width: '60px',
             height: '60px',
@@ -12404,7 +12541,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             <Key size={30} />
           </div>
 
-          <h3 style={{ margin: '0 0 6px 0', fontSize: '1.3rem', fontWeight: 1000, color: '#0f172a' }}>
+          <h3 id="recovery-key-modal-title" style={{ margin: '0 0 6px 0', fontSize: '1.3rem', fontWeight: 1000, color: '#0f172a' }}>
             Elternbereich wiederherstellen 🛡️
           </h3>
           <p style={{ margin: '0 0 18px 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: 1.45 }}>
@@ -12516,6 +12653,23 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             className="hover-scale"
           >
             Notfallschlüssel prüfen ➔
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowRecoveryKeyModal(false)}
+            style={{
+              background: 'transparent',
+              color: '#64748b',
+              border: 'none',
+              padding: '6px 12px',
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              borderRadius: '8px'
+            }}
+          >
+            Abbrechen / Schließen
           </button>
         </div>
       </div>
@@ -13403,102 +13557,64 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       </div>
 
       {visitedTabs.has('practice_board') && (
-        studentUiLevel === 'junior' ? (
-          <div style={{ display: activeTab === 'practice_board' ? 'block' : 'none', padding: isMobile ? '12px' : '24px' }}>
-            <CampusJuniorDashboard
-              studentUser={studentUser}
-              studentId={studentId}
-              avatar={avatar}
-              currentXp={currentXp}
-              progressItems={progressItems}
-              lehrwerke={lehrwerke}
-              localProgress={localProgress}
-              briefingData={briefingData}
-              scheduleOccurrences={scheduleOccurrences}
-              onCompletePracticeSession={(mins, xp) => finishPracticeSession(xp)}
-              totalPracticeMinutes={effectivePracticeMinutes}
-              fokusLogs={fokusLogs}
-              schoolFokusLevels={schoolFokusLevels}
-            />
-          </div>
-        ) : studentUiLevel === 'teen' ? (
-          <div style={{ display: activeTab === 'practice_board' ? 'block' : 'none', padding: isMobile ? '12px' : '24px' }}>
-            <CampusTeenDashboard
-              studentUser={studentUser}
-              studentId={studentId}
-              avatar={avatar}
-              currentXp={currentXp}
-              progressItems={progressItems}
-              lehrwerke={lehrwerke}
-              localProgress={localProgress}
-              briefingData={briefingData}
-              scheduleOccurrences={scheduleOccurrences}
-              onCompletePracticeSession={(mins, xp) => finishPracticeSession(xp)}
-              totalPracticeMinutes={effectivePracticeMinutes}
-              fokusLogs={fokusLogs}
-              schoolFokusLevels={schoolFokusLevels}
-            />
-          </div>
-        ) : (
-          <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Lade Übepfad...</div>}>
-            <StudentPracticeTab
-              activeTab={activeTab}
-              studentUiLevel={studentUiLevel}
-              juniorMissionPhase={juniorMissionPhase}
-              preStartCountdown={preStartCountdown}
-              studentId={studentId}
-              studentUser={studentUser}
-              avatar={avatar}
-              effectivePracticeMinutes={effectivePracticeMinutes}
-              secondsElapsedRef={secondsElapsedRef}
-              isJuniorMissionPausedRef={isJuniorMissionPausedRef}
-              startJuniorMissionImmediately={startJuniorMissionImmediately}
-              handleFinishJuniorMission={handleFinishJuniorMission}
-              handleEmergencyExitJuniorMission={handleEmergencyExitJuniorMission}
-              handleCloseJuniorCelebration={handleCloseJuniorCelebration}
-              handleStartPracticeSession={handleStartPracticeSession}
-              finishPracticeSession={finishPracticeSession}
-              logParentGuidedPractice={logParentGuidedPractice}
-              handleOpenHomeworkBookWithView={handleOpenHomeworkBookWithView}
-              playMilestoneSound={playMilestoneSound}
-              playStarChimeSound={playStarChimeSound}
-              getDeterministicWeekMetrics={getDeterministicWeekMetrics}
-              getGroupedLogs={getGroupedLogs}
-              getJuniorMissionDetails={getJuniorMissionDetails}
-              getTargetMinutes={getTargetMinutes}
-              sessionActive={sessionActive}
-              isPhoneFlat={isPhoneFlat}
-              secondsElapsed={secondsElapsed}
-              isMobile={isMobile}
-              isMusicStandMode={isMusicStandMode}
-              flamesActive={flamesActive}
-              xpActive={xpActive}
-              assignedCampusSongs={assignedCampusSongs}
-              lehrwerke={lehrwerke}
-              progressItems={progressItems}
-              fokusLogs={fokusLogs}
-              activeSongSkills={activeSongSkills}
-              showJuniorPracticeSettingsModal={showJuniorPracticeSettingsModal}
-              setShowJuniorPracticeSettingsModal={setShowJuniorPracticeSettingsModal}
-              showJuniorStickerModal={showJuniorStickerModal}
-              setShowJuniorStickerModal={setShowJuniorStickerModal}
-              practiceAnchor={practiceAnchor}
-              setPracticeAnchor={setPracticeAnchor}
-              juniorMissionTier={juniorMissionTier}
-              juniorMissionCountdown={juniorMissionCountdown}
-              isJuniorMissionPaused={isJuniorMissionPaused}
-              setIsJuniorMissionPaused={setIsJuniorMissionPaused}
-              showJuniorCheatSheet={showJuniorCheatSheet}
-              setShowJuniorCheatSheet={setShowJuniorCheatSheet}
-              juniorSelectedTrackIndex={juniorSelectedTrackIndex}
-              isJuniorTabPaused={isJuniorTabPaused}
-              juniorCelebrationSummary={juniorCelebrationSummary}
-              juniorLaunchStage={juniorLaunchStage}
-              expandedMonths={expandedMonths}
-              setExpandedMonths={setExpandedMonths}
-            />
-          </Suspense>
-        )
+        <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Lade Übepfad...</div>}>
+          <StudentPracticeTab
+            activeTab={activeTab}
+            studentUiLevel={studentUiLevel}
+            juniorMissionPhase={juniorMissionPhase}
+            preStartCountdown={preStartCountdown}
+            studentId={studentId}
+            studentUser={studentUser}
+            avatar={avatar}
+            effectivePracticeMinutes={effectivePracticeMinutes}
+            secondsElapsedRef={secondsElapsedRef}
+            isJuniorMissionPausedRef={isJuniorMissionPausedRef}
+            startJuniorMissionImmediately={startJuniorMissionImmediately}
+            handleFinishJuniorMission={handleFinishJuniorMission}
+            handleEmergencyExitJuniorMission={handleEmergencyExitJuniorMission}
+            handleCloseJuniorCelebration={handleCloseJuniorCelebration}
+            handleStartPracticeSession={handleStartPracticeSession}
+            finishPracticeSession={finishPracticeSession}
+            logParentGuidedPractice={logParentGuidedPractice}
+            handleOpenHomeworkBookWithView={handleOpenHomeworkBookWithView}
+            playMilestoneSound={playMilestoneSound}
+            playStarChimeSound={playStarChimeSound}
+            getDeterministicWeekMetrics={getDeterministicWeekMetrics}
+            getGroupedLogs={getGroupedLogs}
+            getJuniorMissionDetails={getJuniorMissionDetails}
+            getTargetMinutes={getTargetMinutes}
+            sessionActive={sessionActive}
+            isPhoneFlat={isPhoneFlat}
+            secondsElapsed={secondsElapsed}
+            isMobile={isMobile}
+            isMusicStandMode={isMusicStandMode}
+            flamesActive={flamesActive}
+            xpActive={xpActive}
+            assignedCampusSongs={assignedCampusSongs}
+            lehrwerke={lehrwerke}
+            progressItems={progressItems}
+            fokusLogs={fokusLogs}
+            activeSongSkills={activeSongSkills}
+            showJuniorPracticeSettingsModal={showJuniorPracticeSettingsModal}
+            setShowJuniorPracticeSettingsModal={setShowJuniorPracticeSettingsModal}
+            showJuniorStickerModal={showJuniorStickerModal}
+            setShowJuniorStickerModal={setShowJuniorStickerModal}
+            practiceAnchor={practiceAnchor}
+            setPracticeAnchor={setPracticeAnchor}
+            juniorMissionTier={juniorMissionTier}
+            juniorMissionCountdown={juniorMissionCountdown}
+            isJuniorMissionPaused={isJuniorMissionPaused}
+            setIsJuniorMissionPaused={setIsJuniorMissionPaused}
+            showJuniorCheatSheet={showJuniorCheatSheet}
+            setShowJuniorCheatSheet={setShowJuniorCheatSheet}
+            juniorSelectedTrackIndex={juniorSelectedTrackIndex}
+            isJuniorTabPaused={isJuniorTabPaused}
+            juniorCelebrationSummary={juniorCelebrationSummary}
+            juniorLaunchStage={juniorLaunchStage}
+            expandedMonths={expandedMonths}
+            setExpandedMonths={setExpandedMonths}
+          />
+        </Suspense>
       )}
 
       {visitedTabs.has('songs') && (
@@ -13759,11 +13875,6 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         studentMissionProgress={studentMissionProgress}
         progressItems={progressItems}
         studentUser={studentUser}
-        pinInput={pinInput}
-        setPinInput={setPinInput}
-        setCustomAvatarFile={setCustomAvatarFile}
-        handleUploadAvatarWithPin={handleUploadAvatarWithPin}
-        isUploadingCustomAvatar={isUploadingCustomAvatar}
         startTour={startTour}
       />
 
@@ -13832,6 +13943,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             draftBoardOverrides={draftBoardOverrides}
             draftUiLevel={draftUiLevel}
             extendParentSession={extendParentSession}
+            lockParentSession={lockParentSession}
+            parentLockRemainingSeconds={parentLockRemainingSeconds}
             familyProfiles={familyProfiles}
             firstPinActiveField={firstPinActiveField}
             firstPinShowMask={firstPinShowMask}
@@ -13873,7 +13986,6 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             parentGateCooldownSeconds={parentGateCooldownSeconds}
             parentGateError={parentGateError}
             parentGatePinInput={parentGatePinInput}
-            parentLockRemainingSeconds={parentLockRemainingSeconds}
             parentSetupConfirm={parentSetupConfirm}
             parentSetupError={parentSetupError}
             parentSetupPin={parentSetupPin}
@@ -14417,6 +14529,66 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         >
           <Shield size={18} className="text-emerald-400" />
           <span>{uiLevelToast}</span>
+        </div>
+      )}
+
+      {/* 🛡️ FAIL-CLOSED PARENT CONTROL ERROR TOAST */}
+      {parentErrorToast && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          style={{
+            position: 'fixed',
+            top: '24px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 99999,
+            background: '#dc2626',
+            color: '#ffffff',
+            padding: '10px 18px 10px 22px',
+            borderRadius: '100px',
+            fontSize: '0.92rem',
+            fontWeight: 800,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            maxWidth: '92vw',
+            boxShadow: '0 12px 32px rgba(220, 38, 38, 0.4)',
+            animation: 'toastSlideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+            fontFamily: "'Plus Jakarta Sans', sans-serif"
+          }}
+        >
+          <ShieldAlert size={18} color="#ffffff" style={{ flexShrink: 0 }} />
+          <span>{parentErrorToast}</span>
+          <button
+            type="button"
+            onClick={() => {
+              setPendingParentTarget('parent_controls');
+              setParentGatePinInput('');
+              setParentGateError('');
+              setShowParentGateModal(true);
+            }}
+            style={{
+              background: '#ffffff',
+              color: '#dc2626',
+              border: 'none',
+              borderRadius: '999px',
+              padding: '6px 14px',
+              fontWeight: 900,
+              fontSize: '0.82rem',
+              cursor: 'pointer',
+              flexShrink: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              touchAction: 'manipulation'
+            }}
+            className="hover-scale"
+          >
+            <Key size={14} />
+            <span>PIN jetzt eingeben</span>
+          </button>
         </div>
       )}
 

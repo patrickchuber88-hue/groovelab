@@ -149,7 +149,16 @@ export const FirstLoginPinModal: React.FC<FirstLoginPinModalProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {/* Field 1: Neue PIN */}
               <div 
+                role="button"
+                tabIndex={0}
+                aria-label="1. Neue 4-stellige PIN auswählen"
                 onClick={() => setFirstPinActiveField('new')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setFirstPinActiveField('new');
+                  }
+                }}
                 style={{
                   padding: '12px 14px',
                   borderRadius: '16px',
@@ -204,7 +213,16 @@ export const FirstLoginPinModal: React.FC<FirstLoginPinModalProps> = ({
 
               {/* Field 2: PIN Bestätigen */}
               <div 
+                role="button"
+                tabIndex={0}
+                aria-label="2. PIN wiederholen auswählen"
                 onClick={() => setFirstPinActiveField('confirm')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setFirstPinActiveField('confirm');
+                  }
+                }}
                 style={{
                   padding: '12px 14px',
                   borderRadius: '16px',

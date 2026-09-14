@@ -31,8 +31,9 @@ serve(async (req) => {
       if (leaseToken) {
         const { data: lease } = await supabase
           .from("session_leases")
-          .select("id, user_id, revoked_at")
+          .select("id, user_id, revoked_at, is_revoked")
           .eq("id", leaseToken)
+          .eq("is_revoked", false)
           .is("revoked_at", null)
           .maybeSingle();
         if (lease && lease.id) {

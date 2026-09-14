@@ -24,6 +24,7 @@ import { UpdateAnnouncementHero } from './common/UpdateAnnouncementHero';
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
 import { StudentToDelete } from './ConfirmDeleteStudentModal';
 import { deleteStudentFully } from '../utils/studentDeletionService';
+import { scrubSharedDeviceCache } from '../utils/sharedDeviceScrubber';
 import { getParentOnboardingUrl, isDevEnvironment } from '../utils/tenantUrlHelper';
 import { isUUID } from '../utils/uuidValidator';
 import { getAlphabeticalHue, getAlphabeticalUniColor } from '../utils/adminColorHelpers';
@@ -1273,25 +1274,30 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     return 'briefing';
   });
 
+  // 🛡️ Zero Data Remanence & Forensic Purge beim Sekretariats-Logout (DSGVO Art. 17 / Art. 32)
+  const handleSecretaryLogout = async () => {
+    try {
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('groovelab_secretary_subtab');
+        sessionStorage.removeItem('groovelab_active_workspace');
+        localStorage.removeItem('groovelab_secretary_subtab');
+        localStorage.removeItem('groovelab_active_workspace');
+        localStorage.removeItem('groovelab_school_overrides');
+        localStorage.removeItem('campus_school_overrides');
+        localStorage.removeItem('groovelab_school_profile');
+      }
+      await scrubSharedDeviceCache();
+    } catch (e) {
+      console.warn('[SecretaryDashboard] Logout scrubber note:', e);
+    }
+    if (onLogout) {
+      onLogout();
+    }
+  };
+
   // 🎙️ Dynamic Multi-Layer Audio-Vault Calculator (Local-First + Cloud Reconciliation)
   const getEffectiveStorageUsedBytes = (profile: any): number => {
     let bytes = Number(profile?.storage_used_bytes || 0);
-    try {
-      const schoolId = String(profile?.id || '');
-      const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
-      const overrides = JSON.parse(overridesStr);
-      if (overrides[schoolId]?.storage_used_bytes !== undefined) {
-        bytes = Math.max(bytes, Number(overrides[schoolId].storage_used_bytes));
-      }
-      const directSchoolKey = localStorage.getItem(`groovelab_storage_used_bytes_${schoolId}`);
-      if (directSchoolKey) {
-        bytes = Math.max(bytes, Number(directSchoolKey));
-      }
-      const genericKey = localStorage.getItem('groovelab_storage_used_bytes');
-      if (genericKey) {
-        bytes = Math.max(bytes, Number(genericKey));
-      }
-    } catch {}
 
     try {
       if (typeof window !== 'undefined') {
@@ -4505,7 +4511,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       ] = await Promise.all([
         supabase
           .from('schools')
-          .select('id, subdomain, name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota, campus_activated_this_month, groovelab_activated_this_month, student_billing_option, zip_code, city, street, house_number, phone_number, email, contract_ends_at, created_at, is_billing_booked, contract_start_date, extra_billing_option, opening_hours, is_trial, trial_ends_at, status, subscription_bypass, school_year_start_month, school_year_start_day, auto_delete_expired_users, custom_price_campus, custom_price_groovelab, custom_price_kombi, custom_price_teacher, custom_price_student, grandfathered_campus_price, grandfathered_groovelab_price, grandfathered_kombi_price, grandfathered_teacher_price, grandfathered_student_price, price_grandfathered_at, avv_signed_at, avv_signee_name, storage_addon_gb, storage_addon_monthly_fee, storage_addon_status, storage_pending_downgrade_gb, storage_pending_effective_date')
+          .select('id, subdomain, name, logo_url, primary_color, calendar_url, groovelab_kiosk_token, campus_login_token, allow_messages_global, has_campus_subscription, has_groovelab_subscription, is_paused, limits_enabled, user_quota, pending_user_quota, campus_activated_this_month, groovelab_activated_this_month, student_billing_option, zip_code, city, street, house_number, phone_number, email, contract_ends_at, created_at, is_billing_booked, contract_start_date, extra_billing_option, opening_hours, is_trial, trial_ends_at, status, subscription_bypass, school_year_start_month, school_year_start_day, auto_delete_expired_users, custom_price_campus, custom_price_groovelab, custom_price_kombi, custom_price_teacher, custom_price_student, grandfathered_campus_price, grandfathered_groovelab_price, grandfathered_kombi_price, grandfathered_teacher_price, grandfathered_student_price, price_grandfathered_at, avv_signed_at, avv_signee_name, storage_addon_gb, storage_addon_monthly_fee, storage_addon_status, storage_pending_downgrade_gb, storage_pending_effective_date, storage_used_bytes')
           .eq('id', schoolId)
           .single(),
         supabase
@@ -4548,26 +4554,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       }
       let schoolData: any = rawSchoolData;
       if (schoolData) {
-        try {
-          const overridesStr = localStorage.getItem('groovelab_school_overrides');
-          if (overridesStr) {
-            const overrides = JSON.parse(overridesStr);
-            if (overrides[schoolData.id]) {
-              const schoolOverride = overrides[schoolData.id];
-              schoolData = {
-                ...rawSchoolData,
-                ...schoolOverride,
-                opening_hours: {
-                  ...(rawSchoolData?.opening_hours || {}),
-                  ...(schoolOverride.opening_hours || {})
-                }
-              };
-            }
-          }
-        } catch (e) {
-          console.warn('Could not load localStorage school overrides in SecretaryDashboard:', e);
-        }
-
         const localSignedTimestamp = typeof window !== 'undefined' 
           ? (localStorage.getItem(`groovelab_avv_signed_${schoolId}`) || localStorage.getItem(`groovelab_avv_signed_${schoolData.id}`)) 
           : null;
@@ -4576,27 +4562,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         }
 
         let storageAddonGbFromSource = Number(schoolData.storage_addon_gb || schoolData.extra_storage_gb || 0);
-
-        try {
-          const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
-          const overrides = JSON.parse(overridesStr);
-          if (overrides[schoolId] && overrides[schoolId].storage_addon_gb !== undefined) {
-            storageAddonGbFromSource = Number(overrides[schoolId].storage_addon_gb);
-          } else if (overrides[schoolData.id] && overrides[schoolData.id].storage_addon_gb !== undefined) {
-            storageAddonGbFromSource = Number(overrides[schoolData.id].storage_addon_gb);
-          }
-        } catch (e) {}
-
-        if (storageAddonGbFromSource === 0) {
-          const localStoredGb = Number(
-            localStorage.getItem(`groovelab_storage_addon_gb_${schoolId}`) || 
-            localStorage.getItem(`groovelab_storage_addon_gb_${schoolData.id}`) || 
-            localStorage.getItem('groovelab_storage_addon_gb') || 0
-          );
-          if (localStoredGb > 0) {
-            storageAddonGbFromSource = localStoredGb;
-          }
-        }
 
         schoolData.storage_addon_gb = storageAddonGbFromSource;
         if (storageAddonGbFromSource > 0) {
@@ -11736,7 +11701,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           {onLogout && (
             <button 
               type="button"
-              onClick={onLogout}
+              onClick={handleSecretaryLogout}
               style={{ 
                 width: '100%', 
                 display: 'flex', 
@@ -23475,7 +23440,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               {onLogout && (
                 <button
                   type="button"
-                  onClick={onLogout}
+                  onClick={handleSecretaryLogout}
                   style={{
                     display: 'flex',
                     alignItems: 'center',

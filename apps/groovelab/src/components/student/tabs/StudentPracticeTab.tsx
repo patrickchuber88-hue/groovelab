@@ -1476,27 +1476,34 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                     type="button"
                                     onClick={handleFinishJuniorMission}
                                     style={{
-                                      background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(217, 119, 6, 0.35) 100%)',
-                                      border: '1.5px solid rgba(253, 224, 71, 0.7)',
+                                      background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.35) 0%, rgba(217, 119, 6, 0.5) 100%)',
+                                      border: '1.5px solid rgba(253, 224, 71, 0.85)',
                                       backdropFilter: 'blur(20px)',
                                       WebkitBackdropFilter: 'blur(20px)',
                                       borderRadius: '100px',
-                                      height: '40px',
-                                      padding: '0 18px',
+                                      minHeight: '44px',
+                                      height: '44px',
+                                      padding: '0 20px',
                                       color: '#fef08a',
-                                      fontSize: '0.90rem',
+                                      fontSize: '0.92rem',
                                       fontWeight: 950,
                                       cursor: 'pointer',
                                       display: 'inline-flex',
                                       alignItems: 'center',
-                                      gap: '7px',
-                                      boxShadow: '0 0 16px rgba(245, 158, 11, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3)',
+                                      justifyContent: 'center',
+                                      gap: '8px',
+                                      boxShadow: '0 0 20px rgba(245, 158, 11, 0.5), 0 4px 14px rgba(0, 0, 0, 0.35)',
+                                      touchAction: 'manipulation',
+                                      WebkitTapHighlightColor: 'transparent',
+                                      userSelect: 'none',
                                       transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                                     }}
                                     className="hover-scale"
+                                    title="Ziel erreicht! Mission abschließen und Sterne sichern"
+                                    aria-label="Mission abschließen"
                                   >
                                     <span>Abschließen</span>
-                                    <Star size={15} fill="#fef08a" color="#fef08a" />
+                                    <Star size={16} fill="#fef08a" color="#fef08a" />
                                   </button>
                                 ) : (
                                   <>
@@ -1508,55 +1515,68 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                         isJuniorMissionPausedRef.current = true;
                                       }}
                                       style={{
-                                        background: 'rgba(255, 255, 255, 0.10)',
-                                        border: '1px solid rgba(255, 255, 255, 0.18)',
+                                        background: 'rgba(255, 255, 255, 0.12)',
+                                        border: '1.5px solid rgba(255, 255, 255, 0.22)',
                                         backdropFilter: 'blur(20px)',
                                         WebkitBackdropFilter: 'blur(20px)',
                                         borderRadius: '100px',
-                                        height: '40px',
+                                        minHeight: '44px',
+                                        height: '44px',
                                         padding: '0 16px',
                                         color: '#f8fafc',
-                                        fontSize: '0.86rem',
+                                        fontSize: '0.88rem',
                                         fontWeight: 900,
                                         cursor: 'pointer',
                                         display: 'inline-flex',
                                         alignItems: 'center',
+                                        justifyContent: 'center',
                                         gap: '7px',
                                         boxShadow: '0 4px 14px rgba(0, 0, 0, 0.25)',
+                                        touchAction: 'manipulation',
+                                        WebkitTapHighlightColor: 'transparent',
+                                        userSelect: 'none',
                                         transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                                       }}
                                       className="hover-scale"
+                                      title="Übung kurz pausieren"
+                                      aria-label="Übung pausieren"
                                     >
                                       <Pause size={14} fill="#f8fafc" color="#f8fafc" />
                                       <span>Pause</span>
                                     </button>
 
-                                    {/* ⏹️ Beenden (Apple Music Coral-Glass Capsule - Beruhigt & Stressfrei) */}
+                                    {/* ⏹️ Beenden (Apple Music Vibrant Crimson Capsule - Sofort sichtbar & Mobile First) */}
                                     <button
                                       type="button"
                                       onClick={handleFinishJuniorMission}
                                       style={{
-                                        background: 'rgba(239, 68, 68, 0.16)',
-                                        border: '1px solid rgba(248, 113, 113, 0.38)',
+                                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                                        border: '1.5px solid #fca5a5',
                                         backdropFilter: 'blur(20px)',
                                         WebkitBackdropFilter: 'blur(20px)',
                                         borderRadius: '100px',
-                                        height: '40px',
-                                        padding: '0 16px',
-                                        color: '#fca5a5',
-                                        fontSize: '0.86rem',
-                                        fontWeight: 900,
+                                        minHeight: '44px',
+                                        height: '44px',
+                                        padding: '0 20px',
+                                        color: '#ffffff',
+                                        fontSize: '0.92rem',
+                                        fontWeight: 950,
                                         cursor: 'pointer',
                                         display: 'inline-flex',
                                         alignItems: 'center',
-                                        gap: '7px',
-                                        boxShadow: '0 4px 14px rgba(239, 68, 68, 0.2)',
+                                        justifyContent: 'center',
+                                        gap: '8px',
+                                        boxShadow: '0 4px 18px rgba(239, 68, 68, 0.55), 0 0 12px rgba(239, 68, 68, 0.35)',
+                                        touchAction: 'manipulation',
+                                        WebkitTapHighlightColor: 'transparent',
+                                        userSelect: 'none',
                                         transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                                       }}
                                       className="hover-scale"
                                       title="Übung beenden und deine Übe-Zeit als XP sichern"
+                                      aria-label="Übung beenden und Zeit sichern"
                                     >
-                                      <Square size={13} fill="#fca5a5" color="#fca5a5" />
+                                      <Square size={14} fill="#ffffff" color="#ffffff" />
                                       <span>Beenden</span>
                                     </button>
                                   </>
@@ -2825,44 +2845,65 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                     background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                                     border: '1.5px solid #fde047',
                                     borderRadius: '100px',
-                                    height: '40px',
-                                    padding: '0 18px',
+                                    minHeight: '44px',
+                                    height: '44px',
+                                    padding: '0 20px',
                                     color: '#ffffff',
-                                    fontSize: '0.90rem',
+                                    fontSize: '0.92rem',
                                     fontWeight: 950,
                                     cursor: 'pointer',
                                     display: 'inline-flex',
                                     alignItems: 'center',
-                                    gap: '7px',
-                                    boxShadow: '0 0 16px rgba(245, 158, 11, 0.45)'
+                                    justifyContent: 'center',
+                                    gap: '8px',
+                                    boxShadow: '0 0 20px rgba(245, 158, 11, 0.5), 0 4px 14px rgba(0, 0, 0, 0.35)',
+                                    touchAction: 'manipulation',
+                                    WebkitTapHighlightColor: 'transparent',
+                                    userSelect: 'none',
+                                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                                   }}
+                                  className="hover-scale"
+                                  title="Ziel erreicht! Mission abschließen und Sterne sichern"
+                                  aria-label="Mission abschließen"
                                 >
                                   <span>Abschließen</span>
-                                  <Star size={15} fill="#ffffff" color="#ffffff" />
+                                  <Star size={16} fill="#fef08a" color="#fef08a" />
                                 </button>
                               ) : (
                                 <>
+                                  {/* ⏸️ Pause (Apple Music Frosted Glass Capsule) */}
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const next = !isJuniorMissionPaused;
-                                      setIsJuniorMissionPaused(next);
-                                      isJuniorMissionPausedRef.current = next;
+                                      setIsJuniorMissionPaused(true);
+                                      isJuniorMissionPausedRef.current = true;
                                     }}
                                     style={{
-                                      background: 'rgba(255, 255, 255, 0.10)',
-                                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                                      background: 'rgba(255, 255, 255, 0.12)',
+                                      border: '1.5px solid rgba(255, 255, 255, 0.22)',
+                                      backdropFilter: 'blur(20px)',
+                                      WebkitBackdropFilter: 'blur(20px)',
                                       borderRadius: '100px',
-                                      height: '40px',
+                                      minHeight: '44px',
+                                      height: '44px',
                                       padding: '0 16px',
                                       color: '#f8fafc',
-                                      fontSize: '0.86rem',
+                                      fontSize: '0.88rem',
                                       fontWeight: 900,
                                       cursor: 'pointer',
                                       display: 'inline-flex',
                                       alignItems: 'center',
-                                      gap: '7px'
+                                      justifyContent: 'center',
+                                      gap: '7px',
+                                      boxShadow: '0 4px 14px rgba(0, 0, 0, 0.25)',
+                                      touchAction: 'manipulation',
+                                      WebkitTapHighlightColor: 'transparent',
+                                      userSelect: 'none',
+                                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                                     }}
+                                    className="hover-scale"
+                                    title={isJuniorMissionPaused ? 'Übung fortsetzen' : 'Übung pausieren'}
+                                    aria-label={isJuniorMissionPaused ? 'Übung fortsetzen' : 'Übung pausieren'}
                                   >
                                     <Pause size={14} fill="#f8fafc" color="#f8fafc" />
                                     <span>{isJuniorMissionPaused ? 'Weiter' : 'Pause'}</span>
@@ -2876,21 +2917,33 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                       finishPracticeSession();
                                     }}
                                     style={{
-                                      background: 'rgba(239, 68, 68, 0.20)',
-                                      border: '1px solid rgba(248, 113, 113, 0.4)',
+                                      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                                      border: '1.5px solid #fca5a5',
+                                      backdropFilter: 'blur(20px)',
+                                      WebkitBackdropFilter: 'blur(20px)',
                                       borderRadius: '100px',
-                                      height: '40px',
-                                      padding: '0 16px',
-                                      color: '#fca5a5',
-                                      fontSize: '0.86rem',
-                                      fontWeight: 900,
+                                      minHeight: '44px',
+                                      height: '44px',
+                                      padding: '0 20px',
+                                      color: '#ffffff',
+                                      fontSize: '0.92rem',
+                                      fontWeight: 950,
                                       cursor: 'pointer',
                                       display: 'inline-flex',
                                       alignItems: 'center',
-                                      gap: '7px'
+                                      justifyContent: 'center',
+                                      gap: '8px',
+                                      boxShadow: '0 4px 18px rgba(239, 68, 68, 0.55), 0 0 12px rgba(239, 68, 68, 0.35)',
+                                      touchAction: 'manipulation',
+                                      WebkitTapHighlightColor: 'transparent',
+                                      userSelect: 'none',
+                                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                                     }}
+                                    className="hover-scale"
+                                    title="Übung beenden und deine Übe-Zeit sichern"
+                                    aria-label="Übung beenden und Zeit sichern"
                                   >
-                                    <Square size={13} fill="#fca5a5" color="#fca5a5" />
+                                    <Square size={14} fill="#ffffff" color="#ffffff" />
                                     <span>Beenden</span>
                                   </button>
                                 </>
@@ -3782,20 +3835,29 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                     background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
                                     border: 'none',
                                     borderRadius: '100px',
-                                    height: '40px',
-                                    padding: '0 18px',
+                                    minHeight: '44px',
+                                    height: '44px',
+                                    padding: '0 20px',
                                     color: '#ffffff',
-                                    fontSize: '0.90rem',
+                                    fontSize: '0.92rem',
                                     fontWeight: 950,
                                     cursor: 'pointer',
                                     display: 'inline-flex',
                                     alignItems: 'center',
-                                    gap: '7px',
-                                    boxShadow: '0 4px 14px rgba(22, 163, 74, 0.35)'
+                                    justifyContent: 'center',
+                                    gap: '8px',
+                                    boxShadow: '0 4px 14px rgba(22, 163, 74, 0.35)',
+                                    touchAction: 'manipulation',
+                                    WebkitTapHighlightColor: 'transparent',
+                                    userSelect: 'none',
+                                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                                   }}
+                                  className="hover-scale"
+                                  title="Tagesziel erreicht! Übung abschließen"
+                                  aria-label="Übung abschließen"
                                 >
                                   <span>Abschließen</span>
-                                  <CheckCircle size={15} color="#ffffff" />
+                                  <CheckCircle size={16} color="#ffffff" />
                                 </button>
                               ) : (
                                 <>
@@ -3808,18 +3870,28 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                     }}
                                     style={{
                                       background: '#f8fafc',
-                                      border: '1px solid #cbd5e1',
+                                      border: '1.5px solid #cbd5e1',
                                       borderRadius: '100px',
-                                      height: '40px',
+                                      minHeight: '44px',
+                                      height: '44px',
                                       padding: '0 16px',
                                       color: '#334155',
-                                      fontSize: '0.86rem',
+                                      fontSize: '0.88rem',
                                       fontWeight: 900,
                                       cursor: 'pointer',
                                       display: 'inline-flex',
                                       alignItems: 'center',
-                                      gap: '7px'
+                                      justifyContent: 'center',
+                                      gap: '7px',
+                                      boxShadow: '0 2px 6px rgba(0, 0, 0, 0.04)',
+                                      touchAction: 'manipulation',
+                                      WebkitTapHighlightColor: 'transparent',
+                                      userSelect: 'none',
+                                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                                     }}
+                                    className="hover-scale"
+                                    title={isJuniorMissionPaused ? 'Übung fortsetzen' : 'Übung pausieren'}
+                                    aria-label={isJuniorMissionPaused ? 'Übung fortsetzen' : 'Übung pausieren'}
                                   >
                                     <Pause size={14} color="#334155" />
                                     <span>{isJuniorMissionPaused ? 'Weiter' : 'Pause'}</span>
@@ -3833,21 +3905,31 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                       finishPracticeSession();
                                     }}
                                     style={{
-                                      background: 'rgba(239, 68, 68, 0.08)',
-                                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                                      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                                      border: '1.5px solid #fca5a5',
                                       borderRadius: '100px',
-                                      height: '40px',
-                                      padding: '0 16px',
-                                      color: '#dc2626',
-                                      fontSize: '0.86rem',
-                                      fontWeight: 900,
+                                      minHeight: '44px',
+                                      height: '44px',
+                                      padding: '0 20px',
+                                      color: '#ffffff',
+                                      fontSize: '0.92rem',
+                                      fontWeight: 950,
                                       cursor: 'pointer',
                                       display: 'inline-flex',
                                       alignItems: 'center',
-                                      gap: '7px'
+                                      justifyContent: 'center',
+                                      gap: '8px',
+                                      boxShadow: '0 4px 18px rgba(239, 68, 68, 0.45), 0 0 10px rgba(239, 68, 68, 0.25)',
+                                      touchAction: 'manipulation',
+                                      WebkitTapHighlightColor: 'transparent',
+                                      userSelect: 'none',
+                                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
                                     }}
+                                    className="hover-scale"
+                                    title="Übung beenden und deine Übe-Zeit sichern"
+                                    aria-label="Übung beenden und Zeit sichern"
                                   >
-                                    <Square size={13} fill="#dc2626" color="#dc2626" />
+                                    <Square size={14} fill="#ffffff" color="#ffffff" />
                                     <span>Beenden</span>
                                   </button>
                                 </>

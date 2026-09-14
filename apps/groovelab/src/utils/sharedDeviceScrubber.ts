@@ -54,14 +54,23 @@ export async function scrubSharedDeviceCache(): Promise<{ success: boolean; purg
           continue;
         }
 
-        // Target student-specific caches, recordings, and audio memo drafts
+        // Target student-specific caches, recordings, audio memo drafts, and administrative office caches
         if (
           k.startsWith('campus_junior_recordings_') ||
           k.startsWith('campus_homework_notes_') ||
           k.startsWith('groovelab_student_') ||
           k.startsWith('offline_audio_') ||
           k.startsWith('cached_audio_') ||
-          k.startsWith('campus_temp_audio_')
+          k.startsWith('campus_temp_audio_') ||
+          k.startsWith('groovelab_school_overrides') ||
+          k.startsWith('campus_school_overrides') ||
+          k.startsWith('groovelab_school_profile') ||
+          k.startsWith('groovelab_storage_addon_gb_') ||
+          k.startsWith('groovelab_storage_used_bytes') ||
+          k.startsWith('groovelab_secretary_subtab') ||
+          k === 'groovelab_storage_addon_gb' ||
+          k === 'groovelab_storage_used_bytes' ||
+          k === 'groovelab_cached_user'
         ) {
           keysToDelete.push(k);
         }

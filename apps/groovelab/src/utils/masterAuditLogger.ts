@@ -218,7 +218,7 @@ export async function logMasterAdminEvent(event: Omit<MasterAuditEvent, 'id' | '
 }
 
 /**
- * Retrieves all stored master audit trail logs
+ * Retrieves all stored master audit trail logs from local buffer (synchronous)
  */
 export function getMasterAuditLogs(): MasterAuditEvent[] {
   if (typeof window === 'undefined') return [];
@@ -231,3 +231,34 @@ export function getMasterAuditLogs(): MasterAuditEvent[] {
     return [];
   }
 }
+
+/**
+ * Authoritative WORM fetch of master audit logs directly from PostgreSQL master_audit_trail
+ */
+export async function fetchMasterAuditLogsFromDb(limit: number = 150): Promise<MasterAuditEvent[]> {
+  try {
+    const { data, error } = await supabase.rpc('get_master_audit_trail', { p_limit: limit });
+    if (!error && Array.isArray(data) && data.length > 0) {
+      const mapped: MasterAuditEvent[] = data.map((row: any) => ({
+        id: row.id,
+        timestamp: row.created_at,
+        userId: row.actor_user_id || 'system',
+        action: row.action,
+        status: row.status as any,
+        details: row.details,
+        userAgent: row.user_agent || 'unknown',
+        origin: row.origin || 'system'
+      }));
+
+      // Synchronize back into local storage buffer
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(MASTER_AUDIT_LOG_KEY, JSON.stringify(mapped.slice(0, 150)));
+      }
+      return mapped;
+    }
+  } catch (err) {
+    console.warn('[Master Audit] Database audit query fallback to local cache:', err);
+  }
+  return getMasterAuditLogs();
+}
+

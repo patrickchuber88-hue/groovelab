@@ -18,6 +18,7 @@ import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from '
 import { getInstrumentAvatarUrl, resolveCampusStudentAvatar } from './StudioAvatar';
 import { getCanonicalQrLandingUrl } from '../utils/tenantUrlHelper';
 import { isUUID } from '../utils/uuidValidator';
+import { isLocalDevEnvironment } from '../utils/devEnvironment';
 
 
 
@@ -3548,15 +3549,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                        !!(schoolData?.opening_hours?.geofence_bypass) || 
                        !!(userSchool?.opening_hours?.geofence_bypass);
 
-      const isLocalhost = typeof window !== 'undefined' && (
-        window.location.hostname === 'localhost' || 
-        window.location.hostname === '127.0.0.1' ||
-        window.location.hostname.endsWith('.local') ||
-        /^192\.168\./.test(window.location.hostname) ||
-        /^10\./.test(window.location.hostname) ||
-        /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(window.location.hostname)
-      );
-
       // ⚡ Enterprise+ Tier-1 Privacy: Physical Station-Coupling replaces Geolocation (§ 87 BetrVG / DSGVO Art. 5 & 8)
       isWithinAnyRoom = true;
       setGeoDebug(null);
@@ -3618,7 +3610,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   };
 
   const [geoDebug, setGeoDebug] = useState<any>(null);
-  const isLocalhost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && import.meta.env.DEV;
+  const isLocalhost = isLocalDevEnvironment();
 
   const [bypassUserCounts, setBypassUserCounts] = useState<{
     hasTeacher: boolean;
@@ -7059,8 +7051,13 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           {/* 1. Master Admin Cockpit Bypass */}
           <button
             type="button"
+            disabled={loading}
+            aria-label="Entwickler-Direktzugang: Master-Admin Leitstand öffnen (Dev Only)"
+            title="Dev Only: 1-Klick Master-Admin Leitstand Login"
             onClick={async () => {
+              if (loading) return;
               try {
+                setLoading(true);
                 console.log('[Bypass] Attempting Master Admin Leitstand login...');
                 // Direct authoritative Master Admin ID (Severin L. - is_master_admin: true)
                 const targetId = '11079eae-664a-49a4-8692-771d83a3193c';
@@ -7083,6 +7080,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               } catch (err: any) {
                 console.error('[Bypass] Error logging in as Master Admin:', err);
                 alert('Master-Admin Bypass Fehler: ' + (err?.message || err));
+                setLoading(false);
               }
             }}
             style={{
@@ -7091,9 +7089,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               border: '1.5px solid #38bdf8',
               borderRadius: '12px',
               padding: '11px 16px',
+              minHeight: '44px',
               fontSize: '0.78rem',
               fontWeight: 900,
-              cursor: 'pointer',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.7 : 1,
+              touchAction: 'manipulation',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -7101,7 +7102,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               boxShadow: '0 4px 14px rgba(15, 23, 42, 0.5)'
             }}
           >
-            👑 BYPASS: MASTER-ADMIN (Leitstand)
+            👑 [DEV ONLY] MASTER-ADMIN LEITSTAND
           </button>
 
           {/* 2. Verwaltung / Schulleitung Bypass */}

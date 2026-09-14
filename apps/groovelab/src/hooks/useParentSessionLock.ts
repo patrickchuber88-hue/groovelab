@@ -76,6 +76,7 @@ export function useParentSessionLock({
 
     // 2. Clear all parent session tokens from sessionStorage
     sessionStorage.removeItem('groovelab_parent_unlocked_global');
+    sessionStorage.removeItem('gl_parent_session_lease');
     if (studentId) {
       sessionStorage.removeItem(`groovelab_parent_unlocked_${studentId}`);
       sessionStorage.removeItem(`groovelab_parent_session_${studentId}`);
@@ -84,7 +85,7 @@ export function useParentSessionLock({
     // Also clear any other parent session keys in sessionStorage
     try {
       Object.keys(sessionStorage).forEach((key) => {
-        if (key.startsWith('groovelab_parent_') || key.startsWith('groovelab_family_unlocked_')) {
+        if (key.startsWith('groovelab_parent_') || key.startsWith('groovelab_family_unlocked_') || key === 'gl_parent_session_lease') {
           sessionStorage.removeItem(key);
         }
       });
@@ -113,14 +114,25 @@ export function useParentSessionLock({
     }
   }, [studentId, timeoutSeconds]);
 
-  // 1. VisibilityChange: Instant Lock on tab switch or app minimize
+  // 1. VisibilityChange: Fail-Closed timeout check on backgrounding
+  const hiddenAtRef = useRef<number | null>(null);
+
   useEffect(() => {
     if (!enabled || typeof document === 'undefined') return;
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
-        console.warn('[ParentSessionLock] Tab hidden / minimized. Locking parent session immediately (Fail-Closed).');
-        lockNow();
+        hiddenAtRef.current = Date.now();
+      } else if (document.visibilityState === 'visible') {
+        if (hiddenAtRef.current) {
+          const backgroundDuration = Date.now() - hiddenAtRef.current;
+          // If the tab was in the background for longer than the timeout, lock immediately
+          if (backgroundDuration >= timeoutSeconds * 1000) {
+            console.warn(`[ParentSessionLock] Inactive in background for ${Math.round(backgroundDuration / 1000)}s. Locking parent session (Fail-Closed).`);
+            lockNow();
+          }
+          hiddenAtRef.current = null;
+        }
       }
     };
 
@@ -128,7 +140,7 @@ export function useParentSessionLock({
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [enabled, lockNow]);
+  }, [enabled, lockNow, timeoutSeconds]);
 
   // 2. User Activity Tracking & Inactivity Countdown
   useEffect(() => {

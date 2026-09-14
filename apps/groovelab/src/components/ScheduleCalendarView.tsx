@@ -3613,10 +3613,24 @@ export function ScheduleCalendarView({
     
     const nameText = sourceOcc?.student ? `${sourceOcc.student.first_name} ${sourceOcc.student.last_name.substring(0, 1)}.` : 'Pause';
     const instrumentText = sourceOcc?.student?.instrument || '';
-    dragImg.innerHTML = `
-      <div style="font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${nameText}</div>
-      ${instrumentText ? `<div style="font-size: 0.65rem; color: #86868b; margin-top: 1px;">${instrumentText}</div>` : ''}
-    `;
+    dragImg.textContent = '';
+
+    const nameDiv = document.createElement('div');
+    nameDiv.style.fontWeight = '800';
+    nameDiv.style.overflow = 'hidden';
+    nameDiv.style.textOverflow = 'ellipsis';
+    nameDiv.style.whiteSpace = 'nowrap';
+    nameDiv.textContent = nameText;
+    dragImg.appendChild(nameDiv);
+
+    if (instrumentText) {
+      const instDiv = document.createElement('div');
+      instDiv.style.fontSize = '0.65rem';
+      instDiv.style.color = '#86868b';
+      instDiv.style.marginTop = '1px';
+      instDiv.textContent = instrumentText;
+      dragImg.appendChild(instDiv);
+    }
     
     document.body.appendChild(dragImg);
     e.dataTransfer.setDragImage(dragImg, 70, 20);
@@ -3737,16 +3751,42 @@ export function ScheduleCalendarView({
 
     if (ghost.dataset.cacheKey !== cacheKey) {
       ghost.dataset.cacheKey = cacheKey;
-      const outsideHint = isDropOutsideSchedule 
-        ? `<div style="font-size: 0.60rem; font-weight: 800; color: #7c3aed; background: rgba(124,58,237,0.10); border: 1px solid rgba(124,58,237,0.2); padding: 1px 5px; border-radius: 3px; display: inline-block; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.04em;">🔔 Raum anfragen (unter Vorbehalt)</div>`
-        : '';
-      ghost.innerHTML = `
-        <div style="font-size: 0.72rem; font-weight: 800; color: ${highlightColor};">${fullTimeRangeStr}</div>
-        <div style="font-size: 0.78rem; font-weight: 800; color: #1f2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">
-          ${studentName}
-        </div>
-        ${outsideHint}
-      `;
+      ghost.textContent = '';
+
+      const timeDiv = document.createElement('div');
+      timeDiv.style.fontSize = '0.72rem';
+      timeDiv.style.fontWeight = '800';
+      timeDiv.style.color = highlightColor;
+      timeDiv.textContent = fullTimeRangeStr;
+      ghost.appendChild(timeDiv);
+
+      const nameDiv = document.createElement('div');
+      nameDiv.style.fontSize = '0.78rem';
+      nameDiv.style.fontWeight = '800';
+      nameDiv.style.color = '#1f2937';
+      nameDiv.style.whiteSpace = 'nowrap';
+      nameDiv.style.overflow = 'hidden';
+      nameDiv.style.textOverflow = 'ellipsis';
+      nameDiv.style.marginTop = '2px';
+      nameDiv.textContent = studentName;
+      ghost.appendChild(nameDiv);
+
+      if (isDropOutsideSchedule) {
+        const hintDiv = document.createElement('div');
+        hintDiv.style.fontSize = '0.60rem';
+        hintDiv.style.fontWeight = '800';
+        hintDiv.style.color = '#7c3aed';
+        hintDiv.style.background = 'rgba(124,58,237,0.10)';
+        hintDiv.style.border = '1px solid rgba(124,58,237,0.2)';
+        hintDiv.style.padding = '1px 5px';
+        hintDiv.style.borderRadius = '3px';
+        hintDiv.style.display = 'inline-block';
+        hintDiv.style.marginTop = '3px';
+        hintDiv.style.textTransform = 'uppercase';
+        hintDiv.style.letterSpacing = '0.04em';
+        hintDiv.textContent = '🔔 Raum anfragen (unter Vorbehalt)';
+        ghost.appendChild(hintDiv);
+      }
     }
     
     if (ghost.parentNode !== e.currentTarget) {

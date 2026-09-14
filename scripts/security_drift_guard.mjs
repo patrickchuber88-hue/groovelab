@@ -28,7 +28,7 @@ process.stdout.write('       Scanning for architectural regressions & invariant 
 process.stdout.write(`${HR}\n\n`);
 
 // =============================================================================
-// PATTERN REGISTRY — 12 OWASP ASVS L3 & Architecture Invariants
+// PATTERN REGISTRY — 14 OWASP ASVS L3 & Architecture Invariants
 // =============================================================================
 const FORBIDDEN_FRONTEND_PATTERNS = [
   {
@@ -134,6 +134,17 @@ const FORBIDDEN_FRONTEND_PATTERNS = [
     severity:    'HIGH',
     description: 'Teacher names must ALWAYS be communicated as full "Vorname Nachname" (formatTeacherFullName). Masking (maskLastName) is strictly reserved for students.',
     allowedFiles: ['src/tests/']
+  },
+  {
+    id:          'FE-14',
+    name:        'Unguarded Developer Auth Bypass Invariant',
+    regex:       /['"]bypass_dev['"]/g,
+    severity:    'CRITICAL',
+    description: 'Hermetic Dev-Bypass Invariant: Developer auth bypass tokens (\'bypass_dev\') are strictly prohibited unless the containing file imports and evaluates isLocalDevEnvironment() or import.meta.env.DEV.',
+    allowedFiles: ['src/tests/', 'src/utils/masterAuditLogger.ts'],
+    isViolation: (content) => {
+      return !content.includes('isLocalDevEnvironment') && !content.includes('import.meta.env.DEV');
+    }
   }
 ];
 
@@ -174,6 +185,9 @@ for (const filePath of frontendFiles) {
 
     const matches = content.match(rule.regex);
     if (matches && matches.length > 0) {
+      if (rule.isViolation && !rule.isViolation(content, relPath)) {
+        continue;
+      }
       const icon = rule.severity === 'CRITICAL' ? '🔴' : '🟠';
       process.stderr.write(`\n  ${icon} [FAIL] ${rule.severity} | ${rule.id} — ${rule.name}\n`);
       process.stderr.write(`       → ${relPath}\n`);
