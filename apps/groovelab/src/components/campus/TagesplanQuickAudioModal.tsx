@@ -6,7 +6,8 @@ import { supabase } from '../../lib/supabase';
 import { acquireAudioStream, releaseAudioStream, requestMicrophonePermissionOnce, PURE_RAW_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
 import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RAW_LIMITER_GR_DB } from '../../utils/audioMasteringEngine';
 import { capitalizeFirstLetter, formatSingleStudentAnonymized } from '../../utils/nameHelper';
-import { saveOfflineAudioRecord } from '../../utils/offlineAudioVault';
+import { saveOfflineAudioRecord, removeOfflineAudioRecord } from '../../utils/offlineAudioVault';
+import { notifyOfflineListeners } from '../../services/offlineSyncService';
 import { checkIsAudioTresorActive, isInternalMetadataNote } from '../../domain/stickersAndTresor';
 import { isUUID } from '../../utils/uuidValidator';
 
@@ -834,9 +835,10 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
 
         // If clip was newly recorded, upload and save to IndexedDB
         if (!clip.isExisting && clip.blob && clip.blob.size > 0) {
+          let savedRecord: any = null;
           // 1. Local-first IndexedDB save (with fallback)
           try {
-            const savedRecord = await saveOfflineAudioRecord({
+            savedRecord = await saveOfflineAudioRecord({
               blob: clip.blob,
               mimeType: 'audio/webm',
               durationSeconds: clip.durationSeconds,
@@ -874,6 +876,12 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
                 const { data: urlData } = supabase.storage.from('campus-assets').getPublicUrl(filePath);
                 if (urlData?.publicUrl) {
                   finalUrl = urlData.publicUrl;
+                }
+
+                // ⚡ Instant De-Queue from local IndexedDB upon confirmed Cloud upload
+                if (savedRecord?.id) {
+                  await removeOfflineAudioRecord(savedRecord.id).catch(() => {});
+                  notifyOfflineListeners().catch(() => {});
                 }
 
                 // Update school storage quota

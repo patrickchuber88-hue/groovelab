@@ -16,6 +16,7 @@ import { Avatar, getInstrumentAvatarUrl, STUDENT_AVATARS } from '../studentAvata
 import { CAMPUS_AGE_STANDARDS } from '../studentAgeStandards';
 import { StudentBillingInvoicesSection } from '../StudentBillingInvoicesSection';
 import JSZip from 'jszip';
+import { ensureWavBlob } from '../../../utils/audioMasteringEngine';
 import { ALL_STICKERS, getUnifiedStickerStatus } from '../../../domain/stickersAndTresor';
 import { ParentProtectionSettingsView } from '../settings/ParentProtectionSettingsView';
 import { ParentScreenTimeSettingsView } from '../settings/ParentScreenTimeSettingsView';
@@ -440,7 +441,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
             if (res.ok) {
               const blob = await res.blob();
               const safeTitle = a.title.replace(/[^a-zA-Z0-9_-]/g, '_');
-              audioFolder.file(`${a.date}_${safeTitle}.webm`, blob);
+              const wavBlob = await ensureWavBlob(blob, { title: safeTitle, artist: 'Campus-Groovelab' });
+              audioFolder.file(`${a.date}_${safeTitle}.wav`, wavBlob);
             }
           } catch (err) {}
         }
@@ -481,7 +483,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
           if (res.ok) {
             const blob = await res.blob();
             const safeTitle = a.title.replace(/[^a-zA-Z0-9_-]/g, '_');
-            zip.file(`${a.date}_${safeTitle}.webm`, blob);
+            const wavBlob = await ensureWavBlob(blob, { title: safeTitle, artist: 'Campus-Groovelab' });
+            zip.file(`${a.date}_${safeTitle}.wav`, wavBlob);
           }
         } catch (err) {}
       }
@@ -518,7 +521,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
             if (res.ok) {
               const blob = await res.blob();
               const safeTitle = (m.title || 'Meilenstein').replace(/[^a-zA-Z0-9_-]/g, '_');
-              zip.file(`${safeTitle}.webm`, blob);
+              const wavBlob = await ensureWavBlob(blob, { title: safeTitle, artist: 'Campus-Groovelab' });
+              zip.file(`${safeTitle}.wav`, wavBlob);
             }
           } catch (err) {}
         }

@@ -1140,6 +1140,8 @@ export function processPureRawAudioBuffer(
     maxLimiterGrDb?: number;
     isLoop?: boolean;
     preserveDynamics?: boolean;
+    applyDeBoxNotch?: boolean;
+    applySlapNotch?: boolean;
   }
 ): AudioBuffer {
   const sampleRate = audioBuffer.sampleRate;
@@ -1154,15 +1156,20 @@ export function processPureRawAudioBuffer(
   const preserveDynamics = options?.preserveDynamics ?? false;
 
   // 1. 30 Hz Subsonic Resonance Shield (24 dB/Oct Butterworth Filter across all channels)
+  // Schützt vor unhörbarem Trittschall, Tischgeräuschen & DC-Offset, lässt das gesamte musikalische Spektrum 100% unberührt
   apply30HzSubsonicHighpass(audioBuffer, 30.0);
 
-  // 2. 1.0 dB Chirurgischer De-Box Resonance Notch (260 Hz, Q = 1.8)
-  // Beseitigt die hohle Pappkarton-Resonanz des Schalllochs / Tischkammfilter-Effekte
-  applyDeBoxResonanceNotch(audioBuffer, 260.0, -1.0, 1.8);
+  // 2. Optional: Chirurgischer De-Box Resonance Notch (260 Hz, Q = 1.8)
+  // Standardmäßig in Pure RAW deaktiviert (false), um die volle akustische Wärme & den natürlichen Korpusklang zu bewahren
+  if (options?.applyDeBoxNotch === true) {
+    applyDeBoxResonanceNotch(audioBuffer, 260.0, -1.0, 1.8);
+  }
 
-  // 3. 1.0 dB Chirurgischer Slap-Transient Tamer (3.400 Hz, Q = 2.4)
-  // Zähmt das metallische Klacken der Saite auf den Bundstäbchen, erhält 100% Zupf-Dynamik
-  applySlapTransientNotch(audioBuffer, 3400.0, -1.0, 2.4);
+  // 3. Optional: Chirurgischer Slap-Transient Tamer (3.400 Hz, Q = 2.4)
+  // Standardmäßig in Pure RAW deaktiviert (false), um 100% lebendige Transienten & Obertöne zu erhalten
+  if (options?.applySlapNotch === true) {
+    applySlapTransientNotch(audioBuffer, 3400.0, -1.0, 2.4);
+  }
 
   // 4. 5ms Equal-Power Micro-Fades (Click/Pop prevention at boundaries)
   const fadeSamples = Math.min(Math.floor(sampleRate * 0.005), Math.floor(length * 0.05));
@@ -1224,6 +1231,8 @@ export async function processPureRawBlob(
     targetPeakDb?: number;
     maxLimiterGrDb?: number;
     isLoop?: boolean;
+    applyDeBoxNotch?: boolean;
+    applySlapNotch?: boolean;
   }
 ): Promise<{
   processedBlob: Blob;
@@ -1253,7 +1262,9 @@ export async function processPureRawBlob(
     targetLufs,
     targetPeakDb: options?.targetPeakDb ?? TARGET_PEAK_DBTP,
     maxLimiterGrDb: options?.maxLimiterGrDb ?? MAX_PURE_RAW_LIMITER_GR_DB,
-    isLoop: options?.isLoop ?? false
+    isLoop: options?.isLoop ?? false,
+    applyDeBoxNotch: options?.applyDeBoxNotch ?? false,
+    applySlapNotch: options?.applySlapNotch ?? false
   });
 
   const finalLufs = Math.round(calculateIntegratedLufs(decodedBuffer) * 10) / 10;
@@ -1328,10 +1339,10 @@ export async function processStudioMasteringAudioBuffer(
   // =========================================================================
   // 1. ADAPTIVE MASTERING 5-BAND EQ
   // =========================================================================
-  // 1a. 30 Hz Subsonic High-Pass Filter (Einheitlicher Goldstandard für alle Instrumente)
+  // 1a. Subsonic High-Pass Filter (20 Hz für Flügel/Piano zum Erhalt von A0=27,5 Hz, 30 Hz für restliche Instrumente)
   const hpfNode = offlineCtx.createBiquadFilter();
   hpfNode.type = 'highpass';
-  hpfNode.frequency.value = 30; // 🏛️ 30 Hz einheitlich über alle Instrumente
+  hpfNode.frequency.value = effectiveProfile === 'grand_piano' ? 20 : 30; // 🏛️ 20 Hz für Klavier/Flügel, 30 Hz Standard
   hpfNode.Q.value = 0.707;
   lastNode.connect(hpfNode);
   lastNode = hpfNode;
@@ -1355,11 +1366,13 @@ export async function processStudioMasteringAudioBuffer(
   lastNode.connect(lowFundNode);
   lastNode = lowFundNode;
 
-  // 1c. Mud & Boxiness De-Resonance Control (Surgical notch at 240-300 Hz)
+  // 1c. Mud & Boxiness De-Resonance Control (Surgical notch at 240-320 Hz)
   const deBoxNode = offlineCtx.createBiquadFilter();
   deBoxNode.type = 'peaking';
-  deBoxNode.frequency.value = isDrum ? 300 : (effectiveProfile === 'grand_piano' ? 320 : 240);
-  deBoxNode.gain.value = isDrum ? -1.8 : -1.2;
+  deBoxNode.frequency.value = isDrum 
+    ? 300 
+    : (effectiveProfile === 'grand_piano' ? 320 : (effectiveProfile === 'acoustic_audiophile' || effectiveProfile === 'acoustic_warm' ? 260 : 240));
+  deBoxNode.gain.value = isDrum ? -1.8 : (effectiveProfile === 'acoustic_audiophile' ? -1.4 : -1.2);
   deBoxNode.Q.value = 1.8;
   lastNode.connect(deBoxNode);
   lastNode = deBoxNode;
@@ -1391,6 +1404,41 @@ export async function processStudioMasteringAudioBuffer(
   airNode.Q.value = 0.707;
   lastNode.connect(airNode);
   lastNode = airNode;
+
+  // =========================================================================
+  // 1f. INTELLIGENT TRANSIENT SOFTENER (Crest-Factor Control for Slap/Percussion)
+  // =========================================================================
+  let transientSofteningApplied = false;
+
+  // Measure Peak & RMS to determine Crest Factor
+  let maxPeakSample = 0;
+  let sumSquares = 0;
+  let totalSampleCount = 0;
+  for (let c = 0; c < inputBuffer.numberOfChannels; c++) {
+    const chData = inputBuffer.getChannelData(c);
+    totalSampleCount += chData.length;
+    for (let i = 0; i < chData.length; i++) {
+      const absS = Math.abs(chData[i]);
+      if (absS > maxPeakSample) maxPeakSample = absS;
+      sumSquares += absS * absS;
+    }
+  }
+  const rmsSample = totalSampleCount > 0 ? Math.sqrt(sumSquares / totalSampleCount) : 0;
+  const peakDb = maxPeakSample > 0 ? 20 * Math.log10(maxPeakSample) : -100;
+  const rmsDb = rmsSample > 0 ? 20 * Math.log10(rmsSample) : -100;
+  const crestFactorDb = peakDb - rmsDb;
+
+  if (options.applyTransientSoftener !== false && crestFactorDb > 17.0) {
+    const transientCatcher = offlineCtx.createDynamicsCompressor();
+    transientCatcher.threshold.value = -6.0; // Fängt nur extreme Slap- & Peak-Spitzen ab
+    transientCatcher.knee.value = 3.0;
+    transientCatcher.ratio.value = 2.5;
+    transientCatcher.attack.value = 0.003; // 3ms schneller Fang
+    transientCatcher.release.value = 0.040; // 40ms schneller Release ohne Pumping
+    lastNode.connect(transientCatcher);
+    lastNode = transientCatcher;
+    transientSofteningApplied = true;
+  }
 
   // =========================================================================
   // 2. CLASS-A TRIODE / TAPE ANALOG WARMTH (Oversampled 4x, THD < 0.01%)
@@ -1559,6 +1607,8 @@ export async function processStudioMasteringAudioBuffer(
     finalLufs: targetLufs,
     detectedF0MinHz: f0MinHz,
     adaptiveHpfFreqHz: hpfFreqHz,
+    crestFactorDb: Math.round(crestFactorDb * 10) / 10,
+    transientSofteningApplied,
     durationSec: Math.round(renderedBuffer.duration * 10) / 10
   };
 }
@@ -1674,6 +1724,8 @@ export async function processDualMastering(
       finalLufs: masterRes.finalLufs,
       detectedF0MinHz: masterRes.detectedF0MinHz,
       adaptiveHpfFreqHz: masterRes.adaptiveHpfFreqHz,
+      crestFactorDb: masterRes.crestFactorDb,
+      transientSofteningApplied: masterRes.transientSofteningApplied,
       durationSec: masterRes.durationSec
     };
   } finally {
@@ -1931,5 +1983,40 @@ export async function sliceAudioBlobForPreview(
     try {
       tempCtx.close();
     } catch (e) {}
+  }
+}
+
+/**
+ * 🎵 UNIVERSAL 24-BIT LOSSLESS PCM WAV CONVERTER
+ * Ensures that any audio blob (already WAV, or legacy WebM, MP4, MP3) is delivered
+ * as a pristine, uncompressed 24-bit PCM WAV file (.wav) with native sample rate.
+ */
+export async function ensureWavBlob(
+  blob: Blob | File,
+  metadata?: { title?: string; artist?: string }
+): Promise<Blob> {
+  if (!blob) return blob;
+  const mime = (blob.type || '').toLowerCase();
+  if (mime === 'audio/wav' || mime === 'audio/x-wav' || mime === 'audio/wave') {
+    return blob;
+  }
+
+  try {
+    const arrayBuffer = await blob.arrayBuffer();
+    const tempCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    try {
+      const decoded = await safeDecodeAudioData(tempCtx, arrayBuffer);
+      return audioBufferToWavBlob(decoded, {
+        title: metadata?.title || 'Campus-Groovelab Audio',
+        artist: metadata?.artist || 'Campus-Groovelab'
+      });
+    } finally {
+      try {
+        tempCtx.close();
+      } catch (e) {}
+    }
+  } catch (err) {
+    console.warn('[ensureWavBlob] Transcode fallback note:', err);
+    return blob instanceof Blob ? blob : new Blob([blob], { type: 'audio/wav' });
   }
 }

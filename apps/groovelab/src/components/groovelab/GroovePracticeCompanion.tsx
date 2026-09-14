@@ -12,7 +12,7 @@ import {
   TARGET_PEAK_DBTP,
   MAX_PURE_RAW_LIMITER_GR_DB
 } from '../../utils/audioMasteringEngine';
-import { acquireAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
+import { acquireAudioStream, stabilizeAudioStream, releaseAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
 import { supabase } from '../../lib/supabase';
 import { validateMediaBlob, stripAudioMetadata } from '../../utils/mediaSecurityValidator';
 import { getSecureAudioUrl, buildCanonicalAudioStoragePath, computeBlobSha256 } from '../../utils/audioStorageHelper';
@@ -812,13 +812,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
       if (audioCtx.state === 'suspended') await audioCtx.resume();
       calibrationAudioCtxRef.current = audioCtx;
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false
-        }
-      });
+      const stream = await acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS });
+      await stabilizeAudioStream(stream, 300);
       loopstationStreamRef.current = stream;
 
       const micSource = audioCtx.createMediaStreamSource(stream);
@@ -1238,17 +1233,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
       const stream = await acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS });
       recordingStreamRef.current = stream;
 
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      const recordAudioCtx = new AudioCtx();
-      recordAudioCtxRef.current = recordAudioCtx;
-      const sourceNode = recordAudioCtx.createMediaStreamSource(stream);
-      const mergerNode = recordAudioCtx.createChannelMerger(2);
-      sourceNode.connect(mergerNode, 0, 0); 
-      sourceNode.connect(mergerNode, 0, 1); 
-      const destNode = recordAudioCtx.createMediaStreamDestination();
-      mergerNode.connect(destNode);
-      const recordStream = destNode.stream;
-
+      // 🎙️ Direct Hardware Stream Capture (Zero WebAudio resampler / Zero pitch shift):
+      // Passes hardware stream directly to MediaRecorder, eliminating clock drift & Safari WebKit pitch artifacts.
       let mimeType = '';
       if (typeof MediaRecorder !== 'undefined') {
         if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mimeType = 'audio/webm;codecs=opus';
@@ -1257,7 +1243,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
         else if (MediaRecorder.isTypeSupported('audio/aac')) mimeType = 'audio/aac';
       }
 
-      const recorder = mimeType ? new MediaRecorder(recordStream, { mimeType }) : new MediaRecorder(recordStream);
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
 

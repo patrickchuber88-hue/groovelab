@@ -58,6 +58,21 @@ export const OfflineStatusBadge: React.FC<OfflineStatusBadgeProps> = ({ floating
     }
   };
 
+  const isInteractive = offlineState.isOnline && offlineState.totalPending > 0 && !offlineState.isSyncing;
+
+  const getAriaLabel = (): string => {
+    if (!offlineState.isOnline) {
+      return `Offline-Tresor aktiv: Stundenpläne und Hausaufgaben lokal verfügbar. ${offlineState.totalPending > 0 ? `${offlineState.totalPending} Aktionen für Synchronisation vorgemerkt.` : ''}`;
+    }
+    if (offlineState.isSyncing) {
+      return 'Synchronisiere lokale Daten mit der Supabase Cloud...';
+    }
+    if (recentlySynced) {
+      return 'Wieder online: Alle Daten wurden erfolgreich synchronisiert.';
+    }
+    return `${offlineState.totalPending} ausstehende Aktionen bereit. Klicken oder Eingabetaste drücken, um jetzt mit der Cloud zu synchronisieren.`;
+  };
+
   return (
     <div style={containerStyle}>
       <style>{`
@@ -68,9 +83,23 @@ export const OfflineStatusBadge: React.FC<OfflineStatusBadgeProps> = ({ floating
         @keyframes badgeSpin {
           100% { transform: rotate(360deg); }
         }
+        .offline-badge-focus:focus-visible {
+          outline: 2px solid #38bdf8 !important;
+          outline-offset: 2px !important;
+        }
       `}</style>
       <div 
+        role={isInteractive ? 'button' : 'status'}
+        tabIndex={isInteractive ? 0 : -1}
+        aria-label={getAriaLabel()}
         onClick={handleManualSync}
+        onKeyDown={(e) => {
+          if ((e.key === 'Enter' || e.key === ' ') && isInteractive) {
+            e.preventDefault();
+            handleManualSync();
+          }
+        }}
+        className={`offline-badge-focus ${isInteractive ? 'hover-scale-mini' : ''}`}
         style={{
           background: !offlineState.isOnline 
             ? 'rgba(6, 78, 59, 0.95)' 
@@ -87,11 +116,13 @@ export const OfflineStatusBadge: React.FC<OfflineStatusBadgeProps> = ({ floating
           gap: '8px',
           fontSize: '0.75rem',
           fontWeight: 750,
-          cursor: offlineState.isOnline && offlineState.totalPending > 0 ? 'pointer' : 'default',
+          cursor: isInteractive ? 'pointer' : 'default',
           userSelect: 'none',
-          transition: 'all 0.2s ease'
+          transition: 'all 0.2s ease',
+          outline: 'none',
+          touchAction: 'manipulation'
         }}
-        title={offlineState.isOnline && offlineState.totalPending > 0 ? 'Klicken, um jetzt zu synchronisieren' : undefined}
+        title={isInteractive ? 'Klicken, um jetzt mit der Cloud zu synchronisieren' : undefined}
       >
         {!offlineState.isOnline ? (
           <>

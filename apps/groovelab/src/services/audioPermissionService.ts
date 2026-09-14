@@ -120,9 +120,10 @@ export const PURE_RAW_AUDIO_CONSTRAINTS: MediaTrackConstraints = {
   googHighpassFilter: false,
   googAudioMirroring: false,
   googTypingNoiseDetection: false,
+  googVoiceIsolation: false,
   channelCount: { ideal: 2 },
   sampleRate: { ideal: 48000 },
-  sampleSize: { ideal: 16 }
+  sampleSize: { ideal: 24 }
 } as any;
 
 /**

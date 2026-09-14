@@ -80,6 +80,23 @@ const notifyListeners = async () => {
   });
 };
 
+export const notifyOfflineListeners = async (): Promise<void> => {
+  await notifyListeners();
+};
+
+let proactiveFlushTimeout: ReturnType<typeof setTimeout> | null = null;
+export const triggerProactiveAutoFlush = (delayMs: number = 400): void => {
+  if (typeof window === 'undefined') return;
+  const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+  if (!isOnline || isCurrentlySyncing) return;
+  if (proactiveFlushTimeout) clearTimeout(proactiveFlushTimeout);
+  proactiveFlushTimeout = setTimeout(() => {
+    if ((typeof navigator === 'undefined' || navigator.onLine) && !isCurrentlySyncing) {
+      flushAllOfflineData().catch(err => console.warn('[OfflineSync] Proactive auto-flush notice:', err));
+    }
+  }, delayMs);
+};
+
 let memoryActionsCache: PendingSyncAction[] = [];
 let isCacheLoaded = false;
 
@@ -110,9 +127,19 @@ export const loadAndMigrateOfflineMutations = async (): Promise<PendingSyncActio
   }
 };
 
-// Initial auto-migration trigger
+// Initial auto-migration & eager auto-flush trigger
 if (typeof window !== 'undefined') {
-  loadAndMigrateOfflineMutations().then(() => notifyListeners()).catch(() => {});
+  loadAndMigrateOfflineMutations().then(async () => {
+    await notifyListeners();
+    // ⚡ Eager Auto-Flush on App Mount: If online, immediately flush all pending actions/audio
+    if (typeof navigator !== 'undefined' && navigator.onLine && !isCurrentlySyncing) {
+      const state = await getOfflineState();
+      if (state.totalPending > 0) {
+        console.info(`[OfflineSync] Eager auto-flush triggered on mount (${state.totalPending} pending items)...`);
+        flushAllOfflineData().catch(err => console.warn('[OfflineSync] Eager mount flush notice:', err));
+      }
+    }
+  }).catch(() => {});
 }
 
 const getPendingSyncActionsFallback = (): PendingSyncAction[] => {
@@ -169,6 +196,9 @@ export const enqueueOfflineAction = (
 
     notifyListeners();
     console.log('[OfflineSync] Action enqueued for offline sync (IndexedDB):', newAction);
+
+    // ⚡ Proactive Zero-Lag Auto-Flush: If currently online, trigger debounced background sync
+    triggerProactiveAutoFlush(300);
   } catch (e) {
     console.error('[OfflineSync] Failed to enqueue offline action:', e);
   }
@@ -189,6 +219,13 @@ export const flushOfflineAudioQueue = async (): Promise<{ success: number; faile
 
     for (const record of records) {
       try {
+        if (!record.blob || (record.blob instanceof Blob && record.blob.size === 0)) {
+          console.warn(`[OfflineSync] Audio record ${record.id} has empty blob. Pruning from queue.`);
+          await removeOfflineAudioRecord(record.id);
+          successCount++;
+          continue;
+        }
+
         const fileExt = record.mimeType?.includes('wav') ? 'wav' : (record.mimeType?.includes('ogg') ? 'ogg' : 'webm');
         const defaultFilename = `offline_${record.context}_${record.studentId || 'unknown'}_${record.id}.${fileExt}`;
         const filePath = record.metadata?.storagePath || `recordings/${defaultFilename}`;
@@ -258,9 +295,20 @@ export const flushOfflineAudioQueue = async (): Promise<{ success: number; faile
         await removeOfflineAudioRecord(record.id);
         successCount++;
         console.log('[OfflineSync] Successfully synced offline audio record:', record.id);
+
+        // 4. Trigger cross-tab/cross-view update
+        if (record.studentId && typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('homework-updated', { detail: { studentId: record.studentId } }));
+          window.dispatchEvent(new CustomEvent('campus_homework_updated', { detail: { studentId: record.studentId } }));
+        }
       } catch (err: any) {
         console.error(`[OfflineSync] Error syncing audio record ${record.id}:`, err);
         failedCount++;
+        const currentAttempts = (record.syncAttempts || 0) + 1;
+        if (currentAttempts >= MAX_RETRY_ATTEMPTS) {
+          console.warn(`[OfflineSync] Audio record ${record.id} exceeded max retries (${MAX_RETRY_ATTEMPTS}). Pruning from active queue.`);
+          await removeOfflineAudioRecord(record.id).catch(() => {});
+        }
       }
     }
   } catch (err) {

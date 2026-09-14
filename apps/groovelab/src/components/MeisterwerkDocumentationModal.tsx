@@ -2934,29 +2934,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       const stream = await acquireAudioStream({ audio: STUDIO_AUDIO_CONSTRAINTS });
       await stabilizeAudioStream(stream, 350);
 
-      // 🌟 WebAudio Dual-Channel Center Bridge:
-      // Routes microphone input to Left and Right channels (true stereo preservation + single-channel center bridge)
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      const recordAudioCtx = new AudioCtx();
-      if (recordAudioCtx.state === 'suspended') {
-        await recordAudioCtx.resume().catch(() => {});
-      }
-      const sourceNode = recordAudioCtx.createMediaStreamSource(stream);
-      const mergerNode = recordAudioCtx.createChannelMerger(2);
-      if (sourceNode.channelCount >= 2) {
-        const splitter = recordAudioCtx.createChannelSplitter(2);
-        sourceNode.connect(splitter);
-        splitter.connect(mergerNode, 0, 0);
-        splitter.connect(mergerNode, 1, 1);
-      } else {
-        sourceNode.connect(mergerNode, 0, 0); // Duplicate to Left
-        sourceNode.connect(mergerNode, 0, 1); // Duplicate to Right
-      }
-      const destNode = recordAudioCtx.createMediaStreamDestination();
-      mergerNode.connect(destNode);
-      const recordStream = destNode.stream;
-
-      // 🎙️ Dynamic Audio Quality Adaptation based on Audio-Tresor Storage (Instant Non-Blocking Startup)
+      // 🎙️ Direct Hardware Stream Capture (Zero WebAudio resampler / Zero pitch shift):
+      // Passes hardware stream directly to MediaRecorder, eliminating clock drift & Safari WebKit pitch artifacts.
+      // True stereo centering & dead channel recovery is safely handled on the decoded PCM buffer in post-processing.
       let targetSchoolId = student?.school_id || (student as any)?.schoolId || localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
       let effectiveTresor = hasTresorStorage || checkIsAudioTresorActive(student);
       if (targetSchoolId && !effectiveTresor) {
@@ -2987,10 +2967,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       let recorder: MediaRecorder;
       try {
         recorder = mimeType 
-          ? new MediaRecorder(recordStream, { mimeType, audioBitsPerSecond: targetBitrate }) 
-          : new MediaRecorder(recordStream, { audioBitsPerSecond: targetBitrate });
+          ? new MediaRecorder(stream, { mimeType, audioBitsPerSecond: targetBitrate }) 
+          : new MediaRecorder(stream, { audioBitsPerSecond: targetBitrate });
       } catch (recErr) {
-        recorder = new MediaRecorder(recordStream);
+        recorder = new MediaRecorder(stream);
       }
       const chunks: BlobPart[] = [];
       
@@ -3001,10 +2981,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       recorder.onstop = async () => {
         try {
           stream.getTracks().forEach(track => track.stop());
-          recordStream.getTracks().forEach(track => track.stop());
-          if (recordAudioCtx && recordAudioCtx.state !== 'closed') {
-            recordAudioCtx.close().catch(() => {});
-          }
         } catch (e) {}
 
         let rawBlob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
@@ -3411,8 +3387,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       return {
         stream,
-        recordStream,
-        recordAudioCtx,
+        recordStream: stream,
+        recordAudioCtx: null as any,
         recorder,
         effectiveTresor
       };

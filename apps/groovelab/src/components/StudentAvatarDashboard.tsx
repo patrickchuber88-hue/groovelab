@@ -25,7 +25,8 @@ import { AudioTrackCarousel, AudioTrackItem } from './AudioTrackCarousel';
 import { ZenPlayAlongDock, PreFlightAudioPreviewButton, PreFlightAudioPlayerSection, getTrackPedagogicalType, playCountInBeep } from './campus/ZenPlayAlongDock';
 import { MeisterOhrSticker } from './MeisterOhrSticker';
 import { getAvatarLevelFrameStyle, resolveCampusStudentAvatar } from './StudioAvatar';
-import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RAW_LIMITER_GR_DB } from '../utils/audioMasteringEngine';
+import { processPureRawBlob, ensureWavBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RAW_LIMITER_GR_DB } from '../utils/audioMasteringEngine';
+import { acquireAudioStream, stabilizeAudioStream, releaseAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../services/audioPermissionService';
 import { computeGroundTruthMetrics, broadcastPracticeUpdate, DEFAULT_FOKUS_LEVELS, getEngineEffectiveLevel } from '../utils/studentProgressEngine';
 import { SharedAudioEngine } from '../utils/sharedAudioEngine';
 import { synthesizeNeuralSpeech, playAudioBlob, stopNeuralSpeech, buildContinuousHomeworkNarrative, cleanTextForTts } from '../services/neuralTtsService';
@@ -5120,39 +5121,16 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
     // 1. Request microphone permission FIRST before starting any visual countdown
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          googEchoCancellation: false,
-          googAutoGainControl: false,
-          googNoiseSuppression: false,
-          googHighpassFilter: false,
-          googTypingNoiseDetection: false,
-          channelCount: 1,
-          sampleRate: 48000
-        } as any
-      });
+      const stream = await acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS });
+      await stabilizeAudioStream(stream, 300);
       juniorAudioStreamRef.current = stream;
       juniorAudioChunksRef.current = [];
 
-      // 🌟 WebAudio Dual-Channel Center Bridge:
-      // Takes raw microphone input and routes it 1:1 to Left and Right channels (100% centered stereo)
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      const juniorRecordAudioCtx = new AudioCtx();
-      const sourceNode = juniorRecordAudioCtx.createMediaStreamSource(stream);
-      const mergerNode = juniorRecordAudioCtx.createChannelMerger(2);
-      sourceNode.connect(mergerNode, 0, 0); // Duplicate to Left
-      sourceNode.connect(mergerNode, 0, 1); // Duplicate to Right
-      const destNode = juniorRecordAudioCtx.createMediaStreamDestination();
-      mergerNode.connect(destNode);
-      const recordStream = destNode.stream;
-
-      // Detect supported cross-browser MIME type (Safari/iOS vs Chrome/Firefox)
+      // 🎙️ Direct Hardware Stream Capture (Zero WebAudio resampler / Zero pitch shift):
+      // Passes hardware stream directly to MediaRecorder, eliminating clock drift & Safari WebKit pitch artifacts.
       let mimeType = '';
       if (typeof MediaRecorder !== 'undefined') {
-        if (!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
           mimeType = 'audio/webm;codecs=opus';
         } else if (MediaRecorder.isTypeSupported('audio/webm')) {
           mimeType = 'audio/webm';
@@ -5164,8 +5142,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       }
 
       const recorder = mimeType 
-        ? new MediaRecorder(recordStream, { mimeType, audioBitsPerSecond: 256000 }) 
-        : new MediaRecorder(recordStream, { audioBitsPerSecond: 256000 });
+        ? new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 256000 }) 
+        : new MediaRecorder(stream, { audioBitsPerSecond: 256000 });
       juniorMediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (e) => {
@@ -5183,12 +5161,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         const defaultTitle = `${studentInstrumentName || 'Mein'}-Hit • ${new Date().toLocaleDateString('de-DE', { day: 'numeric', month: 'short' })}`;
         setJuniorRecordTitle(prev => prev && prev.trim() ? prev : defaultTitle);
         if (juniorAudioStreamRef.current) {
-          juniorAudioStreamRef.current.getTracks().forEach(t => t.stop());
+          releaseAudioStream(juniorAudioStreamRef.current);
           juniorAudioStreamRef.current = null;
-        }
-        recordStream.getTracks().forEach(t => t.stop());
-        if (juniorRecordAudioCtx && juniorRecordAudioCtx.state !== 'closed') {
-          juniorRecordAudioCtx.close().catch(() => {});
         }
       };
 
@@ -5239,7 +5213,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       console.error('Microphone access denied / error:', err);
       alert('Mikrofon-Zugriff nicht möglich oder verweigert. Bitte erlaube den Zugriff im Browser, um deinen Song aufzunehmen.');
       if (juniorAudioStreamRef.current) {
-        juniorAudioStreamRef.current.getTracks().forEach(t => t.stop());
+        releaseAudioStream(juniorAudioStreamRef.current);
         juniorAudioStreamRef.current = null;
       }
       setShowJuniorRecordModal(false);
@@ -5700,31 +5674,37 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
   const downloadJuniorRecording = async (rec: any) => {
     try {
-      let downloadUrl = rec.url;
-      if (!downloadUrl && rec.blobKey) {
+      let rawBlob: Blob | null = null;
+      if (rec.blobKey) {
         const b = await getBlob(rec.blobKey);
-        if (b && b instanceof Blob) {
-          downloadUrl = URL.createObjectURL(b);
-        }
-      } else if (rec.blobKey) {
-        const b = await getBlob(rec.blobKey);
-        if (b && b instanceof Blob) {
-          downloadUrl = URL.createObjectURL(b);
+        if (b && b instanceof Blob) rawBlob = b;
+      }
+      if (!rawBlob && rec.url) {
+        if (rec.url.startsWith('campus_blob_') || rec.url.startsWith('offline://')) {
+          const b = await getBlob(rec.url);
+          if (b && b instanceof Blob) rawBlob = b;
+        } else {
+          const res = await fetch(rec.url);
+          if (res.ok) rawBlob = await res.blob();
         }
       }
 
-      if (!downloadUrl) {
+      if (!rawBlob) {
         alert('Keine Audiodatei gefunden.');
         return;
       }
 
       const safeTitle = (rec.title || 'Aufnahme').replace(/[^a-zA-Z0-9äöüÄÖÜß\-_ ]/g, '').trim() || 'Aufnahme';
+      const wavBlob = await ensureWavBlob(rawBlob, { title: safeTitle, artist: 'Campus-Groovelab' });
+      const downloadUrl = URL.createObjectURL(wavBlob);
+
       const a = document.createElement('a');
       a.href = downloadUrl;
-      a.download = `${safeTitle}.webm`;
+      a.download = `${safeTitle}.wav`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(downloadUrl), 3000);
     } catch (err) {
       console.error('Failed to download recording:', err);
       alert('Download fehlgeschlagen.');

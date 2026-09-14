@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { getBlob } from '../../../utils/blobStorage';
 import { formatHarmonizedAudioTitle } from '../../../utils/audioNamingHelper';
-import { safeDecodeAudioData } from '../../../utils/audioMasteringEngine';
+import { safeDecodeAudioData, ensureWavBlob } from '../../../utils/audioMasteringEngine';
 import { getAudioNotesCount, getAudioNotes, addAudioNote, updateAudioNote, deleteAudioNote, fetchAudioNotesFromServer } from '../../../utils/audioNotesStorage';
 import { getSecureAudioUrl } from '../../../utils/audioStorageHelper';
 import { SharedAudioEngine } from '../../../utils/sharedAudioEngine';
@@ -1091,37 +1091,25 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
         throw new Error('Audio-Inhalt konnte nicht geladen werden');
       }
 
-      // Determine extension from MIME type
-      const mime = (finalBlob.type || '').toLowerCase();
-      if (mime.includes('mp4') || mime.includes('m4a') || mime.includes('aac')) {
-        detectedExt = 'm4a';
-      } else if (mime.includes('mp3') || mime.includes('mpeg')) {
-        detectedExt = 'mp3';
-      } else if (mime.includes('wav')) {
-        detectedExt = 'wav';
-      } else if (mime.includes('ogg')) {
-        detectedExt = 'ogg';
-      } else {
-        detectedExt = 'webm';
-      }
-
+      // 2. 🏛️ Exklusiv verlustfreies 24-Bit PCM WAV-Format (.wav) für alle Downloads
       const safeTitle = (displayTitle || 'Aufnahme').replace(/[^a-zA-Z0-9äöüÄÖÜß_#\.-]/g, '_');
-      const filename = `${safeTitle}.${detectedExt}`;
+      const filename = `${safeTitle}.wav`;
+      const wavBlob = await ensureWavBlob(finalBlob, { title: displayTitle || 'Aufnahme', artist: 'Campus-Groovelab' });
 
-      // 2. Try native Operating System "Speichern unter..." Picker (Chrome, Chromium, Edge on Mac & Windows)
+      // 3. Try native Operating System "Speichern unter..." Picker (Chrome, Chromium, Edge on Mac & Windows)
       if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
         try {
           const handle = await (window as any).showSaveFilePicker({
             suggestedName: filename,
             types: [
               {
-                description: 'Audioaufnahme',
-                accept: { [finalBlob.type || 'audio/webm']: [`.${detectedExt}`] }
+                description: 'WAV Studio Audio (24-Bit PCM)',
+                accept: { 'audio/wav': ['.wav'] }
               }
             ]
           });
           const writable = await handle.createWritable();
-          await writable.write(finalBlob);
+          await writable.write(wavBlob);
           await writable.close();
           return;
         } catch (pickerErr: any) {
@@ -1131,8 +1119,8 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
         }
       }
 
-      // 3. Fallback: Force Same-Origin Blob Download Anchor (Safari, Firefox, Mobile)
-      const blobUrl = URL.createObjectURL(finalBlob);
+      // 4. Fallback: Force Same-Origin Blob Download Anchor (Safari, Firefox, Mobile)
+      const blobUrl = URL.createObjectURL(wavBlob);
       const anchor = document.createElement('a');
       anchor.style.display = 'none';
       anchor.href = blobUrl;
@@ -1148,10 +1136,11 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       }, 3000);
     } catch (err) {
       console.warn('[InlineAudioPlayer] Download fallback:', err);
+      const safeTitle = (displayTitle || 'Aufnahme').replace(/[^a-zA-Z0-9äöüÄÖÜß_#\.-]/g, '_');
       const anchor = document.createElement('a');
       anchor.style.display = 'none';
       anchor.href = resolvedUrl;
-      anchor.download = `${(displayTitle || 'Aufnahme').replace(/[^a-zA-Z0-9äöüÄÖÜß_#\.-]/g, '_')}.webm`;
+      anchor.download = `${safeTitle}.wav`;
       document.body.appendChild(anchor);
       anchor.click();
       setTimeout(() => {

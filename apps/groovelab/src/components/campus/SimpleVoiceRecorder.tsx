@@ -66,18 +66,8 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
       const stream = await acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS });
       audioStreamRef.current = stream;
 
-      // 🌟 2. WebAudio Dual-Channel Center Bridge
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      const recordAudioCtx = new AudioCtx();
-      recordAudioCtxRef.current = recordAudioCtx;
-      const sourceNode = recordAudioCtx.createMediaStreamSource(stream);
-      const mergerNode = recordAudioCtx.createChannelMerger(2);
-      sourceNode.connect(mergerNode, 0, 0); // Left
-      sourceNode.connect(mergerNode, 0, 1); // Right
-      const destNode = recordAudioCtx.createMediaStreamDestination();
-      mergerNode.connect(destNode);
-      const recordStream = destNode.stream;
-
+      // 🎙️ Direct Hardware Stream Capture (Zero WebAudio resampler / Zero pitch shift):
+      // Passes hardware stream directly to MediaRecorder, eliminating clock drift & Safari WebKit pitch artifacts.
       let mimeType = '';
       if (typeof MediaRecorder !== 'undefined') {
         if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mimeType = 'audio/webm;codecs=opus';
@@ -86,7 +76,7 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
         else if (MediaRecorder.isTypeSupported('audio/aac')) mimeType = 'audio/aac';
       }
 
-      const mediaRecorder = mimeType ? new MediaRecorder(recordStream, { mimeType }) : new MediaRecorder(recordStream);
+      const mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (event) => {
@@ -125,7 +115,6 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
           audioStreamRef.current.getTracks().forEach(track => track.stop());
           audioStreamRef.current = null;
         }
-        recordStream.getTracks().forEach(track => track.stop());
         if (recordAudioCtxRef.current && recordAudioCtxRef.current.state !== 'closed') {
           try { recordAudioCtxRef.current.close(); } catch {}
           recordAudioCtxRef.current = null;

@@ -15,6 +15,7 @@ import {
   processStudioMastering, 
   processDualMastering, 
   processPureRawBlob,
+  ensureWavBlob,
   TARGET_STUDIO_LUFS,
   TARGET_PURE_RAW_LUFS,
   TARGET_PEAK_DBTP,
@@ -1791,7 +1792,8 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
       try {
         const res = await fetch(url);
         const blob = await res.blob();
-        const blobUrl = URL.createObjectURL(blob);
+        const wavBlob = await ensureWavBlob(blob, { title: safeTitle, artist: 'Campus-Groovelab' });
+        const blobUrl = URL.createObjectURL(wavBlob);
         const link = document.createElement('a');
         link.href = blobUrl;
         link.download = filename;
@@ -1883,9 +1885,9 @@ export const AudioBiographyView: React.FC<AudioBiographyViewProps> = ({
             const res = await fetch(playableUrl);
             const blob = await res.blob();
             const safeTitle = (track.title || `Track_${count}`).replace(/[^a-zA-Z0-9äöüÄÖÜß_-]/g, '_');
-            const ext = blob.type.includes('wav') ? 'wav' : blob.type.includes('mpeg') ? 'mp3' : 'webm';
-            const filename = `${String(count).padStart(2, '0')}_${safeTitle}.${ext}`;
-            folder.file(filename, blob);
+            const wavBlob = await ensureWavBlob(blob, { title: safeTitle, artist: 'Campus-Groovelab' });
+            const filename = `${String(count).padStart(2, '0')}_${safeTitle}.wav`;
+            folder.file(filename, wavBlob);
           }
         } catch (err) {
           console.warn(`[ZIP Export] Could not download track ${track.title}:`, err);

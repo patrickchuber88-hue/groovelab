@@ -35,6 +35,7 @@ import {
   TARGET_PEAK_DBTP
 } from '../../utils/audioMasteringEngine';
 import { checkIsAudioTresorActive } from '../../domain/stickersAndTresor';
+import { acquireAudioStream, stabilizeAudioStream, releaseAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
 import { SharedAudioEngine } from '../../utils/sharedAudioEngine';
 import { announceA11y } from '../common/A11yLiveAnnouncer';
 import { useFocusInterruptionGuard } from '../../hooks/useFocusInterruptionGuard';
@@ -783,20 +784,8 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       const ctx = audioContextRef.current;
       if (!ctx) throw new Error("AudioContext not ready");
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          googEchoCancellation: false,
-          googAutoGainControl: false,
-          googNoiseSuppression: false,
-          googHighpassFilter: false,
-          googTypingNoiseDetection: false,
-          channelCount: 1,
-          sampleRate: 48000
-        } as any
-      });
+      const stream = await acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS });
+      await stabilizeAudioStream(stream, 300);
       calibrationStreamRef.current = stream;
 
       const micSource = ctx.createMediaStreamSource(stream);
@@ -1840,20 +1829,8 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
     isAutoSequenceActiveRef.current = true;
     setAutoSequenceStatus('WARTE AUF MIKROFON...');
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          googEchoCancellation: false,
-          googAutoGainControl: false,
-          googNoiseSuppression: false,
-          googHighpassFilter: false,
-          googTypingNoiseDetection: false,
-          channelCount: 1,
-          sampleRate: 48000
-        } as any
-      });
+      const stream = await acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS });
+      await stabilizeAudioStream(stream, 300);
       mediaStreamRef.current = stream;
       await detectHeadphones(stream);
 
@@ -2684,20 +2661,8 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
 
     await initAudio();
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          googEchoCancellation: false,
-          googAutoGainControl: false,
-          googNoiseSuppression: false,
-          googHighpassFilter: false,
-          googTypingNoiseDetection: false,
-          channelCount: 1,
-          sampleRate: 48000
-        } as any
-      });
+      const stream = await acquireAudioStream({ audio: PURE_RAW_AUDIO_CONSTRAINTS });
+      await stabilizeAudioStream(stream, 300);
       mediaStreamRef.current = stream;
 
       // 🎙️ High-End 256 kbps Studio-Grade Codec Bitrate
