@@ -1,1 +1,1 @@
-npm run gate:fast
+npm run gate:pre-commit

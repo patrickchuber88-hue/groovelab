@@ -9,7 +9,10 @@
 import fs   from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { execSync }      from 'child_process';
+import { execSync, exec } from 'child_process';
+import { promisify }        from 'util';
+
+const execAsync = promisify(exec);
 
 const __filename    = fileURLToPath(import.meta.url);
 const __dirname     = path.dirname(__filename);
@@ -270,66 +273,63 @@ process.stdout.write(
   ` Scanned ${migrationsScanned} migration file(s).\n\n`
 );
 
+// PARALLEL EXECUTION OF INVARIANT SUB-SUITES (3/6 - 6/6)
+async function runSubSuite(cmd, cwd) {
+  try {
+    const { stdout, stderr } = await execAsync(cmd, { cwd, encoding: 'utf-8' });
+    return { passed: true, stdout, stderr };
+  } catch (err) {
+    return { passed: false, stdout: err.stdout || '', stderr: err.stderr || err.message };
+  }
+}
+
+const [finopsRes, rlsRes, teacherRes, headersRes] = await Promise.all([
+  runSubSuite('npx tsx src/domain/__tests__/runBillingInvariantTests.ts', path.join(ROOT_DIR, 'apps', 'groovelab')),
+  runSubSuite('npx tsx scripts/verify_rls_catalog_invariants.ts', ROOT_DIR),
+  runSubSuite('npx tsx src/tests/runTeacherNameInvariantTests.ts', path.join(ROOT_DIR, 'apps', 'groovelab')),
+  runSubSuite('node scripts/verify_static_security_headers.mjs', ROOT_DIR)
+]);
+
 // 3. FINOPS ARCHITECTURAL INVARIANT & BILLING SUITE
 process.stdout.write('  📂 [3/6] FinOps Billing Invariants (runBillingInvariantTests.ts)...\n');
-try {
-  const out = execSync('npx tsx src/domain/__tests__/runBillingInvariantTests.ts', {
-    cwd: path.join(ROOT_DIR, 'apps', 'groovelab'),
-    encoding: 'utf-8',
-    stdio: ['pipe', 'pipe', 'pipe']
-  });
-  if (out) process.stdout.write(out.split('\n').map(l => `       ${l}`).join('\n') + '\n');
+if (finopsRes.passed) {
+  if (finopsRes.stdout) process.stdout.write(finopsRes.stdout.split('\n').map(l => `       ${l}`).join('\n') + '\n');
   process.stdout.write('     ✅ FinOps Suite: PASSED — Alle Formel- und Algorithmus-Invarianten bestätigt.\n\n');
-} catch (err) {
+} else {
   process.stderr.write('  🚨 FinOps Invariant Check FAILED: Billing engine deviation detected!\n');
-  process.stderr.write((err.stdout || err.message) + '\n');
+  process.stderr.write(finopsRes.stderr + '\n');
   violationsCount++;
 }
 
 // 4. FORENSIC RLS & SCHEMA CATALOG INVARIANTS
 process.stdout.write('  📂 [4/6] Forensic RLS & Schema Catalog Invariants...\n');
-try {
-  const out = execSync('npx tsx scripts/verify_rls_catalog_invariants.ts', {
-    cwd: ROOT_DIR,
-    encoding: 'utf-8',
-    stdio: ['pipe', 'pipe', 'pipe']
-  });
-  if (out) process.stdout.write(out.split('\n').map(l => `       ${l}`).join('\n') + '\n');
-  process.stdout.write('     ✅ All 13 Forensic Architecture & Performance Invariants: VERIFIED\n\n');
-} catch (err) {
+if (rlsRes.passed) {
+  if (rlsRes.stdout) process.stdout.write(rlsRes.stdout.split('\n').map(l => `       ${l}`).join('\n') + '\n');
+  process.stdout.write('     ✅ All 20 Forensic Architecture & Performance Invariants: VERIFIED\n\n');
+} else {
   process.stderr.write('  🚨 Forensic RLS Catalog Invariant Check FAILED: Schema invariant violation detected!\n');
-  process.stderr.write((err.stdout || err.message) + '\n');
+  process.stderr.write(rlsRes.stderr + '\n');
   violationsCount++;
 }
 
 // 5. TEACHER NAME COMMUNICATION INVARIANTS ("Vorname Nachname")
 process.stdout.write('  📂 [5/6] Teacher Name Communication Invariants (runTeacherNameInvariantTests.ts)...\n');
-try {
-  const out = execSync('npx tsx src/tests/runTeacherNameInvariantTests.ts', {
-    cwd: path.join(ROOT_DIR, 'apps', 'groovelab'),
-    encoding: 'utf-8',
-    stdio: ['pipe', 'pipe', 'pipe']
-  });
-  if (out) process.stdout.write(out.split('\n').map(l => `       ${l}`).join('\n') + '\n');
+if (teacherRes.passed) {
+  if (teacherRes.stdout) process.stdout.write(teacherRes.stdout.split('\n').map(l => `       ${l}`).join('\n') + '\n');
   process.stdout.write('     ✅ Teacher Name Communication Suite: PASSED — Vorname Nachname Doktrin bestätigt.\n\n');
-} catch (err) {
+} else {
   process.stderr.write('  🚨 Teacher Name Communication Check FAILED: Invariant violation detected!\n');
-  process.stderr.write((err.stdout || err.message) + '\n');
+  process.stderr.write(teacherRes.stderr + '\n');
   violationsCount++;
 }
 
 // 6. STATIC PERIMETER & MOZILLA OBSERVATORY A+ HEADER INVARIANTS
 process.stdout.write('  📂 [6/6] Static Perimeter & Mozilla Observatory A+ Header Invariants...\n');
-try {
-  const out = execSync('node scripts/verify_static_security_headers.mjs', {
-    cwd: ROOT_DIR,
-    encoding: 'utf-8',
-    stdio: ['pipe', 'pipe', 'pipe']
-  });
+if (headersRes.passed) {
   process.stdout.write('     ✅ Static Perimeter Suite: PASSED — 100% Mozilla Observatory A+ & SecurityHeaders.com Konformität bestätigt.\n\n');
-} catch (err) {
+} else {
   process.stderr.write('  🚨 Static Perimeter Header Check FAILED: Security header degradation detected!\n');
-  process.stderr.write((err.stdout || err.message) + '\n');
+  process.stderr.write(headersRes.stderr + '\n');
   violationsCount++;
 }
 

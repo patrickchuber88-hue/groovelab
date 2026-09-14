@@ -23,7 +23,7 @@ fi
 
 LEAKS_FOUND=0
 
-# Secret patterns to detect
+# Secret patterns to detect (OWASP ASVS L3 & Modern SaaS API Standards)
 PATTERNS=(
     "-----BEGIN[ A-Z0-9_-]*PRIVATE KEY-----"
     "SUPABASE_SERVICE_ROLE_KEY[[:space:]]*=[[:space:]]*[\'\"][a-zA-Z0-9_\.\-]+[\'\"]"
@@ -32,6 +32,12 @@ PATTERNS=(
     "AKIA[0-9A-Z]{16}"
     "repo1-cipher-pass=[^_\n[:space:]]{8,}"
     "CampusGroovelabEnterprise2026SecureBackrestKey"
+    "(^|[^a-zA-Z0-9_])ghp_[0-9a-zA-Z]{36}"
+    "(^|[^a-zA-Z0-9_])github_pat_[0-9a-zA-Z_]{82}"
+    "(^|[^a-zA-Z0-9_])re_[a-zA-Z0-9]{24,}"
+    "(^|[^a-zA-Z0-9_])SG\.[0-9a-zA-Z_-]{22}\.[0-9a-zA-Z_-]{43}"
+    "(^|[^a-zA-Z0-9_])sk-ant-api[0-9]{2}-[0-9a-zA-Z_-]{80,}"
+    "(^|[^a-zA-Z0-9_])sk-(proj-)?[0-9a-zA-Z]{32,}"
 )
 
 for file in $FILES; do

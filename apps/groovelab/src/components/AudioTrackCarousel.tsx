@@ -626,25 +626,25 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
         }}
         aria-label={isLooping ? 'Endlos-Schleife aktiv' : 'Endlos-Schleife aktivieren'}
         style={{
-          border: isLooping ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
-          background: isLooping ? '#dcfce7' : '#ffffff',
+          border: isLooping ? '2px solid #16a34a' : '1px solid #cbd5e1',
+          background: isLooping ? '#bbf7d0' : '#ffffff',
           color: isLooping ? '#15803d' : '#64748b',
-          height: isMobile ? '38px' : '34px',
-          minWidth: isMobile ? '38px' : '34px',
+          height: isMobile ? '40px' : '34px',
+          minWidth: isMobile ? '40px' : '34px',
           padding: '0 8px',
           borderRadius: '10px',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: isLooping ? '0 1px 3px rgba(22, 163, 74, 0.15)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
+          boxShadow: isLooping ? '0 0 0 2px rgba(34, 197, 94, 0.3), 0 2px 6px rgba(22, 163, 74, 0.25)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
           transition: 'all 0.15s ease',
           touchAction: 'manipulation'
         }}
         className="hover-scale-mini"
         title={isLooping ? 'Loop aktiv (Endlos-Schleife)' : 'Loop aktivieren (Endlos-Schleife für Play-Alongs)'}
       >
-        <Repeat size={16} strokeWidth={isLooping ? 2.6 : 2.2} />
+        <Repeat size={16} strokeWidth={isLooping ? 2.8 : 2.2} />
       </button>
 
       {/* ⏱️ 4-Beat Count-In Vorzähler Toggle */}
@@ -661,7 +661,8 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
           color: countInActive ? '#15803d' : '#64748b',
           fontSize: '0.80rem',
           fontWeight: 850,
-          height: isMobile ? '38px' : '34px',
+          height: isMobile ? '40px' : '34px',
+          minWidth: isMobile ? '40px' : undefined,
           padding: isMobile ? '0 10px' : '0 8px',
           borderRadius: '10px',
           cursor: 'pointer',
@@ -695,8 +696,8 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
           color: playbackRate !== 1 ? '#15803d' : '#64748b',
           fontSize: '0.78rem',
           fontWeight: 850,
-          height: isMobile ? '38px' : '34px',
-          minWidth: isMobile ? '44px' : '40px',
+          height: isMobile ? '40px' : '34px',
+          minWidth: isMobile ? '46px' : '40px',
           padding: '0 6px',
           borderRadius: '10px',
           cursor: 'pointer',
@@ -733,8 +734,8 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
           border: notesCount > 0 ? '1px solid #fed7aa' : '1px solid #cbd5e1',
           background: notesCount > 0 ? '#fff7ed' : '#ffffff',
           color: notesCount > 0 ? '#ea580c' : '#475569',
-          height: isMobile ? '38px' : '34px',
-          minWidth: isMobile ? '38px' : '34px',
+          height: isMobile ? '40px' : '34px',
+          minWidth: isMobile ? '40px' : '34px',
           padding: '0 8px',
           borderRadius: '10px',
           cursor: 'pointer',

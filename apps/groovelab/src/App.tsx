@@ -772,6 +772,20 @@ function App() {
         if (parsed?.id) return parsed.id;
       }
     } catch (e) {}
+
+    // 📱 PWA Standalone / Kaltstart-Immunisierung:
+    // Falls sessionStorage nach WebKit-Hintergrund-Suspendierung geleert wurde
+    const persistentId = localStorage.getItem('campus_active_student_id') ||
+                         localStorage.getItem('groovelab_current_student_id') ||
+                         localStorage.getItem('groovelab_user_id');
+    if (persistentId) return persistentId;
+
+    try {
+      const familyProfiles = JSON.parse(localStorage.getItem('campus_family_profiles') || '[]');
+      if (Array.isArray(familyProfiles) && familyProfiles[0]?.id) {
+        return familyProfiles[0].id;
+      }
+    } catch (e) {}
     return null;
   });
 
@@ -779,10 +793,18 @@ function App() {
     setLoggedInUserIdRaw((prev) => {
       const nextVal = typeof val === 'function' ? val(prev) : val;
       if (typeof window !== 'undefined') {
+        const isKiosk = Boolean(localStorage.getItem('groovelab_station_id') && localStorage.getItem('groovelab_station_id') !== 'skip');
         if (nextVal) {
           sessionStorage.setItem('groovelab_user_id', nextVal);
+          if (!isKiosk) {
+            localStorage.setItem('groovelab_user_id', nextVal);
+            localStorage.setItem('campus_active_student_id', nextVal);
+          }
         } else {
           sessionStorage.removeItem('groovelab_user_id');
+          localStorage.removeItem('groovelab_user_id');
+          localStorage.removeItem('campus_active_student_id');
+          localStorage.removeItem('groovelab_current_student_id');
         }
       }
       return nextVal;
@@ -1141,6 +1163,13 @@ function App() {
     const handleOpenHelpCenter = () => {
       setIsGlobalHelpCenterOpen(true);
     };
+    const handleFamilyStudentSwitched = (e: any) => {
+      if (e?.detail && typeof e.detail === 'string') {
+        console.log('[App] Family student switch event received:', e.detail);
+        setLoggedInUserId(e.detail);
+      }
+    };
+    window.addEventListener('campus_family_student_switched', handleFamilyStudentSwitched);
     window.addEventListener('campus_ui_level_changed', handleLevelChangeEvt);
     window.addEventListener('groovelab_parent_mode_changed', handleParentModeChange);
     window.addEventListener('campus_board_permission_changed', handlePermissionChange);
@@ -1148,6 +1177,7 @@ function App() {
     window.addEventListener('storage', handleSimDateSync);
     window.addEventListener('groovelab_simulated_date_changed', handleSimDateSync);
     return () => {
+      window.removeEventListener('campus_family_student_switched', handleFamilyStudentSwitched);
       window.removeEventListener('campus_ui_level_changed', handleLevelChangeEvt);
       window.removeEventListener('groovelab_parent_mode_changed', handleParentModeChange);
       window.removeEventListener('campus_board_permission_changed', handlePermissionChange);
@@ -1372,7 +1402,22 @@ function App() {
       }
 
       const cached = sessionStorage.getItem('groovelab_cached_user');
-      return cached ? JSON.parse(cached) : null;
+      if (cached) return JSON.parse(cached);
+
+      // 📱 PWA Standalone Kaltstart-Fallback für initialen Benutzer-Cache
+      const persistentId = localStorage.getItem('campus_active_student_id') ||
+                           localStorage.getItem('groovelab_current_student_id') ||
+                           localStorage.getItem('groovelab_user_id');
+      if (persistentId) {
+        const offlineCache = localStorage.getItem(`groovelab_offline_user_cache_${persistentId}`);
+        if (offlineCache) {
+          try {
+            const parsed = JSON.parse(offlineCache);
+            if (parsed?.data) return parsed.data;
+          } catch (e) {}
+        }
+      }
+      return null;
     } catch (e) {
       console.error('Failed to parse cached user:', e);
       return null;
@@ -1394,12 +1439,17 @@ function App() {
       }
 
       if (typeof window !== 'undefined') {
+        const isKiosk = Boolean(localStorage.getItem('groovelab_station_id') && localStorage.getItem('groovelab_station_id') !== 'skip');
         if (nextVal) {
-          // 🛡️ Zero-Knowledge: Never persist student last_name in sessionStorage
-          const userToCache = nextVal.role === 'student' ? { ...nextVal, last_name: null } : nextVal;
+          // 🛡️ Zero-Knowledge: Never persist student last_name on shared Kiosk tablets
+          const userToCache = (nextVal.role === 'student' && isKiosk) ? { ...nextVal, last_name: null } : nextVal;
           sessionStorage.setItem('groovelab_cached_user', JSON.stringify(userToCache));
           if (nextVal.id) {
             sessionStorage.setItem('groovelab_user_id', nextVal.id);
+            if (!isKiosk) {
+              localStorage.setItem('groovelab_user_id', nextVal.id);
+              localStorage.setItem('campus_active_student_id', nextVal.id);
+            }
           }
           if (nextVal.token_version !== undefined && nextVal.token_version !== null) {
             sessionStorage.setItem('groovelab_token_version', String(nextVal.token_version));
@@ -2769,26 +2819,12 @@ function App() {
           }
           // Ignore pure heartbeat / presence updates to prevent continuous re-render cascades
           if (payload.new && user) {
-            const substantiveFields = ['role', 'roles', 'school_id', 'is_active', 'is_campus_active', 'is_groovelab_active', 'token_version', 'is_master_admin', 'first_name', 'last_name'];
-            const hasSubstantiveChange = substantiveFields.some(
-              field => payload.new[field] !== undefined && payload.new[field] !== (user as any)[field]
-            );
-            if (!hasSubstantiveChange) return;
-          }
-          console.log('[Realtime] Current user profile update detected, refetching...');
-          const { data: updatedUser } = await supabase.from('users').select('*, schools(*)').eq('id', user.id).single();
-          if (updatedUser) {
-            setUser(updatedUser);
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${user.id}` },
-        async (payload: any) => {
-          // Ignore pure heartbeat / presence updates to prevent continuous re-render cascades
-          if (payload.new && user) {
-            const substantiveFields = ['role', 'roles', 'school_id', 'is_active', 'is_campus_active', 'is_groovelab_active', 'token_version', 'is_master_admin', 'first_name', 'last_name'];
+            const substantiveFields = [
+              'role', 'roles', 'school_id', 'is_active', 'is_campus_active', 'is_groovelab_active',
+              'token_version', 'is_master_admin', 'first_name', 'last_name',
+              'photo_url', 'avatar_url', 'instrument', 'groovelab_instrument', 'nickname',
+              'campus_ui_level', 'parent_permissions'
+            ];
             const hasSubstantiveChange = substantiveFields.some(
               field => payload.new[field] !== undefined && payload.new[field] !== (user as any)[field]
             );

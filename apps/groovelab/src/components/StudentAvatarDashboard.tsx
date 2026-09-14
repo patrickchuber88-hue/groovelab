@@ -271,6 +271,18 @@ const cleanTitle = (t: string | null | undefined): string =>
 
 export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab, onTabChange, onProfileUpdate }: StudentAvatarDashboardProps) {
   const [studentUser, setStudentUser] = useState<any>(() => initialUser || null);
+
+  // 📱 Reaktivitäts-Brücke: Sofortige Synchronisation bei Profilwechsel oder Hintergrundaktualisierung
+  useEffect(() => {
+    if (initialUser && (initialUser.id === studentId || !studentId)) {
+      setStudentUser((prev: any) => {
+        if (!prev) return initialUser;
+        if (JSON.stringify(prev) === JSON.stringify(initialUser)) return prev;
+        return { ...prev, ...initialUser };
+      });
+    }
+  }, [initialUser, studentId]);
+
   const currentPlatform: 'campus' | 'groovelab' = parentActiveTab === 'campus' ? 'campus' : (parentActiveTab === 'groovelab' ? 'groovelab' : ((typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'campus') === 'groovelab' ? 'groovelab' : 'campus'));
 
   // 👨‍🏫 Determine if current session belongs to a teacher or administrator
@@ -1809,6 +1821,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     localStorage.setItem('groovelab_current_student_id', targetStudentId);
     localStorage.setItem('campus_active_student_id', targetStudentId);
     sessionStorage.setItem('groovelab_user_id', targetStudentId);
+    localStorage.setItem('groovelab_user_id', targetStudentId);
+
+    // 📱 Reaktivitäts-Garantie: Cache und State für das Ziel-Profil sofort vorbereiten
+    const targetSibling = familyProfiles.find(p => p.id === targetStudentId);
+    if (targetSibling) {
+      sessionStorage.setItem('groovelab_cached_user', JSON.stringify(targetSibling));
+      setStudentUser(targetSibling);
+    }
+
     if (!keepParentUnlocked) {
       // Auto-lock parent session when handing device over to child for 100% child safety
       sessionStorage.removeItem('groovelab_parent_unlocked_global');
@@ -1818,7 +1839,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       sessionStorage.setItem('groovelab_parent_unlocked_global', 'true');
       sessionStorage.setItem(`groovelab_parent_session_${targetStudentId}`, String(Date.now() + 180 * 1000));
     }
-    window.location.search = `?student=${targetStudentId}`;
+
+    // Sanfte URL-Aktualisierung ohne Seiten-Reload & Benachrichtigung an App.tsx
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('student', targetStudentId);
+      window.history.replaceState({}, '', url.toString());
+      window.dispatchEvent(new CustomEvent('campus_family_student_switched', { detail: targetStudentId }));
+    }
   };
 
   const handleSwitchFamilyStudent = async (targetStudentId: string, keepParentUnlocked = false) => {
@@ -8901,16 +8929,20 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     setSavingProfile(true);
     try {
       const cleanFirstName = sanitizeTextInput(editingProfile.first_name);
+      const cleanNickname = sanitizeTextInput(editingProfile.nickname);
       const cleanPhone = sanitizeTextInput(editingProfile.phone);
       const cleanInstrument = sanitizeTextInput(editingProfile.instrument);
+      const photoUrl = editingProfile.photo_url || null;
 
       const { error } = await supabase
           .from('users')
           .update({
             first_name: cleanFirstName,
+            nickname: cleanNickname,
             phone: cleanPhone,
             instrument: cleanInstrument,
-            photo_url: editingProfile.photo_url
+            photo_url: photoUrl,
+            avatar_url: photoUrl
           })
           .eq('id', studentId);
       
@@ -8920,26 +8952,65 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       const updatedProfile = {
         ...editingProfile,
         first_name: cleanFirstName,
+        nickname: cleanNickname,
         phone: cleanPhone,
-        instrument: cleanInstrument
+        instrument: cleanInstrument,
+        photo_url: photoUrl,
+        avatar_url: photoUrl
       };
       setStudentUser((prev: any) => prev ? { ...prev, ...updatedProfile } : null);
+
+      // 📱 Atomare Synchronisation der lokalen Vaults & Geschwisterliste
+      try {
+        const rawFamily = localStorage.getItem('campus_family_profiles') || '[]';
+        const familyList = JSON.parse(rawFamily);
+        if (Array.isArray(familyList)) {
+          const idx = familyList.findIndex((p: any) => p.id === studentId);
+          if (idx !== -1) {
+            familyList[idx] = { ...familyList[idx], ...updatedProfile };
+            localStorage.setItem('campus_family_profiles', JSON.stringify(familyList));
+            setFamilyProfiles(familyList);
+          }
+        }
+        const rawLocal = localStorage.getItem('groovelab_local_profiles') || '[]';
+        const localList = JSON.parse(rawLocal);
+        if (Array.isArray(localList)) {
+          const idx = localList.findIndex((p: any) => p.id === studentId);
+          if (idx !== -1) {
+            localList[idx] = { ...localList[idx], ...updatedProfile };
+            localStorage.setItem('groovelab_local_profiles', JSON.stringify(localList));
+          }
+        }
+        const offlineKey = `groovelab_offline_user_cache_${studentId}`;
+        const existingOffline = localStorage.getItem(offlineKey);
+        if (existingOffline) {
+          const parsed = JSON.parse(existingOffline);
+          if (parsed && parsed.data) {
+            parsed.data = { ...parsed.data, ...updatedProfile };
+            localStorage.setItem(offlineKey, JSON.stringify(parsed));
+          }
+        }
+      } catch (cacheErr) {
+        console.warn('[ProfileSave] Cache update notice:', cacheErr);
+      }
       
       // Call parent update if exists
       if (onProfileUpdate) {
         onProfileUpdate({
           first_name: cleanFirstName,
+          nickname: cleanNickname,
           phone: cleanPhone,
           instrument: cleanInstrument,
-          photo_url: editingProfile.photo_url
+          photo_url: photoUrl,
+          avatar_url: photoUrl
         });
       }
       
       setShowEditProfile(false);
-      alert('Profil erfolgreich gespeichert!');
+      setUiLevelToast('Profil erfolgreich gespeichert!');
     } catch (err: any) {
       console.error('Error updating student profile:', err);
-      alert('Fehler beim Speichern: ' + err.message);
+      setParentErrorToast('Fehler beim Speichern: ' + (err.message || 'Unbekannter Fehler'));
     } finally {
       setSavingProfile(false);
     }
@@ -10916,7 +10987,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       const [userRes, avatarRes, statsRes, briefingRes, emailRes, missionRes, pinsRes, logsRes, matrixRes, skillsRes] = await Promise.all([
         supabase
           .from('users')
-          .select('id, school_id, role, first_name, avatar_url, photo_url, instrument, teacher_id, is_active, is_campus_active, is_groovelab_active, campus_ui_level, briefing_sidebar_collapsed, parent_allow_chat, parent_allow_absences, parent_allow_reschedule_confirm, parent_allow_timer, parent_allow_leaderboard, parent_allow_proposals, parent_allow_audio, parent_allow_tts, has_parent_pin, has_personal_pin, parent_pin_configured, status, parent_permissions, joker_used_at, weekly_jokers_used, activated_at, is_pin_activated, created_at, push_notifications_enabled, push_notif_schedule_changes, push_notif_homework, push_notif_chat, push_notif_practice_reminder, push_notif_weekly_digest, push_notif_all_features, push_prompt_decision, push_prompt_dismissed_at, is_app_user, is_premium_user, subject, payment_status, student_billing_payment_method, student_billing_cash_paid, exempt_from_direct_billing, schools(*)')
+          .select('id, school_id, role, first_name, last_name, nickname, phone, bio, parent_email, second_email, student_level, avatar_url, photo_url, instrument, teacher_id, is_active, is_campus_active, is_groovelab_active, campus_ui_level, briefing_sidebar_collapsed, parent_allow_chat, parent_allow_absences, parent_allow_reschedule_confirm, parent_allow_timer, parent_allow_leaderboard, parent_allow_proposals, parent_allow_audio, parent_allow_tts, has_parent_pin, has_personal_pin, parent_pin_configured, status, parent_permissions, joker_used_at, weekly_jokers_used, activated_at, is_pin_activated, created_at, push_notifications_enabled, push_notif_schedule_changes, push_notif_homework, push_notif_chat, push_notif_practice_reminder, push_notif_weekly_digest, push_notif_all_features, push_prompt_decision, push_prompt_dismissed_at, is_app_user, is_premium_user, subject, payment_status, student_billing_payment_method, student_billing_cash_paid, exempt_from_direct_billing, schools(*)')
           .eq('id', studentId)
           .single(),
         supabase

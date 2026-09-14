@@ -8,10 +8,10 @@
     "security:check": "node ../../scripts/security_drift_guard.mjs",
     "security:secrets": "bash ../../scripts/pre_commit_secret_scanner.sh --all",
     "security:diff": "node ../../scripts/security_diff_audit.mjs",
-    "build": "tsc && vite build && node ../../scripts/inject_sri_hashes.mjs && node ../../scripts/precompress_assets.mjs",
+    "build": "tsc && vite build && node ../../scripts/inject_sri_hashes.mjs && node ../../scripts/precompress_assets.mjs && node ../../scripts/check-bundle-budget.js",
     "test:billing": "tsx src/domain/__tests__/runBillingInvariantTests.ts",
     "test:teacher-names": "tsx src/tests/runTeacherNameInvariantTests.ts",
-    "gate": "node ../../scripts/security_drift_guard.mjs && bash ../../scripts/pre_commit_secret_scanner.sh --all && tsc --noEmit && tsx src/domain/__tests__/runBillingInvariantTests.ts",
+    "gate": "node ../../scripts/security_drift_guard.mjs && bash ../../scripts/pre_commit_secret_scanner.sh --all && tsc --noEmit",
     "verify:enterprise": "npm run gate",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"

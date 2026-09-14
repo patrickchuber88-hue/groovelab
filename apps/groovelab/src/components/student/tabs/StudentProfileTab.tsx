@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Building, Calendar, Camera, Clock, Flame, Lock, Pencil, QrCode, Star, Users, X } from "lucide-react";
 import { QRCodeModal } from "../../QRCodeModal";
 import { getInstrumentAvatarUrl, resolveCampusStudentAvatar } from "../../../utils/avatarHelper";
@@ -68,6 +68,18 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
   flamesActive = true,
   xpActive = true,
 }) => {
+  // ♿ BFSG 2025 / WCAG 2.2 AA: Escape-Key-Listener zum Schließen des Modals
+  useEffect(() => {
+    if (!showEditProfile) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowEditProfile(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showEditProfile, setShowEditProfile]);
+
   const getSelectableAvatars = () => {
     if (!editingProfile) return [];
     const assigned = (editingProfile.resolved_instrument || editingProfile.instrument || "")
@@ -132,7 +144,15 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
   };
 
   return (
-      <div style={{ display: (activeTab === 'profile' && studentUser) ? 'flex' : 'none', flexDirection: 'column', gap: '28px', maxWidth: '100%', margin: '0 auto', width: '100%' }} className="animation-slide-up">
+      <div style={{ 
+        display: (activeTab === 'profile' && studentUser) ? 'flex' : 'none', 
+        flexDirection: 'column', 
+        gap: '28px', 
+        maxWidth: '100%', 
+        margin: '0 auto', 
+        width: '100%',
+        paddingBottom: 'calc(var(--bottom-bar-height, 68px) + env(safe-area-inset-bottom) + 32px)'
+      }} className="animation-slide-up">
         {activeTab === 'profile' && studentUser && (
           <>
             {/* Header Card with Premium Campus Green Gradient */}
@@ -1027,26 +1047,34 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
 
           {/* Profile Edit Overlay Modal */}
           {showEditProfile && editingProfile && (
-            <div style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(15, 23, 42, 0.3)',
-              backdropFilter: 'blur(16px)',
-              WebkitBackdropFilter: 'blur(16px)',
-              zIndex: 11000,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '20px'
-            }}>
+            <div 
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="profile-edit-title"
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(15, 23, 42, 0.45)',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+                zIndex: 11000,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '16px'
+              }}
+            >
               <form onSubmit={handleSaveProfile} style={{
                 background: 'white',
                 border: '1px solid rgba(255,255,255,0.8)',
                 borderRadius: '32px',
-                boxShadow: '0 20px 50px rgba(15, 23, 42, 0.15)',
+                boxShadow: '0 20px 50px rgba(15, 23, 42, 0.2)',
                 width: '100%',
                 maxWidth: '540px',
-                padding: '36px',
+                maxHeight: 'calc(100dvh - 32px)',
+                overflowY: 'auto',
+                WebkitOverflowScrolling: 'touch',
+                padding: '32px 28px',
                 boxSizing: 'border-box',
                 display: 'flex',
                 flexDirection: 'column',
@@ -1055,13 +1083,14 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
               }}>
                 <button 
                   type="button"
+                  aria-label="Modal schließen"
                   onClick={() => setShowEditProfile(false)}
-                  style={{ position: 'absolute', top: '24px', right: '24px', background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}
+                  style={{ position: 'absolute', top: '24px', right: '24px', background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}
                 >
-                  <X size={16} />
+                  <X size={18} />
                 </button>
 
-                <h3 style={{ fontSize: '1.5rem', fontWeight: 950, color: '#0f172a', margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
+                <h3 id="profile-edit-title" style={{ fontSize: '1.45rem', fontWeight: 950, color: '#0f172a', margin: '0 0 4px 0', letterSpacing: '-0.02em' }}>
                   Profil bearbeiten
                 </h3>
 
@@ -1137,22 +1166,49 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                         required
                         value={editingProfile.first_name || ''} 
                         onChange={(e) => setEditingProfile((prev: any) => ({ ...prev, first_name: e.target.value }))}
-                        style={{ width: '100%', padding: '12px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '0.88rem', outline: 'none', boxSizing: 'border-box' }}
+                        style={{ width: '100%', padding: '12px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '16px', outline: 'none', boxSizing: 'border-box' }}
                       />
                     </div>
                     <div>
-                      <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Nachname</label>
-                      <input 
-                        type="text" 
-                        required
-                        value={editingProfile.last_name || ''} 
-                        onChange={(e) => setEditingProfile((prev: any) => ({ ...prev, last_name: e.target.value }))}
-                        style={{ width: '100%', padding: '12px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '0.88rem', outline: 'none', boxSizing: 'border-box' }}
-                      />
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                        <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Amtlicher Nachname</label>
+                        <span style={{ fontSize: '0.62rem', color: '#94a3b8', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          <Lock size={10} /> Geschützt
+                        </span>
+                      </div>
+                      <div style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        borderRadius: '14px',
+                        border: '1px solid #e2e8f0',
+                        background: '#f8fafc',
+                        fontSize: '16px',
+                        color: '#64748b',
+                        boxSizing: 'border-box',
+                        fontWeight: 600,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }} title={editingProfile.last_name || ''}>
+                        {editingProfile.last_name || '—'}
+                      </div>
                     </div>
                   </div>
 
-
+                  {/* Rufname / Künstlername / Band-Alias */}
+                  <div>
+                    <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Rufname / Band-Alias (Optional)</label>
+                    <input 
+                      type="text" 
+                      placeholder="z. B. Jimi oder Max"
+                      value={editingProfile.nickname || ''} 
+                      onChange={(e) => setEditingProfile((prev: any) => ({ ...prev, nickname: e.target.value }))}
+                      style={{ width: '100%', padding: '12px 16px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '16px', outline: 'none', boxSizing: 'border-box' }}
+                    />
+                    <span style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: '4px', display: 'block' }}>
+                      Wird auf deinen Musiker-Karten und in Band-Ansichten als Alias geführt.
+                    </span>
+                  </div>
 
                   <div>
                     <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>Instrumente</label>
@@ -1164,7 +1220,7 @@ export const StudentProfileTab: React.FC<StudentProfileTabProps> = ({
                       borderRadius: '14px',
                       border: '1px solid #e2e8f0',
                       background: '#f8fafc',
-                      fontSize: '0.88rem',
+                      fontSize: '16px',
                       color: '#64748b',
                       boxSizing: 'border-box'
                     }}>

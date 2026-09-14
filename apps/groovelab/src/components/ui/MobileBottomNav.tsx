@@ -213,8 +213,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         return [
           { id: 'briefing', label: 'Briefing', icon: Monitor },
           { id: 'homework_book', label: 'Aufgaben', icon: BookOpen },
-          { id: 'events', label: 'Termine', icon: Calendar },
-          { id: 'messages', label: 'Chat', icon: Mail, badge: unreadCount }
+          { id: 'practice_board', label: 'Übe-Pfad', icon: Zap },
+          { id: 'events', label: 'Termine', icon: Calendar }
         ];
       } else {
         return [
@@ -243,17 +243,28 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 
   const primaryTabs: Array<{ id: string; label: string; icon: any; badge?: number }> = getPrimaryTabs();
 
-  const [isSmartphone, setIsSmartphone] = useState(() => {
+  const checkIsSmartphone = () => {
     if (typeof window === 'undefined') return true;
-    return window.innerWidth <= 768;
-  });
+    return window.innerWidth <= 768 || Boolean(typeof document !== 'undefined' && document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait, [class*="sim-viewport-mobile"]'));
+  };
+
+  const [isSmartphone, setIsSmartphone] = useState(checkIsSmartphone);
 
   React.useEffect(() => {
-    const handleResize = () => {
-      setIsSmartphone(window.innerWidth <= 768);
+    const handleCheck = () => {
+      setIsSmartphone(checkIsSmartphone());
     };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('resize', handleCheck);
+    const observer = typeof MutationObserver !== 'undefined' && document.body
+      ? new MutationObserver(handleCheck)
+      : null;
+    if (observer && document.body) {
+      observer.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['class'] });
+    }
+    return () => {
+      window.removeEventListener('resize', handleCheck);
+      observer?.disconnect();
+    };
   }, []);
 
   const displayedTabs = isSmartphone ? primaryTabs : menuItems;
@@ -525,16 +536,18 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           display: 'flex',
           flexWrap: 'nowrap',
           alignItems: 'center',
-          justifyContent: 'flex-start',
-          overflowX: 'auto',
+          justifyContent: isSmartphone ? 'space-around' : 'flex-start',
+          overflowX: isSmartphone ? 'hidden' : 'auto',
           overflowY: 'hidden',
           WebkitOverflowScrolling: 'touch',
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
           width: '100%',
           boxSizing: 'border-box',
-          gap: '6px',
-          padding: '0 12px calc(env(safe-area-inset-bottom, 0px) + 4px) 12px'
+          gap: isSmartphone ? '2px' : '6px',
+          padding: isSmartphone 
+            ? '0 6px calc(env(safe-area-inset-bottom, 0px) + 4px) 6px'
+            : '0 12px calc(env(safe-area-inset-bottom, 0px) + 4px) 12px'
         }}
       >
         {displayedTabs.map(item => {
@@ -554,10 +567,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               className={`cg-bottom-nav-item ${isActive ? getActiveThemeClass() : ''}`}
               style={{
                 touchAction: 'manipulation',
-                flex: '0 0 auto',
-                minWidth: '68px',
-                width: 'auto',
-                padding: '6px 8px'
+                flex: isSmartphone ? '1 1 0%' : '0 0 auto',
+                minWidth: isSmartphone ? 0 : '68px',
+                width: isSmartphone ? '100%' : 'auto',
+                padding: isSmartphone ? '6px 2px' : '6px 8px'
               }}
               onClick={() => setActiveTab(item.id)}
             >
@@ -592,6 +605,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           className={`cg-bottom-nav-item ${drawerOpen || (isSmartphone && isSecondaryActive) ? getActiveThemeClass() : ''}`}
           style={{
             touchAction: 'manipulation',
+            flex: isSmartphone ? '1 1 0%' : '0 0 auto',
             minWidth: isSmartphone ? 0 : undefined,
             width: isSmartphone ? '100%' : undefined,
             padding: isSmartphone ? '6px 2px' : undefined

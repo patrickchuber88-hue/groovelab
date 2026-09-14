@@ -620,6 +620,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
 
   const [showModuleUnlockModal, setShowModuleUnlockModal] = useState(false);
   const [showParentPinModalForModules, setShowParentPinModalForModules] = useState(false);
+  const [isConfirmingResolveQuestion, setIsConfirmingResolveQuestion] = useState(false);
   const [localModuleOverrides, setLocalModuleOverrides] = useState<Record<string, boolean>>(() => {
     return props.parentPermissions?.module_overrides || (student as any)?.parent_permissions?.module_overrides || {};
   });
@@ -6993,8 +6994,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         justifyContent: 'center',
                                         gap: isMobileView ? '4px' : '6px',
                                         padding: isMobileView ? '0 8px' : '0 10px',
-                                        height: '32px',
-                                        minHeight: '32px',
+                                        height: isMobileView ? '36px' : '32px',
+                                        minHeight: isMobileView ? '36px' : '32px',
                                         borderRadius: '100px',
                                         border: '1px solid #fde047',
                                         background: '#fef9c3',
@@ -7040,10 +7041,10 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        width: '32px',
-                                        height: '32px',
-                                        minWidth: '32px',
-                                        minHeight: '32px',
+                                        width: isMobileView ? '36px' : '32px',
+                                        height: isMobileView ? '36px' : '32px',
+                                        minWidth: isMobileView ? '36px' : '32px',
+                                        minHeight: isMobileView ? '36px' : '32px',
                                         borderRadius: '100px',
                                         border: '1px solid #cbd5e1',
                                         background: '#f8fafc',
@@ -7142,10 +7143,10 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     border: '1px solid #cbd5e1',
                                     color: '#16a34a',
                                     borderRadius: '100px',
-                                    width: '32px',
-                                    height: '32px',
-                                    minWidth: '32px',
-                                    minHeight: '32px',
+                                    width: isMobileView ? '36px' : '32px',
+                                    height: isMobileView ? '36px' : '32px',
+                                    minWidth: isMobileView ? '36px' : '32px',
+                                    minHeight: isMobileView ? '36px' : '32px',
                                     cursor: 'pointer',
                                     display: 'inline-flex',
                                     alignItems: 'center',
@@ -7175,10 +7176,10 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     border: isLinkCopied ? '1px solid #86efac' : '1px solid #cbd5e1',
                                     color: isLinkCopied ? '#16a34a' : '#475569',
                                     borderRadius: '100px',
-                                    width: '32px',
-                                    height: '32px',
-                                    minWidth: '32px',
-                                    minHeight: '32px',
+                                    width: isMobileView ? '36px' : '32px',
+                                    height: isMobileView ? '36px' : '32px',
+                                    minWidth: isMobileView ? '36px' : '32px',
+                                    minHeight: isMobileView ? '36px' : '32px',
                                     cursor: 'pointer',
                                     display: 'inline-flex',
                                     alignItems: 'center',
@@ -7310,7 +7311,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 background: !hasActiveItems ? 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)' : 'linear-gradient(180deg, #fcfdfe 0%, #f8fafc 100%)',
                                 border: !hasActiveItems ? '1px solid #e2e8f0' : '1px solid #f1f5f9',
                                 borderRadius: isMobileView ? '14px' : '18px',
-                                padding: isMobileView ? '12px 10px' : '14px 16px',
+                                padding: isMobileView ? '12px 10px calc(var(--bottom-bar-height, 68px) + env(safe-area-inset-bottom, 0px) + 32px) 10px' : '14px 16px',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 justifyContent: 'flex-start',
@@ -7684,7 +7685,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                              „{effectiveViewingQuestion.text}“
                                            </span>
                                          </div>
-                                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
                                            <button
                                              type="button"
                                              onClick={() => handleSpeakText(effectiveViewingQuestion.text, 'student_q')}
@@ -7694,15 +7695,16 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                border: '1px solid rgba(253, 224, 71, 0.6)',
                                                background: 'rgba(254, 240, 138, 0.7)',
                                                color: '#854d0e',
-                                               borderRadius: '7px',
-                                               width: '28px',
-                                               height: '28px',
+                                               borderRadius: '8px',
+                                               width: isMobileView ? '32px' : '28px',
+                                               height: isMobileView ? '32px' : '28px',
                                                padding: 0,
                                                cursor: 'pointer',
                                                display: 'flex',
                                                alignItems: 'center',
                                                justifyContent: 'center',
-                                               transition: 'all 0.15s ease'
+                                               transition: 'all 0.15s ease',
+                                               touchAction: 'manipulation'
                                              }}
                                              className="hover-scale-mini"
                                            >
@@ -7720,43 +7722,104 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                border: '1px solid rgba(253, 224, 71, 0.6)',
                                                background: 'rgba(254, 240, 138, 0.7)',
                                                color: '#854d0e',
-                                               borderRadius: '7px',
-                                               width: '28px',
-                                               height: '28px',
+                                               borderRadius: '8px',
+                                               width: isMobileView ? '32px' : '28px',
+                                               height: isMobileView ? '32px' : '28px',
                                                padding: 0,
                                                cursor: 'pointer',
                                                display: 'flex',
                                                alignItems: 'center',
                                                justifyContent: 'center',
-                                               transition: 'all 0.15s ease'
+                                               transition: 'all 0.15s ease',
+                                               touchAction: 'manipulation'
                                              }}
                                              className="hover-scale-mini"
                                            >
                                              <Edit3 size={14} />
                                            </button>
-                                           <button
-                                             type="button"
-                                             onClick={handleResolveStudentQuestion}
-                                             title="Frage löschen oder als erledigt markieren"
-                                             aria-label="Frage löschen oder als erledigt markieren"
-                                             style={{
-                                               border: '1px solid rgba(254, 202, 202, 0.8)',
-                                               background: 'rgba(254, 226, 226, 0.7)',
-                                               color: '#dc2626',
-                                               borderRadius: '7px',
-                                               width: '28px',
-                                               height: '28px',
-                                               padding: 0,
-                                               cursor: 'pointer',
-                                               display: 'flex',
-                                               alignItems: 'center',
-                                               justifyContent: 'center',
-                                               transition: 'all 0.15s ease'
-                                             }}
-                                             className="hover-scale-mini"
-                                           >
-                                             <Trash2 size={14} />
-                                           </button>
+
+                                           {/* 🛡️ Fail-Safe 2-Schritt Lösch-Schutz */}
+                                           {isConfirmingResolveQuestion ? (
+                                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                               <button
+                                                 type="button"
+                                                 onClick={async () => {
+                                                   setIsConfirmingResolveQuestion(false);
+                                                   await handleResolveStudentQuestion();
+                                                 }}
+                                                 title="Löschen bestätigen"
+                                                 aria-label="Löschen bestätigen"
+                                                 style={{
+                                                   border: 'none',
+                                                   background: '#dc2626',
+                                                   color: '#ffffff',
+                                                   borderRadius: '8px',
+                                                   height: isMobileView ? '32px' : '28px',
+                                                   padding: '0 8px',
+                                                   cursor: 'pointer',
+                                                   display: 'flex',
+                                                   alignItems: 'center',
+                                                   gap: '4px',
+                                                   fontSize: '0.72rem',
+                                                   fontWeight: 800,
+                                                   boxShadow: '0 1px 4px rgba(220, 38, 38, 0.3)',
+                                                   touchAction: 'manipulation'
+                                                 }}
+                                                 className="hover-scale-mini"
+                                               >
+                                                 <Check size={12} strokeWidth={3} />
+                                                 <span>Löschen?</span>
+                                               </button>
+                                               <button
+                                                 type="button"
+                                                 onClick={() => setIsConfirmingResolveQuestion(false)}
+                                                 title="Abbrechen"
+                                                 aria-label="Abbrechen"
+                                                 style={{
+                                                   border: '1px solid #cbd5e1',
+                                                   background: '#ffffff',
+                                                   color: '#64748b',
+                                                   borderRadius: '8px',
+                                                   width: isMobileView ? '32px' : '28px',
+                                                   height: isMobileView ? '32px' : '28px',
+                                                   padding: 0,
+                                                   cursor: 'pointer',
+                                                   display: 'flex',
+                                                   alignItems: 'center',
+                                                   justifyContent: 'center',
+                                                   touchAction: 'manipulation'
+                                                 }}
+                                                 className="hover-scale-mini"
+                                               >
+                                                 <X size={13} strokeWidth={2.4} />
+                                               </button>
+                                             </div>
+                                           ) : (
+                                             <button
+                                               type="button"
+                                               onClick={() => setIsConfirmingResolveQuestion(true)}
+                                               title="Frage löschen oder als erledigt markieren"
+                                               aria-label="Frage löschen oder als erledigt markieren"
+                                               style={{
+                                                 border: '1px solid rgba(254, 202, 202, 0.8)',
+                                                 background: 'rgba(254, 226, 226, 0.7)',
+                                                 color: '#dc2626',
+                                                 borderRadius: '8px',
+                                                 width: isMobileView ? '32px' : '28px',
+                                                 height: isMobileView ? '32px' : '28px',
+                                                 padding: 0,
+                                                 cursor: 'pointer',
+                                                 display: 'flex',
+                                                 alignItems: 'center',
+                                                 justifyContent: 'center',
+                                                 transition: 'all 0.15s ease',
+                                                 touchAction: 'manipulation'
+                                               }}
+                                               className="hover-scale-mini"
+                                             >
+                                               <Trash2 size={14} />
+                                             </button>
+                                           )}
                                          </div>
                                        </div>
                                        <div style={{
@@ -8164,7 +8227,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                                   textOverflow: 'ellipsis',
                                                   whiteSpace: 'nowrap'
                                                 }}>
-                                                  {item.topic_name.replace(/\s*\([^)]*\)\s*$/, '')}
+                                                  {item.topic_name.replace(/\s*\([^)]*\)\s*$/, '').replace(/linken park/gi, 'Linkin Park')}
                                                 </span>
                                                 {isFutureWeek && (
                                                   <span style={{

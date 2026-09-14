@@ -35,7 +35,8 @@ files.forEach(file => {
 
   if (file.startsWith('index-') && file.endsWith('.js')) {
     if (stats.size > BUDGETS.mainIndexJs) {
-      console.warn(`⚠️ Warning: ${file} (${sizeKb} KB) exceeds budget of ${BUDGETS.mainIndexJs / 1024} KB`);
+      console.error(`🚨 Error: ${file} (${sizeKb} KB) exceeds budget of ${BUDGETS.mainIndexJs / 1024} KB`);
+      passed = false;
     } else {
       console.log(`✅ ${file}: ${sizeKb} KB (Within ${BUDGETS.mainIndexJs / 1024} KB budget)`);
     }
@@ -43,11 +44,18 @@ files.forEach(file => {
 
   if (file.startsWith('index-') && file.endsWith('.css')) {
     if (stats.size > BUDGETS.cssBundle) {
-      console.warn(`⚠️ Warning: ${file} (${sizeKb} KB) exceeds CSS budget of ${BUDGETS.cssBundle / 1024} KB`);
+      console.error(`🚨 Error: ${file} (${sizeKb} KB) exceeds CSS budget of ${BUDGETS.cssBundle / 1024} KB`);
+      passed = false;
     } else {
       console.log(`✅ ${file}: ${sizeKb} KB (Within ${BUDGETS.cssBundle / 1024} KB CSS budget)`);
     }
   }
 });
 
+if (!passed) {
+  console.error('🚨 Enterprise Performance Budget EXCEEDED! Production build halted.');
+  process.exit(1);
+}
+
 console.log('🎉 Enterprise Performance Budget Check passed successfully!');
+process.exit(0);

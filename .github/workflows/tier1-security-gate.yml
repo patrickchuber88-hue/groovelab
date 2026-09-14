@@ -32,9 +32,9 @@ jobs:
 
       - name: "Layer 5: TypeScript Integrity Check"
         run: |
-          npm --prefix packages/backend-core run build || true
+          npm --prefix packages/backend-core run build
           npm --prefix packages/bff-server run build
           npm --prefix apps/groovelab run build
 
       - name: "Layer 7: Execute Automated Tenant Isolation Tests"
-        run: npm --prefix packages/backend-core test || true
+        run: npm --prefix packages/backend-core test
