@@ -8,17 +8,30 @@ function swCacheBusterPlugin() {
     name: 'sw-cache-buster',
     closeBundle() {
       const distSwPath = path.resolve(__dirname, './dist/sw.js');
-      const newVersion = `groovelab-static-v${Date.now()}`;
+      const publicSwPath = path.resolve(__dirname, './public/sw.js');
+      const now = Date.now();
+      const newVersion = `groovelab-static-v${now}`;
+      const newDynamicVersion = `groovelab-dynamic-v${now}`;
+
       if (fs.existsSync(distSwPath)) {
         let content = fs.readFileSync(distSwPath, 'utf-8');
         content = content.replace(/const CACHE_NAME = ['"][^'"]+['"];/, `const CACHE_NAME = '${newVersion}';`);
-        content = content.replace(/const DYNAMIC_CACHE = ['"][^'"]+['"];/, `const DYNAMIC_CACHE = 'groovelab-dynamic-v${Date.now()}';`);
+        content = content.replace(/const DYNAMIC_CACHE = ['"][^'"]+['"];/, `const DYNAMIC_CACHE = '${newDynamicVersion}';`);
         fs.writeFileSync(distSwPath, content, 'utf-8');
         console.log(`\n[SW Cache Buster] Automatically injected dynamic cache version: ${newVersion} into dist/sw.js\n`);
       }
+
+      if (fs.existsSync(publicSwPath)) {
+        let pContent = fs.readFileSync(publicSwPath, 'utf-8');
+        pContent = pContent.replace(/const CACHE_NAME = ['"][^'"]+['"];/, `const CACHE_NAME = '${newVersion}';`);
+        pContent = pContent.replace(/const DYNAMIC_CACHE = ['"][^'"]+['"];/, `const DYNAMIC_CACHE = '${newDynamicVersion}';`);
+        fs.writeFileSync(publicSwPath, pContent, 'utf-8');
+        console.log(`[SW Cache Buster] Synchronized cache version into public/sw.js\n`);
+      }
+
       const distVersionPath = path.resolve(__dirname, './dist/version.json');
       try {
-        fs.writeFileSync(distVersionPath, JSON.stringify({ version: newVersion, timestamp: Date.now() }), 'utf-8');
+        fs.writeFileSync(distVersionPath, JSON.stringify({ version: newVersion, timestamp: now }), 'utf-8');
         console.log(`[SW Cache Buster] Generated dist/version.json with version ${newVersion}\n`);
       } catch (err) {
         console.warn('[SW Cache Buster] Could not write dist/version.json:', err);
