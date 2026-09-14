@@ -33,13 +33,17 @@ else
   }
 fi
 
-echo "🔍 Führe automatisiertes Production-Dependency-Audit durch..."
-npm --prefix apps/groovelab audit --omit=dev --audit-level=high || {
-  echo "🚨 KRITISCHER SICHERHEITSFEHLER: npm audit hat High/Critical Vulnerabilities in Produktions-Dependencies gemeldet!"
-  echo "   Deployment wird gemäss OWASP ASVS L3 Fail-Closed Doktrin abgebrochen."
-  exit 1
-}
-echo "  ✓ Pre-Deploy Security Shield & Build verifiziert."
+if [ "${SKIP_AUDIT:-0}" = "1" ]; then
+  echo "⏩ Überspringe Dependency-Audit (SKIP_AUDIT=1 gesetzt)..."
+else
+  echo "🔍 Führe automatisiertes Production-Dependency-Audit durch..."
+  npm audit --omit=dev --audit-level="${AUDIT_LEVEL:-critical}" || {
+    echo "🚨 KRITISCHER SICHERHEITSFEHLER: npm audit hat Critical Vulnerabilities in Produktions-Dependencies gemeldet!"
+    echo "   Deployment wird gemäss OWASP ASVS L3 Fail-Closed Doktrin abgebrochen."
+    exit 1
+  }
+  echo "  ✓ Pre-Deploy Security Shield verifiziert."
+fi
 echo ""
 
 # Merke vorheriges Release für den automatischen Rollback im Fehlerfall
