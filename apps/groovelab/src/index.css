@@ -153,6 +153,13 @@
 }
 
 @layer base {
+  /* Axiom 3: Hermetischer Wackelschutz & Reload-Bremse */
+  html, body {
+    overflow-x: clip;
+    overscroll-behavior-x: none;
+    overscroll-behavior-y: contain;
+  }
+
   /* Apple-Style Minimal Scrollbars (Global) */
   * {
     scrollbar-width: thin;
@@ -1843,12 +1850,38 @@ select option {
     margin-left: 0 !important;
     padding-left: 0 !important;
     padding-right: 0 !important;
-    padding-bottom: 0 !important;
+    padding-bottom: var(--mobile-scroll-clearance-bottom) !important;
   }
 }
 
-/* Smartphone Grid Viewport (<= 768px) - Fluid Horizontal Scroll */
+/* Smartphone Grid Viewport (<= 768px) - Fluid Horizontal Scroll & Global Ergonomics */
 @media (max-width: 768px) {
+  /* Axiom 2: Zero Content Occlusion & Scroll Clearance */
+  .main-wrapper,
+  .cg-full-height-board,
+  .fluid-board-scroll-container,
+  .board-page-container {
+    padding-bottom: var(--mobile-scroll-clearance-bottom) !important;
+  }
+
+  /* Axiom 4: Apple / Material Touch-Targets & Native-Feel Tap */
+  button,
+  [role="button"],
+  a,
+  input[type="button"],
+  input[type="submit"],
+  .cg-bottom-nav-item {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Axiom 5: Anti-Auto-Zoom Doktrin (>= 16px auf Mobile) */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
   .cg-mobile-bottom-nav {
     display: flex !important;
     flex-wrap: nowrap !important;
@@ -1868,6 +1901,7 @@ select option {
     min-width: 68px !important;
     width: auto !important;
     padding: 6px 8px !important;
+    min-height: 44px !important;
   }
 }
 

@@ -328,6 +328,7 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
               }}
               style={{
                 padding: '16px',
+                minHeight: '48px',
                 borderRadius: '16px',
                 border: 'none',
                 background: isSpecial ? '#f1f5f9' : '#f8fafc',
@@ -339,6 +340,9 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                touchAction: 'manipulation',
+                userSelect: 'none',
+                WebkitTapHighlightColor: 'transparent',
                 transition: 'all 0.1s'
               }}
               className="hover-scale"
@@ -400,13 +404,20 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
           aria-label="Schließen"
           style={{
             position: 'absolute',
-            top: '20px',
-            right: '20px',
+            top: '12px',
+            right: '12px',
             background: 'none',
             border: 'none',
             color: '#94a3b8',
             cursor: 'pointer',
-            padding: '4px'
+            padding: '10px',
+            minWidth: '44px',
+            minHeight: '44px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent'
           }}
         >
           <X size={20} />
@@ -495,13 +506,19 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
             }}
             style={{
               marginTop: '16px',
+              minHeight: '44px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               background: 'none',
               border: 'none',
               color: isParentMode ? '#34a853' : '#0284c7',
-              fontSize: '0.76rem',
+              fontSize: '0.78rem',
               fontWeight: 700,
               cursor: 'pointer',
-              textDecoration: 'underline'
+              textDecoration: 'underline',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent'
             }}
           >
             {isParentMode ? '← Zurück zur Schüler-Eingabe (4 Ziffern)' : 'Als Elternteil anmelden (6-stellige Master-PIN) →'}

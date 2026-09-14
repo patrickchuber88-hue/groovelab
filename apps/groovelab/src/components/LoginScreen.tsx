@@ -5585,6 +5585,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   <input
                     type="password"
                     maxLength={4}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={loginKioskPinInput}
                     onChange={(e) => {
                       const val = e.target.value.replace(/\D/g, '').slice(0, 4);
@@ -5617,8 +5619,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                       border: '1.5px solid #eab308',
                       background: '#ffffff',
                       color: '#0f172a',
-                      fontSize: '16px',
+                      fontSize: '18px',
                       fontWeight: 900,
+                      minHeight: '44px',
                       letterSpacing: '0.25em',
                       textAlign: 'center',
                       outline: 'none'
