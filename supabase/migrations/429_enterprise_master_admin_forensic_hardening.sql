@@ -47,30 +47,30 @@ BEGIN
             u.school_id,
             COUNT(*) FILTER (WHERE u.role = 'student' OR (u.roles IS NOT NULL AND 'student' = ANY(u.roles))) AS total_students,
             COUNT(*) FILTER (
-                (u.role = 'student' OR (u.roles IS NOT NULL AND 'student' = ANY(u.roles)))
+                WHERE (u.role = 'student' OR (u.roles IS NOT NULL AND 'student' = ANY(u.roles)))
                 AND (COALESCE(u.is_campus_active, false) = true OR COALESCE(u.is_groovelab_active, false) = true)
             ) AS active_students,
             COUNT(*) FILTER (
-                (u.role = 'student' OR (u.roles IS NOT NULL AND 'student' = ANY(u.roles)))
+                WHERE (u.role = 'student' OR (u.roles IS NOT NULL AND 'student' = ANY(u.roles)))
                 AND COALESCE(u.is_campus_active, false) = true
             ) AS campus_students,
             COUNT(*) FILTER (
-                (u.role = 'student' OR (u.roles IS NOT NULL AND 'student' = ANY(u.roles)))
+                WHERE (u.role = 'student' OR (u.roles IS NOT NULL AND 'student' = ANY(u.roles)))
                 AND COALESCE(u.is_groovelab_active, false) = true
             ) AS groovelab_students,
             COUNT(*) FILTER (
-                (u.role = 'student' OR (u.roles IS NOT NULL AND 'student' = ANY(u.roles)))
+                WHERE (u.role = 'student' OR (u.roles IS NOT NULL AND 'student' = ANY(u.roles)))
                 AND COALESCE(u.is_campus_active, false) = true
                 AND COALESCE(u.exempt_from_direct_billing, false) = true
             ) AS exempt_active_students,
             COUNT(*) FILTER (
-                (u.role = 'student' OR (u.roles IS NOT NULL AND 'student' = ANY(u.roles)))
+                WHERE (u.role = 'student' OR (u.roles IS NOT NULL AND 'student' = ANY(u.roles)))
                 AND COALESCE(u.is_campus_active, false) = true
                 AND (u.student_billing_payment_method IN ('bank_transfer', 'debit') OR u.payment_status = 'paid')
             ) AS parent_paid_students,
             COUNT(*) FILTER (WHERE u.role = 'teacher' OR (u.roles IS NOT NULL AND 'teacher' = ANY(u.roles))) AS total_teachers,
             COUNT(*) FILTER (
-                (u.role = 'teacher' OR (u.roles IS NOT NULL AND 'teacher' = ANY(u.roles)))
+                WHERE (u.role = 'teacher' OR (u.roles IS NOT NULL AND 'teacher' = ANY(u.roles)))
                 AND COALESCE(u.is_active, true) = true
             ) AS active_teachers,
             COUNT(*) FILTER (
