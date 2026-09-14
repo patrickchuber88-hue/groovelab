@@ -346,7 +346,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const isInsideSimTabletLandscape = typeof document !== 'undefined' && !!document.querySelector('.sim-viewport-tablet, .sim-viewport-landscape');
   const isInsideSim = isInsideSimMobile || isInsideSimTabletLandscape;
   const isMobileView = (windowWidth <= 768 && !isInsideSimTabletLandscape) || isInsideSimMobile;
-  const [mobileProtokollTab, setMobileProtokollTab] = useState<'repertoire' | 'homework'>(readOnly ? 'homework' : 'repertoire');
+  const [mobileProtokollTab, setMobileProtokollTab] = useState<'repertoire' | 'homework'>('homework');
   const [hubTab, setHubTab] = useState<'modules' | 'protocol'>((student?.is_campus_active === false) ? 'protocol' : 'modules');
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
@@ -1678,6 +1678,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         setActiveSubView('hub');
         setHubTab('modules');
         setActiveViewMode(initialViewMode || 'document');
+        if (initialViewMode === 'recordings') {
+          setMobileProtokollTab('homework');
+        }
       }
     }
   }, [initialModalTab, initialViewMode]);
@@ -10877,7 +10880,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
           {/* Bottom Row (mobile/tablet only) - iOS Native Segmented Switch [ Module | Hausaufgaben ] */}
           {(() => {
-            const isHausaufgabenActive = mobileProtokollTab === 'homework' && activeViewMode === 'document' && activeModalTab === 'document';
+            const isHausaufgabenActive = mobileProtokollTab === 'homework' && (activeViewMode === 'document' || activeViewMode === 'recordings') && activeModalTab === 'document';
             const isModulesActive = !isHausaufgabenActive;
 
             return (

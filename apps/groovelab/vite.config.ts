@@ -8,12 +8,20 @@ function swCacheBusterPlugin() {
     name: 'sw-cache-buster',
     closeBundle() {
       const distSwPath = path.resolve(__dirname, './dist/sw.js');
+      const newVersion = `groovelab-static-v${Date.now()}`;
       if (fs.existsSync(distSwPath)) {
         let content = fs.readFileSync(distSwPath, 'utf-8');
-        const newVersion = `groovelab-static-v${Date.now()}`;
         content = content.replace(/const CACHE_NAME = ['"][^'"]+['"];/, `const CACHE_NAME = '${newVersion}';`);
+        content = content.replace(/const DYNAMIC_CACHE = ['"][^'"]+['"];/, `const DYNAMIC_CACHE = 'groovelab-dynamic-v${Date.now()}';`);
         fs.writeFileSync(distSwPath, content, 'utf-8');
         console.log(`\n[SW Cache Buster] Automatically injected dynamic cache version: ${newVersion} into dist/sw.js\n`);
+      }
+      const distVersionPath = path.resolve(__dirname, './dist/version.json');
+      try {
+        fs.writeFileSync(distVersionPath, JSON.stringify({ version: newVersion, timestamp: Date.now() }), 'utf-8');
+        console.log(`[SW Cache Buster] Generated dist/version.json with version ${newVersion}\n`);
+      } catch (err) {
+        console.warn('[SW Cache Buster] Could not write dist/version.json:', err);
       }
     }
   };

@@ -178,6 +178,7 @@ export async function requestPresignedUploadTicket(options: {
   contentType: string;
   sizeBytes: number;
   schoolId?: string | null;
+  studentId?: string | null;
   uniqueId?: string | null;
   bucket?: string;
 }): Promise<PresignedUploadTicket | null> {
@@ -236,17 +237,26 @@ export async function uploadAudioWithIntegrityVerification(
 
   // 1. Attempt Zero-Memory Direct-to-Storage Upload via Pre-signed URL
   try {
-    // Extract context, schoolId, uniqueId, extension from target filePath if structured
+    // Extract context, schoolId, studentId, uniqueId, extension from target filePath
+    // Hierarchies:
+    // 1. schools/<schoolId>/students/<studentId>/<context>/<filename>
+    // 2. schools/<schoolId>/<context>/<filename>
+    // 3. <context>/<filename>
     const pathParts = filePath.split('/');
     let schoolId: string | null = null;
+    let studentId: string | null = null;
     let context = 'audio';
     const filename = pathParts[pathParts.length - 1];
 
-    if (pathParts[0] === 'schools' && pathParts.length >= 4) {
+    if (pathParts[0] === 'schools' && pathParts[2] === 'students' && pathParts.length >= 5) {
       schoolId = pathParts[1];
-      context = pathParts[2];
+      studentId = pathParts[3];
+      context = pathParts[4] || 'audio';
+    } else if (pathParts[0] === 'schools' && pathParts.length >= 3) {
+      schoolId = pathParts[1];
+      context = pathParts[2] || 'audio';
     } else if (pathParts.length >= 2) {
-      context = pathParts[0];
+      context = pathParts[0] || 'audio';
     }
 
     const extMatch = filename.match(/\.([a-zA-Z0-9]+)$/);
@@ -259,6 +269,7 @@ export async function uploadAudioWithIntegrityVerification(
       contentType,
       sizeBytes,
       schoolId,
+      studentId,
       uniqueId,
       bucket
     });

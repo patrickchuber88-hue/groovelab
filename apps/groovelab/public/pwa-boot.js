@@ -33,11 +33,13 @@
     meta.content = content;
   }
 
-  function setOrAddLink(rel, href, type) {
-    var link = document.querySelector('link[rel="' + rel + '"]');
+  function setOrAddLink(rel, href, type, sizes) {
+    var selector = 'link[rel="' + rel + '"]' + (sizes ? '[sizes="' + sizes + '"]' : ':not([sizes])');
+    var link = document.querySelector(selector);
     if (!link) {
       link = document.createElement('link');
       link.rel = rel;
+      if (sizes) link.setAttribute('sizes', sizes);
       document.head.appendChild(link);
     }
     link.href = href;
@@ -47,7 +49,16 @@
   setOrAddLink('manifest', manifestHref);
   setOrAddMeta('theme-color', themeColor);
   setOrAddMeta('apple-mobile-web-app-title', title);
-  setOrAddLink('apple-touch-icon', appleTouchIcon);
-  setOrAddLink('icon', favicon, 'image/png');
   setOrAddMeta('apple-mobile-web-app-capable', 'yes');
+  setOrAddMeta('mobile-web-app-capable', 'yes');
+  setOrAddMeta('apple-mobile-web-app-status-bar-style', 'black-translucent');
+
+  // Multi-size Apple Touch Icons for iPhone Retina, iPad Pro, iPad & older iOS devices
+  setOrAddLink('apple-touch-icon', appleTouchIcon, 'image/png');
+  setOrAddLink('apple-touch-icon', appleTouchIcon, 'image/png', '180x180');
+  setOrAddLink('apple-touch-icon', appleTouchIcon, 'image/png', '167x167');
+  setOrAddLink('apple-touch-icon', appleTouchIcon, 'image/png', '152x152');
+  setOrAddLink('apple-touch-icon', appleTouchIcon, 'image/png', '120x120');
+
+  setOrAddLink('icon', favicon, 'image/png');
 })();

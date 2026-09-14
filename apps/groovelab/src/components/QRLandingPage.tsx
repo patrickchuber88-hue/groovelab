@@ -577,8 +577,14 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     const acquireWakeLock = async () => {
       if (!('wakeLock' in navigator)) return;
       try {
-        if (wakeLockRef.current) return;
-        wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+        if (wakeLockRef.current && !(wakeLockRef.current as any).released) return;
+        const sentinel = await (navigator as any).wakeLock.request('screen');
+        wakeLockRef.current = sentinel;
+        sentinel.onrelease = () => {
+          if (wakeLockRef.current === sentinel) {
+            wakeLockRef.current = null;
+          }
+        };
         console.log('[PWA] Screen WakeLock acquired for practice session');
       } catch (err) {
         console.warn('[PWA] WakeLock request failed:', err);

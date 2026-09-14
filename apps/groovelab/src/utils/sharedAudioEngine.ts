@@ -188,6 +188,55 @@ export class SharedAudioEngine {
   }
 
   /**
+   * Updates Apple iOS / Android Lock Screen Media Controls (W3C Media Session API)
+   */
+  public static setMediaSession(metadata: {
+    title: string;
+    artist?: string;
+    album?: string;
+    artwork?: Array<{ src: string; sizes?: string; type?: string }>;
+    onPlay?: () => void;
+    onPause?: () => void;
+    onSeekForward?: () => void;
+    onSeekBackward?: () => void;
+  } | null): void {
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return;
+
+    if (!metadata) {
+      navigator.mediaSession.metadata = null;
+      navigator.mediaSession.playbackState = 'none';
+      return;
+    }
+
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: metadata.title,
+        artist: metadata.artist || 'Campus-Groovelab',
+        album: metadata.album || 'GrooveLab Studio',
+        artwork: metadata.artwork || [
+          { src: '/pwa-icon.png', sizes: '512x512', type: 'image/png' }
+        ]
+      });
+
+      if (metadata.onPlay) {
+        navigator.mediaSession.setActionHandler('play', metadata.onPlay);
+      }
+      if (metadata.onPause) {
+        navigator.mediaSession.setActionHandler('pause', metadata.onPause);
+      }
+      if (metadata.onSeekForward) {
+        navigator.mediaSession.setActionHandler('seekforward', metadata.onSeekForward);
+      }
+      if (metadata.onSeekBackward) {
+        navigator.mediaSession.setActionHandler('seekbackward', metadata.onSeekBackward);
+      }
+      navigator.mediaSession.playbackState = 'playing';
+    } catch (e) {
+      console.warn('[SharedAudioEngine] Error updating mediaSession:', e);
+    }
+  }
+
+  /**
    * Closes and cleans up the active context if needed.
    */
   public static async close(): Promise<void> {

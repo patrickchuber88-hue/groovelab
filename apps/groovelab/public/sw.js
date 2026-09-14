@@ -74,8 +74,26 @@ self.addEventListener('activate', function(event) {
       );
     }).then(function() {
       return clients.claim();
+    }).then(function() {
+      // 🚀 Broadcast to all client windows that a new PWA version has activated
+      return clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+        clientList.forEach(function(client) {
+          client.postMessage({ type: 'PWA_UPDATED', version: CACHE_NAME });
+        });
+      });
     })
   );
+});
+
+self.addEventListener('message', function(event) {
+  if (event.data && event.data.action === 'skipWaiting') {
+    self.skipWaiting();
+  }
+  if (event.data && event.data.type === 'GET_VERSION') {
+    if (event.source) {
+      event.source.postMessage({ type: 'PWA_VERSION', version: CACHE_NAME });
+    }
+  }
 });
 
 self.addEventListener('push', function(event) {
@@ -243,20 +261,21 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
-  // Navigate mode (HTML documents) -> Network First with Cache Fallback (prevents PWA stale cache poisoning)
+  // Navigate mode (HTML documents) -> Network First with Snappy Cache Fallback (prevents PWA stale cache poisoning & cold launch freeze)
   if (event.request.mode === 'navigate') {
     event.respondWith(
       new Promise(function(resolve) {
         let hasResolved = false;
+        // 📱 Snappy 1200ms Apple-Level Mobile Network Timeout:
+        // If network takes longer than 1.2s, immediately fall back to cached shell to prevent blank freeze
         const networkTimeout = setTimeout(function() {
-          // If network takes longer than 2.5s, fall back to cached shell
           caches.match('/index.html').then(function(cached) {
             if (cached && !hasResolved) {
               hasResolved = true;
               resolve(cached);
             }
           });
-        }, 2500);
+        }, 1200);
 
         fetch(event.request)
           .then(function(networkResponse) {

@@ -874,6 +874,45 @@ function App() {
             setShowPwaUpdateToast(true);
           }
 
+          // 🚀 Real-time PWA Service Worker update detection
+          const handleSwMessage = (e: MessageEvent) => {
+            if (e.data?.type === 'PWA_UPDATED') {
+              console.log('[PWA] Received PWA_UPDATED notification:', e.data.version);
+              setShowPwaUpdateToast(true);
+            }
+          };
+          navigator.serviceWorker.addEventListener('message', handleSwMessage);
+
+          const handleControllerChange = () => {
+            console.log('[PWA] Service Worker controller changed.');
+            setShowPwaUpdateToast(true);
+          };
+          navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+
+          // Fast version checker via /version.json
+          const checkServerVersion = async () => {
+            try {
+              const res = await fetch('/version.json?t=' + Date.now(), { cache: 'no-store' });
+              if (res.ok) {
+                const data = await res.json();
+                const currentAppVer = sessionStorage.getItem('campus_app_loaded_version');
+                if (!currentAppVer) {
+                  sessionStorage.setItem('campus_app_loaded_version', data.version);
+                } else if (currentAppVer !== data.version) {
+                  console.log('[PWA] New server version detected via version.json:', data.version);
+                  setShowPwaUpdateToast(true);
+                }
+              }
+            } catch {}
+          };
+          checkServerVersion();
+          document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+              checkServerVersion();
+              reg.update().catch(() => {});
+            }
+          });
+
           // Register offline sync queue flusher on network restore
           window.addEventListener('online', () => {
             console.log('[OfflineSync] Network restored. Flushing offline queue...');
@@ -886,6 +925,7 @@ function App() {
               reg.update().catch((err) => {
                 console.warn('[PWA] Service Worker update check failed:', err);
               });
+              checkServerVersion();
               console.log('[PWA] Checking for updates on the server...');
             }
           }, 1000 * 60 * 5);
@@ -2625,6 +2665,26 @@ function App() {
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('groovelab_active_platform', activePlatform);
       localStorage.setItem('groovelab_active_platform', activePlatform);
+
+      // 📱 Axiom 32: Dynamic Theme-Color Synchronization for Apple Status Bar & PWA Shell
+      let targetThemeColor = '#34a853';
+      if (user && (user.role === 'admin' || user.role === 'secretary')) {
+        targetThemeColor = '#ea4335';
+      } else if (activePlatform === 'groovelab') {
+        targetThemeColor = '#eab308';
+      } else if (activePlatform === 'ensembles') {
+        targetThemeColor = '#3b82f6';
+      }
+
+      const metaTheme = document.querySelector('meta[name="theme-color"]');
+      if (metaTheme) {
+        metaTheme.setAttribute('content', targetThemeColor);
+      } else {
+        const newMeta = document.createElement('meta');
+        newMeta.name = 'theme-color';
+        newMeta.content = targetThemeColor;
+        document.head.appendChild(newMeta);
+      }
     }
     if (previousPlatform.current === activePlatform) {
       return;
@@ -2643,7 +2703,7 @@ function App() {
     }
     
     setActiveStudentTab(savedTab || fallbackTab);
-  }, [activePlatform]);
+  }, [activePlatform, user?.role]);
 
   // Safety Hook: Enforce that students in the Campus module can NEVER see the GrooveLab Live Lab tab.
   // If a student is on the 'campus' platform but the activeStudentTab is not a valid campus tab (e.g. 'live'),
@@ -8342,7 +8402,21 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
         {showPwaUpdateToast && (
           <Suspense fallback={null}>
             <PwaUpdateToast 
-              onUpdate={() => window.location.replace(window.location.pathname + '?reload_manual=1')}
+              onUpdate={async () => {
+                try {
+                  if ('caches' in window) {
+                    const keys = await caches.keys();
+                    await Promise.all(keys.map(k => caches.delete(k)));
+                  }
+                  if ('serviceWorker' in navigator) {
+                    const reg = await navigator.serviceWorker.getRegistration();
+                    if (reg && reg.waiting) {
+                      reg.waiting.postMessage({ action: 'skipWaiting' });
+                    }
+                  }
+                } catch {}
+                window.location.replace('/?v=' + Date.now());
+              }}
               onDismiss={() => setShowPwaUpdateToast(false)}
             />
           </Suspense>

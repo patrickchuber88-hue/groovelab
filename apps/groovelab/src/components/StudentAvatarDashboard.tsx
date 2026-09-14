@@ -5778,8 +5778,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         return;
       }
       try {
-        if (wakeLockRef.current) return;
-        wakeLockRef.current = await navigator.wakeLock.request('screen');
+        if (wakeLockRef.current && !(wakeLockRef.current as any).released) return;
+        const sentinel = await navigator.wakeLock.request('screen');
+        wakeLockRef.current = sentinel;
+        sentinel.onrelease = () => {
+          if (wakeLockRef.current === sentinel) {
+            wakeLockRef.current = null;
+          }
+        };
         setWakeLockFailed(false);
         console.log('Wake Lock acquired successfully');
       } catch (err) {
@@ -9473,10 +9479,28 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     const currentWeekNotes: string[] = [];
     const directAudioCandidates: Array<{ url: string; date?: string; label?: string; author?: string; duration?: number; idx?: number }> = [];
 
-    (progressItems || []).forEach((item: any) => {
+    // Resolve authoritative snapshot (current week or latest active past snapshot carried over)
+    const allSnapshotCandidates = (progressItems || []).filter((item: any) => item.topic_name?.startsWith('Hausaufgabe KW '));
+    const curWkNum = (currentWeekStr.split('-W')[1] || '').replace(/^0+/, '');
+    let resolvedSnapshot = allSnapshotCandidates.find((item: any) => {
       const itemW = getItemWeek(item);
-      const curWkNum = (currentWeekStr.split('-W')[1] || '').replace(/^0+/, '');
-      const isCurrentHwSnapshot = item.topic_name === `Hausaufgabe KW ${curWkNum}` || item.topic_name === `Hausaufgabe KW ${currentWeekStr.split('-W')[1] || ''}` || itemW === currentWeekStr;
+      return item.topic_name === `Hausaufgabe KW ${curWkNum}` || item.topic_name === `Hausaufgabe KW ${currentWeekStr.split('-W')[1] || ''}` || itemW === currentWeekStr;
+    });
+
+    if (!resolvedSnapshot && allSnapshotCandidates.length > 0) {
+      const sortedSnaps = [...allSnapshotCandidates].sort((a: any, b: any) => {
+        const wA = getItemWeek(a);
+        const wB = getItemWeek(b);
+        if (wA && wB && wA !== wB) return wB.localeCompare(wA);
+        const tA = new Date(a.updated_at || a.created_at || 0).getTime();
+        const tB = new Date(b.updated_at || b.created_at || 0).getTime();
+        return tB - tA;
+      });
+      resolvedSnapshot = sortedSnaps.find(s => s.is_current_homework) || sortedSnaps[0];
+    }
+
+    (progressItems || []).forEach((item: any) => {
+      const isCurrentHwSnapshot = resolvedSnapshot ? (item.id === resolvedSnapshot.id || item.topic_name === resolvedSnapshot.topic_name) : false;
       const isOtherActiveHw = Boolean(item.is_current_homework) && !item.topic_name?.startsWith('Hausaufgabe KW ');
       const isActive = isCurrentHwSnapshot || isOtherActiveHw;
 

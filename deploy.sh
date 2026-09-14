@@ -38,7 +38,7 @@ echo ""
 
 # 1. Sicherstellen, dass die Remote-Verzeichnisse existieren
 echo "📁 Remote-Verzeichnis & Backup-Ordner vorbereiten..."
-ssh "$SERVER" "mkdir -p $REMOTE_DIR && sudo mkdir -p /mnt/supabase_data/backups && sudo chown deployuser:deployuser /mnt/supabase_data/backups 2>/dev/null || true"
+ssh "$SERVER" "mkdir -p $REMOTE_DIR && sudo chown -R deployuser:deployuser $REMOTE_DIR 2>/dev/null && sudo mkdir -p /mnt/supabase_data/backups && sudo chown deployuser:deployuser /mnt/supabase_data/backups 2>/dev/null || true"
 
 # 2. Pre-Deploy Backup der Live-Datenbank auf dem 14 GB Volume erstellen (falls DB-Container existiert)
 echo "🛡️  Erstelle Pre-Deploy Backup auf dem 14 GB Volume (/mnt/supabase_data/backups)..."

@@ -19,6 +19,12 @@ import {
   Layers
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { storeBlob, getBlob, deleteBlob } from '../../utils/blobStorage';
+import {
+  uploadAudioWithIntegrityVerification,
+  buildCanonicalAudioStoragePath,
+  getSecureAudioUrl
+} from '../../utils/audioStorageHelper';
 import * as lamejs from '@breezystack/lamejs';
 import {
   processPureRawAudioBuffer,
@@ -937,8 +943,24 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         const ctx = audioContextRef.current;
         if (!ctx) return;
 
-        const response = await fetch(url);
-        const arrayBuffer = await response.arrayBuffer();
+        let arrayBuffer: ArrayBuffer | null = null;
+        try {
+          const localBlob = await getBlob(url);
+          if (localBlob) {
+            arrayBuffer = localBlob instanceof ArrayBuffer
+              ? localBlob
+              : await (localBlob as Blob).arrayBuffer();
+          }
+        } catch (e) {
+          console.warn("[Loopstation] IndexedDB read fallback:", e);
+        }
+
+        if (!arrayBuffer) {
+          const streamUrl = await getSecureAudioUrl(url, 'campus-assets');
+          const response = await fetch(streamUrl);
+          arrayBuffer = await response.arrayBuffer();
+        }
+
         const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
 
         const source = ctx.createBufferSource();
@@ -996,13 +1018,24 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         const prefixLen = originalStr.startsWith("AUDIO:") ? 6 : 5;
         const parts = originalStr.substring(prefixLen).split('|');
         const audioUrlString = parts[0];
-        if (audioUrlString && audioUrlString.startsWith("http")) {
-          const marker = '/storage/v1/object/public/campus-assets/';
-          const markerIndex = audioUrlString.indexOf(marker);
-          if (markerIndex !== -1) {
-            const filePath = audioUrlString.substring(markerIndex + marker.length);
-            console.log("Deleting loop audio file from storage:", filePath);
-            await supabase.storage.from('campus-assets').remove([filePath]);
+        if (audioUrlString) {
+          await deleteBlob(audioUrlString).catch(() => {});
+          if (audioUrlString.startsWith("http")) {
+            const publicMarker = '/storage/v1/object/public/campus-assets/';
+            const signMarker = '/storage/v1/object/sign/campus-assets/';
+            let filePath = '';
+            if (audioUrlString.includes(publicMarker)) {
+              filePath = audioUrlString.substring(audioUrlString.indexOf(publicMarker) + publicMarker.length);
+            } else if (audioUrlString.includes(signMarker)) {
+              const afterSign = audioUrlString.substring(audioUrlString.indexOf(signMarker) + signMarker.length);
+              filePath = afterSign.split('?')[0];
+            }
+            if (filePath) {
+              const cleanPath = decodeURIComponent(filePath);
+              await deleteBlob(cleanPath).catch(() => {});
+              console.log("Deleting loop audio file from storage:", cleanPath);
+              await supabase.storage.from('campus-assets').remove([cleanPath]);
+            }
           }
         }
       }
@@ -3174,25 +3207,62 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
         }
       }
 
-      const schoolPathPrefix = targetSchoolId ? `schools/${targetSchoolId}/` : '';
       const fileName = `${student.id}_loopmix_${Date.now()}.${fileExt}`;
-      const filePath = `${schoolPathPrefix}loops/${fileName}`;
+      const filePath = buildCanonicalAudioStoragePath(targetSchoolId, student.id, 'loops', fileName);
 
-      const { error } = await supabase.storage
-        .from('campus-assets')
-        .upload(filePath, mixBlob, { contentType, cacheControl: 'private, max-age=3600' });
+      // 🛡️ ZERO DATA LOSS: Sofort lokal in IndexedDB sichern
+      const localBlobKey = `local_loop_${Date.now()}_${fileName}`;
+      await storeBlob(localBlobKey, mixBlob).catch(() => {});
+      await storeBlob(filePath, mixBlob).catch(() => {});
 
-      if (error) throw error;
+      let resolvedCloudUrl = '';
+      try {
+        const uploadRes = await uploadAudioWithIntegrityVerification(
+          filePath,
+          mixBlob,
+          'campus-assets',
+          contentType
+        );
+        if (uploadRes && uploadRes.success && uploadRes.publicUrl) {
+          resolvedCloudUrl = uploadRes.publicUrl;
+          await storeBlob(resolvedCloudUrl, mixBlob).catch(() => {});
+        } else if (uploadRes?.error) {
+          console.warn('[Loopstation] Cloud upload notice (falling back to direct/local):', uploadRes.error);
+        }
+      } catch (uploadErr) {
+        console.warn('[Loopstation] Upload exception (fallback active):', uploadErr);
+      }
 
-      const publicUrl = supabase.storage.from('campus-assets').getPublicUrl(filePath).data.publicUrl;
+      if (!resolvedCloudUrl) {
+        // Fallback: Direct storage upload or fallback public url
+        try {
+          const { error: directErr } = await supabase.storage
+            .from('campus-assets')
+            .upload(filePath, mixBlob, { contentType, cacheControl: 'private, max-age=3600', upsert: true });
+          if (!directErr) {
+            resolvedCloudUrl = supabase.storage.from('campus-assets').getPublicUrl(filePath).data.publicUrl;
+            if (resolvedCloudUrl) {
+              await storeBlob(resolvedCloudUrl, mixBlob).catch(() => {});
+            }
+          } else {
+            console.warn('[Loopstation] Direct storage upload fallback notice:', directErr);
+          }
+        } catch (directStorageErr) {
+          console.warn('[Loopstation] Direct upload caught:', directStorageErr);
+        }
+      }
+
+      const finalAudioUrl = resolvedCloudUrl || supabase.storage.from('campus-assets').getPublicUrl(filePath).data.publicUrl || localBlobKey;
+      await storeBlob(finalAudioUrl, mixBlob).catch(() => {});
+
       const userRoleInSession = sessionStorage.getItem('groovelab_user_role') || localStorage.getItem('groovelab_user_role');
       const isStudentSession = userRoleInSession === 'student' || readOnly;
       const creatorRole = isStudentSession ? 'student' : 'teacher';
       const initialVisibility = isStudentSession ? 'private' : 'shared_with_teacher';
-      const audioMetaStr = `LOOP:${publicUrl}|${Math.round(masterLoopDuration / 1000)}|${new Date().toISOString()}|${sanitizedLabel}|${creatorRole}|${initialVisibility}`;
+      const audioMetaStr = `LOOP:${finalAudioUrl}|${Math.round(masterLoopDuration / 1000)}|${new Date().toISOString()}|${sanitizedLabel}|${creatorRole}|${initialVisibility}`;
 
       // 🎙️ UPDATE AUDIO-TRESOR STORAGE QUOTA (Consumes school storage_used_bytes)
-      if (targetSchoolId && mixBlob?.size) {
+      if (targetSchoolId && mixBlob?.size && resolvedCloudUrl) {
         try {
           const { data: schoolData } = await supabase
             .from('schools')
@@ -3227,11 +3297,15 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       await syncHomeworkNotes(updatedList);
       await fetchProgress();
       notifyHomeworkChange();
-      alert("Loop-Mix erfolgreich gespeichert!");
+      if (resolvedCloudUrl) {
+        alert("Loop-Mix erfolgreich im Campus-Groovelab Hausaufgabenheft gespeichert!");
+      } else {
+        alert("Loop-Mix erfolgreich lokal im Hausaufgabenheft gesichert! (Cloud-Synchronisation erfolgt automatisch)");
+      }
       setActiveSubTab('saved');
     } catch (err: any) {
       console.error("Export mix failed:", err);
-      alert(`Cloud-Speicherung im Campus-Groovelab Hausaufgabenheft fehlgeschlagen: ${err.message || err}`);
+      alert(`Hinweis zur Speicherung im Campus-Groovelab Hausaufgabenheft: ${err.message || err}`);
     } finally {
       setIsExporting(false);
     }

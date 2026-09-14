@@ -1444,10 +1444,26 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                     const currentWeekNotes: string[] = [];
                     const directAudioCandidates: Array<{ url: string; date?: string; label?: string; author?: string; duration?: number; idx?: number }> = [];
 
-                    (progressItems || []).forEach(item => {
+                    const allSnapshotCandidates = (progressItems || []).filter((item: any) => item.topic_name?.startsWith('Hausaufgabe KW '));
+                    const curWkNum = (currentWeekStr.split('-W')[1] || '').replace(/^0+/, '');
+                    let resolvedSnapshot = allSnapshotCandidates.find((item: any) => {
                       const itemW = getItemWeek(item);
-                      const curWkNum = (currentWeekStr.split('-W')[1] || '').replace(/^0+/, '');
-                      const isCurrentHwSnapshot = item.topic_name === `Hausaufgabe KW ${curWkNum}` || item.topic_name === `Hausaufgabe KW ${currentWeekStr.split('-W')[1] || ''}` || itemW === currentWeekStr;
+                      return item.topic_name === `Hausaufgabe KW ${curWkNum}` || item.topic_name === `Hausaufgabe KW ${currentWeekStr.split('-W')[1] || ''}` || itemW === currentWeekStr;
+                    });
+                    if (!resolvedSnapshot && allSnapshotCandidates.length > 0) {
+                      const sortedSnaps = [...allSnapshotCandidates].sort((a: any, b: any) => {
+                        const wA = getItemWeek(a);
+                        const wB = getItemWeek(b);
+                        if (wA && wB && wA !== wB) return wB.localeCompare(wA);
+                        const tA = new Date(a.updated_at || a.created_at || 0).getTime();
+                        const tB = new Date(b.updated_at || b.created_at || 0).getTime();
+                        return tB - tA;
+                      });
+                      resolvedSnapshot = sortedSnaps.find(s => s.is_current_homework) || sortedSnaps[0];
+                    }
+
+                    (progressItems || []).forEach(item => {
+                      const isCurrentHwSnapshot = resolvedSnapshot ? (item.id === resolvedSnapshot.id || item.topic_name === resolvedSnapshot.topic_name) : false;
                       const isOtherActiveHw = Boolean(item.is_current_homework) && !item.topic_name?.startsWith('Hausaufgabe KW ');
                       const isActive = isCurrentHwSnapshot || isOtherActiveHw;
 
@@ -4632,9 +4648,25 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       const getNotesForWeek = (weekStr: string): string[] => {
                         const notes: string[] = [];
                         const wkNum = (weekStr.split('-W')[1] || '').replace(/^0+/, '');
-                        (progressItems || []).forEach(item => {
+                        const allSnaps = (progressItems || []).filter(item => item.topic_name?.startsWith('Hausaufgabe KW '));
+                        let activeSnap = allSnaps.find(item => {
                           const itemW = getItemWeek(item);
-                          const isThisWeekSnapshot = item.topic_name === `Hausaufgabe KW ${wkNum}` || item.topic_name === `Hausaufgabe KW ${weekStr.split('-W')[1] || ''}` || itemW === weekStr;
+                          return item.topic_name === `Hausaufgabe KW ${wkNum}` || item.topic_name === `Hausaufgabe KW ${weekStr.split('-W')[1] || ''}` || itemW === weekStr;
+                        });
+                        if (!activeSnap && allSnaps.length > 0) {
+                          const sortedSnaps = [...allSnaps].sort((a: any, b: any) => {
+                            const wA = getItemWeek(a);
+                            const wB = getItemWeek(b);
+                            if (wA && wB && wA !== wB) return wB.localeCompare(wA);
+                            const tA = new Date(a.updated_at || a.created_at || 0).getTime();
+                            const tB = new Date(b.updated_at || b.created_at || 0).getTime();
+                            return tB - tA;
+                          });
+                          activeSnap = sortedSnaps.find(s => s.is_current_homework) || sortedSnaps[0];
+                        }
+
+                        (progressItems || []).forEach(item => {
+                          const isThisWeekSnapshot = activeSnap ? (item.id === activeSnap.id || item.topic_name === activeSnap.topic_name) : false;
                           const isOtherActiveHw = Boolean(item.is_current_homework) && !item.topic_name?.startsWith('Hausaufgabe KW ');
                           const isActive = isThisWeekSnapshot || isOtherActiveHw;
                           if (isActive && item.homework_notes && item.homework_notes.trim()) {
@@ -5399,6 +5431,22 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                       </span>
                                     </div>
                                   ))}
+
+                                  {/* 🎧 Unterrichtsaufnahmen Audio Track Carousel */}
+                                  {audioTracks.length > 0 && (
+                                    <div style={{
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '8px',
+                                      paddingTop: (formattedActiveBooks.length > 0 || otherActiveHWItems.length > 0) ? '4px' : '0'
+                                    }}>
+                                      <div style={{ fontSize: '0.74rem', fontWeight: 900, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <Headphones size={13} />
+                                        <span>Unterrichtsaufnahmen ({audioTracks.length})</span>
+                                      </div>
+                                      <AudioTrackCarousel tracks={audioTracks} isTeacher={false} readOnly={true} />
+                                    </div>
+                                  )}
 
                                   {/* Zusätzliche Bemerkung / Notizen */}
                                   {generalNotesList && generalNotesList.length > 0 && (
@@ -6741,9 +6789,25 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       const getNotesForWeek = (weekStr: string): string[] => {
                         const notes: string[] = [];
                         const wkNum = (weekStr.split('-W')[1] || '').replace(/^0+/, '');
-                        (progressItems || []).forEach(item => {
+                        const allSnaps = (progressItems || []).filter(item => item.topic_name?.startsWith('Hausaufgabe KW '));
+                        let activeSnap = allSnaps.find(item => {
                           const itemW = getItemWeek(item);
-                          const isThisWeekSnapshot = item.topic_name === `Hausaufgabe KW ${wkNum}` || item.topic_name === `Hausaufgabe KW ${weekStr.split('-W')[1] || ''}` || itemW === weekStr;
+                          return item.topic_name === `Hausaufgabe KW ${wkNum}` || item.topic_name === `Hausaufgabe KW ${weekStr.split('-W')[1] || ''}` || itemW === weekStr;
+                        });
+                        if (!activeSnap && allSnaps.length > 0) {
+                          const sortedSnaps = [...allSnaps].sort((a: any, b: any) => {
+                            const wA = getItemWeek(a);
+                            const wB = getItemWeek(b);
+                            if (wA && wB && wA !== wB) return wB.localeCompare(wA);
+                            const tA = new Date(a.updated_at || a.created_at || 0).getTime();
+                            const tB = new Date(b.updated_at || b.created_at || 0).getTime();
+                            return tB - tA;
+                          });
+                          activeSnap = sortedSnaps.find(s => s.is_current_homework) || sortedSnaps[0];
+                        }
+
+                        (progressItems || []).forEach(item => {
+                          const isThisWeekSnapshot = activeSnap ? (item.id === activeSnap.id || item.topic_name === activeSnap.topic_name) : false;
                           const isOtherActiveHw = Boolean(item.is_current_homework) && !item.topic_name?.startsWith('Hausaufgabe KW ');
                           const isActive = isThisWeekSnapshot || isOtherActiveHw;
                           if (isActive && item.homework_notes && item.homework_notes.trim()) {
@@ -7512,6 +7576,22 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                       </span>
                                     </div>
                                   ))}
+
+                                  {/* 🎧 Unterrichtsaufnahmen Audio Track Carousel */}
+                                  {audioTracks.length > 0 && (
+                                    <div style={{
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: '8px',
+                                      paddingTop: (formattedActiveBooks.length > 0 || otherActiveHWItems.length > 0) ? '4px' : '0'
+                                    }}>
+                                      <div style={{ fontSize: '0.74rem', fontWeight: 900, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <Headphones size={13} />
+                                        <span>Unterrichtsaufnahmen ({audioTracks.length})</span>
+                                      </div>
+                                      <AudioTrackCarousel tracks={audioTracks} isTeacher={false} readOnly={true} />
+                                    </div>
+                                  )}
 
                                   {/* Zusätzliche Bemerkung / Notizen */}
                                   {generalNotesList && generalNotesList.length > 0 && (

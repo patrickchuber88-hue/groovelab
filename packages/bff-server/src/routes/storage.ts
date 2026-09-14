@@ -32,7 +32,11 @@ const ALLOWED_CONTEXTS = new Set([
   'audio',
   'meisterwerk',
   'avatars',
-  'feed-attachments'
+  'feed-attachments',
+  'homework',
+  'practice_companion',
+  'media',
+  'band-media'
 ]);
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024; // 25 MB strict upper limit
@@ -43,6 +47,7 @@ interface PresignUploadRequest {
   contentType: string;
   sizeBytes: number;
   schoolId?: string | null;
+  studentId?: string | null;
   uniqueId?: string | null;
   bucket?: string;
 }
@@ -86,6 +91,7 @@ router.post('/presign-upload', async (req: Request, res: Response) => {
       contentType = 'audio/webm',
       sizeBytes = 0,
       schoolId = null,
+      studentId = null,
       uniqueId = null,
       bucket = 'campus-assets'
     }: PresignUploadRequest = req.body;
@@ -127,11 +133,18 @@ router.post('/presign-upload', async (req: Request, res: Response) => {
     const cleanExt = sanitizePathSegment(extension, 'webm');
     const cleanUniqueId = sanitizePathSegment(uniqueId, `${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
     const cleanSchoolId = sanitizePathSegment(schoolId, '');
+    const cleanStudentId = sanitizePathSegment(studentId, '');
 
-    // Canonical Campus-Groovelab storage path
-    const storagePath = cleanSchoolId
-      ? `schools/${cleanSchoolId}/${cleanContext}/${cleanUniqueId}.${cleanExt}`
-      : `${cleanContext}/${cleanUniqueId}.${cleanExt}`;
+    // Canonical Campus-Groovelab storage path:
+    // schools/<schoolId>/students/<studentId>/<context>/<uniqueId>.<ext> or schools/<schoolId>/<context>/<uniqueId>.<ext>
+    let storagePath: string;
+    if (cleanSchoolId && cleanStudentId) {
+      storagePath = `schools/${cleanSchoolId}/students/${cleanStudentId}/${cleanContext}/${cleanUniqueId}.${cleanExt}`;
+    } else if (cleanSchoolId) {
+      storagePath = `schools/${cleanSchoolId}/${cleanContext}/${cleanUniqueId}.${cleanExt}`;
+    } else {
+      storagePath = `${cleanContext}/${cleanUniqueId}.${cleanExt}`;
+    }
 
     // 5. Generate authenticated storage client
     const signingKey = accessToken || supabaseServiceRoleKey;
