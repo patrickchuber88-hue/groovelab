@@ -8494,6 +8494,22 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         return [finalItem, ...remaining];
       });
 
+      // Optimistic update of activeSongSkills
+      setActiveSongSkills(prev => (prev || []).map(s => {
+        if (s.id === skillId || s.song_id === skill?.song_id || (skill?.songs?.id && s.song_id === skill.songs.id)) {
+          return {
+            ...s,
+            is_current_homework: targetHomework,
+            homework_notes: noteToSave,
+            teacher_notes: teacherNoteToSave,
+            status: targetStatus,
+            is_stage_ready: targetStatus === 'MASTERED',
+            progress_percent: skillPercent
+          };
+        }
+        return s;
+      }));
+
       // Automatically award +100 Campus-XP when a song is freshly marked as 100% MASTERED
       if (targetStatus === 'MASTERED' || skillPercent === 100) {
         const songXpKey = `xp_awarded_song_${student.id}_${skillId || songTitle}`;

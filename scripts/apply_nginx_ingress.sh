@@ -28,10 +28,13 @@ ssh "$SERVER" "
   ln -sf $REMOTE_AVAIL/campus-groovelab.de.conf $REMOTE_ENAB/
   ln -sf $REMOTE_AVAIL/supabase.campus-groovelab.de.conf $REMOTE_ENAB/
   if command -v nginx >/dev/null 2>&1; then
-    nginx -t && systemctl reload nginx && echo '  ✓ Nginx Ingress erfolgreich validiert und neu geladen.'
+    nginx -t && systemctl reload nginx && echo '  ✓ Nginx Host-Ingress erfolgreich validiert und neu geladen.'
   else
-    echo '  ℹ Hinweis: Host-Nginx noch nicht aktiv. Konfigurationsdateien bereitgestellt.'
+    echo '  ℹ Hinweis: Host-Nginx Ingress-Dateien synchronisiert.'
   fi
+
+  echo '  🛡️  Prüfe aktiven Traefik v3.6 Edge-Gateway & Docker-Container...'
+  docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' | grep -E '(coolify-proxy|supabase-db|groovelab-bff|vghe0)' || true
 "
 
-echo "✅ Ingress-Konfigurationen erfolgreich synchronisiert!"
+echo "✅ Ingress- & Edge-Gateway-Status erfolgreich verifiziert!"

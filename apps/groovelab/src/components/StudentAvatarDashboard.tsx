@@ -264,6 +264,9 @@ const sanitizeTextInput = (text: string | null | undefined): string => {
   return String(text).trim();
 };
 
+const cleanTitle = (t: string | null | undefined): string =>
+  (t || '').replace(/\s*\((gitarre|guitar|e-gitarre|bass|e-bass|drums|schlagzeug|klavier|piano|keys|keyboard|vocals|gesang|stimme|allgemein)\)/i, '');
+
 export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab, onTabChange, onProfileUpdate }: StudentAvatarDashboardProps) {
   const [studentUser, setStudentUser] = useState<any>(() => initialUser || null);
   const currentPlatform: 'campus' | 'groovelab' = parentActiveTab === 'campus' ? 'campus' : (parentActiveTab === 'groovelab' ? 'groovelab' : ((typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'campus') === 'groovelab' ? 'groovelab' : 'campus'));
@@ -6749,24 +6752,27 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     // 4. Unpack SNAPSHOT_SONGS from progressItems snapshots (Fail-Safe Server Hydration)
     (progressItems || []).forEach((item: any) => {
       if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return;
-      const rawNotes = item.homework_notes;
+      const rawNotes = item.homework_notes || item.teacher_notes;
       if (!rawNotes) return;
       let parsedNotes: any = null;
       try {
         parsedNotes = typeof rawNotes === 'string' ? JSON.parse(rawNotes) : rawNotes;
       } catch {}
       if (!Array.isArray(parsedNotes)) {
-        if (typeof rawNotes === 'string' && rawNotes.startsWith('SNAPSHOT_SONGS:')) {
+        if (typeof rawNotes === 'string' && rawNotes.includes('SNAPSHOT_SONGS:')) {
           parsedNotes = [rawNotes];
         } else {
           return;
         }
       }
-      const snapSongEntry = parsedNotes.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_SONGS:'));
+      const snapSongEntry = parsedNotes.find((n: any) => typeof n === 'string' && n.includes('SNAPSHOT_SONGS:'));
       if (snapSongEntry) {
         try {
-          const rawJson = snapSongEntry.substring('SNAPSHOT_SONGS:'.length);
-          const parsedSongs = JSON.parse(rawJson);
+          const sIdx = snapSongEntry.indexOf('SNAPSHOT_SONGS:');
+          const after = snapSongEntry.slice(sIdx + 'SNAPSHOT_SONGS:'.length);
+          const endIdx = after.search(/\n\n--- [A-Z_]+ ---|\n\nSNAPSHOT_/);
+          const jsonStr = (endIdx !== -1 ? after.slice(0, endIdx) : after).trim();
+          const parsedSongs = JSON.parse(jsonStr);
           if (Array.isArray(parsedSongs)) {
             parsedSongs.forEach((song: any) => {
               const sTitle = song.topic_name || song.title || '';
@@ -7064,7 +7070,20 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
               songList.forEach((song: any) => {
                 const sTitle = (song.title || song.topic_name || '').trim();
-                if (sTitle && !loadedProgress.some((p: any) => (p.topic_name || p.title || '').toLowerCase() === sTitle.toLowerCase())) {
+                if (!sTitle) return;
+                const existing = loadedProgress.find((p: any) => (p.topic_name || p.title || '').trim().toLowerCase() === sTitle.toLowerCase());
+                if (existing) {
+                  existing.is_current_homework = true;
+                  if (song.homework_notes || song.notes || song.note) {
+                    existing.homework_notes = song.homework_notes || song.notes || song.note;
+                  }
+                  if (song.teacher_notes) {
+                    existing.teacher_notes = song.teacher_notes;
+                  }
+                  if (song.status) {
+                    existing.status = song.status;
+                  }
+                } else {
                   loadedProgress.push({
                     id: song.id || `snapshot-song-${Date.now()}-${Math.random()}`,
                     student_id: targetId,
@@ -7084,6 +7103,33 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             extractSongsFromSnapshot(item.teacher_notes);
           }
         });
+
+        // 🛡️ Fail-Safe: Ensure activeSongSkills also reflects homework songs from loadedProgress
+        if (loadedSkills && loadedSkills.length > 0) {
+          loadedProgress.forEach((p: any) => {
+            if (p.is_current_homework && (p.topic_name || p.title)) {
+              const pNorm = (p.topic_name || p.title || '').trim().toLowerCase();
+              const pClean = cleanTitle(pNorm.replace(/\s*\([^)]*\)\s*$/, ''));
+              const matchSkill = loadedSkills.find((s: any) => {
+                const sTitle = (s.songs?.title || s.title || s.song_title || '').trim().toLowerCase();
+                const sArtist = (s.songs?.artist || s.artist || '').trim().toLowerCase();
+                const sFull = sArtist ? `${sArtist} - ${sTitle}` : sTitle;
+                return sTitle === pNorm || 
+                       sFull === pNorm || 
+                       cleanTitle(sTitle) === pClean || 
+                       cleanTitle(sFull) === pClean ||
+                       pNorm.includes(sTitle) || 
+                       (sArtist && pNorm.includes(sArtist) && pNorm.includes(sTitle));
+              });
+              if (matchSkill) {
+                matchSkill.is_current_homework = true;
+                if (p.homework_notes) matchSkill.homework_notes = p.homework_notes;
+                if (p.teacher_notes) matchSkill.teacher_notes = p.teacher_notes;
+              }
+            }
+          });
+          setActiveSongSkills([...loadedSkills]);
+        }
 
         setProgressItems(loadedProgress);
 
@@ -9276,17 +9322,56 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       }
     });
 
+    // Also check assignedCampusSongs
+    (assignedCampusSongs || []).forEach((cSong: any) => {
+      const localHw = effectiveId ? (localStorage.getItem(`song_hw_${effectiveId}_${cSong.id}`) ??
+                      (cSong.song_id ? localStorage.getItem(`song_hw_${effectiveId}_${cSong.song_id}`) : null) ??
+                      (cSong.songs?.id ? localStorage.getItem(`song_hw_${effectiveId}_${cSong.songs.id}`) : null)) : null;
+      const isHw = (localHw === 'true') || (localHw !== 'false' && (Boolean(cSong.is_current_homework) || Boolean(cSong.homework_notes) || Boolean(cSong.teacher_notes)));
+
+      if (isHw) {
+        const songArtist = cSong.songs?.artist || cSong.artist || '';
+        const songTitle = cSong.songs?.title || cSong.title || cSong.song_title || 'Song';
+        if (songTitle.includes(' - Seite ') || songTitle.startsWith('Hausaufgabe KW ')) return;
+        const songInstrument = cSong.instrument ? ` (${cSong.instrument})` : '';
+        const fullTitle = songArtist ? `${songArtist} - ${songTitle}${songInstrument}` : `${songTitle}${songInstrument}`;
+        const cleanT = cleanTitle(fullTitle);
+
+        if (cleanT && !otherActiveSongs.some(existing => cleanTitle((existing.topic_name || existing.title || '').replace(/\s*\([^)]*\)\s*$/, '')) === cleanT)) {
+          let cleanNote = (effectiveId ? (localStorage.getItem(`song_note_${effectiveId}_${cSong.id}`) ||
+                           (cSong.song_id ? localStorage.getItem(`song_note_${effectiveId}_${cSong.song_id}`) : '') ||
+                           (cSong.songs?.id ? localStorage.getItem(`song_note_${effectiveId}_${cSong.songs.id}`) : '')) : '') ||
+                           cSong.homework_notes || cSong.teacher_notes || '';
+          if (typeof cleanNote === 'string' && (cleanNote.startsWith('[') || cleanNote.startsWith('{'))) {
+            try {
+              const parsed = JSON.parse(cleanNote);
+              if (Array.isArray(parsed)) {
+                cleanNote = parsed.filter((n: string) => typeof n === 'string' && !n.startsWith('AUDIO:') && !n.startsWith('STICKER:') && !n.toLowerCase().startsWith('latency:') && !n.startsWith('LOOP:') && !n.startsWith('SYSTEM:') && !n.startsWith('STUDENT_NOTE_PUBLIC:') && !n.startsWith('STUDENT_NOTE_PRIVATE:')).join(' ');
+              }
+            } catch {}
+          }
+          cleanNote = String(cleanNote).replace(/.*(STUDENT_NOTE_PUBLIC|STUDENT_NOTE_PRIVATE):[^|]*\|/, '').replace(/^❓\s*Frage für den Unterricht:\s*/i, '').trim();
+
+          otherActiveSongs.push({
+            id: cSong.id,
+            song_id: cSong.song_id || cSong.songs?.id,
+            topic_name: fullTitle,
+            title: fullTitle,
+            is_current_homework: true,
+            status: 'IN_PROGRESS',
+            homework_notes: cleanNote
+          });
+        }
+      }
+    });
+
     // 🔄 Snapshot Hydration for Junior Summary
     if (Object.keys(activeJuniorBooksMap).length === 0 || otherActiveSongs.length === 0) {
-      const allSnapshotCandidates = (progressItems || []).filter((item: any) => {
-        if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
-        const itWeekIso = getItemWeek(item);
-        return itWeekIso && itWeekIso <= currentWeekStr;
-      });
+      const allSnapshotCandidates = (progressItems || []).filter((item: any) => item.topic_name?.startsWith('Hausaufgabe KW '));
       allSnapshotCandidates.sort((a: any, b: any) => {
         const wA = getItemWeek(a);
         const wB = getItemWeek(b);
-        if (wA !== wB) return (wB || '').localeCompare(wA || '');
+        if (wA && wB && wA !== wB) return wB.localeCompare(wA);
         const tA = new Date(a.updated_at || a.created_at || 0).getTime();
         const tB = new Date(b.updated_at || b.created_at || 0).getTime();
         return tB - tA;
@@ -9300,7 +9385,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           parsedSnapNotes = typeof rawNotes === 'string' ? JSON.parse(rawNotes) : rawNotes;
         } catch {}
         if (!Array.isArray(parsedSnapNotes)) {
-          if (typeof rawNotes === 'string' && rawNotes.startsWith('SNAPSHOT_')) {
+          if (typeof rawNotes === 'string' && rawNotes.includes('SNAPSHOT_')) {
             parsedSnapNotes = [rawNotes];
           } else {
             continue;
@@ -9308,11 +9393,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         }
 
         if (Object.keys(activeJuniorBooksMap).length === 0) {
-          const snapLwEntry = parsedSnapNotes.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_LEHRWERKE:'));
+          const snapLwEntry = parsedSnapNotes.find((n: any) => typeof n === 'string' && n.includes('SNAPSHOT_LEHRWERKE:'));
           if (snapLwEntry) {
             try {
-              const rawJson = snapLwEntry.substring('SNAPSHOT_LEHRWERKE:'.length);
-              const parsedLw = JSON.parse(rawJson);
+              const sIdx = snapLwEntry.indexOf('SNAPSHOT_LEHRWERKE:');
+              const after = snapLwEntry.slice(sIdx + 'SNAPSHOT_LEHRWERKE:'.length);
+              const endIdx = after.search(/\n\n--- [A-Z_]+ ---|\n\nSNAPSHOT_/);
+              const jsonStr = (endIdx !== -1 ? after.slice(0, endIdx) : after).trim();
+              const parsedLw = JSON.parse(jsonStr);
               if (Array.isArray(parsedLw) && parsedLw.length > 0) {
                 parsedLw.forEach((lw: any) => {
                   const title = cleanTitle(lw.title || '');
@@ -9335,11 +9423,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         }
 
         if (otherActiveSongs.length === 0) {
-          const snapSongEntry = parsedSnapNotes.find((n: any) => typeof n === 'string' && n.startsWith('SNAPSHOT_SONGS:'));
+          const snapSongEntry = parsedSnapNotes.find((n: any) => typeof n === 'string' && n.includes('SNAPSHOT_SONGS:'));
           if (snapSongEntry) {
             try {
-              const rawJson = snapSongEntry.substring('SNAPSHOT_SONGS:'.length);
-              const parsedSongs = JSON.parse(rawJson);
+              const sIdx = snapSongEntry.indexOf('SNAPSHOT_SONGS:');
+              const after = snapSongEntry.slice(sIdx + 'SNAPSHOT_SONGS:'.length);
+              const endIdx = after.search(/\n\n--- [A-Z_]+ ---|\n\nSNAPSHOT_/);
+              const jsonStr = (endIdx !== -1 ? after.slice(0, endIdx) : after).trim();
+              const parsedSongs = JSON.parse(jsonStr);
               if (Array.isArray(parsedSongs) && parsedSongs.length > 0) {
                 parsedSongs.forEach((song: any) => {
                   const tName = cleanTitle(song.topic_name || song.title || '');
@@ -9347,7 +9438,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                     otherActiveSongs.push({
                       ...song,
                       topic_name: tName,
-                      title: tName
+                      title: tName,
+                      is_current_homework: true
                     });
                   }
                 });
@@ -9493,48 +9585,45 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       }
     });
 
-    // 🌉 Smart Audio Bridge: Bridge active practice tracks from latest past lesson if current week has none
+    // 🌉 Smart Audio Bridge: Bridge active practice tracks from latest snapshot or progressItems if current week has none
     if (audioTracks.length === 0) {
-      const pastHwSnapshots = (progressItems || []).filter((item: any) => {
-        if (!item.topic_name?.startsWith('Hausaufgabe KW ')) return false;
-        const itWeekIso = getItemWeek(item);
-        return itWeekIso && itWeekIso < currentWeekStr;
-      });
-      pastHwSnapshots.sort((a: any, b: any) => {
+      const allAudioSnapshots = (progressItems || []).filter((item: any) => item.topic_name?.startsWith('Hausaufgabe KW '));
+      allAudioSnapshots.sort((a: any, b: any) => {
         const wA = getItemWeek(a);
         const wB = getItemWeek(b);
-        if (wA !== wB) return (wB || '').localeCompare(wA || '');
+        if (wA && wB && wA !== wB) return wB.localeCompare(wA);
         const tA = new Date(a.updated_at || a.created_at || 0).getTime();
         const tB = new Date(b.updated_at || b.created_at || 0).getTime();
         return tB - tA;
       });
-      const latestPast = pastHwSnapshots[0];
-      if (latestPast) {
-        if (latestPast.recording_url && typeof latestPast.recording_url === 'string' && latestPast.recording_url.trim()) {
+
+      for (const snap of allAudioSnapshots) {
+        if (snap.recording_url && typeof snap.recording_url === 'string' && snap.recording_url.trim()) {
           audioTracks.push({
-            url: latestPast.recording_url.trim(),
+            url: snap.recording_url.trim(),
             duration: 0,
-            date: latestPast.updated_at || latestPast.created_at,
-            label: latestPast.topic_name || 'Aufnahme #1',
+            date: snap.updated_at || snap.created_at,
+            label: snap.topic_name || 'Aufnahme #1',
             author: 'teacher',
             isCarriedOver: true,
-            idx: 0
+            idx: audioTracks.length
           });
         }
-        const pastNotesStr = latestPast.homework_notes || latestPast.teacher_notes;
-        if (pastNotesStr) {
+        const snapNotesStr = snap.homework_notes || snap.teacher_notes;
+        if (snapNotesStr) {
           try {
-            const parsed = typeof pastNotesStr === 'string' ? JSON.parse(pastNotesStr) : pastNotesStr;
+            const parsed = typeof snapNotesStr === 'string' && (snapNotesStr.startsWith('[') || snapNotesStr.startsWith('{')) ? JSON.parse(snapNotesStr) : (Array.isArray(snapNotesStr) ? snapNotesStr : [snapNotesStr]);
             if (Array.isArray(parsed)) {
-              parsed.forEach((item: string, index: number) => {
-                if (typeof item === 'string' && item.startsWith('AUDIO:')) {
-                  const parts = item.substring(6).split('|');
+              parsed.forEach((item: any) => {
+                if (typeof item === 'string' && item.includes('AUDIO:')) {
+                  const cleanStr = item.startsWith('[') ? item.replace(/[\[\]"]/g, '') : item;
+                  const parts = cleanStr.substring(cleanStr.indexOf('AUDIO:') + 6).split('|');
                   if (!audioTracks.some(t => t.url === parts[0])) {
                     audioTracks.push({
                       url: parts[0],
                       duration: parseFloat(parts[1]) || 0,
                       date: parts[2],
-                      label: parts[3] || `Aufnahme #${audioTracks.length + 1}`,
+                      label: parts[3] || ('Aufnahme #' + (audioTracks.length + 1)),
                       author: parts[4] || 'teacher',
                       songTag: parts[7] || undefined,
                       isCarriedOver: true,
@@ -9546,6 +9635,52 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             }
           } catch {}
         }
+        if (audioTracks.length > 0) break;
+      }
+
+      // Fallback: check any recording_url or AUDIO: in individual song / lehrwerk progress items
+      if (audioTracks.length === 0) {
+        (progressItems || []).forEach((item: any) => {
+          if (item.recording_url && typeof item.recording_url === 'string' && item.recording_url.trim()) {
+            if (!audioTracks.some(t => t.url === item.recording_url.trim())) {
+              audioTracks.push({
+                url: item.recording_url.trim(),
+                duration: 0,
+                date: item.updated_at || item.created_at,
+                label: item.topic_name || 'Aufnahme',
+                author: 'teacher',
+                isCarriedOver: true,
+                idx: audioTracks.length
+              });
+            }
+          }
+          const nStr = item.homework_notes || item.teacher_notes;
+          if (nStr && typeof nStr === 'string' && nStr.includes('AUDIO:')) {
+            try {
+              const parsed = nStr.startsWith('[') || nStr.startsWith('{') ? JSON.parse(nStr) : [nStr];
+              if (Array.isArray(parsed)) {
+                parsed.forEach((n: any) => {
+                  if (typeof n === 'string' && n.includes('AUDIO:')) {
+                    const cleanStr = n.startsWith('[') ? n.replace(/[\[\]"]/g, '') : n;
+                    const parts = cleanStr.substring(cleanStr.indexOf('AUDIO:') + 6).split('|');
+                    if (!audioTracks.some(t => t.url === parts[0])) {
+                      audioTracks.push({
+                        url: parts[0],
+                        duration: parseFloat(parts[1]) || 0,
+                        date: parts[2],
+                        label: parts[3] || ('Aufnahme #' + (audioTracks.length + 1)),
+                        author: parts[4] || 'teacher',
+                        songTag: parts[7] || undefined,
+                        isCarriedOver: true,
+                        idx: audioTracks.length
+                      });
+                    }
+                  }
+                });
+              }
+            } catch {}
+          }
+        });
       }
     }
 
@@ -9698,7 +9833,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       hasAnyHomework,
       isCarriedOverPlan
     };
-  }, [localProgress, lehrwerke, progressItems, activeSongSkills, studentId, studentUser]);
+  }, [localProgress, lehrwerke, progressItems, activeSongSkills, assignedCampusSongs, studentId, studentUser]);
 
   // 📖 Junior Mission Resolver: Verarbeitet Buch- & Song-Hausaufgaben kindgerecht ohne KW-Kauderwelsch
   const getJuniorMissionDetails = useCallback(() => {
@@ -13453,6 +13588,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       {/* Briefing Tab */}
       <StudentBriefingTab
         studentId={studentId}
+        assignedCampusSongs={assignedCampusSongs}
         DEFAULT_FOKUS_LEVELS={DEFAULT_FOKUS_LEVELS}
         activeSongSkills={activeSongSkills}
         activeTab={activeTab}
