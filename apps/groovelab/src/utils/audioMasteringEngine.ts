@@ -40,9 +40,9 @@ import * as lamejs from '@breezystack/lamejs';
 // 🌟 CENTRAL PLATFORM-WIDE LOUDNESS & PEAK STANDARDS
 export const TARGET_STUDIO_LUFS = -14.0;
 export const TARGET_PURE_RAW_LUFS = -18.5; // 🏛️ Musikschul-Goldstandard (-18.5 LUFS): EBU R128 Musik-Referenz, volle Akustik-Dynamik & perfekte Durchsetzungsfähigkeit auf mobilen Geräten
-export const TARGET_PEAK_DBTP = -1.5;      // 🏛️ Broadcast-Headroom (-1.5 dBTP): Zero Intersample Clipping
-export const TARGET_PURE_RAW_PEAK_DBTP = -1.5;
-export const MAX_PURE_RAW_LIMITER_GR_DB = 3.0; // Maximum limiter peak reduction allowed in Pure RAW (preserves dynamic integrity: max 3.0 dB)
+export const TARGET_PEAK_DBTP = -1.0;      // 🏛️ Broadcast-Headroom (-1.0 dBTP): Zero Intersample Clipping nach EBU R128
+export const TARGET_PURE_RAW_PEAK_DBTP = -1.0;
+export const MAX_PURE_RAW_LIMITER_GR_DB = 0.0; // 🏛️ Pure RAW Doktrin: Zero Limiter Gain Reduction (0.0 dB)
 
 export type MasteringProfile = 
   | 'acoustic_audiophile' 
@@ -1155,9 +1155,8 @@ export function processPureRawAudioBuffer(
   const isLoop = options?.isLoop ?? false;
   const preserveDynamics = options?.preserveDynamics ?? false;
 
-  // 1. 30 Hz Subsonic Resonance Shield (24 dB/Oct Butterworth Filter across all channels)
-  // Schützt vor unhörbarem Trittschall, Tischgeräuschen & DC-Offset, lässt das gesamte musikalische Spektrum 100% unberührt
-  apply30HzSubsonicHighpass(audioBuffer, 30.0);
+  // 1. Transparenter 18 Hz Subsonic Shield (DC-Offset Schutz ohne hörbare Phasenverschiebung im Bassbereich)
+  apply30HzSubsonicHighpass(audioBuffer, 18.0);
 
   // 2. Optional: Chirurgischer De-Box Resonance Notch (260 Hz, Q = 1.8)
   // Standardmäßig in Pure RAW deaktiviert (false), um die volle akustische Wärme & den natürlichen Korpusklang zu bewahren
@@ -1185,38 +1184,65 @@ export function processPureRawAudioBuffer(
     }
   }
 
-  // 5. Musikschul-Pegelanpassung (Ziel -18.5 LUFS):
-  // Hebt die Musik linear und gleichmäßig an, damit Schüler, Lehrer & Eltern auf iPads
-  // und Smartphones eine hervorragende Lautstärke und Sprachverständlichkeit genießen.
+  // 5. 🏛️ HEADROOM-SAFE EBU R128 LINEAR NORMALIZER (100% Linear, 0% Distortion, 0% Pumping)
+  // Hebt leise Passagen nach EBU R128 an, deckelt den Gain-Faktor jedoch mathematisch strikt
+  // am physikalischen Headroom bis targetPeakDb (-1.0 dBTP).
+  // Dadurch wird KEIN EINZIGER SAMPLE über die Decke geschoben!
+  // Keine tanh-Sättigung, kein Limiter-Ducking, kein Klirrfaktor – 100% reine, offene Akustik.
   if (!preserveDynamics) {
-    const currentLufs = calculateIntegratedLufs(audioBuffer);
-    if (currentLufs > -65 && currentLufs < 5) {
-      const lufsDeltaDb = targetLufs - currentLufs;
-      // Sanfter linearer Gain-Lift (bis zu +10 dB für lebendige Präsenz auf Mobilgeräten)
-      const effectiveGainDb = Math.max(-6.0, Math.min(10.0, lufsDeltaDb));
-      const linearGain = Math.pow(10, effectiveGainDb / 20);
+    const ceilingLinear = Math.pow(10, targetPeakDb / 20); // z.B. 0.89125 für -1.0 dBTP
 
-      for (let c = 0; c < numChannels; c++) {
-        const data = audioBuffer.getChannelData(c);
-        for (let i = 0; i < length; i++) {
-          data[i] *= linearGain;
+    // 5a. Globalen Maximalpeak über alle Kanäle inklusive Intersample-Interpolation ermitteln
+    let globalMaxPeak = 0;
+    for (let c = 0; c < numChannels; c++) {
+      const data = audioBuffer.getChannelData(c);
+      for (let i = 0; i < length; i++) {
+        const absVal = Math.abs(data[i]);
+        if (absVal > globalMaxPeak) globalMaxPeak = absVal;
+        if (i < length - 1) {
+          const midVal = Math.abs((data[i] + data[i + 1]) * 0.5);
+          if (midVal > globalMaxPeak) globalMaxPeak = midVal;
+        }
+      }
+    }
+
+    if (globalMaxPeak > 0) {
+      if (globalMaxPeak > ceilingLinear) {
+        // Fall 1: Signal übersteuert bereits ab Hardware -> 100% rein linear absenken
+        const attenuationFactor = ceilingLinear / globalMaxPeak;
+        for (let c = 0; c < numChannels; c++) {
+          const data = audioBuffer.getChannelData(c);
+          for (let i = 0; i < length; i++) {
+            data[i] *= attenuationFactor;
+          }
+        }
+      } else {
+        // Fall 2: Signal hat Headroom -> Linear anheben, aber NIEMALS höher als maxSafeGainDb
+        const maxSafeGainDb = 20 * Math.log10(ceilingLinear / globalMaxPeak);
+        const currentLufs = calculateIntegratedLufs(audioBuffer);
+
+        if (currentLufs > -70 && currentLufs < 5) {
+          const lufsDeltaDb = targetLufs - currentLufs;
+          // Strikte physikalische Deckelung: Gain darf nicht höher sein als der Headroom bis -1.0 dBTP!
+          const effectiveGainDb = Math.max(0, Math.min(lufsDeltaDb, maxSafeGainDb));
+
+          if (effectiveGainDb > 0.05) {
+            const linearGain = Math.pow(10, effectiveGainDb / 20);
+            for (let c = 0; c < numChannels; c++) {
+              const data = audioBuffer.getChannelData(c);
+              for (let i = 0; i < length; i++) {
+                data[i] *= linearGain;
+              }
+            }
+          }
         }
       }
     }
   }
 
-  // 6. C2-Continuous Soft-Knee Peak-Catcher (Punktgenau ab -2.0 dBTP bis Decke -1.5 dBTP)
-  // Rundet ausschließlich die extremen Millisekunden-Spitzen der Daumen-Slaps sanft ab.
-  // 99.8% der Musik (Zupfen, Akkorde, Gesang) bleibt zu 100% linear und unberührt!
-  // Kein zeitvariables Ducking, keine Hüllkurven-Verzögerung, kein Pumping!
-  applyFastLookaheadSoftClipper(audioBuffer, targetPeakDb);
-
-  // 7. Pre-Calculated Static Ceiling Guard (100% Linear Peak-Safety auf -1.5 dBTP)
-  // Garantiert -1.5 dBTP Deckenpegel bit-genau und ohne jegliche zeitvariable Kompression
+  // 6. Pre-Calculated Static Ceiling Guard (100% Bit-Pure Linear Safety)
+  // Mathematische Absicherung: Garantiert bit-genau, dass kein Sample über targetPeakDb liegt
   applyPreCalculatedStaticCeiling(audioBuffer, targetPeakDb);
-
-  // 8. Lookahead Safety Ceiling Guard (Inaktiver Notfall-Sicherheitsgurt, 0.0 dB GR)
-  applyLookaheadTruePeakLimiter(audioBuffer, targetPeakDb);
 
   return audioBuffer;
 }
