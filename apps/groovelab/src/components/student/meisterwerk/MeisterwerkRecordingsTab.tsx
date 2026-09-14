@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import {
   X, Check, BookOpen, Music, Plus, ChevronRight, ChevronDown, ChevronUp, Book, Star,
   Mic, Square, Play, Headphones, Calendar, Clock, ArrowLeft, Edit3, Search, Lock,
-  Share2, Sparkles, Filter, HelpCircle
+  Share2, Sparkles, Filter, HelpCircle, SlidersHorizontal
 } from 'lucide-react';
 import { harmonizeAudioList } from '../../../utils/audioNamingHelper';
 import { checkIsAudioTresorActive } from '../../../domain/stickersAndTresor';
+import { shouldDefaultToInputPad } from '../../../utils/instruments';
 import { getSimulatedNow } from '../studentDateUtils';
 import { parseSongArtistAndTitle, Student } from '../meisterwerk.types';
 import { InlineAudioPlayer, MechanicalMetronomeIcon } from './MeisterwerkAudioPlayers';
@@ -44,6 +45,8 @@ export interface MeisterwerkRecordingsTabProps {
   isMobileOrSim: boolean;
   isRecordingAudio: boolean;
   isRecordingMetronomeActive: boolean;
+  isRecordingPadActive?: boolean;
+  setIsRecordingPadActive?: React.Dispatch<React.SetStateAction<boolean>>;
   isSharingToPlaylist: boolean;
   isStudentWeekExpanded: boolean;
   isTeacherHomeworkExpanded: boolean;
@@ -142,6 +145,8 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
     isMobileOrSim,
     isRecordingAudio,
     isRecordingMetronomeActive,
+    isRecordingPadActive,
+    setIsRecordingPadActive,
     isSharingToPlaylist,
     isStudentWeekExpanded,
     isTeacherHomeworkExpanded,
@@ -205,6 +210,17 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
     topicName,
     useNotebookLayout
   } = props;
+
+  // 🎛️ Instrumenten-PAD State (-6 dB Dämpfung für dynamikstarke Instrumente / Slap-Transienten)
+  const [localPadActive, setLocalPadActive] = useState<boolean>(() => shouldDefaultToInputPad(props.student));
+  const effectivePadActive = isRecordingPadActive !== undefined ? isRecordingPadActive : localPadActive;
+  const handleTogglePad = () => {
+    if (setIsRecordingPadActive) {
+      setIsRecordingPadActive(prev => !prev);
+    } else {
+      setLocalPadActive(prev => !prev);
+    }
+  };
 
   const [duettModalData, setDuettModalData] = useState<{
     teacherUrl: string;
@@ -424,6 +440,32 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                       </span>
                       {!isRecordingAudio ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', position: 'relative' }}>
+                          {/* 🎛️ Instrumenten-PAD Button (-6 dB Dämpfung für Slap/Percussion) */}
+                          <button
+                            type="button"
+                            onClick={handleTogglePad}
+                            aria-label={effectivePadActive ? "Instrumenten-PAD aktiv (-6 dB Headroom-Dämpfung)" : "Instrumenten-PAD inaktiv (Standard 0 dB)"}
+                            title={effectivePadActive ? "PAD aktiv: -6 dB Headroom für dynamikstarke Instrumente / Slap-Gitarre" : "PAD: -6 dB Headroom-Dämpfung zuschalten"}
+                            style={{
+                              background: effectivePadActive ? '#0f172a' : '#f8fafc',
+                              border: effectivePadActive ? '1.5px solid #0f172a' : '1.5px solid #cbd5e1',
+                              color: effectivePadActive ? '#ffffff' : '#64748b',
+                              borderRadius: '10px',
+                              width: '32px',
+                              height: '32px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              flexShrink: 0,
+                              boxShadow: effectivePadActive ? '0 2px 8px rgba(15, 23, 42, 0.25)' : 'none',
+                              transition: 'all 0.15s ease'
+                            }}
+                            className="hover-scale-mini"
+                          >
+                            <SlidersHorizontal size={15} color={effectivePadActive ? '#ffffff' : '#64748b'} strokeWidth={effectivePadActive ? 2.4 : 2} />
+                          </button>
+
                           {/* ⏱️ Metronom / Klick Button */}
                           <button
                             type="button"
@@ -2263,6 +2305,32 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                                   </button>
                                 )}
 
+                                {/* 🎛️ Instrumenten-PAD Button (-6 dB Dämpfung für dynamikstarke Instrumente) */}
+                                <button
+                                  type="button"
+                                  onClick={handleTogglePad}
+                                  aria-label={effectivePadActive ? "Instrumenten-PAD aktiv (-6 dB Headroom-Dämpfung)" : "Instrumenten-PAD inaktiv (Standard 0 dB)"}
+                                  title={effectivePadActive ? "PAD aktiv: -6 dB Headroom für dynamikstarke Instrumente / Slap-Gitarre" : "PAD: -6 dB Headroom-Dämpfung zuschalten"}
+                                  style={{
+                                    background: effectivePadActive ? '#0f172a' : '#ffffff',
+                                    border: effectivePadActive ? '1.5px solid #0f172a' : '1.5px solid #cbd5e1',
+                                    color: effectivePadActive ? '#ffffff' : '#64748b',
+                                    borderRadius: '16px',
+                                    width: '52px',
+                                    height: '52px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    flexShrink: 0,
+                                    boxShadow: effectivePadActive ? '0 2px 8px rgba(15, 23, 42, 0.25)' : '0 1px 3px rgba(0,0,0,0.04)',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  className="hover-scale-mini"
+                                >
+                                  <SlidersHorizontal size={20} color={effectivePadActive ? '#ffffff' : '#64748b'} strokeWidth={effectivePadActive ? 2.4 : 2} />
+                                </button>
+
                                 {/* ⏱️ Metronom / Klick Button (52px) */}
                                 <button
                                   type="button"
@@ -2670,7 +2738,8 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                                   isCustomTitle: rec.isCustomTitle || (rec.source === 'practice_companion'),
                                   metronomeBpm: validatedBpm,
                                   original_url: rec.original_url || rec.originalUrl,
-                                  original_duration: rec.original_duration || rec.originalDuration
+                                  original_duration: rec.original_duration || rec.originalDuration,
+                                  waveformPeaks: rec.waveformPeaks
                                 });
                               }
                             });
@@ -2722,9 +2791,11 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                           <InlineAudioPlayer 
                             key={aud.id || aud.blobKey || aud.url || `shared-aud-${idx}`}
                             id={aud.id || aud.blobKey || aud.url}
+                            audioId={aud.id || aud.blobKey}
                             url={aud.url} 
                             label={aud.label} 
                             duration={aud.duration}
+                            waveformPeaks={aud.waveformPeaks}
                             date={aud.date}
                             isHero={idx === 0 || (Boolean(justRecordedAudioUrl) && (aud.url === justRecordedAudioUrl || aud.blobKey === justRecordedAudioUrl))}
                             contextBadge={aud.songTag}
@@ -2956,9 +3027,11 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                       <InlineAudioPlayer 
                         key={playerKey}
                         id={playerKey}
+                        audioId={aud.id || aud.blobKey}
                         url={aud.url} 
                         label={aud.label} 
                         duration={aud.duration}
+                        waveformPeaks={aud.waveformPeaks}
                         date={aud.date}
                         isHero={isHero || (Boolean(justRecordedAudioUrl) && (aud.url === justRecordedAudioUrl || aud.blobKey === justRecordedAudioUrl))}
                         contextBadge={aud.songTag}

@@ -1093,8 +1093,7 @@ export function AdminDashboard({
     isAdmin: boolean;
     instrument: string;
     photoUrl: string;
-    employment_type?: 'employed' | 'freelance';
-  }>({ firstName: '', lastName: '', isAdmin: false, instrument: '', photoUrl: '', employment_type: 'employed' });
+  }>({ firstName: '', lastName: '', isAdmin: false, instrument: '', photoUrl: '' });
 
   const op = schoolObj?.opening_hours || {};
   const teachersManageStudents = op.gl_setting_groovelab_teachers_manage_students === true;
@@ -3283,11 +3282,10 @@ export function AdminDashboard({
       last_name: newTeacher.lastName, 
       instrument: newTeacher.instrument || '',
       photo_url: isAdmOrSec ? '/campus_login_hero.png' : newTeacher.photoUrl,
-      employment_type: newTeacher.employment_type || 'employed',
       qr_token: crypto.randomUUID()
     }).select().single();
     if (error) alert('Fehler: ' + error.message);
-    else if (data) { setTeachers([...teachers, data]); setShowAddTeacher(false); setNewTeacher({ firstName: '', lastName: '', isAdmin: false, instrument: '', photoUrl: '', employment_type: 'employed' }); }
+    else if (data) { setTeachers([...teachers, data]); setShowAddTeacher(false); setNewTeacher({ firstName: '', lastName: '', isAdmin: false, instrument: '', photoUrl: '' }); }
   };
 
   const handleDeleteTeacher = async (id: string) => {
@@ -3340,8 +3338,7 @@ export function AdminDashboard({
       photo_url: isAdmOrSec ? '/campus_login_hero.png' : editingTeacher.photo_url,
       bio: editingTeacher.bio,
       expertise: editingTeacher.expertise,
-      bands: editingTeacher.bands,
-      employment_type: editingTeacher.employment_type || 'employed'
+      bands: editingTeacher.bands
     }).eq('id', editingTeacher.id);
     
     if (error) alert('Fehler: ' + error.message);

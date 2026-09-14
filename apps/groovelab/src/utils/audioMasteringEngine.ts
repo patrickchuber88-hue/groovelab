@@ -1142,6 +1142,8 @@ export function processPureRawAudioBuffer(
     preserveDynamics?: boolean;
     applyDeBoxNotch?: boolean;
     applySlapNotch?: boolean;
+    padActive?: boolean;
+    padDb?: number;
   }
 ): AudioBuffer {
   const sampleRate = audioBuffer.sampleRate;
@@ -1155,6 +1157,20 @@ export function processPureRawAudioBuffer(
   const isLoop = options?.isLoop ?? false;
   const preserveDynamics = options?.preserveDynamics ?? false;
 
+  // 0. 🎛️ INSTRUMENTEN-PAD (Headroom Dämpfung für dynamikstarke Instrumente / Slap-Transienten)
+  // Senkt den Eingangspegel um -6 dB (oder definiertes padDb) ab, um internen Headroom zu schaffen.
+  // Der nachfolgende EBU R128 Linear Normalizer hebt den Pegel anschließend verlustfrei auf -1.0 dBTP an.
+  const padDb = options?.padDb ?? (options?.padActive ? -6.0 : 0);
+  if (padDb < 0) {
+    const padGain = Math.pow(10, padDb / 20);
+    for (let c = 0; c < numChannels; c++) {
+      const data = audioBuffer.getChannelData(c);
+      for (let i = 0; i < length; i++) {
+        data[i] *= padGain;
+      }
+    }
+  }
+
   // 1. Transparenter 18 Hz Subsonic Shield (DC-Offset Schutz ohne hörbare Phasenverschiebung im Bassbereich)
   apply30HzSubsonicHighpass(audioBuffer, 18.0);
 
@@ -1165,9 +1181,10 @@ export function processPureRawAudioBuffer(
   }
 
   // 3. Optional: Chirurgischer Slap-Transient Tamer (3.400 Hz, Q = 2.4)
-  // Standardmäßig in Pure RAW deaktiviert (false), um 100% lebendige Transienten & Obertöne zu erhalten
-  if (options?.applySlapNotch === true) {
-    applySlapTransientNotch(audioBuffer, 3400.0, -1.0, 2.4);
+  // Bei aktivem Instrumenten-PAD automatisch aktiv (-1.5 dB), um aggressive Nahbesprechungs-Klicks abzufangen
+  const applySlapNotch = options?.applySlapNotch === true || (options?.padActive === true && options?.applySlapNotch !== false);
+  if (applySlapNotch) {
+    applySlapTransientNotch(audioBuffer, 3400.0, -1.5, 2.4);
   }
 
   // 4. 5ms Equal-Power Micro-Fades (Click/Pop prevention at boundaries)
@@ -1259,6 +1276,8 @@ export async function processPureRawBlob(
     isLoop?: boolean;
     applyDeBoxNotch?: boolean;
     applySlapNotch?: boolean;
+    padActive?: boolean;
+    padDb?: number;
   }
 ): Promise<{
   processedBlob: Blob;
@@ -1290,7 +1309,9 @@ export async function processPureRawBlob(
     maxLimiterGrDb: options?.maxLimiterGrDb ?? MAX_PURE_RAW_LIMITER_GR_DB,
     isLoop: options?.isLoop ?? false,
     applyDeBoxNotch: options?.applyDeBoxNotch ?? false,
-    applySlapNotch: options?.applySlapNotch ?? false
+    applySlapNotch: options?.applySlapNotch ?? false,
+    padActive: options?.padActive ?? false,
+    padDb: options?.padDb
   });
 
   const finalLufs = Math.round(calculateIntegratedLufs(decodedBuffer) * 10) / 10;

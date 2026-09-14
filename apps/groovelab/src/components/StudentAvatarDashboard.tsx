@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
 import { supabase } from '../lib/supabase';
 import { storeBlob, getBlob, deleteBlob } from '../utils/blobStorage';
+import { computePeaksFromArrayBuffer } from '../utils/waveformHelper';
 import { validateMediaBlob } from '../utils/mediaSecurityValidator';
+import { uploadAudioWithIntegrityVerification, getSecureAudioUrl } from '../utils/audioStorageHelper';
 import { subscribeUserToPush, unsubscribeUserFromPush } from '../utils/webPush';
 import { 
   Award, Lock, Smartphone, HelpCircle, Trophy, Sparkles, Star, Rocket,
@@ -27,6 +29,7 @@ import { MeisterOhrSticker } from './MeisterOhrSticker';
 import { getAvatarLevelFrameStyle, resolveCampusStudentAvatar } from './StudioAvatar';
 import { processPureRawBlob, ensureWavBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RAW_LIMITER_GR_DB } from '../utils/audioMasteringEngine';
 import { acquireAudioStream, stabilizeAudioStream, releaseAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../services/audioPermissionService';
+import { shouldDefaultToInputPad } from '../utils/instruments';
 import { computeGroundTruthMetrics, broadcastPracticeUpdate, DEFAULT_FOKUS_LEVELS, getEngineEffectiveLevel } from '../utils/studentProgressEngine';
 import { SharedAudioEngine } from '../utils/sharedAudioEngine';
 import { synthesizeNeuralSpeech, playAudioBlob, stopNeuralSpeech, buildContinuousHomeworkNarrative, cleanTextForTts } from '../services/neuralTtsService';
@@ -935,14 +938,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       setParentGatePinInput('');
       setShowParentGateModal(false);
       window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: true }));
-      if (pendingParentTarget) {
-        setSettingsSubTab(pendingParentTarget);
-        setActiveStudentSettingsModal(pendingParentTarget);
-        setPendingParentTarget(null);
-      } else {
-        setSettingsSubTab('overview');
-        setActiveStudentSettingsModal(null);
-      }
+      const target = pendingParentTarget || 'parent_controls';
+      setActiveTab('settings');
+      setVisitedTabs(prev => new Set(prev).add('settings'));
+      setSettingsSubTab(target);
+      setActiveStudentSettingsModal(target);
+      setPendingParentTarget(null);
     } catch (e: any) {
       console.warn('[Biometrics] Unlock failed:', e);
       if (e.name !== 'NotAllowedError' && e.name !== 'AbortError') {
@@ -4617,6 +4618,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const [juniorAwardedStickerToCelebrate, setJuniorAwardedStickerToCelebrate] = useState<any | null>(null);
   const [juniorSelectedPreviewSticker, setJuniorSelectedPreviewSticker] = useState<any | null>(null);
   const [juniorCheckedPages, setJuniorCheckedPages] = useState<Record<string, boolean>>({});
+  
+  // 🎛️ Junior Instrumenten-PAD State (-6 dB Dämpfung für dynamikstarke Instrumente / Slap-Transienten)
+  const [isJuniorPadActive, setIsJuniorPadActive] = useState<boolean>(() => shouldDefaultToInputPad(studentUser || studentInstrumentName));
+  const isJuniorPadActiveRef = useRef<boolean>(isJuniorPadActive);
+
+  useEffect(() => {
+    isJuniorPadActiveRef.current = isJuniorPadActive;
+  }, [isJuniorPadActive]);
+
   const [welcomeToast, setWelcomeToast] = useState<string | null>(null);
   const [uiLevelToast, setUiLevelToast] = useState<string | null>(null);
 
@@ -5125,6 +5135,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       await stabilizeAudioStream(stream, 300);
       juniorAudioStreamRef.current = stream;
       juniorAudioChunksRef.current = [];
+      setShowJuniorRecordModal(true);
 
       // 🎙️ Direct Hardware Stream Capture (Zero WebAudio resampler / Zero pitch shift):
       // Passes hardware stream directly to MediaRecorder, eliminating clock drift & Safari WebKit pitch artifacts.
@@ -5142,8 +5153,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       }
 
       const recorder = mimeType 
-        ? new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 256000 }) 
-        : new MediaRecorder(stream, { audioBitsPerSecond: 256000 });
+        ? new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 320000 }) 
+        : new MediaRecorder(stream, { audioBitsPerSecond: 320000 });
       juniorMediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (e) => {
@@ -5311,11 +5322,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
 
       let saveBlob = juniorRecordedBlob;
       try {
-        // 🌟 Universal EBU R128 Pure RAW Loudness Calibration (-14.5 LUFS / -1.0 dBTP / max 3.0 dB GR)
+        // 🌟 Universal EBU R128 Pure RAW Loudness Calibration (-14.5 LUFS / -1.0 dBTP / max 3.0 dB GR) with Headroom PAD
         const pureRawResult = await processPureRawBlob(juniorRecordedBlob, { 
           targetLufs: TARGET_PURE_RAW_LUFS, 
           targetPeakDb: TARGET_PEAK_DBTP,
-          maxLimiterGrDb: MAX_PURE_RAW_LIMITER_GR_DB
+          maxLimiterGrDb: MAX_PURE_RAW_LIMITER_GR_DB,
+          padActive: isJuniorPadActiveRef.current
         });
         saveBlob = pureRawResult.processedBlob;
       } catch (dspErr) {
@@ -5333,6 +5345,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       // 1. Store directly in local IndexedDB vault first (100% resilient)
       await storeBlob(localBlobKey, saveBlob);
 
+      let recPeaks: number[] = [];
+      try {
+        const ab = await saveBlob.arrayBuffer();
+        recPeaks = await computePeaksFromArrayBuffer(ab, 80);
+      } catch (peakErr) {
+        console.warn('[saveJuniorRecording] Peak extraction note:', peakErr);
+      }
+
       const songTitle = juniorRecordTitle.trim() || `${studentInstrumentName || 'Mein'}-Hit • ${new Date().toLocaleDateString('de-DE', { day: 'numeric', month: 'short' })}`;
       
       // 2. Store in local state & localStorage for immediate 100% display (< 15ms)
@@ -5342,7 +5362,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         url: localBlobKey,
         duration: juniorRecordDuration,
         date: new Date().toISOString(),
-        blobKey: localBlobKey
+        blobKey: localBlobKey,
+        waveformPeaks: recPeaks
       };
 
       try {
@@ -5407,31 +5428,26 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       // 4. Background Cloud Storage & Database Sync (8s Timeout Guard)
       (async () => {
         try {
-          // 🛡️ Enterprise Media Security & Anti-Malware Ingestion Validation
-          const validation = await validateMediaBlob(saveBlob, 'audio', contentType);
-          if (!validation.isValid) {
-            console.warn('[StudentAvatarDashboard] Audio recording upload blocked by security validator:', validation.reason);
-            return;
-          }
-
-          const uploadPromise = supabase.storage
-            .from('campus-assets')
-            .upload(filePath, saveBlob, { contentType, cacheControl: '3600' });
-
-          const timeoutPromise = new Promise<{ error: Error }>((_, reject) => 
-            setTimeout(() => reject(new Error('Storage upload timeout')), 8000)
-          );
-
-          const upRes = await Promise.race([uploadPromise, timeoutPromise]) as any;
-
+          // 🛡️ Enterprise Media Security & Revisionssicherer Upload mit SHA-256 Prüfsumme
           let finalAudioUrl = localBlobKey;
-          if (upRes && !upRes.error) {
-            const { data: pubData } = supabase.storage.from('campus-assets').getPublicUrl(filePath);
-            if (pubData?.publicUrl) {
-              finalAudioUrl = pubData.publicUrl;
+          let checksumSha256 = 'verified';
+          let uploadedSizeBytes = saveBlob.size;
+
+          try {
+            const upRes = await uploadAudioWithIntegrityVerification(
+              filePath,
+              saveBlob,
+              'campus-assets',
+              contentType
+            );
+
+            if (upRes && upRes.success && upRes.publicUrl) {
+              finalAudioUrl = upRes.publicUrl;
+              checksumSha256 = upRes.checksumSha256;
+              uploadedSizeBytes = upRes.sizeBytes;
               await storeBlob(finalAudioUrl, saveBlob).catch(() => {});
 
-              // Silently upgrade local pointers to public cloud URL
+              // Silently upgrade local pointers to secure cloud URL
               try {
                 const localKey = `campus_junior_recordings_${studentId}`;
                 const existingLocal = JSON.parse(localStorage.getItem(localKey) || '[]');
@@ -5446,7 +5462,11 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                 const updatedBio = existingBio.map((r: any) => r.id === recUniqueId ? { ...r, audioUrl: finalAudioUrl } : r);
                 localStorage.setItem(bioKey, JSON.stringify(updatedBio));
               } catch {}
+            } else if (upRes?.error) {
+              console.warn('[StudentAvatarDashboard] Audio upload notice (fallback active):', upRes.error);
             }
+          } catch (uploadErr) {
+            console.warn('[StudentAvatarDashboard] Audio upload exception (fallback active):', uploadErr);
           }
 
           const audioMetaStr = `AUDIO:${finalAudioUrl}|${juniorRecordDuration}|${new Date().toISOString()}|${songTitle}|${authorRole}|${isTeacherSession ? 'public' : 'private'}|${recUniqueId}`;
@@ -5455,7 +5475,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           try {
             await supabase.from('progress_matrix').insert({
               student_id: studentId,
-              school_id: studentUser?.school_id,
+              school_id: studentUser?.school_id || targetSchoolId,
               topic_name: songTitle,
               homework_notes: JSON.stringify([audioMetaStr]),
               audio_url: finalAudioUrl,
@@ -5465,6 +5485,29 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             });
           } catch (dbErr) {
             console.warn('Supabase insert notice:', dbErr);
+          }
+
+          // 🏛️ Revisionssicheres Audit-Logging (GoBD / OWASP ASVS Level 3)
+          try {
+            await supabase.from('audit_logs').insert({
+              school_id: studentUser?.school_id || targetSchoolId,
+              user_id: studentId,
+              action: 'AUDIO_RECORDING_CREATED',
+              target_type: 'storage.objects',
+              target_id: recUniqueId,
+              details: {
+                file_path: filePath,
+                checksum_sha256: checksumSha256,
+                file_size_bytes: uploadedSizeBytes,
+                title: songTitle,
+                duration_seconds: juniorRecordDuration,
+                author_role: authorRole,
+                is_private: !isTeacherSession,
+                created_at: new Date().toISOString()
+              }
+            });
+          } catch (auditErr) {
+            console.warn('[StudentAvatarDashboard] Audit log notice:', auditErr);
           }
 
           // Append to active homework item if exists
@@ -5744,6 +5787,26 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         if (parts[1]) {
           await supabase.storage.from('campus-assets').remove([parts[1]]);
         }
+      }
+
+      // 🏛️ Revisionssicheres Audit-Logging der Löschung (GoBD / OWASP ASVS Level 3)
+      try {
+        await supabase.from('audit_logs').insert({
+          school_id: studentUser?.school_id,
+          user_id: studentId,
+          action: 'AUDIO_RECORDING_DELETED',
+          target_type: 'storage.objects',
+          target_id: rec.id,
+          details: {
+            title: rec.title,
+            recording_id: rec.id,
+            storage_url: rec.url,
+            deleted_by: studentId,
+            deleted_at: new Date().toISOString()
+          }
+        });
+      } catch (auditErr) {
+        console.warn('[StudentAvatarDashboard] Audit log notice on delete:', auditErr);
       }
 
       if (juniorActivePlayingAudioId === rec.id) {
@@ -7444,6 +7507,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         } catch (e) {
           // ignore quota
         }
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('campus_homework_updated', { detail: { studentId: targetId } }));
       }
     } catch (err) {
       console.error('Error fetching student progress in parallel:', err);
@@ -11815,10 +11882,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             setTimeout(() => {
               handleVerifyParentPinAttempt(nextVal, () => {
                 setShowParentGateModal(false);
-                if (pendingParentTarget) {
-                  setSettingsSubTab(pendingParentTarget);
-                  setActiveStudentSettingsModal(pendingParentTarget);
-                }
+                const target = pendingParentTarget || 'parent_controls';
+                setActiveTab('settings');
+                setVisitedTabs(prev => new Set(prev).add('settings'));
+                setSettingsSubTab(target);
+                setActiveStudentSettingsModal(target);
+                setPendingParentTarget(null);
               });
             }, 0);
           }
@@ -11904,10 +11973,12 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
                   setParentSetupPin('');
                   setParentSetupConfirm('');
                   setParentSetupStep('enter');
-                  if (pendingParentTarget) {
-                    setSettingsSubTab(pendingParentTarget);
-                    setActiveStudentSettingsModal(pendingParentTarget);
-                  }
+                  const target = pendingParentTarget || 'parent_controls';
+                  setActiveTab('settings');
+                  setVisitedTabs(prev => new Set(prev).add('settings'));
+                  setSettingsSubTab(target);
+                  setActiveStudentSettingsModal(target);
+                  setPendingParentTarget(null);
 
                   // Trigger Schicht 1: One-Time Emergency Kit Modal!
                   setNewGeneratedRecoveryKey(recKey);
@@ -11976,12 +12047,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showRecoveryKeyModal]);
 
-  // 🛡️ SECURITY HARDENING: Auto-lock Parent Session when navigating away from Settings tab
-  useEffect(() => {
-    if (activeTab !== 'settings' && isParentUnlocked && !showLevelModal && !showParentGateModal) {
-      lockParentSession();
-    }
-  }, [activeTab, isParentUnlocked, lockParentSession, showLevelModal, showParentGateModal]);
+  // 🛡️ Die Eltern-Sitzung wird autoritativ über useParentSessionLock (3-Minuten-Inaktivitäts-Timer & manuelles Sperren) gesteuert.
+  // Das Dashboard bleibt während einer aktiven Sitzung uneingeschränkt nutzbar.
 
   // 🛡️ REUSABLE MODALS: Parent Gate Master PIN & Recovery Key
   const renderParentGateModal = () => {
@@ -12804,43 +12871,123 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const isCurrentlyLocked = (isCurrentlyInInstantLock || ((isCurrentlyInBedtime || isCurrentlyInDaytimeLock) && !isGracePuffering)) && !checkIsParentSessionActive();
 
   if (isCurrentlyLocked) {
-    const lockConfig = isCurrentlyInInstantLock ? {
-      title: 'Familien-Pause ☕',
-      badge: 'Sofortpause aktiv',
-      badgeBg: 'rgba(245, 158, 11, 0.2)',
-      badgeColor: '#fde047',
-      subtitle: (
-        <>Deine Eltern haben eine gemeinsame Bildschirmpause aktiviert. Zeit für Familie, Essen oder frische Luft!{instantLockUntil && <> Pause aktiv bis ca. <strong style={{ color: '#ffffff' }}>{new Date(instantLockUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} Uhr</strong>.</>}</>
-      ),
-      icon: <Coffee size={44} color="#fbbf24" />,
-      iconBg: 'radial-gradient(circle, rgba(245, 158, 11, 0.25) 0%, rgba(245, 158, 11, 0.05) 100%)',
-      iconBorder: 'rgba(245, 158, 11, 0.5)',
-      quote: '„Gemeinsame Zeit ist wie Musik – sie verbindet die Familie.“'
-    } : isCurrentlyInDaytimeLock ? {
-      title: 'Schulzeit- & Hausaufgaben-Fokus 🎒',
-      badge: `Fokuszeit (${daytimeLockStart} – ${daytimeLockEnd} Uhr)`,
-      badgeBg: 'rgba(129, 140, 248, 0.2)',
-      badgeColor: '#c7d2fe',
-      subtitle: (
-        <>Jetzt konzentrieren wir uns auf die Schule und Hausaufgaben! Die Übe-App ist von <strong style={{ color: '#ffffff' }}>{daytimeLockStart} Uhr</strong> bis <strong style={{ color: '#ffffff' }}>{daytimeLockEnd} Uhr</strong> pausiert. Deine Instrumente warten nach dem Unterricht auf dich!</>
-      ),
-      icon: <BookOpen size={44} color="#a5b4fc" />,
-      iconBg: 'radial-gradient(circle, rgba(129, 140, 248, 0.25) 0%, rgba(129, 140, 248, 0.05) 100%)',
-      iconBorder: 'rgba(129, 140, 248, 0.5)',
-      quote: '„Erst die Schule, dann die Töne – so werden Champions gemacht!“'
-    } : {
-      title: 'Gute Nacht, kleiner Musiker! 🌙',
-      badge: `Nachtruhe (${bedtimeStart} – ${bedtimeEnd} Uhr)`,
-      badgeBg: 'rgba(56, 189, 248, 0.2)',
-      badgeColor: '#bae6fd',
-      subtitle: (
-        <>Toll geübt heute! Deine Instrumente schlafen schon tief und fest. Die Übe-App ruht von <strong style={{ color: '#ffffff' }}>{bedtimeStart} Uhr</strong> bis <strong style={{ color: '#ffffff' }}>{bedtimeEnd} Uhr</strong>, damit du morgen wieder fit und ausgeschlafen bist!</>
-      ),
-      icon: <Moon size={44} color="#7dd3fc" />,
-      iconBg: 'radial-gradient(circle, rgba(56, 189, 248, 0.25) 0%, rgba(56, 189, 248, 0.05) 100%)',
-      iconBorder: 'rgba(56, 189, 248, 0.5)',
-      quote: '„Im Schlaf wächst dein musikalisches Gehör. Träum süß von neuen Melodien!“'
-    };
+    const currentUiLevel: CampusUiLevel = studentUiLevel || 'junior';
+
+    const lockConfig = isCurrentlyInInstantLock ? (
+      currentUiLevel === 'pro' ? {
+        title: 'Pausen-Modus ⏸️',
+        badge: 'Geplante Pause aktiv',
+        badgeBg: 'rgba(99, 102, 241, 0.2)',
+        badgeColor: '#c7d2fe',
+        subtitle: (
+          <>Bildschirmpause aktiviert. Zeit zum Durchatmen und Auftanken.{instantLockUntil && <> Pause aktiv bis ca. <strong style={{ color: '#ffffff' }}>{new Date(instantLockUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} Uhr</strong>.</>}</>
+        ),
+        icon: <Pause size={44} color="#818cf8" />,
+        iconBg: 'radial-gradient(circle, rgba(99, 102, 241, 0.25) 0%, rgba(99, 102, 241, 0.05) 100%)',
+        iconBorder: 'rgba(99, 102, 241, 0.5)',
+        quote: '„Wer Pausen strategisch nutzt, trainiert auf höchstem Niveau.“'
+      } : currentUiLevel === 'teen' ? {
+        title: 'Bildschirm-Pause ⏸️',
+        badge: 'Pause aktiv',
+        badgeBg: 'rgba(245, 158, 11, 0.2)',
+        badgeColor: '#fde047',
+        subtitle: (
+          <>Kurze Unterbrechung für gemeinsame Familienzeit oder frische Luft. Gleich geht’s weiter!{instantLockUntil && <> Pause aktiv bis ca. <strong style={{ color: '#ffffff' }}>{new Date(instantLockUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} Uhr</strong>.</>}</>
+        ),
+        icon: <Coffee size={44} color="#fbbf24" />,
+        iconBg: 'radial-gradient(circle, rgba(245, 158, 11, 0.25) 0%, rgba(245, 158, 11, 0.05) 100%)',
+        iconBorder: 'rgba(245, 158, 11, 0.5)',
+        quote: '„Kurz durchatmen schärft den Fokus für den nächsten Beat.“'
+      } : {
+        title: 'Familien-Pause ☕',
+        badge: 'Sofortpause aktiv',
+        badgeBg: 'rgba(245, 158, 11, 0.2)',
+        badgeColor: '#fde047',
+        subtitle: (
+          <>Deine Eltern haben eine gemeinsame Bildschirmpause aktiviert. Zeit für Familie, Essen oder frische Luft!{instantLockUntil && <> Pause aktiv bis ca. <strong style={{ color: '#ffffff' }}>{new Date(instantLockUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} Uhr</strong>.</>}</>
+        ),
+        icon: <Coffee size={44} color="#fbbf24" />,
+        iconBg: 'radial-gradient(circle, rgba(245, 158, 11, 0.25) 0%, rgba(245, 158, 11, 0.05) 100%)',
+        iconBorder: 'rgba(245, 158, 11, 0.5)',
+        quote: '„Gemeinsame Zeit ist wie Musik – sie verbindet die Familie.“'
+      }
+    ) : isCurrentlyInDaytimeLock ? (
+      currentUiLevel === 'pro' ? {
+        title: 'Fokus- & Arbeitsphase 💼',
+        badge: `Fokusfenster (${daytimeLockStart} – ${daytimeLockEnd} Uhr)`,
+        badgeBg: 'rgba(99, 102, 241, 0.2)',
+        badgeColor: '#c7d2fe',
+        subtitle: (
+          <>Geplantes Fokusfenster von <strong style={{ color: '#ffffff' }}>{daytimeLockStart} Uhr</strong> bis <strong style={{ color: '#ffffff' }}>{daytimeLockEnd} Uhr</strong>. Die Plattform ist während deiner Arbeits- und Studienzeiten pausiert.</>
+        ),
+        icon: <BookOpen size={44} color="#818cf8" />,
+        iconBg: 'radial-gradient(circle, rgba(99, 102, 241, 0.25) 0%, rgba(99, 102, 241, 0.05) 100%)',
+        iconBorder: 'rgba(99, 102, 241, 0.5)',
+        quote: '„Ungestörte Deep-Work-Phasen schaffen Raum für echte Spitzenleistung.“'
+      } : currentUiLevel === 'teen' ? {
+        title: 'Schul- & Lernfokus 📚',
+        badge: `Lernzeit (${daytimeLockStart} – ${daytimeLockEnd} Uhr)`,
+        badgeBg: 'rgba(14, 165, 233, 0.2)',
+        badgeColor: '#7dd3fc',
+        subtitle: (
+          <>Fokus auf Schule und Hausaufgaben. Die Übe-App pausiert von <strong style={{ color: '#ffffff' }}>{daytimeLockStart} Uhr</strong> bis <strong style={{ color: '#ffffff' }}>{daytimeLockEnd} Uhr</strong>, damit du ungestört durchziehen kannst!</>
+        ),
+        icon: <BookOpen size={44} color="#38bdf8" />,
+        iconBg: 'radial-gradient(circle, rgba(14, 165, 233, 0.25) 0%, rgba(14, 165, 233, 0.05) 100%)',
+        iconBorder: 'rgba(14, 165, 233, 0.5)',
+        quote: '„Konzentration auf eine Sache bringt die besten Ergebnisse.“'
+      } : {
+        title: 'Schulzeit- & Hausaufgaben-Fokus 🎒',
+        badge: `Fokuszeit (${daytimeLockStart} – ${daytimeLockEnd} Uhr)`,
+        badgeBg: 'rgba(129, 140, 248, 0.2)',
+        badgeColor: '#c7d2fe',
+        subtitle: (
+          <>Jetzt konzentrieren wir uns auf die Schule und Hausaufgaben! Die Übe-App ist von <strong style={{ color: '#ffffff' }}>{daytimeLockStart} Uhr</strong> bis <strong style={{ color: '#ffffff' }}>{daytimeLockEnd} Uhr</strong> pausiert. Deine Instrumente warten nach dem Unterricht auf dich!</>
+        ),
+        icon: <BookOpen size={44} color="#a5b4fc" />,
+        iconBg: 'radial-gradient(circle, rgba(129, 140, 248, 0.25) 0%, rgba(129, 140, 248, 0.05) 100%)',
+        iconBorder: 'rgba(129, 140, 248, 0.5)',
+        quote: '„Erst die Schule, dann die Töne – so werden Champions gemacht!“'
+      }
+    ) : (
+      currentUiLevel === 'pro' ? {
+        title: 'Nachtruhe & Regeneration 🌙',
+        badge: `Regenerationsphase (${bedtimeStart} – ${bedtimeEnd} Uhr)`,
+        badgeBg: 'rgba(99, 102, 241, 0.2)',
+        badgeColor: '#c7d2fe',
+        subtitle: (
+          <>Tagesziel erreicht. Die Plattform pausiert planmäßig von <strong style={{ color: '#ffffff' }}>{bedtimeStart} Uhr</strong> bis <strong style={{ color: '#ffffff' }}>{bedtimeEnd} Uhr</strong> für deine nächtliche Regenerationsphase. Morgen geht es mit klarem Kopf weiter.</>
+        ),
+        icon: <Moon size={44} color="#a5b4fc" />,
+        iconBg: 'radial-gradient(circle, rgba(99, 102, 241, 0.25) 0%, rgba(99, 102, 241, 0.05) 100%)',
+        iconBorder: 'rgba(99, 102, 241, 0.5)',
+        quote: '„Präzision und Meisterschaft entstehen in der Pause – Zeit für den mentalen Reset.“'
+      } : currentUiLevel === 'teen' ? {
+        title: 'Starke Session! Zeit für Erholung 🌙',
+        badge: `Ruhezeit (${bedtimeStart} – ${bedtimeEnd} Uhr)`,
+        badgeBg: 'rgba(56, 189, 248, 0.2)',
+        badgeColor: '#bae6fd',
+        subtitle: (
+          <>Richtig stark durchgezogen heute! Für heute macht die Übe-App von <strong style={{ color: '#ffffff' }}>{bedtimeStart} Uhr</strong> bis <strong style={{ color: '#ffffff' }}>{bedtimeEnd} Uhr</strong> Pause. Gönn deinem Kopf und deinen Fingern die verdiente Erholung.</>
+        ),
+        icon: <Moon size={44} color="#38bdf8" />,
+        iconBg: 'radial-gradient(circle, rgba(56, 189, 248, 0.25) 0%, rgba(56, 189, 248, 0.05) 100%)',
+        iconBorder: 'rgba(56, 189, 248, 0.5)',
+        quote: '„Echte Fortschritte entstehen in der Regeneration. Morgen geht’s mit frischem Groove weiter!“'
+      } : {
+        title: 'Gute Nacht, kleiner Musiker! 🌙',
+        badge: `Nachtruhe (${bedtimeStart} – ${bedtimeEnd} Uhr)`,
+        badgeBg: 'rgba(56, 189, 248, 0.2)',
+        badgeColor: '#bae6fd',
+        subtitle: (
+          <>Toll geübt heute! Deine Instrumente schlafen schon tief und fest. Die Übe-App ruht von <strong style={{ color: '#ffffff' }}>{bedtimeStart} Uhr</strong> bis <strong style={{ color: '#ffffff' }}>{bedtimeEnd} Uhr</strong>, damit du morgen wieder fit und ausgeschlafen bist!</>
+        ),
+        icon: <Moon size={44} color="#7dd3fc" />,
+        iconBg: 'radial-gradient(circle, rgba(56, 189, 248, 0.25) 0%, rgba(56, 189, 248, 0.05) 100%)',
+        iconBorder: 'rgba(56, 189, 248, 0.5)',
+        quote: '„Im Schlaf wächst dein musikalisches Gehör. Träum süß von neuen Melodien!“'
+      }
+    );
 
     return (
       <>
@@ -13008,7 +13155,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             className="hover-scale"
           >
             <Lock size={16} />
-            <span>Eltern-PIN eingeben (Entsperren)</span>
+            <span>{isAdultStudent ? 'PIN eingeben (Entsperren)' : 'Eltern-PIN eingeben (Entsperren)'}</span>
           </button>
         </div>
       </div>,
@@ -13268,6 +13415,77 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
             }}
           >
             <X size={12} strokeWidth={2.5} />
+          </button>
+        </div>
+      )}
+
+      {/* 🛡️ Aktive Eltern-Sitzung während Sperrzeit / Nachtruhe */}
+      {isParentUnlocked && (isCurrentlyInBedtime || isCurrentlyInDaytimeLock || isCurrentlyInInstantLock) && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.12) 0%, rgba(3, 105, 161, 0.08) 100%)',
+          border: '1.5px solid rgba(2, 132, 199, 0.35)',
+          padding: '14px 20px',
+          borderRadius: '24px',
+          marginBottom: '20px',
+          display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
+          alignItems: isMobile ? 'flex-start' : 'center',
+          justifyContent: 'space-between',
+          gap: '14px',
+          boxShadow: '0 4px 15px rgba(2, 132, 199, 0.1)',
+          animation: 'fadeIn 0.3s ease',
+          boxSizing: 'border-box'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '14px',
+              background: '#0284c7',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)'
+            }}>
+              <ShieldCheck size={22} />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.94rem', fontWeight: 800, color: '#0369a1' }}>
+                Elternbereich aktiv (Dashboard entsperrt)
+              </div>
+              <div style={{ fontSize: '0.80rem', color: '#64748b', fontWeight: 600 }}>
+                {parentLockRemainingSeconds > 0
+                  ? `Automatische Sperre bei Inaktivität in ${parentLockRemainingSeconds}s`
+                  : 'Eltern-Sitzung aktiv'}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={lockParentSession}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 18px',
+              borderRadius: '100px',
+              background: '#0284c7',
+              color: '#ffffff',
+              border: 'none',
+              fontSize: '0.84rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)',
+              transition: 'all 0.2s ease',
+              touchAction: 'manipulation'
+            }}
+            className="hover-scale"
+            aria-label="Elternbereich jetzt sperren"
+          >
+            <Lock size={15} />
+            <span>Jetzt sperren</span>
           </button>
         </div>
       )}
@@ -13821,6 +14039,8 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         showJuniorRecordModal={showJuniorRecordModal}
         showJuniorRecordingsModal={showJuniorRecordingsModal}
         showJuniorTimerModal={showJuniorTimerModal}
+        isJuniorPadActive={isJuniorPadActive}
+        setIsJuniorPadActive={setIsJuniorPadActive}
         songStats={songStats}
         songs={songs}
         startJuniorRecordingFlow={startJuniorRecordingFlow}

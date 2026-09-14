@@ -110,10 +110,10 @@ export function isMicrophonePermissionCached(): boolean {
  * Studio-Grade High-Fidelity Audio Constraints (Zero Compression, Zero Filter DSP Artifacts)
  */
 export const PURE_RAW_AUDIO_CONSTRAINTS: MediaTrackConstraints = {
-  echoCancellation: { ideal: false },
-  noiseSuppression: { ideal: false },
-  autoGainControl: { ideal: false },
-  voiceIsolation: { ideal: false } as any,
+  echoCancellation: false,
+  noiseSuppression: false,
+  autoGainControl: false,
+  voiceIsolation: false,
   googEchoCancellation: false,
   googAutoGainControl: false,
   googNoiseSuppression: false,
@@ -121,7 +121,7 @@ export const PURE_RAW_AUDIO_CONSTRAINTS: MediaTrackConstraints = {
   googAudioMirroring: false,
   googTypingNoiseDetection: false,
   googVoiceIsolation: false,
-  channelCount: { ideal: 2 },
+  channelCount: { ideal: 1 }, // 🏛️ Phasenreines Einzelkapsel-Mono: Verhindert Beamforming-Kammfilterung auf Smartphones
   sampleRate: { ideal: 48000 },
   sampleSize: { ideal: 24 }
 } as any;

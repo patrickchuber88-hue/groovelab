@@ -25,6 +25,7 @@ import { safeDecodeAudioData, ensureWavBlob } from '../../../utils/audioMasterin
 import { getAudioNotesCount, getAudioNotes, addAudioNote, updateAudioNote, deleteAudioNote, fetchAudioNotesFromServer } from '../../../utils/audioNotesStorage';
 import { getSecureAudioUrl } from '../../../utils/audioStorageHelper';
 import { SharedAudioEngine } from '../../../utils/sharedAudioEngine';
+import { resampleWaveformPeaks, extractWaveformPeaks, detectAudioMimeType } from '../../../utils/waveformHelper';
 
 const AudioEditorModal = React.lazy(() => import('../../campus/AudioEditorModal').then(m => ({ default: m.AudioEditorModal })));
 const AudioNotesModal = React.lazy(() => import('../../campus/AudioNotesModal').then(m => ({ default: m.AudioNotesModal })));
@@ -403,6 +404,7 @@ export interface InlineAudioPlayerProps {
   onRevertToOriginal?: () => void;
   onOpenDuettDeck?: () => void;
   metronomeBpm?: number;
+  waveformPeaks?: number[];
 }
 
 export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({ 
@@ -436,11 +438,13 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
   originalDuration,
   onRevertToOriginal,
   onOpenDuettDeck,
-  metronomeBpm
+  metronomeBpm,
+  waveformPeaks
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState<number>(initialDuration || 0);
   const [currentTime, setCurrentTime] = useState<number>(0);
+  const [peaks, setPeaks] = useState<number[]>(() => waveformPeaks || []);
 
   // Sync duration with prop changes
   useEffect(() => {
@@ -448,6 +452,13 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       setDuration(initialDuration);
     }
   }, [initialDuration]);
+
+  // Sync waveformPeaks with prop changes
+  useEffect(() => {
+    if (waveformPeaks && waveformPeaks.length > 0) {
+      setPeaks(waveformPeaks);
+    }
+  }, [waveformPeaks]);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isLooping, setIsLooping] = useState(false);
   const [countInActive, setCountInActive] = useState(false);
@@ -633,7 +644,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
     if (url.startsWith('campus_blob_') || url.startsWith('campus_audio_') || url.startsWith('offline://')) {
       getBlob(url).then(raw => {
         if (active && raw) {
-          const mime = url.includes('.wav') ? 'audio/wav' : (url.includes('.mp3') ? 'audio/mpeg' : 'audio/webm');
+          const mime = detectAudioMimeType(raw instanceof Blob ? raw : null, url);
           const finalBlob = raw instanceof Blob ? raw : new Blob([raw], { type: mime });
           createdBlobUrl = URL.createObjectURL(finalBlob);
           setResolvedUrl(createdBlobUrl);
@@ -643,7 +654,8 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       // ⚡ First check if this file was stored in IndexedDB locally (0ms Fast Local-First)
       getBlob(url).then(cachedBlob => {
         if (active && cachedBlob) {
-          const finalBlob = cachedBlob instanceof Blob ? cachedBlob : new Blob([cachedBlob], { type: 'audio/webm' });
+          const mime = detectAudioMimeType(cachedBlob instanceof Blob ? cachedBlob : null, url);
+          const finalBlob = cachedBlob instanceof Blob ? cachedBlob : new Blob([cachedBlob], { type: mime });
           createdBlobUrl = URL.createObjectURL(finalBlob);
           setResolvedUrl(createdBlobUrl);
           return;
@@ -735,6 +747,43 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
         if (decoded.duration && isFinite(decoded.duration)) {
           setDuration(Number(decoded.duration.toFixed(2)));
         }
+
+        // 🌟 Auto-Retrofit Wellenform-Peaks für Bestandsaufnahmen
+        if (decoded && (!peaks || peaks.length === 0)) {
+          const newPeaks = extractWaveformPeaks(decoded, 80);
+          if (newPeaks.length > 0) {
+            setPeaks(newPeaks);
+            try {
+              if (typeof window !== 'undefined' && window.localStorage) {
+                for (let i = 0; i < localStorage.length; i++) {
+                  const k = localStorage.key(i);
+                  if (k && k.startsWith('campus_junior_recordings_')) {
+                    const val = localStorage.getItem(k);
+                    if (val && (val.includes(url) || (audioId && val.includes(audioId)) || (id && val.includes(id)))) {
+                      const parsed = JSON.parse(val);
+                      if (Array.isArray(parsed)) {
+                        let updated = false;
+                        const next = parsed.map((item: any) => {
+                          if (item.url === url || (audioId && item.id === audioId) || (id && item.id === id) || (item.blobKey === url)) {
+                            updated = true;
+                            return { ...item, waveformPeaks: newPeaks };
+                          }
+                          return item;
+                        });
+                        if (updated) {
+                          localStorage.setItem(k, JSON.stringify(next));
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            } catch (retroErr) {
+              console.warn('[InlineAudioPlayer] Waveform retrofit note:', retroErr);
+            }
+          }
+        }
+
         return decoded;
       }
     } catch (err) {
@@ -890,6 +939,13 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       loadAudioBuffer().catch(() => {});
     }
   }, [resolvedUrl]);
+
+  // 🌊 Background Retrofit: Berechnet Wellenform für Bestandsaufnahmen automatisch
+  useEffect(() => {
+    if (!peaks || peaks.length === 0) {
+      loadAudioBuffer().catch(() => {});
+    }
+  }, [url, resolvedUrl]);
 
   const togglePlay = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -1555,6 +1611,13 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
     </div>
   );
 
+  const effective16Bars = useMemo(() => {
+    if (peaks && peaks.length > 0) {
+      return resampleWaveformPeaks(peaks, 16);
+    }
+    return [0.25, 0.40, 0.65, 0.35, 0.55, 0.85, 0.95, 0.70, 0.45, 0.65, 0.80, 0.95, 0.75, 0.55, 0.40, 0.25];
+  }, [peaks]);
+
   const renderWaveform = (isDesktop: boolean) => (
     <div
       onClick={(e) => {
@@ -1582,16 +1645,17 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       }}
       title="Tippen zum Spulen"
     >
-      {waveformHeights.slice(0, 16).map((h, i) => {
-        const barRatio = i / 16;
+      {effective16Bars.map((val, i) => {
+        const barRatio = i / effective16Bars.length;
         const isFilled = barRatio <= progressRatio;
+        const heightPct = Math.max(20, Math.round(val * 100));
         return (
           <div
             key={i}
             style={{
               flex: 1,
               minWidth: "2.5px",
-              height: `${Math.max(25, h)}%`,
+              height: `${heightPct}%`,
               borderRadius: "1.5px",
               background: isFilled
                 ? (isIndigoPurple ? (isPlaying ? "#7c3aed" : "#6d28d9") : (isPlaying ? "#16a34a" : "#15803d"))
@@ -1908,7 +1972,10 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
           {/* 💬 Studio Timeline Notizen / Marker (SoundCloud-Style) */}
           <button
             type="button"
-            onClick={() => setIsNotesModalOpen(true)}
+            onClick={() => {
+              loadAudioBuffer().catch(() => {});
+              setIsNotesModalOpen(true);
+            }}
             style={{
               border: '1px solid #cbd5e1',
               background: '#ffffff',
@@ -2473,6 +2540,8 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
             title={displayTitle}
             initialDuration={duration}
             currentUserRole={badge?.toLowerCase().includes('lehrer') || isSharedWithTeacher ? 'teacher' : 'student'}
+            waveformPeaks={peaks}
+            initialAudioBuffer={audioBufferRef.current}
           />
         </React.Suspense>
       )}

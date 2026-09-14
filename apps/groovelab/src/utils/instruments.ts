@@ -125,3 +125,30 @@ export const renderInstrumentIcon = (name: string, color?: string, size = 18): R
 
   return '🎵';
 };
+
+/**
+ * 🎛️ Prüft, ob für ein Instrument standardmäßig das -6 dB Headroom-PAD aktiviert werden sollte.
+ * Betrifft Instrumente mit starken Transienten / Dynamikspitzen: Drums, Schlagzeug, Percussion, Cajón, Gitarre (Slaps), Blechbläser.
+ */
+export const shouldDefaultToInputPad = (instrumentOrStudent?: any): boolean => {
+  if (!instrumentOrStudent) return false;
+  const rawStr = typeof instrumentOrStudent === 'string'
+    ? instrumentOrStudent
+    : (instrumentOrStudent.instrument || instrumentOrStudent.instrument_name || instrumentOrStudent.instrumentName || instrumentOrStudent.subject || '');
+  if (!rawStr) return false;
+  const lower = rawStr.toLowerCase().trim();
+  return (
+    lower.includes('drum') ||
+    lower.includes('schlagzeug') ||
+    lower.includes('percussion') ||
+    lower.includes('cajon') ||
+    lower.includes('cajón') ||
+    lower.includes('gitarre') ||
+    lower.includes('guitar') ||
+    lower.includes('trompete') ||
+    lower.includes('posaune') ||
+    lower.includes('sax') ||
+    lower.includes('horn') ||
+    lower.includes('brass')
+  );
+};

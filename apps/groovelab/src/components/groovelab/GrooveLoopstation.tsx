@@ -2665,8 +2665,8 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       await stabilizeAudioStream(stream, 300);
       mediaStreamRef.current = stream;
 
-      // 🎙️ High-End 256 kbps Studio-Grade Codec Bitrate
-      const targetBitrate = 256000;
+      // 🎙️ 320 kbps Broadcast Studio-Grade Codec Bitrate (Maximum Opus/AAC transparency)
+      const targetBitrate = 320000;
       let mimeType = 'audio/webm;codecs=opus';
       if (typeof MediaRecorder !== 'undefined') {
         if (!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {

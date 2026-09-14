@@ -20,12 +20,15 @@ import {
   Circle,
   Share2,
   Bookmark,
-  Mic
+  Mic,
+  Loader2
 } from 'lucide-react';
 import { useVoiceToText } from '../../hooks/useVoiceToText';
 import { getBlob } from '../../utils/blobStorage';
 import { getSecureAudioUrl } from '../../utils/audioStorageHelper';
 import { safeDecodeAudioData } from '../../utils/audioMasteringEngine';
+import { SharedAudioEngine } from '../../utils/sharedAudioEngine';
+import { extractWaveformPeaks, resampleWaveformPeaks, detectAudioMimeType } from '../../utils/waveformHelper';
 import { 
   AudioTimelineNote, 
   AudioNoteTag, 
@@ -38,6 +41,8 @@ import {
   fetchAudioNotesFromServer
 } from '../../utils/audioNotesStorage';
 
+const isPlayableUrl = (u?: string | null) => Boolean(u && (u.startsWith('http://') || u.startsWith('https://') || u.startsWith('blob:') || u.startsWith('data:')));
+
 export interface AudioNotesModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -48,6 +53,8 @@ export interface AudioNotesModalProps {
   currentUserRole?: 'teacher' | 'student' | 'admin';
   currentUserName?: string;
   onExportToHomework?: (notes: AudioTimelineNote[]) => void;
+  waveformPeaks?: number[];
+  initialAudioBuffer?: AudioBuffer | null;
 }
 
 // ⚡ 1-Tap Quick Feedback Chips für den Musikunterricht (monochrome Vektor-Icons)
@@ -195,16 +202,23 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
   initialDuration = 0,
   currentUserRole = 'student',
   currentUserName,
-  onExportToHomework
+  onExportToHomework,
+  waveformPeaks,
+  initialAudioBuffer
 }) => {
   const isStudent = currentUserRole === 'student';
   const effectiveAudioKey = audioId || audioUrl;
   const [notes, setNotes] = useState<AudioTimelineNote[]>([]);
-  const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(initialAudioBuffer || null);
+  const audioBufferRef = useRef<AudioBuffer | null>(initialAudioBuffer || null);
+  const [isLoading, setIsLoading] = useState(!initialAudioBuffer);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLooping, setIsLooping] = useState(false);
-  const [duration, setDuration] = useState<number>(initialDuration || 0);
+  const [duration, setDuration] = useState<number>(
+    initialAudioBuffer && initialAudioBuffer.duration && isFinite(initialAudioBuffer.duration)
+      ? Number(initialAudioBuffer.duration.toFixed(2))
+      : (initialDuration || 0)
+  );
   const [currentPlayTime, setCurrentPlayTime] = useState(0);
 
   // 📱 Mobile Viewport Detection (Apple HIG / Material Standard <= 768px)
@@ -284,12 +298,209 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const blobUrlToRevokeRef = useRef<string | null>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
   const animFrameRef = useRef<number | null>(null);
   const waveformContainerRef = useRef<HTMLDivElement | null>(null);
   const waveformScrollRef = useRef<HTMLDivElement | null>(null);
   const isPlayingRef = useRef(false);
   const noteInputRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // ⚡ Web Audio Source Node & Hardware Timing References
+  const webAudioSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const isWebAudioPlayingRef = useRef<boolean>(false);
+  const playStartTimestampRef = useRef<number>(0);
+  const playStartOffsetSecRef = useRef<number>(0);
+  const arrayBufferRef = useRef<ArrayBuffer | null>(null);
+  const loadingBufferPromiseRef = useRef<Promise<AudioBuffer | null> | null>(null);
+
+  // ⚡ Helper für AudioContext mit sofortigem Resume
+  const getOrCreateAudioContext = useCallback(async (): Promise<AudioContext | null> => {
+    try {
+      const ctx = SharedAudioEngine.getContext();
+      if (ctx.state === 'suspended') {
+        await ctx.resume().catch(() => {});
+      }
+      return ctx;
+    } catch (err) {
+      console.warn('[AudioNotesModal] Failed to get AudioContext:', err);
+      return null;
+    }
+  }, []);
+
+  // 🎧 Ausfallsicheres Laden & Decodieren des AudioBuffers (IndexedDB + Storage + URL)
+  const loadAudioBuffer = useCallback(async (): Promise<AudioBuffer | null> => {
+    if (audioBufferRef.current) return audioBufferRef.current;
+    if (loadingBufferPromiseRef.current) return loadingBufferPromiseRef.current;
+
+    const promise = (async (): Promise<AudioBuffer | null> => {
+      try {
+        const ctx = await getOrCreateAudioContext();
+        if (!ctx) return null;
+
+        let arrayBuffer: ArrayBuffer | null = arrayBufferRef.current;
+
+        // 1. ArrayBuffer auflösen, falls noch nicht im Cache
+        if (!arrayBuffer) {
+          const candidateKeys: string[] = [];
+          if (audioId) {
+            candidateKeys.push(audioId);
+            if (!audioId.startsWith('campus_audio_')) candidateKeys.push(`campus_audio_${audioId}_raw`);
+            if (!audioId.startsWith('campus_blob_')) candidateKeys.push(`campus_blob_${audioId}`);
+            candidateKeys.push(`campus_audio_${audioId}`);
+          }
+          if (audioUrl && audioUrl !== audioId) {
+            candidateKeys.push(audioUrl);
+            if (!audioUrl.startsWith('campus_audio_')) candidateKeys.push(`campus_audio_${audioUrl}_raw`);
+            if (!audioUrl.startsWith('campus_blob_')) candidateKeys.push(`campus_blob_${audioUrl}`);
+          }
+
+          // 🌟 Deep scan localStorage für campus_junior_recordings_* und campus_audio_biography_*
+          if (typeof window !== 'undefined' && window.localStorage) {
+            try {
+              for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k && (k.startsWith('campus_junior_recordings_') || k.startsWith('campus_audio_biography_'))) {
+                  const val = localStorage.getItem(k);
+                  if (val && (
+                    (audioId && val.includes(audioId)) ||
+                    (audioUrl && val.includes(audioUrl)) ||
+                    (title && val.includes(title))
+                  )) {
+                    const recs = JSON.parse(val);
+                    if (Array.isArray(recs)) {
+                      for (const r of recs) {
+                        if (
+                          (audioId && (r.id === audioId || r.blobKey === audioId || r.url === audioId)) ||
+                          (audioUrl && (r.url === audioUrl || r.blobKey === audioUrl || r.id === audioUrl)) ||
+                          (title && r.title === title)
+                        ) {
+                          if (r.blobKey && !candidateKeys.includes(r.blobKey)) candidateKeys.unshift(r.blobKey);
+                          if (r.url && !candidateKeys.includes(r.url)) candidateKeys.push(r.url);
+                          if (r.id && !candidateKeys.includes(r.id)) candidateKeys.push(r.id);
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            } catch {}
+          }
+
+          // 2. Suche in IndexedDB
+          for (const candidateKey of candidateKeys) {
+            if (!candidateKey) continue;
+            try {
+              const raw = await getBlob(candidateKey);
+              if (raw instanceof Blob) {
+                const detectedMime = detectAudioMimeType(raw, candidateKey);
+                const typedBlob = raw.type === detectedMime ? raw : new Blob([raw], { type: detectedMime });
+                arrayBuffer = await typedBlob.arrayBuffer();
+                const playableSrc = URL.createObjectURL(typedBlob);
+                if (blobUrlToRevokeRef.current) URL.revokeObjectURL(blobUrlToRevokeRef.current);
+                blobUrlToRevokeRef.current = playableSrc;
+                if (!audioRef.current) {
+                  const audio = new Audio();
+                  audio.preload = 'auto';
+                  audio.src = playableSrc;
+                  applyPreservesPitch(audio, playbackSpeedRef.current);
+                  audioRef.current = audio;
+                }
+                break;
+              } else if (raw instanceof ArrayBuffer) {
+                arrayBuffer = raw;
+                const blob = new Blob([raw], { type: 'audio/wav' });
+                const playableSrc = URL.createObjectURL(blob);
+                if (blobUrlToRevokeRef.current) URL.revokeObjectURL(blobUrlToRevokeRef.current);
+                blobUrlToRevokeRef.current = playableSrc;
+                if (!audioRef.current) {
+                  const audio = new Audio();
+                  audio.preload = 'auto';
+                  audio.src = playableSrc;
+                  applyPreservesPitch(audio, playbackSpeedRef.current);
+                  audioRef.current = audio;
+                }
+                break;
+              }
+            } catch {}
+          }
+
+          // 3. Fallback auf Network / Supabase Storage URLs
+          if (!arrayBuffer) {
+            let targetUrl = audioUrl || audioId || '';
+            if (targetUrl.startsWith('schools/') || targetUrl.includes('/storage/v1/object/')) {
+              try {
+                const sec = await getSecureAudioUrl(targetUrl, 'campus-assets', 300);
+                if (sec) targetUrl = sec;
+              } catch (secErr) {
+                console.warn('[AudioNotesModal] Failed to resolve secure audio url:', secErr);
+              }
+            }
+
+            if (targetUrl && isPlayableUrl(targetUrl)) {
+              if (targetUrl.startsWith('data:') || targetUrl.startsWith('blob:')) {
+                try {
+                  const resp = await fetch(targetUrl);
+                  arrayBuffer = await resp.arrayBuffer();
+                } catch {}
+              } else if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
+                try {
+                  const resp = await fetch(targetUrl, { mode: 'cors' });
+                  if (resp.ok) {
+                    arrayBuffer = await resp.arrayBuffer();
+                  }
+                } catch {}
+              }
+
+              if (targetUrl && !audioRef.current) {
+                const audio = new Audio();
+                audio.preload = 'auto';
+                audio.src = targetUrl;
+                applyPreservesPitch(audio, playbackSpeedRef.current);
+                audioRef.current = audio;
+              }
+            }
+          }
+
+          if (arrayBuffer) {
+            arrayBufferRef.current = arrayBuffer;
+          }
+        }
+
+        // 4. Decodieren via safeDecodeAudioData
+        if (arrayBuffer) {
+          const decoded = await safeDecodeAudioData(ctx, arrayBuffer);
+          if (decoded) {
+            setAudioBuffer(decoded);
+            audioBufferRef.current = decoded;
+            if (decoded.duration && isFinite(decoded.duration)) {
+              setDuration(Number(decoded.duration.toFixed(2)));
+            }
+            return decoded;
+          }
+        }
+        return null;
+      } catch (err) {
+        console.warn('[AudioNotesModal] loadAudioBuffer error:', err);
+        return null;
+      } finally {
+        loadingBufferPromiseRef.current = null;
+      }
+    })();
+
+    loadingBufferPromiseRef.current = promise;
+    return promise;
+  }, [audioId, audioUrl, title, getOrCreateAudioContext]);
+
+  // Sync initialAudioBuffer from props if provided
+  useEffect(() => {
+    if (initialAudioBuffer) {
+      setAudioBuffer(initialAudioBuffer);
+      audioBufferRef.current = initialAudioBuffer;
+      if (initialAudioBuffer.duration && isFinite(initialAudioBuffer.duration)) {
+        setDuration(Number(initialAudioBuffer.duration.toFixed(2)));
+      }
+      setIsLoading(false);
+    }
+  }, [initialAudioBuffer]);
 
   // Sync playbackSpeed Ref & native AudioElement
   useEffect(() => {
@@ -330,13 +541,27 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
     }
   }, [isOpen, isListening, stopListening]);
 
-  // 🛑 Stop playback helper
-  const stopPlayback = useCallback(() => {
-    isPlayingRef.current = false;
+  // 🛑 Stop Web Audio playback node helper
+  const stopWebAudio = useCallback(() => {
     if (animFrameRef.current) {
       cancelAnimationFrame(animFrameRef.current);
       animFrameRef.current = null;
     }
+    if (webAudioSourceRef.current) {
+      try {
+        webAudioSourceRef.current.onended = null;
+        webAudioSourceRef.current.stop();
+        webAudioSourceRef.current.disconnect();
+      } catch {}
+      webAudioSourceRef.current = null;
+    }
+    isWebAudioPlayingRef.current = false;
+  }, []);
+
+  // 🛑 Stop playback helper (Web Audio + HTML5 Audio)
+  const stopPlayback = useCallback(() => {
+    isPlayingRef.current = false;
+    stopWebAudio();
     if (audioRef.current) {
       try {
         audioRef.current.pause();
@@ -345,144 +570,28 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
     setIsPlaying(false);
     setSpotLoopNoteId(null);
     spotLoopRangeRef.current = null;
-  }, []);
+  }, [stopWebAudio]);
 
-  // 🎧 Load audio element and decode buffer for waveform
+  // 🎧 Load audio buffer on modal open
   useEffect(() => {
     if (!isOpen || (!audioUrl && !audioId)) return;
     let active = true;
-    setIsLoading(true);
 
-    const loadData = async () => {
-      try {
-        let arrayBuffer: ArrayBuffer | null = null;
-        let candidateBlobKey = (audioId && (audioId.startsWith('campus_blob_') || audioId.startsWith('campus_audio_') || audioId.startsWith('offline://')))
-          ? audioId
-          : (audioUrl && (audioUrl.startsWith('campus_blob_') || audioUrl.startsWith('campus_audio_') || audioUrl.startsWith('offline://')) ? audioUrl : null);
-
-        let playableSrc = '';
-
-        // 1. ⚡ Direktzugriff auf IndexedDB-Binärspeicher (immun gegen CORS, Netzwerk & flüchtige URLs)
-        if (candidateBlobKey) {
-          const raw = await getBlob(candidateBlobKey);
-          if (raw instanceof Blob) {
-            arrayBuffer = await raw.arrayBuffer();
-            playableSrc = URL.createObjectURL(raw);
-            blobUrlToRevokeRef.current = playableSrc;
-          } else if (raw instanceof ArrayBuffer) {
-            arrayBuffer = raw;
-            const blob = new Blob([raw], { type: 'audio/wav' });
-            playableSrc = URL.createObjectURL(blob);
-            blobUrlToRevokeRef.current = playableSrc;
-          }
-        }
-
-        // 2. 🌐 Fallback auf HTTP/Blob/Data URLs
-        if (!arrayBuffer) {
-          let targetUrl = audioUrl || audioId || '';
-
-          if (targetUrl.startsWith('schools/') || targetUrl.includes('/storage/v1/object/')) {
-            try {
-              const sec = await getSecureAudioUrl(targetUrl, 'campus-assets', 300);
-              if (sec) targetUrl = sec;
-            } catch (secErr) {
-              console.warn('[AudioNotesModal] Failed to resolve secure audio url:', secErr);
-            }
-          }
-
-          if (targetUrl.startsWith('campus_blob_') || targetUrl.startsWith('campus_audio_') || targetUrl.startsWith('offline://')) {
-            const raw = await getBlob(targetUrl);
-            if (raw instanceof Blob) {
-              arrayBuffer = await raw.arrayBuffer();
-              playableSrc = URL.createObjectURL(raw);
-              blobUrlToRevokeRef.current = playableSrc;
-            } else if (raw instanceof ArrayBuffer) {
-              arrayBuffer = raw;
-              const blob = new Blob([raw], { type: 'audio/wav' });
-              playableSrc = URL.createObjectURL(blob);
-              blobUrlToRevokeRef.current = playableSrc;
-            }
-          } else if (targetUrl.startsWith('data:') || targetUrl.startsWith('blob:')) {
-            const resp = await fetch(targetUrl);
-            arrayBuffer = await resp.arrayBuffer();
-            playableSrc = targetUrl;
-          } else if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
-            const resp = await fetch(targetUrl, { mode: 'cors' });
-            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            arrayBuffer = await resp.arrayBuffer();
-            playableSrc = targetUrl;
-          }
-        }
-
-        if (!arrayBuffer) {
-          throw new Error('Konnte Audiodaten nicht abrufen');
-        }
-
-        if (!active) return;
-
-        // 🎵 HTML5 Audio Element für 100% tonhöhenneutrale Wiedergabe (preservesPitch = true)
-        const audio = new Audio();
-        audio.preload = 'auto';
-        audio.src = playableSrc;
-        applyPreservesPitch(audio, playbackSpeedRef.current);
-        audio.onended = () => {
-          if (!audio.loop && !spotLoopRangeRef.current) {
-            stopPlayback();
-            setCurrentPlayTime(0);
-          }
-        };
-        audio.addEventListener('loadedmetadata', () => {
-          if (audio.duration && isFinite(audio.duration)) {
-            setDuration(prev => (prev > 0 ? prev : Number(audio.duration.toFixed(2))));
-          }
+    if (!audioBufferRef.current && !initialAudioBuffer) {
+      setIsLoading(true);
+      loadAudioBuffer()
+        .then(() => {})
+        .catch(() => {})
+        .finally(() => {
+          if (active) setIsLoading(false);
         });
-        audioRef.current = audio;
-
-        // 🎙️ Ausfallsichere Safari & WebKit Decodierung via OfflineAudioContext (keine Autoplay-/Suspension-Blockade)
-        let decoded: AudioBuffer | null = null;
-        try {
-          const OfflineCtx = window.OfflineAudioContext || (window as unknown as { webkitOfflineAudioContext: typeof OfflineAudioContext }).webkitOfflineAudioContext;
-          if (OfflineCtx) {
-            const offlineCtx = new OfflineCtx(1, 2, 44100);
-            decoded = await safeDecodeAudioData(offlineCtx, arrayBuffer);
-          }
-        } catch (offlineErr) {
-          console.warn('[AudioNotesModal] OfflineAudioContext decode fallback note:', offlineErr);
-        }
-
-        // Fallback: Regulärer AudioContext, falls OfflineAudioContext nicht verfügbar
-        if (!decoded) {
-          const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-          const audioCtx = new AudioCtx();
-          audioCtxRef.current = audioCtx;
-          if (audioCtx.state === 'suspended') {
-            await audioCtx.resume().catch(() => {});
-          }
-          decoded = await safeDecodeAudioData(audioCtx, arrayBuffer);
-        }
-
-        if (!active) return;
-
-        if (decoded) {
-          setAudioBuffer(decoded);
-          if (decoded.duration && isFinite(decoded.duration)) {
-            setDuration(Number(decoded.duration.toFixed(2)));
-          }
-        }
-      } catch (err) {
-        console.warn('[AudioNotesModal] Decode note error:', err);
-      } finally {
-        if (active) setIsLoading(false);
-      }
-    };
-
-    loadData();
+    }
 
     return () => {
       active = false;
       stopPlayback();
       if (audioRef.current) {
-        audioRef.current.pause();
+        try { audioRef.current.pause(); } catch {}
         audioRef.current.src = '';
         audioRef.current = null;
       }
@@ -490,85 +599,44 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
         URL.revokeObjectURL(blobUrlToRevokeRef.current);
         blobUrlToRevokeRef.current = null;
       }
-      if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
-        audioCtxRef.current.close().catch(() => {});
-        audioCtxRef.current = null;
-      }
     };
-  }, [isOpen, audioUrl, audioId, stopPlayback]);
+  }, [isOpen, audioUrl, audioId, initialAudioBuffer, loadAudioBuffer, stopPlayback]);
 
-  // 🌊 Studio-Grade Waveform Generator: Scannt das gesamte Audiosignal (RMS & True-Peak)
+  // 🌊 Studio-Grade Waveform Generator: 100% Synchron zur Aufnahme (RMS & True-Peak)
   const waveformBars = useMemo(() => {
     const barsCount = 80 * zoomLevel;
+    let peaksSource: number[] = [];
+
     if (audioBuffer && audioBuffer.length > 0) {
-      const numChannels = audioBuffer.numberOfChannels;
-      const channelsData: Float32Array[] = [];
-      for (let c = 0; c < numChannels; c++) {
-        channelsData.push(audioBuffer.getChannelData(c));
-      }
-      const totalSamples = audioBuffer.length;
-      const blockSize = Math.max(1, totalSamples / barsCount);
-      const rawValues: number[] = [];
-      let maxVal = 0.001;
+      peaksSource = extractWaveformPeaks(audioBuffer, barsCount);
+    } else if (waveformPeaks && waveformPeaks.length > 0) {
+      peaksSource = resampleWaveformPeaks(waveformPeaks, barsCount);
+    }
 
-      for (let i = 0; i < barsCount; i++) {
-        const start = Math.floor(i * blockSize);
-        const end = Math.min(Math.floor(start + blockSize), totalSamples);
-        let blockPeak = 0;
-        let sumSquares = 0;
-        let count = 0;
+    const totalSvgWidth = 800 * zoomLevel;
 
-        // Dynamischer Stride (< 1ms Execution Time bei vollständiger Transientenerfassung)
-        const stride = Math.max(1, Math.floor((end - start) / 400));
-        for (let j = start; j < end; j += stride) {
-          for (let c = 0; c < numChannels; c++) {
-            const val = Math.abs(channelsData[c][j] || 0);
-            if (val > blockPeak) blockPeak = val;
-            sumSquares += val * val;
-            count++;
-          }
-        }
-        const rms = count > 0 ? Math.sqrt(sumSquares / count) : 0;
-        // Authentische Studio-Wellenform: 75% Peak-Wahrnehmung + 25% RMS-Dichte
-        const barEnergy = (blockPeak * 0.75) + (rms * 0.25);
-        rawValues.push(barEnergy);
-        if (barEnergy > maxVal) maxVal = barEnergy;
-      }
-
-      const totalSvgWidth = 800 * zoomLevel;
-      return rawValues.map((val, i) => {
-        // Natürliche logarithmisch-lineare Skalierung: Leise Passagen bleiben sichtbar, laute Stellen clippen nicht
-        const normalized = Math.min(1, Math.max(0.06, val / maxVal));
-        const height = Math.max(6, Math.round(normalized * 66 + 6));
-        const x = (i / barsCount) * totalSvgWidth + 1.2;
-        const width = Math.max(2, (totalSvgWidth / barsCount) - 3.2);
+    if (peaksSource.length > 0) {
+      return peaksSource.map((peak, i) => {
+        // peak ist normalisiert zwischen 0.06 und 1.00
+        const height = Math.max(6, Math.round(peak * 66 + 6));
+        const x = (i / peaksSource.length) * totalSvgWidth + 1.2;
+        const width = Math.max(2, (totalSvgWidth / peaksSource.length) - 3.2);
         const y = (80 - height) / 2;
         return { x, y, width, height };
       });
     }
 
-    // Organische Studio-Voransicht während des initialen Ladevorgangs
-    const organicSeed = [
-      0.15, 0.22, 0.35, 0.48, 0.65, 0.78, 0.85, 0.72, 0.55, 0.40,
-      0.30, 0.45, 0.68, 0.82, 0.92, 0.75, 0.60, 0.42, 0.28, 0.38,
-      0.58, 0.76, 0.88, 0.95, 0.70, 0.52, 0.36, 0.48, 0.70, 0.85,
-      0.90, 0.68, 0.46, 0.32, 0.44, 0.65, 0.80, 0.88, 0.72, 0.50,
-      0.34, 0.46, 0.68, 0.84, 0.90, 0.74, 0.54, 0.38, 0.26, 0.38,
-      0.56, 0.74, 0.86, 0.68, 0.48, 0.32, 0.44, 0.62, 0.78, 0.85,
-      0.65, 0.45, 0.30, 0.42, 0.60, 0.75, 0.82, 0.60, 0.40, 0.25,
-      0.35, 0.52, 0.68, 0.74, 0.55, 0.38, 0.24, 0.32, 0.45, 0.20
-    ];
-    const totalSvgWidth = 800 * zoomLevel;
-    return organicSeed.map((peak, i) => {
-      const height = Math.round(peak * 66 + 6);
-      const x = (i / organicSeed.length) * totalSvgWidth + 1.2;
-      const width = Math.max(2, (totalSvgWidth / organicSeed.length) - 3.2);
+    // Falls weder audioBuffer noch waveformPeaks verfügbar sind: neutrale Studio-Baseline (keine irreführenden Fake-Wellen!)
+    return Array.from({ length: barsCount }, (_, i) => {
+      const height = 6;
+      const x = (i / barsCount) * totalSvgWidth + 1.2;
+      const width = Math.max(2, (totalSvgWidth / barsCount) - 3.2);
       const y = (80 - height) / 2;
       return { x, y, width, height };
     });
-  }, [audioBuffer, zoomLevel]);
+  }, [audioBuffer, waveformPeaks, zoomLevel]);
 
-  // 🔄 Sync Playhead mit 60fps/120fps auf die native Audio-Hardware
+  // 🔄 Sync Playhead mit 60fps/120fps auf die native Audio-Hardware (HTML5 Fallback)
   const startPlayheadSync = useCallback(() => {
     if (animFrameRef.current) {
       cancelAnimationFrame(animFrameRef.current);
@@ -608,38 +676,123 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
   }, [duration, stopPlayback]);
 
   // ▶️ Play from specific timestamp (supports speed, looping and spot loop with 100% pitch-preservation)
-  const playFrom = useCallback((startSec: number = 0, loop = isLooping, spotRange: { start: number; end: number } | null = null) => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
+  const playFrom = useCallback(async (startSec: number = 0, loop = isLooping, spotRange: { start: number; end: number } | null = null) => {
     window.dispatchEvent(new CustomEvent('campus-global-audio-play', { detail: { playerId: 'audio_notes_preview' } }));
 
-    const currentSpeed = playbackSpeedRef.current;
-    applyPreservesPitch(audio, currentSpeed);
+    stopPlayback();
 
-    const bufDur = duration || audio.duration || 0;
-    const effectiveStart = spotRange ? spotRange.start : startSec;
-    const playStart = Math.max(0, Math.min(bufDur > 0 ? bufDur - 0.05 : effectiveStart, effectiveStart));
-
-    if (spotRange) {
-      spotLoopRangeRef.current = spotRange;
-      audio.loop = false;
-    } else {
-      spotLoopRangeRef.current = null;
-      audio.loop = loop;
+    const ctx = await getOrCreateAudioContext();
+    let buf = audioBufferRef.current;
+    if (!buf) {
+      setIsLoading(true);
+      try {
+        buf = await loadAudioBuffer();
+      } finally {
+        setIsLoading(false);
+      }
     }
 
-    audio.currentTime = playStart;
-    setCurrentPlayTime(playStart);
+    const currentSpeed = playbackSpeedRef.current;
+    const bufDur = (buf && buf.duration > 0) ? buf.duration : (duration || (audioRef.current ? audioRef.current.duration : 0) || 0);
 
-    audio.play().then(() => {
-      isPlayingRef.current = true;
-      setIsPlaying(true);
-      startPlayheadSync();
-    }).catch((err) => {
-      console.warn('[AudioNotesModal] play failed:', err);
-    });
-  }, [duration, isLooping, startPlayheadSync]);
+    const effectiveStart = spotRange ? spotRange.start : startSec;
+    let playStart = effectiveStart;
+    if (bufDur > 0 && playStart >= bufDur - 0.05) {
+      playStart = 0;
+    } else {
+      playStart = Math.max(0, Math.min(bufDur > 0 ? bufDur - 0.05 : playStart, playStart));
+    }
+
+    spotLoopRangeRef.current = spotRange;
+
+    // 1. ⚡ Primär: Shared Web Audio Engine Buffer Source (100% Safari/iOS stabil, 0ms Latenz, keine Autoplay/MIME-Hänger)
+    if (buf && ctx) {
+      try {
+        if (ctx.state === 'suspended') {
+          await ctx.resume().catch(() => {});
+        }
+        const source = ctx.createBufferSource();
+        source.buffer = buf;
+        source.playbackRate.value = currentSpeed;
+
+        if (spotRange) {
+          source.loop = true;
+          source.loopStart = Math.max(0, spotRange.start);
+          source.loopEnd = Math.min(bufDur, spotRange.end);
+        } else {
+          source.loop = loop;
+          if (loop) {
+            source.loopStart = 0;
+            source.loopEnd = bufDur;
+          }
+        }
+
+        source.connect(ctx.destination);
+        source.start(0, playStart);
+        webAudioSourceRef.current = source;
+        isWebAudioPlayingRef.current = true;
+        playStartTimestampRef.current = ctx.currentTime;
+        playStartOffsetSecRef.current = playStart;
+
+        isPlayingRef.current = true;
+        setIsPlaying(true);
+        setCurrentPlayTime(playStart);
+
+        source.onended = () => {
+          if (!loop && !spotLoopRangeRef.current && isWebAudioPlayingRef.current && webAudioSourceRef.current === source) {
+            stopPlayback();
+            setCurrentPlayTime(0);
+          }
+        };
+
+        // 🔄 60fps/120fps Playhead Synchronisation auf native Audio-Clock
+        const updatePlayhead = () => {
+          if (!isWebAudioPlayingRef.current || !webAudioSourceRef.current || !buf) return;
+          const curBufDur = buf.duration;
+          const elapsed = (ctx.currentTime - playStartTimestampRef.current) * playbackSpeedRef.current;
+          const current = playStartOffsetSecRef.current + elapsed;
+
+          if (spotLoopRangeRef.current) {
+            const { start, end } = spotLoopRangeRef.current;
+            const rangeLen = Math.max(0.1, end - start);
+            const loopTime = start + (((current - start) % rangeLen + rangeLen) % rangeLen);
+            setCurrentPlayTime(loopTime);
+          } else if (loop) {
+            setCurrentPlayTime(curBufDur > 0 ? (current % curBufDur) : 0);
+          } else {
+            setCurrentPlayTime(Math.min(curBufDur, current));
+            if (curBufDur > 0 && current >= curBufDur) {
+              stopPlayback();
+              setCurrentPlayTime(0);
+              return;
+            }
+          }
+          animFrameRef.current = requestAnimationFrame(updatePlayhead);
+        };
+        animFrameRef.current = requestAnimationFrame(updatePlayhead);
+        return;
+      } catch (webAudioErr) {
+        console.warn('[AudioNotesModal] WebAudio playback fallback to HTML5:', webAudioErr);
+      }
+    }
+
+    // 2. 🌐 Sekundär: HTML5 Audio Element Fallback
+    const audio = audioRef.current;
+    if (audio) {
+      applyPreservesPitch(audio, currentSpeed);
+      audio.loop = spotRange ? false : loop;
+      audio.currentTime = playStart;
+      setCurrentPlayTime(playStart);
+
+      audio.play().then(() => {
+        isPlayingRef.current = true;
+        setIsPlaying(true);
+        startPlayheadSync();
+      }).catch((err) => {
+        console.warn('[AudioNotesModal] HTML5 Audio play failed:', err);
+      });
+    }
+  }, [duration, isLooping, getOrCreateAudioContext, loadAudioBuffer, startPlayheadSync, stopPlayback]);
 
   // 🎧 Globales Pausieren bei fremden Audio-Events
   useEffect(() => {
@@ -656,6 +809,13 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
   const handleSetSpeed = (newSpeed: number) => {
     setPlaybackSpeed(newSpeed);
     playbackSpeedRef.current = newSpeed;
+    if (webAudioSourceRef.current && isWebAudioPlayingRef.current) {
+      try {
+        webAudioSourceRef.current.playbackRate.setValueAtTime(newSpeed, SharedAudioEngine.getContext().currentTime);
+      } catch {
+        webAudioSourceRef.current.playbackRate.value = newSpeed;
+      }
+    }
     if (audioRef.current) {
       applyPreservesPitch(audioRef.current, newSpeed);
     }
@@ -664,6 +824,13 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
   const handleToggleLoop = () => {
     setIsLooping(prev => {
       const next = !prev;
+      if (webAudioSourceRef.current && !spotLoopRangeRef.current) {
+        webAudioSourceRef.current.loop = next;
+        if (next && audioBufferRef.current) {
+          webAudioSourceRef.current.loopStart = 0;
+          webAudioSourceRef.current.loopEnd = audioBufferRef.current.duration;
+        }
+      }
       if (audioRef.current && !spotLoopRangeRef.current) {
         audioRef.current.loop = next;
       }
@@ -672,10 +839,20 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
   };
 
   const togglePlay = () => {
+    // 🛡️ Safari/iOS Gesture Unlock: AudioContext synchron im Klick-Callstack entsperren
+    try {
+      const ctx = SharedAudioEngine.getContext();
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+    } catch {}
+
     if (isPlaying) {
       stopPlayback();
     } else {
-      playFrom(currentPlayTime);
+      playFrom(currentPlayTime).catch((err) => {
+        console.warn('[AudioNotesModal] playFrom error:', err);
+      });
     }
   };
 
@@ -730,6 +907,12 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
       const start = Math.max(0, note.time - leadIn);
       const end = Math.min(duration, start + rounded);
       spotLoopRangeRef.current = { start, end };
+      if (webAudioSourceRef.current && isWebAudioPlayingRef.current) {
+        try {
+          webAudioSourceRef.current.loopStart = start;
+          webAudioSourceRef.current.loopEnd = end;
+        } catch {}
+      }
       if (audioRef.current && audioRef.current.currentTime >= end) {
         audioRef.current.currentTime = start;
         setCurrentPlayTime(start);
@@ -1484,7 +1667,12 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
                 }}
                 className="hover-scale-mini"
               >
-                {isPlaying ? (
+                {isLoading ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" />
+                    <span>Lade Audio...</span>
+                  </>
+                ) : isPlaying ? (
                   <>
                     <Square size={15} fill="currentColor" />
                     <span>Pause</span>

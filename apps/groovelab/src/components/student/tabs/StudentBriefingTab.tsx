@@ -4,7 +4,7 @@ import {
   Clock, Timer, Flame, BookOpen, Play, Pause, Square, RotateCcw, Volume2, VolumeX, X,
   Zap, Music, School, Calendar, CalendarX, Check, Target, MessageSquare, Pencil, User,
   Phone, Users, Shield, Palmtree, Settings, FileText, ThumbsUp, Heart, AlertTriangle,
-  Mic, Disc, Download, Key, Headphones, Sliders, Bell, Crown
+  Mic, Disc, Download, Key, Headphones, Sliders, SlidersHorizontal, Bell, Crown
 } from 'lucide-react';
 import { ALL_STICKERS } from '../../../domain/stickersAndTresor';
 import { UpdateAnnouncementHero } from '../../common/UpdateAnnouncementHero';
@@ -115,6 +115,8 @@ export interface StudentBriefingTabProps {
   showJuniorRecordModal: boolean;
   showJuniorRecordingsModal: boolean;
   showJuniorTimerModal: boolean;
+  isJuniorPadActive?: boolean;
+  setIsJuniorPadActive?: React.Dispatch<React.SetStateAction<boolean>>;
   songStats: any;
   songs: any[];
   startJuniorRecordingFlow: () => void;
@@ -239,6 +241,8 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
     showJuniorRecordModal,
     showJuniorRecordingsModal,
     showJuniorTimerModal,
+    isJuniorPadActive,
+    setIsJuniorPadActive,
     songStats,
     songs,
     startJuniorRecordingFlow,
@@ -3498,6 +3502,36 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         gap: '24px',
                         textAlign: 'center'
                       }}>
+                        {/* 🎛️ Instrumenten-PAD Button (-6 dB Dämpfung für dynamikstarke Instrumente / Slap-Transienten) */}
+                        {setIsJuniorPadActive && (
+                          <button
+                            type="button"
+                            onClick={() => setIsJuniorPadActive(prev => !prev)}
+                            aria-label={isJuniorPadActive ? "Instrumenten-PAD aktiv (-6 dB Headroom-Dämpfung)" : "Instrumenten-PAD inaktiv (Standard 0 dB)"}
+                            title={isJuniorPadActive ? "PAD aktiv: -6 dB Headroom für dynamikstarke Instrumente / Slap-Gitarre" : "PAD: -6 dB Headroom-Dämpfung zuschalten"}
+                            style={{
+                              position: 'absolute',
+                              top: '24px',
+                              left: '24px',
+                              background: isJuniorPadActive ? '#0f172a' : '#f1f5f9',
+                              border: isJuniorPadActive ? '1.5px solid #0f172a' : '1.5px solid #cbd5e1',
+                              width: '44px',
+                              height: '44px',
+                              borderRadius: '12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              color: isJuniorPadActive ? '#ffffff' : '#64748b',
+                              boxShadow: isJuniorPadActive ? '0 2px 8px rgba(15, 23, 42, 0.25)' : 'none',
+                              transition: 'all 0.15s ease'
+                            }}
+                            className="hover-scale-mini"
+                          >
+                            <SlidersHorizontal size={18} color={isJuniorPadActive ? '#ffffff' : '#64748b'} strokeWidth={isJuniorPadActive ? 2.4 : 2} />
+                          </button>
+                        )}
+
                         <button
                           onClick={cancelJuniorRecording}
                           style={{

@@ -19,6 +19,7 @@ import { getSecureAudioUrl, buildCanonicalAudioStoragePath, computeBlobSha256 } 
 import { useFocusInterruptionGuard } from '../../hooks/useFocusInterruptionGuard';
 import { FocusInterruptionBanner } from '../focus/FocusInterruptionBanner';
 import { FocusAbortedModal } from '../focus/FocusAbortedModal';
+import { extractWaveformPeaks } from '../../utils/waveformHelper';
 
 // Helper to decode Base64 WAV into AudioBuffer with true header sample rate
 const decodeBase64Wav = (ctx: AudioContext | BaseAudioContext, b64Uri: string): AudioBuffer => {
@@ -119,7 +120,7 @@ async function mixMicWithDirectBackingBeat(
   style: string,
   variation: 'A' | 'B' | 'C',
   meter: string = '4/4'
-): Promise<{ processedBlob: Blob; processedUrl: string; durationSec: number }> {
+): Promise<{ processedBlob: Blob; processedUrl: string; durationSec: number; waveformPeaks?: number[] }> {
   try {
     const arrayBuffer = await micBlob.arrayBuffer();
     const tempCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -520,11 +521,13 @@ async function mixMicWithDirectBackingBeat(
       artist: 'Campus-Groovelab'
     });
     const processedUrl = URL.createObjectURL(wavBlob);
+    const peaks = extractWaveformPeaks(renderedBuffer, 80);
 
     return {
       processedBlob: wavBlob,
       processedUrl,
-      durationSec: Math.round(renderedBuffer.duration * 10) / 10
+      durationSec: Math.round(renderedBuffer.duration * 10) / 10,
+      waveformPeaks: peaks
     };
   } catch (err) {
     console.warn('[mixMicWithDirectBackingBeat] Falling back to pure raw blob:', err);
@@ -536,7 +539,8 @@ async function mixMicWithDirectBackingBeat(
     return {
       processedBlob: fallback.processedBlob,
       processedUrl: fallback.processedUrl,
-      durationSec: fallback.durationSec
+      durationSec: fallback.durationSec,
+      waveformPeaks: []
     };
   }
 }
@@ -669,7 +673,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
   const [recordSeconds, setRecordSeconds] = useState(0);
   const [isCountingIn, setIsCountingIn] = useState(false);
   const [countInBeat, setCountInBeat] = useState<number>(1);
-  const [pendingPreviewTake, setPendingPreviewTake] = useState<{ id: string; blob: Blob; blobUrl: string; duration: number; title: string; label: string; date: Date; bpm: number; style: string } | null>(null);
+  const [pendingPreviewTake, setPendingPreviewTake] = useState<{ id: string; blob: Blob; blobUrl: string; duration: number; title: string; label: string; date: Date; bpm: number; style: string; waveformPeaks?: number[] } | null>(null);
   const [savedTakeSuccessToast, setSavedTakeSuccessToast] = useState<string | null>(null);
   const [isSavingTake, setIsSavingTake] = useState(false);
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
@@ -1276,6 +1280,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
         const rhythmLabel = styleNames[selectedStyleRef.current || 'metronome'] || 'Begleit-Rhythmus';
         const recTitle = `Übe-Begleiter: ${rhythmLabel} (${bpmRef.current} BPM)`;
 
+        let takePeaks: number[] = [];
         try {
           const mixResult = await mixMicWithDirectBackingBeat(
             rawBlob,
@@ -1284,6 +1289,9 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             selectedVariationRef.current,
             metronomeMeterRef.current
           );
+          if (mixResult.waveformPeaks && mixResult.waveformPeaks.length > 0) {
+            takePeaks = mixResult.waveformPeaks;
+          }
           finalBlob = mixResult.processedBlob;
           blobUrl = mixResult.processedUrl;
           if (mixResult.durationSec) durationSec = Math.round(mixResult.durationSec);
@@ -1314,7 +1322,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
           label: recTitle,
           date: new Date(),
           bpm: bpmRef.current,
-          style: selectedStyleRef.current
+          style: selectedStyleRef.current,
+          waveformPeaks: takePeaks
         });
         setPreviewCurrentTime(0);
         setPreviewProgress(0);
@@ -1420,6 +1429,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
         bpm: pendingPreviewTake.bpm,
         style: pendingPreviewTake.style,
         songTag,
+        waveformPeaks: pendingPreviewTake.waveformPeaks || [],
         cloudSyncStatus: 'pending' as const
       };
 

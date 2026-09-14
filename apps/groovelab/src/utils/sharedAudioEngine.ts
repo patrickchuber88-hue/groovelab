@@ -14,6 +14,7 @@ export class SharedAudioEngine {
   private static isVisibilityListenerAttached = false;
   private static silentAudioElement: HTMLAudioElement | null = null;
   private static activePracticeSessionCount = 0;
+  private static registeredWorklets: Set<string> = new Set();
 
   /**
    * 📱 iOS Safari Silent Audio Loop for Hardware Mute Switch Bypass.
@@ -185,6 +186,19 @@ export class SharedAudioEngine {
     } catch (e) {
       console.warn('[SharedAudioEngine] Unlock error:', e);
     }
+  }
+
+  /**
+   * Idempotently registers an AudioWorklet module URL into the shared AudioContext.
+   */
+  public static async registerWorkletModule(moduleUrl: string): Promise<void> {
+    if (this.registeredWorklets.has(moduleUrl)) return;
+    const ctx = this.getContext();
+    if (!ctx.audioWorklet) {
+      throw new Error('[SharedAudioEngine] AudioWorklet is not supported in this browser.');
+    }
+    await ctx.audioWorklet.addModule(moduleUrl);
+    this.registeredWorklets.add(moduleUrl);
   }
 
   /**

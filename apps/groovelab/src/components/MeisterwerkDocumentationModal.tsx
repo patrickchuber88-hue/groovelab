@@ -23,6 +23,7 @@ import { synthesizeNeuralSpeech, playAudioBlob, stopNeuralSpeech, buildContinuou
 import { isDevEnvironment, getCanonicalQrLandingUrl } from '../utils/tenantUrlHelper';
 import { generateStudentHomeworkPrintoutPDF } from '../utils/pdfGenerator';
 import { formatTeacherFullName, capitalizeFirstLetter, formatSongTitleCase, copyTextToClipboard, maskLastName } from '../utils/nameHelper';
+import { shouldDefaultToInputPad } from '../utils/instruments';
 import { AudioWaveformVisualizer } from './ui/AudioWaveformVisualizer';
 import { harmonizeAudioList, formatHarmonizedAudioTitle, cleanSongOrBookTitle, extractBaseTopic, formatAudioDate, getNextSequentialTakeNumber } from '../utils/audioNamingHelper';
 import { HomeworkTransferModal } from './campus/HomeworkTransferModal';
@@ -2472,6 +2473,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     recordingBpmRef.current = recordingBpm;
   }, [recordingBpm]);
 
+  // 🎛️ Recording Headroom-PAD State (-6 dB Dämpfung für dynamikstarke Instrumente / Slap-Transienten)
+  const [isRecordingPadActive, setIsRecordingPadActive] = useState<boolean>(() => shouldDefaultToInputPad(student));
+  const isRecordingPadActiveRef = useRef<boolean>(isRecordingPadActive);
+
+  useEffect(() => {
+    isRecordingPadActiveRef.current = isRecordingPadActive;
+  }, [isRecordingPadActive]);
+
   useEffect(() => {
     if (!showRecordingMetronomePopup) return;
     const handleOutside = (e: MouseEvent | TouchEvent) => {
@@ -2952,8 +2961,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           }, () => {});
       }
 
-      // 192 kbps Transparent Studio Audio (Opus 48kHz Stereo) when Audio-Tresor is booked, else 128 kbps
-      const targetBitrate = effectiveTresor ? 192000 : 128000;
+      // 🏛️ 320 kbps Broadcast Studio-Grade Audio (Maximum Opus/AAC transparency, zero transient smearing)
+      const targetBitrate = 320000;
       let mimeType = 'audio/webm;codecs=opus';
       if (typeof MediaRecorder !== 'undefined') {
         if (!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
@@ -2996,11 +3005,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         let blob: Blob = rawBlob;
         let url = '';
         try {
-          // 🌟 100% PURE RAW Universal Limiter Normalization (-14.5 LUFS / max 3.0 dB GR)
+          // 🌟 100% PURE RAW Universal Limiter Normalization (-14.5 LUFS / max 3.0 dB GR) with Headroom PAD
           const pureRawRes = await processPureRawBlob(rawBlob, { 
             targetLufs: TARGET_PURE_RAW_LUFS, 
             targetPeakDb: TARGET_PEAK_DBTP,
-            maxLimiterGrDb: MAX_PURE_RAW_LIMITER_GR_DB
+            maxLimiterGrDb: MAX_PURE_RAW_LIMITER_GR_DB,
+            padActive: isRecordingPadActiveRef.current
           });
           blob = pureRawRes.processedBlob;
           url = pureRawRes.processedUrl;
@@ -3014,7 +3024,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             const pureRawFallback = await processPureRawBlob(rawBlob, {
               targetLufs: TARGET_PURE_RAW_LUFS,
               targetPeakDb: TARGET_PEAK_DBTP,
-              maxLimiterGrDb: MAX_PURE_RAW_LIMITER_GR_DB
+              maxLimiterGrDb: MAX_PURE_RAW_LIMITER_GR_DB,
+              padActive: isRecordingPadActiveRef.current
             });
             blob = pureRawFallback.processedBlob;
             url = pureRawFallback.processedUrl;
@@ -3884,8 +3895,49 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       return;
     }
     const currentWeek = getISOWeek();
-    const allNotesJson = JSON.stringify(notesList);
-    const cleanNotesJson = JSON.stringify(notesList.filter(n => !n.startsWith('AUDIO:')));
+
+    // 🛡️ Enterprise+ Safe-Merge Protection:
+    // Never allow an incoming notesList to accidentally discard existing AUDIO: attachments or SNAPSHOT_ entries
+    const dummyWeeklyItem = progressItems.find(item => 
+      item.topic_name.startsWith('Hausaufgabe KW ') && 
+      getItemWeek(item) === currentWeek
+    );
+
+    const effectiveMergedList = [...notesList];
+    if (dummyWeeklyItem && dummyWeeklyItem.homework_notes) {
+      try {
+        const rawExisting = dummyWeeklyItem.homework_notes;
+        let existingArr: string[] = [];
+        if (typeof rawExisting === 'string') {
+          try { existingArr = JSON.parse(rawExisting); } catch { existingArr = [rawExisting]; }
+        } else if (Array.isArray(rawExisting)) {
+          existingArr = rawExisting;
+        }
+        if (Array.isArray(existingArr)) {
+          existingArr.forEach(exNote => {
+            if (typeof exNote === 'string' && exNote.includes('AUDIO:')) {
+              const exParts = exNote.substring(exNote.indexOf('AUDIO:') + 6).split('|');
+              const exUrl = exParts[0]?.trim();
+              const alreadyPresent = effectiveMergedList.some(m => typeof m === 'string' && m.includes('AUDIO:') && m.includes(exUrl));
+              if (!alreadyPresent && exUrl) {
+                effectiveMergedList.push(exNote);
+              }
+            } else if (typeof exNote === 'string' && (exNote.startsWith('SNAPSHOT_LEHRWERKE:') || exNote.startsWith('SNAPSHOT_SONGS:'))) {
+              const prefix = exNote.startsWith('SNAPSHOT_LEHRWERKE:') ? 'SNAPSHOT_LEHRWERKE:' : 'SNAPSHOT_SONGS:';
+              const alreadyHasSnap = effectiveMergedList.some(m => typeof m === 'string' && m.startsWith(prefix));
+              if (!alreadyHasSnap) {
+                effectiveMergedList.push(exNote);
+              }
+            }
+          });
+        }
+      } catch (mergeErr) {
+        console.warn('[syncHomeworkNotes] Safe-merge inspection notice:', mergeErr);
+      }
+    }
+
+    const allNotesJson = JSON.stringify(effectiveMergedList);
+    const cleanNotesJson = JSON.stringify(effectiveMergedList.filter(n => !n.startsWith('AUDIO:')));
 
     // Always backup to localStorage across all candidate IDs
     try {
@@ -3912,7 +3964,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             if (Array.isArray(parsed)) existingVault = parsed;
           } catch {}
         }
-        const audioNotesToKeep = notesList.filter(n => typeof n === 'string' && n.startsWith('AUDIO:'));
+        const audioNotesToKeep = effectiveMergedList.filter(n => typeof n === 'string' && n.startsWith('AUDIO:'));
         let vaultChanged = false;
         audioNotesToKeep.forEach(an => {
           if (!existingVault.includes(an)) {
@@ -3929,11 +3981,6 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
 
     try {
-      const dummyWeeklyItem = progressItems.find(item => 
-        item.topic_name.startsWith('Hausaufgabe KW ') && 
-        getItemWeek(item) === currentWeek
-      );
-
       if (dummyWeeklyItem) {
         const { error } = await supabase
           .from('progress_matrix')
@@ -3966,6 +4013,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     } catch (dbErr) {
       console.warn('[syncHomeworkNotes] Supabase sync notice (cached locally):', dbErr);
     }
+    notifyHomeworkChange();
   };
 
 
@@ -4472,23 +4520,28 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     // 2. Broadcast on Supabase channel for cross-browser / cross-device real-time websocket sync
     try {
       const channel = supabase.channel(`realtime_student_progress_${student.id}`);
-      const fallbackTimer = setTimeout(() => supabase.removeChannel(channel), 5000);
-      try {
-        await channel.send({
+      channel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          channel.send({
+            type: 'broadcast',
+            event: 'homework-changed',
+            payload: { studentId: student.id }
+          });
+        }
+      });
+      if ((channel as any).state === 'joined') {
+        channel.send({
           type: 'broadcast',
           event: 'homework-changed',
           payload: { studentId: student.id }
         });
-      } finally {
-        clearTimeout(fallbackTimer);
-        setTimeout(() => supabase.removeChannel(channel), 1000);
       }
     } catch (e) {
       console.warn('Realtime broadcast error:', e);
     }
   };
 
-  // 🔄 Reactive Auto-Sync: Refresh progress immediately when homework is updated elsewhere
+  // 🔄 Reactive Auto-Sync: Refresh progress immediately when homework is updated elsewhere (Cross-Device & Same-Window)
   useEffect(() => {
     const candidateIds = new Set([
       student.id,
@@ -4498,18 +4551,44 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       (student as any)?.slot_id
     ].filter(Boolean));
 
-    const handleHwUpdate = (e: Event) => {
+    const handleHwUpdate = (e?: Event) => {
       const detail = (e as CustomEvent)?.detail;
       if (!detail?.studentId || candidateIds.has(detail.studentId)) {
         fetchProgress();
+        loadActiveSongSkills();
+        loadLehrwerke();
       }
     };
 
     window.addEventListener('homework-updated', handleHwUpdate);
     window.addEventListener('campus_homework_updated', handleHwUpdate);
+    window.addEventListener('campus_student_question_updated', handleHwUpdate);
+
+    // 🌐 Cross-Device Realtime WebSocket Channel
+    let realtimeChannel: any = null;
+    if (student.id && student.id !== 'teacher-self') {
+      try {
+        realtimeChannel = supabase.channel(`realtime_student_progress_${student.id}`);
+        realtimeChannel
+          .on('broadcast', { event: 'homework-changed' }, (payload: any) => {
+            const sid = payload?.payload?.studentId;
+            if (!sid || candidateIds.has(sid)) {
+              handleHwUpdate();
+            }
+          })
+          .subscribe();
+      } catch (rtErr) {
+        console.warn('[MeisterwerkDocumentationModal] Realtime channel subscription notice:', rtErr);
+      }
+    }
+
     return () => {
       window.removeEventListener('homework-updated', handleHwUpdate);
       window.removeEventListener('campus_homework_updated', handleHwUpdate);
+      window.removeEventListener('campus_student_question_updated', handleHwUpdate);
+      if (realtimeChannel) {
+        supabase.removeChannel(realtimeChannel);
+      }
     };
   }, [student.id, (student as any)?.student_id]);
 
@@ -8444,7 +8523,11 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           .from('user_song_skills')
           .update({
             is_stage_ready: targetStatus === 'MASTERED',
-            progress_percent: skillPercent
+            progress_percent: skillPercent,
+            is_current_homework: targetHomework,
+            homework_notes: noteToSave,
+            teacher_notes: teacherNoteToSave,
+            status: targetStatus
           })
           .eq('id', skillId);
       }
@@ -8492,6 +8575,91 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           .single();
         if (!error && data) {
           savedItem = data;
+        }
+      }
+
+      // 🛡️ Fail-Safe Cross-Device & Mobile PWA Snapshot Synchronization:
+      // Keep weekly snapshot row in progress_matrix in sync with SNAPSHOT_SONGS
+      const currentWeek = getISOWeek();
+      const currentWeekNum = currentWeek.split('-W')[1];
+      const weeklySnapshotItem = progressItems.find(item => 
+        item.topic_name.startsWith('Hausaufgabe KW ') && 
+        (getItemWeek(item) === currentWeek || item.topic_name === `Hausaufgabe KW ${currentWeekNum}` || item.topic_name === `Hausaufgabe KW ${parseInt(currentWeekNum, 10)}`)
+      );
+
+      const targetSongObj = {
+        id: skillId || existingItem?.id || ('song-' + Date.now()),
+        song_id: skill?.song_id || skill?.songs?.id || skillId,
+        topic_name: fullTitle,
+        title: songTitle,
+        artist: songArtist,
+        instrument: skill?.instrument || '',
+        is_current_homework: targetHomework,
+        status: targetStatus,
+        homework_notes: noteToSave,
+        teacher_notes: teacherNoteToSave
+      };
+
+      let currentSnapSongs: any[] = [];
+      let existingNotesArr: string[] = [];
+      if (weeklySnapshotItem && weeklySnapshotItem.homework_notes) {
+        try {
+          const rawNotes = weeklySnapshotItem.homework_notes;
+          existingNotesArr = typeof rawNotes === 'string' ? JSON.parse(rawNotes) : rawNotes;
+          if (!Array.isArray(existingNotesArr)) existingNotesArr = [String(rawNotes)];
+          const snapEntry = existingNotesArr.find(n => typeof n === 'string' && n.startsWith('SNAPSHOT_SONGS:'));
+          if (snapEntry) {
+            currentSnapSongs = JSON.parse(snapEntry.substring('SNAPSHOT_SONGS:'.length));
+          }
+        } catch {}
+      }
+
+      let updatedSnapSongs = (Array.isArray(currentSnapSongs) ? currentSnapSongs : []).filter(
+        s => !isSongMatch(s, skill || { topic_name: fullTitle })
+      );
+      if (targetHomework) {
+        updatedSnapSongs.push(targetSongObj);
+      }
+
+      const cleanedWeeklyNotes = existingNotesArr.filter(
+        n => typeof n === 'string' && !n.startsWith('SNAPSHOT_SONGS:')
+      );
+      if (updatedSnapSongs.length > 0) {
+        cleanedWeeklyNotes.push(`SNAPSHOT_SONGS:${JSON.stringify(updatedSnapSongs)}`);
+      }
+
+      const snapPayloadJson = JSON.stringify(cleanedWeeklyNotes);
+
+      if (weeklySnapshotItem) {
+        await supabase
+          .from('progress_matrix')
+          .update({
+            homework_notes: snapPayloadJson,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', weeklySnapshotItem.id);
+
+        setProgressItems(prev => (prev || []).map(p => 
+          p.id === weeklySnapshotItem.id ? { ...p, homework_notes: snapPayloadJson, updated_at: new Date().toISOString() } : p
+        ));
+      } else if (targetHomework) {
+        const { data: newSnap } = await supabase
+          .from('progress_matrix')
+          .insert({
+            student_id: student.id,
+            teacher_id: activeTId,
+            topic_name: `Hausaufgabe KW ${currentWeekNum}`,
+            status: 'IN_PROGRESS',
+            is_current_homework: true,
+            teacher_notes: teacherNoteToSave,
+            homework_notes: snapPayloadJson,
+            updated_at: new Date().toISOString()
+          })
+          .select()
+          .maybeSingle();
+
+        if (newSnap) {
+          setProgressItems(prev => [newSnap, ...(prev || [])]);
         }
       }
 
@@ -8608,8 +8776,44 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       const isoNow = new Date().toISOString();
       const tag = `STUDENT_QUESTION:${isoNow}|${trimmed}`;
 
-      // 1. Optimistic local state update
-      const filtered = (homeworkNotesList || []).filter(
+      // 1. Optimistic local state update with Safe-Merge Protection
+      const currentWeek = getISOWeek();
+      const currentWeekNum = currentWeek.split('-W')[1];
+      const weeklySnapshotItem = progressItems.find(item => 
+        item.topic_name.startsWith('Hausaufgabe KW ') && 
+        (getItemWeek(item) === currentWeek || item.topic_name === `Hausaufgabe KW ${currentWeekNum}` || item.topic_name === `Hausaufgabe KW ${parseInt(currentWeekNum, 10)}`)
+      );
+
+      let existingSnapNotes: string[] = [];
+      if (weeklySnapshotItem?.homework_notes) {
+        try {
+          const raw = typeof weeklySnapshotItem.homework_notes === 'string'
+            ? JSON.parse(weeklySnapshotItem.homework_notes)
+            : weeklySnapshotItem.homework_notes;
+          if (Array.isArray(raw)) existingSnapNotes = raw;
+        } catch {}
+      }
+
+      // Merge existing notes from weeklySnapshotItem so AUDIO: or SNAPSHOT_ are never dropped
+      const mergedList = [...(homeworkNotesList || [])];
+      existingSnapNotes.forEach(sn => {
+        if (typeof sn === 'string' && (sn.includes('AUDIO:') || sn.startsWith('SNAPSHOT_'))) {
+          const isAudio = sn.includes('AUDIO:');
+          if (isAudio) {
+            const url = sn.substring(sn.indexOf('AUDIO:') + 6).split('|')[0]?.trim();
+            if (url && !mergedList.some(m => typeof m === 'string' && m.includes('AUDIO:') && m.includes(url))) {
+              mergedList.push(sn);
+            }
+          } else {
+            const pfx = sn.startsWith('SNAPSHOT_LEHRWERKE:') ? 'SNAPSHOT_LEHRWERKE:' : (sn.startsWith('SNAPSHOT_SONGS:') ? 'SNAPSHOT_SONGS:' : '');
+            if (pfx && !mergedList.some(m => typeof m === 'string' && m.startsWith(pfx))) {
+              mergedList.push(sn);
+            }
+          }
+        }
+      });
+
+      const filtered = mergedList.filter(
         n => typeof n === 'string' && !n.startsWith('STUDENT_QUESTION:') && !n.startsWith('❓ Frage für den Unterricht:')
       );
       const updatedList = [tag, ...filtered];
@@ -8631,6 +8835,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('campus_student_question_updated', { detail: { studentId: student.id } }));
       }
+      notifyHomeworkChange();
       setIsQuestionEditorOpen(false);
       setQuestionDraftText('');
       setStudentNotesSavedToast(true);
@@ -8663,6 +8868,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('campus_student_question_updated', { detail: { studentId: student.id } }));
       }
+      notifyHomeworkChange();
       setIsQuestionEditorOpen(false);
       setQuestionDraftText('');
     } catch (err) {
@@ -11270,6 +11476,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               isMobileOrSim={isMobileOrSim}
               isRecordingAudio={isRecordingAudio}
               isRecordingMetronomeActive={isRecordingMetronomeActive}
+              isRecordingPadActive={isRecordingPadActive}
+              setIsRecordingPadActive={setIsRecordingPadActive}
               isSharingToPlaylist={isSharingToPlaylist}
               isStudentWeekExpanded={isStudentWeekExpanded}
               isTeacherHomeworkExpanded={isTeacherHomeworkExpanded}

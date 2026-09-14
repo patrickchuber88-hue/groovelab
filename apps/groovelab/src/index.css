@@ -3118,6 +3118,10 @@ input[type="range"]::-moz-range-thumb {
       padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4px) !important;
     }
   }
+
+  .pwa-standalone-mode .mobile-bottom-nav {
+    padding-bottom: calc(var(--safe-area-inset-bottom, 34px) + 4px) !important;
+  }
 }
 
 /* ==========================================================================
