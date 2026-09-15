@@ -41,15 +41,12 @@ const GrooveLabMessagesBoard = lazy(() => import('./components/GrooveLabMessages
 const StudentOnboardingPage = lazy(() => import('./components/StudentOnboardingPage').then(m => ({ default: m.StudentOnboardingPage })));
 const DeviceOnboardingPage = lazy(() => import('./components/DeviceOnboardingPage').then(m => ({ default: m.DeviceOnboardingPage })));
 const SchoolSelfOnboardingModal = lazy(() => import('./components/SchoolSelfOnboardingModal').then(m => ({ default: m.SchoolSelfOnboardingModal })));
-const CampusPinUnlockModal = lazy(() => import('./components/CampusPinUnlockModal').then(m => ({ default: m.CampusPinUnlockModal })));
 const GhostSupportCapsule = lazy(() => import('./components/masterAdmin/GhostSupportCapsule').then(m => ({ default: m.GhostSupportCapsule })));
 const SharedAudioBiographyPage = lazy(() => import('./components/campus/SharedAudioBiographyPage').then(m => ({ default: m.SharedAudioBiographyPage })));
 const HelpCenterModal = lazy(() => import('./components/help/HelpCenterModal').then(m => ({ default: m.HelpCenterModal })));
 const TrialInfoModal = lazy(() => import('./components/TrialInfoModal').then(m => ({ default: m.TrialInfoModal })));
-const AdminSecuritySuiteModal = lazy(() => import('./components/AdminSecuritySuiteModal').then(m => ({ default: m.AdminSecuritySuiteModal })));
-const QuarterlyAccessReportModal = lazy(() => import('./components/ui/QuarterlyAccessReportModal').then(m => ({ default: m.QuarterlyAccessReportModal })));
-const SessionLockModal = lazy(() => import('./components/ui/SessionLockModal').then(m => ({ default: m.SessionLockModal })));
 import { LegalModalsHub } from './components/modals/LegalModalsHub';
+import { SecurityAuthModalsHub } from './components/modals/SecurityAuthModalsHub';
 const ConfettiModal = lazy(() => import('./components/ConfettiModal'));
 const MaintenanceLockoutOverlay = lazy(() => import('./components/MaintenanceLockoutOverlay').then(m => ({ default: m.MaintenanceLockoutOverlay })));
 const GlobalBroadcastBanner = lazy(() => import('./components/GlobalBroadcastBanner').then(m => ({ default: m.GlobalBroadcastBanner })));
@@ -14749,31 +14746,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
         </Suspense>
       )}
 
-      {showCampusPinPrompt && (
-        <Suspense fallback={null}>
-          <CampusPinUnlockModal 
-            user={user}
-            supabase={supabase}
-            schoolData={school}
-            onUnlock={() => {
-              setIsCampusUnlocked(true);
-              setShowCampusPinPrompt(false);
-              const wasScreenLocked = isScreenLockedByInactivity;
-              setIsScreenLockedByInactivity(false);
-              if (!wasScreenLocked) {
-                setActivePlatform('campus');
-                const isStaff = user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'secretary';
-                const startTab = isStaff ? 'live' : 'briefing';
-                setActiveStudentTab(startTab);
-                localStorage.setItem('campus_active_tab', startTab);
-              }
-            }}
-            onClose={() => {
-              setShowCampusPinPrompt(false);
-            }}
-          />
-        </Suspense>
-      )}
+
 
       {/* Global Leitfäden & Akademie Modal */}
       {isGlobalHelpCenterOpen && (
@@ -16066,44 +16039,44 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
         />
       )}
 
-      {showAdminSecuritySuiteModal && (school?.id || user?.school_id || (Array.isArray(user?.schools) ? user?.schools[0]?.id : user?.schools?.id)) && (
-        <Suspense fallback={null}>
-          <AdminSecuritySuiteModal
-            schoolId={school?.id || user?.school_id || (Array.isArray(user?.schools) ? user?.schools[0]?.id : user?.schools?.id)}
-            onClose={() => setShowAdminSecuritySuiteModal(false)}
-            onOpenAccessReport={() => setShowQuarterlyAccessReportModal(true)}
-          />
-        </Suspense>
-      )}
-
-      {showQuarterlyAccessReportModal && (
-        <Suspense fallback={null}>
-          <QuarterlyAccessReportModal
-            school={school || (Array.isArray(user?.schools) ? user?.schools[0] : user?.schools)}
-            schoolUsers={schoolUsers || []}
-            onClose={() => setShowQuarterlyAccessReportModal(false)}
-          />
-        </Suspense>
-      )}
-
-      {/* 🔒 Universal 45-Minute Inactivity Screen Lock (Enterprise Goldstandard) */}
-      {isScreenLockedByInactivity && (
-        <Suspense fallback={null}>
-          <SessionLockModal
-            user={user}
-            supabase={supabase}
-            schoolData={school}
-            activePlatform={activePlatform}
-            onUnlock={() => {
-              setIsScreenLockedByInactivity(false);
-              setIsCampusUnlocked(true);
-            }}
-            onLogout={() => {
-              handleLogout(true, false);
-            }}
-          />
-        </Suspense>
-      )}
+      {/* 🛡️ Universal Security & Auth Modals Hub (OWASP ASVS Level 3) */}
+      <SecurityAuthModalsHub
+        user={user}
+        school={school}
+        schoolUsers={schoolUsers}
+        supabase={supabase}
+        activePlatform={activePlatform}
+        showAdminSecuritySuiteModal={showAdminSecuritySuiteModal}
+        onCloseAdminSecuritySuite={() => setShowAdminSecuritySuiteModal(false)}
+        showQuarterlyAccessReportModal={showQuarterlyAccessReportModal}
+        onOpenQuarterlyAccessReport={() => setShowQuarterlyAccessReportModal(true)}
+        onCloseQuarterlyAccessReport={() => setShowQuarterlyAccessReportModal(false)}
+        isScreenLockedByInactivity={isScreenLockedByInactivity}
+        onUnlockSession={() => {
+          setIsScreenLockedByInactivity(false);
+          setIsCampusUnlocked(true);
+        }}
+        onLogoutSession={() => {
+          handleLogout(true, false);
+        }}
+        showCampusPinPrompt={showCampusPinPrompt}
+        onCloseCampusPinPrompt={() => {
+          setShowCampusPinPrompt(false);
+        }}
+        onUnlockCampusPin={() => {
+          setIsCampusUnlocked(true);
+          setShowCampusPinPrompt(false);
+          const wasScreenLocked = isScreenLockedByInactivity;
+          setIsScreenLockedByInactivity(false);
+          if (!wasScreenLocked) {
+            setActivePlatform('campus');
+            const isStaff = user?.role === 'teacher' || user?.role === 'admin' || user?.role === 'secretary';
+            const startTab = isStaff ? 'live' : 'briefing';
+            setActiveStudentTab(startTab);
+            localStorage.setItem('campus_active_tab', startTab);
+          }
+        }}
+      />
 
 
 

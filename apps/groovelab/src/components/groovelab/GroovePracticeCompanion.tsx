@@ -2370,8 +2370,17 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             playKlopfgeistClick(ctx, noteTime, isAcc, mVol * gainMul, masterGain);
           }
           triggerVisualBeat(beatIdx);
-        } else if (!isMutedBar && subdivisionRef.current !== '1') {
-          // Subdivisions (Eighths / 16ths):
+
+          // 🎶 Triolen-Unterteilung ('3'): 3 Schläge pro Viertel (Hauptschlag + 2 Triolen-Zwischenschläge)
+          if (!isMutedBar && subdivisionRef.current === '3') {
+            const beatDuration = 60.0 / bpmRef.current;
+            const trip1Time = noteTime + (beatDuration / 3);
+            const trip2Time = noteTime + (beatDuration * 2 / 3);
+            playSubdivisionClick(ctx, trip1Time, mVol * 0.35, masterGain);
+            playSubdivisionClick(ctx, trip2Time, mVol * 0.35, masterGain);
+          }
+        } else if (!isMutedBar && subdivisionRef.current !== '1' && subdivisionRef.current !== '3') {
+          // Gerade Unterteilungen (Achtel '2' / Sechzehntel '4'):
           const isEighth = step % 2 === 0;
           if (subdivisionRef.current === '2' && isEighth) {
             playSubdivisionClick(ctx, noteTime, mVol * 0.35, masterGain);
@@ -3008,7 +3017,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 title="Notenständer-Großansicht"
               >
                 <Maximize2 size={11} />
-                <span>Bühne</span>
+                <span>Notenständer</span>
               </button>
             </div>
           </div>
@@ -3060,7 +3069,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               }}>
                 <Activity size={24} color="#facc15" style={{ transform: isPlaying ? 'scale(1.15)' : 'scale(1)', transition: 'transform 0.08s' }} />
                 <span style={{ fontSize: '0.56rem', fontWeight: 900, color: '#facc15', letterSpacing: '0.04em', marginTop: '2px' }}>
-                  {isPlaying ? 'POCKET' : 'BEAT'}
+                  {isPlaying ? 'IM TAKT' : 'BEREIT'}
                 </span>
               </div>
             </div>
@@ -3387,7 +3396,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     transition: 'all 0.08s ease',
                     position: 'relative'
                   }}
-                  title={`Schlag ${idx + 1}: ${isAccent ? 'Akzent (Klick)' : isGhost ? 'Leise (Ghost)' : isMute ? 'Stumm' : 'Normal'} - Tippen zum Wechseln`}
+                  title={`Schlag ${idx + 1}: ${isAccent ? 'Betont (Laut)' : isGhost ? 'Leise (Gedämpft)' : isMute ? 'Stumm' : 'Normal'} – Antippen zum Wechseln`}
                 >
                   <span style={{ fontSize: '0.48rem', fontWeight: 900, lineHeight: 1, marginBottom: '1px' }}>
                     {isAccent ? '👑' : isGhost ? '•' : isMute ? '✕' : ''}
@@ -3649,7 +3658,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   cursor: 'pointer'
                 }}
               >
-                ⚡ Tap Tempo
+                ⚡ Tempo einklopfen
               </button>
               <span>240 Schnell</span>
             </div>
@@ -3679,7 +3688,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Flame size={14} style={{ color: speedTrainerActive ? '#ea580c' : '#ca8a04' }} />
-                <span>Übe-Tools {speedTrainerActive ? '🔥 Speed-Trainer an' : muteBarActive ? '🧠 Mute-Bar an' : ''}</span>
+                <span>Übe-Werkzeuge {speedTrainerActive ? '🔥 Tempo-Trainer an' : muteBarActive ? '🧠 Stummtakt an' : ''}</span>
               </div>
               <span style={{ fontSize: '0.64rem', color: '#64748b' }}>
                 {showToolsDrawer ? 'Schließen ▲' : 'Öffnen ▼'}
@@ -3698,7 +3707,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 gap: '10px',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
               }}>
-                {/* 1. Speed-Trainer */}
+                {/* 1. Tempo-Trainer */}
                 <div style={{
                   padding: '8px',
                   borderRadius: '8px',
@@ -3708,7 +3717,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                       <Flame size={13} style={{ color: '#ea580c' }} />
-                      <span style={{ fontSize: '0.72rem', fontWeight: 850, color: '#9a3412' }}>Speed-Trainer</span>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 850, color: '#9a3412' }}>Tempo-Trainer</span>
                     </div>
                     <button
                       type="button"
@@ -3745,7 +3754,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   )}
                 </div>
 
-                {/* 2. Mute-Bar Inner-Clock Challenge */}
+                {/* 2. Stummtakt-Herausforderung */}
                 <div style={{
                   padding: '8px',
                   borderRadius: '8px',
@@ -3755,7 +3764,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: muteBarActive ? '6px' : 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                       <span style={{ fontSize: '0.78rem' }}>🧠</span>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 850, color: '#166534' }}>Mute-Bar Challenge</span>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 850, color: '#166534' }}>Stummtakt-Training</span>
                     </div>
                     <button
                       type="button"
@@ -4000,7 +4009,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        🎧 Dein Take zum Vorhören
+                        🎧 Deine Aufnahme anhören
                       </span>
                       <span style={{ fontSize: '0.56rem', color: '#94a3b8' }}>
                         {new Date(pendingPreviewTake.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -4140,7 +4149,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   }}
                 >
                   <Check size={14} strokeWidth={2.6} />
-                  <span>{isSavingTake ? 'Speichern...' : 'An Aufnahmen senden ⭐'}</span>
+                  <span>{isSavingTake ? 'Speichern...' : 'Zu meinen Aufnahmen speichern ⭐'}</span>
                 </button>
               </div>
             </div>
@@ -4469,7 +4478,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
             <div>
               <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 850, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                BEAT GENERATOR
+                RHYTHMUS-GENERATOR
               </span>
               <h3 style={{ fontSize: '1.05rem', fontWeight: 950, color: '#0f172a', margin: '2px 0 0 0' }}>
                 Begleit-Rhythmen
@@ -4502,10 +4511,10 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             gap: '10px'
           }}>
             {[
-              { id: 'metronome', label: 'Metronom Klick', desc: 'Akustischer Klick' },
-              { id: 'rock', label: 'Rock & Pop Groove', desc: 'Kräftiger Drums-Beat' },
-              { id: 'hiphop', label: 'Hip-Hop Pocket', desc: 'Lässiger Boom-Bap' },
-              { id: 'singersongwriter', label: 'Singer-Songwriter', desc: 'Akustik-Schlagzeug' }
+              { id: 'metronome', label: 'Metronom Klick', desc: 'Klassischer Klick' },
+              { id: 'rock', label: 'Rock & Pop Rhythmus', desc: 'Kräftiger Schlagzeug-Takt' },
+              { id: 'hiphop', label: 'Hip-Hop Rhythmus', desc: 'Lässiger Boom-Bap Takt' },
+              { id: 'singersongwriter', label: 'Liedermacher', desc: 'Akustik-Schlagzeug' }
             ].map((styleOpt) => {
               const isSelected = selectedStyle === styleOpt.id;
               return (
@@ -4658,12 +4667,12 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             padding: '10px 14px'
           }}>
             <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-              Groove-Stufe
+              Rhythmus-Variante
             </span>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               {[
-                { id: 'A', label: 'Basis-Groove (Standard)' },
-                { id: 'B', label: 'Mehr Pep (Groove+)' }
+                { id: 'A', label: 'Grund-Rhythmus' },
+                { id: 'B', label: 'Mehr Schwung (Variante)' }
               ].map((varOpt) => {
                 const isSelected = selectedVariation === varOpt.id;
                 return (
@@ -4719,10 +4728,10 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Sliders size={14} color={showStudioMixer ? '#eab308' : '#64748b'} />
-                <span>Profi-Mixer & Sound-Optionen</span>
+                <span>Mischpult & Klangeinstellungen</span>
                 {selectedVariation === 'C' && (
                   <span style={{ fontSize: '0.62rem', fontWeight: 850, background: '#fef3c7', color: '#92400e', padding: '1px 6px', borderRadius: '100px' }}>
-                    Fill C aktiv
+                    Wirbel aktiv
                   </span>
                 )}
               </div>
@@ -4789,18 +4798,18 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 {/* Instrumenten Mixer */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b' }}>DRUM KIT:</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b' }}>SCHLAGZEUG-KLANG:</span>
                     <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#0f172a' }}>
-                      🥁 {selectedStyle === 'singersongwriter' ? 'Soft Mahogany Kit' :
-                           selectedStyle === 'swing' ? 'Smoky Vintage Jazz Kit' :
-                           selectedStyle === 'hiphop' ? 'Tape Boom-Bap Sub Kit' :
-                           selectedStyle === 'reggae' ? 'Deep Dub One-Drop Sub Kit' :
-                           selectedStyle === 'latin' ? 'Warm Percussive Bossa Kit' :
-                           selectedStyle === 'funk' ? '70s Vintage Funk Kit' :
-                           selectedStyle === 'rock' ? 'Birch Studio Rock Kit' :
-                           selectedStyle === 'walzer' ? 'Acoustic Waltz Kit' :
-                           selectedStyle === 'ballad68' ? 'Slow Ballad Kit' :
-                           selectedStyle === 'disco' ? '70s Disco Kit' : 'Soft Hardwood Click Kit'}
+                      🥁 {selectedStyle === 'singersongwriter' ? 'Warmes Mahagoni-Schlagzeug' :
+                           selectedStyle === 'swing' ? 'Traditionelles Jazz-Schlagzeug' :
+                           selectedStyle === 'hiphop' ? 'Tiefes Boom-Bap Schlagzeug' :
+                           selectedStyle === 'reggae' ? 'Reggae One-Drop Schlagzeug' :
+                           selectedStyle === 'latin' ? 'Warmes Bossa-Percussion-Set' :
+                           selectedStyle === 'funk' ? 'Funk-Studio-Schlagzeug' :
+                           selectedStyle === 'rock' ? 'Kräftiges Rock-Schlagzeug' :
+                           selectedStyle === 'walzer' ? 'Akustisches Walzer-Set' :
+                           selectedStyle === 'ballad68' ? 'Sanftes Balladen-Schlagzeug' :
+                           selectedStyle === 'disco' ? 'Disco-Schlagzeug' : 'Akustisches Holz-Klick-Set'}
                     </span>
                   </div>
 
@@ -4839,7 +4848,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                       {/* Kick */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.66rem', fontWeight: 750 }}>
-                          <span>Kick</span>
+                          <span>Basstrommel (Kick)</span>
                           <span>{volKick}%</span>
                         </div>
                         <input
@@ -4854,7 +4863,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                       {/* Snare */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.66rem', fontWeight: 750 }}>
-                          <span>Snare</span>
+                          <span>Snare (Trommel)</span>
                           <span>{volSnare}%</span>
                         </div>
                         <input
