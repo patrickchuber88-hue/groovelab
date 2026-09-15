@@ -1254,7 +1254,7 @@ export function TeacherDashboard({
       s.scheduleId !== draggedSchedId && 
       s.timeSlot === targetSlot.timeSlot && 
       s.status !== 'canceled_by_student' &&
-      s.status !== 'teacher_sick' &&
+      s.status !== 'teacher_ausfall' &&
       s.student !== null
     );
 
@@ -1396,7 +1396,7 @@ export function TeacherDashboard({
         s.scheduleId !== draggedSchedId && 
         s.timeSlot === targetSlot.timeSlot && 
         s.status !== 'canceled_by_student' &&
-        s.status !== 'teacher_sick' &&
+        s.status !== 'teacher_ausfall' &&
         s.student !== null
       );
 
@@ -1538,7 +1538,7 @@ export function TeacherDashboard({
         const cancelIds = slotsToCancel.map(s => s.id);
         await supabase
           .from('schedules')
-          .update({ status: 'canceled_by_teacher_sick' })
+          .update({ status: 'canceled_by_teacher_ausfall' })
           .in('id', cancelIds);
 
         const notifs = slotsToCancel.map(s => {
@@ -1644,7 +1644,7 @@ export function TeacherDashboard({
       if (!rpcSuccess) {
         const { data: profile, error: profileErr } = await supabase
           .from('users')
-          .select('school_id, first_name, last_name, sick_start, sick_until')
+          .select('school_id, first_name, last_name, ausfall_start, ausfall_until')
           .eq('id', userId)
           .single();
 
@@ -1653,14 +1653,14 @@ export function TeacherDashboard({
         }
 
         teacherDisplayName = formatTeacherFullName(profile);
-        const prevAbsenceUntilStr = profile.sick_until;
+        const prevAbsenceUntilStr = profile.ausfall_until;
 
         // Update user table
         const { error: userErr } = await supabase
           .from('users')
           .update({ 
-            sick_until: absenceUntilVal,
-            sick_start: absenceStartVal
+            ausfall_until: absenceUntilVal,
+            ausfall_start: absenceStartVal
           })
           .eq('id', userId);
 
@@ -1804,7 +1804,7 @@ export function TeacherDashboard({
 
         // Parallel mutations
         await Promise.all([
-          scheduleIdsToCancel.size > 0 ? supabase.from('schedules').update({ status: 'canceled_by_teacher_sick' }).in('id', Array.from(scheduleIdsToCancel)) : Promise.resolve(),
+          scheduleIdsToCancel.size > 0 ? supabase.from('schedules').update({ status: 'canceled_by_teacher_ausfall' }).in('id', Array.from(scheduleIdsToCancel)) : Promise.resolve(),
           occurrenceIdsToCancel.size > 0 ? supabase.from('schedule_occurrences').update({ status: 'cancelled', canceled_by_role: 'teacher', teacher_acknowledged: true, handling_owner: absenceHandlingOwner || 'secretariat' }).in('id', Array.from(occurrenceIdsToCancel)) : Promise.resolve(),
           notificationsToInsert.length > 0 ? supabase.from('crisis_notifications').insert(notificationsToInsert) : Promise.resolve(),
           shoutboxMessagesToInsert.length > 0 ? supabase.from('campus_direct_messages').insert(shoutboxMessagesToInsert) : Promise.resolve(),
@@ -1819,7 +1819,7 @@ export function TeacherDashboard({
         ]);
       }
 
-      // 📲 3. PUSH-BENACHRICHTIGUNG: 1 präzise Push pro betroffener Unterrichtsstunde (KEIN Wort "krank")
+      // 📲 3. PUSH-BENACHRICHTIGUNG: 1 präzise Push pro betroffener Unterrichtsstunde (Neutral: Ausfall)
       const pushTeacherName = teacherDisplayName || formatTeacherFullName(teacher) || 'deiner Lehrkraft';
       affectedSlots.forEach((slot: any) => {
         if (slot.student_id) {
@@ -1842,7 +1842,7 @@ export function TeacherDashboard({
       });
 
       // Optimistic instant state update
-      setTeacher((prev: any) => prev ? { ...prev, sick_until: absenceUntilVal, sick_start: absenceStartVal } : prev);
+      setTeacher((prev: any) => prev ? { ...prev, ausfall_until: absenceUntilVal, ausfall_start: absenceStartVal } : prev);
 
       // Close the form modal immediately so the teacher is not trapped in it
       setShowAbsenceModal(false);
@@ -1885,11 +1885,11 @@ export function TeacherDashboard({
       setAbsenceUntilDate('');
       const today = new Date();
       setAbsenceStartDate(today.toISOString().substring(0, 10));
-      setTeacher((prev: any) => prev ? { ...prev, sick_until: null, sick_start: null } : prev);
+      setTeacher((prev: any) => prev ? { ...prev, ausfall_until: null, ausfall_start: null } : prev);
 
       const { data: profile } = await supabase
         .from('users')
-        .select('school_id, first_name, last_name, sick_start, sick_until')
+        .select('school_id, first_name, last_name, ausfall_start, ausfall_until')
         .eq('id', userId)
         .maybeSingle();
 
@@ -1910,8 +1910,8 @@ export function TeacherDashboard({
       const { error: userErr } = await supabase
         .from('users')
         .update({ 
-          sick_until: ABSENCE_RESET_SENTINEL,
-          sick_start: ABSENCE_RESET_SENTINEL
+          ausfall_until: ABSENCE_RESET_SENTINEL,
+          ausfall_start: ABSENCE_RESET_SENTINEL
         })
         .eq('id', userId);
 
@@ -2002,7 +2002,7 @@ export function TeacherDashboard({
             .from('schedules')
             .update({ status: 'approved' })
             .in('id', Array.from(scheduleIdsToRestore))
-            .eq('status', 'canceled_by_teacher_sick');
+            .eq('status', 'canceled_by_teacher_ausfall');
         }
 
         // Restore all future occurrences to rescheduled_confirmed
@@ -2090,7 +2090,7 @@ export function TeacherDashboard({
 
       // 4. Dispatch status change event for widgets and sibling components
       window.dispatchEvent(new CustomEvent('groovelab_teacher_status_changed', {
-        detail: { teacherId: userId, sick_until: null, sick_start: null }
+        detail: { teacherId: userId, ausfall_until: null, ausfall_start: null }
       }));
 
       // Refresh teacher profile from DB
@@ -2103,12 +2103,12 @@ export function TeacherDashboard({
       if (updatedTeacher) {
         const cleanUpdated = {
           ...updatedTeacher,
-          sick_until: isTeacherCurrentlyAbsent(updatedTeacher) ? updatedTeacher.sick_until : null,
-          sick_start: isTeacherCurrentlyAbsent(updatedTeacher) ? updatedTeacher.sick_start : null
+          ausfall_until: isTeacherCurrentlyAbsent(updatedTeacher) ? (updatedTeacher.ausfall_until ?? (updatedTeacher as any).ausfallUntil) : null,
+          ausfall_start: isTeacherCurrentlyAbsent(updatedTeacher) ? (updatedTeacher.ausfall_start ?? (updatedTeacher as any).ausfallStart) : null
         };
         setTeacher(cleanUpdated);
       } else {
-        setTeacher((prev: any) => prev ? { ...prev, sick_until: null, sick_start: null } : prev);
+        setTeacher((prev: any) => prev ? { ...prev, ausfall_until: null, ausfall_start: null } : prev);
       }
 
       setTicker(t => t + 1);
@@ -2116,7 +2116,7 @@ export function TeacherDashboard({
     } catch (err) {
       console.error('Fehler bei Verfügbarkeitsmeldung:', err);
       // Fallback: force local clear so teacher is never trapped in absence mode
-      setTeacher((prev: any) => prev ? { ...prev, sick_until: null, sick_start: null } : prev);
+      setTeacher((prev: any) => prev ? { ...prev, ausfall_until: null, ausfall_start: null } : prev);
       setShowAbsenceEndedModal(true);
     } finally {
       setSubmittingAbsence(false);
@@ -2473,12 +2473,12 @@ export function TeacherDashboard({
       if (isAbsentForSlot) {
         return {
           ...slot,
-          status: 'canceled_by_teacher_sick'
+          status: 'canceled_by_teacher_ausfall'
         };
       }
       // If teacher is NOT absent for this slot (e.g. earlier slot before absence report or re-activated slot),
-      // ensure it doesn't carry a stale canceled_by_teacher_sick status
-      if (slot.status === 'canceled_by_teacher_sick' && !isAbsentForSlot) {
+      // ensure it doesn't carry a stale canceled_by_teacher_ausfall status
+      if (slot.status === 'canceled_by_teacher_ausfall' && !isAbsentForSlot) {
         return {
           ...slot,
           status: 'scheduled'
@@ -2876,9 +2876,9 @@ export function TeacherDashboard({
         !s.is_room_booking &&
         !s.isRoomBooking &&
         s.status !== 'canceled_by_student' &&
-        s.status !== 'teacher_sick' &&
+        s.status !== 'teacher_ausfall' &&
         s.status !== 'cancelled' &&
-        s.status !== 'canceled_by_teacher_sick' &&
+        s.status !== 'canceled_by_teacher_ausfall' &&
         s.status !== 'rescheduled_away'
       ) {
         const timeKey = s.timeSlot || s.id;
@@ -2918,9 +2918,9 @@ export function TeacherDashboard({
       !s.is_room_booking &&
       !s.isRoomBooking &&
       s.status !== 'canceled_by_student' && 
-      s.status !== 'teacher_sick' && 
+      s.status !== 'teacher_ausfall' && 
       s.status !== 'cancelled' && 
-      s.status !== 'canceled_by_teacher_sick' && 
+      s.status !== 'canceled_by_teacher_ausfall' && 
       s.status !== 'rescheduled_away'
     );
     if (activeTimelineStudents.length === 0) return '0.0';
@@ -2935,9 +2935,9 @@ export function TeacherDashboard({
       !s.is_room_booking &&
       !s.isRoomBooking &&
       s.status !== 'canceled_by_student' && 
-      s.status !== 'teacher_sick' && 
+      s.status !== 'teacher_ausfall' && 
       s.status !== 'cancelled' && 
-      s.status !== 'canceled_by_teacher_sick' && 
+      s.status !== 'canceled_by_teacher_ausfall' && 
       s.status !== 'rescheduled_away'
     );
     if (activeTimelineStudents.length === 0) return { value: '0', unit: 'Min' };
@@ -2964,9 +2964,9 @@ export function TeacherDashboard({
         !s.is_room_booking &&
         !s.isRoomBooking &&
         s.status !== 'canceled_by_student' &&
-        s.status !== 'teacher_sick' &&
+        s.status !== 'teacher_ausfall' &&
         s.status !== 'cancelled' &&
-        s.status !== 'canceled_by_teacher_sick' &&
+        s.status !== 'canceled_by_teacher_ausfall' &&
         s.status !== 'rescheduled_away'
       ) {
         const timeKey = s.timeSlot || s.id;
@@ -2989,9 +2989,9 @@ export function TeacherDashboard({
     if (!briefingData?.timeline) return 0;
     return briefingData.timeline.filter((s: any) => 
       s.status === 'canceled_by_student' || 
-      s.status === 'teacher_sick' || 
+      s.status === 'teacher_ausfall' || 
       s.status === 'cancelled' || 
-      s.status === 'canceled_by_teacher_sick' ||
+      s.status === 'canceled_by_teacher_ausfall' ||
       s.status === 'rescheduled_away' ||
       s.isRescheduledPending
     ).length;
@@ -3009,9 +3009,9 @@ export function TeacherDashboard({
         !slot.is_room_booking &&
         !slot.isRoomBooking &&
         slot.status !== 'canceled_by_student' &&
-        slot.status !== 'teacher_sick' &&
+        slot.status !== 'teacher_ausfall' &&
         slot.status !== 'cancelled' &&
-        slot.status !== 'canceled_by_teacher_sick' &&
+        slot.status !== 'canceled_by_teacher_ausfall' &&
         slot.status !== 'rescheduled_away'
       ) {
         const slotStudents = splitAndNormalizeStudents(
@@ -3408,13 +3408,15 @@ export function TeacherDashboard({
     if (!isTeacherCurrentlyAbsent(teacher)) return [];
 
     let startDateTime: Date;
-    if (teacher.sick_start) {
-      const rawStart = String(teacher.sick_start).trim();
+    const teacherAusfallStart = teacher.ausfall_start ?? (teacher as any).ausfallStart;
+    const teacherAusfallUntil = teacher.ausfall_until ?? (teacher as any).ausfallUntil;
+    if (teacherAusfallStart) {
+      const rawStart = String(teacherAusfallStart).trim();
       if (rawStart.includes('T') && !rawStart.endsWith('00:00:00.000Z') && !rawStart.endsWith('00:00:00')) {
         startDateTime = new Date(rawStart);
       } else {
         const [stYear, stMonth, stDay] = rawStart.substring(0, 10).split('-').map(Number);
-        // Falls sick_start ohne genaue Uhrzeit vorliegt (z. B. nur Datum):
+        // Falls ausfall_start ohne genaue Uhrzeit vorliegt (z. B. nur Datum):
         // Bei Abmeldungen am heutigen Tag ist der Zeitpunkt der Aktualisierung / Jetzt die Grenze.
         const today = new Date();
         const isTodayStart = today.getFullYear() === stYear && today.getMonth() === (stMonth - 1) && today.getDate() === stDay;
@@ -3425,7 +3427,7 @@ export function TeacherDashboard({
         }
       }
     } else {
-      const rawUntil = String(teacher.sick_until).trim();
+      const rawUntil = String(teacherAusfallUntil).trim();
       const [uYear, uMonth, uDay] = rawUntil.substring(0, 10).split('-').map(Number);
       const today = new Date();
       if (today.getFullYear() === uYear && today.getMonth() === (uMonth - 1) && today.getDate() === uDay) {
@@ -3435,7 +3437,7 @@ export function TeacherDashboard({
       }
     }
 
-    const rawUntilStr = String(teacher.sick_until).trim();
+    const rawUntilStr = String(teacherAusfallUntil).trim();
     let endDateTime: Date;
     if (rawUntilStr.includes('T') && !rawUntilStr.endsWith('00:00:00.000Z') && !rawUntilStr.endsWith('00:00:00')) {
       endDateTime = new Date(rawUntilStr);
@@ -3476,8 +3478,8 @@ export function TeacherDashboard({
     if (briefingData?.timeline) {
       const todayStr = new Date().toLocaleDateString('sv-SE');
       briefingData.timeline.forEach((s: any) => {
-        const isCancelled = s.status === 'canceled_by_teacher_sick' || 
-          s.status === 'teacher_sick' || 
+        const isCancelled = s.status === 'canceled_by_teacher_ausfall' || 
+          s.status === 'teacher_ausfall' || 
           s.status === 'cancelled';
         if (!isCancelled) return;
 
@@ -3509,7 +3511,7 @@ export function TeacherDashboard({
     return Array.from(resultMap.values()).sort((a, b) => {
       return new Date(a.slot_start_datetime).getTime() - new Date(b.slot_start_datetime).getTime();
     });
-  }, [teacher?.sick_until, teacher?.sick_start, teacher?.updated_at, crisisNotifications, briefingData?.timeline, allStudents, showRealNames]);
+  }, [teacher?.ausfall_until, (teacher as any)?.ausfallUntil, teacher?.ausfall_start, (teacher as any)?.ausfallStart, teacher?.updated_at, crisisNotifications, briefingData?.timeline, allStudents, showRealNames]);
 
   // Tageweise Gruppierung für das Akkordeon-System der Ausfälle
   const groupedAbsenceCancellations = useMemo(() => {
@@ -3647,15 +3649,16 @@ export function TeacherDashboard({
   const activeTimelineSlotRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (teacher?.sick_until) {
-      if (teacher.sick_until !== lastAbsenceUntilRef.current) {
-        lastAbsenceUntilRef.current = teacher.sick_until;
-        setAbsenceUntilDate(teacher.sick_until.substring(0, 10));
+    const absenceUntilVal = teacher?.ausfall_until ?? (teacher as any)?.ausfallUntil;
+    if (absenceUntilVal) {
+      if (absenceUntilVal !== lastAbsenceUntilRef.current) {
+        lastAbsenceUntilRef.current = absenceUntilVal;
+        setAbsenceUntilDate(absenceUntilVal.substring(0, 10));
       }
     } else {
       lastAbsenceUntilRef.current = undefined;
     }
-  }, [teacher?.sick_until]);
+  }, [teacher?.ausfall_until, (teacher as any)?.ausfallUntil]);
 
   useEffect(() => {
     const handleSelectDate = (e: Event) => {
@@ -3955,9 +3958,9 @@ export function TeacherDashboard({
             studentName: studentDisplayName,
             student_acknowledged: occ.student_acknowledged,
             studentAcknowledged: occ.studentAcknowledged,
-            canceled_by_role: occ.canceled_by_role || ((occ.status === 'canceled_by_teacher_sick' || isTeacherCurrentlyAbsent(teacher)) ? 'teacher' : undefined),
-            teacher_acknowledged: (occ.status === 'canceled_by_teacher_sick' || occ.canceled_by_role === 'teacher' || isTeacherCurrentlyAbsent(teacher)) ? true : occ.teacher_acknowledged,
-            teacherAcknowledged: (occ.status === 'canceled_by_teacher_sick' || occ.canceled_by_role === 'teacher' || isTeacherCurrentlyAbsent(teacher)) ? true : occ.teacherAcknowledged,
+            canceled_by_role: occ.canceled_by_role || ((occ.status === 'canceled_by_teacher_ausfall' || isTeacherCurrentlyAbsent(teacher)) ? 'teacher' : undefined),
+            teacher_acknowledged: (occ.status === 'canceled_by_teacher_ausfall' || occ.canceled_by_role === 'teacher' || isTeacherCurrentlyAbsent(teacher)) ? true : occ.teacher_acknowledged,
+            teacherAcknowledged: (occ.status === 'canceled_by_teacher_ausfall' || occ.canceled_by_role === 'teacher' || isTeacherCurrentlyAbsent(teacher)) ? true : occ.teacherAcknowledged,
             is_rescheduled: occ.is_rescheduled || occ.isRescheduled,
             is_moved: occ.is_moved || occ.isMoved,
             is_room_booking: Boolean(occ.is_room_booking || occ.isRoomBooking || occ.room_override_id || occ.roomOverrideId || occ.is_room_changed || occ.isRoomChanged),
@@ -3997,7 +4000,7 @@ export function TeacherDashboard({
           
           const isDateMoved = Boolean(b.original_date && b.original_date !== b.date);
           const isTimeMoved = Boolean(b.original_start_time && b.startTime && b.original_start_time.substring(0, 5) !== b.startTime.substring(0, 5));
-          const isChangedStatus = Boolean(b.status && ['pending_reschedule', 'rescheduled_confirmed', 'rescheduled', 'cancelled', 'canceled_by_student', 'teacher_sick', 'canceled_by_teacher_sick', 'open_reschedule', 'changed'].includes(b.status));
+          const isChangedStatus = Boolean(b.status && ['pending_reschedule', 'rescheduled_confirmed', 'rescheduled', 'cancelled', 'canceled_by_student', 'teacher_ausfall', 'canceled_by_teacher_ausfall', 'open_reschedule', 'changed'].includes(b.status));
           const isExplicitChange = Boolean(b.is_rescheduled || b.isRescheduled || b.is_changed || b.isChanged || b.is_moved || b.isMoved);
           const isReactivatedUnacknowledged = Boolean(b.status === 'scheduled' && b.original_date && (b.teacher_acknowledged === false || b.teacherAcknowledged === false));
 
@@ -4262,7 +4265,7 @@ export function TeacherDashboard({
   const firstLessonStartMin = useMemo(() => {
     if (!briefingData?.timeline || briefingData.timeline.length === 0) return null;
     const sorted = [...briefingData.timeline]
-      .filter((slot: any) => slot.student && slot.status !== 'canceled_by_student' && slot.status !== 'teacher_sick' && slot.status !== 'cancelled' && slot.status !== 'canceled_by_teacher_sick')
+      .filter((slot: any) => slot.student && slot.status !== 'canceled_by_student' && slot.status !== 'teacher_ausfall' && slot.status !== 'cancelled' && slot.status !== 'canceled_by_teacher_ausfall')
       .sort((a: any, b: any) => a.timeSlot.localeCompare(b.timeSlot));
     
     if (sorted.length === 0) return null;
@@ -4274,7 +4277,7 @@ export function TeacherDashboard({
   const lastLessonEndMin = useMemo(() => {
     if (!briefingData?.timeline || briefingData.timeline.length === 0) return null;
     const sorted = [...briefingData.timeline]
-      .filter((slot: any) => slot.student && slot.status !== 'canceled_by_student' && slot.status !== 'teacher_sick' && slot.status !== 'cancelled' && slot.status !== 'canceled_by_teacher_sick')
+      .filter((slot: any) => slot.student && slot.status !== 'canceled_by_student' && slot.status !== 'teacher_ausfall' && slot.status !== 'cancelled' && slot.status !== 'canceled_by_teacher_ausfall')
       .sort((a: any, b: any) => a.timeSlot.localeCompare(b.timeSlot));
 
     if (sorted.length === 0) return null;
@@ -4293,7 +4296,7 @@ export function TeacherDashboard({
   const firstSlotStartStr = useMemo(() => {
     if (!briefingData?.timeline || briefingData.timeline.length === 0) return '';
     const sorted = [...briefingData.timeline]
-      .filter((slot: any) => slot.student && slot.status !== 'canceled_by_student' && slot.status !== 'teacher_sick' && slot.status !== 'cancelled' && slot.status !== 'canceled_by_teacher_sick')
+      .filter((slot: any) => slot.student && slot.status !== 'canceled_by_student' && slot.status !== 'teacher_ausfall' && slot.status !== 'cancelled' && slot.status !== 'canceled_by_teacher_ausfall')
       .sort((a: any, b: any) => a.timeSlot.localeCompare(b.timeSlot));
     return sorted.length > 0 ? sorted[0].timeSlot : '';
   }, [briefingData?.timeline]);
@@ -5378,7 +5381,7 @@ export function TeacherDashboard({
                roomId: slot.roomId || slot.rooms?.id || null,
                room: resolvedRoom,
                instrument: resolvedInstrument,
-               student_acknowledged: slot.student_acknowledged ?? (slot.status?.includes('cancel') || slot.status?.includes('sick') ? false : true),
+               student_acknowledged: slot.student_acknowledged ?? (slot.status?.includes('cancel') || slot.status?.includes('ausfall') ? false : true),
                original_date: null,
                makeup_token_id: slot.makeup_token_id || null,
                makeup_extension_minutes: slot.makeup_extension_minutes || 0,
@@ -5455,7 +5458,7 @@ export function TeacherDashboard({
                    roomId: occ.room_id || occ.schedules?.room_id || existingItem?.roomId || null,
                    room: resolvedRoom,
                    instrument: resolvedInstrument,
-                   student_acknowledged: occ.student_acknowledged ?? (occStatus?.includes('cancel') || occStatus?.includes('sick') ? false : true),
+                   student_acknowledged: occ.student_acknowledged ?? (occStatus?.includes('cancel') || occStatus?.includes('ausfall') ? false : true),
                    original_date: (occ.original_date || null) as null,
                    makeup_token_id: occ.makeup_token_id || existingItem?.makeup_token_id || null,
                    makeup_extension_minutes: occ.makeup_extension_minutes || existingItem?.makeup_extension_minutes || 0,
@@ -5903,7 +5906,7 @@ export function TeacherDashboard({
           const substantiveFields = [
             'role', 'roles', 'school_id', 'is_active', 'is_campus_active', 
             'is_groovelab_active', 'token_version', 'is_master_admin', 
-            'first_name', 'last_name', 'instrument', 'sick_until', 'sick_start'
+            'first_name', 'last_name', 'instrument', 'ausfall_until', 'ausfall_start'
           ];
           const hasSubstantiveChange = substantiveFields.some(
             field => payload.old[field] !== undefined && payload.new[field] !== undefined && payload.old[field] !== payload.new[field]
@@ -7723,7 +7726,7 @@ useEffect(() => {
 
   const renderAbsenceCardWidget = () => {
     const isAbsent = isTeacherCurrentlyAbsent(teacher);
-    const absenceUntilFormatted = isAbsent ? formatAbsenceEndDate(teacher?.sick_until) : '';
+    const absenceUntilFormatted = isAbsent ? formatAbsenceEndDate(teacher?.ausfall_until ?? (teacher as any)?.ausfallUntil) : '';
 
     if (!isAbsent) {
       return (
@@ -9314,13 +9317,15 @@ useEffect(() => {
                   {isTeacherCurrentlyAbsent(teacher) && (() => {
                     const todayLocal = new Date();
                     todayLocal.setHours(0, 0, 0, 0);
-                    const absenceUntilLocal = new Date(teacher.sick_until);
+                    const teacherAusfallUntilVal = teacher.ausfall_until ?? (teacher as any).ausfallUntil;
+                    const teacherAusfallStartVal = teacher.ausfall_start ?? (teacher as any).ausfallStart;
+                    const absenceUntilLocal = new Date(teacherAusfallUntilVal);
                     absenceUntilLocal.setHours(23, 59, 59, 999);
-                    const absenceStartLocal = teacher.sick_start ? new Date(teacher.sick_start) : todayLocal;
+                    const absenceStartLocal = teacherAusfallStartVal ? new Date(teacherAusfallStartVal) : todayLocal;
                     absenceStartLocal.setHours(0, 0, 0, 0);
                     // Show banner if today is within absence period
                     if (todayLocal >= absenceStartLocal && todayLocal <= absenceUntilLocal) {
-                      const endStr = formatAbsenceEndDate(teacher.sick_until);
+                      const endStr = formatAbsenceEndDate(teacherAusfallUntilVal);
                       return (
                         <div style={{
                           background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(255, 255, 255, 0.97) 100%)',
@@ -9878,7 +9883,7 @@ useEffect(() => {
                         </div>
                       }
                       absenceWidget={renderAbsenceCardWidget()}
-                      sickWidget={renderAbsenceCardWidget()}
+                      ausfallWidget={renderAbsenceCardWidget()}
                       tagesplanWidget={renderTagesplanWidget()}
                       hausaufgabenWidget={renderHausaufgabenWidget()}
                       mitteilungenWidget={renderFeedWidget()}
@@ -10653,7 +10658,7 @@ useEffect(() => {
                           for (let i = 0; i < timelineWithGaps.length; i++) {
                             const slot = timelineWithGaps[i];
                             const activeSlots = (slot.isGroup && Array.isArray(slot.slots)) ? slot.slots : (slot.slots || [slot]);
-                            const isCanceled = activeSlots.every((s: any) => s.status === 'canceled_by_student' || s.status === 'teacher_sick' || s.status === 'cancelled' || s.status === 'canceled_by_teacher_sick');
+                            const isCanceled = activeSlots.every((s: any) => s.status === 'canceled_by_student' || s.status === 'teacher_ausfall' || s.status === 'cancelled' || s.status === 'canceled_by_teacher_ausfall');
                             if (!isCanceled) {
                               const slotStart = slot.timeSlot;
                               const slotEnd = (() => {
@@ -10680,7 +10685,7 @@ useEffect(() => {
                             const isBreak = slot.isBreak;
                             const activeSlots = slot.isGroup ? slot.slots : [slot];
                             
-                            const isCanceled = activeSlots.every((s: any) => s.status === 'canceled_by_student' || s.status === 'teacher_sick' || s.status === 'cancelled' || s.status === 'canceled_by_teacher_sick');
+                            const isCanceled = activeSlots.every((s: any) => s.status === 'canceled_by_student' || s.status === 'teacher_ausfall' || s.status === 'cancelled' || s.status === 'canceled_by_teacher_ausfall');
                             const isRescheduledAway = activeSlots.every((s: any) => s.status === 'rescheduled_away');
                             const isFinished = currentTimeStr >= slotEnd && !isCanceled && !isRescheduledAway;
                             const isCurrentSlot = currentTimeStr >= slotStart && currentTimeStr < slotEnd;

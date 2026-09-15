@@ -34,7 +34,8 @@ interface CrisisNotificationItem {
     id: string;
     first_name: string;
     last_name: string;
-    sick_until?: string | null;
+    ausfall_until?: string | null;
+    ausfallUntil?: string | null;
   };
 }
 
@@ -97,8 +98,9 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
   // ── Derived data ──
   const absentTeachersMap = new Map<string, any>();
   crisisNotifications.forEach(n => {
-    if (n.teacher && n.teacher.sick_until) {
-      const absenceUntilTime = new Date(n.teacher.sick_until).getTime();
+    const untilVal = n.teacher?.ausfall_until ?? n.teacher?.ausfallUntil;
+    if (n.teacher && untilVal) {
+      const absenceUntilTime = new Date(untilVal).getTime();
       if (absenceUntilTime >= todayStart.getTime()) {
         absentTeachersMap.set(n.teacher.id, n.teacher);
       }
@@ -109,8 +111,9 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
   const liveTickets = crisisNotifications.filter(n => {
     const isPast = new Date(n.slot_start_datetime).getTime() < todayStart.getTime();
     if (n.status === 'ARCHIVED' || isPast) return false;
-    if (!n.teacher || !n.teacher.sick_until) return false;
-    const absenceUntilTime = new Date(n.teacher.sick_until).getTime();
+    const untilVal = n.teacher?.ausfall_until ?? n.teacher?.ausfallUntil;
+    if (!n.teacher || !untilVal) return false;
+    const absenceUntilTime = new Date(untilVal).getTime();
     return absenceUntilTime >= todayStart.getTime();
   });
   const todayEnd = new Date(todayStart);
@@ -121,7 +124,8 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
   });
   const archiveTickets = crisisNotifications.filter(n => {
     const isPast = new Date(n.slot_start_datetime).getTime() < todayStart.getTime();
-    const isAvailable = !n.teacher || !n.teacher.sick_until || new Date(n.teacher.sick_until).getTime() < todayStart.getTime();
+    const untilVal = n.teacher?.ausfall_until ?? n.teacher?.ausfallUntil;
+    const isAvailable = !n.teacher || !untilVal || new Date(untilVal).getTime() < todayStart.getTime();
     return n.status === 'ARCHIVED' || isPast || isAvailable;
   });
   const poolTickets = crisisTabMode === 'live' ? liveTickets : archiveTickets;
@@ -821,7 +825,7 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
                               {group.date} &bull; {teacherName}
                             </strong>
                             <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
-                              Abwesenheit: {absenceDurStr(group.teacher?.sick_until)}
+                              Abwesenheit: {absenceDurStr(group.teacher?.ausfall_until ?? group.teacher?.ausfallUntil)}
                             </span>
                           </div>
                         </div>
@@ -1013,7 +1017,7 @@ export const SecretaryCrisisView: React.FC<SecretaryCrisisViewProps> = ({
                             {count} {count === 1 ? 'Fall' : 'Fälle'}
                           </span>
                           <span style={{ color: '#fca5a5', fontSize: '0.6rem' }}>&bull;</span>
-                          <span style={{ fontSize: '0.72rem', color: '#b91c1c', fontWeight: 600 }}>{absenceDurStr(teacher.sick_until)}</span>
+                          <span style={{ fontSize: '0.72rem', color: '#b91c1c', fontWeight: 600 }}>{absenceDurStr(teacher.ausfall_until ?? teacher.ausfallUntil)}</span>
                         </div>
                       </div>
                       {/* Re-activate button */}

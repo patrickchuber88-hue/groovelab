@@ -22,7 +22,7 @@ export interface TeacherFeedWidgetProps {
   showAllBookings: boolean;
   setShowAllBookings: React.Dispatch<React.SetStateAction<boolean>>;
   bypassAbsenceView?: boolean;
-  bypassSickView?: boolean;
+  bypassAusfallView?: boolean;
   adminFeedbackRequests: any[];
   adminFeedbackResponses: any[];
   campusFeedAnnouncements: any[];
@@ -68,7 +68,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
   showAllBookings,
   setShowAllBookings,
   bypassAbsenceView,
-  bypassSickView,
+  bypassAusfallView,
   adminFeedbackRequests,
   adminFeedbackResponses,
   campusFeedAnnouncements,
@@ -135,7 +135,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {(showAllChangedAppointments ? visibleChangedAppointments : visibleChangedAppointments.slice(0, 3)).map((b: any) => {
               const dateObj = new Date(b.date);
-              const isCancelled = ['cancelled', 'canceled_by_student', 'teacher_sick', 'canceled_by_teacher_sick'].includes(b.status);
+              const isCancelled = ['cancelled', 'canceled_by_student', 'teacher_ausfall', 'canceled_by_teacher_ausfall'].includes(b.status);
               const isCancelledByStudent = b.status === 'canceled_by_student' || b.canceled_by_role === 'student';
               const isReactivated = Boolean(b.status === 'scheduled' && b.original_date && b.original_date === b.date);
               const isRescheduled = ['pending_reschedule', 'rescheduled_confirmed', 'rescheduled', 'open_reschedule', 'changed', 'pending', 'draft'].includes(b.status) || 
@@ -696,7 +696,7 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
       )}
 
       {/* 3. INFOS DER VERWALTUNG & MITTEILUNGEN */}
-      {(!isTeacherCurrentlyAbsent(teacher) || bypassAbsenceView || bypassSickView) && (
+      {(!isTeacherCurrentlyAbsent(teacher) || bypassAbsenceView || bypassAusfallView) && (
         <>
           {/* INFOS DER VERWALTUNG */}
           <div style={{ 

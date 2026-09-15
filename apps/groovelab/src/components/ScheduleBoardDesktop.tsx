@@ -35,7 +35,15 @@ import {
   Coffee,
   ArrowLeftRight
 } from 'lucide-react';
-import { useRealNamesVisibility, maskLastName, formatGroupStudentsAnonymized, formatTeacherFullName } from '../utils/nameHelper';
+import { 
+  useRealNamesVisibility, 
+  maskLastName, 
+  formatGroupStudentsAnonymized, 
+  formatTeacherFullName,
+  resolveCanonicalStudentFromList,
+  matchStudentNameOrInitial,
+  extractStudentTokensFromName
+} from '../utils/nameHelper';
 import { ScheduleCalendarViewDesktop as ScheduleCalendarView } from './ScheduleCalendarViewDesktop';
 const StudentScheduleSlotsModal = React.lazy(() => import('./StudentScheduleSlotsModal').then(m => ({ default: m.StudentScheduleSlotsModal })));
 import { getParentOnboardingUrl } from '../utils/tenantUrlHelper';
@@ -762,9 +770,11 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         nameToCanonicalMap.set(nameKey, s);
       }
     });
+
+    const rawStudentsList = Array.from(allStudentsMap.values());
     
-    const resolveCanonicalStudent = (sId: string, sFname?: string, sLname?: string): Student | undefined => {
-      if (allStudentsMap.has(sId)) return allStudentsMap.get(sId);
+    const resolveCanonicalStudent = (sId?: string | null, sFname?: string | null, sLname?: string | null): Student | undefined => {
+      if (sId && allStudentsMap.has(sId)) return allStudentsMap.get(sId);
       const fn = (sFname || '').trim().toLowerCase();
       const ln = (sLname || '').trim().toLowerCase();
       const nameKey = `${fn}_${ln}`;
@@ -772,10 +782,32 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         const canonical = nameToCanonicalMap.get(nameKey)!;
         return allStudentsMap.get(canonical.id);
       }
-      return undefined;
+      // Enterprise Initial & Token Matcher fallback (e.g. "Tina H." -> "Tina Huber")
+      return resolveCanonicalStudentFromList({ id: sId, first_name: sFname, last_name: sLname }, rawStudentsList);
     };
 
     const assignedStudentIds = new Set<string>();
+
+    // Pre-pass: Identify all students who are already part of an existing group card on the boards
+    // This ensures single duplicate cards for members (e.g. Tina H. or Fabian T.) are eliminated.
+    const preAssignedGroupMemberIds = new Set<string>();
+    boardsList.forEach(b => {
+      b.students.forEach(s => {
+        if (s.isBreak) return;
+        if (s.isGroup && s.groupStudents && s.groupStudents.length > 0) {
+          s.groupStudents.forEach(gs => {
+            const res = resolveCanonicalStudent(gs.id, gs.first_name, gs.last_name);
+            preAssignedGroupMemberIds.add(res ? res.id : gs.id);
+          });
+        } else if (s.first_name && (s.first_name.includes('&') || s.first_name.includes(',') || /\b(and|und)\b/i.test(s.first_name))) {
+          const tokens = extractStudentTokensFromName(s.first_name);
+          tokens.forEach(tok => {
+            const res = resolveCanonicalStudentFromList(tok, rawStudentsList);
+            if (res) preAssignedGroupMemberIds.add(res.id);
+          });
+        }
+      });
+    });
 
     // Step 1: Scan and clean boardsList of any duplicates. Keep only the first occurrence.
     const cleanedBoards = boardsList.map(b => {
@@ -785,7 +817,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
           nextStudents.push(s);
           return;
         }
-        if (s.isGroup && s.groupStudents) {
+        if (s.isGroup && s.groupStudents && s.groupStudents.length > 0) {
           const uniqueMembers = s.groupStudents.filter(gs => {
             const resolved = resolveCanonicalStudent(gs.id, gs.first_name, gs.last_name);
             const targetId = resolved ? resolved.id : gs.id;
@@ -810,8 +842,8 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         } else {
           const resolved = resolveCanonicalStudent(s.id, s.first_name, s.last_name);
           const targetId = resolved ? resolved.id : s.id;
-          if (assignedStudentIds.has(targetId)) {
-            // Already scheduled elsewhere -> remove duplicate card
+          // If this student is already scheduled OR is part of a scheduled group card, drop redundant single card
+          if (assignedStudentIds.has(targetId) || preAssignedGroupMemberIds.has(targetId)) {
             return;
           }
           assignedStudentIds.add(targetId);
@@ -832,7 +864,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
     cleanedBoards.forEach(b => {
       b.students.forEach(s => {
         if (s.isBreak) return;
-        if (s.isGroup && s.groupStudents) {
+        if (s.isGroup && s.groupStudents && s.groupStudents.length > 0) {
           s.groupStudents.forEach(gs => {
             const existing = resolveCanonicalStudent(gs.id, gs.first_name, gs.last_name);
             if (existing) {
@@ -922,8 +954,16 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         }
         
         if (s.isGroup && s.groupStudents) {
-          const nonGroupMembers = s.groupStudents.filter(gs => !individualStudentIdsInGroups.has(gs.id));
-          const groupMembers = s.groupStudents.filter(gs => individualStudentIdsInGroups.has(gs.id));
+          const nonGroupMembers = s.groupStudents.filter(gs => {
+            const res = resolveCanonicalStudent(gs.id, gs.first_name, gs.last_name);
+            const effId = res ? res.id : gs.id;
+            return !individualStudentIdsInGroups.has(effId);
+          });
+          const groupMembers = s.groupStudents.filter(gs => {
+            const res = resolveCanonicalStudent(gs.id, gs.first_name, gs.last_name);
+            const effId = res ? res.id : gs.id;
+            return individualStudentIdsInGroups.has(effId);
+          });
 
           if (nonGroupMembers.length >= 2) {
             nextStudents.push({
@@ -936,26 +976,41 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
           }
 
           groupMembers.forEach(gs => {
-            if (gs.group_id) {
-              const merged = mergedGroupsMap.get(`group-${gs.group_id}`);
-              if (merged && merged.assignedDay === b.dayOfWeek && !addedGroupIds.has(gs.group_id)) {
+            const res = resolveCanonicalStudent(gs.id, gs.first_name, gs.last_name);
+            const effGroupId = res?.group_id || gs.group_id;
+            if (effGroupId) {
+              const merged = mergedGroupsMap.get(`group-${effGroupId}`);
+              if (merged && merged.assignedDay === b.dayOfWeek && !addedGroupIds.has(effGroupId)) {
                 nextStudents.push(merged);
-                addedGroupIds.add(gs.group_id);
+                addedGroupIds.add(effGroupId);
               }
             }
           });
         } else {
-          if (individualStudentIdsInGroups.has(s.id)) {
-            if (s.group_id) {
-              const merged = mergedGroupsMap.get(`group-${s.group_id}`);
-              if (merged && merged.assignedDay === b.dayOfWeek && !addedGroupIds.has(s.group_id)) {
+          // Single student card on board: check if this student belongs to a group
+          const resolved = resolveCanonicalStudent(s.id, s.first_name, s.last_name) || allStudentsMap.get(s.id);
+          const effectiveId = resolved ? resolved.id : s.id;
+          const effectiveGroupId = resolved?.group_id || s.group_id;
+
+          if (individualStudentIdsInGroups.has(effectiveId) || (effectiveGroupId && mergedGroupsMap.has(`group-${effectiveGroupId}`))) {
+            const targetGroupId = effectiveGroupId;
+            if (targetGroupId) {
+              const merged = mergedGroupsMap.get(`group-${targetGroupId}`);
+              if (merged && merged.assignedDay === b.dayOfWeek && !addedGroupIds.has(targetGroupId)) {
                 nextStudents.push(merged);
-                addedGroupIds.add(s.group_id);
+                addedGroupIds.add(targetGroupId);
               }
             }
+            // Do NOT push `s` as single student card! It is absorbed into the group.
           } else {
-            const _freshS = resolveCanonicalStudent(s.id, s.first_name, s.last_name) || allStudentsMap.get(s.id);
-            nextStudents.push(_freshS ? { ...s, id: _freshS.id, first_name: _freshS.first_name, last_name: _freshS.last_name, duration: _freshS.duration || s.duration, instrument: _freshS.instrument || s.instrument } : s);
+            nextStudents.push(resolved ? { 
+              ...s, 
+              id: resolved.id, 
+              first_name: resolved.first_name, 
+              last_name: resolved.last_name, 
+              duration: resolved.duration || s.duration, 
+              instrument: resolved.instrument || s.instrument 
+            } : s);
           }
         }
       });
@@ -1810,6 +1865,17 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
               b.students.forEach(s => {
                 if (!s.isBreak) {
                   usedStudentIds.add(s.id);
+                  if (s.isGroup && s.groupStudents && s.groupStudents.length > 0) {
+                    s.groupStudents.forEach(gs => {
+                      usedStudentIds.add(gs.id);
+                    });
+                  } else if (s.first_name && (s.first_name.includes('&') || s.first_name.includes(',') || /\b(and|und)\b/i.test(s.first_name))) {
+                    const tokens = extractStudentTokensFromName(s.first_name);
+                    tokens.forEach(tok => {
+                      const can = resolveCanonicalStudentFromList(tok, loadedStudents);
+                      if (can) usedStudentIds.add(can.id);
+                    });
+                  }
                 }
               });
             });
@@ -2286,7 +2352,18 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
       return s;
     }));
 
-    setBoards(prev => prev.filter(b => b.id !== boardId));  };
+    setBoards(prev => {
+      const nextBoards = prev.filter(b => b.id !== boardId);
+      const currentActiveId = activeDraftIdRef.current || activeDraftId;
+      const currentList = draftsRef.current.length > 0 ? draftsRef.current : drafts;
+      const updatedDrafts = currentList.map(d => d.id === currentActiveId ? { ...d, boards: nextBoards } : d);
+      draftsRef.current = updatedDrafts;
+      setDrafts(updatedDrafts);
+      triggerDebouncedAutoSave(nextBoards);
+      return nextBoards;
+    });
+    setToast({ message: 'Unterrichtstag gelöscht und Schüler freigegeben', type: 'success' });
+  };
 
   // Select/deselect a student and load their preferences in real-time
   const handleSelectStudent = async (studentId: string) => {
@@ -3964,9 +4041,11 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
       const board = prev.find(b => b.id === boardId);
       if (!board) return prev;
 
+      const breakCard = board.students.find(s => s.id === breakId);
       const breakIndex = board.students.findIndex(s => s.id === breakId);
       if (breakIndex === -1) return prev;
 
+      const breakDuration = breakCard?.duration || 15;
       let nextStudents = board.students.filter(s => s.id !== breakId);
 
       if (!slideUp && breakIndex < nextStudents.length) {
@@ -3982,7 +4061,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         nextStudents = nextStudents.map((s, idx) => {
           if (idx >= breakIndex && s.customStartTime) {
             const [csh, csm] = parseTime(s.customStartTime);
-            const shifted = Math.max(0, csh * 60 + csm - 15);
+            const shifted = Math.max(0, csh * 60 + csm - breakDuration);
             const h = Math.floor(shifted / 60) % 24;
             const m = shifted % 60;
             return { ...s, customStartTime: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}` };
@@ -4033,6 +4112,11 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
       }));
 
       const nextBoards = prev.map(b => b.id === boardId ? updatedBoard : b);
+      const currentActiveId = activeDraftIdRef.current || activeDraftId;
+      const currentList = draftsRef.current.length > 0 ? draftsRef.current : drafts;
+      const updatedDrafts = currentList.map(d => d.id === currentActiveId ? { ...d, boards: nextBoards } : d);
+      draftsRef.current = updatedDrafts;
+      setDrafts(updatedDrafts);
       triggerDebouncedAutoSave(nextBoards);
       return nextBoards;
     });
@@ -6812,6 +6896,43 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                         onClick={() => setFocusedDayOfWeek(focusedDayOfWeek === board.dayOfWeek ? null : board.dayOfWeek)}
                         title={focusedDayOfWeek === board.dayOfWeek ? "Zurück zur Wochenansicht" : "Diesen Tag vergrößern (Fokus-Ansicht)"}
                       >
+                        {/* Day deletion button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteBoard(board.id);
+                          }}
+                          aria-label={`Unterrichtstag ${dayLabel} löschen`}
+                          title={`Unterrichtstag ${dayLabel} löschen`}
+                          style={{
+                            position: 'absolute',
+                            top: '2px',
+                            left: '2px',
+                            padding: '4px',
+                            background: 'transparent',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            color: '#94a3b8',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 2,
+                            transition: 'color 0.15s, background-color 0.15s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.color = '#ef4444';
+                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.color = '#94a3b8';
+                            e.currentTarget.style.background = 'transparent';
+                          }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+
                         {focusedDayOfWeek === board.dayOfWeek && (
                           <button
                             type="button"

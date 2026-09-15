@@ -2,25 +2,32 @@
  * 🏛️ CAMPUS-GROOVELAB: TEACHER ABSENCE & AVAILABILITY HELPER
  *
  * Strikte, neutrale und forensische Prüfung des Abwesenheitsstatus von Lehrkräften.
- * Ersetzt naive Boolean(teacher.sick_until)-Prüfungen durch eine präzise
- * Zeitfenster- und Sentinel-Validierung.
+ * Standard: DSGVO Art. 9 Konformität — vollständige Neutralität ("ausfall" / "abwesend").
+ * Ersetzt naive Prüfungen durch eine präzise Zeitfenster- und Sentinel-Validierung.
  */
 
 export const ABSENCE_RESET_SENTINEL = '1970-01-01T00:00:00.000Z';
+
+export interface TeacherAbsenceRecord {
+  ausfall_until?: string | null;
+  ausfall_start?: string | null;
+  [key: string]: any;
+}
 
 /**
  * Prüft, ob eine Lehrkraft gegenwärtig aktiv abwesend gemeldet ist.
  * 
  * Kriterien für eine aktive Abwesenheit:
- * 1. teacher.sick_until ist vorhanden.
+ * 1. teacher.ausfall_until (oder Legacy-Feld) ist vorhanden.
  * 2. Das Datum ist ein valider Zeitstempel.
  * 3. Das Jahr liegt NACH 1971 (schließt Sentinel-Werte wie 1970-01-01 aus).
  * 4. Das Enddatum liegt heute oder in der Zukunft (End-of-Day 23:59:59.999).
  */
-export function isTeacherCurrentlyAbsent(teacher: { sick_until?: string | null; sick_start?: string | null } | null | undefined): boolean {
-  if (!teacher?.sick_until) return false;
+export function isTeacherCurrentlyAbsent(teacher: TeacherAbsenceRecord | null | undefined): boolean {
+  const rawUntilVal = teacher?.ausfall_until ?? (teacher as any)?.ausfallUntil;
+  if (!rawUntilVal) return false;
 
-  const rawUntil = String(teacher.sick_until).trim();
+  const rawUntil = String(rawUntilVal).trim();
   if (!rawUntil || rawUntil === 'null' || rawUntil === 'undefined') return false;
 
   const untilDate = new Date(rawUntil);
@@ -41,9 +48,9 @@ export function isTeacherCurrentlyAbsent(teacher: { sick_until?: string | null; 
 /**
  * Formatiert den Abwesenheitszeitraum für die Benutzeroberfläche.
  */
-export function formatAbsenceEndDate(sickUntil: string | null | undefined): string {
-  if (!sickUntil) return '';
-  const d = new Date(sickUntil);
+export function formatAbsenceEndDate(ausfallUntil: string | null | undefined): string {
+  if (!ausfallUntil) return '';
+  const d = new Date(ausfallUntil);
   if (isNaN(d.getTime()) || d.getFullYear() <= 1971) return '';
   return d.toLocaleDateString('de-DE', {
     weekday: 'short',
@@ -65,15 +72,17 @@ export function formatAbsenceEndDate(sickUntil: string | null | undefined): stri
 export function isSlotCancelledByAbsence(
   slotDateStr: string,
   slotStartTimeStr: string,
-  teacher: { sick_start?: string | null; sick_until?: string | null } | null | undefined
+  teacher: TeacherAbsenceRecord | null | undefined
 ): boolean {
-  if (!teacher?.sick_until) return false;
+  const rawUntilVal = teacher?.ausfall_until ?? (teacher as any)?.ausfallUntil;
+  if (!rawUntilVal) return false;
 
-  const rawUntil = String(teacher.sick_until).trim();
+  const rawUntil = String(rawUntilVal).trim();
   if (!rawUntil || rawUntil === 'null' || rawUntil === 'undefined') return false;
 
   const untilDate = new Date(rawUntil);
-  if (isNaN(untilDate.getTime()) || untilDate.getFullYear() <= 1971) return false;
+  if (isNaN(untilDate.getTime())) return false;
+  if (untilDate.getFullYear() <= 1971) return false;
 
   // Slot-Startzeitpunkt ermitteln (Lokale Zeit)
   const cleanTime = (slotStartTimeStr || '00:00').substring(0, 5);
@@ -83,9 +92,10 @@ export function isSlotCancelledByAbsence(
   if (isNaN(slotDateTime.getTime())) return false;
 
   // Abwesenheits-Startzeitpunkt ermitteln (volljuristischer Zeitstempel)
+  const rawStartVal = teacher?.ausfall_start ?? (teacher as any)?.ausfallStart;
   let startDateTime: Date;
-  if (teacher.sick_start) {
-    const rawStart = String(teacher.sick_start).trim();
+  if (rawStartVal) {
+    const rawStart = String(rawStartVal).trim();
     if (rawStart.includes('T')) {
       startDateTime = new Date(rawStart);
     } else {
@@ -98,7 +108,7 @@ export function isSlotCancelledByAbsence(
     startDateTime = new Date(uYear, (uMonth || 1) - 1, uDay || 1, 0, 0, 0, 0);
   }
 
-  // End-Zeitpunkt: Falls sick_until nur ein Datum ist, bis 23:59:59.999
+  // End-Zeitpunkt: Falls ausfall_until nur ein Datum ist, bis 23:59:59.999
   let endDateTime: Date;
   if (rawUntil.includes('T') && !rawUntil.endsWith('00:00:00.000Z') && !rawUntil.endsWith('00:00:00')) {
     endDateTime = new Date(rawUntil);

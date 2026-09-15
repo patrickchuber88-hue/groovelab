@@ -598,3 +598,127 @@ export function copyTextToClipboard(text: string): boolean {
   return copied || true;
 }
 
+/**
+ * Enterprise Canonical Student Matcher (OWASP ASVS / Single Source of Truth)
+ * Matches a candidate student (from board card, occurrence, or draft text)
+ * against a reference student record, supporting:
+ *  - Exact ID match (s1.id === s2.id)
+ *  - Full name match ("Tina Huber" === "Tina Huber")
+ *  - Initial match ("Tina H." or "Tina H" === "Tina Huber")
+ *  - Privacy masked match ("Tina H." === "Tina H.")
+ */
+export function matchStudentNameOrInitial(
+  candidate: { id?: string | null; first_name?: string | null; last_name?: string | null; name?: string | null },
+  target: { id?: string | null; first_name?: string | null; last_name?: string | null; name?: string | null }
+): boolean {
+  if (!candidate || !target) return false;
+
+  // 1. Direct ID match if both have valid IDs and not generic index IDs
+  const cId = candidate.id ? String(candidate.id).trim() : '';
+  const tId = target.id ? String(target.id).trim() : '';
+  if (cId && tId && !cId.startsWith('idx-') && !tId.startsWith('idx-') && !cId.startsWith('group-') && !tId.startsWith('group-')) {
+    if (cId === tId) return true;
+  }
+
+  // 2. Extract first and last names
+  const cFirst = (candidate.first_name || candidate.name?.split(' ')[0] || '').trim().toLowerCase();
+  const tFirst = (target.first_name || target.name?.split(' ')[0] || '').trim().toLowerCase();
+
+  if (!cFirst || !tFirst || cFirst !== tFirst) {
+    return false;
+  }
+
+  // First names match! Now compare last names
+  const cLast = (candidate.last_name || candidate.name?.split(' ').slice(1).join(' ') || '').trim().toLowerCase();
+  const tLast = (target.last_name || target.name?.split(' ').slice(1).join(' ') || '').trim().toLowerCase();
+
+  // If either has no last name, first name match is accepted only if unique
+  if (!cLast || !tLast) {
+    return true;
+  }
+
+  // Direct last name match
+  if (cLast === tLast) return true;
+
+  // Clean initials (e.g. "h." -> "h", "t." -> "t")
+  const cCleanLast = cLast.replace(/\./g, '').trim();
+  const tCleanLast = tLast.replace(/\./g, '').trim();
+
+  if (cCleanLast === tCleanLast) return true;
+
+  // Initial check: if one is 1 character long, does it match the other's first character?
+  if (cCleanLast.length === 1 && tCleanLast.startsWith(cCleanLast)) return true;
+  if (tCleanLast.length === 1 && cCleanLast.startsWith(tCleanLast)) return true;
+
+  return false;
+}
+
+/**
+ * Extracts individual student tokens from a single or combined name string.
+ * e.g. "Tina H. & Fabian T." -> ["Tina H.", "Fabian T."]
+ * e.g. "Tina Huber, Fabian Trautmann" -> ["Tina Huber", "Fabian Trautmann"]
+ */
+export function extractStudentTokensFromName(nameStr?: string | null): string[] {
+  if (!nameStr) return [];
+  const clean = nameStr.replace(/^Unterricht:\s*/i, '').trim();
+  if (!clean) return [];
+
+  // Split by common delimiters (&, comma, und, and, +)
+  const tokens = clean.split(/\s*(?:&|,|\bund\b|\band\b|\+)\s*/i)
+    .map(t => t.trim())
+    .filter(t => t.length > 0 && !['pause', 'schüler', 'student', 'vacant', 'unbekannt'].includes(t.toLowerCase()));
+
+  return tokens.length > 0 ? tokens : [clean];
+}
+
+/**
+ * Resolves a canonical student record from a student pool given an ID or name string.
+ * Checks ID first, then exact `${first}_${last}`, then initial matching.
+ */
+export function resolveCanonicalStudentFromList<T extends { id: string; first_name?: string | null; last_name?: string | null; group_id?: string | null }>(
+  query: { id?: string | null; name?: string | null; first_name?: string | null; last_name?: string | null } | string,
+  students: T[]
+): T | undefined {
+  if (!query || !students || students.length === 0) return undefined;
+
+  const qId = typeof query === 'string' ? query : query.id;
+  const qName = typeof query === 'string' ? query : query.name;
+  const qFirst = typeof query !== 'string' ? query.first_name : undefined;
+  const qLast = typeof query !== 'string' ? query.last_name : undefined;
+
+  // 1. Direct ID match
+  if (qId && !String(qId).startsWith('idx-') && !String(qId).startsWith('group-')) {
+    const direct = students.find(s => s.id === qId);
+    if (direct) return direct;
+  }
+
+  // Construct target candidate object
+  let candidateFirst = qFirst ? qFirst.trim() : '';
+  let candidateLast = qLast ? qLast.trim() : '';
+
+  if (!candidateFirst && qName) {
+    const parts = qName.trim().split(/\s+/);
+    candidateFirst = parts[0] || '';
+    candidateLast = parts.slice(1).join(' ') || '';
+  }
+
+  if (!candidateFirst) return undefined;
+
+  // 2. Full match
+  const fullMatch = students.find(s =>
+    (s.first_name || '').trim().toLowerCase() === candidateFirst.toLowerCase() &&
+    (s.last_name || '').trim().toLowerCase() === candidateLast.toLowerCase()
+  );
+  if (fullMatch) return fullMatch;
+
+  // 3. Initial match (e.g. "Tina H." matching "Tina Huber")
+  const initialMatch = students.find(s =>
+    matchStudentNameOrInitial(
+      { first_name: candidateFirst, last_name: candidateLast },
+      { id: s.id, first_name: s.first_name, last_name: s.last_name }
+    )
+  );
+
+  return initialMatch;
+}
+

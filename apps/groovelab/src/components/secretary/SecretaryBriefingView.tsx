@@ -151,9 +151,10 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
             const roomOccupancyRate = totalSlotsCount > 0 ? Math.round((todayAllocations.length / totalSlotsCount) * 100) : 0;
 
             // 2. Heutige Abwesenheiten
-            const activeSickTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].filter(t => {
-              if (!t.sick_until) return false;
-              return t.sick_until.substring(0, 10) >= todayDateStr;
+            const activeAusfallTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].filter(t => {
+              const untilVal = t.ausfall_until;
+              if (!untilVal) return false;
+              return String(untilVal).substring(0, 10) >= todayDateStr;
             }).reduce((acc: any[], current) => {
               if (!acc.some(item => item.id === current.id)) {
                 acc.push(current);
@@ -859,10 +860,10 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                       </div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
                         <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
-                          {activeSickTeachers.length}
+                          {activeAusfallTeachers.length}
                         </span>
                         <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>
-                          {activeSickTeachers.length === 0 ? 'Kein Ausfallbedarf' : (activeSickTeachers.length === 1 ? 'Ausfall gemeldet' : 'Ausfälle gemeldet')}
+                          {activeAusfallTeachers.length === 0 ? 'Kein Ausfallbedarf' : (activeAusfallTeachers.length === 1 ? 'Ausfall gemeldet' : 'Ausfälle gemeldet')}
                         </span>
                       </div>
                     </div>
@@ -1688,8 +1689,8 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                     border: '1px solid rgba(0, 0, 0, 0.05)'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                      <div style={{ background: activeSickTeachers.length > 0 ? '#fee2e2' : '#e6f4ea', color: activeSickTeachers.length > 0 ? '#b91c1c' : '#34a853', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
-                        {activeSickTeachers.length > 0 ? <CalendarX size={16} color="#ef4444" /> : <CheckCircle size={16} color="#34a853" />}
+                      <div style={{ background: activeAusfallTeachers.length > 0 ? '#fee2e2' : '#e6f4ea', color: activeAusfallTeachers.length > 0 ? '#b91c1c' : '#34a853', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
+                        {activeAusfallTeachers.length > 0 ? <CalendarX size={16} color="#ef4444" /> : <CheckCircle size={16} color="#34a853" />}
                       </div>
                       <div>
                         <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -1701,7 +1702,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                       </div>
                     </div>
 
-                    {activeSickTeachers.length === 0 ? (
+                    {activeAusfallTeachers.length === 0 ? (
                       <div style={{
                         background: 'rgba(52, 168, 83, 0.04)',
                         border: '1px solid rgba(52, 168, 83, 0.1)',
@@ -1718,8 +1719,9 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                       </div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {activeSickTeachers.map(teacher => {
-                          const sickUntilStr = teacher.sick_until ? new Date(teacher.sick_until).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }) : 'unbefristet';
+                        {activeAusfallTeachers.map(teacher => {
+                          const untilDateVal = teacher.ausfall_until;
+                          const ausfallUntilStr = untilDateVal ? new Date(untilDateVal).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }) : 'unbefristet';
                           return (
                             <div key={teacher.id} style={{
                               padding: '12px 14px',
@@ -1742,7 +1744,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                   fontSize: '0.66rem',
                                   fontWeight: 700
                                 }}>
-                                  bis {sickUntilStr}
+                                  bis {ausfallUntilStr}
                                 </span>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.70rem', color: '#64748b' }}>

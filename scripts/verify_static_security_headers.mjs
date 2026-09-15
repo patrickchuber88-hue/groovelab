@@ -169,6 +169,16 @@ const REQUIRED_INVARIANTS = [
       if (!/credentialless|require-corp/i.test(val)) return `Ungültiger COEP Wert: ${val}`;
       return null;
     }
+  },
+  {
+    key: 'x-request-id',
+    name: 'X-Request-ID (End-to-End Forensic Traceability)',
+    appliesTo: ['nginx-conf'],
+    validate: (val) => {
+      if (!val) return 'Header fehlt';
+      if (!/\$request_id/i.test(val)) return `Ungültiger Wert: ${val} ($request_id erforderlich)`;
+      return null;
+    }
   }
 ];
 
@@ -189,6 +199,9 @@ for (const target of FILES_TO_VALIDATE) {
 
   let fileViolations = 0;
   for (const inv of REQUIRED_INVARIANTS) {
+    if (inv.appliesTo && !inv.appliesTo.includes(target.type)) {
+      continue;
+    }
     const headerVal = headers[inv.key];
     const err = inv.validate(headerVal);
     if (err) {

@@ -133,12 +133,19 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
     let timeoutId: any = null;
     try {
       let fetchInit = newInit;
-      // Wrap request with a resilient failover timeout (25s for normal queries, 60s for large audio/asset uploads)
-      // 25s guarantees the client does not abort prematurely before PostgreSQL finishes complex joins
+      // Adaptive Mobile Failover Timeout: 25s for desktop/heavy joins, 60s for storage uploads.
+      // On mobile viewports (<= 768px / touch), cut off stalled carrier sockets after 5.5s (attempt 1) or 4.0s (retries)
+      // to immediately activate local encrypted SWR vault without freezing the screen.
       if (!newInit.signal && typeof AbortController !== 'undefined') {
         const inputUrlStr = typeof input === 'string' ? input : (input instanceof URL ? input.href : '');
         const isStorageUpload = inputUrlStr.includes('/storage/v1/object/');
-        const queryTimeout = isStorageUpload ? 60000 : 25000;
+        const isMobileDevice = typeof window !== 'undefined' && (
+          window.innerWidth <= 768 || (typeof navigator !== 'undefined' && (navigator.maxTouchPoints > 0 || (navigator as any).userAgentData?.mobile))
+        );
+        let queryTimeout = isStorageUpload ? 60000 : 25000;
+        if (isMobileDevice && !isStorageUpload) {
+          queryTimeout = attempt === 1 ? 5500 : 4000;
+        }
         const controller = new AbortController();
         timeoutId = setTimeout(() => controller.abort(), queryTimeout);
         fetchInit = { ...newInit, signal: controller.signal };
@@ -238,6 +245,42 @@ if (typeof window !== 'undefined') {
       triggerHealthRecovery();
     }
   });
+}
+
+/**
+ * Active L2/L7 Connectivity Diagnostic & Socket Reset Probe
+ * Detects whether the current carrier gateway is stalling (5G Signal Ghosting).
+ */
+export async function checkSupabaseConnection(timeoutMs = 3500): Promise<{
+  online: boolean;
+  carrierGhosting: boolean;
+  latencyMs?: number;
+  error?: string;
+}> {
+  const isL2Online = typeof navigator !== 'undefined' ? navigator.onLine : true;
+  const start = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+
+  try {
+    const res = await fetch(`${supabaseUrl}/rest/v1/`, {
+      method: 'HEAD',
+      headers: { apikey: supabaseAnonKey },
+      signal: controller?.signal
+    });
+    if (timeoutId) clearTimeout(timeoutId);
+    const end = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+    const latencyMs = Math.round(end - start);
+    dbCircuitBreaker.recordSuccess();
+    return { online: res.ok || res.status === 401 || res.status === 200, carrierGhosting: false, latencyMs };
+  } catch (err: any) {
+    if (timeoutId) clearTimeout(timeoutId);
+    return {
+      online: false,
+      carrierGhosting: isL2Online, // Radio says connected, but IP transport failed
+      error: err?.message || 'Connection timeout'
+    };
+  }
 }
 
 // ─── Custom in-memory auth lock ─────────────────────────────────────────────

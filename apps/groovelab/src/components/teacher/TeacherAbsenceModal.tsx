@@ -171,7 +171,7 @@ export const TeacherAbsenceModal: React.FC<TeacherAbsenceModalProps> = ({
                   Aktuell als abwesend gemeldet
                 </strong>
                 <span style={{ fontSize: '0.70rem', color: '#15803d', lineHeight: 1.35, fontWeight: 600 }}>
-                  Bis einschließlich {teacher?.sick_until ? new Date(teacher.sick_until.substring(0, 10) + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'auf Weiteres'}. Du kannst dich jederzeit vorzeitig wieder verfügbar melden.
+                  Bis einschließlich {(teacher?.ausfall_until ?? (teacher as any)?.ausfallUntil) ? new Date(String(teacher.ausfall_until || teacher.ausfallUntil).substring(0, 10) + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'auf Weiteres'}. Du kannst dich jederzeit vorzeitig wieder verfügbar melden.
                 </span>
               </div>
             </div>

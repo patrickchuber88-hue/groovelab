@@ -11367,8 +11367,20 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 isCampusModule={true}
                 studentId={student.id}
                 student={student}
+                uiLevel={uiLevel}
                 onNavigateToRecordings={() => setActiveViewMode('recordings')}
                 activeSongContext={activeRhythmSong}
+                onPracticeMinutesLogged={(minutes, details) => {
+                  setStudentPracticeMinutes(prev => (prev || 0) + minutes);
+                  const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                  const entry = `⏱️ Übe-Begleiter: ${minutes} Min. bei ${details.bpm} BPM (${details.styleLabel}) geübt (${timeStr})`;
+                  setHomeworkNotesList(prev => {
+                    const updated = [...prev, entry];
+                    syncHomeworkNotes(updated).catch(err => console.error('Error syncing practice notes:', err));
+                    return updated;
+                  });
+                  broadcastPracticeUpdate(student.id, { durationMinutes: minutes, durationSeconds: minutes * 60 });
+                }}
                 onRhythmScoreUpdate={(score, details) => {
                   if (details.beatsCount >= 12) {
                     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

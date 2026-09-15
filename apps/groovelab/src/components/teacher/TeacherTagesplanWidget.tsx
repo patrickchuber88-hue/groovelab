@@ -886,7 +886,7 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                   for (let i = 0; i < timelineWithGaps.length; i++) {
                     const slot = timelineWithGaps[i];
                     const activeSlots = (slot.isGroup && Array.isArray(slot.slots)) ? slot.slots : (slot.slots || [slot]);
-                    const isCanceled = activeSlots.every((s: any) => s.status === 'canceled_by_student' || s.status === 'teacher_sick' || s.status === 'cancelled' || s.status === 'canceled_by_teacher_sick');
+                    const isCanceled = activeSlots.every((s: any) => s.status === 'canceled_by_student' || s.status === 'teacher_ausfall' || s.status === 'cancelled' || s.status === 'canceled_by_teacher_ausfall');
                     if (!isCanceled) {
                       const slotStart = slot.timeSlot;
                       const slotEnd = (() => {
@@ -929,7 +929,7 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                     const isBreak = slot.isBreak;
                     const activeSlots = (slot.isGroup && Array.isArray(slot.slots)) ? slot.slots : (slot.slots || [slot]);
                     
-                    const isCanceled = activeSlots.every((s: any) => s.status === 'canceled_by_student' || s.status === 'teacher_sick' || s.status === 'cancelled' || s.status === 'canceled_by_teacher_sick');
+                    const isCanceled = activeSlots.every((s: any) => s.status === 'canceled_by_student' || s.status === 'teacher_ausfall' || s.status === 'cancelled' || s.status === 'canceled_by_teacher_ausfall');
                     const isRescheduledAway = activeSlots.every((s: any) => s.status === 'rescheduled_away');
                     const isFinished = currentTimeStr >= slotEnd && !isCanceled && !isRescheduledAway;
                     const isCurrentSlot = currentTimeStr >= slotStart && currentTimeStr < slotEnd;

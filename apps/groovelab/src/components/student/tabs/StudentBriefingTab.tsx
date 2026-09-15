@@ -4,7 +4,7 @@ import {
   Clock, Timer, Flame, BookOpen, Play, Pause, Square, RotateCcw, Volume2, VolumeX, X,
   Zap, Music, School, Calendar, CalendarX, Check, Target, MessageSquare, Pencil, User,
   Phone, Users, Shield, Palmtree, Settings, FileText, ThumbsUp, Heart, AlertTriangle,
-  Mic, Disc, Download, Key, Headphones, Sliders, SlidersHorizontal, Bell, Crown
+  Mic, Disc, Download, Key, Headphones, Sliders, SlidersHorizontal, Bell, Crown, RefreshCw
 } from 'lucide-react';
 import { ALL_STICKERS } from '../../../domain/stickersAndTresor';
 import { UpdateAnnouncementHero } from '../../common/UpdateAnnouncementHero';
@@ -136,6 +136,9 @@ export interface StudentBriefingTabProps {
   pushEnabled?: boolean;
   setShowPushSoftPrompt?: (val: boolean) => void;
   onOpenRescheduleBottomSheet?: (occ: any) => void;
+  isOfflineScheduleActive?: boolean;
+  carrierGhostingDetected?: boolean;
+  onRefreshConnection?: () => void;
 }
 
 export function StudentBriefingTab(props: StudentBriefingTabProps) {
@@ -143,6 +146,9 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
     studentId,
     assignedCampusSongs,
     onOpenRescheduleBottomSheet,
+    isOfflineScheduleActive = false,
+    carrierGhostingDetected = false,
+    onRefreshConnection,
     DEFAULT_FOKUS_LEVELS,
     activeSongSkills,
     activeTab,
@@ -961,7 +967,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 })() : 'Demnächst');
                             const hasMessage = checkOccurrenceHasMessages(nextOcc || finalOccurId, targetDateStr);
                             const unreadMsgCount = getOccurrenceUnreadCount(nextOcc || finalOccurId, targetDateStr);
-                            const isCanceled = nextOcc?.status === 'canceled_by_student' || nextOcc?.status === 'cancelled' || nextOcc?.status === 'teacher_sick' || nextOcc?.status === 'canceled_by_teacher_sick';
+                            const isCanceled = nextOcc?.status === 'canceled_by_student' || nextOcc?.status === 'cancelled' || nextOcc?.status === 'teacher_ausfall' || nextOcc?.status === 'canceled_by_teacher_ausfall';
 
                             return (
                               <div style={{ marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
@@ -4477,7 +4483,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             })() : 'Demnächst');
                         const hasMessage = checkOccurrenceHasMessages(nextOcc || finalOccurId, targetDateStr);
                         const unreadMsgCount = getOccurrenceUnreadCount(nextOcc || finalOccurId, targetDateStr);
-                        const isCanceled = nextOcc?.status === 'canceled_by_student' || nextOcc?.status === 'cancelled' || nextOcc?.status === 'teacher_sick' || nextOcc?.status === 'canceled_by_teacher_sick';
+                        const isCanceled = nextOcc?.status === 'canceled_by_student' || nextOcc?.status === 'cancelled' || nextOcc?.status === 'teacher_ausfall' || nextOcc?.status === 'canceled_by_teacher_ausfall';
 
                         return (
                           <div style={{ marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
@@ -6458,24 +6464,30 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '6px',
-                          background: typeof navigator !== 'undefined' && !navigator.onLine 
-                            ? '#fefce8' 
-                            : 'rgba(52, 168, 83, 0.08)',
-                          border: typeof navigator !== 'undefined' && !navigator.onLine 
-                            ? '1px solid #fef08a' 
-                            : '1px solid rgba(52, 168, 83, 0.2)',
+                          background: carrierGhostingDetected
+                            ? '#fef3c7'
+                            : (((typeof navigator !== 'undefined' && !navigator.onLine) || isOfflineScheduleActive) 
+                              ? '#fef9c3' 
+                              : 'rgba(52, 168, 83, 0.08)'),
+                          border: carrierGhostingDetected
+                            ? '1px solid #fde68a'
+                            : (((typeof navigator !== 'undefined' && !navigator.onLine) || isOfflineScheduleActive) 
+                              ? '1px solid #fef08a' 
+                              : '1px solid rgba(52, 168, 83, 0.2)'),
                           borderRadius: '100px',
                           padding: '4px 12px',
-                          color: typeof navigator !== 'undefined' && !navigator.onLine 
-                            ? '#854d0e' 
-                            : '#15803d',
+                          color: carrierGhostingDetected
+                            ? '#92400e'
+                            : (((typeof navigator !== 'undefined' && !navigator.onLine) || isOfflineScheduleActive) 
+                              ? '#854d0e' 
+                              : '#15803d'),
                           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)'
                         }}>
                           <div style={{
                             width: '6px',
                             height: '6px',
                             borderRadius: '50%',
-                            background: typeof navigator !== 'undefined' && !navigator.onLine ? '#eab308' : '#34a853'
+                            background: carrierGhostingDetected ? '#f59e0b' : (((typeof navigator !== 'undefined' && !navigator.onLine) || isOfflineScheduleActive) ? '#eab308' : '#34a853')
                           }} />
                           <span style={{
                             fontSize: '0.65rem',
@@ -6483,11 +6495,39 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             letterSpacing: '0.04em',
                             textTransform: 'uppercase'
                           }}>
-                            {typeof navigator !== 'undefined' && !navigator.onLine 
-                              ? '☁️ Offline-Modus' 
-                              : '● Offline-bereit'}
+                            {carrierGhostingDetected 
+                              ? '📶 5G-Signalstau • Offline-Plan' 
+                              : (((typeof navigator !== 'undefined' && !navigator.onLine) || isOfflineScheduleActive) 
+                                ? '☁️ Offline-Modus' 
+                                : '● Offline-bereit')}
                           </span>
                         </div>
+
+                        {onRefreshConnection && (carrierGhostingDetected || isOfflineScheduleActive) && (
+                          <button
+                            type="button"
+                            onClick={onRefreshConnection}
+                            title="Mobilfunk-Verbindung erneut prüfen"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              background: '#ffffff',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '100px',
+                              padding: '4px 10px',
+                              fontSize: '0.68rem',
+                              fontWeight: 800,
+                              color: '#334155',
+                              cursor: 'pointer',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                              touchAction: 'manipulation'
+                            }}
+                          >
+                            <RefreshCw size={11} color="#64748b" />
+                            <span>Verbindung prüfen</span>
+                          </button>
+                        )}
 
                         <div style={{
                           background: 'rgba(99, 102, 241, 0.08)',
@@ -6547,7 +6587,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             })() : 'Demnächst');
                         const hasMessage = checkOccurrenceHasMessages(nextOcc || finalOccurId, targetDateStr);
                         const unreadMsgCount = getOccurrenceUnreadCount(nextOcc || finalOccurId, targetDateStr);
-                        const isCanceled = nextOcc?.status === 'canceled_by_student' || nextOcc?.status === 'cancelled' || nextOcc?.status === 'teacher_sick' || nextOcc?.status === 'canceled_by_teacher_sick';
+                        const isCanceled = nextOcc?.status === 'canceled_by_student' || nextOcc?.status === 'cancelled' || nextOcc?.status === 'teacher_ausfall' || nextOcc?.status === 'canceled_by_teacher_ausfall';
 
                         return (
                           <div style={{ marginTop: '16px', display: 'inline-flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>

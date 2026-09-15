@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Square, Volume2, VolumeX, Music, Clock, Sliders, RotateCcw, Mic, Zap, Activity, CheckCircle2, Sparkles, Star, BookOpen, Check, Settings, Pause, Headphones, ChevronRight, X, Minus, Plus } from 'lucide-react';
+import { Play, Square, Volume2, VolumeX, Music, Clock, Sliders, RotateCcw, Mic, Zap, Activity, CheckCircle2, Sparkles, Star, BookOpen, Check, Settings, Pause, Headphones, ChevronRight, X, Minus, Plus, Bell, Maximize2, Minimize2, Flame } from 'lucide-react';
 import { ACOUSTIC_STUDIO_SAMPLES } from './AcousticDrumSamples';
 import { storeBlob } from '../../utils/blobStorage';
 import { 
@@ -104,6 +104,46 @@ const playKlopfgeistClick = (
     primaryOsc.stop(time + decayTime + 0.005);
     snapOsc.stop(time + 0.015);
     bodyOsc.stop(time + decayTime + 0.005);
+  } catch (_) {}
+};
+
+// 🎶 Crisp Subdivision Click (440 Hz gentle tick for eighths/triplets/16ths)
+const playSubdivisionClick = (
+  ctx: AudioContext | BaseAudioContext,
+  time: number,
+  volume: number,
+  destination: AudioNode
+) => {
+  if (volume <= 0.001) return;
+  try {
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(440, time);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.linearRampToValueAtTime(volume * 0.40, time + 0.0008);
+    gain.gain.exponentialRampToValueAtTime(0.00001, time + 0.015);
+    osc.connect(gain);
+    gain.connect(destination);
+    osc.start(time);
+    osc.stop(time + 0.02);
+  } catch (_) {}
+};
+
+// 🔔 Pleasant Chime Tone (for Speed-Trainer tempo ramp signal)
+const playChimeTone = (ctx: AudioContext, time: number) => {
+  try {
+    const osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(2093, time); // C7 pleasant chime
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.linearRampToValueAtTime(0.14, time + 0.005);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.25);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(time);
+    osc.stop(time + 0.3);
   } catch (_) {}
 };
 
@@ -548,12 +588,14 @@ async function mixMicWithDirectBackingBeat(
 export interface GroovePracticeCompanionProps {
   useNotebookLayout?: boolean;
   onRhythmScoreUpdate?: (score: number, details: { beatsCount: number; precision: number; bpm: number; songTitle?: string; stars?: number; advice?: string }) => void;
+  onPracticeMinutesLogged?: (minutes: number, details: { bpm: number; style: string; styleLabel: string }) => void;
   targetBpm?: number;
   targetScore?: number;
   isCampusModule?: boolean;
   activeSongContext?: { songTitle: string; targetBpm: number; songId?: string } | null;
   studentId?: string;
   student?: any;
+  uiLevel?: 'junior' | 'teen' | 'pro';
   onNavigateToRecordings?: () => void;
 }
 
@@ -564,14 +606,17 @@ export interface GroovePracticeCompanionProps {
 export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = ({ 
   useNotebookLayout,
   onRhythmScoreUpdate,
+  onPracticeMinutesLogged,
   targetBpm,
   targetScore,
   isCampusModule = true,
   activeSongContext,
   studentId,
   student,
+  uiLevel,
   onNavigateToRecordings
 }) => {
+  const effectiveUiLevel: 'junior' | 'teen' | 'pro' = uiLevel || student?.campus_ui_level || 'junior';
   const getActiveMeter = (style: string, metMeter: string) => {
     if (style === 'walzer') {
       return { meter: '3/4', beats: 3, countInBeats: 3, stepsInBar: 12, stepDivision: 4 };
@@ -668,6 +713,142 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
     microTimingDeltas?: number[];
   } | null>(null);
 
+  // 🥁 Interactive Accent Matrix: 4-level cycle per beat: 'accent' | 'normal' | 'ghost' | 'mute'
+  const [beatAccents, setBeatAccents] = useState<Array<'accent' | 'normal' | 'ghost' | 'mute'>>(['accent', 'normal', 'normal', 'normal']);
+  const beatAccentsRef = useRef(beatAccents);
+  useEffect(() => { beatAccentsRef.current = beatAccents; }, [beatAccents]);
+
+  // Update beat accents array when meter changes
+  useEffect(() => {
+    const numBeats = activeMeterInfo.beats;
+    setBeatAccents(prev => {
+      const next = Array(numBeats).fill('normal') as Array<'accent' | 'normal' | 'ghost' | 'mute'>;
+      next[0] = 'accent';
+      for (let i = 1; i < numBeats; i++) {
+        if (prev[i]) next[i] = prev[i];
+      }
+      return next;
+    });
+  }, [activeMeterInfo.beats]);
+
+  const toggleBeatAccent = (index: number) => {
+    setBeatAccents(prev => {
+      const next = [...prev];
+      const curr = next[index] || 'normal';
+      const cycle: Record<'accent' | 'normal' | 'ghost' | 'mute', 'accent' | 'normal' | 'ghost' | 'mute'> = {
+        accent: 'normal',
+        normal: 'ghost',
+        ghost: 'mute',
+        mute: 'accent'
+      };
+      next[index] = cycle[curr];
+      return next;
+    });
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try { navigator.vibrate(20); } catch (_) {}
+    }
+  };
+
+  // 🎶 Subdivisions: '1' (Viertel), '2' (Achtel), '3' (Triolen), '4' (16tel)
+  const [subdivision, setSubdivision] = useState<'1' | '2' | '3' | '4'>('1');
+  const subdivisionRef = useRef(subdivision);
+  useEffect(() => { subdivisionRef.current = subdivision; }, [subdivision]);
+
+  // ⚡ Speed-Trainer States
+  const [speedTrainerActive, setSpeedTrainerActive] = useState(false);
+  const [speedTrainerTargetBpm, setSpeedTrainerTargetBpm] = useState(Math.min(240, (activeSongContext?.targetBpm || targetBpm || 120) + 20));
+  const [speedTrainerIntervalBars, setSpeedTrainerIntervalBars] = useState(4);
+  const [speedTrainerStep, setSpeedTrainerStep] = useState(2);
+  const [speedTrainerBarsUntilNext, setSpeedTrainerBarsUntilNext] = useState(4);
+  const speedTrainerActiveRef = useRef(speedTrainerActive);
+  const speedTrainerTargetBpmRef = useRef(speedTrainerTargetBpm);
+  const speedTrainerIntervalBarsRef = useRef(speedTrainerIntervalBars);
+  const speedTrainerStepRef = useRef(speedTrainerStep);
+  useEffect(() => { speedTrainerActiveRef.current = speedTrainerActive; }, [speedTrainerActive]);
+  useEffect(() => { speedTrainerTargetBpmRef.current = speedTrainerTargetBpm; }, [speedTrainerTargetBpm]);
+  useEffect(() => { speedTrainerIntervalBarsRef.current = speedTrainerIntervalBars; }, [speedTrainerIntervalBars]);
+  useEffect(() => { speedTrainerStepRef.current = speedTrainerStep; }, [speedTrainerStep]);
+
+  // 🧠 Mute-Bar Inner-Clock Challenge States
+  const [muteBarActive, setMuteBarActive] = useState(false);
+  const [muteBarMode, setMuteBarMode] = useState<'3_plus_1' | '1_plus_1'>('3_plus_1');
+  const [isCurrentBarMuted, setIsCurrentBarMuted] = useState(false);
+  const muteBarActiveRef = useRef(muteBarActive);
+  const muteBarModeRef = useRef(muteBarMode);
+  const isCurrentBarMutedRef = useRef(false);
+  useEffect(() => { muteBarActiveRef.current = muteBarActive; }, [muteBarActive]);
+  useEffect(() => { muteBarModeRef.current = muteBarMode; }, [muteBarMode]);
+
+  // 🔔 Stimmgabel / Chamber Pitch (440 Hz / 442 Hz)
+  const [chamberPitch, setChamberPitch] = useState<0 | 440 | 442>(0);
+  const chamberOscRef = useRef<OscillatorNode | null>(null);
+  const chamberGainRef = useRef<GainNode | null>(null);
+  const chamberCtxRef = useRef<AudioContext | null>(null);
+
+  const stopChamberPitch = () => {
+    if (chamberOscRef.current && chamberGainRef.current && chamberCtxRef.current) {
+      try {
+        const ctx = chamberCtxRef.current;
+        chamberGainRef.current.gain.setValueAtTime(chamberGainRef.current.gain.value, ctx.currentTime);
+        chamberGainRef.current.gain.linearRampToValueAtTime(0.0001, ctx.currentTime + 0.04);
+        setTimeout(() => {
+          try {
+            chamberOscRef.current?.stop();
+            chamberCtxRef.current?.close();
+          } catch {}
+          chamberOscRef.current = null;
+          chamberGainRef.current = null;
+          chamberCtxRef.current = null;
+        }, 50);
+      } catch {}
+    }
+    setChamberPitch(0);
+  };
+
+  const playChamberPitch = (freq: 440 | 442) => {
+    if (chamberPitch === freq) {
+      stopChamberPitch();
+      return;
+    }
+    stopChamberPitch();
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.35, ctx.currentTime + 0.05);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+
+      chamberCtxRef.current = ctx;
+      chamberOscRef.current = osc;
+      chamberGainRef.current = gain;
+      setChamberPitch(freq);
+    } catch (e) {
+      console.error('Failed to play chamber pitch:', e);
+    }
+  };
+
+  // ⛶ Notenständer-Modus (Full Stage View) & Ambient Border Flash
+  const [isStageView, setIsStageView] = useState(false);
+  const [ambientBorderFlash, setAmbientBorderFlash] = useState<'accent' | 'regular' | null>(null);
+  const ambientFlashTimeoutRef = useRef<any>(null);
+
+  // 🛠️ Slide-Up Drawer for "Übe-Tools ⚡"
+  const [showToolsDrawer, setShowToolsDrawer] = useState(false);
+
+  // ⏱️ Zero-Click Smart Practice Diary Session Timer
+  const [sessionElapsedSeconds, setSessionElapsedSeconds] = useState(0);
+  const sessionStartTimeRef = useRef<number | null>(null);
+  const sessionElapsedSecondsRef = useRef<number>(0);
+  const [sessionLoggedToast, setSessionLoggedToast] = useState<{ minutes: number; bpm: number; styleLabel: string } | null>(null);
+  const totalBarsCountRef = useRef(0);
+
   // 🔴 Recording Engine & 4-Beat Count-In States
   const [isRecording, setIsRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
@@ -724,6 +905,62 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
       }
     } catch (e) {}
   }, [isPlaying, isRecording, rhythmCoachActive]);
+
+  // ⏱️ Zero-Click Smart Practice Diary: Session Time Tracker
+  useEffect(() => {
+    if (isPlaying && !isRecording) {
+      if (!sessionStartTimeRef.current) {
+        sessionStartTimeRef.current = Date.now();
+      }
+      const interval = setInterval(() => {
+        if (sessionStartTimeRef.current) {
+          const secs = Math.floor((Date.now() - sessionStartTimeRef.current) / 1000);
+          sessionElapsedSecondsRef.current = secs;
+          setSessionElapsedSeconds(secs);
+        }
+      }, 1000);
+      return () => clearInterval(interval);
+    } else {
+      if (sessionStartTimeRef.current) {
+        const totalSecs = sessionElapsedSecondsRef.current;
+        sessionStartTimeRef.current = null;
+        sessionElapsedSecondsRef.current = 0;
+        setSessionElapsedSeconds(0);
+
+        // Quality gate: Session must be at least 120 seconds (2 minutes)
+        if (totalSecs >= 120) {
+          const mins = Math.round(totalSecs / 60);
+          const styleLabels: Record<string, string> = {
+            metronome: 'Metronom Klick',
+            rock: 'Rock & Pop Groove',
+            hiphop: 'Hip-Hop Pocket',
+            singersongwriter: 'Singer-Songwriter',
+            swing: 'Jazz Swing',
+            latin: 'Latin Bossa',
+            funk: 'Funk Break',
+            reggae: 'Reggae One-Drop',
+            walzer: 'Walzer',
+            ballad68: '6/8 Ballade',
+            disco: 'Disco'
+          };
+          const styleLabel = styleLabels[selectedStyle] || selectedStyle;
+
+          if (onPracticeMinutesLogged) {
+            onPracticeMinutesLogged(mins, { bpm, style: selectedStyle, styleLabel });
+          }
+
+          setSessionLoggedToast({
+            minutes: mins,
+            bpm,
+            styleLabel
+          });
+          setTimeout(() => {
+            setSessionLoggedToast(null);
+          }, 5000);
+        }
+      }
+    }
+  }, [isPlaying, isRecording, selectedStyle, bpm, onPracticeMinutesLogged]);
 
   const micStreamRef = useRef<MediaStream | null>(null);
   const analyserNodeRef = useRef<AnalyserNode | null>(null);
@@ -1219,9 +1456,13 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
       } catch {}
       recordAudioCtxRef.current = null;
     }
+    setIsCurrentBarMuted(false);
+    isCurrentBarMutedRef.current = false;
+    totalBarsCountRef.current = 0;
   };
 
   const handleTogglePlay = () => {
+    stopChamberPitch();
     if (isPlaying || isRecording || isCountingIn) {
       handleStopAll();
     } else {
@@ -1781,6 +2022,37 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
       
       if (current16thNoteRef.current === 0) {
         barStartAudioTimeRef.current = nextNoteTimeRef.current;
+        totalBarsCountRef.current++;
+
+        // ⚡ Speed-Trainer Progression (Automated tempo ramp)
+        if (speedTrainerActiveRef.current) {
+          const interval = speedTrainerIntervalBarsRef.current || 4;
+          const barsLeft = interval - (totalBarsCountRef.current % interval);
+          setSpeedTrainerBarsUntilNext(barsLeft === 0 ? interval : barsLeft);
+          if (totalBarsCountRef.current % interval === 0) {
+            const target = speedTrainerTargetBpmRef.current;
+            const step = speedTrainerStepRef.current || 2;
+            if (bpmRef.current < target) {
+              const newBpm = Math.min(target, bpmRef.current + step);
+              bpmRef.current = newBpm;
+              setBpm(newBpm);
+              playChimeTone(audioCtx, nextNoteTimeRef.current);
+            }
+          }
+        }
+
+        // 🧠 Mute-Bar Challenge State (Bar mute cycle)
+        if (muteBarActiveRef.current) {
+          const is3plus1 = muteBarModeRef.current === '3_plus_1';
+          const cycleLen = is3plus1 ? 4 : 2;
+          const barInCycle = totalBarsCountRef.current % cycleLen;
+          const shouldMute = is3plus1 ? (barInCycle === 3) : (barInCycle === 1);
+          isCurrentBarMutedRef.current = shouldMute;
+          setIsCurrentBarMuted(shouldMute);
+        } else {
+          isCurrentBarMutedRef.current = false;
+          setIsCurrentBarMuted(false);
+        }
       }
     };
 
@@ -2057,41 +2329,61 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
 
       ctx.resume().then(() => {
         setActiveBeatIndex(beatIdx);
+        const isAccent = beatIdx === 0;
+        setAmbientBorderFlash(isAccent ? 'accent' : 'regular');
+        if (ambientFlashTimeoutRef.current) clearTimeout(ambientFlashTimeoutRef.current);
+        ambientFlashTimeoutRef.current = setTimeout(() => {
+          setAmbientBorderFlash(null);
+        }, isAccent ? 120 : 70);
+
+        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+          try { navigator.vibrate(isAccent ? 25 : 12); } catch (_) {}
+        }
       });
     };
 
     const isSwing = selectedStyleRef.current === 'swing';
     const variant = selectedVariationRef.current; // 'A', 'B' or 'C'
+    const isMutedBar = isCurrentBarMutedRef.current;
 
     if (selectedStyleRef.current === 'metronome') {
       const meterInfo = getActiveMeter('metronome', metronomeMeterRef.current);
       if (meterInfo.meter === '6/8') {
         const beatIdx = Math.floor(step / 2);
         if (step % 2 === 0) {
-          playClick(beatIdx === 0);
+          const accentType = beatAccentsRef.current[beatIdx] || (beatIdx === 0 ? 'accent' : 'normal');
+          if (!isMutedBar && accentType !== 'mute') {
+            const isAcc = accentType === 'accent';
+            const gainMul = accentType === 'ghost' ? 0.30 : (isAcc ? 1.0 : 0.75);
+            playKlopfgeistClick(ctx, noteTime, isAcc, mVol * gainMul, masterGain);
+          }
           triggerVisualBeat(beatIdx);
         }
       } else {
         const beatIdx = Math.floor(step / 4);
-        if (variant === 'A') {
-          // V1: Classic quarter-note clicks
-          if (step % 4 === 0) {
-            playClick(beatIdx === 0);
-            triggerVisualBeat(beatIdx);
+        const isMainBeat = step % 4 === 0;
+        if (isMainBeat) {
+          const accentType = beatAccentsRef.current[beatIdx] || (beatIdx === 0 ? 'accent' : 'normal');
+          if (!isMutedBar && accentType !== 'mute') {
+            const isAcc = accentType === 'accent';
+            const gainMul = accentType === 'ghost' ? 0.30 : (isAcc ? 1.0 : 0.75);
+            playKlopfgeistClick(ctx, noteTime, isAcc, mVol * gainMul, masterGain);
           }
-        } else if (variant === 'B') {
-          // V2: Eighth-note clicks (pedagogical subdivision)
-          if (step % 2 === 0) {
-            playClick(step === 0);
-            if (step % 4 === 0) triggerVisualBeat(beatIdx);
+          triggerVisualBeat(beatIdx);
+        } else if (!isMutedBar && subdivisionRef.current !== '1') {
+          // Subdivisions (Eighths / 16ths):
+          const isEighth = step % 2 === 0;
+          if (subdivisionRef.current === '2' && isEighth) {
+            playSubdivisionClick(ctx, noteTime, mVol * 0.35, masterGain);
+          } else if (subdivisionRef.current === '4') {
+            playSubdivisionClick(ctx, noteTime, isEighth ? mVol * 0.32 : mVol * 0.18, masterGain);
           }
-        } else {
-          // V3: 16th-note clicks (high resolution micro-timing)
-          playClick(step === 0);
-          if (step % 4 === 0) triggerVisualBeat(beatIdx);
         }
       }
-    } else if (selectedStyleRef.current === 'rock') {
+    }
+    if (isMutedBar && selectedStyleRef.current !== 'metronome') {
+      if (step % 4 === 0) triggerVisualBeat(Math.floor(step / 4));
+    } else if (!isMutedBar && selectedStyleRef.current === 'rock') {
       if (variant === 'A') {
         // V1: Solid basic Pop/Rock beat
         if (step === 0 || step === 8 || step === 10) playKick(1.0);
@@ -2394,6 +2686,184 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
       position: 'relative'
     }}>
+      {/* 🌟 Ambient Screen Border Flash (Beat 1 visual pulse across the whole screen) */}
+      {ambientBorderFlash && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          borderRadius: useNotebookLayout ? '0 0 24px 24px' : '24px',
+          border: '4px solid #facc15',
+          boxShadow: 'inset 0 0 30px rgba(250, 204, 21, 0.45)',
+          pointerEvents: 'none',
+          zIndex: 50,
+          animation: 'pulse 0.12s ease-out'
+        }} />
+      )}
+
+      {/* 🏆 Zero-Click Übezeit Gutschrift Toast */}
+      {sessionLoggedToast && (
+        <div style={{
+          position: 'absolute',
+          top: '12px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 100,
+          background: '#0f172a',
+          color: '#ffffff',
+          padding: '8px 16px',
+          borderRadius: '100px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+          border: '1px solid #facc15',
+          animation: 'fadeIn 0.3s ease-out'
+        }}>
+          <span style={{ fontSize: '1rem' }}>🎉</span>
+          <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#fef08a' }}>
+            {sessionLoggedToast.minutes} Min. Übezeit ({sessionLoggedToast.bpm} BPM) dem Sticker-Tresor gutgeschrieben!
+          </span>
+        </div>
+      )}
+
+      {/* 🎼 Notenständer-Modus (Stage View Overlay) */}
+      {isStageView && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 9999,
+          background: '#090d16',
+          color: '#ffffff',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: 'calc(env(safe-area-inset-top, 24px) + 20px) 24px calc(env(safe-area-inset-bottom, 24px) + 24px) 24px',
+          boxSizing: 'border-box'
+        }}>
+          {/* Header */}
+          <div style={{ width: '100%', maxWidth: '640px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '1.2rem' }}>🎼</span>
+              <span style={{ fontSize: '1rem', fontWeight: 900, color: '#facc15', letterSpacing: '0.04em' }}>
+                NOTENSTÄNDER-MODUS
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsStageView(false)}
+              style={{
+                background: 'rgba(255,255,255,0.12)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                color: '#ffffff',
+                padding: '8px 14px',
+                borderRadius: '10px',
+                fontWeight: 800,
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <Minimize2 size={16} />
+              <span>Zurück</span>
+            </button>
+          </div>
+
+          {/* Center Stage BPM & Beat Display */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px', margin: 'auto 0' }}>
+            {/* Massive Tempo */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                <span style={{ fontSize: '6rem', fontWeight: 950, color: '#facc15', lineHeight: 1, fontFamily: 'SF Mono, monospace' }}>
+                  {bpm}
+                </span>
+                <span style={{ fontSize: '1.4rem', fontWeight: 850, color: '#94a3b8' }}>BPM</span>
+              </div>
+              <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#e2e8f0', marginTop: '8px' }}>
+                {effectiveUiLevel === 'junior'
+                  ? (bpm <= 70 ? '🐢 Schildkröte' : bpm <= 110 ? '🐕 Hund' : bpm <= 150 ? '🐇 Hase' : '🐆 Gepard')
+                  : (bpm < 60 ? 'Largo' : bpm < 76 ? 'Adagio' : bpm < 108 ? 'Andante' : bpm < 120 ? 'Moderato' : bpm < 168 ? 'Allegro' : 'Presto')}
+              </span>
+            </div>
+
+            {/* Giant Beat Circles */}
+            <div style={{ display: 'flex', gap: '14px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              {Array.from({ length: activeMeterInfo.beats }).map((_, idx) => {
+                const isActive = activeBeatIndex === idx;
+                const state = beatAccents[idx] || (idx === 0 ? 'accent' : 'normal');
+                const isAccent = state === 'accent';
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      width: '68px',
+                      height: '68px',
+                      borderRadius: '50%',
+                      background: isActive
+                        ? (isAccent ? '#eab308' : '#38bdf8')
+                        : 'rgba(255,255,255,0.08)',
+                      border: isActive
+                        ? '4px solid #ffffff'
+                        : '2px solid rgba(255,255,255,0.2)',
+                      boxShadow: isActive
+                        ? `0 0 35px ${isAccent ? 'rgba(234, 179, 8, 0.8)' : 'rgba(56, 189, 248, 0.8)'}`
+                        : 'none',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: isActive ? '#0f172a' : '#ffffff',
+                      fontSize: '1.5rem',
+                      fontWeight: 950,
+                      transform: isActive ? 'scale(1.15)' : 'scale(1)',
+                      transition: 'all 0.08s ease'
+                    }}
+                  >
+                    <span>{idx + 1}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Subdivisions Info & Meter */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', color: '#94a3b8', fontSize: '0.9rem', fontWeight: 800 }}>
+              <span>Takt: <strong style={{ color: '#ffffff' }}>{metronomeMeter}</strong></span>
+              <span>•</span>
+              <span>Unterteilung: <strong style={{ color: '#ffffff' }}>{subdivision === '1' ? '♩ Viertel' : subdivision === '2' ? '♫ Achtel' : subdivision === '3' ? '3er Triolen' : '𝅘𝅥𝅯𝅘𝅥𝅯 16tel'}</strong></span>
+            </div>
+          </div>
+
+          {/* Bottom Play / Stop Hero in Stage View */}
+          <div style={{ width: '100%', maxWidth: '360px', display: 'flex', gap: '12px' }}>
+            <button
+              type="button"
+              onClick={handleTogglePlay}
+              style={{
+                flex: 1,
+                padding: '16px',
+                borderRadius: '16px',
+                border: 'none',
+                background: isPlaying ? '#ef4444' : '#eab308',
+                color: isPlaying ? '#ffffff' : '#0f172a',
+                fontSize: '1.2rem',
+                fontWeight: 950,
+                cursor: 'pointer',
+                boxShadow: '0 6px 20px rgba(0,0,0,0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px'
+              }}
+            >
+              {isPlaying ? <Square size={22} fill="currentColor" /> : <Play size={22} fill="currentColor" />}
+              <span>{isPlaying ? 'STOPP' : 'START'}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 🛡️ Fokus-Wächter Banner & Abbruch-Modal */}
       <FocusInterruptionBanner
         isInterrupted={focusGuard.isInterrupted}
@@ -2489,24 +2959,124 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
           height: '100%',
           boxSizing: 'border-box'
         }}>
-          <div style={{ width: '100%', textAlign: 'center' }}>
-            <span style={{ fontSize: '0.62rem', color: '#86868b', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-              ÜBE-METRONOM
+          <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.62rem', color: '#86868b', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              ÜBE-METRONOM {effectiveUiLevel === 'junior' ? '• JUNIOR' : effectiveUiLevel === 'teen' ? '• TEEN BEAT' : '• PRO STUDIO'}
             </span>
+            <div style={{ display: 'flex', gap: '5px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (chamberPitch === 0) playChamberPitch(440);
+                  else if (chamberPitch === 440) playChamberPitch(442);
+                  else stopChamberPitch();
+                }}
+                style={{
+                  background: chamberPitch !== 0 ? '#fefce8' : '#f8fafc',
+                  border: chamberPitch !== 0 ? '1.5px solid #eab308' : '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  padding: '2px 6px',
+                  fontSize: '0.62rem',
+                  fontWeight: 800,
+                  color: chamberPitch !== 0 ? '#854d0e' : '#475569',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '3px'
+                }}
+                title="Kammerton Stimmgabel (440 Hz / 442 Hz)"
+              >
+                <Bell size={11} color={chamberPitch !== 0 ? '#eab308' : '#64748b'} />
+                <span>{chamberPitch !== 0 ? `${chamberPitch} Hz` : 'A=440'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsStageView(true)}
+                style={{
+                  background: '#f8fafc',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  padding: '2px 6px',
+                  fontSize: '0.62rem',
+                  fontWeight: 800,
+                  color: '#475569',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '3px'
+                }}
+                title="Notenständer-Großansicht"
+              >
+                <Maximize2 size={11} />
+                <span>Bühne</span>
+              </button>
+            </div>
           </div>
 
-          {/* Mechanical Metronome Container */}
-          <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center', margin: '0' }}>
-            <style>{`
-              @keyframes swing-anim {
-                0% { transform: rotate(-12deg); }
-                100% { transform: rotate(12deg); }
-              }
-              @keyframes rotate-key {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-              }
-            `}</style>
+          {/* Visualizer Container: Teen Pulsing Wave-Ring OR Junior/Pro Mechanical Metronome */}
+          {effectiveUiLevel === 'teen' ? (
+            <div style={{
+              position: 'relative',
+              width: '135px',
+              height: '160px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0'
+            }}>
+              <div style={{
+                position: 'absolute',
+                width: isPlaying ? '128px' : '90px',
+                height: isPlaying ? '128px' : '90px',
+                borderRadius: '50%',
+                border: '2px solid rgba(234, 179, 8, 0.45)',
+                transform: isPlaying ? 'scale(1.12)' : 'scale(1)',
+                opacity: isPlaying ? 0.85 : 0.25,
+                transition: 'all 0.12s ease-out'
+              }} />
+              <div style={{
+                position: 'absolute',
+                width: isPlaying ? '102px' : '78px',
+                height: isPlaying ? '102px' : '78px',
+                borderRadius: '50%',
+                background: 'radial-gradient(circle, rgba(250, 204, 21, 0.3) 0%, transparent 70%)',
+                border: '1.5px solid rgba(234, 179, 8, 0.7)',
+                transform: isPlaying ? 'scale(1.06)' : 'scale(1)',
+                transition: 'all 0.1s ease-out'
+              }} />
+              <div style={{
+                width: '74px',
+                height: '74px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                border: '2px solid #eab308',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: isPlaying ? '0 0 20px rgba(234, 179, 8, 0.55)' : '0 4px 10px rgba(0,0,0,0.15)',
+                zIndex: 2
+              }}>
+                <Activity size={24} color="#facc15" style={{ transform: isPlaying ? 'scale(1.15)' : 'scale(1)', transition: 'transform 0.08s' }} />
+                <span style={{ fontSize: '0.56rem', fontWeight: 900, color: '#facc15', letterSpacing: '0.04em', marginTop: '2px' }}>
+                  {isPlaying ? 'POCKET' : 'BEAT'}
+                </span>
+              </div>
+            </div>
+          ) : (
+            /* Mechanical Metronome Container */
+            <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center', margin: '0' }}>
+              <style>{`
+                @keyframes swing-anim {
+                  0% { transform: rotate(-12deg); }
+                  100% { transform: rotate(12deg); }
+                }
+                @keyframes rotate-key {
+                  0% { transform: rotate(0deg); }
+                  100% { transform: rotate(360deg); }
+                }
+              `}</style>
 
             <svg width="135" height="160" viewBox="0 0 180 215" style={{ overflow: 'visible' }}>
               <defs>
@@ -2695,6 +3265,29 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               <circle cx="90" cy="180" r="2.5" fill="#423000" />
             </svg>
           </div>
+        )}
+
+          {/* Mute-Bar Challenge Alert Banner */}
+          {isCurrentBarMuted && (
+            <div style={{
+              width: '100%',
+              maxWidth: '280px',
+              background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 100%)',
+              color: '#e0e7ff',
+              padding: '6px 10px',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              fontSize: '0.74rem',
+              fontWeight: 900,
+              boxShadow: '0 0 16px rgba(99, 102, 241, 0.4)',
+              animation: 'pulse 1.2s infinite'
+            }}>
+              <span>🧠 Zähle im Kopf weiter... (Stummtakt)</span>
+            </div>
+          )}
 
           {/* Zählzeiten Header mit Taktart-Pille */}
           <div style={{
@@ -2717,23 +3310,38 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               gap: '5px'
             }}>
               <Clock size={11} />
-              Zählzeiten
+              Zählzeiten & Akzente
             </span>
-            <span style={{
-              fontSize: '0.68rem',
-              fontWeight: 900,
-              color: '#854d0e',
-              background: '#fefce8',
-              border: '1px solid #fde047',
-              padding: '1px 8px',
-              borderRadius: '100px',
-              fontFamily: 'SF Mono, monospace'
-            }}>
-              {activeMeterInfo.meter} Takt
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              {effectiveUiLevel === 'pro' && (
+                <span style={{
+                  fontSize: '0.62rem',
+                  fontWeight: 700,
+                  color: '#64748b',
+                  background: '#f1f5f9',
+                  padding: '1px 6px',
+                  borderRadius: '4px',
+                  fontFamily: 'SF Mono, monospace'
+                }}>
+                  {Math.round((60000 / bpm))}ms
+                </span>
+              )}
+              <span style={{
+                fontSize: '0.68rem',
+                fontWeight: 900,
+                color: '#854d0e',
+                background: '#fefce8',
+                border: '1px solid #fde047',
+                padding: '1px 8px',
+                borderRadius: '100px',
+                fontFamily: 'SF Mono, monospace'
+              }}>
+                {activeMeterInfo.meter} Takt
+              </span>
+            </div>
           </div>
 
-          {/* Dynamische Beat-Karten je Taktart */}
+          {/* Dynamische Interaktive Beat-Karten je Taktart (4-Stufen-Zyklus) */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: `repeat(${activeMeterInfo.beats}, 1fr)`,
@@ -2744,36 +3352,48 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
           }}>
             {Array.from({ length: activeMeterInfo.beats }).map((_, idx) => {
               const isActive = (activeBeatIndex !== null && activeBeatIndex !== undefined) ? (activeBeatIndex % activeMeterInfo.beats === idx) : false;
-              const isDown = idx === 0;
-              const isSecondaryAccent = activeMeterInfo.meter === '6/8' && idx === 3;
+              const accentState = beatAccents[idx] || (idx === 0 ? 'accent' : 'normal');
+              const isAccent = accentState === 'accent';
+              const isGhost = accentState === 'ghost';
+              const isMute = accentState === 'mute';
+
               return (
-                <div
+                <button
                   key={idx}
+                  type="button"
+                  onClick={() => toggleBeatAccent(idx)}
+                  className="tactile-btn"
                   style={{
-                    height: activeMeterInfo.beats > 4 ? '34px' : '36px',
-                    borderRadius: activeMeterInfo.beats > 4 ? '8px' : '10px',
+                    height: activeMeterInfo.beats > 4 ? '36px' : '42px',
+                    borderRadius: activeMeterInfo.beats > 4 ? '8px' : '12px',
                     background: isActive 
-                      ? (isDown ? '#eab308' : (isSecondaryAccent ? '#0284c7' : '#0f172a')) 
-                      : (isSecondaryAccent ? '#f8fafc' : '#f1f5f9'),
+                      ? (isAccent ? '#eab308' : (isGhost ? '#475569' : (isMute ? '#64748b' : '#0f172a'))) 
+                      : (isAccent ? '#fefce8' : (isGhost ? '#f8fafc' : (isMute ? '#f1f5f9' : '#ffffff'))),
                     border: isActive 
-                      ? (isDown ? '2px solid #facc15' : (isSecondaryAccent ? '2px solid #38bdf8' : '2px solid #334155')) 
-                      : (isSecondaryAccent ? '1.5px dashed #cbd5e1' : '1px solid #e2e8f0'),
+                      ? '2px solid #facc15' 
+                      : (isAccent ? '2px solid #eab308' : (isMute ? '1.5px dashed #cbd5e1' : '1px solid #cbd5e1')),
                     boxShadow: isActive 
-                      ? (isDown ? '0 0 12px rgba(234, 179, 8, 0.45)' : (isSecondaryAccent ? '0 0 10px rgba(2, 132, 199, 0.4)' : '0 0 8px rgba(15, 23, 42, 0.25)')) 
-                      : 'none',
+                      ? '0 0 14px rgba(234, 179, 8, 0.45)' 
+                      : (isAccent ? '0 2px 6px rgba(234, 179, 8, 0.15)' : 'none'),
                     display: 'flex',
+                    flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: isActive ? '#ffffff' : (isSecondaryAccent ? '#0f172a' : '#64748b'),
-                    fontSize: activeMeterInfo.beats > 4 ? '0.80rem' : '0.90rem',
+                    color: isActive ? '#ffffff' : (isAccent ? '#854d0e' : (isMute ? '#94a3b8' : '#0f172a')),
+                    fontSize: activeMeterInfo.beats > 4 ? '0.78rem' : '0.88rem',
                     fontWeight: 950,
-                    transform: isActive ? 'scale(1.05)' : 'scale(1)',
-                    transition: 'all 0.08s ease'
+                    cursor: 'pointer',
+                    transform: isActive ? 'scale(1.06)' : 'scale(1)',
+                    transition: 'all 0.08s ease',
+                    position: 'relative'
                   }}
-                  title={isDown ? `Zählzeit ${idx + 1} (Haupt-Downbeat)` : isSecondaryAccent ? `Zählzeit ${idx + 1} (Halbtakt-Akzent)` : `Zählzeit ${idx + 1}`}
+                  title={`Schlag ${idx + 1}: ${isAccent ? 'Akzent (Klick)' : isGhost ? 'Leise (Ghost)' : isMute ? 'Stumm' : 'Normal'} - Tippen zum Wechseln`}
                 >
-                  {idx + 1}
-                </div>
+                  <span style={{ fontSize: '0.48rem', fontWeight: 900, lineHeight: 1, marginBottom: '1px' }}>
+                    {isAccent ? '👑' : isGhost ? '•' : isMute ? '✕' : ''}
+                  </span>
+                  <span>{idx + 1}</span>
+                </button>
               );
             })}
           </div>
@@ -2787,7 +3407,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               gap: '4px',
               width: '100%',
               maxWidth: '280px',
-              margin: '2px 0 4px 0',
+              margin: '2px 0 2px 0',
               background: '#f1f5f9',
               padding: '3px',
               borderRadius: '10px'
@@ -2820,6 +3440,51 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   </button>
                 );
               })}
+            </div>
+          )}
+
+          {/* Subdivisions Selector (Unterteilungen: ♩ Viertel, ♫ Achtel, 3er Triolen, 𝅘𝅥𝅯𝅘𝅥𝅯 16tel) */}
+          {selectedStyle === 'metronome' && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px',
+              width: '100%',
+              maxWidth: '280px',
+              margin: '1px 0 3px 0',
+              background: '#f8fafc',
+              padding: '2px 3px',
+              borderRadius: '8px',
+              border: '1px solid #e2e8f0'
+            }}>
+              {[
+                { id: '1', label: '♩ Viertel' },
+                { id: '2', label: '♫ Achtel' },
+                { id: '3', label: '3er' },
+                { id: '4', label: '𝅘𝅥𝅯𝅘𝅥𝅯 16tel' }
+              ].map(subOpt => (
+                <button
+                  key={subOpt.id}
+                  type="button"
+                  onClick={() => setSubdivision(subOpt.id as any)}
+                  style={{
+                    flex: 1,
+                    padding: '3px 0',
+                    fontSize: '0.62rem',
+                    fontWeight: subdivision === subOpt.id ? 900 : 700,
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: subdivision === subOpt.id ? '#fefce8' : 'transparent',
+                    color: subdivision === subOpt.id ? '#854d0e' : '#64748b',
+                    boxShadow: subdivision === subOpt.id ? '0 1px 2px rgba(234, 179, 8, 0.2)' : 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.1s ease'
+                  }}
+                >
+                  {subOpt.label}
+                </button>
+              ))}
             </div>
           )}
 
@@ -2910,7 +3575,9 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 borderRadius: '100px',
                 marginTop: '3px'
               }}>
-                {bpm < 60 ? 'Largo' : bpm < 76 ? 'Adagio' : bpm < 108 ? 'Andante' : bpm < 120 ? 'Moderato' : bpm < 168 ? 'Allegro' : 'Presto'}
+                {effectiveUiLevel === 'junior'
+                  ? (bpm <= 70 ? '🐢 Schildkröte' : bpm <= 110 ? '🐕 Hund' : bpm <= 150 ? '🐇 Hase' : '🐆 Gepard')
+                  : (bpm < 60 ? 'Largo' : bpm < 76 ? 'Adagio' : bpm < 108 ? 'Andante' : bpm < 120 ? 'Moderato' : bpm < 168 ? 'Allegro' : 'Presto')}
               </span>
             </div>
 
@@ -2986,6 +3653,211 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               </button>
               <span>240 Schnell</span>
             </div>
+          </div>
+
+          {/* ⚡ 1% Top Tools Bar (Speed-Trainer, Mute-Bar Challenge, Stimmgabel) */}
+          <div style={{ width: '100%', maxWidth: '280px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <button
+              type="button"
+              onClick={() => setShowToolsDrawer(prev => !prev)}
+              style={{
+                width: '100%',
+                padding: '7px 12px',
+                borderRadius: '10px',
+                border: showToolsDrawer ? '1.5px solid #ca8a04' : '1px solid #e2e8f0',
+                background: showToolsDrawer ? '#fefce8' : '#ffffff',
+                color: showToolsDrawer ? '#854d0e' : '#475569',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                fontSize: '0.72rem',
+                fontWeight: 800,
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Flame size={14} style={{ color: speedTrainerActive ? '#ea580c' : '#ca8a04' }} />
+                <span>Übe-Tools {speedTrainerActive ? '🔥 Speed-Trainer an' : muteBarActive ? '🧠 Mute-Bar an' : ''}</span>
+              </div>
+              <span style={{ fontSize: '0.64rem', color: '#64748b' }}>
+                {showToolsDrawer ? 'Schließen ▲' : 'Öffnen ▼'}
+              </span>
+            </button>
+
+            {/* Expandable Tools Drawer */}
+            {showToolsDrawer && (
+              <div style={{
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                padding: '10px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
+              }}>
+                {/* 1. Speed-Trainer */}
+                <div style={{
+                  padding: '8px',
+                  borderRadius: '8px',
+                  background: speedTrainerActive ? '#fff7ed' : '#f8fafc',
+                  border: speedTrainerActive ? '1px solid #fdba74' : '1px solid #f1f5f9'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Flame size={13} style={{ color: '#ea580c' }} />
+                      <span style={{ fontSize: '0.72rem', fontWeight: 850, color: '#9a3412' }}>Speed-Trainer</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSpeedTrainerActive(prev => !prev)}
+                      style={{
+                        fontSize: '0.62rem',
+                        fontWeight: 800,
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        background: speedTrainerActive ? '#ea580c' : '#cbd5e1',
+                        color: '#ffffff',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {speedTrainerActive ? 'Aktiv' : 'Aus'}
+                    </button>
+                  </div>
+                  {speedTrainerActive && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.64rem', color: '#7c2d12' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Ziel-Tempo: <strong>{speedTrainerTargetBpm} BPM</strong></span>
+                        <span>Alle <strong>{speedTrainerIntervalBars} Takte</strong> (+{speedTrainerStep} BPM)</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="60"
+                        max="220"
+                        value={speedTrainerTargetBpm}
+                        onChange={(e) => setSpeedTrainerTargetBpm(Number(e.target.value))}
+                        style={{ width: '100%', height: '4px', accentColor: '#ea580c' }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Mute-Bar Inner-Clock Challenge */}
+                <div style={{
+                  padding: '8px',
+                  borderRadius: '8px',
+                  background: muteBarActive ? '#f0fdf4' : '#f8fafc',
+                  border: muteBarActive ? '1px solid #86efac' : '1px solid #f1f5f9'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: muteBarActive ? '6px' : 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <span style={{ fontSize: '0.78rem' }}>🧠</span>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 850, color: '#166534' }}>Mute-Bar Challenge</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMuteBarActive(prev => !prev);
+                        setIsCurrentBarMuted(false);
+                      }}
+                      style={{
+                        fontSize: '0.62rem',
+                        fontWeight: 850,
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        background: muteBarActive ? '#16a34a' : '#cbd5e1',
+                        color: '#ffffff',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {muteBarActive ? 'Aktiv' : 'Aus'}
+                    </button>
+                  </div>
+                  {muteBarActive && (
+                    <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+                      {[
+                        { mode: '3_plus_1' as const, label: '3 Takte Play + 1 Mute' },
+                        { mode: '1_plus_1' as const, label: '1 Takt Play + 1 Mute' }
+                      ].map(item => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          onClick={() => setMuteBarMode(item.mode)}
+                          style={{
+                            flex: 1,
+                            padding: '3px 4px',
+                            fontSize: '0.6rem',
+                            fontWeight: muteBarMode === item.mode ? 800 : 600,
+                            borderRadius: '5px',
+                            border: '1px solid',
+                            borderColor: muteBarMode === item.mode ? '#16a34a' : '#cbd5e1',
+                            background: muteBarMode === item.mode ? '#dcfce7' : '#ffffff',
+                            color: muteBarMode === item.mode ? '#166534' : '#64748b',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. Stimmgabel (440 Hz / 442 Hz) */}
+                <div style={{
+                  padding: '8px',
+                  borderRadius: '8px',
+                  background: chamberPitch > 0 ? '#fef3c7' : '#f8fafc',
+                  border: chamberPitch > 0 ? '1px solid #fcd34d' : '1px solid #f1f5f9',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <Bell size={13} style={{ color: '#b45309' }} />
+                    <span style={{ fontSize: '0.72rem', fontWeight: 850, color: '#78350f' }}>Kammerton A</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={() => chamberPitch === 440 ? stopChamberPitch() : playChamberPitch(440)}
+                      style={{
+                        padding: '3px 7px',
+                        fontSize: '0.64rem',
+                        fontWeight: 800,
+                        borderRadius: '6px',
+                        border: 'none',
+                        background: chamberPitch === 440 ? '#d97706' : '#e2e8f0',
+                        color: chamberPitch === 440 ? '#ffffff' : '#475569',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {chamberPitch === 440 ? 'Stopp' : '440 Hz'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => chamberPitch === 442 ? stopChamberPitch() : playChamberPitch(442)}
+                      style={{
+                        padding: '3px 7px',
+                        fontSize: '0.64rem',
+                        fontWeight: 800,
+                        borderRadius: '6px',
+                        border: 'none',
+                        background: chamberPitch === 442 ? '#d97706' : '#e2e8f0',
+                        color: chamberPitch === 442 ? '#ffffff' : '#475569',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {chamberPitch === 442 ? 'Stopp' : '442 Hz'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Active Song Context Banner */}

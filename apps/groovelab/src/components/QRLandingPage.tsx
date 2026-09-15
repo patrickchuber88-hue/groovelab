@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown, Smartphone, Award, ExternalLink, ShieldCheck, CheckCheck, Download, Target, Radio, BarChart3, Fingerprint, Delete, Send, RotateCcw, Share2, Printer, Copy } from 'lucide-react';
+import { Music, Shield, Clock, CheckCircle, AlertTriangle, Flame, Zap, /* Car, */ Calendar, MapPin, User, Check, Sparkles, Play, Pause, BookOpen, X, FileText, ArrowLeft, Mail, CreditCard, Lock, Settings, Key, Users, Trophy, MessageSquare, Timer, ChevronDown, Smartphone, Award, ExternalLink, ShieldCheck, CheckCheck, Download, Target, Radio, BarChart3, Fingerprint, Delete, Send, RotateCcw, Share2, Printer, Copy, RefreshCw } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { maskLastName, cleanHomeworkNotesText, formatTeacherFullName } from '../utils/nameHelper';
 import { isWebAuthnSupported, registerUserBiometrics, getStoredBiometricProfiles } from '../utils/webauthn';
@@ -195,6 +195,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [pageState, setPageState] = useState<PageState>('loading');
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>('');
+  const [initRetryCount, setInitRetryCount] = useState<number>(0);
   const masterPricing = useMasterPricing();
 
   const redirectToCampus = async (userData: { id: string; role: string; roles?: string[]; is_campus_active?: boolean; is_groovelab_active?: boolean; schools?: any; school_id?: string | null }) => {
@@ -1543,13 +1544,23 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         sessionStorage.removeItem('groovelab_qr_token');
         sessionStorage.removeItem('groovelab_user_id');
         console.error('[QRLanding] check_qr_device error:', err);
-        setErrorMsg('Verbindungsfehler. Bitte versuche es erneut.');
+        const isOfflineOrCarrierStall = (typeof navigator !== 'undefined' && !navigator.onLine) ||
+          String(err?.message || '').includes('Failed to fetch') ||
+          String(err?.message || '').includes('Load failed') ||
+          String(err?.message || '').includes('timeout') ||
+          String(err?.message || '').includes('NetworkError');
+
+        if (isOfflineOrCarrierStall) {
+          setErrorMsg('Die Mobilfunk-Verbindung zur Musikschule konnte nicht zeitnah hergestellt werden (5G-Signalstau oder Funkloch). Bitte tippe auf „Erneut versuchen“.');
+        } else {
+          setErrorMsg('Dieser QR-Code konnte nicht verifiziert werden. Bitte versuche es erneut.');
+        }
         setPageState('error');
       }
     };
 
     init();
-  }, [token]);
+  }, [token, initRetryCount]);
 
   // Cleanup tokens from sessionStorage when component unmounts
   useEffect(() => {
@@ -1641,7 +1652,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           if (occRes.data) {
             occRes.data.forEach((occ: any) => {
               if (occ.schedule_id) overriddenScheduleIds.add(occ.schedule_id);
-              const isCanceled = ['cancelled', 'teacher_sick', 'canceled_by_student', 'canceled_by_teacher_sick'].includes(occ.status);
+              const isCanceled = ['cancelled', 'teacher_ausfall', 'canceled_by_student', 'canceled_by_teacher_ausfall'].includes(occ.status);
               if (!isCanceled) {
                 const sLastName = maskLastName(occ.student?.last_name, true);
                 const studentName = occ.student 
@@ -1660,7 +1671,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
           if (schRes.data) {
             schRes.data.forEach((sch: any) => {
-              if (!overriddenScheduleIds.has(sch.id) && sch.status !== 'canceled_by_teacher_sick') {
+              if (!overriddenScheduleIds.has(sch.id) && sch.status !== 'canceled_by_teacher_ausfall') {
                 const sLastName = maskLastName(sch.student?.last_name, true);
                 const studentName = sch.student 
                   ? `${sch.student.first_name || ''} ${sLastName}`.trim()
@@ -1943,8 +1954,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               const dateStr = `${yyyy}-${mm}-${dd}`;
 
               // Check if teacher is absent on this date & time slot
-              const isTeacherSickOnDate = Boolean(
-                sch.status === 'canceled_by_teacher_sick' ||
+              const isTeacherAusfallOnDate = Boolean(
+                sch.status === 'canceled_by_teacher_ausfall' ||
                 isSlotCancelledByAbsence(dateStr, sch.time_slot || '00:00', sch.teacher)
               );
 
@@ -1957,7 +1968,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               if (actual) {
                 allMergedOccurrences.push({
                   ...actual,
-                  status: (actual.status === 'scheduled' && isTeacherSickOnDate) ? 'canceled_by_teacher_sick' : actual.status,
+                  status: (actual.status === 'scheduled' && isTeacherAusfallOnDate) ? 'canceled_by_teacher_ausfall' : actual.status,
                   schedule: sch
                 });
                 usedActualIds.add(actual.id);
@@ -1970,7 +1981,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                   date: dateStr,
                   start_time: sch.time_slot + (sch.time_slot.split(':').length === 2 ? ':00' : ''),
                   duration: sch.duration || 45,
-                  status: isTeacherSickOnDate ? 'canceled_by_teacher_sick' : 'scheduled',
+                  status: isTeacherAusfallOnDate ? 'canceled_by_teacher_ausfall' : 'scheduled',
                   is_virtual: true,
                   teacher: sch.teacher,
                   schedule: sch
@@ -3844,7 +3855,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const unconfirmedRescheduledOcc = useMemo(() => {
     return (occurrences || []).find((occ: any) => {
       if (!occ) return false;
-      const isCanceled = ['cancelled', 'teacher_sick', 'canceled_by_student', 'canceled_by_teacher_sick'].includes(occ.status);
+      const isCanceled = ['cancelled', 'teacher_ausfall', 'canceled_by_student', 'canceled_by_teacher_ausfall'].includes(occ.status);
       if (isCanceled) return false;
       const isConfirmed = occ.student_acknowledged === true || occ.status === 'rescheduled_confirmed';
       if (isConfirmed) return false;
@@ -4267,7 +4278,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
               <Lock size={22} />
               {occurrences.some(occ => {
                 const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed';
-                const isCanceled = occ.status === 'cancelled' || occ.status === 'canceled_by_student' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
+                const isCanceled = occ.status === 'cancelled' || occ.status === 'canceled_by_student' || occ.status === 'teacher_ausfall' || occ.status === 'canceled_by_teacher_ausfall';
                 const needsAck = occ.student_acknowledged === false && (isRescheduled || isCanceled || occ.original_date);
                 const hasUnreadMsg = unreadMessageOccurrences.includes(occ.id);
                 return needsAck || hasUnreadMsg;
@@ -4290,7 +4301,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
             </p>
             {occurrences.some(occ => {
               const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed';
-              const isCanceled = occ.status === 'cancelled' || occ.status === 'canceled_by_student' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
+              const isCanceled = occ.status === 'cancelled' || occ.status === 'canceled_by_student' || occ.status === 'teacher_ausfall' || occ.status === 'canceled_by_teacher_ausfall';
               const needsAck = occ.student_acknowledged === false && (isRescheduled || isCanceled || occ.original_date);
               const hasUnreadMsg = unreadMessageOccurrences.includes(occ.id);
               return needsAck || hasUnreadMsg;
@@ -4550,7 +4561,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           {!isCollapsed && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {group.items.map((occ: any) => {
-                const isCanceled = occ.status === 'cancelled' || occ.status === 'canceled_by_student' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
+                const isCanceled = occ.status === 'cancelled' || occ.status === 'canceled_by_student' || occ.status === 'teacher_ausfall' || occ.status === 'canceled_by_teacher_ausfall';
                 const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed';
                 const isPendingReview = occ.schedule?.status === 'ready_for_admin_review' && !occ.room_name && !occ.schedule?.room_id;
                 const needsAcknowledge = occ.student_acknowledged === false && (isRescheduled || occ.original_date || isCanceled);
@@ -6214,8 +6225,8 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       const nextTeacherFullName = formatTeacherFullName(nextTeacherObj, (profile as any)?.teacher_name);
       const isCancelled = Boolean(
         nextLesson.isCancelled || 
-        nextLesson.occ?.status === 'canceled_by_teacher_sick' || 
-        nextLesson.occ?.status === 'teacher_sick' || 
+        nextLesson.occ?.status === 'canceled_by_teacher_ausfall' || 
+        nextLesson.occ?.status === 'teacher_ausfall' || 
         nextLesson.occ?.status === 'cancelled'
       );
       const isShiftedPending = Boolean(nextLesson.needsAck && !isCancelled);
@@ -6494,7 +6505,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           {(() => {
             const pendingCount = occurrences.filter(occ => {
               const isRescheduled = occ.status === 'pending_reschedule' || occ.status === 'rescheduled_confirmed';
-              const isCanceled = occ.status === 'cancelled' || occ.status === 'canceled_by_student' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
+              const isCanceled = occ.status === 'cancelled' || occ.status === 'canceled_by_student' || occ.status === 'teacher_ausfall' || occ.status === 'canceled_by_teacher_ausfall';
               const needsAck = occ.student_acknowledged === false && (isRescheduled || isCanceled || occ.original_date);
               const hasUnreadMsg = unreadMessageOccurrences.includes(occ.id);
               return needsAck || hasUnreadMsg;
@@ -7818,16 +7829,57 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
   // ── Render: Error ─────────────────────────────────────────────────────────
   if (pageState === 'error') {
+    const isNetwork = errorMsg.includes('Mobilfunk') || errorMsg.includes('Verbindung') || errorMsg.includes('Signalstau') || errorMsg.includes('Offline');
     return (
       <div style={styles.fullScreen}>
         <div style={{ ...styles.card, maxWidth: '340px', textAlign: 'center', gap: '20px' }}>
-          <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
-            <AlertTriangle size={32} color="#ef4444" />
+          <div style={{
+            width: '64px',
+            height: '64px',
+            borderRadius: '50%',
+            background: isNetwork ? '#fef3c7' : '#fef2f2',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto'
+          }}>
+            {isNetwork ? <RefreshCw size={28} color="#d97706" /> : <AlertTriangle size={32} color="#ef4444" />}
           </div>
           <div>
-            <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>Ungültiger Code</h2>
+            <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
+              {isNetwork ? 'Verbindung verzögert' : 'Ungültiger Code'}
+            </h2>
             <p style={{ margin: '8px 0 0 0', fontSize: '0.875rem', color: '#64748b', lineHeight: 1.5 }}>{errorMsg}</p>
           </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setErrorMsg('');
+              setPageState('loading');
+              setInitRetryCount(c => c + 1);
+            }}
+            style={{
+              background: '#34a853',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '16px',
+              padding: '12px 24px',
+              fontWeight: 800,
+              fontSize: '0.95rem',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 14px rgba(52, 168, 83, 0.3)',
+              touchAction: 'manipulation'
+            }}
+          >
+            <RefreshCw size={16} />
+            <span>Erneut versuchen</span>
+          </button>
+
           <div style={styles.brandFooter}>
             <Music size={14} color="#eab308" />
             <span>Campus-Groovelab</span>
@@ -8185,9 +8237,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     const nextLessonInfo = (() => {
       const simNow = getSimulatedNow();
       const todayStr = simNow.toLocaleDateString('sv-SE');
-      const activeOccs = occurrences.filter(o => o.status !== 'cancelled' && o.status !== 'canceled_by_student' && o.status !== 'teacher_sick' && o.status !== 'canceled_by_teacher_sick');
+      const activeOccs = occurrences.filter(o => o.status !== 'cancelled' && o.status !== 'canceled_by_student' && o.status !== 'teacher_ausfall' && o.status !== 'canceled_by_teacher_ausfall');
       const nextAnyOcc = occurrences.find(o => o.date >= todayStr);
-      const isCancelledNext = Boolean(nextAnyOcc && ['cancelled', 'teacher_sick', 'canceled_by_teacher_sick', 'canceled_by_student'].includes(nextAnyOcc.status));
+      const isCancelledNext = Boolean(nextAnyOcc && ['cancelled', 'teacher_ausfall', 'canceled_by_teacher_ausfall', 'canceled_by_student'].includes(nextAnyOcc.status));
       const upcomingOcc = isCancelledNext ? nextAnyOcc : activeOccs.find(o => o.date >= todayStr);
 
       if (upcomingOcc) {
@@ -8211,7 +8263,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           room_name: roomName,
           isRescheduled,
           needsAck,
-          isCancelled: Boolean(isCancelledNext || ['cancelled', 'teacher_sick', 'canceled_by_teacher_sick', 'canceled_by_student'].includes(upcomingOcc.status))
+          isCancelled: Boolean(isCancelledNext || ['cancelled', 'teacher_ausfall', 'canceled_by_teacher_ausfall', 'canceled_by_student'].includes(upcomingOcc.status))
         };
       }
       return getVirtualNextLesson();
@@ -9560,9 +9612,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     const nextLessonInfo = (() => {
       const simNow = getSimulatedNow();
       const todayStr = simNow.toLocaleDateString('sv-SE');
-      const activeOccs = occurrences.filter(o => o.status !== 'cancelled' && o.status !== 'canceled_by_student' && o.status !== 'teacher_sick' && o.status !== 'canceled_by_teacher_sick');
+      const activeOccs = occurrences.filter(o => o.status !== 'cancelled' && o.status !== 'canceled_by_student' && o.status !== 'teacher_ausfall' && o.status !== 'canceled_by_teacher_ausfall');
       const nextAnyOcc = occurrences.find(o => o.date >= todayStr);
-      const isCancelledNext = Boolean(nextAnyOcc && ['cancelled', 'teacher_sick', 'canceled_by_teacher_sick', 'canceled_by_student'].includes(nextAnyOcc.status));
+      const isCancelledNext = Boolean(nextAnyOcc && ['cancelled', 'teacher_ausfall', 'canceled_by_teacher_ausfall', 'canceled_by_student'].includes(nextAnyOcc.status));
       const upcomingOcc = isCancelledNext ? nextAnyOcc : activeOccs.find(o => o.date >= todayStr);
 
       if (upcomingOcc) {
@@ -9586,7 +9638,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           room_name: roomName,
           isRescheduled,
           needsAck,
-          isCancelled: Boolean(isCancelledNext || ['cancelled', 'teacher_sick', 'canceled_by_teacher_sick', 'canceled_by_student'].includes(upcomingOcc.status))
+          isCancelled: Boolean(isCancelledNext || ['cancelled', 'teacher_ausfall', 'canceled_by_teacher_ausfall', 'canceled_by_student'].includes(upcomingOcc.status))
         };
       }
       return getVirtualNextLesson();
@@ -9626,7 +9678,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         room_name: getLessonRoom(occurrenceToday, todayStr)
       };
       isTodayLessonScheduled = true;
-      isCanceled = ['cancelled', 'teacher_sick', 'canceled_by_student', 'canceled_by_teacher_sick'].includes(occurrenceToday.status);
+      isCanceled = ['cancelled', 'teacher_ausfall', 'canceled_by_student', 'canceled_by_teacher_ausfall'].includes(occurrenceToday.status);
     } else if (scheduleToday) {
       const overridingOcc = occurrences.find(o => o.schedule_id === scheduleToday.id && o.date === todayStr);
       if (overridingOcc) {
@@ -9635,7 +9687,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           room_name: getLessonRoom(overridingOcc, todayStr)
         };
         isTodayLessonScheduled = true;
-        isCanceled = ['cancelled', 'teacher_sick', 'canceled_by_student', 'canceled_by_teacher_sick'].includes(overridingOcc.status);
+        isCanceled = ['cancelled', 'teacher_ausfall', 'canceled_by_student', 'canceled_by_teacher_ausfall'].includes(overridingOcc.status);
       } else {
         lessonToday = {
           ...scheduleToday,
@@ -9643,7 +9695,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           room_name: getLessonRoom(scheduleToday, todayStr)
         };
         isTodayLessonScheduled = true;
-        isCanceled = scheduleToday.status === 'canceled_by_teacher_sick';
+        isCanceled = scheduleToday.status === 'canceled_by_teacher_ausfall';
       }
     }
 

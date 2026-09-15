@@ -17,7 +17,7 @@
     "verify:invariants": "tsx scripts/verify_rls_catalog_invariants.ts",
     "typecheck": "tsc -p apps/groovelab/tsconfig.json --noEmit && tsc -p packages/shared/tsconfig.json --noEmit && tsc -p packages/bff-server/tsconfig.json --noEmit && tsc -p packages/backend-core/tsconfig.json --noEmit",
     "gate": "npm run security:check && npm run security:secrets && npm run typecheck",
-    "gate:pre-commit": "bash scripts/pre_commit_secret_scanner.sh && node scripts/security_drift_guard.mjs && npm run typecheck",
+    "gate:pre-commit": "npm run gate",
     "gate:fast": "node scripts/security_drift_guard.mjs && npx tsc --noEmit",
     "verify:enterprise": "npm run gate",
     "verify:headers:static": "node scripts/verify_static_security_headers.mjs",

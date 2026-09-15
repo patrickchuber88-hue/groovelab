@@ -10,7 +10,7 @@ import {
   Copy, Check, Link as LinkIcon, Monitor, Sliders,
   Coffee, Sparkles, Clock, ClipboardList, Upload, Plus,
   Trash2, Shield, Calendar, CalendarX, CalendarCheck, BookOpen, Music, CheckSquare, XSquare, Check as CheckIcon, Edit2,
-  LayoutDashboard, Award, UserPlus, GraduationCap, ZoomIn, ZoomOut, ChevronLeft, X, AlertCircle, MoreVertical, ArrowUp, ArrowDown,
+  LayoutDashboard, Award, UserPlus, GraduationCap, ZoomIn, ZoomOut, ChevronLeft, X, AlertCircle, MoreVertical, ArrowUp, ArrowDown, ArrowLeftRight,
   School, User, DoorOpen, Tag, Wrench, BarChart2, Edit3, Search, Ruler, Eye, EyeOff, Lock, GripVertical, Mail, QrCode, CreditCard, TrendingDown, Info, Lightbulb, Download, Printer, Palette, Zap, Database, Activity, HeartHandshake,
   HardDrive, Cloud, Crown, Rocket, Cpu, Fingerprint, Smartphone, KeyRound, RotateCw, LayoutGrid, Mic, Smile, Radio, Archive,
   Disc3, Menu, ScrollText
@@ -169,7 +169,7 @@ interface BypassTeacher {
   role?: string;
   roles?: string[];
   isPinActivated?: boolean;
-  sick_until?: string | null;
+  ausfall_until?: string | null;
   preferred_room_ids?: string[];
 }
 
@@ -189,7 +189,7 @@ interface GrooveLabCoach {
   isPinActivated?: boolean;
   studentCount?: number;
   contractEndsAt?: string | null;
-  sick_until?: string | null;
+  ausfall_until?: string | null;
   preferred_room_ids?: string[];
 }
 
@@ -2377,8 +2377,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         : Array.isArray(userRoles) 
           ? userRoles 
           : [];
-    return roles.includes('teacher') || currentEmp?.role === 'teacher' || currentUserProfile?.role === 'teacher' || userRole === 'teacher';
-  }, [employees, userId, currentUserProfile, userRoles, userRole]);
+    return roles.includes('teacher') || currentEmp?.role === 'teacher' || currentUserProfile?.role === 'teacher';
+  }, [employees, userId, currentUserProfile, userRoles]);
 
   // Employee Form States
   const [employeeFirstName, setEmployeeFirstName] = useState<string>('');
@@ -2400,6 +2400,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [userQuota, setUserQuota] = useState<number>(150);
   const [activeUserQuota, setActiveUserQuota] = useState<number>(150);
   const [pendingUserQuota, setPendingUserQuota] = useState<number | null>(null);
+  const [showDualRoleNotice, setShowDualRoleNotice] = useState<boolean>(() => {
+    return typeof window !== 'undefined' && sessionStorage.getItem('groovelab_dual_role_switched_notice') === 'true';
+  });
 
   // School Data & Subscription
   const [isAvvSigned, setIsAvvSigned] = useState<boolean>(true);
@@ -3780,7 +3783,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           notified_at,
           handling_owner,
           student:users!crisis_notifications_student_id_fkey (first_name, last_name, instrument),
-          teacher:users!crisis_notifications_teacher_id_fkey (id, first_name, last_name, sick_until)
+          teacher:users!crisis_notifications_teacher_id_fkey (id, first_name, last_name, ausfall_until)
         `)
         .order('slot_start_datetime', { ascending: true });
 
@@ -3888,7 +3891,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       'id', 'created_at', 'school_id', 'password', 'password_hash', 
       'personal_pin', 'parent_pin', 'teacher_qr_token', 'campus_login_token', 
       'groovelab_kiosk_token', 'secret_token', 'joker_used_at', 'weekly_jokers_used',
-      'lesson_duration', 'preferred_room_ids', 'planned_boards', 'sick_until',
+      'lesson_duration', 'preferred_room_ids', 'planned_boards', 'ausfall_until',
       'age', 'bio', 'gear', 'listening', 'projects', 'bands', 'expertise', 'phone', 'group_id', 'nickname'
     ];
 
@@ -4047,7 +4050,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         'id', 'created_at', 'school_id', 'password', 'password_hash', 
         'personal_pin', 'parent_pin', 'teacher_qr_token', 'campus_login_token', 
         'groovelab_kiosk_token', 'secret_token', 'joker_used_at', 'weekly_jokers_used',
-        'lesson_duration', 'preferred_room_ids', 'planned_boards', 'sick_until',
+        'lesson_duration', 'preferred_room_ids', 'planned_boards', 'ausfall_until',
         'age', 'bio', 'gear', 'listening', 'projects', 'bands', 'expertise', 'phone', 'group_id', 'nickname'
       ];
       
@@ -4516,7 +4519,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           .single(),
         supabase
           .from('users')
-          .select('id, first_name, last_name, role, roles, email, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, nickname, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token, is_pin_activated, sick_until, personal_pin, created_at, preferred_room_ids, planned_boards, student_billing_payment_method, activated_at, student_billing_cash_paid, is_trial, trial_ends_at, exempt_from_direct_billing')
+          .select('id, first_name, last_name, role, roles, email, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, nickname, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token, is_pin_activated, ausfall_until, personal_pin, created_at, preferred_room_ids, planned_boards, student_billing_payment_method, activated_at, student_billing_cash_paid, is_trial, trial_ends_at, exempt_from_direct_billing')
           .eq('school_id', schoolId),
         supabase
           .from('students')
@@ -4871,9 +4874,18 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         setPendingUserQuota(schoolData.pending_user_quota);
       }
 
-      const allUsers: any[] = usersResult.data || [];
+      let allUsers: any[] = usersResult.data || [];
       if (usersResult.error) {
-        console.warn('[SecretaryDashboard] usersResult warning:', usersResult.error);
+        console.warn('[SecretaryDashboard] usersResult warning, trying resilient fallback:', usersResult.error);
+        try {
+          const fallbackUsersRes = await supabase
+            .from('users')
+            .select('*')
+            .eq('school_id', schoolId);
+          if (fallbackUsersRes.data && fallbackUsersRes.data.length > 0) {
+            allUsers = fallbackUsersRes.data;
+          }
+        } catch (e) {}
       }
 
       // Fetch contract statuses for all students
@@ -5072,7 +5084,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               role: u.role,
               roles: u.roles,
               isPinActivated: u.is_pin_activated,
-              sick_until: u.sick_until,
+              ausfall_until: u.ausfall_until,
               preferred_room_ids: u.preferred_room_ids || []
             });
           } else {
@@ -5092,7 +5104,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 teacherQrToken: u.teacher_qr_token || '',
                 studentCount: currentStudentCount,
                 contractEndsAt: u.contract_ends_at || null,
-                sick_until: u.sick_until,
+                ausfall_until: u.ausfall_until,
                 preferred_room_ids: u.preferred_room_ids || [],
                 isPinActivated: u.is_pin_activated
               });
@@ -5113,7 +5125,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 teacherQrToken: u.teacher_qr_token || '',
                 studentCount: currentStudentCount,
                 contractEndsAt: u.contract_ends_at || null,
-                sick_until: u.sick_until,
+                ausfall_until: u.ausfall_until,
                 preferred_room_ids: u.preferred_room_ids || [],
                 isPinActivated: u.is_pin_activated
               });
@@ -5218,6 +5230,11 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         if (currUser) {
           resolvedProfile = currUser;
           setCurrentUserProfile(currUser);
+          const isCurrInEmployees = employeesList.some(e => e.id === currUser.id);
+          if (!isCurrInEmployees && (currUser.role === 'admin' || currUser.role === 'secretary' || userRole === 'admin' || userRole === 'secretary' || (currUser.roles && (currUser.roles.includes('admin') || currUser.roles.includes('secretary'))))) {
+            employeesList.unshift(currUser);
+            setEmployees([...employeesList]);
+          }
         }
       }
 
@@ -6196,12 +6213,12 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         throw new Error('Lehrerprofil nicht gefunden.');
       }
 
-      // 1. Clear user sick columns
+      // 1. Clear user absence columns (Neutral: Ausfall)
       const { error: userErr } = await supabase
         .from('users')
         .update({ 
-          sick_until: null,
-          sick_start: null
+          ausfall_until: null,
+          ausfall_start: null
         })
         .eq('id', teacherId);
 
@@ -6268,7 +6285,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           .from('schedules')
           .update({ status: 'approved' })
           .in('id', Array.from(scheduleIdsToRestore))
-          .eq('status', 'canceled_by_teacher_sick');
+          .in('status', ['canceled_by_teacher_ausfall', 'teacher_ausfall']);
       }
 
       // Restore occurrences
@@ -11525,8 +11542,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 todayStart.setHours(0,0,0,0);
                 return crisisNotifications.filter(n => {
                   if (n.status !== 'UNREAD') return false;
-                  if (!n.teacher || !n.teacher.sick_until) return false;
-                  const absenceUntilTime = new Date(n.teacher.sick_until).getTime();
+                  const untilVal = n.teacher?.ausfall_until ?? n.teacher?.ausfallUntil;
+                  if (!n.teacher || !untilVal) return false;
+                  const absenceUntilTime = new Date(untilVal).getTime();
                   if (absenceUntilTime < todayStart.getTime()) return false;
                   const isPast = new Date(n.slot_start_datetime).getTime() < todayStart.getTime();
                   return !isPast;
@@ -11940,12 +11958,26 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   <span>{schoolName || 'Meine Musikschule'}</span>
                 </span>
                 <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
-                <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <User size={14} color="#3b82f6" />
                   <span>
                     {currentUserProfile 
                       ? `${currentUserProfile.first_name || ''} ${currentUserProfile.last_name || ''}`.trim() 
                       : (schoolName ? `${schoolName} Schulleitung` : 'Verwaltung')}
+                  </span>
+                  <span style={{
+                    marginLeft: '2px',
+                    background: '#fee2e2',
+                    color: '#b91c1c',
+                    border: '1px solid rgba(239, 68, 68, 0.25)',
+                    fontSize: '0.62rem',
+                    fontWeight: 900,
+                    padding: '2px 6px',
+                    borderRadius: '6px',
+                    letterSpacing: '0.04em',
+                    lineHeight: 1
+                  }}>
+                    VERWALTUNG
                   </span>
                 </span>
               </span>
@@ -12096,6 +12128,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                 }}
                 className="hover-scale"
                 title="Zum Lehrer-Dashboard wechseln"
+                aria-label="Aktive Ansicht: Schulsekretariat. Klicken, um zum Lehrer-Dashboard zu wechseln."
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = '#d1fae5';
                 }}
@@ -12103,8 +12136,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                   e.currentTarget.style.background = '#e6f4ea';
                 }}
               >
+                <ArrowLeftRight size={13} color="#34a853" />
                 <GraduationCap size={15} color="#34a853" />
-                <span>Lehrer</span>
+                <span>Zum Lehrerpult</span>
               </button>
             )}
           </div>
@@ -12117,6 +12151,47 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           width: '100%',
           flexShrink: 0
         }} />
+
+        {showDualRoleNotice && (
+          <div style={{
+            background: '#ecfdf5',
+            borderBottom: '1px solid #a7f3d0',
+            padding: '10px 40px',
+            fontSize: '0.82rem',
+            color: '#065f46',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontWeight: 600,
+            fontFamily: 'Inter, sans-serif',
+            flexShrink: 0
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>🎓</span>
+              <span><strong>Doppelrolle aktiv:</strong> Sie sind als Schulsekretariat angemeldet. Über die Schaltfläche <strong>„⇄ Zum Lehrerpult“</strong> oben rechts können Sie jederzeit zu Ihrer persönlichen Unterrichtsansicht wechseln.</span>
+            </div>
+            <button
+              onClick={() => {
+                setShowDualRoleNotice(false);
+                try {
+                  sessionStorage.removeItem('groovelab_dual_role_switched_notice');
+                } catch (e) {}
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#047857',
+                fontWeight: 800,
+                cursor: 'pointer',
+                fontSize: '0.85rem',
+                padding: '2px 8px'
+              }}
+              aria-label="Hinweis schließen"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {!isBillingBooked && !isSchoolTrial && !hasCampusSub && !hasGroovelabSub && (
           <div style={{
@@ -23237,8 +23312,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
                     todayStart.setHours(0,0,0,0);
                     return crisisNotifications.filter(n => {
                       if (n.status !== 'UNREAD') return false;
-                      if (!n.teacher || !n.teacher.sick_until) return false;
-                      const absenceUntilTime = new Date(n.teacher.sick_until).getTime();
+                      const untilVal = n.teacher?.ausfall_until ?? n.teacher?.ausfallUntil;
+                      if (!n.teacher || !untilVal) return false;
+                      const absenceUntilTime = new Date(untilVal).getTime();
                       if (absenceUntilTime < todayStart.getTime()) return false;
                       const isPast = new Date(n.slot_start_datetime).getTime() < todayStart.getTime();
                       return !isPast;

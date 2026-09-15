@@ -626,7 +626,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
           const rId = occ.schedules?.room_id || null;
           if (rId !== roomId) return false;
           if (occ.date !== todayStr) return false;
-          if (occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick') {
+          if (occ.status === 'cancelled' || occ.status === 'teacher_ausfall' || occ.status === 'canceled_by_teacher_ausfall') {
             return false;
           }
           const isRescheduledFromOutside = occ.original_date && 
@@ -892,7 +892,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
         );
 
         if (occ) {
-          if (['cancelled', 'teacher_sick', 'canceled_by_student', 'canceled_by_teacher_sick'].includes(occ.status)) {
+          if (['cancelled', 'teacher_ausfall', 'canceled_by_student', 'canceled_by_teacher_ausfall'].includes(occ.status)) {
             return; // Cancelled lesson
           }
           if (occ.date !== targetDateStr) {
@@ -917,7 +917,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
         const roomId = occ.schedules?.room_id || occ.room_id;
         if (!isRoomMatch(roomId)) return;
         if (occ.date !== targetDateStr) return;
-        if (['cancelled', 'teacher_sick', 'canceled_by_student', 'canceled_by_teacher_sick'].includes(occ.status)) return;
+        if (['cancelled', 'teacher_ausfall', 'canceled_by_student', 'canceled_by_teacher_ausfall'].includes(occ.status)) return;
 
         const startTimeStr = occ.start_time ? occ.start_time.substring(0, 5) : '';
         if (!startTimeStr) return;
@@ -1184,7 +1184,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
         if (rId !== roomId) return false;
         if (occ.date !== bookingDate) return false;
 
-        if (occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick') {
+        if (occ.status === 'cancelled' || occ.status === 'teacher_ausfall' || occ.status === 'canceled_by_teacher_ausfall') {
           return false;
         }
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
-import { Music, AlertCircle, Play, Pause, ArrowDown, ArrowRight, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, Tablet, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Key, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School, GraduationCap, Trophy, Compass, MapPin, RefreshCw, Repeat, BookOpen, Info, Disc, Building, ZoomIn } from 'lucide-react';
+import { Music, AlertCircle, Play, Pause, ArrowDown, ArrowRight, ArrowLeftRight, Library, Shield, ShieldCheck, FileText, LogOut, Award, Users, User, Monitor, Tablet, X, Camera, Clock, QrCode, Plus, ExternalLink, BarChart, Star, Box, Settings, Lock, Key, Pencil, Trash2, Zap, RotateCcw, Check, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Search, Mic, Calendar, PlayCircle, Youtube, Megaphone, Mail, School, GraduationCap, Trophy, Compass, MapPin, RefreshCw, Repeat, BookOpen, Info, Disc, Building, ZoomIn } from 'lucide-react';
 import { useWindowSize } from 'react-use';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase, supabaseUrl, supabaseAnonKey } from './lib/supabase';
@@ -49,7 +49,7 @@ const TrialInfoModal = lazy(() => import('./components/TrialInfoModal').then(m =
 const AdminSecuritySuiteModal = lazy(() => import('./components/AdminSecuritySuiteModal').then(m => ({ default: m.AdminSecuritySuiteModal })));
 const QuarterlyAccessReportModal = lazy(() => import('./components/ui/QuarterlyAccessReportModal').then(m => ({ default: m.QuarterlyAccessReportModal })));
 const SessionLockModal = lazy(() => import('./components/ui/SessionLockModal').then(m => ({ default: m.SessionLockModal })));
-const LegalTextModal = lazy(() => import('./components/LegalTextModal').then(m => ({ default: m.LegalTextModal })));
+import { LegalModalsHub } from './components/modals/LegalModalsHub';
 const ConfettiModal = lazy(() => import('./components/ConfettiModal'));
 const MaintenanceLockoutOverlay = lazy(() => import('./components/MaintenanceLockoutOverlay').then(m => ({ default: m.MaintenanceLockoutOverlay })));
 const GlobalBroadcastBanner = lazy(() => import('./components/GlobalBroadcastBanner').then(m => ({ default: m.GlobalBroadcastBanner })));
@@ -655,32 +655,23 @@ function App() {
     return null;
   }, [masterPricing?.specialOffers]);
 
-  // Declarative definition of renderLegalModals to ensure availability across all routes/landing pages
-  const renderLegalModals = () => {
-    const isLegalOpen = showPrivacy || showAgb || showImpressum || showCancellation || showAccessibility;
-    if (!isLegalOpen) return null;
-    const initialTab: 'privacy' | 'terms' | 'impressum' | 'cancellation' | 'accessibility' = showAccessibility
-      ? 'accessibility'
-      : (showPrivacy 
-        ? 'privacy' 
-        : (showAgb ? 'terms' : (showCancellation ? 'cancellation' : 'impressum')));
-
-    return (
-      <Suspense fallback={null}>
-        <LegalTextModal 
-          isOpen={isLegalOpen}
-          initialTab={initialTab}
-          onClose={() => {
-            setShowPrivacy(false);
-            setShowAgb(false);
-            setShowImpressum(false);
-            setShowCancellation(false);
-            setShowAccessibility(false);
-          }}
-        />
-      </Suspense>
-    );
-  };
+  // Declarative definition of renderLegalModals to ensure availability across all routes/landing pages via LegalModalsHub
+  const renderLegalModals = () => (
+    <LegalModalsHub
+      showPrivacy={showPrivacy}
+      showAgb={showAgb}
+      showImpressum={showImpressum}
+      showCancellation={showCancellation}
+      showAccessibility={showAccessibility}
+      onClose={() => {
+        setShowPrivacy(false);
+        setShowAgb(false);
+        setShowImpressum(false);
+        setShowCancellation(false);
+        setShowAccessibility(false);
+      }}
+    />
+  );
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -719,29 +710,7 @@ function App() {
     return cleanup;
   }, []);
 
-  const [isScreenLockedByInactivity, setIsScreenLockedByInactivity] = useState(false);
   const [showQuarterlyAccessReportModal, setShowQuarterlyAccessReportModal] = useState(false);
-
-  // 🔒 Universal 45-Minute Inactivity Idle Screen Lock (Enterprise Goldstandard)
-  useInactivityTimeout({
-    timeoutMs: 45 * 60 * 1000,
-    enabled: Boolean(currentView === 'dashboard' && !isScreenLockedByInactivity),
-    onTimeout: () => {
-      console.warn('[Inactivity] 45 minutes idle reached. Activating Privacy Screen Lock...');
-      // Privilege Downgrade: If in admin mode, auto-downgrade to teacher if user has teacher role
-      try {
-        const storedUserStr = sessionStorage.getItem('groovelab_cached_user');
-        if (storedUserStr) {
-          const parsed = JSON.parse(storedUserStr);
-          if (parsed?.role === 'admin' && Array.isArray(parsed?.roles) && parsed.roles.includes('teacher')) {
-            console.log('[Inactivity] Downgrading active role from admin to teacher (Least Privilege)...');
-            sessionStorage.setItem('groovelab_active_workspace', 'teacher');
-          }
-        }
-      } catch (e) {}
-      setIsScreenLockedByInactivity(true);
-    }
-  });
 
 
   const qrPathMatch = location.pathname.match(/^\/qr\/([^/?#]+)/);
@@ -1503,6 +1472,41 @@ function App() {
       supabase.removeChannel(channel);
     };
   }, [user?.id]);
+
+  const [isScreenLockedByInactivity, setIsScreenLockedByInactivity] = useState(false);
+
+  // 🔒 Dynamic Inactivity Idle Screen Lock (Enterprise Goldstandard):
+  // 45 minutes for Administration/Secretary (high risk), 60 minutes for Teachers (pedagogical continuity)
+  const effectiveInactivityTimeoutMs = useMemo(() => {
+    const activeRole = (user?.role || '').toLowerCase();
+    if (activeRole === 'admin' || activeRole === 'secretary') {
+      return 45 * 60 * 1000; // 45 Minuten für Verwaltung
+    }
+    if (activeRole === 'teacher') {
+      return 60 * 60 * 1000; // 60 Minuten für Lehrkräfte
+    }
+    return 45 * 60 * 1000; // Fallback 45 Minuten
+  }, [user?.role]);
+
+  useInactivityTimeout({
+    timeoutMs: effectiveInactivityTimeoutMs,
+    enabled: Boolean(currentView === 'dashboard' && !isScreenLockedByInactivity),
+    onTimeout: () => {
+      console.warn(`[Inactivity] Idle timeout reached (${effectiveInactivityTimeoutMs / 60000}m). Activating Privacy Screen Lock...`);
+      // Privilege Downgrade: If in admin mode, auto-downgrade to teacher if user has teacher role
+      try {
+        const storedUserStr = sessionStorage.getItem('groovelab_cached_user');
+        if (storedUserStr) {
+          const parsed = JSON.parse(storedUserStr);
+          if (parsed?.role === 'admin' && Array.isArray(parsed?.roles) && parsed.roles.includes('teacher')) {
+            console.log('[Inactivity] Downgrading active role from admin to teacher (Least Privilege)...');
+            sessionStorage.setItem('groovelab_active_workspace', 'teacher');
+          }
+        }
+      } catch (e) {}
+      setIsScreenLockedByInactivity(true);
+    }
+  });
 
   const { isShielded, dismissShield } = usePrivacyShield(false);
 
@@ -3218,7 +3222,23 @@ function App() {
         const targetSchoolId = typeof window !== 'undefined' ? (localStorage.getItem('groovelab_last_school_id') || localStorage.getItem('groovelab_school_id') || '53e83805-1d5a-4ed8-988e-1fb0b8200b9c') : '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
         const schoolName = 'Musäk Bad Säckingen';
 
-        if (userId === '15102f5e-c504-4c33-93ab-436285197c8c' || (sessionStorage.getItem('groovelab_active_workspace') === 'student' && (!userId || userId.startsWith('15102f5e')))) {
+        if (userId === '88888888-8888-8888-8888-888888888888' || (sessionStorage.getItem('groovelab_active_workspace') === 'master_admin')) {
+          userData = {
+            id: '88888888-8888-8888-8888-888888888888',
+            first_name: 'Master',
+            last_name: 'Administrator',
+            name: 'Master Administrator',
+            role: 'admin',
+            roles: ['admin'],
+            school_id: targetSchoolId,
+            is_master_admin: true,
+            is_campus_active: true,
+            is_groovelab_active: true,
+            photo_url: '/campus_login_hero.png',
+            avatar_url: '/campus_login_hero.png',
+            schools: { id: targetSchoolId, name: schoolName, has_campus_subscription: true, has_groovelab_subscription: true }
+          };
+        } else if (userId === '15102f5e-c504-4c33-93ab-436285197c8c' || userId === '44444444-4444-4444-4444-444444444444' || (sessionStorage.getItem('groovelab_active_workspace') === 'student' && (!userId || userId.startsWith('15102f5e') || userId.startsWith('4444')))) {
           userData = {
             id: userId || '15102f5e-c504-4c33-93ab-436285197c8c',
             first_name: 'Linus',
@@ -3233,7 +3253,7 @@ function App() {
             instrument: 'Gitarre',
             schools: { id: targetSchoolId, name: schoolName, has_campus_subscription: true, has_groovelab_subscription: true }
           };
-        } else if (userId === '98b6a599-7ff7-4f99-b51d-b6a4c348a0a0' || (sessionStorage.getItem('groovelab_active_workspace') === 'teacher' && (!userId || userId.startsWith('98b6a599')))) {
+        } else if (userId === '11079eae-664a-49a4-8692-771d83a3193c' || userId === '98b6a599-7ff7-4f99-b51d-b6a4c348a0a0' || userId === '99999999-9999-9999-9999-999999999999' || (sessionStorage.getItem('groovelab_active_workspace') === 'teacher' && (!userId || userId.startsWith('11079eae') || userId.startsWith('98b6a599') || userId.startsWith('9999')))) {
           userData = {
             id: userId || '11079eae-664a-49a4-8692-771d83a3193c',
             first_name: 'Peter',
@@ -3563,7 +3583,7 @@ function App() {
         const substantiveKeys = [
           'id', 'school_id', 'role', 'is_active', 'is_campus_active', 'is_groovelab_active',
           'token_version', 'is_master_admin', 'first_name', 'last_name', 'instrument',
-          'nickname', 'avatar_url', 'photo_url', 'sick_until', 'sick_start', 'student_level',
+          'nickname', 'avatar_url', 'photo_url', 'ausfall_until', 'ausfall_start', 'student_level',
           'campus_ui_level'
         ];
         const hasChange = substantiveKeys.some(key => (prev as any)[key] !== (userData as any)[key]);
@@ -3614,7 +3634,7 @@ function App() {
           if (sId) {
             fetchActiveStudentCount(sId).catch(err => console.error('Error fetching student count:', err));
             supabase.from('users')
-              .select('id, first_name, last_name, role, avatar_url, photo_url, instrument, last_seen, sick_until, sick_start, phone, is_active, nickname, is_groovelab_active, is_campus_active')
+              .select('id, first_name, last_name, role, avatar_url, photo_url, instrument, last_seen, ausfall_until, ausfall_start, phone, is_active, nickname, is_groovelab_active, is_campus_active')
               .eq('school_id', sId)
               .in('role', ['teacher', 'admin'])
               .order('first_name')
@@ -3714,7 +3734,7 @@ function App() {
             `).in('id', bandIds)
           : Promise.resolve({ data: [], error: null }),
         supabase.from('bands').select('*, songs(id, title, artist, instrumentation), band_members(*, users!user_id(id, first_name, last_name, photo_url, role)), band_songs(*, songs(id, title, artist, instrumentation), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))), coach:users!coach_id (first_name, last_name, photo_url)').eq('school_id', schoolId).order('name', { ascending: true }),
-        supabase.from('users').select('id, first_name, last_name, role, avatar_url, photo_url, instrument, last_seen, sick_until, sick_start, phone, is_active, nickname, is_groovelab_active, is_campus_active').eq('school_id', schoolId).in('role', ['teacher', 'admin']).order('first_name'),
+        supabase.from('users').select('id, first_name, last_name, role, avatar_url, photo_url, instrument, last_seen, ausfall_until, ausfall_start, phone, is_active, nickname, is_groovelab_active, is_campus_active').eq('school_id', schoolId).in('role', ['teacher', 'admin']).order('first_name'),
         supabase.from('sessions').select('user_id, station_id, gps_verified, users!inner(role, school_id, last_seen, is_groovelab_active)').is('check_out_time', null).eq('users.school_id', schoolId).eq('users.role', 'student')
       ]).catch(err => {
         console.error('[Dashboard] Critical Fetch Error Stage 2:', err);
@@ -4503,7 +4523,7 @@ function App() {
       // Fetch school users strictly belonging to current schoolId (enforce multi-tenant isolation with zero-redundancy query)
       const uResSchool = await supabase
         .from('users')
-        .select('id, first_name, last_name, instrument, avatar_url, photo_url, role, roles, is_active, is_campus_active, is_groovelab_active, teacher_id, school_id, age, birth_date, sick_until, sick_start, phone, nickname, group_id, contract_ends_at, contract_decision_made, qr_token, is_external_vocalist, show_messages_menu, master_admin_username, master_admin_email')
+        .select('id, first_name, last_name, instrument, avatar_url, photo_url, role, roles, is_active, is_campus_active, is_groovelab_active, teacher_id, school_id, age, birth_date, ausfall_until, ausfall_start, phone, nickname, group_id, contract_ends_at, contract_decision_made, qr_token, is_external_vocalist, show_messages_menu, master_admin_username, master_admin_email')
         .eq('school_id', schoolId)
         .order('first_name');
 
@@ -6956,12 +6976,10 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
         .eq('id', userId);
     }
       
-    // Force a hard reload to absolutely guarantee that any lingering camera 
-    // media streams from the browser are destroyed.
-    // If there are search parameters (like qr_token or teacher_qr_token), reload to the clean origin page to prevent infinite loops.
+    // 🛡️ Forensische URL-Sanitization: Bereinigt Query-Params und leitet autoritativ auf /dashboard
     setTimeout(() => {
-      if (window.location.search || window.location.pathname === '/login') {
-        window.location.replace(window.location.origin + '/');
+      if (window.location.pathname !== '/dashboard') {
+        window.location.replace(window.location.origin + '/dashboard');
       } else {
         window.location.reload();
       }
@@ -7580,8 +7598,8 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
   if (location.pathname === '/' || location.pathname === '/landingpage' || location.pathname === '/startseite') {
     const isStandalone = typeof window !== 'undefined' && ((window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches);
     
-    // Im installierten PWA-Standalone-Modus bei bestehendem Login direkt ins Dashboard springen
-    if (isStandalone && loggedInUserId && location.pathname === '/') {
+    // Bei bestehendem Login direkt ins Dashboard springen (PWA Standalone & Web-Browser)
+    if (loggedInUserId && location.pathname === '/') {
       navigate('/dashboard', { replace: true });
       return <DashboardLoader />;
     }
@@ -7615,7 +7633,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
       return !!sub;
     })();
 
-    const isExplicitSchoolLogin = location.pathname === '/' && (
+    const isExplicitSchoolLogin = !loggedInUserId && location.pathname === '/' && (
       urlParams.has('invite_school_id') || 
       urlParams.get('onboarding') === 'parent' || 
       urlParams.get('platform') === 'groovelab' ||
@@ -7628,9 +7646,11 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
 
     if (isExplicitSchoolLogin) {
       return (
-        <Suspense fallback={<DashboardLoader />}>
-          <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={<DashboardLoader />}>
+            <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />
+          </Suspense>
+        </ErrorBoundary>
       );
     }
 
@@ -7693,15 +7713,19 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
 
     if (location.pathname === '/login' || location.pathname === '/master-admin' || location.pathname === '/admin') {
       return (
-        <Suspense fallback={<DashboardLoader />}>
-          <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={<DashboardLoader />}>
+            <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />
+          </Suspense>
+        </ErrorBoundary>
       );
     }
     return (
-      <Suspense fallback={<DashboardLoader />}>
-        <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />
-      </Suspense>
+      <ErrorBoundary>
+        <Suspense fallback={<DashboardLoader />}>
+          <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />
+        </Suspense>
+      </ErrorBoundary>
     );
   }
 
@@ -7930,8 +7954,12 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
 
       // 2. Await authoritative database role update via RPC (Fail-Closed, no client table update)
       try {
+        const activeLeaseId = typeof window !== 'undefined' 
+          ? (sessionStorage.getItem('gl_active_session_lease_id') || localStorage.getItem('gl_active_session_lease_id') || null) 
+          : null;
         const { error: rpcErr } = await supabase.rpc('switch_user_active_role', {
-          p_target_role: newRole
+          p_target_role: newRole,
+          ...(activeLeaseId ? { p_lease_id: activeLeaseId } : {})
         });
         if (rpcErr) {
           console.error('[Role Switch] switch_user_active_role error:', rpcErr.message);
@@ -7969,6 +7997,8 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
           localStorage.setItem('groovelab_active_workspace', 'teacher');
           sessionStorage.removeItem('groovelab_is_master_admin');
           localStorage.removeItem('groovelab_is_master_admin');
+          sessionStorage.removeItem('groovelab_secretary_subtab');
+          sessionStorage.removeItem('groovelab_dual_role_switched_notice');
           sessionStorage.setItem('groovelab_active_platform', targetPlatform);
           localStorage.setItem('groovelab_active_platform', targetPlatform);
         }
@@ -10474,11 +10504,11 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                 </div>
               )}
 
-              {/* Elegant Switch to Admin/Verwaltung Button (Only for users with admin or secretary privileges) */}
-              {user && ((user.roles && (user.roles.includes('admin') || user.roles.includes('secretary'))) || user.role === 'admin' || user.role === 'secretary') && (
+              {/* Elegant Switch to Admin/Verwaltung Button (Strictly only for teachers who genuinely possess dual-role admin/secretary privileges) */}
+              {user && Array.isArray(user.roles) && (user.roles.includes('admin') || user.roles.includes('secretary')) && (
                 <button 
                   onClick={() => {
-                    const targetRole = (user.roles && user.roles.includes('admin')) ? 'admin' : (user.role === 'admin' ? 'admin' : 'secretary');
+                    const targetRole = user.roles.includes('admin') ? 'admin' : 'secretary';
                     handleSwitchActiveRole(targetRole);
                   }}
                   style={{ 
@@ -10501,9 +10531,11 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                   }}
                   className="hover-scale"
                   title="Zur Schulverwaltung wechseln"
+                  aria-label="Aktive Ansicht: Lehrkraft. Klicken, um zur Schulverwaltung zu wechseln."
                 >
+                  <ArrowLeftRight size={13} color="#ea4335" />
                   <School size={15} color="#ea4335" />
-                  <span>Verwaltung</span>
+                  <span>Zur Verwaltung</span>
                 </button>
               )}
               {/* Elegant Logout Button next to avatar (mobile-only to avoid duplicate on desktop) */}

@@ -41,7 +41,18 @@ import {
   Bookmark,
   ArrowRight
 } from 'lucide-react';
-import { useRealNamesVisibility, maskLastName, formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel, formatTeacherFullName } from '../utils/nameHelper';
+import { 
+  useRealNamesVisibility, 
+  maskLastName, 
+  formatSingleStudentAnonymized, 
+  formatGroupStudentsAnonymized, 
+  formatCombinedStudentNames, 
+  getGroupTypeLabel, 
+  formatTeacherFullName,
+  resolveCanonicalStudentFromList,
+  matchStudentNameOrInitial,
+  extractStudentTokensFromName
+} from '../utils/nameHelper';
 import { ScheduleCalendarView } from './ScheduleCalendarView';
 import { LiquidGlassSkeleton } from './ui/LiquidGlassSkeleton';
 const StudentScheduleSlotsModal = React.lazy(() => import('./StudentScheduleSlotsModal').then(m => ({ default: m.StudentScheduleSlotsModal })));
@@ -874,9 +885,11 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
         nameToCanonicalMap.set(nameKey, s);
       }
     });
+
+    const rawStudentsList = Array.from(allStudentsMap.values());
     
-    const resolveCanonicalStudent = (sId: string, sFname?: string, sLname?: string): Student | undefined => {
-      if (allStudentsMap.has(sId)) return allStudentsMap.get(sId);
+    const resolveCanonicalStudent = (sId?: string | null, sFname?: string | null, sLname?: string | null): Student | undefined => {
+      if (sId && allStudentsMap.has(sId)) return allStudentsMap.get(sId);
       const fn = (sFname || '').trim().toLowerCase();
       const ln = (sLname || '').trim().toLowerCase();
       const nameKey = `${fn}_${ln}`;
@@ -884,10 +897,32 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
         const canonical = nameToCanonicalMap.get(nameKey)!;
         return allStudentsMap.get(canonical.id);
       }
-      return undefined;
+      // Enterprise Initial & Token Matcher fallback (e.g. "Tina H." -> "Tina Huber")
+      return resolveCanonicalStudentFromList({ id: sId, first_name: sFname, last_name: sLname }, rawStudentsList);
     };
 
     const assignedStudentIds = new Set<string>();
+
+    // Pre-pass: Identify all students who are already part of an existing group card on the boards
+    // This ensures single duplicate cards for members (e.g. Tina H. or Fabian T.) are eliminated.
+    const preAssignedGroupMemberIds = new Set<string>();
+    boardsList.forEach(b => {
+      b.students.forEach(s => {
+        if (s.isBreak) return;
+        if (s.isGroup && s.groupStudents && s.groupStudents.length > 0) {
+          s.groupStudents.forEach(gs => {
+            const res = resolveCanonicalStudent(gs.id, gs.first_name, gs.last_name);
+            preAssignedGroupMemberIds.add(res ? res.id : gs.id);
+          });
+        } else if (s.first_name && (s.first_name.includes('&') || s.first_name.includes(',') || /\b(and|und)\b/i.test(s.first_name))) {
+          const tokens = extractStudentTokensFromName(s.first_name);
+          tokens.forEach(tok => {
+            const res = resolveCanonicalStudentFromList(tok, rawStudentsList);
+            if (res) preAssignedGroupMemberIds.add(res.id);
+          });
+        }
+      });
+    });
 
     // Step 1: Scan and clean boardsList of any duplicates. Keep only the first occurrence.
     const cleanedBoards = boardsList.map(b => {
@@ -897,7 +932,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
           nextStudents.push(s);
           return;
         }
-        if (s.isGroup && s.groupStudents) {
+        if (s.isGroup && s.groupStudents && s.groupStudents.length > 0) {
           const uniqueMembers = s.groupStudents.filter(gs => {
             const resolved = resolveCanonicalStudent(gs.id, gs.first_name, gs.last_name);
             const targetId = resolved ? resolved.id : gs.id;
@@ -922,8 +957,8 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
         } else {
           const resolved = resolveCanonicalStudent(s.id, s.first_name, s.last_name);
           const targetId = resolved ? resolved.id : s.id;
-          if (assignedStudentIds.has(targetId)) {
-            // Already scheduled elsewhere -> remove duplicate card
+          // If this student is already scheduled OR is part of a scheduled group card, drop redundant single card
+          if (assignedStudentIds.has(targetId) || preAssignedGroupMemberIds.has(targetId)) {
             return;
           }
           assignedStudentIds.add(targetId);
@@ -944,7 +979,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
     cleanedBoards.forEach(b => {
       b.students.forEach(s => {
         if (s.isBreak) return;
-        if (s.isGroup && s.groupStudents) {
+        if (s.isGroup && s.groupStudents && s.groupStudents.length > 0) {
           s.groupStudents.forEach(gs => {
             const existing = resolveCanonicalStudent(gs.id, gs.first_name, gs.last_name);
             if (existing) {
@@ -1034,8 +1069,16 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
         }
         
         if (s.isGroup && s.groupStudents) {
-          const nonGroupMembers = s.groupStudents.filter(gs => !individualStudentIdsInGroups.has(gs.id));
-          const groupMembers = s.groupStudents.filter(gs => individualStudentIdsInGroups.has(gs.id));
+          const nonGroupMembers = s.groupStudents.filter(gs => {
+            const res = resolveCanonicalStudent(gs.id, gs.first_name, gs.last_name);
+            const effId = res ? res.id : gs.id;
+            return !individualStudentIdsInGroups.has(effId);
+          });
+          const groupMembers = s.groupStudents.filter(gs => {
+            const res = resolveCanonicalStudent(gs.id, gs.first_name, gs.last_name);
+            const effId = res ? res.id : gs.id;
+            return individualStudentIdsInGroups.has(effId);
+          });
 
           if (nonGroupMembers.length >= 2) {
             nextStudents.push({
@@ -1048,26 +1091,41 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
           }
 
           groupMembers.forEach(gs => {
-            if (gs.group_id) {
-              const merged = mergedGroupsMap.get(`group-${gs.group_id}`);
-              if (merged && merged.assignedDay === b.dayOfWeek && !addedGroupIds.has(gs.group_id)) {
+            const res = resolveCanonicalStudent(gs.id, gs.first_name, gs.last_name);
+            const effGroupId = res?.group_id || gs.group_id;
+            if (effGroupId) {
+              const merged = mergedGroupsMap.get(`group-${effGroupId}`);
+              if (merged && merged.assignedDay === b.dayOfWeek && !addedGroupIds.has(effGroupId)) {
                 nextStudents.push(merged);
-                addedGroupIds.add(gs.group_id);
+                addedGroupIds.add(effGroupId);
               }
             }
           });
         } else {
-          if (individualStudentIdsInGroups.has(s.id)) {
-            if (s.group_id) {
-              const merged = mergedGroupsMap.get(`group-${s.group_id}`);
-              if (merged && merged.assignedDay === b.dayOfWeek && !addedGroupIds.has(s.group_id)) {
+          // Single student card on board: check if this student belongs to a group
+          const resolved = resolveCanonicalStudent(s.id, s.first_name, s.last_name) || allStudentsMap.get(s.id);
+          const effectiveId = resolved ? resolved.id : s.id;
+          const effectiveGroupId = resolved?.group_id || s.group_id;
+
+          if (individualStudentIdsInGroups.has(effectiveId) || (effectiveGroupId && mergedGroupsMap.has(`group-${effectiveGroupId}`))) {
+            const targetGroupId = effectiveGroupId;
+            if (targetGroupId) {
+              const merged = mergedGroupsMap.get(`group-${targetGroupId}`);
+              if (merged && merged.assignedDay === b.dayOfWeek && !addedGroupIds.has(targetGroupId)) {
                 nextStudents.push(merged);
-                addedGroupIds.add(s.group_id);
+                addedGroupIds.add(targetGroupId);
               }
             }
+            // Do NOT push `s` as single student card! It is absorbed into the group.
           } else {
-            const _freshS = resolveCanonicalStudent(s.id, s.first_name, s.last_name) || allStudentsMap.get(s.id);
-            nextStudents.push(_freshS ? { ...s, id: _freshS.id, first_name: _freshS.first_name, last_name: _freshS.last_name, duration: _freshS.duration || s.duration, instrument: _freshS.instrument || s.instrument } : s);
+            nextStudents.push(resolved ? { 
+              ...s, 
+              id: resolved.id, 
+              first_name: resolved.first_name, 
+              last_name: resolved.last_name, 
+              duration: resolved.duration || s.duration, 
+              instrument: resolved.instrument || s.instrument 
+            } : s);
           }
         }
       });
@@ -1876,6 +1934,17 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
               b.students.forEach(s => {
                 if (!s.isBreak) {
                   usedStudentIds.add(s.id);
+                  if (s.isGroup && s.groupStudents && s.groupStudents.length > 0) {
+                    s.groupStudents.forEach(gs => {
+                      usedStudentIds.add(gs.id);
+                    });
+                  } else if (s.first_name && (s.first_name.includes('&') || s.first_name.includes(',') || /\b(and|und)\b/i.test(s.first_name))) {
+                    const tokens = extractStudentTokensFromName(s.first_name);
+                    tokens.forEach(tok => {
+                      const can = resolveCanonicalStudentFromList(tok, loadedStudents);
+                      if (can) usedStudentIds.add(can.id);
+                    });
+                  }
                 }
               });
             });

@@ -12,6 +12,7 @@
  */
 
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { supabase } from '../lib/supabase';
 
 export interface UseParentSessionLockOptions {
   enabled: boolean;
@@ -71,10 +72,13 @@ export function useParentSessionLock({
   const lockNow = useCallback(() => {
     if (typeof window === 'undefined') return;
 
-    // 1. Stop hardware media streams immediately
+    // 1. Grab active lease before wiping for authoritative server-side revocation
+    const activeLease = sessionStorage.getItem('gl_parent_session_lease');
+
+    // 2. Stop hardware media streams immediately
     stopHardwareMediaStreams();
 
-    // 2. Clear all parent session tokens from sessionStorage
+    // 3. Clear all parent session tokens from sessionStorage
     sessionStorage.removeItem('groovelab_parent_unlocked_global');
     sessionStorage.removeItem('gl_parent_session_lease');
     if (studentId) {
@@ -91,14 +95,22 @@ export function useParentSessionLock({
       });
     } catch (e) {}
 
-    // 3. Dispatch global lock event
+    // 4. 🔥 AUTORITATIVER SERVER-KILL-SWITCH (Zero-Delay Revocation RPC)
+    // Sofortige Entwertung des Leases auf PostgreSQL-Ebene (beseitigt verbleibende Restzeit)
+    if (activeLease && !activeLease.startsWith('parent-passkey-') && !activeLease.startsWith('parent-lease-')) {
+      try {
+        supabase.rpc('revoke_parent_session_lease', { p_lease_id: activeLease }).then(() => {}, () => {});
+      } catch (e) {}
+    }
+
+    // 5. Dispatch global lock event
     window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: false }));
 
-    // 4. Reset internal states
+    // 6. Reset internal states
     setIsWarning(false);
     setRemainingSeconds(timeoutSeconds);
 
-    // 5. Invoke caller callback via stable ref
+    // 7. Invoke caller callback via stable ref
     if (onLockRef.current) {
       onLockRef.current();
     }
@@ -142,7 +154,28 @@ export function useParentSessionLock({
     };
   }, [enabled, lockNow, timeoutSeconds]);
 
-  // 2. User Activity Tracking & Inactivity Countdown
+  // 2. Unload / Pagehide Shield: Guarantee server lease revocation when tab or browser is closed
+  useEffect(() => {
+    if (!enabled || typeof window === 'undefined') return;
+
+    const handlePageHide = () => {
+      try {
+        const activeLease = sessionStorage.getItem('gl_parent_session_lease');
+        if (activeLease && !activeLease.startsWith('parent-passkey-') && !activeLease.startsWith('parent-lease-')) {
+          supabase.rpc('revoke_parent_session_lease', { p_lease_id: activeLease }).then(() => {}, () => {});
+        }
+      } catch (e) {}
+    };
+
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('beforeunload', handlePageHide);
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('beforeunload', handlePageHide);
+    };
+  }, [enabled]);
+
+  // 3. User Activity Tracking & Inactivity Countdown
   useEffect(() => {
     if (!enabled || typeof window === 'undefined') {
       if (timerIntervalRef.current) {

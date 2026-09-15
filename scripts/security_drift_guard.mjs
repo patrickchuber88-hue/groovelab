@@ -148,6 +148,14 @@ const FORBIDDEN_FRONTEND_PATTERNS = [
     isViolation: (content) => {
       return !content.includes('isLocalDevEnvironment') && !content.includes('import.meta.env.DEV');
     }
+  },
+  {
+    id:          'FE-15',
+    name:        'Plaintext Audio Base64 in Browser Storage Invariant',
+    regex:       /localStorage\.setItem\([^,]+,\s*(?:['"`]data:audio\/|audioBase64|rawAudio)/g,
+    severity:    'HIGH',
+    description: 'DSGVO Art. 8 & 32 Compliance: Direct unencrypted storage of raw audio base64 or data URLs in browser storage is forbidden. Use encryptedOfflineVault or IndexedDB with encryption.',
+    allowedFiles: ['src/tests/']
   }
 ];
 
@@ -173,7 +181,7 @@ function walkDir(dir, filterExt = ['.ts', '.tsx', '.js', '.jsx']) {
 }
 
 // 1. SCAN FRONTEND SOURCE CODE
-process.stdout.write('  📂 [1/6] Frontend Source Scan (apps/groovelab/src)...\n');
+process.stdout.write('  📂 [1/7] Frontend Source Scan (apps/groovelab/src)...\n');
 const frontendFiles = walkDir(SRC_DIR);
 
 for (const filePath of frontendFiles) {
@@ -208,7 +216,7 @@ process.stdout.write(
 );
 
 // 2. SCAN SQL MIGRATIONS FOR RLS DEFICIENCIES & DML SHIELDS
-process.stdout.write('  📂 [2/6] SQL Migration Invariants (supabase/migrations)...\n');
+process.stdout.write('  📂 [2/7] SQL Migration Invariants (supabase/migrations)...\n');
 const migrationFiles = walkDir(MIGRATIONS_DIR, ['.sql']);
 
 let latestDmlMigration = null;
@@ -249,6 +257,37 @@ for (const filePath of migrationFiles) {
         }
       }
     }
+
+    // 1% Invariant SQL-01: Scalar Subquery RLS Enforcement (Migrations >= 436)
+    if (migNum >= 436) {
+      const unSubqueried = content.match(/school_id\s*=\s*get_current_user_school_id\(\)/gi);
+      if (unSubqueried) {
+        process.stderr.write(`\n  🔴 [FAIL] [CRITICAL] Un-subqueried RLS function call in Migration ${baseName}\n`);
+        process.stderr.write(`       File: ${relPath}\n`);
+        process.stderr.write(`       Details: Migrations >= 436 must wrap RLS helper functions in scalar subqueries: 'school_id = (SELECT public.get_current_user_school_id())' to prevent O(N) query planner degradation.\n`);
+        violationsCount++;
+      }
+    }
+
+    // 1% Invariant SQL-02: Strict Plaintext PIN Elimination (Migrations >= 435)
+    if (migNum >= 435) {
+      if (content.includes('v_stored_hash = v_clean_pin') || content.includes('v_stored_hash = input_pin')) {
+        process.stderr.write(`\n  🔴 [FAIL] [CRITICAL] Insecure Plaintext PIN Fallback in Migration ${baseName}\n`);
+        process.stderr.write(`       File: ${relPath}\n`);
+        process.stderr.write(`       Details: Migrations >= 435 must strictly eliminate plaintext PIN comparison fallbacks (Fail-Closed).\n`);
+        violationsCount++;
+      }
+    }
+
+    // 1% Invariant SQL-03: Parent Step-Up Lease Timebox (Migrations >= 435)
+    if (migNum >= 435 && content.includes('save_parent_controls') && content.includes('session_leases')) {
+      if (content.includes("INTERVAL '30 days'") || content.includes("INTERVAL '7 days'")) {
+        process.stderr.write(`\n  🔴 [FAIL] [HIGH] Insecure Long-Lived Parent Session Lease in Migration ${baseName}\n`);
+        process.stderr.write(`       File: ${relPath}\n`);
+        process.stderr.write(`       Details: Parent step-up leases in save_parent_controls must be timeboxed to a maximum of 15 minutes (INTERVAL '15 minutes') to protect shared family devices.\n`);
+        violationsCount++;
+      }
+    }
   }
 }
 
@@ -273,7 +312,7 @@ process.stdout.write(
   ` Scanned ${migrationsScanned} migration file(s).\n\n`
 );
 
-// PARALLEL EXECUTION OF INVARIANT SUB-SUITES (3/6 - 6/6)
+// PARALLEL EXECUTION OF INVARIANT SUB-SUITES (3/7 - 7/7)
 async function runSubSuite(cmd, cwd) {
   try {
     const { stdout, stderr } = await execAsync(cmd, { cwd, encoding: 'utf-8' });
@@ -283,15 +322,16 @@ async function runSubSuite(cmd, cwd) {
   }
 }
 
-const [finopsRes, rlsRes, teacherRes, headersRes] = await Promise.all([
+const [finopsRes, rlsRes, teacherRes, headersRes, sbomRes] = await Promise.all([
   runSubSuite('npx tsx src/domain/__tests__/runBillingInvariantTests.ts', path.join(ROOT_DIR, 'apps', 'groovelab')),
   runSubSuite('npx tsx scripts/verify_rls_catalog_invariants.ts', ROOT_DIR),
   runSubSuite('npx tsx src/tests/runTeacherNameInvariantTests.ts', path.join(ROOT_DIR, 'apps', 'groovelab')),
-  runSubSuite('node scripts/verify_static_security_headers.mjs', ROOT_DIR)
+  runSubSuite('node scripts/verify_static_security_headers.mjs', ROOT_DIR),
+  runSubSuite('node scripts/generate_cyclonedx_sbom.mjs', ROOT_DIR)
 ]);
 
 // 3. FINOPS ARCHITECTURAL INVARIANT & BILLING SUITE
-process.stdout.write('  📂 [3/6] FinOps Billing Invariants (runBillingInvariantTests.ts)...\n');
+process.stdout.write('  📂 [3/7] FinOps Billing Invariants (runBillingInvariantTests.ts)...\n');
 if (finopsRes.passed) {
   if (finopsRes.stdout) process.stdout.write(finopsRes.stdout.split('\n').map(l => `       ${l}`).join('\n') + '\n');
   process.stdout.write('     ✅ FinOps Suite: PASSED — Alle Formel- und Algorithmus-Invarianten bestätigt.\n\n');
@@ -302,7 +342,7 @@ if (finopsRes.passed) {
 }
 
 // 4. FORENSIC RLS & SCHEMA CATALOG INVARIANTS
-process.stdout.write('  📂 [4/6] Forensic RLS & Schema Catalog Invariants...\n');
+process.stdout.write('  📂 [4/7] Forensic RLS & Schema Catalog Invariants...\n');
 if (rlsRes.passed) {
   if (rlsRes.stdout) process.stdout.write(rlsRes.stdout.split('\n').map(l => `       ${l}`).join('\n') + '\n');
   process.stdout.write('     ✅ All 20 Forensic Architecture & Performance Invariants: VERIFIED\n\n');
@@ -313,7 +353,7 @@ if (rlsRes.passed) {
 }
 
 // 5. TEACHER NAME COMMUNICATION INVARIANTS ("Vorname Nachname")
-process.stdout.write('  📂 [5/6] Teacher Name Communication Invariants (runTeacherNameInvariantTests.ts)...\n');
+process.stdout.write('  📂 [5/7] Teacher Name Communication Invariants (runTeacherNameInvariantTests.ts)...\n');
 if (teacherRes.passed) {
   if (teacherRes.stdout) process.stdout.write(teacherRes.stdout.split('\n').map(l => `       ${l}`).join('\n') + '\n');
   process.stdout.write('     ✅ Teacher Name Communication Suite: PASSED — Vorname Nachname Doktrin bestätigt.\n\n');
@@ -324,12 +364,22 @@ if (teacherRes.passed) {
 }
 
 // 6. STATIC PERIMETER & MOZILLA OBSERVATORY A+ HEADER INVARIANTS
-process.stdout.write('  📂 [6/6] Static Perimeter & Mozilla Observatory A+ Header Invariants...\n');
+process.stdout.write('  📂 [6/7] Static Perimeter & Mozilla Observatory A+ Header Invariants...\n');
 if (headersRes.passed) {
   process.stdout.write('     ✅ Static Perimeter Suite: PASSED — 100% Mozilla Observatory A+ & SecurityHeaders.com Konformität bestätigt.\n\n');
 } else {
   process.stderr.write('  🚨 Static Perimeter Header Check FAILED: Security header degradation detected!\n');
   process.stderr.write(headersRes.stderr + '\n');
+  violationsCount++;
+}
+
+// 7. SUPPLY CHAIN & CYCLONEDX SBOM INVARIANTS (NIST SP 800-161)
+process.stdout.write('  📂 [7/7] Supply Chain CycloneDX SBOM Invariants (NIST SP 800-161)...\n');
+if (sbomRes.passed) {
+  process.stdout.write('     ✅ CycloneDX SBOM Suite: PASSED — Dynamisches Software-Inventar & SHA-512 Integrität verifiziert.\n\n');
+} else {
+  process.stderr.write('  🚨 CycloneDX SBOM Check FAILED: Supply-Chain Integritätsprüfung fehlgeschlagen!\n');
+  process.stderr.write(sbomRes.stderr + '\n');
   violationsCount++;
 }
 

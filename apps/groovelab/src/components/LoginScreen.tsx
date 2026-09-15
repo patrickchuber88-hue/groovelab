@@ -1572,6 +1572,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [schoolName, setSchoolName] = useState<string>('');
   const [schoolData, setSchoolData] = useState<any>(null);
   const [logoTheme, setLogoTheme] = useState<'light' | 'dark'>('light');
+  const [logoError, setLogoError] = useState<boolean>(false);
 
   // Preserve reschedule deep-link across login screens for seamless cold boot
   useEffect(() => {
@@ -1603,6 +1604,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   }, [biometricProfiles, schoolData?.name, schoolData?.id]);
 
   useEffect(() => {
+    setLogoError(false);
     if (!schoolData?.logo_url) return;
     
     const img = new Image();
@@ -1661,6 +1663,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     };
     img.onerror = () => {
       setLogoTheme('light');
+      setLogoError(true);
     };
     img.src = schoolData.logo_url;
   }, [schoolData?.logo_url]);
@@ -1873,6 +1876,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             console.error('[Role Auto-Switch] switch_user_active_role error:', roleErr.message);
           } else {
             user.role = newRole;
+            try {
+              sessionStorage.setItem('groovelab_dual_role_switched_notice', 'true');
+            } catch (e) {}
           }
         } catch (e: any) {
           console.error('[Role Auto-Switch] RPC error:', e);
@@ -2260,6 +2266,80 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       sessionStorage.removeItem('groovelab_user_id');
       sessionStorage.removeItem('groovelab_location_mode');
       setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  const handleFamilyProfileSelect = async (p: any) => {
+    if (isManagingProfiles) return;
+    try {
+      setLoading(true);
+      setError(null);
+      const effectiveSchoolId = schoolData?.id || p.school_id || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_last_school_id') : null);
+
+      // 1. PIN-Schranke: Falls das Schülerprofil PIN-geschützt ist (Zero-Trust Schülersicherheit)
+      if (p.has_personal_pin || p.is_pin_activated) {
+        setPinVerificationUser({
+          ...p,
+          role: 'student',
+          school_id: effectiveSchoolId
+        });
+        setPinVerificationIsWithinRoom(true);
+        setPinVerificationInput('');
+        setPinVerificationAttempts(0);
+        setLoading(false);
+        return;
+      }
+
+      // 2. Autoritativer Auth-Flow:
+      let authenticatedUser: any = null;
+
+      // Falls ein gespeicherter qr_token vorliegt, autoritativen Auth-RPC ausführen
+      if (p.qr_token && effectiveSchoolId) {
+        try {
+          const { data: authResult, error: rpcErr } = await supabase.rpc('authenticate_by_credential', {
+            p_credential: p.qr_token,
+            p_school_id: effectiveSchoolId
+          });
+          if (!rpcErr && authResult?.success && authResult?.user) {
+            authenticatedUser = authResult.user;
+            if (authResult.lease_token) {
+              sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+              localStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+            }
+          }
+        } catch (authErr) {
+          console.warn('[FamilyLogin] QR token auth notice:', authErr);
+        }
+      }
+
+      // 3. Ergänzende Absicherung: Kryptographischen Session-Lease registrieren
+      if (effectiveSchoolId) {
+        try {
+          const leaseRes = await registerClientSessionLease({ id: p.id, role: 'student' }, effectiveSchoolId);
+          if (leaseRes.revoked) {
+            alert('Sitzung widerrufen: Dieses Profil wurde zentral abgemeldet. Bitte melde dich erneut mit Ausweis oder QR-Code an.');
+            setLoading(false);
+            return;
+          }
+        } catch (leaseErr) {
+          console.warn('[FamilyLogin] Session lease registration notice:', leaseErr);
+        }
+      }
+
+      if (!authenticatedUser) {
+        authenticatedUser = {
+          ...p,
+          role: 'student',
+          school_id: effectiveSchoolId,
+          schools: schoolData || { id: effectiveSchoolId, name: schoolName, has_campus_subscription: true }
+        };
+      }
+
+      await finalizeLogin(authenticatedUser, null, true);
+    } catch (err: any) {
+      console.error('[FamilyLogin] Error during profile login:', err);
+      setError(err?.message || 'Anmeldung fehlgeschlagen.');
       setLoading(false);
     }
   };
@@ -3610,8 +3690,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     await finalizeLogin(user, loginStationId, isWithinAnyRoom, hidePresence);
   };
 
+  const isDevBuild = Boolean(import.meta.env.DEV && isLocalDevEnvironment());
+  const isLocalhost = isDevBuild;
   const [geoDebug, setGeoDebug] = useState<any>(null);
-  const isLocalhost = isLocalDevEnvironment();
 
   const [bypassUserCounts, setBypassUserCounts] = useState<{
     hasTeacher: boolean;
@@ -3639,7 +3720,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   }, []);
 
   useEffect(() => {
-    if (!isLocalhost) return;
+    if (!isDevBuild) return;
 
     const loadSchoolUsers = async () => {
       try {
@@ -3714,11 +3795,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           console.warn('[Bypass users query error]:', queryErr);
         }
 
-        // 2. Canonical Fail-Safe Fallback defaults (Musäk Bad Säckingen & Generic)
+        // 2. Canonical Fail-Safe Fallback defaults (Verifizierte Seed-Identitäten)
         if (!resolvedAdmin) {
           resolvedAdmin = {
-            id: isMusaek ? 'f8d28267-0552-48b5-b1cd-0e415409ecd4' : '88888888-8888-8888-8888-888888888888',
-            name: isMusaek ? 'Manuel Wagner' : 'Schulleitung',
+            id: 'f8d28267-0552-48b5-b1cd-0e415409ecd4',
+            name: isMusaek ? 'Manuel Wagner' : `Manuel Wagner (Seed • ${schoolName})`,
             role: 'admin',
             school_id: targetSchoolId
           };
@@ -3726,8 +3807,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
         if (!resolvedTeacher) {
           resolvedTeacher = {
-            id: isMusaek ? '11079eae-664a-49a4-8692-771d83a3193c' : '99999999-9999-9999-9999-999999999999',
-            name: 'Peter Pan',
+            id: '11079eae-664a-49a4-8692-771d83a3193c',
+            name: isMusaek ? 'Peter Pan' : `Peter Pan (Seed • ${schoolName})`,
             role: 'teacher',
             school_id: targetSchoolId
           };
@@ -3735,8 +3816,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
         if (!resolvedStudent) {
           resolvedStudent = {
-            id: isMusaek ? '15102f5e-c504-4c33-93ab-436285197c8c' : '44444444-4444-4444-4444-444444444444',
-            name: 'Linus',
+            id: '15102f5e-c504-4c33-93ab-436285197c8c',
+            name: isMusaek ? 'Linus' : `Linus (Seed • ${schoolName})`,
             role: 'student',
             school_id: targetSchoolId
           };
@@ -3780,7 +3861,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       }
     };
     loadSchoolUsers();
-  }, [schoolData?.id, schoolData?.name, isLocalhost]);
+  }, [schoolData?.id, schoolData?.name, isDevBuild]);
 
   // Intercept and render coach self-onboarding if invite parameters are in URL
   if (inviteSchoolId) {
@@ -4280,7 +4361,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           <span>Andere Musikschule</span>
         </button>
 
-        {schoolData?.logo_url ? (
+        {schoolData?.logo_url && !logoError ? (
           <div style={{
             width: '72px',
             height: '72px',
@@ -4298,6 +4379,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             <img 
               src={schoolData.logo_url} 
               alt={schoolName || "Schul logo"} 
+              onError={() => setLogoError(true)}
               style={{ 
                 width: '100%',
                 height: '100%',
@@ -4321,7 +4403,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
             overflow: 'hidden'
           }}>
-            <Music size={28} color="#000000" />
+            <Music size={28} color="#ffffff" />
           </div>
         )}
 
@@ -4648,33 +4730,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 return (
                   <div
                     key={p.id}
-                    onClick={() => {
-                      if (isManagingProfiles) return;
-                      sessionStorage.setItem('groovelab_user_id', p.id);
-                      sessionStorage.setItem('groovelab_location_mode', 'home');
-                      sessionStorage.setItem('groovelab_active_workspace', 'student');
-                      sessionStorage.setItem('groovelab_active_platform', 'campus');
-                      sessionStorage.setItem('campus_active_tab', 'briefing');
-                      sessionStorage.setItem('groovelab_active_tab', 'briefing');
-                      sessionStorage.removeItem('groovelab_is_master_admin');
-                      localStorage.removeItem('groovelab_is_master_admin');
-                      sessionStorage.removeItem('groovelab_support_ghost');
-                      onLogin(p.id, true);
-                    }}
+                    onClick={() => handleFamilyProfileSelect(p)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
-                        if (isManagingProfiles) return;
-                        sessionStorage.setItem('groovelab_user_id', p.id);
-                        sessionStorage.setItem('groovelab_location_mode', 'home');
-                        sessionStorage.setItem('groovelab_active_workspace', 'student');
-                        sessionStorage.setItem('groovelab_active_platform', 'campus');
-                        sessionStorage.setItem('campus_active_tab', 'briefing');
-                        sessionStorage.setItem('groovelab_active_tab', 'briefing');
-                        sessionStorage.removeItem('groovelab_is_master_admin');
-                        localStorage.removeItem('groovelab_is_master_admin');
-                        sessionStorage.removeItem('groovelab_support_ghost');
-                        onLogin(p.id, true);
+                        handleFamilyProfileSelect(p);
                       }
                     }}
                     role="button"
@@ -7060,8 +7120,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
 
 
-      {/* Geofence Diagnostic Panel (Localhost only) */}
-      {isLocalhost && isGroovelabKiosk && geoDebug && (
+      {/* Geofence Diagnostic Panel (Localhost / Dev only) */}
+      {isDevBuild && isGroovelabKiosk && geoDebug && (
         <div style={{ 
           marginTop: '24px', 
           padding: '24px', 
@@ -7137,7 +7197,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       )}
 
       {/* Admin, Teacher & Student Bypass Buttons for Localhost / Dev */}
-      {isLocalhost && (
+      {isDevBuild && (
         <div style={{ marginTop: '24px', width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {/* 1. Master Admin Cockpit Bypass */}
           <button

@@ -15,7 +15,7 @@ interface MobileBriefingCarouselProps {
   hausaufgabenWidget?: React.ReactNode;
   mitteilungenWidget?: React.ReactNode;
   absenceWidget?: React.ReactNode;
-  sickWidget?: React.ReactNode;
+  ausfallWidget?: React.ReactNode;
   customTabs?: CarouselTabItem[];
   themeColor?: string;
 }
@@ -27,7 +27,7 @@ export const MobileBriefingCarousel: React.FC<MobileBriefingCarouselProps> = ({
   hausaufgabenWidget,
   mitteilungenWidget,
   absenceWidget,
-  sickWidget,
+  ausfallWidget,
   customTabs,
   themeColor = '#34a853'
 }) => {
@@ -35,7 +35,7 @@ export const MobileBriefingCarousel: React.FC<MobileBriefingCarouselProps> = ({
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
 
-  const effectiveAbsenceWidget = absenceWidget || sickWidget;
+  const effectiveAbsenceWidget = absenceWidget || ausfallWidget;
 
   const tabs: CarouselTabItem[] = customTabs || [
     {

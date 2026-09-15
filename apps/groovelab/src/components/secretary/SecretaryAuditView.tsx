@@ -55,7 +55,7 @@ export const SecretaryAuditView: React.FC<SecretaryAuditViewProps> = ({
         'id', 'created_at', 'school_id', 'password', 'password_hash', 
         'personal_pin', 'parent_pin', 'teacher_qr_token', 'campus_login_token', 
         'groovelab_kiosk_token', 'secret_token', 'joker_used_at', 'weekly_jokers_used',
-        'lesson_duration', 'preferred_room_ids', 'planned_boards', 'sick_until',
+        'lesson_duration', 'preferred_room_ids', 'planned_boards', 'ausfall_until',
         'age', 'bio', 'gear', 'listening', 'projects', 'bands', 'expertise', 'phone', 'group_id', 'nickname'
       ];
       

@@ -1,5 +1,5 @@
-const CACHE_NAME = 'groovelab-static-v1789471942998';
-const DYNAMIC_CACHE = 'groovelab-dynamic-v1789471942998';
+const CACHE_NAME = 'groovelab-static-v1789472500000';
+const DYNAMIC_CACHE = 'groovelab-dynamic-v1789472500000';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -7,12 +7,25 @@ const ASSETS_TO_CACHE = [
   '/pwa-icon.png',
   '/campus_login_hero.png',
   '/avatars/gitarre_avatar_new.png',
+  '/avatars/egitarre_avatar.png',
+  '/avatars/bass_avatar.png',
+  '/avatars/ebass_avatar.png',
+  '/avatars/kontrabass_avatar.png',
   '/avatars/schlagzeug_avatar.png',
   '/avatars/klavier_avatar_new.png',
   '/avatars/gesang_avatar.png',
+  '/avatars/trompete_avatar_new.png',
+  '/avatars/posaune_avatar.png',
+  '/avatars/horn_avatar_new.png',
+  '/avatars/cello_avatar_new.png',
+  '/avatars/violine_avatar_new.png',
+  '/avatars/klarinette_avatar_new.png',
+  '/avatars/blockfloete_avatar.png',
+  '/avatars/querfloete_avatar.png',
   '/avatars/saxophon_avatar_new.png',
-  '/avatars/bass_avatar.png',
-  '/avatars/violine_avatar_new.png'
+  '/avatars/bariton_avatar.png',
+  '/avatars/oboe_avatar.png',
+  '/avatars/neutral_instrument_avatar.png'
 ];
 
 // Security Hardening: Allowed origins for background sync & push notifications

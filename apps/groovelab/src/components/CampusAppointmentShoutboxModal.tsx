@@ -142,7 +142,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
 
   // Occurrence status flags
   const statusStr = String(occurrence.status || 'scheduled').toLowerCase();
-  const isCanceled = ['cancelled', 'canceled_by_student', 'canceled', 'teacher_sick', 'canceled_by_teacher_sick'].includes(statusStr);
+  const isCanceled = ['cancelled', 'canceled_by_student', 'canceled', 'teacher_ausfall', 'canceled_by_teacher_ausfall'].includes(statusStr);
 
   const isRescheduled = Boolean(
     !isCanceled && (

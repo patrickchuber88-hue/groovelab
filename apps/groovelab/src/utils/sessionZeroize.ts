@@ -8,6 +8,7 @@
 import { removeSecureCookie } from './cookieAuthBridge';
 import { broadcastLogoutToPeerTabs } from './authBroadcastSync';
 import { safeReplaceUrl } from './urlSecurityScrubber';
+import { secureVault } from './secureVault';
 
 /**
  * Performs complete cryptographic memory wipe and storage zeroization upon logout or tenant switch.
@@ -52,9 +53,14 @@ export function executeSessionZeroize(options: { preserveDeviceKey?: boolean; re
       (window as any).__CG_USER__ = null;
     }
 
+    // 5. Cryptographic Client-Vault Zeroization (AES-GCM-256 Shredding)
+    try {
+      secureVault.zeroize();
+    } catch (_) {}
+
     console.info('[Security] Session zeroization complete.');
 
-    // 5. Navigate to clean destination if requested and not already there
+    // 6. Navigate to clean destination if requested and not already there
     if (redirectUrl && typeof window !== 'undefined') {
       safeReplaceUrl(redirectUrl);
     }

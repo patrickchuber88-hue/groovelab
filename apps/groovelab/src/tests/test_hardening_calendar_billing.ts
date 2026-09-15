@@ -165,7 +165,7 @@ async function main() {
     });
 
     await runTest(3, 'Set lesson status to cancelled and verify conflict disappears', async () => {
-      // Update status to 'cancelled' (the value we unified from 'canceled_by_teacher_sick')
+      // Update status to 'cancelled' (the value we unified from 'canceled_by_teacher_ausfall')
       const { error: updErr } = await masterClient.from('lessons').update({ status: 'cancelled' }).eq('id', lessonId);
       if (updErr) throw updErr;
 

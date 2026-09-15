@@ -13,8 +13,8 @@ export interface UserProfile {
   photo_url?: string;
   instrument?: string;
   last_seen?: string;
-  sick_start?: string | null;
-  sick_until?: string | null;
+  ausfall_start?: string | null;
+  ausfall_until?: string | null;
   is_campus_active?: boolean;
   is_groovelab_active?: boolean;
   schools?: any;

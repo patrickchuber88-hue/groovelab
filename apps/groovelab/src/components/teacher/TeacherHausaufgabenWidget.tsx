@@ -19,7 +19,7 @@ export interface TeacherHausaufgabenWidgetProps {
   setSelectedGroupStudentId: (id: string | null) => void;
   allStudents: any[];
   bypassAbsenceView?: boolean;
-  bypassSickView?: boolean;
+  bypassAusfallView?: boolean;
   selectedStudentProfile: any;
   setSelectedStudentProfile: (s: any) => void;
   docStudent: any;
@@ -47,7 +47,7 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
   setSelectedGroupStudentId,
   allStudents,
   bypassAbsenceView,
-  bypassSickView,
+  bypassAusfallView,
   selectedStudentProfile,
   setSelectedStudentProfile,
   docStudent,
@@ -229,7 +229,7 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
       flexDirection: 'column',
       borderLeft: isTourDemoScheduleActive 
         ? '4px solid #34a853' 
-        : (isTeacherCurrentlyAbsent(teacher) && !(bypassAbsenceView || bypassSickView))
+        : (isTeacherCurrentlyAbsent(teacher) && !(bypassAbsenceView || bypassAusfallView))
         ? '4px solid #ef4444'
         : widgetState === 'VORBEREITUNG' 
         ? '4px solid #fbbc05' 
@@ -339,7 +339,7 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
             );
           }
 
-          if (isTeacherCurrentlyAbsent(teacher) && !(bypassAbsenceView || bypassSickView)) {
+          if (isTeacherCurrentlyAbsent(teacher) && !(bypassAbsenceView || bypassAusfallView)) {
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'center', padding: '16px 8px' }}>
                 <div style={{ 
@@ -370,14 +370,14 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
 
           if (widgetState === 'VORBEREITUNG') {
             const activeLessonsCount = briefingData?.timeline 
-              ? briefingData.timeline.filter((s: any) => s.student && s.status !== 'canceled_by_student' && s.status !== 'teacher_sick' && s.status !== 'cancelled' && s.status !== 'canceled_by_teacher_sick' && s.status !== 'rescheduled_away').length 
+              ? briefingData.timeline.filter((s: any) => s.student && s.status !== 'canceled_by_student' && s.status !== 'teacher_ausfall' && s.status !== 'cancelled' && s.status !== 'canceled_by_teacher_ausfall' && s.status !== 'rescheduled_away').length 
               : 0;
             const dailyChanges = briefingData?.timeline 
               ? briefingData.timeline.filter((s: any) => s.student && (
                   s.status === 'canceled_by_student' || 
-                  s.status === 'teacher_sick' || 
+                  s.status === 'teacher_ausfall' || 
                   s.status === 'cancelled' || 
-                  s.status === 'canceled_by_teacher_sick' ||
+                  s.status === 'canceled_by_teacher_ausfall' ||
                   s.status === 'rescheduled_away'
                 )) 
               : [];
@@ -1262,10 +1262,11 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
                   {/* Quick-Tags */}
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     {[
-                      'Takt 1–8 mit Metronom bpm 80',
-                      'Akkordwechsel G-C-D flüssig',
-                      'Blattlese-Übung S. 14',
-                      'Dynamik & Phrasierung beachten'
+                      'Takte 1–16 wiederholen',
+                      'Tempo langsam mit Metronom (BPM 80)',
+                      'Intonation & Bogenteilung beachten',
+                      'Stricharten & Dynamik vertiefen',
+                      'Akkordwechsel & Rhythmus festigen'
                     ].map((tag) => (
                       <button
                         key={tag}

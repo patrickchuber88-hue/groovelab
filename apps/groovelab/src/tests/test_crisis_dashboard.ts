@@ -109,61 +109,61 @@ async function main() {
   }
 
   try {
-    // ─── TIER 1: SICKNESS REPORTING AND SCHEDULING CANCELLATION (1-15) ───
+    // ─── TIER 1: ABSENCE REPORTING AND SCHEDULING CANCELLATION (1-15) ───
     
-    await runTest(1, 'Verify teacher profile initial sickness status is healthy', async () => {
-      const { data } = await adminClient.from('users').select('sick_until').eq('id', teacherId1).single();
-      if (data?.sick_until !== null) throw new Error('Teacher should initially be healthy');
+    await runTest(1, 'Verify teacher profile initial absence status is healthy/available', async () => {
+      const { data } = await adminClient.from('users').select('ausfall_until').eq('id', teacherId1).single();
+      if (data?.ausfall_until !== null) throw new Error('Teacher should initially be healthy');
     });
 
-    await runTest(2, 'Submit basic illness report with 3-day sick leave window', async () => {
-      const sickUntil = '2026-06-28';
-      await masterClient.from('users_raw').update({ sick_until: sickUntil, sick_start: '2026-06-25' }).eq('id', teacherId1);
-      const { data } = await adminClient.from('users').select('sick_until').eq('id', teacherId1).single();
-      if (!data?.sick_until?.startsWith(sickUntil)) throw new Error('Sickness window failed to write: ' + JSON.stringify(data));
+    await runTest(2, 'Submit basic absence report with 3-day absence window', async () => {
+      const ausfallUntil = '2026-06-28';
+      await masterClient.from('users_raw').update({ ausfall_until: ausfallUntil, ausfall_start: '2026-06-25' }).eq('id', teacherId1);
+      const { data } = await adminClient.from('users').select('ausfall_until').eq('id', teacherId1).single();
+      if (!data?.ausfall_until?.startsWith(ausfallUntil)) throw new Error('Absence window failed to write: ' + JSON.stringify(data));
     });
 
-    await runTest(3, 'Verify RLS protects reporting sick leave from unauthenticated profiles', async () => {
+    await runTest(3, 'Verify RLS protects reporting absence from unauthenticated profiles', async () => {
       const anonymousClient = createClient(supabaseUrl, supabaseAnonKey);
-      await anonymousClient.from('users').update({ sick_until: '2026-06-30' }).eq('id', teacherId1);
-      const { data } = await adminClient.from('users').select('sick_until').eq('id', teacherId1).single();
-      if (data?.sick_until?.startsWith('2026-06-30')) {
-        throw new Error('RLS breached: Anonymous user successfully modified teacher sick leave');
+      await anonymousClient.from('users').update({ ausfall_until: '2026-06-30' }).eq('id', teacherId1);
+      const { data } = await adminClient.from('users').select('ausfall_until').eq('id', teacherId1).single();
+      if (data?.ausfall_until?.startsWith('2026-06-30')) {
+        throw new Error('RLS breached: Anonymous user successfully modified teacher absence');
       }
     });
 
-    await runTest(4, 'Add custom validation check for invalid sickness end dates', async () => {
-      const { error } = await masterClient.from('users_raw').update({ sick_until: 'invalid-date' }).eq('id', teacherId1);
+    await runTest(4, 'Add custom validation check for invalid absence end dates', async () => {
+      const { error } = await masterClient.from('users_raw').update({ ausfall_until: 'invalid-date' }).eq('id', teacherId1);
       if (!error) throw new Error('Check constraints or types should reject non-date values');
     });
 
-    await runTest(5, 'Teacher reports sickness themselves successfully', async () => {
-      const testSickUntil = '2026-06-27';
-      const { error } = await teacherClient.from('users').update({ sick_until: testSickUntil }).eq('id', teacherId1);
+    await runTest(5, 'Teacher reports absence themselves successfully', async () => {
+      const testAusfallUntil = '2026-06-27';
+      const { error } = await teacherClient.from('users').update({ ausfall_until: testAusfallUntil }).eq('id', teacherId1);
       if (error) throw new Error(error.message);
     });
 
-    await runTest(6, 'Verify user has sick_start value defaults correctly', async () => {
-      const { data } = await adminClient.from('users').select('sick_start').eq('id', teacherId1).single();
-      if (!data) throw new Error('Sickness start date should not be empty');
+    await runTest(6, 'Verify user has ausfall_start value defaults correctly', async () => {
+      const { data } = await adminClient.from('users').select('ausfall_start').eq('id', teacherId1).single();
+      if (!data) throw new Error('Absence start date should not be empty');
     });
 
-    await runTest(7, 'Secretary reports teacher sick with custom duration on behalf', async () => {
+    await runTest(7, 'Secretary reports teacher absence with custom duration on behalf', async () => {
       const secClient = getClientForUser(secretaryId1, testSchoolId);
-      const { error } = await secClient.from('users').update({ sick_until: '2026-06-29' }).eq('id', teacherId1);
-      if (error) throw new Error('Secretary should be authorized to report teacher sick');
+      const { error } = await secClient.from('users').update({ ausfall_until: '2026-06-29' }).eq('id', teacherId1);
+      if (error) throw new Error('Secretary should be authorized to report teacher absence');
     });
 
-    await runTest(8, 'Extend teacher sick leave period to 7 days', async () => {
-      await masterClient.from('users_raw').update({ sick_until: '2026-07-02' }).eq('id', teacherId1);
-      const { data } = await adminClient.from('users').select('sick_until').eq('id', teacherId1).single();
-      if (!data?.sick_until?.startsWith('2026-07-02')) throw new Error('Failed to extend sick leave: ' + JSON.stringify(data));
+    await runTest(8, 'Extend teacher absence period to 7 days', async () => {
+      await masterClient.from('users_raw').update({ ausfall_until: '2026-07-02' }).eq('id', teacherId1);
+      const { data } = await adminClient.from('users').select('ausfall_until').eq('id', teacherId1).single();
+      if (!data?.ausfall_until?.startsWith('2026-07-02')) throw new Error('Failed to extend absence: ' + JSON.stringify(data));
     });
 
-    await runTest(9, 'Shorten teacher sick leave period back to 2 days', async () => {
-      await masterClient.from('users_raw').update({ sick_until: '2026-06-27' }).eq('id', teacherId1);
-      const { data } = await adminClient.from('users').select('sick_until').eq('id', teacherId1).single();
-      if (!data?.sick_until?.startsWith('2026-06-27')) throw new Error('Failed to shorten sick leave: ' + JSON.stringify(data));
+    await runTest(9, 'Shorten teacher absence period back to 2 days', async () => {
+      await masterClient.from('users_raw').update({ ausfall_until: '2026-06-27' }).eq('id', teacherId1);
+      const { data } = await adminClient.from('users').select('ausfall_until').eq('id', teacherId1).single();
+      if (!data?.ausfall_until?.startsWith('2026-06-27')) throw new Error('Failed to shorten absence: ' + JSON.stringify(data));
     });
 
     await runTest(10, 'Create crisis notifications for canceled slots', async () => {
@@ -188,7 +188,7 @@ async function main() {
       if (!data || data.length === 0) throw new Error('Original ticket must exist');
     });
 
-    await runTest(12, 'Verify system alert for teacher sickness is correctly written', async () => {
+    await runTest(12, 'Verify system alert for teacher absence is correctly written', async () => {
       const alertId = crypto.randomUUID();
       await masterClient.from('system_alerts').insert({
         id: alertId,
@@ -202,19 +202,19 @@ async function main() {
       if (!data) throw new Error('System alert should be created');
     });
 
-    await runTest(13, 'Submit multiple system alerts for the same illness', async () => {
+    await runTest(13, 'Submit multiple system alerts for the same absence', async () => {
       const { data } = await adminClient.from('system_alerts').select('*').eq('teacher_id', teacherId1);
       if (!data || data.length === 0) throw new Error('System alert listings should be active');
     });
 
-    await runTest(14, 'Verify KPI counts: total sick teachers is 1', async () => {
-      const { data } = await adminClient.from('users').select('id').eq('school_id', testSchoolId).not('sick_until', 'is', null);
-      if (!data || data.length !== 1) throw new Error('KPI Count of sick teachers should be 1');
+    await runTest(14, 'Verify KPI counts: total absent teachers is 1', async () => {
+      const { data } = await adminClient.from('users').select('id').eq('school_id', testSchoolId).not('ausfall_until', 'is', null);
+      if (!data || data.length !== 1) throw new Error('KPI Count of absent teachers should be 1');
     });
 
-    await runTest(15, 'Ensure healthy teachers are not counted in sick KPI', async () => {
-      const { data } = await adminClient.from('users').select('id').eq('id', teacherId2).not('sick_until', 'is', null);
-      if (data && data.length > 0) throw new Error('Alice Smith is healthy and should not be in sick KPI');
+    await runTest(15, 'Ensure healthy teachers are not counted in absent KPI', async () => {
+      const { data } = await adminClient.from('users').select('id').eq('id', teacherId2).not('ausfall_until', 'is', null);
+      if (data && data.length > 0) throw new Error('Alice Smith is healthy and should not be in absent KPI');
     });
 
     // ─── TIER 2: SCHEDULE CANCELATION AND OCCURRENCE UPDATES (16-25) ───
@@ -224,19 +224,19 @@ async function main() {
       if (data?.status !== 'approved') throw new Error('Schedule should be approved');
     });
 
-    await runTest(17, 'Cancel schedule on sick day (simulated action)', async () => {
-      await masterClient.from('schedules').update({ status: 'canceled_by_teacher_sick' }).eq('id', schedId1);
+    await runTest(17, 'Cancel schedule on absence day (simulated action)', async () => {
+      await masterClient.from('schedules').update({ status: 'canceled_by_teacher_ausfall' }).eq('id', schedId1);
       const { data } = await adminClient.from('schedules').select('status').eq('id', schedId1).single();
-      if (data?.status !== 'canceled_by_teacher_sick') throw new Error('Schedule failed to cancel');
+      if (data?.status !== 'canceled_by_teacher_ausfall') throw new Error('Schedule failed to cancel');
     });
 
     await runTest(18, 'Restore cancelled schedule to approved (simulated action)', async () => {
-      await masterClient.from('schedules').update({ status: 'approved' }).eq('id', schedId1).eq('status', 'canceled_by_teacher_sick');
+      await masterClient.from('schedules').update({ status: 'approved' }).eq('id', schedId1).eq('status', 'canceled_by_teacher_ausfall');
       const { data } = await adminClient.from('schedules').select('status').eq('id', schedId1).single();
       if (data?.status !== 'approved') throw new Error('Schedule failed to restore');
     });
 
-    await runTest(19, 'Cancel schedule occurrence for specific lesson on sick date', async () => {
+    await runTest(19, 'Cancel schedule occurrence for specific lesson on absence date', async () => {
       const { error: updErr, data: updData } = await masterClient.from('schedule_occurrences').update({ status: 'cancelled' }).eq('id', occId1).select();
       if (updErr) console.error('Update error in Test 19:', updErr);
       const { data } = await adminClient.from('schedule_occurrences').select('status').eq('id', occId1).single();
@@ -254,7 +254,7 @@ async function main() {
       await masterClient.from('schedule_occurrences').insert({
         id: occId2, teacher_id: teacherId1, student_id: studentId1, date: '2026-06-26', start_time: '12:00:00', duration: 45, status: 'rescheduled_confirmed'
       });
-      // Sickness only affects occId1 on 25th, recovery before 26th
+      // Absence only affects occId1 on 25th, recovery before 26th
       await masterClient.from('schedule_occurrences').update({ status: 'cancelled' }).eq('id', occId1);
       const { data: o1 } = await adminClient.from('schedule_occurrences').select('status').eq('id', occId1).single();
       const { data: o2 } = await adminClient.from('schedule_occurrences').select('status').eq('id', occId2).single();
@@ -270,7 +270,7 @@ async function main() {
       await masterClient.from('schedules').insert({
         id: otherSchedId, school_id: otherSchoolId, teacher_id: teacherId2, student_id: studentId1, day_of_week: 1, time_slot: '14:00:00', status: 'approved'
       });
-      // Sickness logic of school-1 teacher-1 must not touch school-2 schedules
+      // Absence logic of school-1 teacher-1 must not touch school-2 schedules
       const { data } = await adminClient.from('schedules').select('*').eq('id', otherSchedId);
       if (data && data.length > 0) throw new Error('Multi-tenant violation: Admin should not query other school schedules');
 
@@ -284,21 +284,21 @@ async function main() {
       await masterClient.from('schedules').insert({
         id: otherSchedId, school_id: testSchoolId, teacher_id: teacherId2, student_id: studentId1, day_of_week: 1, time_slot: '15:00:00', status: 'approved'
       });
-      // John Doe's sickness must not cancel Alice Smith's schedule
+      // John Doe's absence must not cancel Alice Smith's schedule
       const { data } = await adminClient.from('schedules').select('status').eq('id', otherSchedId).single();
       if (data?.status !== 'approved') throw new Error('Healthy teacher schedule was impacted');
     });
 
     await runTest(24, 'Ensure student cannot access canceled schedule edit features', async () => {
       // Set status to cancelled first using master client
-      await masterClient.from('schedules').update({ status: 'canceled_by_teacher_sick' }).eq('id', schedId1);
+      await masterClient.from('schedules').update({ status: 'canceled_by_teacher_ausfall' }).eq('id', schedId1);
       const { data } = await studentClient.from('schedules').update({ status: 'approved' }).eq('id', schedId1).select();
       if (data && data.length > 0) {
         throw new Error('Student successfully changed schedule status! RLS bypass!');
       }
       // Double check it is still canceled
       const { data: check } = await masterClient.from('schedules').select('status').eq('id', schedId1).single();
-      if (check?.status !== 'canceled_by_teacher_sick') {
+      if (check?.status !== 'canceled_by_teacher_ausfall') {
         throw new Error('Schedule status was modified by student');
       }
     });
@@ -312,7 +312,7 @@ async function main() {
       });
 
       // Try to update other school schedule using teacher client
-      const { data } = await teacherClient.from('schedules').update({ status: 'canceled_by_teacher_sick' }).eq('id', otherSchedId).select();
+      const { data } = await teacherClient.from('schedules').update({ status: 'canceled_by_teacher_ausfall' }).eq('id', otherSchedId).select();
       if (data && data.length > 0) {
         throw new Error('Teacher successfully modified another school schedule! RLS breach!');
       }
@@ -324,10 +324,10 @@ async function main() {
 
     // ─── TIER 3: EARLY RETURN AND REINSTATEMENT CONSISTENCY (26-35) ───
 
-    await runTest(26, 'Teacher reports healthy (early return flow)', async () => {
-      await masterClient.from('users_raw').update({ sick_until: null, sick_start: null }).eq('id', teacherId1);
-      const { data } = await adminClient.from('users').select('sick_until').eq('id', teacherId1).single();
-      if (data?.sick_until !== null) throw new Error('Teacher sick leave should be empty');
+    await runTest(26, 'Teacher reports available (early return flow)', async () => {
+      await masterClient.from('users_raw').update({ ausfall_until: null, ausfall_start: null }).eq('id', teacherId1);
+      const { data } = await adminClient.from('users').select('ausfall_until').eq('id', teacherId1).single();
+      if (data?.ausfall_until !== null) throw new Error('Teacher absence should be empty');
     });
 
     await runTest(27, 'Mark future canceled slots as reinstated (is_reinstated=true, status=UNREAD)', async () => {
@@ -355,13 +355,13 @@ async function main() {
       if (!reinstatedNotif) throw new Error('Student should see the green reinstated notification');
     });
 
-    await runTest(29, 'Verify secretary recovery flow (handleEndSickOnBehalf) updates instead of deletes', async () => {
+    await runTest(29, 'Verify secretary recovery flow (handleEndAbsenceOnBehalf) updates instead of deletes', async () => {
       const ticketId3 = crypto.randomUUID();
       await masterClient.from('crisis_notifications').insert({
         id: ticketId3, teacher_id: teacherId1, student_id: studentId1, slot_start_datetime: '2026-06-28T10:00:00.000Z', status: 'UNREAD'
       });
 
-      // Simulating handleEndSickOnBehalf recovery fix: update instead of delete
+      // Simulating handleEndAbsenceOnBehalf recovery fix: update instead of delete
       await masterClient.from('crisis_notifications')
         .update({ is_reinstated: true, status: 'UNREAD' })
         .eq('teacher_id', teacherId1)
@@ -369,7 +369,7 @@ async function main() {
 
       const { data } = await adminClient.from('crisis_notifications').select('is_reinstated, status').eq('id', ticketId3).single();
       if (!data || !data.is_reinstated) {
-        throw new Error('Secretary healthy report should reinstate the slot, NOT delete it!');
+        throw new Error('Secretary available report should reinstate the slot, NOT delete it!');
       }
     });
 
@@ -391,7 +391,7 @@ async function main() {
       });
 
       // Try to update other school user using teacher client
-      const { data } = await teacherClient.from('users').update({ sick_until: '2026-07-10' }).eq('id', otherTeacherId).select();
+      const { data } = await teacherClient.from('users').update({ ausfall_until: '2026-07-10' }).eq('id', otherTeacherId).select();
       if (data && data.length > 0) {
         throw new Error('Teacher successfully modified another school user! RLS breach!');
       }
@@ -401,18 +401,18 @@ async function main() {
       await masterClient.from('schools').delete().eq('id', otherSchoolId);
     });
 
-    await runTest(32, 'Verify anonymous client cannot update teacher sickness fields (RLS)', async () => {
+    await runTest(32, 'Verify anonymous client cannot update teacher absence fields (RLS)', async () => {
       // First ensure the value is null
-      await masterClient.from('users_raw').update({ sick_until: null }).eq('id', teacherId1);
+      await masterClient.from('users_raw').update({ ausfall_until: null }).eq('id', teacherId1);
 
       const anonymousClient = createClient(supabaseUrl, supabaseAnonKey);
-      const { data } = await anonymousClient.from('users').update({ sick_until: '2026-07-10' }).eq('id', teacherId1).select();
+      const { data } = await anonymousClient.from('users').update({ ausfall_until: '2026-07-10' }).eq('id', teacherId1).select();
       if (data && data.length > 0) {
-        throw new Error('Anonymous client successfully updated teacher sick status! RLS breach!');
+        throw new Error('Anonymous client successfully updated teacher absence status! RLS breach!');
       }
-      const { data: check } = await masterClient.from('users_raw').select('sick_until').eq('id', teacherId1).single();
-      if (check?.sick_until !== null) {
-        throw new Error('Teacher sick status was modified by anonymous client');
+      const { data: check } = await masterClient.from('users_raw').select('ausfall_until').eq('id', teacherId1).single();
+      if (check?.ausfall_until !== null) {
+        throw new Error('Teacher absence status was modified by anonymous client');
       }
     });
 
@@ -427,7 +427,7 @@ async function main() {
     });
 
     await runTest(35, 'Check that recovered teacher is removed from current abwesend lists', async () => {
-      const { data } = await adminClient.from('users').select('*').eq('school_id', testSchoolId).not('sick_until', 'is', null);
+      const { data } = await adminClient.from('users').select('*').eq('school_id', testSchoolId).not('ausfall_until', 'is', null);
       if (data && data.length > 0) throw new Error('John Doe is recovered and should not be abwesend');
     });
 

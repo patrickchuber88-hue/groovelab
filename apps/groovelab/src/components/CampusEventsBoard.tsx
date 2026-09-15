@@ -56,7 +56,18 @@ import {
 } from 'lucide-react';
 import { isWebAuthnSupported, authenticateParentBiometricPasskey } from '../utils/webauthn';
 import { downloadCsvFile } from '../utils/csvHelper';
-import { formatSingleStudentAnonymized, formatGroupStudentsAnonymized, formatCombinedStudentNames, getGroupTypeLabel, formatTeacherFullName, formatDisplaySubjectOrInstrument, isInvalidInstrument, maskLastName } from '../utils/nameHelper';
+import { 
+  formatSingleStudentAnonymized, 
+  formatGroupStudentsAnonymized, 
+  formatCombinedStudentNames, 
+  getGroupTypeLabel, 
+  formatTeacherFullName, 
+  formatDisplaySubjectOrInstrument, 
+  isInvalidInstrument, 
+  maskLastName,
+  matchStudentNameOrInitial,
+  extractStudentTokensFromName
+} from '../utils/nameHelper';
 import { isSlotCancelledByAbsence } from '../utils/teacherAbsenceHelper';
 import { isUUID } from '../utils/uuidValidator';
 import { formatGermanDate, formatGermanWeekday } from '../utils/formatters';
@@ -81,7 +92,7 @@ interface LessonOccurrence {
   date: string;
   start_time: string;
   duration: number;
-  status: 'scheduled' | 'pending_reschedule' | 'rescheduled_confirmed' | 'cancelled' | 'canceled_by_student' | 'teacher_sick' | 'canceled_by_teacher_sick';
+  status: 'scheduled' | 'pending_reschedule' | 'rescheduled_confirmed' | 'cancelled' | 'canceled_by_student' | 'teacher_ausfall' | 'canceled_by_teacher_ausfall';
   is_virtual?: boolean;
   teacher?: { first_name: string; last_name: string; photo_url?: string };
   student?: { first_name: string; last_name: string; instrument?: string };
@@ -3737,8 +3748,8 @@ export function CampusEventsBoard({
               const movedCandidates = movedAwayByOrigDate.get(dateStr);
               const actualMovedAway = !actual && movedCandidates?.some((occ: any) => isSameScheduleOrStudent(occ, sch));
 
-              const isTeacherSickOnDate = Boolean(
-                sch.status === 'canceled_by_teacher_sick' ||
+              const isTeacherAusfallOnDate = Boolean(
+                sch.status === 'canceled_by_teacher_ausfall' ||
                 isSlotCancelledByAbsence(dateStr, sch.time_slot || '00:00', sch.teacher) ||
                 (String(sch.teacher_id) === String(userId) && isSlotCancelledByAbsence(dateStr, sch.time_slot || '00:00', teacherProfileObj))
               );
@@ -3757,7 +3768,7 @@ export function CampusEventsBoard({
                   );
                   allMergedOccurrences.push({
                     ...actual,
-                    status: (actual.status === 'scheduled' && isTeacherSickOnDate) ? 'canceled_by_teacher_sick' : actual.status,
+                    status: (actual.status === 'scheduled' && isTeacherAusfallOnDate) ? 'canceled_by_teacher_ausfall' : actual.status,
                     start_time: actTime,
                     schedule: sch,
                     teacher: actual.teacher || sch.teacher || teacherProfileObj || studentTeacherObj || { first_name: 'Lehrkraft', last_name: '', instrument: 'Musik' },
@@ -3787,7 +3798,7 @@ export function CampusEventsBoard({
                   date: dateStr,
                   start_time: startTimeStr,
                   duration: sch.duration || 45,
-                  status: isTeacherSickOnDate ? 'canceled_by_teacher_sick' : 'scheduled',
+                  status: isTeacherAusfallOnDate ? 'canceled_by_teacher_ausfall' : 'scheduled',
                   is_virtual: true,
                   teacher: sch.teacher || teacherProfileObj || studentTeacherObj || { first_name: 'Lehrkraft', last_name: '', instrument: 'Musik' },
                   student: sch.student,
@@ -4249,7 +4260,7 @@ export function CampusEventsBoard({
       if (dbOccs && dbOccs.length > 0) {
         for (const o of dbOccs) {
           if (o.id === occ.id) continue;
-          const isCanceled = o.status === 'cancelled' || o.status === 'canceled_by_student' || o.status === 'teacher_sick' || o.status === 'canceled_by_teacher_sick';
+          const isCanceled = o.status === 'cancelled' || o.status === 'canceled_by_student' || o.status === 'teacher_ausfall' || o.status === 'canceled_by_teacher_ausfall';
           if (isCanceled) continue;
 
           const oStart = parseMinutes(o.start_time || '00:00');
@@ -4278,7 +4289,7 @@ export function CampusEventsBoard({
         .select('id, student_id, start_time, duration, status, student:users!schedules_student_id_fkey(first_name, last_name)')
         .eq('teacher_id', teacherId)
         .eq('day_of_week', dayOfWeek)
-        .neq('status', 'canceled_by_teacher_sick');
+        .neq('status', 'canceled_by_teacher_ausfall');
 
       if (dbSchedules && dbSchedules.length > 0) {
         for (const sch of dbSchedules) {
@@ -4381,12 +4392,12 @@ export function CampusEventsBoard({
       const teacherId = occ.teacher_id || (occ.teacher as any)?.id || (isTeacherActor ? userId : null);
 
       if (isVirtual) {
-        if (occ.status === "teacher_sick" || occ.status === "canceled_by_teacher_sick") {
+        if (occ.status === "teacher_ausfall" || occ.status === "canceled_by_teacher_ausfall") {
           const { error: updErr } = await supabase
             .from("schedules")
             .update({ status: "approved" })
             .eq("id", occ.schedule_id)
-            .eq("status", "canceled_by_teacher_sick");
+            .eq("status", "canceled_by_teacher_ausfall");
           if (updErr) throw updErr;
         }
 
@@ -4628,7 +4639,7 @@ export function CampusEventsBoard({
       return;
     }
 
-    const isCanceled = occ.status === 'canceled_by_student' || occ.status === 'cancelled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick';
+    const isCanceled = occ.status === 'canceled_by_student' || occ.status === 'cancelled' || occ.status === 'teacher_ausfall' || occ.status === 'canceled_by_teacher_ausfall';
     if (isCanceled) {
       if (role === 'student' && !isAbsenceAllowed) {
         setPinGatePendingAction(() => () => handleUndoCancel(occ, true));
@@ -4873,7 +4884,7 @@ export function CampusEventsBoard({
 
     if (lessonTab === 'cancelled') {
       return lessons.filter(occ => {
-        return ['cancelled', 'canceled_by_student', 'canceled', 'teacher_sick', 'canceled_by_teacher_sick', 'absent'].includes(String(occ.status || ''));
+        return ['cancelled', 'canceled_by_student', 'canceled', 'teacher_ausfall', 'canceled_by_teacher_ausfall', 'absent'].includes(String(occ.status || ''));
       });
     }
 
@@ -5721,7 +5732,7 @@ export function CampusEventsBoard({
       const schedIdStr = String(o.schedule_id || o.schedule?.id || '');
 
       // 1. Explicit cancellation has highest priority (must show red dashed card)
-      if (['cancelled', 'canceled_by_student', 'canceled', 'teacher_sick', 'canceled_by_teacher_sick', 'absent'].includes(status)) {
+      if (['cancelled', 'canceled_by_student', 'canceled', 'teacher_ausfall', 'canceled_by_teacher_ausfall', 'absent'].includes(status)) {
         return 100;
       }
       // 2. Rescheduled / moved appointment has 2nd highest priority (must show yellow dashed card)
@@ -5795,10 +5806,32 @@ export function CampusEventsBoard({
             const sId = st.id || st.student_id || st.user_id;
             const rawName = String(st.first_name || st.name || '').trim();
             
+            // Check if this student already matches an entry in uniqueStudentMap (e.g. Tina H. vs Tina Huber)
+            let existingKey: string | null = null;
+            for (const [key, existingSt] of uniqueStudentMap.entries()) {
+              if (sId && (existingSt.id === sId || existingSt.student_id === sId || existingSt.user_id === sId)) {
+                existingKey = key;
+                break;
+              }
+              if (matchStudentNameOrInitial(st, existingSt)) {
+                existingKey = key;
+                break;
+              }
+            }
+
+            if (existingKey) {
+              const existingSt = uniqueStudentMap.get(existingKey);
+              // If incoming st has more complete information (e.g. real last name instead of initial), upgrade it
+              if ((!existingSt.last_name || existingSt.last_name.length <= 2) && st.last_name && st.last_name.length > 2) {
+                uniqueStudentMap.set(existingKey, { ...existingSt, ...st });
+              }
+              return;
+            }
+
             if (sId && String(sId).length > 10 && !String(sId).startsWith('group-') && !String(sId).startsWith('virtual-')) {
               uniqueStudentMap.set(String(sId), st);
             } else if (rawName.includes('&') || rawName.includes(',') || /\b(and|und)\b/i.test(rawName)) {
-              const tokens = rawName.split(/&|,|\bund\b|\band\b/i).map((s: string) => s.trim()).filter(Boolean);
+              const tokens = extractStudentTokensFromName(rawName);
               tokens.forEach((t: string) => {
                 const key = t.toLowerCase();
                 if (!uniqueStudentMap.has(key)) {
@@ -5827,7 +5860,7 @@ export function CampusEventsBoard({
             group_occurrences: slotOccs
           });
         } else {
-          const cancelledOrActual = slotOccs.find(o => ['cancelled', 'canceled_by_student', 'canceled', 'teacher_sick', 'canceled_by_teacher_sick', 'absent'].includes(o.status)) || slotOccs.find(o => o.is_moved || !o.is_virtual) || slotOccs[0];
+          const cancelledOrActual = slotOccs.find(o => ['cancelled', 'canceled_by_student', 'canceled', 'teacher_ausfall', 'canceled_by_teacher_ausfall', 'absent'].includes(o.status)) || slotOccs.find(o => o.is_moved || !o.is_virtual) || slotOccs[0];
           groupedSlotItems.push(cancelledOrActual);
         }
       } else {
@@ -5870,7 +5903,7 @@ export function CampusEventsBoard({
     return groupedSlotItems.map(occ => {
       const isPastOcc = lessonTab === 'past' || occ.date < todayStr || (occ.date === todayStr && (occ.start_time || '00:00') < nowTimeStr);
       const isPendingReview = occ.schedule?.status === 'ready_for_admin_review';
-      const isCanceled = occ.status === 'canceled_by_student' || occ.status === 'cancelled' || occ.status === 'canceled' || occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick' || occ.status === 'absent';
+      const isCanceled = occ.status === 'canceled_by_student' || occ.status === 'cancelled' || occ.status === 'canceled' || occ.status === 'teacher_ausfall' || occ.status === 'canceled_by_teacher_ausfall' || occ.status === 'absent';
       const isRescheduled = Boolean(
         occ.status === 'pending_reschedule' || 
         occ.status === 'rescheduled_confirmed' ||

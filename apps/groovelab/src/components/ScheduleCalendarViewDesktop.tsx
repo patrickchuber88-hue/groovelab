@@ -37,10 +37,97 @@ import {
   Scale,
   Sliders
 } from 'lucide-react';
-import { useRealNamesVisibility, maskLastName, formatTeacherFullName, formatDisplaySubjectOrInstrument } from '../utils/nameHelper';
+import { 
+  useRealNamesVisibility, 
+  maskLastName, 
+  formatTeacherFullName, 
+  formatDisplaySubjectOrInstrument,
+  matchStudentNameOrInitial,
+  extractStudentTokensFromName,
+  resolveCanonicalStudentFromList
+} from '../utils/nameHelper';
 import { MeisterwerkDocumentationModal, checkIsAudioTresorActive } from './MeisterwerkDocumentationModal';
 import { validateChatMessageContent } from '../utils/chatRespectGuard';
 import { isSlotCancelledByAbsence } from '../utils/teacherAbsenceHelper';
+
+const getStudentNameParts = (s: any) => {
+  let fn = (s?.first_name || s?.firstName || '').trim();
+  let ln = (s?.last_name || s?.lastName || '').trim();
+  if (!fn) {
+    const full = (s?.name || s?.studentName || s?.fullName || '').trim();
+    if (full) {
+      const parts = full.split(' ');
+      fn = parts[0] || '';
+      ln = parts.slice(1).join(' ') || '';
+    }
+  }
+  return { fn: fn.toLowerCase(), ln: ln.toLowerCase() };
+};
+
+const matchesTemplateStudent = (occ: any, s: any) => {
+  if (!s || !occ) return false;
+
+  const occStudentId = occ.student_id;
+  if (occStudentId) {
+    if (
+      occStudentId === s.id || 
+      occStudentId === s.student_id || 
+      occStudentId === s.studentId ||
+      occStudentId === s.db_id ||
+      occStudentId === s.user_id
+    ) return true;
+
+    if (s.groupStudents && Array.isArray(s.groupStudents)) {
+      if (s.groupStudents.some((gs: any) => 
+        gs.id === occStudentId || 
+        gs.student_id === occStudentId || 
+        gs.studentId === occStudentId ||
+        gs.db_id === occStudentId ||
+        gs.user_id === occStudentId
+      )) {
+        return true;
+      }
+    }
+  }
+
+  const oFirst = (occ.student?.first_name || occ.student_first_name || occ.first_name || '').trim();
+  const oLast = (occ.student?.last_name || occ.student_last_name || occ.last_name || '').trim();
+  const { fn: sFirst, ln: sLast } = getStudentNameParts(s);
+
+  if (matchStudentNameOrInitial({ first_name: oFirst, last_name: oLast }, { first_name: sFirst, last_name: sLast })) {
+    return true;
+  }
+
+  if (sFirst && (sFirst.includes('&') || sFirst.includes(',') || /\b(and|und)\b/i.test(sFirst))) {
+    const tokens = extractStudentTokensFromName(sFirst);
+    if (tokens.some(tok => matchStudentNameOrInitial({ first_name: oFirst, last_name: oLast }, { name: tok }))) {
+      return true;
+    }
+  }
+
+  if (oFirst && (oFirst.includes('&') || oFirst.includes(',') || /\b(and|und)\b/i.test(oFirst))) {
+    const tokens = extractStudentTokensFromName(oFirst);
+    if (tokens.some(tok => matchStudentNameOrInitial({ name: tok }, { first_name: sFirst, last_name: sLast }))) {
+      return true;
+    }
+  }
+
+  if (oFirst && sFirst && (oFirst.toLowerCase() === sFirst.toLowerCase() || oFirst.toLowerCase().includes(sFirst.toLowerCase()) || sFirst.toLowerCase().includes(oFirst.toLowerCase()))) {
+    if (!oLast || !sLast || oLast.toLowerCase() === sLast.toLowerCase() || oLast.toLowerCase().startsWith(sLast[0].toLowerCase()) || sLast.toLowerCase().startsWith(oLast[0].toLowerCase())) {
+      return true;
+    }
+  }
+
+  if (sFirst && sFirst.length >= 3) {
+    const notesStr = (occ.notes || occ.title || '').toLowerCase();
+    if (notesStr.includes(sFirst)) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
 interface ScheduleOccurrence {
   id: string;
   student_id: string | null;
@@ -56,7 +143,7 @@ interface ScheduleOccurrence {
   date: string;
   start_time: string;
   duration: number;
-  status: 'scheduled' | 'pending_reschedule' | 'rescheduled_confirmed' | 'cancelled' | 'teacher_sick' | 'canceled_by_teacher_sick' | 'canceled_by_student';
+  status: 'scheduled' | 'pending_reschedule' | 'rescheduled_confirmed' | 'cancelled' | 'teacher_ausfall' | 'canceled_by_teacher_ausfall' | 'canceled_by_student';
   original_date?: string;
   original_start_time?: string;
   student_acknowledged?: boolean;
@@ -85,7 +172,22 @@ interface ScheduleOccurrence {
   instrument?: string | null;
   notes?: string | null;
   is_swap?: boolean;
+  isBreak?: boolean;
 }
+
+export const isBreakOccurrence = (occ: any): boolean => {
+  if (!occ) return false;
+  if (occ.student_id === 'vacant' || String(occ.student_id).startsWith('vacant-') || String(occ.id).startsWith('vacant-')) {
+    return false;
+  }
+  return Boolean(
+    occ.isBreak === true ||
+    !occ.student_id ||
+    String(occ.student_id).startsWith('break-') ||
+    String(occ.id).includes('-break-') ||
+    (occ.student?.first_name && (occ.student.first_name.includes('Pause') || occ.student.first_name === '☕️ Pause'))
+  );
+};
 
 interface ScheduleCalendarViewProps {
   schoolId: string;
@@ -329,12 +431,12 @@ export function ScheduleCalendarViewDesktop({
         .from('schedule_occurrences')
         .select('*, student:users!schedule_occurrences_student_id_fkey(first_name, last_name, instrument, campus_ui_level, parent_permissions), schedules:schedules(room_id, room:rooms(name))')
         .eq('teacher_id', userId)
-        .in('status', ['cancelled', 'canceled_by_student', 'teacher_sick', 'canceled_by_teacher_sick', 'open_reschedule'])
+        .in('status', ['cancelled', 'canceled_by_student', 'teacher_ausfall', 'canceled_by_teacher_ausfall', 'open_reschedule'])
         .order('date', { ascending: true });
 
       const isCancelledLesson = (occ: any) => {
         if (occ.isGap || occ.isBreak || occ.isVacant) return false;
-        return ['cancelled', 'canceled_by_student', 'teacher_sick', 'canceled_by_teacher_sick', 'open_reschedule'].includes(occ.status);
+        return ['cancelled', 'canceled_by_student', 'teacher_ausfall', 'canceled_by_teacher_ausfall', 'open_reschedule'].includes(occ.status);
       };
 
       let dbOpen: ScheduleOccurrence[] = [];
@@ -1523,7 +1625,11 @@ export function ScheduleCalendarViewDesktop({
           }
         }
 
-        if ((!targetStudentId || targetStudentId === 'vacant' || targetStudentId.startsWith('vacant-') || targetStudentId.startsWith('break-')) && change.status !== 'cancelled') {
+        const isValidUUID = (val: any) => 
+          typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
+        if (isBreakOccurrence(change) || isBreakOccurrence(originalOcc) || !isValidUUID(targetStudentId)) {
+          // 🛡️ Pausen und Mocks besitzen keinen Tabelleneintrag in schedule_occurrences (Foreign Key Schutz)
           continue;
         }
 
@@ -1891,7 +1997,7 @@ export function ScheduleCalendarViewDesktop({
       if (o.date !== satStr && o.date !== sunStr) return false;
       const isVacant = o.student_id === 'vacant';
       const isCancelled = o.status === 'cancelled';
-      const isBreak = !o.student_id;
+      const isBreak = isBreakOccurrence(o);
       return !isVacant && !isCancelled && !isBreak;
     });
   }, [weekStart, occurrences]);
@@ -2052,12 +2158,12 @@ export function ScheduleCalendarViewDesktop({
     const fetchAbsenceDates = async () => {
       const { data } = await supabase
         .from('users')
-        .select('sick_start, sick_until')
+        .select('ausfall_start, ausfall_until')
         .eq('id', userId)
         .single();
-      if (data?.sick_until) {
-        setAbsenceStart(data.sick_start || null);
-        setAbsenceUntil(data.sick_until);
+      if (data?.ausfall_until) {
+        setAbsenceStart(data.ausfall_start || null);
+        setAbsenceUntil(data.ausfall_until);
       } else {
         setAbsenceStart(null);
         setAbsenceUntil(null);
@@ -2071,9 +2177,9 @@ export function ScheduleCalendarViewDesktop({
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${userId}` },
         (payload) => {
-          if (payload.new && 'sick_until' in payload.new) {
-            setAbsenceStart(payload.new.sick_start || null);
-            setAbsenceUntil(payload.new.sick_until || null);
+          if (payload.new && 'ausfall_until' in payload.new) {
+            setAbsenceStart(payload.new.ausfall_start || null);
+            setAbsenceUntil(payload.new.ausfall_until || null);
           }
         }
       )
@@ -2315,13 +2421,34 @@ export function ScheduleCalendarViewDesktop({
           }
         }
 
-        // 2. Name matching (first_name & last_name)
-        const oFirst = (occ.student?.first_name || occ.student_first_name || occ.first_name || '').trim().toLowerCase();
+        // 2. Initial & Token Name matching
+        const oFirst = (occ.student?.first_name || occ.student_first_name || occ.first_name || '').trim();
+        const oLast = (occ.student?.last_name || occ.student_last_name || occ.last_name || '').trim();
         const { fn: sFirst, ln: sLast } = getStudentNameParts(s);
 
-        if (oFirst && sFirst && (oFirst === sFirst || oFirst.includes(sFirst) || sFirst.includes(oFirst))) {
-          const oLast = (occ.student?.last_name || occ.student_last_name || occ.last_name || '').trim().toLowerCase();
-          if (!oLast || !sLast || oLast === sLast || oLast.startsWith(sLast[0]) || sLast.startsWith(oLast[0])) {
+        // Check canonical initial matching
+        if (matchStudentNameOrInitial({ first_name: oFirst, last_name: oLast }, { first_name: sFirst, last_name: sLast })) {
+          return true;
+        }
+
+        // Check if `s` is composite ("Tina H. & Fabian T.") and matches `occ`
+        if (sFirst && (sFirst.includes('&') || sFirst.includes(',') || /\b(and|und)\b/i.test(sFirst))) {
+          const tokens = extractStudentTokensFromName(sFirst);
+          if (tokens.some(tok => matchStudentNameOrInitial({ first_name: oFirst, last_name: oLast }, { name: tok }))) {
+            return true;
+          }
+        }
+
+        // Check if `occ` is composite and matches `s`
+        if (oFirst && (oFirst.includes('&') || oFirst.includes(',') || /\b(and|und)\b/i.test(oFirst))) {
+          const tokens = extractStudentTokensFromName(oFirst);
+          if (tokens.some(tok => matchStudentNameOrInitial({ name: tok }, { first_name: sFirst, last_name: sLast }))) {
+            return true;
+          }
+        }
+
+        if (oFirst && sFirst && (oFirst.toLowerCase() === sFirst.toLowerCase() || oFirst.toLowerCase().includes(sFirst.toLowerCase()) || sFirst.toLowerCase().includes(oFirst.toLowerCase()))) {
+          if (!oLast || !sLast || oLast.toLowerCase() === sLast.toLowerCase() || oLast.toLowerCase().startsWith(sLast[0].toLowerCase()) || sLast.toLowerCase().startsWith(oLast[0].toLowerCase())) {
             return true;
           }
         }
@@ -2329,7 +2456,7 @@ export function ScheduleCalendarViewDesktop({
         // 3. Fallback matching against notes/title (e.g. if student name was embedded in notes)
         if (sFirst && sFirst.length >= 3) {
           const notesStr = (occ.notes || occ.title || '').toLowerCase();
-          if (notesStr.includes(sFirst)) {
+          if (notesStr.includes(sFirst.toLowerCase())) {
             return true;
           }
         }
@@ -2357,7 +2484,7 @@ export function ScheduleCalendarViewDesktop({
             if (student.isBreak) {
               const isBreakCancelled = fetchedData.some(o => 
                 o.date === dateStr && 
-                (!o.student_id || o.student_id === 'vacant') && 
+                isBreakOccurrence(o) && 
                 o.start_time.substring(0, 5) === (student.assignedTime || '').substring(0, 5) && 
                 ['cancelled', 'canceled_by_student'].includes(o.status)
               );
@@ -2374,6 +2501,7 @@ export function ScheduleCalendarViewDesktop({
                   start_time: formattedTime,
                   duration: student.duration,
                   status: 'scheduled',
+                  isBreak: true,
                   student: {
                     first_name: 'Pause',
                     last_name: '',
@@ -2423,14 +2551,23 @@ export function ScheduleCalendarViewDesktop({
               };
 
               let hasDbRecordForThisSlot = false;
-              if (student.isGroup && student.groupStudents) {
+              if (student.isGroup && student.groupStudents && student.groupStudents.length > 0) {
                 hasDbRecordForThisSlot = fetchedData.some(o => 
                   (o.date === dateStr || o.original_date === dateStr) && 
-                  student.groupStudents.some((gs: any) => gs.id === o.student_id)
+                  isRecordMatchingSlotTime(o) &&
+                  student.groupStudents.some((gs: any) => matchesTemplateStudent(o, gs))
+                );
+              } else if (student.first_name && (student.first_name.includes('&') || student.first_name.includes(',') || /\b(and|und)\b/i.test(student.first_name))) {
+                const tokens = extractStudentTokensFromName(student.first_name);
+                hasDbRecordForThisSlot = fetchedData.some(o =>
+                  (o.date === dateStr || o.original_date === dateStr) &&
+                  isRecordMatchingSlotTime(o) &&
+                  tokens.some(tok => matchesTemplateStudent(o, { first_name: tok, last_name: '' }))
                 );
               } else {
                 hasDbRecordForThisSlot = fetchedData.some(o => 
                   (o.date === dateStr || o.original_date === dateStr) && 
+                  isRecordMatchingSlotTime(o) &&
                   matchesTemplateStudent(o, student)
                 );
               }
@@ -2577,23 +2714,79 @@ export function ScheduleCalendarViewDesktop({
 
           const studId = occ.student_id || occ.student?.first_name || 'unknown';
           const origDate = occ.original_date || occ.date;
+          const slotTime = (occ.start_time || '').substring(0, 5);
           const studDateKey = `stud_date_${studId}_${origDate}`;
           const dbKey = `db_${occ.id}`;
-          const slotKey = `slot_${studId}_${occ.date}_${(occ.start_time || '').substring(0, 5)}`;
+          const slotKey = `slot_${studId}_${occ.date}_${slotTime}`;
+
+          // If this slot already contains a group card that includes this student, drop the redundant single appointment
+          const sFirst = (occ.student?.first_name || '').trim();
+          const isRedundantMember = seenKeys.has(`slot_member_${studId}_${occ.date}_${slotTime}`) ||
+            (sFirst && seenKeys.has(`slot_tok_${sFirst.toLowerCase()}_${occ.date}_${slotTime}`));
+          if (isRedundantMember) {
+            continue;
+          }
 
           if (!seenKeys.has(studDateKey) && !seenKeys.has(dbKey) && !seenKeys.has(slotKey)) {
             seenKeys.add(studDateKey);
             seenKeys.add(dbKey);
             seenKeys.add(slotKey);
+
+            // Register all members of this occurrence if it is a group
+            if (occ.isGroupBlock || (occ as any).groupOccurrences?.length > 0 || (occ.student as any)?.group_id) {
+              const members = (occ as any).groupOccurrences || [];
+              members.forEach((m: any) => {
+                const mId = m.id || m.student_id;
+                if (mId) {
+                  seenKeys.add(`slot_member_${mId}_${occ.date}_${slotTime}`);
+                  seenKeys.add(`slot_${mId}_${occ.date}_${slotTime}`);
+                }
+              });
+            }
+            if (sFirst && (sFirst.includes('&') || sFirst.includes(',') || /\b(and|und)\b/i.test(sFirst))) {
+              const tokens = extractStudentTokensFromName(sFirst);
+              tokens.forEach(tok => {
+                seenKeys.add(`slot_tok_${tok.toLowerCase()}_${occ.date}_${slotTime}`);
+              });
+            }
+
             deduplicatedData.push(occ);
           }
         } else {
           const studId = occ.student_id || occ.student?.first_name || 'unknown';
+          const slotTime = (occ.start_time || '').substring(0, 5);
           const studDateKey = `stud_date_${studId}_${occ.date}`;
-          const slotKey = `slot_${studId}_${occ.date}_${(occ.start_time || '').substring(0, 5)}`;
+          const slotKey = `slot_${studId}_${occ.date}_${slotTime}`;
+
+          // Check redundant member in projected cards
+          const sFirst = (occ.student?.first_name || '').trim();
+          const isRedundantMember = seenKeys.has(`slot_member_${studId}_${occ.date}_${slotTime}`) ||
+            (sFirst && seenKeys.has(`slot_tok_${sFirst.toLowerCase()}_${occ.date}_${slotTime}`));
+          if (isRedundantMember) {
+            continue;
+          }
+
           if (!seenKeys.has(slotKey) && !seenKeys.has(studDateKey)) {
             seenKeys.add(slotKey);
             seenKeys.add(studDateKey);
+
+            if (occ.isGroupBlock || (occ as any).groupOccurrences?.length > 0) {
+              const members = (occ as any).groupOccurrences || [];
+              members.forEach((m: any) => {
+                const mId = m.id || m.student_id;
+                if (mId) {
+                  seenKeys.add(`slot_member_${mId}_${occ.date}_${slotTime}`);
+                  seenKeys.add(`slot_${mId}_${occ.date}_${slotTime}`);
+                }
+              });
+            }
+            if (sFirst && (sFirst.includes('&') || sFirst.includes(',') || /\b(and|und)\b/i.test(sFirst))) {
+              const tokens = extractStudentTokensFromName(sFirst);
+              tokens.forEach(tok => {
+                seenKeys.add(`slot_tok_${tok.toLowerCase()}_${occ.date}_${slotTime}`);
+              });
+            }
+
             deduplicatedData.push(occ);
           }
         }
@@ -3034,7 +3227,7 @@ export function ScheduleCalendarViewDesktop({
           occ.notes?.includes('Getauscht mit') ||
           (swapLinks && swapLinks.some((link: any) => link.id1 === occ.id || link.id2 === occ.id))
         );
-        const isStatusAltered = Boolean(occ.status && ['cancelled', 'teacher_sick', 'open_reschedule', 'pending_reschedule', 'rescheduled_confirmed'].includes(occ.status));
+        const isStatusAltered = Boolean(occ.status && ['cancelled', 'teacher_ausfall', 'open_reschedule', 'pending_reschedule', 'rescheduled_confirmed'].includes(occ.status));
         const isDateMoved = Boolean(occ.original_date && occ.original_date !== occ.date);
         const isTimeMoved = Boolean(occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occ.start_time.substring(0, 5));
         const isAtMaster = checkIsOccurrenceAtMasterSlot(occ);
@@ -3081,7 +3274,7 @@ export function ScheduleCalendarViewDesktop({
         occ.status !== 'canceled_by_student' &&
         occ.canceled_by_role !== 'student' &&
         (
-          ['cancelled', 'teacher_sick', 'canceled_by_teacher_sick', 'open_reschedule', 'pending_reschedule'].includes(occ.status) ||
+          ['cancelled', 'teacher_ausfall', 'canceled_by_teacher_ausfall', 'open_reschedule', 'pending_reschedule'].includes(occ.status) ||
           (occ.original_date && (occ.original_date !== occ.date || occ.original_start_time !== occ.start_time)) ||
           occ.rescheduled
         )
@@ -4533,6 +4726,7 @@ export function ScheduleCalendarViewDesktop({
         o.id !== breakOcc.id &&
         o.student_id !== 'vacant' &&
         o.status !== 'cancelled' &&
+        !isBreakOccurrence(o) &&
         o.start_time.localeCompare(breakOcc.start_time) > 0
       ).sort((a, b) => a.start_time.localeCompare(b.start_time));
 
@@ -4543,19 +4737,63 @@ export function ScheduleCalendarViewDesktop({
           start_time: nextTime, 
           status: 'pending_reschedule' 
         };
-        nextTime = addMins(nextTime, occ.duration);
+        nextTime = addMins(nextTime, occ.duration || 30);
       });
     }
 
-    updateMultipleOccurrences(updatesMap, 'Pause entfernt');
+    // 🛡️ Remove break immediately from baseOccurrences and pending changes
+    setBaseOccurrences(prev => prev.filter(o => o.id !== breakOcc.id));
+    setPendingChanges(prev => {
+      const next = { ...prev };
+      delete next[breakOcc.id];
+      return next;
+    });
+
+    // 🛡️ Remove break from template boards in database if it originated from a designer template
+    if (breakOcc.id.startsWith('mock-') && boards && boards.length > 0) {
+      const targetBoard = boards.find(b => breakOcc.id.startsWith(`mock-${b.id}-`));
+      if (targetBoard) {
+        const breakId = breakOcc.student_id;
+        const nextStudents = targetBoard.students.filter((s: any) => s.id !== breakId);
+        const updatedBoard = { ...targetBoard, students: nextStudents };
+
+        const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+        const draftStateKey = `groovelab_teacher_draft_state_${activePlatform}_${userId}`;
+        try {
+          const rawCached = localStorage.getItem(draftStateKey);
+          if (rawCached) {
+            const parsed = JSON.parse(rawCached);
+            if (parsed && parsed.drafts) {
+              parsed.drafts = parsed.drafts.map((d: any) => ({
+                ...d,
+                boards: d.boards ? d.boards.map((b: any) => b.id === targetBoard.id ? updatedBoard : b) : d.boards
+              }));
+              localStorage.setItem(draftStateKey, JSON.stringify(parsed));
+              supabase.from('users').update({
+                planned_boards: parsed,
+                campus_räume: parsed,
+                groovelab_räume: parsed
+              }).eq('id', userId).then();
+            }
+          }
+        } catch (e) {}
+      }
+    }
+
+    if (Object.keys(updatesMap).length > 1) {
+      delete updatesMap[breakOcc.id];
+      updateMultipleOccurrences(updatesMap, 'Pause gelöscht & Termine vorgezogen');
+    } else {
+      showActionToast('Pause gelöscht');
+    }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'scheduled': return { bg: 'rgba(230, 244, 234, 0.45)', border: '#34a853', text: '#34a853' };
       case 'cancelled':
-      case 'teacher_sick':
-      case 'canceled_by_teacher_sick':
+      case 'teacher_ausfall':
+      case 'canceled_by_teacher_ausfall':
         return { bg: 'rgba(254, 226, 226, 0.45)', border: '#ef4444', text: '#991b1b' };
       case 'pending_reschedule': return { bg: 'rgba(254, 243, 199, 0.45)', border: '#f59e0b', text: '#92400e' };
       case 'rescheduled_confirmed': return { bg: 'rgba(230, 244, 234, 0.45)', border: '#34a853', text: '#34a853' };
@@ -5726,7 +5964,7 @@ export function ScheduleCalendarViewDesktop({
           const activeHoliday = holidays.find(h => dateStr >= h.start && dateStr <= h.end);
 
           const nativeOccs = dayOccurrences.filter(o => {
-            const isBreak = !o.student_id;
+            const isBreak = isBreakOccurrence(o);
             const isCancelledBreak = isBreak && o.status === 'cancelled';
             return !isCancelledBreak && (!o.original_date || o.original_date === dateStr);
           });
@@ -6251,7 +6489,7 @@ export function ScheduleCalendarViewDesktop({
                 // Grouping logic for rendering
                 const renderedGroups: { key: string, occurrences: any[], mainOcc: any }[] = [];
                 dayOccurrences.forEach(occ => {
-                  const isBreak = !occ.student_id;
+                  const isBreak = isBreakOccurrence(occ);
                   const isVacant = occ.student_id === 'vacant';
                   if (isBreak || isVacant) {
                     renderedGroups.push({
@@ -6271,19 +6509,56 @@ export function ScheduleCalendarViewDesktop({
                       occ.isGroupBlock || 
                       (occ as any).groupOccurrences?.length > 0 || 
                       (occ as any).isExplicitMerged || 
-                      (occ.student as any)?.group_id
+                      (occ.student as any)?.group_id ||
+                      (occ.student?.first_name && (occ.student.first_name.includes('&') || occ.student.first_name.includes(',')))
                     );
-                    const existing = isExplicitGroupOcc ? renderedGroups.find(g => 
-                      g.mainOcc.student_id && 
-                      g.mainOcc.student_id !== 'vacant' &&
-                      g.mainOcc.start_time === occ.start_time &&
-                      (g.mainOcc.schedules?.room_id || null) === room_id &&
-                      g.mainOcc.student_id !== occ.student_id &&
-                      !g.occurrences.some(o => o.student_id === occ.student_id) &&
-                      (g.mainOcc.isGroupBlock || (g.mainOcc as any).isExplicitMerged || (g.mainOcc.student as any)?.group_id)
-                    ) : null;
+
+                    const existing = renderedGroups.find(g => {
+                      if (!g.mainOcc.student_id || g.mainOcc.student_id === 'vacant') return false;
+                      if (g.mainOcc.start_time !== occ.start_time) return false;
+                      if ((g.mainOcc.schedules?.room_id || null) !== room_id) return false;
+                      if (g.mainOcc.id === occ.id) return false;
+
+                      // Check if g is an explicit group OR occ is an explicit group
+                      const gIsGroup = Boolean(
+                        g.mainOcc.isGroupBlock || 
+                        (g.mainOcc as any).groupOccurrences?.length > 0 || 
+                        (g.mainOcc as any).isExplicitMerged || 
+                        (g.mainOcc.student as any)?.group_id ||
+                        (g.mainOcc.student?.first_name && (g.mainOcc.student.first_name.includes('&') || g.mainOcc.student.first_name.includes(',')))
+                      );
+
+                      if (!gIsGroup && !isExplicitGroupOcc) return false;
+
+                      // If occ is already registered in g
+                      if (g.occurrences.some(o => o.id === occ.id || (occ.student_id && o.student_id === occ.student_id))) return true;
+
+                      // Check shared group_id
+                      const gGroupId = (g.mainOcc.student as any)?.group_id;
+                      const occGroupId = (occ.student as any)?.group_id;
+                      if (gGroupId && occGroupId && gGroupId === occGroupId) return true;
+
+                      // Check groupOccurrences list membership
+                      if (g.mainOcc.groupOccurrences?.some((go: any) => matchesTemplateStudent(occ, go))) return true;
+                      if ((occ as any).groupOccurrences?.some((go: any) => matchesTemplateStudent(g.mainOcc, go))) return true;
+
+                      // Check composite name token matching
+                      if (g.mainOcc.student?.first_name && (g.mainOcc.student.first_name.includes('&') || g.mainOcc.student.first_name.includes(','))) {
+                        const tokens = extractStudentTokensFromName(g.mainOcc.student.first_name);
+                        if (tokens.some(tok => matchesTemplateStudent(occ, { first_name: tok, last_name: '' }))) return true;
+                      }
+                      if (occ.student?.first_name && (occ.student.first_name.includes('&') || occ.student.first_name.includes(','))) {
+                        const tokens = extractStudentTokensFromName(occ.student.first_name);
+                        if (tokens.some(tok => matchesTemplateStudent(g.mainOcc, { first_name: tok, last_name: '' }))) return true;
+                      }
+
+                      return false;
+                    });
+
                     if (existing) {
-                      existing.occurrences.push(occ);
+                      if (!existing.occurrences.some(o => o.id === occ.id)) {
+                        existing.occurrences.push(occ);
+                      }
                     } else {
                       renderedGroups.push({
                         key: occ.id || `${occ.date}_${occ.start_time}_${room_id || 'noroom'}`,
@@ -6396,7 +6671,7 @@ export function ScheduleCalendarViewDesktop({
                   const isGroup = occurrencesInGroup.length > 1;
                   const occ = group.mainOcc;
                   
-                  const isBreak = !occ.student_id;
+                  const isBreak = isBreakOccurrence(occ);
                   const isVacant = occ.student_id === 'vacant';
 
                   if (isBreak && ['cancelled', 'canceled_by_student'].includes(occ.status)) {
@@ -6404,9 +6679,9 @@ export function ScheduleCalendarViewDesktop({
                   }
 
                    const isAbsentSlot = !isBreak && !isVacant && (
-                    occ.status === 'teacher_sick' || 
-                    occ.status === 'canceled_by_teacher_sick' ||
-                    isSlotCancelledByAbsence(occ.date, occ.start_time, { sick_start: absenceStart, sick_until: absenceUntil })
+                    occ.status === 'teacher_ausfall' || 
+                    occ.status === 'canceled_by_teacher_ausfall' ||
+                    isSlotCancelledByAbsence(occ.date, occ.start_time, { ausfall_start: absenceStart, ausfall_until: absenceUntil })
                   );
 
                   const isExcused = !isBreak && !isVacant && occ.status === 'cancelled' && !!occ.notes?.startsWith('[Entschuldigt]');
@@ -8060,14 +8335,17 @@ return (
         const studentName = occ ? `${occ.student?.first_name || ''} ${maskLastName(occ.student?.last_name, showRealNames)}`.trim() : 'Schüler';
         const isPastDate = editOccState?.date ? new Date(editOccState.date) < new Date(new Date().setHours(0,0,0,0)) : false;
         
-        const modalTitle = occ?.student_id 
-          ? (isGruppenunterrichtOcc 
-              ? uniqueGroupOccs.map(go => `${go.student?.first_name || ''} ${maskLastName(go.student?.last_name, showRealNames)}`.trim()).join(' & ')
-              : isEnsembleOcc 
-                ? 'Ensemble/Band Termin' 
-                : `Termin bearbeiten: ${studentName}`
-            ) 
-          : 'Pause bearbeiten';
+        const isModalBreak = occ ? isBreakOccurrence(occ) : false;
+        const modalTitle = isModalBreak
+          ? 'Pause bearbeiten'
+          : (occ?.student_id 
+              ? (isGruppenunterrichtOcc 
+                  ? uniqueGroupOccs.map(go => `${go.student?.first_name || ''} ${maskLastName(go.student?.last_name, showRealNames)}`.trim()).join(' & ')
+                  : isEnsembleOcc 
+                    ? 'Ensemble/Band Termin' 
+                    : `Termin bearbeiten: ${studentName}`
+                ) 
+              : 'Pause bearbeiten');
 
         const formattedDateLabel = occ ? new Date(editOccState.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
         const formattedTimeLabel = editOccState.start_time.substring(0, 5);
@@ -8297,8 +8575,58 @@ return (
                 <div className="drawer-col drawer-col-1">
                   <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px', marginBottom: '16px' }}>
                     
-                    {/* Student Mini Profile Header Card */}
-                    {occ && occ.student && !isEnsembleOcc && (
+                    {/* Student or Pause Mini Profile Header Card */}
+                    {isModalBreak ? (
+                      <div style={{
+                        background: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)',
+                        borderRadius: '16px',
+                        padding: '12px 14px',
+                        marginBottom: '16px',
+                        border: '1px solid #fdba74',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{
+                            width: '42px',
+                            height: '42px',
+                            borderRadius: '14px',
+                            background: '#ffedd5',
+                            color: '#ea580c',
+                            fontWeight: 800,
+                            fontSize: '1.2rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: '1.5px solid #fed7aa'
+                          }}>
+                            ☕
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#0f172a' }}>
+                              Pause / Zeitfenster
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                              <span style={{
+                                padding: '2px 8px',
+                                borderRadius: '12px',
+                                background: '#fff7ed',
+                                color: '#c2410c',
+                                fontSize: '0.68rem',
+                                fontWeight: 800,
+                                border: '1px solid #fdba74'
+                              }}>
+                                Pause
+                              </span>
+                              <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>
+                                • {editOccState.duration || 15} Min
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : occ && occ.student && !isEnsembleOcc && (
                       <div style={{
                         background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
                         borderRadius: '16px',
@@ -8359,7 +8687,7 @@ return (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '180px', overflowY: 'auto' }}>
                           {uniqueGroupOccs.map(go => {
                             const isGoCancelled = ['cancelled', 'canceled_by_student'].includes(go.status);
-                            const isGoAbsent = go.status === 'teacher_sick' || go.status === 'canceled_by_teacher_sick';
+                            const isGoAbsent = go.status === 'teacher_ausfall' || go.status === 'canceled_by_teacher_ausfall';
                             const isConfirmed = go.student_acknowledged === true;
 
                             let itemBg = 'rgba(0, 0, 0, 0.02)';
@@ -8592,162 +8920,194 @@ return (
 
 
 
-                    {/* Explicit Absence / Abwesenheit Lesson Section (L1) */}
-                    <div style={{ marginBottom: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <AlertCircle size={12} strokeWidth={2.4} color="#64748b" />
-                          <span>Status & Abwesenheit</span>
-                        </span>
-                        {isCancelled && (
-                          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#b91c1c', background: '#fee2e2', padding: '1px 6px', borderRadius: '4px' }}>
-                            {occ?.status === 'canceled_by_student' || (occ as any)?.canceled_by_role === 'student'
-                              ? 'Vom Schüler abgemeldet'
-                              : (occ?.notes?.includes('Lehrkraft') 
-                                ? 'Lehrkraft abwesend' 
-                                : (occ?.notes?.includes('Schulausfall') ? 'Schulausfall' : 'Schüler abwesend'))}
-                          </span>
-                        )}
+                    {/* Explicit Absence / Pause Löschen Section */}
+                    {isModalBreak ? (
+                      <div style={{ marginBottom: '16px' }}>
+                        <button 
+                          type="button"
+                          onClick={(e) => {
+                            if (occ) handleCancelBreak(e, occ);
+                            setEditOccState(null);
+                          }}
+                          style={{ 
+                            width: '100%',
+                            padding: '10px 12px', 
+                            borderRadius: '10px', 
+                            border: '1px solid rgba(239, 68, 68, 0.3)', 
+                            background: 'rgba(239, 68, 68, 0.08)', 
+                            color: '#dc2626', 
+                            fontSize: '0.82rem', 
+                            fontWeight: 800, 
+                            cursor: 'pointer', 
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            transition: 'all 0.2s' 
+                          }}
+                          aria-label="Pause löschen und Folgetermine aufrücken"
+                        >
+                          <Trash2 size={15} />
+                          Pause löschen (Folgetermine rücken auf)
+                        </button>
                       </div>
-
-                      {!isCancelled ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, marginBottom: '2px' }}>
-                            Termin absagen / Abwesenheit erfassen:
+                    ) : (
+                      <div style={{ marginBottom: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <AlertCircle size={12} strokeWidth={2.4} color="#64748b" />
+                            <span>Status & Abwesenheit</span>
                           </span>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
-                            {/* Option 1: Schüler abwesend */}
-                            <button
-                              type="button"
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                const sName = occ?.student ? `${occ.student.first_name} ${maskLastName(occ.student.last_name, showRealNames)}`.trim() : 'Schüler';
-                                if (await showConfirm(`Möchtest du ${sName} für diesen Termin als abwesend markieren?`)) {
-                                  updateOccurrence(editOccState.id, { status: 'cancelled', notes: '[Abwesend: Schüler]' }, `${sName} als abwesend markiert`);
-                                  setEditOccState(null);
-                                }
-                              }}
-                              style={{
-                                padding: '8px 6px',
-                                borderRadius: '8px',
-                                border: '1px solid #cbd5e1',
-                                background: '#ffffff',
-                                color: '#0f172a',
-                                fontSize: '0.74rem',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                gap: '3px',
-                                transition: 'all 0.15s'
-                              }}
-                              onMouseEnter={e => e.currentTarget.style.borderColor = '#94a3b8'}
-                              onMouseLeave={e => e.currentTarget.style.borderColor = '#cbd5e1'}
-                              title="Schüler ist verhindert / abwesend"
-                            >
-                              <Users size={15} color="#475569" />
-                              <span>Schüler abwesend</span>
-                            </button>
+                          {isCancelled && (
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#b91c1c', background: '#fee2e2', padding: '1px 6px', borderRadius: '4px' }}>
+                              {occ?.status === 'canceled_by_student' || (occ as any)?.canceled_by_role === 'student'
+                                ? 'Vom Schüler abgemeldet'
+                                : (occ?.notes?.includes('Lehrkraft') 
+                                  ? 'Lehrkraft abwesend' 
+                                  : (occ?.notes?.includes('Schulausfall') ? 'Schulausfall' : 'Schüler abwesend'))}
+                            </span>
+                          )}
+                        </div>
 
-                            {/* Option 2: Lehrkraft abwesend */}
-                            <button
-                              type="button"
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                if (await showConfirm('Möchtest du deine Abwesenheit für diesen Termin erfassen? (Ersatztermin fällig)')) {
-                                  updateOccurrence(editOccState.id, { status: 'cancelled', notes: '[Abwesend: Lehrkraft]' }, 'Lehrkraft als abwesend markiert');
-                                  setEditOccState(null);
-                                }
-                              }}
-                              style={{
-                                padding: '8px 6px',
-                                borderRadius: '8px',
-                                border: '1px solid #cbd5e1',
-                                background: '#ffffff',
-                                color: '#0f172a',
-                                fontSize: '0.74rem',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                gap: '3px',
-                                transition: 'all 0.15s'
-                              }}
-                              onMouseEnter={e => e.currentTarget.style.borderColor = '#94a3b8'}
-                              onMouseLeave={e => e.currentTarget.style.borderColor = '#cbd5e1'}
-                              title="Lehrkraft ist verhindert / abwesend"
-                            >
-                              <UserCheck size={15} color="#475569" />
-                              <span>Lehrkraft abwesend</span>
-                            </button>
+                        {!isCancelled ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, marginBottom: '2px' }}>
+                              Termin absagen / Abwesenheit erfassen:
+                            </span>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                              {/* Option 1: Schüler abwesend */}
+                              <button
+                                type="button"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  const sName = occ?.student ? `${occ.student.first_name} ${maskLastName(occ.student.last_name, showRealNames)}`.trim() : 'Schüler';
+                                  if (await showConfirm(`Möchtest du ${sName} für diesen Termin als abwesend markieren?`)) {
+                                    updateOccurrence(editOccState.id, { status: 'cancelled', notes: '[Abwesend: Schüler]' }, `${sName} als abwesend markiert`);
+                                    setEditOccState(null);
+                                  }
+                                }}
+                                style={{
+                                  padding: '8px 6px',
+                                  borderRadius: '8px',
+                                  border: '1px solid #cbd5e1',
+                                  background: '#ffffff',
+                                  color: '#0f172a',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  transition: 'all 0.15s'
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.borderColor = '#94a3b8'}
+                                onMouseLeave={e => e.currentTarget.style.borderColor = '#cbd5e1'}
+                                title="Schüler ist verhindert / abwesend"
+                              >
+                                <Users size={15} color="#475569" />
+                                <span>Schüler abwesend</span>
+                              </button>
 
-                            {/* Option 3: Schulausfall / Feiertag */}
+                              {/* Option 2: Lehrkraft abwesend */}
+                              <button
+                                type="button"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (await showConfirm('Möchtest du deine Abwesenheit für diesen Termin erfassen? (Ersatztermin fällig)')) {
+                                    updateOccurrence(editOccState.id, { status: 'cancelled', notes: '[Abwesend: Lehrkraft]' }, 'Lehrkraft als abwesend markiert');
+                                    setEditOccState(null);
+                                  }
+                                }}
+                                style={{
+                                  padding: '8px 6px',
+                                  borderRadius: '8px',
+                                  border: '1px solid #cbd5e1',
+                                  background: '#ffffff',
+                                  color: '#0f172a',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  transition: 'all 0.15s'
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.borderColor = '#94a3b8'}
+                                onMouseLeave={e => e.currentTarget.style.borderColor = '#cbd5e1'}
+                                title="Lehrkraft ist verhindert / abwesend"
+                              >
+                                <UserCheck size={15} color="#475569" />
+                                <span>Lehrkraft abwesend</span>
+                              </button>
+
+                              {/* Option 3: Schulausfall / Feiertag */}
+                              <button
+                                type="button"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (await showConfirm('Möchtest du diesen Termin als Schulausfall / Feiertag erfassen?')) {
+                                    updateOccurrence(editOccState.id, { status: 'cancelled', notes: '[Abwesend: Schulausfall]' }, 'Schulausfall / Feiertag markiert');
+                                    setEditOccState(null);
+                                  }
+                                }}
+                                style={{
+                                  padding: '8px 6px',
+                                  borderRadius: '8px',
+                                  border: '1px solid #cbd5e1',
+                                  background: '#ffffff',
+                                  color: '#0f172a',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  transition: 'all 0.15s'
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.borderColor = '#94a3b8'}
+                                onMouseLeave={e => e.currentTarget.style.borderColor = '#cbd5e1'}
+                                title="Schule geschlossen / Feiertag"
+                              >
+                                <Scale size={15} color="#475569" />
+                                <span>Schulausfall</span>
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                            <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                              Termin ist aktuell als abwesend / abgesagt erfasst.
+                            </span>
                             <button
                               type="button"
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                if (await showConfirm('Möchtest du diesen Termin als Schulausfall / Feiertag erfassen?')) {
-                                  updateOccurrence(editOccState.id, { status: 'cancelled', notes: '[Abwesend: Schulausfall]' }, 'Schulausfall / Feiertag markiert');
-                                  setEditOccState(null);
-                                }
+                              onClick={async () => {
+                                updateOccurrence(editOccState.id, { status: 'scheduled', notes: '' }, 'Termin reaktiviert');
+                                setEditOccState(null);
                               }}
                               style={{
-                                padding: '8px 6px',
+                                background: '#22c55e',
+                                color: '#ffffff',
+                                border: 'none',
                                 borderRadius: '8px',
-                                border: '1px solid #cbd5e1',
-                                background: '#ffffff',
-                                color: '#0f172a',
-                                fontSize: '0.74rem',
-                                fontWeight: 700,
+                                padding: '6px 12px',
+                                fontSize: '0.76rem',
+                                fontWeight: 800,
                                 cursor: 'pointer',
                                 display: 'flex',
-                                flexDirection: 'column',
                                 alignItems: 'center',
-                                gap: '3px',
-                                transition: 'all 0.15s'
+                                gap: '4px'
                               }}
-                              onMouseEnter={e => e.currentTarget.style.borderColor = '#94a3b8'}
-                              onMouseLeave={e => e.currentTarget.style.borderColor = '#cbd5e1'}
-                              title="Schule geschlossen / Feiertag"
                             >
-                              <Scale size={15} color="#475569" />
-                              <span>Schulausfall</span>
+                              <RefreshCw size={12} />
+                              <span>Reaktivieren</span>
                             </button>
                           </div>
-                        </div>
-                      ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                          <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
-                            Termin ist aktuell als abwesend / abgesagt erfasst.
-                          </span>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              updateOccurrence(editOccState.id, { status: 'scheduled', notes: '' }, 'Termin reaktiviert');
-                              setEditOccState(null);
-                            }}
-                            style={{
-                              background: '#22c55e',
-                              color: '#ffffff',
-                              border: 'none',
-                              borderRadius: '8px',
-                              padding: '6px 12px',
-                              fontSize: '0.76rem',
-                              fontWeight: 800,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                          >
-                            <RefreshCw size={12} />
-                            <span>Reaktivieren</span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Left Column Action Footer Buttons */}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, checkSupabaseConnection } from '../lib/supabase';
+import { secureVault } from '../utils/secureVault';
 import { storeBlob, getBlob, deleteBlob } from '../utils/blobStorage';
 import { computePeaksFromArrayBuffer } from '../utils/waveformHelper';
 import { validateMediaBlob } from '../utils/mediaSecurityValidator';
@@ -282,6 +283,17 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       });
     }
   }, [initialUser, studentId]);
+
+  // 🛡️ Speculative SWR Fast-Path: Instantly recover profile from secureVault if initialUser is not available (0ms paint)
+  useEffect(() => {
+    if (!studentUser && studentId) {
+      secureVault.get<any>(`cg_secure_vault_user_${studentId}`).then((cached) => {
+        if (cached) {
+          setStudentUser((prev: any) => prev || cached);
+        }
+      });
+    }
+  }, [studentId, studentUser]);
 
   const currentPlatform: 'campus' | 'groovelab' = parentActiveTab === 'campus' ? 'campus' : (parentActiveTab === 'groovelab' ? 'groovelab' : ((typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'campus') === 'groovelab' ? 'groovelab' : 'campus'));
 
@@ -2359,6 +2371,24 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const [rawScheduleOccurrences, setRawScheduleOccurrences] = useState<any[]>([]);
   const [roomBookings, setRoomBookings] = useState<any[]>([]);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
+  const [isOfflineScheduleActive, setIsOfflineScheduleActive] = useState<boolean>(false);
+  const [carrierGhostingDetected, setCarrierGhostingDetected] = useState<boolean>(false);
+  const [vaultLastSyncedAt, setVaultLastSyncedAt] = useState<number | null>(null);
+
+  // 🛡️ Speculative SWR Fast-Path: Instantly load cached schedule & room bookings from secureVault (0ms paint)
+  useEffect(() => {
+    if (!studentId) return;
+    secureVault.get<{ occurrences: any[]; schedules: any[]; roomBookings?: any[]; timestamp: number }>(`cg_secure_vault_schedule_${studentId}`).then((cached) => {
+      if (cached && Array.isArray(cached.occurrences) && cached.occurrences.length > 0) {
+        setRawScheduleOccurrences((prev) => prev.length === 0 ? cached.occurrences : prev);
+        if (cached.roomBookings && Array.isArray(cached.roomBookings)) {
+          setRoomBookings((prev) => prev.length === 0 ? cached.roomBookings! : prev);
+        }
+        setIsOfflineScheduleActive(true);
+        if (cached.timestamp) setVaultLastSyncedAt(cached.timestamp);
+      }
+    });
+  }, [studentId]);
   const [rawSchoolYearOccurrences, setRawSchoolYearOccurrences] = useState<any[]>([]);
   const [loadingSchoolYearSchedule, setLoadingSchoolYearSchedule] = useState(false);
   const [appointmentFilter, setAppointmentFilter] = useState<'all' | 'upcoming' | 'past'>('upcoming');
@@ -2419,7 +2449,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     return (rawSchoolYearOccurrences || [])
       .filter((occ: any) => {
         const s = String(occ.status || '').toLowerCase();
-        return s === 'cancelled' || s === 'canceled_by_student' || s === 'canceled' || s === 'teacher_sick' || s === 'canceled_by_teacher_sick' || s === 'absent';
+        return s === 'cancelled' || s === 'canceled_by_student' || s === 'canceled' || s === 'teacher_ausfall' || s === 'canceled_by_teacher_ausfall' || s === 'absent';
       })
       .sort((a, b) => {
         if (b.date !== a.date) return b.date.localeCompare(a.date);
@@ -2830,8 +2860,40 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       });
 
       setRawScheduleOccurrences(mergedList);
-    } catch (err) {
-      console.error('Error fetching student schedule:', err);
+      setIsOfflineScheduleActive(false);
+      setCarrierGhostingDetected(false);
+
+      // 🛡️ Vault Sync: Encrypt and persist schedule data in secureVault
+      if (mergedList.length > 0 && studentId) {
+        const nowTs = Date.now();
+        setVaultLastSyncedAt(nowTs);
+        secureVault.set(`cg_secure_vault_schedule_${studentId}`, {
+          occurrences: mergedList,
+          schedules: schedules || [],
+          roomBookings: roomBookings || [],
+          timestamp: nowTs
+        });
+      }
+    } catch (err: any) {
+      console.warn('[Schedule] Network fetch failed (e.g. 5G carrier stall). Activating secureVault fallback:', err);
+      // L2/L7 Carrier Ghosting Diagnostic Probe
+      checkSupabaseConnection(2500).then((diag) => {
+        if (diag.carrierGhosting) {
+          setCarrierGhostingDetected(true);
+        }
+      });
+      // Fallback: Read from secureVault if not already active
+      try {
+        const cached = await secureVault.get<{ occurrences: any[]; schedules: any[]; roomBookings?: any[]; timestamp: number }>(`cg_secure_vault_schedule_${studentId}`);
+        if (cached && Array.isArray(cached.occurrences) && cached.occurrences.length > 0) {
+          setRawScheduleOccurrences(cached.occurrences);
+          if (cached.roomBookings && Array.isArray(cached.roomBookings)) {
+            setRoomBookings(cached.roomBookings);
+          }
+          setIsOfflineScheduleActive(true);
+          if (cached.timestamp) setVaultLastSyncedAt(cached.timestamp);
+        }
+      } catch (_) {}
     } finally {
       setLoadingSchedule(false);
     }
@@ -4998,6 +5060,15 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     }
   });
 
+  // 🛡️ Tier-1 Forensic Memory Hygiene: Revoke junior recorded blob URL to prevent browser heap retention
+  useEffect(() => {
+    return () => {
+      if (juniorRecordedUrl) {
+        URL.revokeObjectURL(juniorRecordedUrl);
+      }
+    };
+  }, [juniorRecordedUrl]);
+
   useEffect(() => {
     if (!studentId) return;
     const reloadLocalRecordings = () => {
@@ -5737,6 +5808,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       setJuniorActivePlayingAudioId(recId);
       audio.play().catch(e => console.warn('Audio play error:', e));
       audio.onended = () => {
+        if (playableUrl && playableUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(playableUrl);
+        }
         setJuniorActivePlayingAudioId(null);
         juniorAudioPlayerRef.current = null;
       };
@@ -11026,8 +11100,24 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           .eq('user_id', studentId)
       ]);
 
-      if (userRes.error) throw userRes.error;
-      const user: any = userRes.data;
+      let user: any = userRes?.data;
+      if (userRes?.error || !user) {
+        console.warn('[StudentDashboard] userRes error or empty. Checking secureVault for studentId:', studentId, userRes?.error);
+        try {
+          const cachedUser = await secureVault.get<any>(`cg_secure_vault_user_${studentId}`);
+          if (cachedUser) {
+            user = cachedUser;
+            console.info('[StudentDashboard] Recovered user from secureVault fallback.');
+          } else if (initialUser) {
+            user = initialUser;
+          } else if (userRes?.error) {
+            throw userRes.error;
+          }
+        } catch (vaultErr) {
+          if (initialUser) user = initialUser;
+          else if (userRes?.error) throw userRes.error;
+        }
+      }
       if (!user) return;
 
       if (user.schools) {
@@ -11097,6 +11187,9 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       }
 
       setStudentUser(user);
+      if (studentId) {
+        secureVault.set(`cg_secure_vault_user_${studentId}`, user);
+      }
       if (onProfileUpdate) {
         try {
           onProfileUpdate({
@@ -14007,6 +14100,21 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       <StudentBriefingTab
         studentId={studentId}
         assignedCampusSongs={assignedCampusSongs}
+        isOfflineScheduleActive={isOfflineScheduleActive}
+        carrierGhostingDetected={carrierGhostingDetected}
+        onRefreshConnection={() => {
+          setLoadingSchedule(true);
+          checkSupabaseConnection(3000).then((diag) => {
+            if (diag.online) {
+              setCarrierGhostingDetected(false);
+              fetchSchedule();
+              fetchStudentAndAvatar(true);
+            } else {
+              setCarrierGhostingDetected(diag.carrierGhosting);
+              setLoadingSchedule(false);
+            }
+          });
+        }}
         DEFAULT_FOKUS_LEVELS={DEFAULT_FOKUS_LEVELS}
         activeSongSkills={activeSongSkills}
         activeTab={activeTab}

@@ -4253,7 +4253,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                           </span>
                           {(() => {
                             const occStatus = String(occObj?.status || 'scheduled').toLowerCase();
-                            const isCurrentlyCancelled = ['cancelled', 'canceled_by_student', 'canceled', 'teacher_sick', 'canceled_by_teacher_sick'].includes(occStatus);
+                            const isCurrentlyCancelled = ['cancelled', 'canceled_by_student', 'canceled', 'teacher_ausfall', 'canceled_by_teacher_ausfall'].includes(occStatus);
                             
                             const isReactivated = !isCurrentlyCancelled && (
                               (currentTab.messages || []).some((m: any) => 
