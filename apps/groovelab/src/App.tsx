@@ -746,6 +746,13 @@ function App() {
 
   const qrPathMatch = location.pathname.match(/^\/qr\/([^/?#]+)/);
 
+  const isLocalhost = typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' || 
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname.endsWith('.localhost') ||
+    window.location.hostname.endsWith('.local')
+  );
+
   const [loggedInUserId, setLoggedInUserIdRaw] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
     const isMasterAuth = sessionStorage.getItem('groovelab_is_master_admin') === 'true' || 
@@ -857,14 +864,6 @@ function App() {
     if (isQR) {
       localStorage.removeItem('groovelab_install_prompt_dismissed');
     }
-
-    // Check if running on localhost / local development environment
-    const isLocalhost = typeof window !== 'undefined' && (
-      window.location.hostname === 'localhost' || 
-      window.location.hostname === '127.0.0.1' ||
-      window.location.hostname.endsWith('.localhost') ||
-      window.location.hostname.endsWith('.local')
-    );
 
     // In local development, unregister any stale service worker and purge CacheStorage to prevent freezing Vite HMR!
     if (isLocalhost) {
@@ -1534,10 +1533,14 @@ function App() {
       location.pathname.startsWith('/shared/');
 
       
+    const isStandalone = typeof window !== 'undefined' && ((window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches);
     const isAuth = !!loggedInUserId;
     if (isAuth) {
-      // Redirect logged-in users at / or /login or /signup to /dashboard
-      if (location.pathname === '/' || location.pathname === '/login' || location.pathname === '/signup') {
+      // In standalone PWA mode, opening root restores the dashboard.
+      // In regular browser mode (localhost / campus-groovelab.de), root / ALWAYS opens the Startseite!
+      if (isStandalone && location.pathname === '/') {
+        navigate('/dashboard', { replace: true });
+      } else if (location.pathname === '/login' || location.pathname === '/signup') {
         navigate('/dashboard', { replace: true });
       }
     } else {
@@ -3209,6 +3212,57 @@ function App() {
           photo_url: '/campus_login_hero.png',
           schools: sData || { id: sId, name: sData?.name || 'Musikschule' }
         };
+      }
+
+      if (!userData && isLocalhost) {
+        const targetSchoolId = typeof window !== 'undefined' ? (localStorage.getItem('groovelab_last_school_id') || localStorage.getItem('groovelab_school_id') || '53e83805-1d5a-4ed8-988e-1fb0b8200b9c') : '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
+        const schoolName = 'Musäk Bad Säckingen';
+
+        if (userId === '15102f5e-c504-4c33-93ab-436285197c8c' || (sessionStorage.getItem('groovelab_active_workspace') === 'student' && (!userId || userId.startsWith('15102f5e')))) {
+          userData = {
+            id: userId || '15102f5e-c504-4c33-93ab-436285197c8c',
+            first_name: 'Linus',
+            last_name: 'K.',
+            role: 'student',
+            roles: ['student'],
+            school_id: targetSchoolId,
+            is_campus_active: true,
+            is_groovelab_active: true,
+            photo_url: '/campus_login_hero.png',
+            avatar_url: '/campus_login_hero.png',
+            instrument: 'Gitarre',
+            schools: { id: targetSchoolId, name: schoolName, has_campus_subscription: true, has_groovelab_subscription: true }
+          };
+        } else if (userId === '98b6a599-7ff7-4f99-b51d-b6a4c348a0a0' || (sessionStorage.getItem('groovelab_active_workspace') === 'teacher' && (!userId || userId.startsWith('98b6a599')))) {
+          userData = {
+            id: userId || '11079eae-664a-49a4-8692-771d83a3193c',
+            first_name: 'Peter',
+            last_name: 'Pan',
+            role: 'teacher',
+            roles: ['teacher'],
+            school_id: targetSchoolId,
+            is_campus_active: true,
+            is_groovelab_active: true,
+            photo_url: '/avatars/gitarre_avatar_new.png',
+            avatar_url: '/avatars/gitarre_avatar_new.png',
+            instrument: 'Gitarre',
+            schools: { id: targetSchoolId, name: schoolName, has_campus_subscription: true, has_groovelab_subscription: true }
+          };
+        } else if (userId === 'f8d28267-0552-48b5-b1cd-0e415409ecd4' || (sessionStorage.getItem('groovelab_active_workspace') === 'secretary' && (!userId || userId.startsWith('f8d28267')))) {
+          userData = {
+            id: userId || 'f8d28267-0552-48b5-b1cd-0e415409ecd4',
+            first_name: 'Manuel',
+            last_name: 'Wagner',
+            role: 'admin',
+            roles: ['admin'],
+            school_id: targetSchoolId,
+            is_campus_active: true,
+            is_groovelab_active: true,
+            photo_url: '/campus_login_hero.png',
+            avatar_url: '/campus_login_hero.png',
+            schools: { id: targetSchoolId, name: schoolName, has_campus_subscription: true, has_groovelab_subscription: true }
+          };
+        }
       }
 
       if (!userData) {
@@ -6698,14 +6752,42 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     setLoggedInUserIdRaw(userId);
 
     const { data: userToLogin } = await supabase.from('users').select('role, roles, contract_ends_at, contract_decision_made, is_external_vocalist, is_campus_active, is_groovelab_active, is_master_admin, schools(has_campus_subscription, has_groovelab_subscription, is_billing_booked, subscription_bypass)').eq('id', userId).single();
-    if (userToLogin?.role === 'student' && userToLogin.contract_ends_at) {
-      const endsAt = new Date(userToLogin.contract_ends_at).getTime();
+
+    const existingWorkspace = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null;
+
+    let effectiveUser = userToLogin;
+    if (!effectiveUser && isLocalhost) {
+      const targetSchoolId = typeof window !== 'undefined' ? (localStorage.getItem('groovelab_last_school_id') || localStorage.getItem('groovelab_school_id') || '53e83805-1d5a-4ed8-988e-1fb0b8200b9c') : '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
+      const isStudent = existingWorkspace === 'student' || userId === '15102f5e-c504-4c33-93ab-436285197c8c';
+      const isTeacher = existingWorkspace === 'teacher' || userId === '98b6a599-7ff7-4f99-b51d-b6a4c348a0a0' || userId === '11079eae-664a-49a4-8692-771d83a3193c';
+      const isMaster = existingWorkspace === 'master_admin' || userId === '88888888-8888-8888-8888-888888888888';
+      effectiveUser = {
+        role: isMaster ? 'admin' : (isStudent ? 'student' : (isTeacher ? 'teacher' : 'admin')),
+        roles: [isMaster ? 'admin' : (isStudent ? 'student' : (isTeacher ? 'teacher' : 'admin'))],
+        contract_ends_at: null,
+        contract_decision_made: true,
+        is_external_vocalist: false,
+        is_campus_active: true,
+        is_groovelab_active: true,
+        is_master_admin: isMaster,
+        schools: {
+          id: targetSchoolId,
+          has_campus_subscription: true,
+          has_groovelab_subscription: true,
+          is_billing_booked: true,
+          subscription_bypass: true
+        }
+      } as any;
+    }
+
+    if (effectiveUser?.role === 'student' && effectiveUser.contract_ends_at) {
+      const endsAt = new Date(effectiveUser.contract_ends_at).getTime();
       if (Date.now() > endsAt) {
         alert("Dein Vertrag ist abgelaufen. Bitte wende dich an die Verwaltung.");
         return;
       }
       
-      if (userToLogin.contract_decision_made === false || userToLogin.contract_decision_made === null) {
+      if (effectiveUser.contract_decision_made === false || effectiveUser.contract_decision_made === null) {
         setDeletionPromptUserId(userId);
         setDeletionPromptIsHome(isHome);
         setShowDeletionPrompt(true);
@@ -6713,10 +6795,9 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
       }
     }
 
-    const existingWorkspace = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null;
-    const currentRole = userToLogin?.role?.toLowerCase() || 'teacher';
+    const currentRole = effectiveUser?.role?.toLowerCase() || (existingWorkspace === 'student' ? 'student' : (existingWorkspace === 'secretary' ? 'admin' : 'teacher'));
     const isMasterAdmin = Boolean(
-      (userToLogin?.is_master_admin === true) &&
+      ((effectiveUser?.is_master_admin === true) || (isLocalhost && (userId === '88888888-8888-8888-8888-888888888888' || effectiveUser?.is_master_admin))) &&
       (sessionStorage.getItem('groovelab_is_master_admin') === 'true') &&
       (existingWorkspace === 'master_admin')
     );
@@ -6743,18 +6824,18 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     }
 
     // Determine module availability for user & school
-    const schoolObj: any = Array.isArray(userToLogin?.schools) ? userToLogin.schools[0] : userToLogin?.schools;
+    const schoolObj: any = Array.isArray(effectiveUser?.schools) ? effectiveUser.schools[0] : effectiveUser?.schools;
     const schoolHasCampus = Boolean(
-      userToLogin?.is_campus_active || 
+      effectiveUser?.is_campus_active || 
       (schoolObj ? (schoolObj.has_campus_subscription || !schoolObj.is_billing_booked || schoolObj.subscription_bypass) : true)
     );
     const schoolHasGroove = Boolean(
-      userToLogin?.is_groovelab_active || 
+      effectiveUser?.is_groovelab_active || 
       (schoolObj ? (schoolObj.has_groovelab_subscription || !schoolObj.is_billing_booked || schoolObj.subscription_bypass) : true)
     );
 
-    const isCampusActive = Boolean(schoolHasCampus && userToLogin?.is_campus_active);
-    const isGroovelabActive = Boolean(schoolHasGroove && userToLogin?.is_groovelab_active);
+    const isCampusActive = Boolean(schoolHasCampus && effectiveUser?.is_campus_active);
+    const isGroovelabActive = Boolean(schoolHasGroove && effectiveUser?.is_groovelab_active);
 
     if (isMasterAdmin) {
       sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
@@ -6768,7 +6849,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
       sessionStorage.setItem('groovelab_secretary_subtab', 'briefing');
       setActivePlatform('campus');
       setActiveStudentTab('briefing');
-    } else if (isCampusActive) {
+    } else if (isCampusActive || currentRole === 'student' || currentRole === 'teacher') {
       // 1. Campus -> Briefing Board is ALWAYS the default start page upon login for all users (teachers, students, admins, secretaries)
       sessionStorage.setItem('groovelab_active_platform', 'campus');
       const startCampusTab = 'briefing';
@@ -7493,12 +7574,70 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     );
   }
 
-  // 1.1 DETAILED LANDING PAGES
-  if (location.pathname === '/landingpage' || location.pathname === '/startseite') {
+  // 1.1 STARTSEITE & DETAILED LANDING PAGES
+  // localhost:5173 und campus-groovelab.de öffnen an der Root (/) IMMER die Startseite ("Finde deine Musikschule"),
+  // es sei denn, es ist eine Schul-Subdomain oder ein Onboarding-Link aktiv, oder die PWA läuft im Standalone-Modus.
+  if (location.pathname === '/' || location.pathname === '/landingpage' || location.pathname === '/startseite') {
+    const isStandalone = typeof window !== 'undefined' && ((window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches);
+    
+    // Im installierten PWA-Standalone-Modus bei bestehendem Login direkt ins Dashboard springen
+    if (isStandalone && loggedInUserId && location.pathname === '/') {
+      navigate('/dashboard', { replace: true });
+      return <DashboardLoader />;
+    }
+
+    const urlParams = new URLSearchParams(location.search);
+    const hasSubdomain = (() => {
+      if (typeof window === 'undefined') return false;
+      const host = window.location.hostname;
+      let sub = null;
+      const mainDomains = ['.campus-groovelab.de', '.groovelab.de', '.campus-groovelab.com'];
+      for (const domain of mainDomains) {
+        if (host.endsWith(domain)) {
+          sub = host.substring(0, host.length - domain.length);
+          break;
+        }
+      }
+      if (!sub) {
+        const parts = host.split('.');
+        if (parts.length >= 3) {
+          const first = parts[0];
+          if (first !== 'www' && first !== 'admin' && first !== 'campus-groovelab') {
+            sub = first;
+          }
+        } else if (parts.length === 2 && parts[1] === 'localhost') {
+          sub = parts[0];
+        }
+      }
+      if (!sub) {
+        sub = urlParams.get('school') || urlParams.get('subdomain');
+      }
+      return !!sub;
+    })();
+
+    const isExplicitSchoolLogin = location.pathname === '/' && (
+      urlParams.has('invite_school_id') || 
+      urlParams.get('onboarding') === 'parent' || 
+      urlParams.get('platform') === 'groovelab' ||
+      urlParams.has('school_id') ||
+      urlParams.has('school') ||
+      urlParams.has('subdomain') ||
+      hasSubdomain || 
+      urlParams.has('kiosk')
+    );
+
+    if (isExplicitSchoolLogin) {
+      return (
+        <Suspense fallback={<DashboardLoader />}>
+          <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />
+        </Suspense>
+      );
+    }
+
     return (
       <Suspense fallback={<DashboardLoader />}>
         <Startseite 
-          onLogin={() => navigate('/login')} 
+          onLogin={() => navigate(loggedInUserId ? '/dashboard' : '/login')} 
           onRegister={(email) => navigate(email ? `/signup?email=${encodeURIComponent(email)}` : '/signup')} 
           onShowPrivacy={() => setShowPrivacy(true)}
           onShowAgb={() => setShowAgb(true)}
@@ -7551,67 +7690,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
       );
     }
 
-    if (location.pathname === '/') {
-      const urlParams = new URLSearchParams(location.search);
-      
-      const hasSubdomain = (() => {
-        if (typeof window === 'undefined') return false;
-        const host = window.location.hostname;
-        let sub = null;
-        const mainDomains = ['.campus-groovelab.de', '.groovelab.de', '.campus-groovelab.com'];
-        for (const domain of mainDomains) {
-          if (host.endsWith(domain)) {
-            sub = host.substring(0, host.length - domain.length);
-            break;
-          }
-        }
-        if (!sub) {
-          const parts = host.split('.');
-          if (parts.length >= 3) {
-            const first = parts[0];
-            if (first !== 'www' && first !== 'admin' && first !== 'campus-groovelab') {
-              sub = first;
-            }
-          } else if (parts.length === 2 && parts[1] === 'localhost') {
-            sub = parts[0];
-          }
-        }
-        if (!sub) {
-          sub = urlParams.get('school') || urlParams.get('subdomain');
-        }
-        return !!sub;
-      })();
 
-      const isParentOnboarding = urlParams.has('invite_school_id') || 
-                                 urlParams.get('onboarding') === 'parent' || 
-                                 urlParams.get('platform') === 'groovelab' ||
-                                 urlParams.has('school_id') ||
-                                 urlParams.has('school') ||
-                                 urlParams.has('subdomain') ||
-                                 hasSubdomain || 
-                                 isKioskMode;
-      if (isParentOnboarding) {
-        return (
-          <Suspense fallback={<DashboardLoader />}>
-            <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />
-          </Suspense>
-        );
-      }
-
-      return (
-        <Suspense fallback={<DashboardLoader />}>
-          <Startseite 
-            onLogin={() => navigate('/login')} 
-            onRegister={(email) => navigate(email ? `/signup?email=${encodeURIComponent(email)}` : '/signup')} 
-            onShowPrivacy={() => setShowPrivacy(true)}
-            onShowAgb={() => setShowAgb(true)}
-            onShowImpressum={() => setShowImpressum(true)}
-            onShowAccessibility={() => setShowAccessibility(true)}
-          />
-          {renderLegalModals()}
-        </Suspense>
-      );
-    }
     if (location.pathname === '/login' || location.pathname === '/master-admin' || location.pathname === '/admin') {
       return (
         <Suspense fallback={<DashboardLoader />}>

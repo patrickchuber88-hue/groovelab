@@ -38,11 +38,16 @@ export const Startseite: React.FC<StartseiteProps> = ({
 
   // Read last visited school for 1-click shortcut
   const [lastVisitedSchoolId, setLastVisitedSchoolId] = useState<string | null>(null);
+  const [hasActiveSession, setHasActiveSession] = useState(false);
 
   useEffect(() => {
     try {
       const lastId = localStorage.getItem('groovelab_last_school_id');
       if (lastId) setLastVisitedSchoolId(lastId);
+      const activeId = localStorage.getItem('groovelab_user_id') || 
+                       localStorage.getItem('campus_active_student_id') || 
+                       sessionStorage.getItem('groovelab_user_id');
+      if (activeId) setHasActiveSession(true);
     } catch (e) {}
   }, []);
 
@@ -246,13 +251,13 @@ export const Startseite: React.FC<StartseiteProps> = ({
 
       const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
       if (isLocalhost) {
-        window.location.href = `http://${window.location.hostname}:${window.location.port}/?school_id=${school.id}&subdomain=${school.subdomain || ''}&platform=${targetPlatform}`;
+        window.location.href = `${window.location.origin}/?school_id=${school.id}&subdomain=${school.subdomain || ''}&platform=${targetPlatform}`;
       } else if (school.subdomain) {
-        const baseDomain = window.location.hostname.replace('www.', ''); // e.g. campus-groovelab.de
+        const baseDomain = window.location.hostname.replace(/^www\./, ''); // e.g. campus-groovelab.de
         window.location.href = `${window.location.protocol}//${school.subdomain}.${baseDomain}/?school_id=${school.id}&platform=${targetPlatform}`;
       } else {
         // Schule ohne Subdomain: direkt mit school_id-Parameter auf der Hauptdomain anmelden
-        window.location.href = `${window.location.protocol}//${window.location.hostname}/?school_id=${school.id}&platform=${targetPlatform}`;
+        window.location.href = `${window.location.origin}/?school_id=${school.id}&platform=${targetPlatform}`;
       }
     }
   };
@@ -470,6 +475,50 @@ export const Startseite: React.FC<StartseiteProps> = ({
         boxSizing: 'border-box'
       }}
     >
+      {/* Quick Jump to Dashboard if logged in */}
+      {hasActiveSession && (
+        <button
+          type="button"
+          onClick={onLogin}
+          aria-label="Zum Dashboard wechseln"
+          style={{
+            position: 'absolute',
+            top: '20px',
+            right: '20px',
+            zIndex: 40,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 18px',
+            borderRadius: '100px',
+            background: 'rgba(52, 168, 83, 0.15)',
+            border: '1px solid rgba(52, 168, 83, 0.4)',
+            color: '#4ade80',
+            fontSize: '0.85rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.4)',
+            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            touchAction: 'manipulation',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(52, 168, 83, 0.25)';
+            e.currentTarget.style.borderColor = 'rgba(52, 168, 83, 0.6)';
+            e.currentTarget.style.transform = 'translateY(-1px)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(52, 168, 83, 0.15)';
+            e.currentTarget.style.borderColor = 'rgba(52, 168, 83, 0.4)';
+            e.currentTarget.style.transform = 'translateY(0)';
+          }}
+        >
+          <span>Zum Dashboard</span>
+          <ArrowRight size={15} />
+        </button>
+      )}
+
       {/* Dynamic background ambient glows */}
       <style>{`
         @keyframes float-glow-1 {

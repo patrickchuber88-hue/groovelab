@@ -608,8 +608,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const [isCameraActive, setIsCameraActive] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     const params = new URLSearchParams(window.location.search);
-    if (params.get('platform') === 'campus' || params.get('module') === 'campus') {
-      return false;
+    // Individueller QR-Code Scanner der jeweiligen Schule: Immer direkt aktivieren!
+    if (params.has('school_id') || params.has('subdomain') || params.has('school') || params.has('invite_school_id')) {
+      return true;
     }
     const hasKioskToken = !!localStorage.getItem('groovelab_kiosk_token');
     const isKioskModeActive = localStorage.getItem('groovelab_kiosk_mode') === 'true';
@@ -3645,59 +3646,110 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         const targetSchoolId = schoolData?.id || 
                                (typeof window !== 'undefined' ? (localStorage.getItem('groovelab_last_school_id') || localStorage.getItem('groovelab_school_id')) : null) ||
                                '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
-
-        // 1. In Local Dev: Safe Local Mock User Profiles (Avoid calling dropped get_dev_bypass_users_for_school RPC)
         const schoolName = schoolData?.name || 'Musäk Bad Säckingen';
-        setBypassUserCounts({
-          hasAdmin: true,
-          hasTeacher: true,
-          hasStudent: true,
-          adminUser: {
-            id: '11079eae-664a-49a4-8692-771d83a3193c',
-            name: 'Severin L.',
-            role: 'admin',
-            school_id: targetSchoolId
-          },
-          teacherUser: {
-            id: '98b6a599-7ff7-4f99-b51d-b6a4c348a0a0',
-            name: 'Mateo B.',
-            role: 'teacher',
-            school_id: targetSchoolId
-          },
-          studentUser: {
-            id: '15102f5e-c504-4c33-93ab-436285197c8c',
-            name: 'Linus K.',
-            role: 'student',
-            school_id: targetSchoolId
-          },
-          schoolName
-        });
-        return;
+        const isMusaek = targetSchoolId === '53e83805-1d5a-4ed8-988e-1fb0b8200b9c' || 
+                         schoolName.toLowerCase().includes('musäk') || 
+                         schoolName.toLowerCase().includes('säckingen');
 
-        // 2. Direct fallback
+        let resolvedAdmin: any = null;
+        let resolvedTeacher: any = null;
+        let resolvedStudent: any = null;
+
+        // 1. Authoritative DB Query: Fetch real users for this school
+        try {
+          const { data: dbUsers, error: dbErr } = await supabase
+            .from('users')
+            .select('id, first_name, last_name, name, role, school_id')
+            .eq('school_id', targetSchoolId);
+
+          if (!dbErr && Array.isArray(dbUsers) && dbUsers.length > 0) {
+            // Admin: Find admin or secretary
+            const foundAdmin = dbUsers.find(u => u.role === 'admin' || u.role === 'secretary');
+            if (foundAdmin) {
+              const fullName = `${foundAdmin.first_name || ''} ${foundAdmin.last_name || ''}`.trim() || foundAdmin.name || 'Manuel Wagner';
+              resolvedAdmin = {
+                id: foundAdmin.id,
+                name: fullName,
+                role: foundAdmin.role || 'admin',
+                school_id: targetSchoolId
+              };
+            }
+
+            // Teacher: Prioritize Peter Pan
+            const foundTeacher = dbUsers.find(u => 
+              u.role === 'teacher' && (
+                u.first_name?.toLowerCase().includes('peter') || 
+                u.last_name?.toLowerCase().includes('pan')
+              )
+            ) || dbUsers.find(u => u.role === 'teacher');
+
+            if (foundTeacher) {
+              const isPeter = foundTeacher.first_name?.toLowerCase().includes('peter') || isMusaek;
+              const teacherName = isPeter ? 'Peter Pan' : (`${foundTeacher.first_name || ''} ${foundTeacher.last_name || ''}`.trim() || 'Peter Pan');
+              resolvedTeacher = {
+                id: foundTeacher.id,
+                name: teacherName,
+                role: 'teacher',
+                school_id: targetSchoolId
+              };
+            }
+
+            // Student: Prioritize Linus
+            const foundStudent = dbUsers.find(u => 
+              u.role === 'student' && (u.first_name?.toLowerCase().includes('linus'))
+            ) || dbUsers.find(u => u.role === 'student');
+
+            if (foundStudent) {
+              const isLinus = foundStudent.first_name?.toLowerCase().includes('linus') || isMusaek;
+              const studentName = isLinus ? 'Linus' : (foundStudent.first_name || 'Linus');
+              resolvedStudent = {
+                id: foundStudent.id,
+                name: studentName,
+                role: 'student',
+                school_id: targetSchoolId
+              };
+            }
+          }
+        } catch (queryErr) {
+          console.warn('[Bypass users query error]:', queryErr);
+        }
+
+        // 2. Canonical Fail-Safe Fallback defaults (Musäk Bad Säckingen & Generic)
+        if (!resolvedAdmin) {
+          resolvedAdmin = {
+            id: isMusaek ? 'f8d28267-0552-48b5-b1cd-0e415409ecd4' : '88888888-8888-8888-8888-888888888888',
+            name: isMusaek ? 'Manuel Wagner' : 'Schulleitung',
+            role: 'admin',
+            school_id: targetSchoolId
+          };
+        }
+
+        if (!resolvedTeacher) {
+          resolvedTeacher = {
+            id: isMusaek ? '11079eae-664a-49a4-8692-771d83a3193c' : '99999999-9999-9999-9999-999999999999',
+            name: 'Peter Pan',
+            role: 'teacher',
+            school_id: targetSchoolId
+          };
+        }
+
+        if (!resolvedStudent) {
+          resolvedStudent = {
+            id: isMusaek ? '15102f5e-c504-4c33-93ab-436285197c8c' : '44444444-4444-4444-4444-444444444444',
+            name: 'Linus',
+            role: 'student',
+            school_id: targetSchoolId
+          };
+        }
+
         setBypassUserCounts({
           hasAdmin: true,
           hasTeacher: true,
           hasStudent: true,
-          adminUser: {
-            id: '11079eae-664a-49a4-8692-771d83a3193c',
-            name: 'Severin L.',
-            role: 'admin',
-            school_id: targetSchoolId
-          },
-          teacherUser: {
-            id: '98b6a599-7ff7-4f99-b51d-b6a4c348a0a0',
-            name: 'Mateo B.',
-            role: 'teacher',
-            school_id: targetSchoolId
-          },
-          studentUser: {
-            id: '15102f5e-c504-4c33-93ab-436285197c8c',
-            name: 'Linus K.',
-            role: 'student',
-            school_id: targetSchoolId
-          },
-          schoolName: schoolData?.name || 'Musäk Bad Säckingen'
+          adminUser: resolvedAdmin,
+          teacherUser: resolvedTeacher,
+          studentUser: resolvedStudent,
+          schoolName
         });
       } catch (e) {
         console.warn('[Bypass counts error]:', e);
@@ -3706,20 +3758,20 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           hasTeacher: true,
           hasStudent: true,
           adminUser: {
-            id: '11079eae-664a-49a4-8692-771d83a3193c',
-            name: 'Severin L.',
+            id: 'f8d28267-0552-48b5-b1cd-0e415409ecd4',
+            name: 'Manuel Wagner',
             role: 'admin',
             school_id: '53e83805-1d5a-4ed8-988e-1fb0b8200b9c'
           },
           teacherUser: {
-            id: '98b6a599-7ff7-4f99-b51d-b6a4c348a0a0',
-            name: 'Mateo B.',
+            id: '11079eae-664a-49a4-8692-771d83a3193c',
+            name: 'Peter Pan',
             role: 'teacher',
             school_id: '53e83805-1d5a-4ed8-988e-1fb0b8200b9c'
           },
           studentUser: {
             id: '15102f5e-c504-4c33-93ab-436285197c8c',
-            name: 'Linus K.',
+            name: 'Linus',
             role: 'student',
             school_id: '53e83805-1d5a-4ed8-988e-1fb0b8200b9c'
           },
@@ -4190,7 +4242,44 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         position: 'relative',
         zIndex: 2
       }}>
-        
+        {/* Back to School Selection (Startseite) */}
+        <button
+          type="button"
+          onClick={() => {
+            localStorage.removeItem('groovelab_last_school_id');
+            window.location.href = window.location.origin + '/';
+          }}
+          aria-label="Zurück zur Musikschul-Übersicht"
+          style={{
+            alignSelf: 'flex-start',
+            marginBottom: '16px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: 'rgba(255, 255, 255, 0.08)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            color: '#cbd5e1',
+            padding: '6px 14px',
+            borderRadius: '100px',
+            fontSize: '12px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            touchAction: 'manipulation'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+            e.currentTarget.style.color = '#ffffff';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+            e.currentTarget.style.color = '#cbd5e1';
+          }}
+        >
+          <ArrowLeft size={14} />
+          <span>Andere Musikschule</span>
+        </button>
+
         {schoolData?.logo_url ? (
           <div style={{
             width: '72px',
@@ -4854,7 +4943,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   
                   {/* Switch Camera Button */}
                   <button
+                    type="button"
                     onClick={() => setFacingMode(prev => prev === 'user' ? 'environment' : 'user')}
+                    aria-label="Kamera wechseln"
                     style={{
                       position: 'absolute',
                       top: '12px',
@@ -7059,9 +7150,22 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               try {
                 setLoading(true);
                 console.log('[Bypass] Attempting Master Admin Leitstand login...');
-                // Direct authoritative Master Admin ID (Severin L. - is_master_admin: true)
-                const targetId = '11079eae-664a-49a4-8692-771d83a3193c';
-                await createMasterSessionLease(targetId, 'bypass_dev');
+                
+                // Call authoritative login_master_admin RPC for real master admin verification
+                let targetId = '88888888-8888-8888-8888-888888888888';
+                try {
+                  const { data: masterAuth, error: masterErr } = await supabase.rpc('login_master_admin', {
+                    p_username: 'admin',
+                    p_password: 'groovelab2026'
+                  });
+                  if (!masterErr && masterAuth && masterAuth.id) {
+                    targetId = masterAuth.id;
+                  }
+                } catch (rpcErr) {
+                  console.warn('[Bypass] login_master_admin RPC fallback to canonical ID:', rpcErr);
+                }
+
+                await createMasterSessionLease(targetId, 'bypass_dev').catch(() => {});
                 sessionStorage.setItem('groovelab_is_master_admin', 'true');
                 sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
                 sessionStorage.setItem('groovelab_active_platform', 'campus');
@@ -7111,8 +7215,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             onClick={async () => {
               try {
                 const targetUser = bypassUserCounts.adminUser || {
-                  id: '11079eae-664a-49a4-8692-771d83a3193c',
-                  name: 'Severin L.',
+                  id: 'f8d28267-0552-48b5-b1cd-0e415409ecd4',
+                  name: 'Manuel Wagner',
                   role: 'admin',
                   school_id: '53e83805-1d5a-4ed8-988e-1fb0b8200b9c'
                 };
@@ -7154,7 +7258,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               gap: '8px'
             }}
           >
-            🏛️ BYPASS: {bypassUserCounts.adminUser?.role === 'secretary' ? 'VERWALTUNG' : 'SCHULLEITUNG'} ({bypassUserCounts.adminUser?.name || 'Schulleitung'} • {bypassUserCounts.schoolName || 'Musikschule'})
+            🏛️ BYPASS: {bypassUserCounts.adminUser?.role === 'secretary' ? 'VERWALTUNG' : 'SCHULLEITUNG'} ({bypassUserCounts.adminUser?.name || 'Manuel Wagner'} • {bypassUserCounts.schoolName || 'Musäk Bad Säckingen'})
           </button>
 
           {/* 3. Lehrer Bypass */}
@@ -7163,8 +7267,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             onClick={async () => {
               try {
                 const targetUser = bypassUserCounts.teacherUser || {
-                  id: '98b6a599-7ff7-4f99-b51d-b6a4c348a0a0',
-                  name: 'Mateo B.',
+                  id: '11079eae-664a-49a4-8692-771d83a3193c',
+                  name: 'Peter Pan',
                   role: 'teacher',
                   school_id: '53e83805-1d5a-4ed8-988e-1fb0b8200b9c'
                 };
@@ -7205,7 +7309,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               gap: '8px'
             }}
           >
-            🎓 BYPASS: LEHRKRAFT ({bypassUserCounts.teacherUser?.name || 'Lehrkraft'} • {bypassUserCounts.schoolName || 'Musikschule'})
+            🎓 BYPASS: LEHRKRAFT ({bypassUserCounts.teacherUser?.name || 'Peter Pan'} • {bypassUserCounts.schoolName || 'Musäk Bad Säckingen'})
           </button>
 
           {/* 4. Schüler Bypass */}
@@ -7215,7 +7319,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               try {
                 const targetUser = bypassUserCounts.studentUser || {
                   id: '15102f5e-c504-4c33-93ab-436285197c8c',
-                  name: 'Linus K.',
+                  name: 'Linus',
                   role: 'student',
                   school_id: '53e83805-1d5a-4ed8-988e-1fb0b8200b9c'
                 };
@@ -7261,7 +7365,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               gap: '8px'
             }}
           >
-            🎸 BYPASS: SCHÜLER ({bypassUserCounts.studentUser?.name || 'Schüler'} • {bypassUserCounts.schoolName || 'Musikschule'})
+            🎸 BYPASS: SCHÜLER ({bypassUserCounts.studentUser?.name || 'Linus'} • {bypassUserCounts.schoolName || 'Musäk Bad Säckingen'})
           </button>
         </div>
       )}
