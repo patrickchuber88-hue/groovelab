@@ -2803,7 +2803,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               </div>
               <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#e2e8f0', marginTop: '8px' }}>
                 {effectiveUiLevel === 'junior'
-                  ? (bpm <= 70 ? '🐢 Leo (Gemütlich)' : bpm <= 110 ? '🐕 Bello (Flott)' : bpm <= 150 ? '🐇 Flitzi (Schnell)' : '🐆 Cheetah (Rakete)')
+                  ? (bpm <= 75 ? '🐢 Leo (Gemütlich)' : bpm <= 110 ? '🐕 Bello (Spazieren)' : bpm <= 155 ? '🐇 Flitzi (Schwungvoll)' : '🐆 Gepard (Turbo)')
                   : (bpm < 60 ? 'Largo' : bpm < 76 ? 'Adagio' : bpm < 108 ? 'Andante' : bpm < 120 ? 'Moderato' : bpm < 168 ? 'Allegro' : 'Presto')}
               </span>
             </div>
@@ -3346,6 +3346,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
           gap: '12px',
           boxShadow: '0 8px 28px rgba(0, 0, 0, 0.04)',
           height: '100%',
+          overflowY: 'auto',
           boxSizing: 'border-box'
         }}>
           <div style={{ width: '100%', maxWidth: '400px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -3396,281 +3397,503 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 type="button"
                 onClick={() => setIsStageView(true)}
                 style={{
-                  background: '#f8fafc',
-                  border: '1px solid #cbd5e1',
+                  background: 'linear-gradient(135deg, #fefce8 0%, #fef08a 100%)',
+                  border: '1.5px solid #facc15',
                   borderRadius: '10px',
-                  padding: '6px 11px',
-                  fontSize: '0.72rem',
-                  fontWeight: 850,
-                  color: '#334155',
+                  padding: '6px 12px',
+                  fontSize: '0.74rem',
+                  fontWeight: 900,
+                  color: '#854d0e',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '5px',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                  boxShadow: '0 2px 8px rgba(234, 179, 8, 0.25)',
                   transition: 'all 0.15s ease'
                 }}
                 title="Notenständer-Großansicht"
               >
-                <Maximize2 size={13} />
+                <Maximize2 size={13} strokeWidth={2.5} />
                 <span>Notenständer</span>
               </button>
             </div>
           </div>
 
-          {/* Visualizer Container: Teen Pulsing Wave-Ring OR Junior/Pro Mechanical Metronome */}
-          {effectiveUiLevel === 'teen' ? (
+          {/* 🎙️ Side-by-Side Studio-Bühne: Metronom-Visualizer (links) & Apple-Style Tempo-Cockpit (rechts) */}
+          <div style={{
+            width: '100%',
+            maxWidth: '400px',
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: '20px',
+            padding: '10px 12px',
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)'
+          }}>
+            {/* Linke Zelle: Visualizer (Teen Wave-Ring oder Nussbaum-Metronom) */}
             <div style={{
-              position: 'relative',
-              width: '135px',
-              height: '160px',
+              width: '124px',
+              height: '144px',
               display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              margin: '0'
+              flexShrink: 0,
+              position: 'relative'
             }}>
-              <div style={{
-                position: 'absolute',
-                width: isPlaying ? '128px' : '90px',
-                height: isPlaying ? '128px' : '90px',
-                borderRadius: '50%',
-                border: '2px solid rgba(234, 179, 8, 0.45)',
-                transform: isPlaying ? 'scale(1.12)' : 'scale(1)',
-                opacity: isPlaying ? 0.85 : 0.25,
-                transition: 'all 0.12s ease-out'
-              }} />
-              <div style={{
-                position: 'absolute',
-                width: isPlaying ? '102px' : '78px',
-                height: isPlaying ? '102px' : '78px',
-                borderRadius: '50%',
-                background: 'radial-gradient(circle, rgba(250, 204, 21, 0.3) 0%, transparent 70%)',
-                border: '1.5px solid rgba(234, 179, 8, 0.7)',
-                transform: isPlaying ? 'scale(1.06)' : 'scale(1)',
-                transition: 'all 0.1s ease-out'
-              }} />
-              <div style={{
-                width: '74px',
-                height: '74px',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-                border: '2px solid #eab308',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: isPlaying ? '0 0 20px rgba(234, 179, 8, 0.55)' : '0 4px 10px rgba(0,0,0,0.15)',
-                zIndex: 2
-              }}>
-                <Activity size={24} color="#facc15" style={{ transform: isPlaying ? 'scale(1.15)' : 'scale(1)', transition: 'transform 0.08s' }} />
-                <span style={{ fontSize: '0.56rem', fontWeight: 900, color: '#facc15', letterSpacing: '0.04em', marginTop: '2px' }}>
-                  {isPlaying ? 'IM TAKT' : 'BEREIT'}
+              {effectiveUiLevel === 'teen' ? (
+                <div style={{
+                  position: 'relative',
+                  width: '116px',
+                  height: '136px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <div style={{
+                    position: 'absolute',
+                    width: isPlaying ? '112px' : '78px',
+                    height: isPlaying ? '112px' : '78px',
+                    borderRadius: '50%',
+                    border: '2px solid rgba(234, 179, 8, 0.45)',
+                    transform: isPlaying ? 'scale(1.12)' : 'scale(1)',
+                    opacity: isPlaying ? 0.85 : 0.25,
+                    transition: 'all 0.12s ease-out'
+                  }} />
+                  <div style={{
+                    position: 'absolute',
+                    width: isPlaying ? '90px' : '66px',
+                    height: isPlaying ? '90px' : '66px',
+                    borderRadius: '50%',
+                    background: 'radial-gradient(circle, rgba(250, 204, 21, 0.3) 0%, transparent 70%)',
+                    border: '1.5px solid rgba(234, 179, 8, 0.7)',
+                    transform: isPlaying ? 'scale(1.06)' : 'scale(1)',
+                    transition: 'all 0.1s ease-out'
+                  }} />
+                  <div style={{
+                    width: '64px',
+                    height: '64px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                    border: '2px solid #eab308',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: isPlaying ? '0 0 18px rgba(234, 179, 8, 0.55)' : '0 4px 10px rgba(0,0,0,0.15)',
+                    zIndex: 2
+                  }}>
+                    <Activity size={20} color="#facc15" style={{ transform: isPlaying ? 'scale(1.15)' : 'scale(1)', transition: 'transform 0.08s' }} />
+                    <span style={{ fontSize: '0.52rem', fontWeight: 900, color: '#facc15', letterSpacing: '0.04em', marginTop: '2px' }}>
+                      {isPlaying ? 'IM TAKT' : 'BEREIT'}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                /* Mechanical Metronome Container */
+                <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <style>{`
+                    @keyframes swing-anim {
+                      0% { transform: rotate(-12deg); }
+                      100% { transform: rotate(12deg); }
+                    }
+                    @keyframes rotate-key {
+                      0% { transform: rotate(0deg); }
+                      100% { transform: rotate(360deg); }
+                    }
+                  `}</style>
+
+                  <svg width="118" height="140" viewBox="0 0 180 215" style={{ overflow: 'visible' }}>
+                    <defs>
+                      {/* Walnut Wood Gradient */}
+                      <linearGradient id="walnutWood" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#6c472c" />
+                        <stop offset="40%" stopColor="#53331b" />
+                        <stop offset="85%" stopColor="#2f1d0f" />
+                        <stop offset="100%" stopColor="#1c1109" />
+                      </linearGradient>
+                      {/* Wood Shadow Overlay */}
+                      <radialGradient id="woodGlow" cx="50%" cy="40%" r="60%">
+                        <stop offset="0%" stopColor="#ffe5d9" stopOpacity="0.08" />
+                        <stop offset="100%" stopColor="#000000" stopOpacity="0.65" />
+                      </radialGradient>
+                      {/* Hollow Interior Shadow */}
+                      <linearGradient id="interiorChamber" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stopColor="#19110d" />
+                        <stop offset="100%" stopColor="#060403" />
+                      </linearGradient>
+                      {/* Ivory scale Plate */}
+                      <linearGradient id="ivoryPlate" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stopColor="#fbf9f4" />
+                        <stop offset="100%" stopColor="#e5decb" />
+                      </linearGradient>
+                      {/* Steel Pendulum Rod */}
+                      <linearGradient id="steelRod" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#f3f4f6" />
+                        <stop offset="50%" stopColor="#9ca3af" />
+                        <stop offset="100%" stopColor="#d1d5db" />
+                      </linearGradient>
+                      {/* Brass Gold Gradient */}
+                      <linearGradient id="brassGold" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#ffe066" />
+                        <stop offset="35%" stopColor="#e5c142" />
+                        <stop offset="75%" stopColor="#b58e17" />
+                        <stop offset="100%" stopColor="#7a5b08" />
+                      </linearGradient>
+                      {/* Soft Casing Drop Shadow */}
+                      <filter id="casingShadow" x="-20%" y="-10%" width="140%" height="130%">
+                        <feDropShadow dx="0" dy="8" stdDeviation="6" floodColor="#000000" floodOpacity="0.32" />
+                      </filter>
+                    </defs>
+
+                    {/* Side Winding Key */}
+                    <g style={{
+                      transformOrigin: '138px 145px',
+                      transform: 'rotate(25deg)',
+                      transition: 'transform 0.2s ease-out'
+                    }}>
+                      <rect x="136" y="142" width="8" height="6" fill="url(#brassGold)" stroke="#7a5b08" strokeWidth="0.8" rx="1" />
+                      <path d="M 144 145 C 144 138, 158 138, 158 145 C 158 152, 144 152, 144 145 Z" fill="none" stroke="url(#brassGold)" strokeWidth="2.5" />
+                      <circle cx="144" cy="145" r="1.8" fill="#5a3d00" />
+                    </g>
+
+                    {/* 3D Pyramid Casing (Walnut Wood) */}
+                    <path 
+                      d="M 90 12 L 24 195 C 24 201, 30 205, 38 205 L 142 205 C 150 205, 156 201, 156 195 Z" 
+                      fill="url(#walnutWood)" 
+                      stroke="#2f1d0f" 
+                      strokeWidth="2.5" 
+                      filter="url(#casingShadow)"
+                    />
+                    <path 
+                      d="M 90 12 L 24 195 C 24 201, 30 205, 38 205 L 142 205 C 150 205, 156 201, 156 195 Z" 
+                      fill="url(#woodGlow)" 
+                      style={{ mixBlendMode: 'multiply' }}
+                    />
+
+                    {/* Golden Casing Trim Line */}
+                    <path 
+                      d="M 90 18 L 29 191 C 32 195, 36 197, 42 197 L 138 197 C 144 197, 148 195, 151 191 Z" 
+                      fill="none" 
+                      stroke="#e5c142" 
+                      strokeWidth="1.2" 
+                      opacity="0.32"
+                    />
+
+                    {/* Hollow Interior Chamber */}
+                    <path 
+                      d="M 78 35 L 102 35 L 138 188 L 42 188 Z" 
+                      fill="url(#interiorChamber)" 
+                      stroke="#19110d" 
+                      strokeWidth="1.5"
+                    />
+
+                    {/* Ivory scale Plate */}
+                    <path 
+                      d="M 80 40 L 100 40 L 134 184 L 46 184 Z" 
+                      fill="url(#ivoryPlate)" 
+                      stroke="#b5ad9e"
+                      strokeWidth="0.5"
+                    />
+
+                    {/* Detailed Scale Lines and Tempo Markings */}
+                    <g fill="#1d1d1f" opacity="0.65" fontFamily="Georgia, serif" fontSize="5.5" fontWeight="bold">
+                      <line x1="90" y1="45" x2="90" y2="175" stroke="#1d1d1f" strokeWidth="0.8" opacity="0.25" />
+                      <line x1="82" y1="65" x2="98" y2="65" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
+                      <text x="76" y="67" textAnchor="end">40</text>
+                      <text x="104" y="67" textAnchor="start">Largo</text>
+                      <line x1="80" y1="83" x2="100" y2="83" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
+                      <text x="74" y="85" textAnchor="end">80</text>
+                      <text x="106" y="85" textAnchor="start">Adagio</text>
+                      <line x1="78" y1="101" x2="102" y2="101" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
+                      <text x="72" y="103" textAnchor="end">120</text>
+                      <text x="108" y="103" textAnchor="start">Andante</text>
+                      <line x1="76" y1="119" x2="104" y2="119" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
+                      <text x="70" y="121" textAnchor="end">160</text>
+                      <text x="110" y="121" textAnchor="start">Allegro</text>
+                      <line x1="74" y1="137" x2="106" y2="137" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
+                      <text x="68" y="139" textAnchor="end">200</text>
+                      <text x="112" y="139" textAnchor="start">Presto</text>
+                      <line x1="72" y1="155" x2="108" y2="155" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
+                      <text x="66" y="157" textAnchor="end">240</text>
+                      <text x="114" y="157" textAnchor="start">Prestiss</text>
+                    </g>
+
+                    {/* Pendulum Shadow Group */}
+                    <g style={{
+                      transformOrigin: '87px 180px',
+                      transform: isPlaying ? 'none' : 'rotate(0deg)',
+                      animation: isPlaying ? `swing-anim ${60 / bpm}s ease-in-out infinite alternate` : 'none',
+                      transition: isPlaying ? 'none' : 'transform 0.3s ease-out',
+                      opacity: 0.22
+                    }}>
+                      <line x1="87" y1="180" x2="87" y2="40" stroke="#000000" strokeWidth="3.5" strokeLinecap="round" />
+                      <rect 
+                        x="77" 
+                        y={40 + ((240 - bpm) / (240 - 40)) * 115} 
+                        width="20" 
+                        height="15" 
+                        rx="2" 
+                        fill="#000000" 
+                      />
+                    </g>
+
+                    {/* Pendulum Group */}
+                    <g style={{
+                      transformOrigin: '90px 180px',
+                      transform: isPlaying ? 'none' : 'rotate(0deg)',
+                      animation: isPlaying ? `swing-anim ${60 / bpm}s ease-in-out infinite alternate` : 'none',
+                      transition: isPlaying ? 'none' : 'transform 0.3s ease-out'
+                    }}>
+                      <line x1="90" y1="180" x2="90" y2="40" stroke="url(#steelRod)" strokeWidth="3" strokeLinecap="round" />
+                      <rect 
+                        x="80" 
+                        y={40 + ((240 - bpm) / (240 - 40)) * 115} 
+                        width="20" 
+                        height="15" 
+                        rx="2" 
+                        fill="url(#brassGold)" 
+                        stroke="#856404" 
+                        strokeWidth="1.2" 
+                        style={{ transition: 'y 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)' }}
+                      />
+                      <circle 
+                        cx="90" 
+                        cy={40 + ((240 - bpm) / (240 - 40)) * 115 + 7.5} 
+                        r="2.5" 
+                        fill="url(#brassGold)" 
+                        stroke="#5a3d00" 
+                        strokeWidth="0.8" 
+                        style={{ transition: 'cy 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)' }}
+                      />
+                    </g>
+
+                    {/* Brass Lager / Pivot Cap */}
+                    <circle cx="90" cy="180" r="7.5" fill="url(#brassGold)" stroke="#5a3d00" strokeWidth="1.5" />
+                    <circle cx="90" cy="180" r="2.5" fill="#423000" />
+                  </svg>
+                </div>
+              )}
+            </div>
+
+            {/* Rechte Zelle: Apple-Style Tempo-Cockpit */}
+            <div style={{
+              flex: 1,
+              minWidth: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              {/* Apple Symmetrie-Achse: Tier-Avatar, BPM-Hero & Tempo-Kapsel */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', width: '100%' }}>
+                {/* Junior Animated Animal Medallion */}
+                {effectiveUiLevel === 'junior' && (() => {
+                  const animalInfo = bpm <= 75
+                    ? { emoji: '🐢', name: 'Leo', bg: '#dcfce7', border: '#86efac', text: '#166534' }
+                    : bpm <= 110
+                    ? { emoji: '🐕', name: 'Bello', bg: '#fef3c7', border: '#fcd34d', text: '#854d0e' }
+                    : bpm <= 155
+                    ? { emoji: '🐇', name: 'Flitzi', bg: '#e0f2fe', border: '#7dd3fc', text: '#0369a1' }
+                    : { emoji: '🐆', name: 'Gepard', bg: '#fee2e2', border: '#fca5a5', text: '#991b1b' };
+
+                  const isBeatBounce = isPlaying && (activeBeatIndex !== null);
+
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                          try { navigator.vibrate(15); } catch (_) {}
+                        }
+                      }}
+                      style={{
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '50%',
+                        background: animalInfo.bg,
+                        border: `2px solid ${animalInfo.border}`,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: isBeatBounce ? `0 0 14px ${animalInfo.border}` : '0 2px 5px rgba(0,0,0,0.05)',
+                        transform: isBeatBounce ? 'scale(1.18)' : 'scale(1)',
+                        transition: 'transform 0.08s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                        cursor: 'pointer',
+                        padding: 0,
+                        flexShrink: 0
+                      }}
+                      title={`${animalInfo.name} wippt im Takt mit!`}
+                    >
+                      <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>{animalInfo.emoji}</span>
+                    </button>
+                  );
+                })()}
+
+                {/* BPM Hero Number */}
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '3px' }}>
+                  <span style={{ fontSize: '2.3rem', fontWeight: 950, color: '#0f172a', lineHeight: 1, fontFamily: 'SF Mono, monospace', letterSpacing: '-0.03em' }}>
+                    {bpm}
+                  </span>
+                  <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 900 }}>
+                    BPM
+                  </span>
+                </div>
+
+                {/* Didaktische Tempo-Pille */}
+                <span style={{
+                  fontSize: '0.66rem',
+                  fontWeight: 850,
+                  color: '#854d0e',
+                  background: '#fefce8',
+                  border: '1px solid #fde047',
+                  padding: '2px 10px',
+                  borderRadius: '100px',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {effectiveUiLevel === 'junior'
+                    ? (bpm <= 75 ? 'Leo (Gemütlich)' : bpm <= 110 ? 'Bello (Spazieren)' : bpm <= 155 ? 'Flitzi (Schwungvoll)' : 'Gepard (Turbo)')
+                    : (bpm < 60 ? 'Largo' : bpm < 76 ? 'Adagio' : bpm < 108 ? 'Andante' : bpm < 120 ? 'Moderato' : bpm < 168 ? 'Allegro' : 'Presto')}
                 </span>
               </div>
+
+              {/* Tactile Hardware Stepper Row: -5, -, +, +5 */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%' }}>
+                <button
+                  type="button"
+                  onClick={() => setBpm(prev => Math.max(40, prev - 5))}
+                  style={{
+                    height: '34px',
+                    padding: '0 8px',
+                    borderRadius: '10px',
+                    border: '1px solid #cbd5e1',
+                    background: '#ffffff',
+                    color: '#475569',
+                    fontWeight: 850,
+                    fontSize: '0.76rem',
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                    transition: 'all 0.12s ease'
+                  }}
+                  title="5 BPM langsamer"
+                >
+                  -5
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBpm(prev => Math.max(40, prev - 1))}
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    border: '1.5px solid #cbd5e1',
+                    background: '#ffffff',
+                    color: '#0f172a',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.06)',
+                    transition: 'all 0.12s ease',
+                    flexShrink: 0
+                  }}
+                  title="1 BPM langsamer"
+                >
+                  <Minus size={15} strokeWidth={2.8} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBpm(prev => Math.min(240, prev + 1))}
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    border: '1.5px solid #cbd5e1',
+                    background: '#ffffff',
+                    color: '#0f172a',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.06)',
+                    transition: 'all 0.12s ease',
+                    flexShrink: 0
+                  }}
+                  title="1 BPM schneller"
+                >
+                  <Plus size={15} strokeWidth={2.8} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBpm(prev => Math.min(240, prev + 5))}
+                  style={{
+                    height: '34px',
+                    padding: '0 8px',
+                    borderRadius: '10px',
+                    border: '1px solid #cbd5e1',
+                    background: '#ffffff',
+                    color: '#475569',
+                    fontWeight: 850,
+                    fontSize: '0.76rem',
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                    transition: 'all 0.12s ease'
+                  }}
+                  title="5 BPM schneller"
+                >
+                  +5
+                </button>
+              </div>
+
+              {/* Ungestörte Slider-Spur mit 40 / 240 BPM Endmarken */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '0 2px' }}>
+                <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#94a3b8', fontFamily: 'SF Mono, monospace' }}>40</span>
+                <input
+                  type="range"
+                  min="40"
+                  max="240"
+                  value={bpm}
+                  onChange={(e) => setBpm(Number(e.target.value))}
+                  style={{ flex: 1, height: '5px', accentColor: '#eab308', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#94a3b8', fontFamily: 'SF Mono, monospace' }}>240</span>
+              </div>
+
+              {/* Aufgeräumte Tap-Tempo-Leiste (0% Kollision) */}
+              <button
+                type="button"
+                onClick={handleTapTempo}
+                style={{
+                  width: '100%',
+                  height: '28px',
+                  borderRadius: '10px',
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '5px',
+                  fontSize: '0.72rem',
+                  fontWeight: 850,
+                  color: '#0f172a',
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                  transition: 'all 0.12s ease'
+                }}
+                title="Takt tippen um Tempo zu ermitteln"
+              >
+                <Zap size={12} color="#eab308" />
+                <span>Tempo einklopfen (Tap)</span>
+              </button>
             </div>
-          ) : (
-            /* Mechanical Metronome Container */
-            <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center', margin: '0' }}>
-              <style>{`
-                @keyframes swing-anim {
-                  0% { transform: rotate(-12deg); }
-                  100% { transform: rotate(12deg); }
-                }
-                @keyframes rotate-key {
-                  0% { transform: rotate(0deg); }
-                  100% { transform: rotate(360deg); }
-                }
-              `}</style>
-
-            <svg width="135" height="160" viewBox="0 0 180 215" style={{ overflow: 'visible' }}>
-              <defs>
-                {/* Walnut Wood Gradient */}
-                <linearGradient id="walnutWood" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#6c472c" />
-                  <stop offset="40%" stopColor="#53331b" />
-                  <stop offset="85%" stopColor="#2f1d0f" />
-                  <stop offset="100%" stopColor="#1c1109" />
-                </linearGradient>
-                {/* Wood Shadow Overlay */}
-                <radialGradient id="woodGlow" cx="50%" cy="40%" r="60%">
-                  <stop offset="0%" stopColor="#ffe5d9" stopOpacity="0.08" />
-                  <stop offset="100%" stopColor="#000000" stopOpacity="0.65" />
-                </radialGradient>
-                {/* Hollow Interior Shadow */}
-                <linearGradient id="interiorChamber" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#19110d" />
-                  <stop offset="100%" stopColor="#060403" />
-                </linearGradient>
-                {/* Ivory scale Plate */}
-                <linearGradient id="ivoryPlate" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#fbf9f4" />
-                  <stop offset="100%" stopColor="#e5decb" />
-                </linearGradient>
-                {/* Steel Pendulum Rod */}
-                <linearGradient id="steelRod" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#f3f4f6" />
-                  <stop offset="50%" stopColor="#9ca3af" />
-                  <stop offset="100%" stopColor="#d1d5db" />
-                </linearGradient>
-                {/* Brass Gold Gradient */}
-                <linearGradient id="brassGold" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#ffe066" />
-                  <stop offset="35%" stopColor="#e5c142" />
-                  <stop offset="75%" stopColor="#b58e17" />
-                  <stop offset="100%" stopColor="#7a5b08" />
-                </linearGradient>
-                {/* Soft Casing Drop Shadow */}
-                <filter id="casingShadow" x="-20%" y="-10%" width="140%" height="130%">
-                  <feDropShadow dx="0" dy="8" stdDeviation="6" floodColor="#000000" floodOpacity="0.32" />
-                </filter>
-              </defs>
-
-              {/* Side Winding Key (Connected cleanly to right casing edge at x=138, static 3D angle) */}
-              <g style={{
-                transformOrigin: '138px 145px',
-                transform: 'rotate(25deg)',
-                transition: 'transform 0.2s ease-out'
-              }}>
-                <rect x="136" y="142" width="8" height="6" fill="url(#brassGold)" stroke="#7a5b08" strokeWidth="0.8" rx="1" />
-                <path d="M 144 145 C 144 138, 158 138, 158 145 C 158 152, 144 152, 144 145 Z" fill="none" stroke="url(#brassGold)" strokeWidth="2.5" />
-                <circle cx="144" cy="145" r="1.8" fill="#5a3d00" />
-              </g>
-
-              {/* 3D Pyramid Casing (Walnut Wood) */}
-              <path 
-                d="M 90 12 L 24 195 C 24 201, 30 205, 38 205 L 142 205 C 150 205, 156 201, 156 195 Z" 
-                fill="url(#walnutWood)" 
-                stroke="#2f1d0f" 
-                strokeWidth="2.5" 
-                filter="url(#casingShadow)"
-              />
-              <path 
-                d="M 90 12 L 24 195 C 24 201, 30 205, 38 205 L 142 205 C 150 205, 156 201, 156 195 Z" 
-                fill="url(#woodGlow)" 
-                style={{ mixBlendMode: 'multiply' }}
-              />
-
-              {/* Golden Casing Trim Line */}
-              <path 
-                d="M 90 18 L 29 191 C 32 195, 36 197, 42 197 L 138 197 C 144 197, 148 195, 151 191 Z" 
-                fill="none" 
-                stroke="#e5c142" 
-                strokeWidth="1.2" 
-                opacity="0.32"
-              />
-
-              {/* Hollow Interior Chamber (Trapezoid for wider text space at top) */}
-              <path 
-                d="M 78 35 L 102 35 L 138 188 L 42 188 Z" 
-                fill="url(#interiorChamber)" 
-                stroke="#19110d" 
-                strokeWidth="1.5"
-              />
-
-              {/* Ivory scale Plate (Trapezoid fitting scale markings perfectly) */}
-              <path 
-                d="M 80 40 L 100 40 L 134 184 L 46 184 Z" 
-                fill="url(#ivoryPlate)" 
-                stroke="#b5ad9e"
-                strokeWidth="0.5"
-              />
-
-              {/* Detailed Scale Lines and Tempo Markings (Left Column: BPM, Right Column: Term) */}
-              <g fill="#1d1d1f" opacity="0.65" fontFamily="Georgia, serif" fontSize="5.5" fontWeight="bold">
-                {/* Center axis line */}
-                <line x1="90" y1="45" x2="90" y2="175" stroke="#1d1d1f" strokeWidth="0.8" opacity="0.25" />
-
-                {/* 40 Largo */}
-                <line x1="82" y1="65" x2="98" y2="65" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
-                <text x="76" y="67" textAnchor="end">40</text>
-                <text x="104" y="67" textAnchor="start">Largo</text>
-
-                {/* 80 Adagio */}
-                <line x1="80" y1="83" x2="100" y2="83" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
-                <text x="74" y="85" textAnchor="end">80</text>
-                <text x="106" y="85" textAnchor="start">Adagio</text>
-
-                {/* 120 Andante */}
-                <line x1="78" y1="101" x2="102" y2="101" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
-                <text x="72" y="103" textAnchor="end">120</text>
-                <text x="108" y="103" textAnchor="start">Andante</text>
-
-                {/* 160 Allegro */}
-                <line x1="76" y1="119" x2="104" y2="119" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
-                <text x="70" y="121" textAnchor="end">160</text>
-                <text x="110" y="121" textAnchor="start">Allegro</text>
-
-                {/* 200 Presto */}
-                <line x1="74" y1="137" x2="106" y2="137" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
-                <text x="68" y="139" textAnchor="end">200</text>
-                <text x="112" y="139" textAnchor="start">Presto</text>
-
-                {/* 240 Prestissimo */}
-                <line x1="72" y1="155" x2="108" y2="155" stroke="#1d1d1f" strokeWidth="0.6" opacity="0.3" />
-                <text x="66" y="157" textAnchor="end">240</text>
-                <text x="114" y="157" textAnchor="start">Prestiss</text>
-              </g>
-
-              {/* Pendulum Shadow Group (Swings behind the rod for massive 3D depth) */}
-              <g style={{
-                transformOrigin: '87px 180px',
-                transform: isPlaying ? 'none' : 'rotate(0deg)',
-                animation: isPlaying ? `swing-anim ${60 / bpm}s ease-in-out infinite alternate` : 'none',
-                transition: isPlaying ? 'none' : 'transform 0.3s ease-out',
-                opacity: 0.22
-              }}>
-                <line x1="87" y1="180" x2="87" y2="40" stroke="#000000" strokeWidth="3.5" strokeLinecap="round" />
-                <rect 
-                  x="77" 
-                  y={40 + ((240 - bpm) / (240 - 40)) * 115} 
-                  width="20" 
-                  height="15" 
-                  rx="2"
-                  fill="#000000" 
-                />
-              </g>
-
-              {/* Pendulum Group (rotating from pivot point) */}
-              <g style={{
-                transformOrigin: '90px 180px',
-                transform: isPlaying ? 'none' : 'rotate(0deg)',
-                animation: isPlaying ? `swing-anim ${60 / bpm}s ease-in-out infinite alternate` : 'none',
-                transition: isPlaying ? 'none' : 'transform 0.3s ease-out'
-              }}>
-                {/* Steel Pendulum Rod */}
-                <line x1="90" y1="180" x2="90" y2="40" stroke="url(#steelRod)" strokeWidth="3" strokeLinecap="round" />
-                
-                {/* 3D Brass weight */}
-                <rect 
-                  x="80" 
-                  y={40 + ((240 - bpm) / (240 - 40)) * 115} 
-                  width="20" 
-                  height="15" 
-                  rx="2"
-                  fill="url(#brassGold)" 
-                  stroke="#856404"
-                  strokeWidth="1.2"
-                  style={{ transition: 'y 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)' }}
-                />
-                {/* Center screw detail on weight */}
-                <circle 
-                  cx="90" 
-                  cy={40 + ((240 - bpm) / (240 - 40)) * 115 + 7.5} 
-                  r="2.5" 
-                  fill="url(#brassGold)" 
-                  stroke="#5a3d00" 
-                  strokeWidth="0.8"
-                  style={{ transition: 'cy 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)' }}
-                />
-              </g>
-
-              {/* Brass Lager / Pivot Cap */}
-              <circle cx="90" cy="180" r="7.5" fill="url(#brassGold)" stroke="#5a3d00" strokeWidth="1.5" />
-              <circle cx="90" cy="180" r="2.5" fill="#423000" />
-            </svg>
           </div>
-        )}
 
           {/* Mute-Bar Challenge Alert Banner */}
           {isCurrentBarMuted && (
@@ -3769,7 +3992,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   onClick={() => toggleBeatAccent(idx)}
                   className="tactile-btn"
                   style={{
-                    height: activeMeterInfo.beats > 4 ? '44px' : '52px',
+                    height: activeMeterInfo.beats > 4 ? '50px' : '62px',
                     borderRadius: '16px',
                     background: isActive 
                       ? (isAccent ? '#eab308' : (isGhost ? '#475569' : (isMute ? '#64748b' : '#0f172a'))) 
@@ -3785,7 +4008,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: isActive ? '#ffffff' : (isAccent ? '#854d0e' : (isMute ? '#94a3b8' : '#0f172a')),
-                    fontSize: activeMeterInfo.beats > 4 ? '0.88rem' : '1.05rem',
+                    fontSize: activeMeterInfo.beats > 4 ? '0.92rem' : '1.1rem',
                     fontWeight: 950,
                     cursor: 'pointer',
                     transform: isActive ? 'scale(1.08)' : 'scale(1)',
@@ -3829,8 +4052,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                       }}
                       style={{
                         flex: 1,
-                        padding: '7px 0',
-                        fontSize: '0.78rem',
+                        padding: '9px 0',
+                        fontSize: '0.82rem',
                         fontWeight: isSelected ? 900 : 750,
                         borderRadius: '10px',
                         border: 'none',
@@ -3871,8 +4094,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     onClick={() => setSubdivision(subOpt.id as any)}
                     style={{
                       flex: 1,
-                      padding: '6px 0',
-                      fontSize: '0.72rem',
+                      padding: '8px 0',
+                      fontSize: '0.76rem',
                       fontWeight: subdivision === subOpt.id ? 900 : 700,
                       borderRadius: '10px',
                       border: 'none',
@@ -3894,12 +4117,12 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
           <div style={{
             width: '100%',
             maxWidth: '400px',
-            height: '5px',
+            height: '6px',
             background: '#e2e8f0',
             borderRadius: '10px',
             overflow: 'hidden',
             position: 'relative',
-            margin: '2px 0'
+            margin: '4px 0'
           }}>
             <div style={{
               position: 'absolute',
@@ -3914,215 +4137,6 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             }} />
           </div>
 
-          {/* ⏱️ Apple-Style Tempo-Cockpit */}
-          <div style={{
-            width: '100%',
-            maxWidth: '400px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            borderRadius: '20px',
-            padding: '14px 16px',
-            boxSizing: 'border-box'
-          }}>
-            {/* BPM Hero & Animal Medallion */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '14px' }}>
-              {/* Junior Animated Animal Medallion */}
-              {effectiveUiLevel === 'junior' && (() => {
-                const animalInfo = bpm <= 70
-                  ? { emoji: '🐢', name: 'Leo', bg: '#dcfce7', border: '#86efac', text: '#166534' }
-                  : bpm <= 110
-                  ? { emoji: '🐕', name: 'Bello', bg: '#fef3c7', border: '#fcd34d', text: '#854d0e' }
-                  : bpm <= 150
-                  ? { emoji: '🐇', name: 'Flitzi', bg: '#e0f2fe', border: '#7dd3fc', text: '#0369a1' }
-                  : { emoji: '🐆', name: 'Cheetah', bg: '#fee2e2', border: '#fca5a5', text: '#991b1b' };
-
-                const isBeatBounce = isPlaying && (activeBeatIndex !== null);
-
-                return (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-                        try { navigator.vibrate(15); } catch (_) {}
-                      }
-                    }}
-                    style={{
-                      width: '48px',
-                      height: '48px',
-                      borderRadius: '50%',
-                      background: animalInfo.bg,
-                      border: `2px solid ${animalInfo.border}`,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: isBeatBounce ? `0 0 16px ${animalInfo.border}` : '0 2px 8px rgba(0,0,0,0.06)',
-                      transform: isBeatBounce ? 'scale(1.18)' : 'scale(1)',
-                      transition: 'transform 0.08s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-                      cursor: 'pointer',
-                      padding: 0,
-                      flexShrink: 0
-                    }}
-                    title={`${animalInfo.name} wippt im Takt mit!`}
-                  >
-                    <span style={{ fontSize: '1.45rem', lineHeight: 1 }}>{animalInfo.emoji}</span>
-                  </button>
-                );
-              })()}
-
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                  <span style={{ fontSize: '2.6rem', fontWeight: 950, color: '#0f172a', lineHeight: 1, fontFamily: 'SF Mono, monospace', letterSpacing: '-0.02em' }}>
-                    {bpm}
-                  </span>
-                  <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 900 }}>
-                    BPM
-                  </span>
-                </div>
-                <span style={{
-                  fontSize: '0.72rem',
-                  fontWeight: 850,
-                  color: '#854d0e',
-                  background: '#fefce8',
-                  border: '1px solid #fde047',
-                  padding: '2px 10px',
-                  borderRadius: '100px',
-                  marginTop: '4px'
-                }}>
-                  {effectiveUiLevel === 'junior'
-                    ? (bpm <= 70 ? '🐢 Leo (Gemütlich)' : bpm <= 110 ? '🐕 Bello (Flott)' : bpm <= 150 ? '🐇 Flitzi (Schnell)' : '🐆 Cheetah (Rakete)')
-                    : (bpm < 60 ? 'Largo' : bpm < 76 ? 'Adagio' : bpm < 108 ? 'Andante' : bpm < 120 ? 'Moderato' : bpm < 168 ? 'Allegro' : 'Presto')}
-                </span>
-              </div>
-            </div>
-
-            {/* Tactile Hardware Stepper Row: -5, -, +, +5 */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={() => setBpm(prev => Math.max(40, prev - 5))}
-                style={{
-                  height: '42px',
-                  padding: '0 14px',
-                  borderRadius: '12px',
-                  border: '1px solid #cbd5e1',
-                  background: '#ffffff',
-                  color: '#475569',
-                  fontWeight: 850,
-                  fontSize: '0.84rem',
-                  cursor: 'pointer',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                  transition: 'all 0.12s ease'
-                }}
-                title="5 BPM langsamer"
-              >
-                -5
-              </button>
-              <button
-                type="button"
-                onClick={() => setBpm(prev => Math.max(40, prev - 1))}
-                style={{
-                  width: '48px',
-                  height: '48px',
-                  borderRadius: '50%',
-                  border: '1.5px solid #cbd5e1',
-                  background: '#ffffff',
-                  color: '#0f172a',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
-                  transition: 'all 0.12s ease'
-                }}
-                title="1 BPM langsamer"
-              >
-                <Minus size={18} strokeWidth={2.8} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setBpm(prev => Math.min(240, prev + 1))}
-                style={{
-                  width: '48px',
-                  height: '48px',
-                  borderRadius: '50%',
-                  border: '1.5px solid #cbd5e1',
-                  background: '#ffffff',
-                  color: '#0f172a',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
-                  transition: 'all 0.12s ease'
-                }}
-                title="1 BPM schneller"
-              >
-                <Plus size={18} strokeWidth={2.8} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setBpm(prev => Math.min(240, prev + 5))}
-                style={{
-                  height: '42px',
-                  padding: '0 14px',
-                  borderRadius: '12px',
-                  border: '1px solid #cbd5e1',
-                  background: '#ffffff',
-                  color: '#475569',
-                  fontWeight: 850,
-                  fontSize: '0.84rem',
-                  cursor: 'pointer',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                  transition: 'all 0.12s ease'
-                }}
-                title="5 BPM schneller"
-              >
-                +5
-              </button>
-            </div>
-
-            {/* Slider & Tap Tempo Row */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <input
-                type="range"
-                min="40"
-                max="240"
-                value={bpm}
-                onChange={(e) => setBpm(Number(e.target.value))}
-                style={{ width: '100%', height: '6px', accentColor: '#eab308', cursor: 'pointer' }}
-              />
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.70rem', color: '#64748b', fontWeight: 750 }}>
-                <span>40 Langsam</span>
-                <button
-                  type="button"
-                  onClick={handleTapTempo}
-                  style={{
-                    border: '1px solid #cbd5e1',
-                    background: '#ffffff',
-                    padding: '5px 14px',
-                    borderRadius: '10px',
-                    fontSize: '0.74rem',
-                    fontWeight: 850,
-                    color: '#0f172a',
-                    cursor: 'pointer',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    transition: 'all 0.12s ease'
-                  }}
-                >
-                  <Zap size={12} color="#eab308" />
-                  <span>Tempo einklopfen (Tap)</span>
-                </button>
-                <span>240 Schnell</span>
-              </div>
-            </div>
-          </div>
 
           {/* Active Song Context Banner */}
           {activeSongContext?.songTitle && (
@@ -4171,8 +4185,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             gap: '10px',
             width: '100%',
             maxWidth: '400px',
-            marginTop: 'auto',
-            paddingTop: '6px'
+            marginTop: '8px',
+            paddingTop: '4px'
           }}>
             <button
               type="button"
@@ -5001,35 +5015,37 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
 
           {/* SEKUNDÄR-TOOLBOX: Profi-Studio, Mixer & Fills */}
           <div style={{
-            borderRadius: '14px',
+            borderRadius: '16px',
             border: '1px solid #e2e8f0',
             background: showStudioMixer ? '#ffffff' : '#f8fafc',
             overflow: 'hidden',
             transition: 'all 0.2s ease',
-            marginTop: 'auto'
+            marginTop: 'auto',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
           }}>
             <button
               type="button"
               onClick={() => setShowStudioMixer(!showStudioMixer)}
               style={{
                 width: '100%',
-                padding: '10px 14px',
+                minHeight: '48px',
+                padding: '12px 16px',
                 border: 'none',
                 background: 'transparent',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 cursor: 'pointer',
-                color: showStudioMixer ? '#0f172a' : '#64748b',
-                fontWeight: 800,
-                fontSize: '0.78rem'
+                color: showStudioMixer ? '#0f172a' : '#475569',
+                fontWeight: 850,
+                fontSize: '0.84rem'
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Sliders size={14} color={showStudioMixer ? '#eab308' : '#64748b'} />
+                <Sliders size={16} color={showStudioMixer ? '#eab308' : '#64748b'} />
                 <span>Mischpult & Klangeinstellungen</span>
                 {selectedVariation === 'C' && (
-                  <span style={{ fontSize: '0.62rem', fontWeight: 850, background: '#fef3c7', color: '#92400e', padding: '1px 6px', borderRadius: '100px' }}>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 850, background: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: '100px' }}>
                     Wirbel aktiv
                   </span>
                 )}
