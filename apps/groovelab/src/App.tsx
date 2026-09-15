@@ -31,8 +31,6 @@ const QRLandingPage = lazy(() => import('./components/QRLandingPage').then(m => 
 const LoginScreen = lazy(() => import('./components/LoginScreen').then(m => ({ default: m.LoginScreen })));
 const QRCodeModal = lazy(() => import('./components/QRCodeModal').then(m => ({ default: m.QRCodeModal })));
 const DeviceSetupScreen = lazy(() => import('./components/DeviceSetupScreen').then(m => ({ default: m.DeviceSetupScreen })));
-const TeacherDetailModal = lazy(() => import('./components/TeacherDetailModal').then(m => ({ default: m.TeacherDetailModal })));
-const StudentDetailModal = lazy(() => import('./components/StudentDetailModal').then(m => ({ default: m.StudentDetailModal })));
 const ContractEndPrompt = lazy(() => import('./components/ContractEndPrompt').then(m => ({ default: m.ContractEndPrompt })));
 const SignupWizard = lazy(() => import('./components/SignupWizard').then(m => ({ default: m.SignupWizard })));
 const StudentRadarChart = lazy(() => import('./components/StudentRadarChart'));
@@ -46,7 +44,7 @@ const SharedAudioBiographyPage = lazy(() => import('./components/campus/SharedAu
 import { OnboardingHelpModalsHub } from './components/modals/OnboardingHelpModalsHub';
 import { LegalModalsHub } from './components/modals/LegalModalsHub';
 import { SecurityAuthModalsHub } from './components/modals/SecurityAuthModalsHub';
-const ConfettiModal = lazy(() => import('./components/ConfettiModal'));
+import { DetailProfilesModalsHub } from './components/modals/DetailProfilesModalsHub';
 const MaintenanceLockoutOverlay = lazy(() => import('./components/MaintenanceLockoutOverlay').then(m => ({ default: m.MaintenanceLockoutOverlay })));
 const GlobalBroadcastBanner = lazy(() => import('./components/GlobalBroadcastBanner').then(m => ({ default: m.GlobalBroadcastBanner })));
 const PwaUpdateToast = lazy(() => import('./components/ui/PwaUpdateToast').then(m => ({ default: m.PwaUpdateToast })));
@@ -14183,18 +14181,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
 
 
 
-      {/* Confetti Modal */}
-      {showConfetti && (
-        <Suspense fallback={null}>
-          <ConfettiModal 
-            showConfetti={showConfetti} 
-            width={width} 
-            height={height} 
-            brandColor={brandColor} 
-            clearConfetti={clearConfetti} 
-          />
-        </Suspense>
-      )}
+
 
       {/* Help FAB (Only for logged-in students in Lab Mode with active station on the Groovelab platform) */}
       {user && activePlatform === 'groovelab' && user.role === 'student' && locationMode === 'lab' && session?.station_id && (
@@ -15100,155 +15087,36 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
         );
       })()}
 
-      {selectedTeacher && (
-        <Suspense fallback={null}>
-          <TeacherDetailModal 
-            teacher={selectedTeacher} 
-            onClose={() => setSelectedTeacher(null)} 
-          />
-        </Suspense>
-      )}
-
-      {selectedStudentProfile && (
-        <Suspense fallback={null}>
-          <StudentDetailModal 
-            student={selectedStudentProfile} 
-            onClose={() => setSelectedStudentProfile(null)} 
-            onOpenBandProfile={(band) => {
-              setSelectedBandForProfile(band);
-              setBandProfileView('public');
-              setShowBandProfile(true);
-              setSelectedStudentProfile(null);
-            }}
-            onOpenTageskompass={(student) => {
-              if ((window as any).openTageskompass) {
-                (window as any).openTageskompass(student);
-              }
-              setSelectedStudentProfile(null);
-            }}
-            activePlatform={activePlatform as any}
-            callerDashboard={
-              (activeWorkspace === 'teacher' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_active_workspace') === 'teacher') || user?.role === 'teacher')
-                ? 'teacher'
-                : (activeWorkspace === 'secretary' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_active_workspace') === 'secretary') || user?.role === 'secretary')
-                ? 'secretary'
-                : (activeWorkspace === 'admin' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_active_workspace') === 'admin') || user?.role === 'admin')
-                ? 'admin'
-                : undefined
-            }
-            onSwitchPlatform={(newPlatform) => {
-              setActivePlatform(newPlatform);
-            }}
-          />
-        </Suspense>
-      )}
-
-      {/* Auto-Lock Inactivity Warning Modal */}
-      {showAutoLockWarning && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 9999,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '24px',
-          background: 'rgba(15, 23, 42, 0.75)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-        }}>
-          <div className="glass-panel animation-slide-up" style={{
-            background: '#ffffff',
-            border: '1px solid rgba(239, 68, 68, 0.2)',
-            padding: '36px',
-            borderRadius: '28px',
-            maxWidth: '460px',
-            width: '100%',
-            textAlign: 'center',
-            boxShadow: '0 30px 60px rgba(0, 0, 0, 0.25)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '24px'
-          }}>
-            <div style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '50%',
-              background: '#fef2f2',
-              color: '#ef4444',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)'
-            }}>
-              <Clock size={32} />
-            </div>
-
-            <div>
-              <h2 style={{ fontSize: '1.4rem', fontWeight: 900, color: '#1e293b', margin: '0 0 10px 0', letterSpacing: '-0.02em' }}>
-                Bist du noch da?
-              </h2>
-              <p style={{ margin: 0, fontSize: '0.95rem', color: '#64748b', lineHeight: 1.5, fontWeight: 550 }}>
-                Aufgrund von Inaktivität wirst du in <span style={{ color: '#ef4444', fontWeight: 800 }}>{autoLockCountdown} Sekunden</span> automatisch abgemeldet.
-              </p>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAutoLockWarning(false);
-                }}
-                style={{
-                  background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)',
-                  color: 'white',
-                  border: 'none',
-                  padding: '16px 24px',
-                  borderRadius: '16px',
-                  fontSize: '1rem',
-                  fontWeight: 850,
-                  cursor: 'pointer',
-                  boxShadow: '0 8px 20px rgba(52,168,83,0.3)',
-                  transition: 'all 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  width: '100%'
-                }}
-                className="hover-scale"
-              >
-                <Check size={20} />
-                Ja, weiterüben!
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAutoLockWarning(false);
-                  handleLogout(true, false);
-                }}
-                style={{
-                  background: '#f1f5f9',
-                  color: '#64748b',
-                  border: 'none',
-                  padding: '14px 24px',
-                  borderRadius: '16px',
-                  fontSize: '0.9rem',
-                  fontWeight: 750,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  width: '100%'
-                }}
-                className="hover-scale"
-              >
-                Jetzt abmelden
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 📇 Detail Profiles & Reward Modals Hub */}
+      <DetailProfilesModalsHub
+        user={user}
+        activePlatform={activePlatform}
+        activeWorkspace={activeWorkspace}
+        selectedTeacher={selectedTeacher}
+        onCloseTeacher={() => setSelectedTeacher(null)}
+        selectedStudentProfile={selectedStudentProfile}
+        onCloseStudentProfile={() => setSelectedStudentProfile(null)}
+        onOpenBandProfile={(band) => {
+          setSelectedBandForProfile(band);
+          setBandProfileView('public');
+          setShowBandProfile(true);
+          setSelectedStudentProfile(null);
+        }}
+        onOpenTageskompass={(student) => {
+          if ((window as any).openTageskompass) {
+            (window as any).openTageskompass(student);
+          }
+          setSelectedStudentProfile(null);
+        }}
+        onSwitchPlatform={(newPlatform) => {
+          setActivePlatform(newPlatform);
+        }}
+        showConfetti={showConfetti}
+        confettiWidth={width}
+        confettiHeight={height}
+        confettiBrandColor={brandColor}
+        onClearConfetti={clearConfetti}
+      />
 
 
       {/* Edit Profile Modal */}
@@ -15935,6 +15803,13 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
           setIsCampusUnlocked(true);
         }}
         onLogoutSession={() => {
+          handleLogout(true, false);
+        }}
+        showAutoLockWarning={showAutoLockWarning}
+        autoLockCountdown={autoLockCountdown}
+        onContinueSession={() => setShowAutoLockWarning(false)}
+        onLogoutWarning={() => {
+          setShowAutoLockWarning(false);
           handleLogout(true, false);
         }}
         showCampusPinPrompt={showCampusPinPrompt}
