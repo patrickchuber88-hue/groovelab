@@ -839,8 +839,19 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
   const [ambientBorderFlash, setAmbientBorderFlash] = useState<'accent' | 'regular' | null>(null);
   const ambientFlashTimeoutRef = useRef<any>(null);
 
-  // 🛠️ Slide-Up Drawer for "Übe-Tools ⚡"
+  // 🛠️ Studio-Modal for "Übe-Werkzeuge"
+  const [showToolsModal, setShowToolsModal] = useState(false);
   const [showToolsDrawer, setShowToolsDrawer] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showToolsModal) {
+        setShowToolsModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showToolsModal]);
 
   // ⏱️ Zero-Click Smart Practice Diary Session Timer
   const [sessionElapsedSeconds, setSessionElapsedSeconds] = useState(0);
@@ -2792,7 +2803,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               </div>
               <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#e2e8f0', marginTop: '8px' }}>
                 {effectiveUiLevel === 'junior'
-                  ? (bpm <= 70 ? '🐢 Schildkröte' : bpm <= 110 ? '🐕 Hund' : bpm <= 150 ? '🐇 Hase' : '🐆 Gepard')
+                  ? (bpm <= 70 ? '🐢 Leo (Gemütlich)' : bpm <= 110 ? '🐕 Bello (Flott)' : bpm <= 150 ? '🐇 Flitzi (Schnell)' : '🐆 Cheetah (Rakete)')
                   : (bpm < 60 ? 'Largo' : bpm < 76 ? 'Adagio' : bpm < 108 ? 'Andante' : bpm < 120 ? 'Moderato' : bpm < 168 ? 'Allegro' : 'Presto')}
               </span>
             </div>
@@ -2950,6 +2961,375 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
         </div>
       )}
 
+      {/* 🛠️ Studio-Modal: Übe-Werkzeuge VOR dem Player */}
+      {showToolsModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="tools-modal-title"
+          onClick={() => setShowToolsModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1000,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+            animation: 'fadeIn 0.2s ease'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: '520px',
+              background: '#ffffff',
+              borderRadius: '24px',
+              border: '1px solid rgba(226, 232, 240, 0.9)',
+              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.35)',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '18px',
+              maxHeight: '90vh',
+              overflowY: 'auto'
+            }}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '12px',
+                  background: '#fef3c7',
+                  border: '1.5px solid #fde047',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Flame size={22} color="#d97706" />
+                </div>
+                <div>
+                  <h3 id="tools-modal-title" style={{ margin: 0, fontSize: '1.12rem', fontWeight: 900, color: '#0f172a' }}>
+                    Übe-Werkzeuge
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
+                    Tempo-Trainer, Innere Rhythmusuhr & Stimmgabel
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowToolsModal(false)}
+                aria-label="Schließen"
+                style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '50%',
+                  border: '1px solid #e2e8f0',
+                  background: '#f8fafc',
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.1rem',
+                  fontWeight: 700
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* 1. Tempo-Trainer */}
+            <div style={{
+              padding: '16px',
+              borderRadius: '16px',
+              background: speedTrainerActive ? '#fff7ed' : '#f8fafc',
+              border: speedTrainerActive ? '1.5px solid #fdba74' : '1px solid #e2e8f0',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              transition: 'all 0.2s ease'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Flame size={18} style={{ color: '#ea580c' }} />
+                  <div>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#9a3412', display: 'block' }}>
+                      Tempo-Trainer (Speed-Up)
+                    </span>
+                    <span style={{ fontSize: '0.68rem', color: '#7c2d12', fontWeight: 600 }}>
+                      Steigert das Tempo automatisch alle X Takte
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSpeedTrainerActive(prev => !prev)}
+                  style={{
+                    fontSize: '0.74rem',
+                    fontWeight: 850,
+                    padding: '6px 14px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: speedTrainerActive ? '#ea580c' : '#cbd5e1',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                    boxShadow: speedTrainerActive ? '0 2px 8px rgba(234, 88, 12, 0.35)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {speedTrainerActive ? 'Aktiv' : 'Aus'}
+                </button>
+              </div>
+
+              {speedTrainerActive && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', color: '#7c2d12', fontWeight: 700 }}>
+                    <span>Ziel-Tempo:</span>
+                    <strong style={{ fontSize: '1rem', color: '#9a3412', fontFamily: 'SF Mono, monospace' }}>
+                      {speedTrainerTargetBpm} BPM
+                    </strong>
+                  </div>
+                  <input
+                    type="range"
+                    min="60"
+                    max="220"
+                    value={speedTrainerTargetBpm}
+                    onChange={(e) => setSpeedTrainerTargetBpm(Number(e.target.value))}
+                    style={{ width: '100%', height: '6px', accentColor: '#ea580c', cursor: 'pointer' }}
+                  />
+                  <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
+                    {[
+                      { bars: 2, step: 2, label: 'Alle 2 Takte (+2 BPM)' },
+                      { bars: 4, step: 2, label: 'Alle 4 Takte (+2 BPM)' },
+                      { bars: 8, step: 4, label: 'Alle 8 Takte (+4 BPM)' }
+                    ].map(opt => {
+                      const isSel = speedTrainerIntervalBars === opt.bars && speedTrainerStep === opt.step;
+                      return (
+                        <button
+                          key={opt.label}
+                          type="button"
+                          onClick={() => {
+                            setSpeedTrainerIntervalBars(opt.bars);
+                            setSpeedTrainerStep(opt.step);
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: '6px 4px',
+                            fontSize: '0.66rem',
+                            fontWeight: isSel ? 900 : 700,
+                            borderRadius: '8px',
+                            border: isSel ? '1.5px solid #ea580c' : '1px solid #fed7aa',
+                            background: isSel ? '#ffedd5' : '#ffffff',
+                            color: isSel ? '#9a3412' : '#7c2d12',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 2. Stummtakt-Herausforderung */}
+            <div style={{
+              padding: '16px',
+              borderRadius: '16px',
+              background: muteBarActive ? '#f0fdf4' : '#f8fafc',
+              border: muteBarActive ? '1.5px solid #86efac' : '1px solid #e2e8f0',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              transition: 'all 0.2s ease'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '1.2rem' }}>🧠</span>
+                  <div>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 900, color: '#166534', display: 'block' }}>
+                      Stummtakt-Training (Innere Uhr)
+                    </span>
+                    <span style={{ fontSize: '0.68rem', color: '#15803d', fontWeight: 600 }}>
+                      Mutet Takte für Timing-Training im Kopf
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMuteBarActive(prev => !prev);
+                    setIsCurrentBarMuted(false);
+                  }}
+                  style={{
+                    fontSize: '0.74rem',
+                    fontWeight: 850,
+                    padding: '6px 14px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: muteBarActive ? '#16a34a' : '#cbd5e1',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                    boxShadow: muteBarActive ? '0 2px 8px rgba(22, 163, 74, 0.35)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {muteBarActive ? 'Aktiv' : 'Aus'}
+                </button>
+              </div>
+
+              {muteBarActive && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', paddingTop: '4px' }}>
+                  {[
+                    { mode: '3_plus_1' as const, label: '3 Takte Play', sub: '+ 1 Takt Stumm' },
+                    { mode: '1_plus_1' as const, label: '1 Takt Play', sub: '+ 1 Takt Stumm' }
+                  ].map(item => {
+                    const isSel = muteBarMode === item.mode;
+                    return (
+                      <button
+                        key={item.mode}
+                        type="button"
+                        onClick={() => setMuteBarMode(item.mode)}
+                        style={{
+                          padding: '10px 8px',
+                          borderRadius: '10px',
+                          border: isSel ? '2px solid #16a34a' : '1px solid #cbd5e1',
+                          background: isSel ? '#dcfce7' : '#ffffff',
+                          color: isSel ? '#166534' : '#475569',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '2px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <span style={{ fontSize: '0.82rem', fontWeight: 900 }}>{item.label}</span>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 700, opacity: 0.85 }}>{item.sub}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 3. Stimmgabel (440 Hz / 442 Hz) */}
+            <div style={{
+              padding: '16px',
+              borderRadius: '16px',
+              background: chamberPitch > 0 ? '#fefce8' : '#f8fafc',
+              border: chamberPitch > 0 ? '1.5px solid #fcd34d' : '1px solid #e2e8f0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              transition: 'all 0.2s ease'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Bell size={18} style={{ color: chamberPitch > 0 ? '#d97706' : '#64748b' }} />
+                <div>
+                  <span style={{ fontSize: '0.88rem', fontWeight: 900, color: chamberPitch > 0 ? '#92400e' : '#1e293b', display: 'block' }}>
+                    Kammerton-Stimmgabel
+                  </span>
+                  <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>
+                    Reiner Sinuston zum Stimmen deines Instruments
+                  </span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => chamberPitch === 440 ? stopChamberPitch() : playChamberPitch(440)}
+                  style={{
+                    padding: '8px 12px',
+                    fontSize: '0.78rem',
+                    fontWeight: 850,
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: chamberPitch === 440 ? '#d97706' : '#ffffff',
+                    color: chamberPitch === 440 ? '#ffffff' : '#0f172a',
+                    boxShadow: chamberPitch === 440 ? '0 2px 8px rgba(217, 119, 6, 0.35)' : '0 1px 3px rgba(0,0,0,0.06)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {chamberPitch === 440 ? '⏹ 440 Hz' : '440 Hz'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => chamberPitch === 442 ? stopChamberPitch() : playChamberPitch(442)}
+                  style={{
+                    padding: '8px 12px',
+                    fontSize: '0.78rem',
+                    fontWeight: 850,
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: chamberPitch === 442 ? '#d97706' : '#ffffff',
+                    color: chamberPitch === 442 ? '#ffffff' : '#0f172a',
+                    boxShadow: chamberPitch === 442 ? '0 2px 8px rgba(217, 119, 6, 0.35)' : '0 1px 3px rgba(0,0,0,0.06)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {chamberPitch === 442 ? '⏹ 442 Hz' : '442 Hz'}
+                </button>
+              </div>
+            </div>
+
+            {/* Footer Button: Fertig */}
+            <button
+              type="button"
+              onClick={() => setShowToolsModal(false)}
+              style={{
+                width: '100%',
+                minHeight: '48px',
+                borderRadius: '14px',
+                border: 'none',
+                background: '#0f172a',
+                color: '#ffffff',
+                fontSize: '0.94rem',
+                fontWeight: 900,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 14px rgba(15, 23, 42, 0.25)',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              Fertig
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Global Equalizer & Pulse Animations */}
+      <style>{`
+        @keyframes eq-bounce-1 {
+          0%, 100% { height: 4px; }
+          50% { height: 14px; }
+        }
+        @keyframes eq-bounce-2 {
+          0%, 100% { height: 14px; }
+          50% { height: 6px; }
+        }
+        @keyframes eq-bounce-3 {
+          0%, 100% { height: 7px; }
+          50% { height: 14px; }
+        }
+        .eq-bar-1 { animation: eq-bounce-1 0.45s ease-in-out infinite alternate; }
+        .eq-bar-2 { animation: eq-bounce-2 0.38s ease-in-out infinite alternate; }
+        .eq-bar-3 { animation: eq-bounce-3 0.52s ease-in-out infinite alternate; }
+      `}</style>
+
       <div style={{ display: 'flex', gap: '18px', flex: 1, width: '100%', minHeight: 0, height: '100%' }} className="flex-col lg:flex-row">
         {/* Left Column: Equalized Metronome Panel */}
         <div style={{
@@ -2959,44 +3339,58 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
           flexDirection: 'column',
           alignItems: 'center',
           background: '#ffffff',
-          borderRadius: '20px',
+          borderRadius: '24px',
           border: '1px solid #e8e8ed',
-          padding: '16px 20px',
+          padding: isMobileView ? '16px' : '20px 24px',
           justifyContent: 'space-between',
-          gap: '8px',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.03)',
+          gap: '12px',
+          boxShadow: '0 8px 28px rgba(0, 0, 0, 0.04)',
           height: '100%',
           boxSizing: 'border-box'
         }}>
-          <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.62rem', color: '#86868b', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-              ÜBE-METRONOM {effectiveUiLevel === 'junior' ? '• JUNIOR' : effectiveUiLevel === 'teen' ? '• TEEN BEAT' : '• PRO STUDIO'}
-            </span>
-            <div style={{ display: 'flex', gap: '5px' }}>
+          <div style={{ width: '100%', maxWidth: '400px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                ÜBE-METRONOM
+              </span>
+              <span style={{
+                fontSize: '0.62rem',
+                fontWeight: 800,
+                color: '#854d0e',
+                background: '#fefce8',
+                border: '1px solid #fef08a',
+                padding: '2px 8px',
+                borderRadius: '100px'
+              }}>
+                {effectiveUiLevel === 'junior' ? 'JUNIOR' : effectiveUiLevel === 'teen' ? 'TEEN BEAT' : 'PRO STUDIO'}
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: '6px' }}>
               <button
                 type="button"
-                onClick={() => {
-                  if (chamberPitch === 0) playChamberPitch(440);
-                  else if (chamberPitch === 440) playChamberPitch(442);
-                  else stopChamberPitch();
-                }}
+                onClick={() => setShowToolsModal(true)}
                 style={{
-                  background: chamberPitch !== 0 ? '#fefce8' : '#f8fafc',
-                  border: chamberPitch !== 0 ? '1.5px solid #eab308' : '1px solid #cbd5e1',
-                  borderRadius: '6px',
-                  padding: '2px 6px',
-                  fontSize: '0.62rem',
-                  fontWeight: 800,
-                  color: chamberPitch !== 0 ? '#854d0e' : '#475569',
+                  background: (speedTrainerActive || muteBarActive || chamberPitch !== 0) ? '#fff7ed' : '#f8fafc',
+                  border: (speedTrainerActive || muteBarActive || chamberPitch !== 0) ? '1.5px solid #ea580c' : '1px solid #cbd5e1',
+                  borderRadius: '10px',
+                  padding: '6px 11px',
+                  fontSize: '0.72rem',
+                  fontWeight: 850,
+                  color: (speedTrainerActive || muteBarActive || chamberPitch !== 0) ? '#9a3412' : '#334155',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '3px'
+                  gap: '5px',
+                  boxShadow: (speedTrainerActive || muteBarActive) ? '0 2px 6px rgba(234, 88, 12, 0.2)' : '0 1px 2px rgba(0,0,0,0.02)',
+                  transition: 'all 0.15s ease'
                 }}
-                title="Kammerton Stimmgabel (440 Hz / 442 Hz)"
+                title="Übe-Werkzeuge öffnen (Tempo-Trainer, Stummtakt, Kammerton)"
               >
-                <Bell size={11} color={chamberPitch !== 0 ? '#eab308' : '#64748b'} />
-                <span>{chamberPitch !== 0 ? `${chamberPitch} Hz` : 'A=440'}</span>
+                <Flame size={13} style={{ color: (speedTrainerActive || muteBarActive || chamberPitch !== 0) ? '#ea580c' : '#64748b' }} />
+                <span>Werkzeuge</span>
+                {(speedTrainerActive || muteBarActive || chamberPitch !== 0) && (
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ea580c' }} />
+                )}
               </button>
               <button
                 type="button"
@@ -3004,19 +3398,21 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 style={{
                   background: '#f8fafc',
                   border: '1px solid #cbd5e1',
-                  borderRadius: '6px',
-                  padding: '2px 6px',
-                  fontSize: '0.62rem',
-                  fontWeight: 800,
-                  color: '#475569',
+                  borderRadius: '10px',
+                  padding: '6px 11px',
+                  fontSize: '0.72rem',
+                  fontWeight: 850,
+                  color: '#334155',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '3px'
+                  gap: '5px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                  transition: 'all 0.15s ease'
                 }}
                 title="Notenständer-Großansicht"
               >
-                <Maximize2 size={11} />
+                <Maximize2 size={13} />
                 <span>Notenständer</span>
               </button>
             </div>
@@ -3304,44 +3700,44 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             alignItems: 'center',
             justifyContent: 'space-between',
             width: '100%',
-            maxWidth: '280px',
+            maxWidth: '400px',
             margin: '2px 0 4px 0',
-            padding: '0 2px'
+            padding: '0 4px'
           }}>
             <span style={{
-              fontSize: '0.64rem',
-              fontWeight: 800,
+              fontSize: '0.68rem',
+              fontWeight: 900,
               color: '#64748b',
               textTransform: 'uppercase',
               letterSpacing: '0.06em',
               display: 'flex',
               alignItems: 'center',
-              gap: '5px'
+              gap: '6px'
             }}>
-              <Clock size={11} />
+              <Clock size={13} />
               Zählzeiten & Akzente
             </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               {effectiveUiLevel === 'pro' && (
                 <span style={{
-                  fontSize: '0.62rem',
-                  fontWeight: 700,
+                  fontSize: '0.66rem',
+                  fontWeight: 800,
                   color: '#64748b',
                   background: '#f1f5f9',
-                  padding: '1px 6px',
-                  borderRadius: '4px',
+                  padding: '2px 7px',
+                  borderRadius: '6px',
                   fontFamily: 'SF Mono, monospace'
                 }}>
                   {Math.round((60000 / bpm))}ms
                 </span>
               )}
               <span style={{
-                fontSize: '0.68rem',
-                fontWeight: 900,
+                fontSize: '0.74rem',
+                fontWeight: 950,
                 color: '#854d0e',
                 background: '#fefce8',
                 border: '1px solid #fde047',
-                padding: '1px 8px',
+                padding: '2px 10px',
                 borderRadius: '100px',
                 fontFamily: 'SF Mono, monospace'
               }}>
@@ -3350,14 +3746,14 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             </div>
           </div>
 
-          {/* Dynamische Interaktive Beat-Karten je Taktart (4-Stufen-Zyklus) */}
+          {/* Dynamische Interaktive Beat-Pads je Taktart (4-Stufen-Zyklus: Akzent, Normal, Ghost, Mute) */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: `repeat(${activeMeterInfo.beats}, 1fr)`,
-            gap: activeMeterInfo.beats > 4 ? '5px' : '8px',
+            gap: activeMeterInfo.beats > 4 ? '6px' : '10px',
             width: '100%',
-            maxWidth: '280px',
-            margin: '2px 0 4px 0'
+            maxWidth: '400px',
+            margin: '2px 0 6px 0'
           }}>
             {Array.from({ length: activeMeterInfo.beats }).map((_, idx) => {
               const isActive = (activeBeatIndex !== null && activeBeatIndex !== undefined) ? (activeBeatIndex % activeMeterInfo.beats === idx) : false;
@@ -3373,32 +3769,32 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   onClick={() => toggleBeatAccent(idx)}
                   className="tactile-btn"
                   style={{
-                    height: activeMeterInfo.beats > 4 ? '36px' : '42px',
-                    borderRadius: activeMeterInfo.beats > 4 ? '8px' : '12px',
+                    height: activeMeterInfo.beats > 4 ? '44px' : '52px',
+                    borderRadius: '16px',
                     background: isActive 
                       ? (isAccent ? '#eab308' : (isGhost ? '#475569' : (isMute ? '#64748b' : '#0f172a'))) 
                       : (isAccent ? '#fefce8' : (isGhost ? '#f8fafc' : (isMute ? '#f1f5f9' : '#ffffff'))),
                     border: isActive 
-                      ? '2px solid #facc15' 
-                      : (isAccent ? '2px solid #eab308' : (isMute ? '1.5px dashed #cbd5e1' : '1px solid #cbd5e1')),
+                      ? '2.5px solid #facc15' 
+                      : (isAccent ? '2px solid #eab308' : (isMute ? '1.5px dashed #cbd5e1' : '1.5px solid #cbd5e1')),
                     boxShadow: isActive 
-                      ? '0 0 14px rgba(234, 179, 8, 0.45)' 
-                      : (isAccent ? '0 2px 6px rgba(234, 179, 8, 0.15)' : 'none'),
+                      ? '0 0 20px rgba(234, 179, 8, 0.55)' 
+                      : (isAccent ? '0 2px 8px rgba(234, 179, 8, 0.2)' : '0 1px 3px rgba(0,0,0,0.04)'),
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: isActive ? '#ffffff' : (isAccent ? '#854d0e' : (isMute ? '#94a3b8' : '#0f172a')),
-                    fontSize: activeMeterInfo.beats > 4 ? '0.78rem' : '0.88rem',
+                    fontSize: activeMeterInfo.beats > 4 ? '0.88rem' : '1.05rem',
                     fontWeight: 950,
                     cursor: 'pointer',
-                    transform: isActive ? 'scale(1.06)' : 'scale(1)',
-                    transition: 'all 0.08s ease',
+                    transform: isActive ? 'scale(1.08)' : 'scale(1)',
+                    transition: 'all 0.08s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                     position: 'relative'
                   }}
                   title={`Schlag ${idx + 1}: ${isAccent ? 'Betont (Laut)' : isGhost ? 'Leise (Gedämpft)' : isMute ? 'Stumm' : 'Normal'} – Antippen zum Wechseln`}
                 >
-                  <span style={{ fontSize: '0.48rem', fontWeight: 900, lineHeight: 1, marginBottom: '1px' }}>
+                  <span style={{ fontSize: '0.60rem', fontWeight: 900, lineHeight: 1, marginBottom: '2px' }}>
                     {isAccent ? '👑' : isGhost ? '•' : isMute ? '✕' : ''}
                   </span>
                   <span>{idx + 1}</span>
@@ -3407,107 +3803,103 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             })}
           </div>
 
-          {/* Schnelle Taktart-Wahl bei Metronom */}
+          {/* Rhythmus-Zentrale Kapseln: Taktart & Unterteilung */}
           {selectedStyle === 'metronome' && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '4px',
-              width: '100%',
-              maxWidth: '280px',
-              margin: '2px 0 2px 0',
-              background: '#f1f5f9',
-              padding: '3px',
-              borderRadius: '10px'
-            }}>
-              {(['4/4', '3/4', '2/4', '6/8'] as const).map((meterOpt) => {
-                const isSelected = metronomeMeter === meterOpt;
-                return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', maxWidth: '400px' }}>
+              {/* Taktart-Wahl (4/4, 3/4, 2/4, 6/8) */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                width: '100%',
+                background: '#f1f5f9',
+                padding: '4px',
+                borderRadius: '14px'
+              }}>
+                {(['4/4', '3/4', '2/4', '6/8'] as const).map((meterOpt) => {
+                  const isSelected = metronomeMeter === meterOpt;
+                  return (
+                    <button
+                      key={meterOpt}
+                      type="button"
+                      onClick={() => {
+                        setMetronomeMeter(meterOpt);
+                        setActiveBeatIndex(null);
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '7px 0',
+                        fontSize: '0.78rem',
+                        fontWeight: isSelected ? 900 : 750,
+                        borderRadius: '10px',
+                        border: 'none',
+                        background: isSelected ? '#ffffff' : 'transparent',
+                        color: isSelected ? '#854d0e' : '#64748b',
+                        boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.12s ease'
+                      }}
+                    >
+                      {meterOpt}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Subdivisions Selector (♩ Viertel, ♫ Achtel, 3er Triolen, 𝅘𝅥𝅯𝅘𝅥𝅯 16tel) */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                width: '100%',
+                background: '#f8fafc',
+                padding: '4px',
+                borderRadius: '14px',
+                border: '1px solid #e2e8f0'
+              }}>
+                {[
+                  { id: '1', label: '♩ Viertel' },
+                  { id: '2', label: '♫ Achtel' },
+                  { id: '3', label: '3er Triolen' },
+                  { id: '4', label: '𝅘𝅥𝅯𝅘𝅥𝅯 16tel' }
+                ].map(subOpt => (
                   <button
-                    key={meterOpt}
+                    key={subOpt.id}
                     type="button"
-                    onClick={() => {
-                      setMetronomeMeter(meterOpt);
-                      setActiveBeatIndex(null);
-                    }}
+                    onClick={() => setSubdivision(subOpt.id as any)}
                     style={{
                       flex: 1,
-                      padding: '4px 0',
-                      fontSize: '0.68rem',
-                      fontWeight: 850,
-                      borderRadius: '7px',
+                      padding: '6px 0',
+                      fontSize: '0.72rem',
+                      fontWeight: subdivision === subOpt.id ? 900 : 700,
+                      borderRadius: '10px',
                       border: 'none',
-                      background: isSelected ? '#ffffff' : 'transparent',
-                      color: isSelected ? '#854d0e' : '#64748b',
-                      boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                      background: subdivision === subOpt.id ? '#fefce8' : 'transparent',
+                      color: subdivision === subOpt.id ? '#854d0e' : '#64748b',
+                      boxShadow: subdivision === subOpt.id ? '0 2px 6px rgba(234, 179, 8, 0.25)' : 'none',
                       cursor: 'pointer',
-                      transition: 'all 0.12s ease'
+                      transition: 'all 0.1s ease'
                     }}
                   >
-                    {meterOpt}
+                    {subOpt.label}
                   </button>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Subdivisions Selector (Unterteilungen: ♩ Viertel, ♫ Achtel, 3er Triolen, 𝅘𝅥𝅯𝅘𝅥𝅯 16tel) */}
-          {selectedStyle === 'metronome' && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '4px',
-              width: '100%',
-              maxWidth: '280px',
-              margin: '1px 0 3px 0',
-              background: '#f8fafc',
-              padding: '2px 3px',
-              borderRadius: '8px',
-              border: '1px solid #e2e8f0'
-            }}>
-              {[
-                { id: '1', label: '♩ Viertel' },
-                { id: '2', label: '♫ Achtel' },
-                { id: '3', label: '3er' },
-                { id: '4', label: '𝅘𝅥𝅯𝅘𝅥𝅯 16tel' }
-              ].map(subOpt => (
-                <button
-                  key={subOpt.id}
-                  type="button"
-                  onClick={() => setSubdivision(subOpt.id as any)}
-                  style={{
-                    flex: 1,
-                    padding: '3px 0',
-                    fontSize: '0.62rem',
-                    fontWeight: subdivision === subOpt.id ? 900 : 700,
-                    borderRadius: '6px',
-                    border: 'none',
-                    background: subdivision === subOpt.id ? '#fefce8' : 'transparent',
-                    color: subdivision === subOpt.id ? '#854d0e' : '#64748b',
-                    boxShadow: subdivision === subOpt.id ? '0 1px 2px rgba(234, 179, 8, 0.2)' : 'none',
-                    cursor: 'pointer',
-                    transition: 'all 0.1s ease'
-                  }}
-                >
-                  {subOpt.label}
-                </button>
-              ))}
+                ))}
+              </div>
             </div>
           )}
 
           {/* Takt-Fortschritts-Sweep-Bar */}
           <div style={{
             width: '100%',
-            maxWidth: '280px',
-            height: '4px',
-            background: '#e5e5e7',
+            maxWidth: '400px',
+            height: '5px',
+            background: '#e2e8f0',
             borderRadius: '10px',
             overflow: 'hidden',
             position: 'relative',
-            marginTop: '-1px',
-            marginBottom: '2px'
+            margin: '2px 0'
           }}>
             <div style={{
               position: 'absolute',
@@ -3516,392 +3908,278 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               height: '100%',
               width: `${barProgress}%`,
               background: 'linear-gradient(90deg, #facc15 0%, #eab308 100%)',
-              boxShadow: '0 0 6px rgba(234, 179, 8, 0.4)',
+              boxShadow: '0 0 8px rgba(234, 179, 8, 0.5)',
               borderRadius: '10px',
               transition: isPlaying ? 'none' : 'width 0.1s ease-out'
             }} />
           </div>
 
-          {/* Large Tempo Display & Touch Stepper */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: '280px', gap: '6px' }}>
-            <button
-              type="button"
-              onClick={() => setBpm(prev => Math.max(40, prev - 5))}
-              style={{
-                height: '38px',
-                padding: '0 10px',
-                borderRadius: '10px',
-                border: '1px solid #cbd5e1',
-                background: '#ffffff',
-                color: '#475569',
-                fontWeight: 800,
-                fontSize: '0.76rem',
-                cursor: 'pointer',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-              }}
-              title="5 BPM langsamer"
-            >
-              -5
-            </button>
-            <button
-              type="button"
-              onClick={() => setBpm(prev => Math.max(40, prev - 1))}
-              style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '12px',
-                border: '1px solid #cbd5e1',
-                background: '#ffffff',
-                color: '#0f172a',
-                fontWeight: 900,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
-              }}
-              title="1 BPM langsamer"
-            >
-              <Minus size={16} strokeWidth={2.5} />
-            </button>
+          {/* ⏱️ Apple-Style Tempo-Cockpit */}
+          <div style={{
+            width: '100%',
+            maxWidth: '400px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: '20px',
+            padding: '14px 16px',
+            boxSizing: 'border-box'
+          }}>
+            {/* BPM Hero & Animal Medallion */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '14px' }}>
+              {/* Junior Animated Animal Medallion */}
+              {effectiveUiLevel === 'junior' && (() => {
+                const animalInfo = bpm <= 70
+                  ? { emoji: '🐢', name: 'Leo', bg: '#dcfce7', border: '#86efac', text: '#166534' }
+                  : bpm <= 110
+                  ? { emoji: '🐕', name: 'Bello', bg: '#fef3c7', border: '#fcd34d', text: '#854d0e' }
+                  : bpm <= 150
+                  ? { emoji: '🐇', name: 'Flitzi', bg: '#e0f2fe', border: '#7dd3fc', text: '#0369a1' }
+                  : { emoji: '🐆', name: 'Cheetah', bg: '#fee2e2', border: '#fca5a5', text: '#991b1b' };
 
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '90px' }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '3px' }}>
-                <span style={{ fontSize: '2.4rem', fontWeight: 950, color: '#0f172a', lineHeight: 1, fontFamily: 'SF Mono, monospace' }}>
-                  {bpm}
-                </span>
-                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 800 }}>
-                  BPM
+                const isBeatBounce = isPlaying && (activeBeatIndex !== null);
+
+                return (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                        try { navigator.vibrate(15); } catch (_) {}
+                      }
+                    }}
+                    style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '50%',
+                      background: animalInfo.bg,
+                      border: `2px solid ${animalInfo.border}`,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: isBeatBounce ? `0 0 16px ${animalInfo.border}` : '0 2px 8px rgba(0,0,0,0.06)',
+                      transform: isBeatBounce ? 'scale(1.18)' : 'scale(1)',
+                      transition: 'transform 0.08s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                      cursor: 'pointer',
+                      padding: 0,
+                      flexShrink: 0
+                    }}
+                    title={`${animalInfo.name} wippt im Takt mit!`}
+                  >
+                    <span style={{ fontSize: '1.45rem', lineHeight: 1 }}>{animalInfo.emoji}</span>
+                  </button>
+                );
+              })()}
+
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                  <span style={{ fontSize: '2.6rem', fontWeight: 950, color: '#0f172a', lineHeight: 1, fontFamily: 'SF Mono, monospace', letterSpacing: '-0.02em' }}>
+                    {bpm}
+                  </span>
+                  <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 900 }}>
+                    BPM
+                  </span>
+                </div>
+                <span style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 850,
+                  color: '#854d0e',
+                  background: '#fefce8',
+                  border: '1px solid #fde047',
+                  padding: '2px 10px',
+                  borderRadius: '100px',
+                  marginTop: '4px'
+                }}>
+                  {effectiveUiLevel === 'junior'
+                    ? (bpm <= 70 ? '🐢 Leo (Gemütlich)' : bpm <= 110 ? '🐕 Bello (Flott)' : bpm <= 150 ? '🐇 Flitzi (Schnell)' : '🐆 Cheetah (Rakete)')
+                    : (bpm < 60 ? 'Largo' : bpm < 76 ? 'Adagio' : bpm < 108 ? 'Andante' : bpm < 120 ? 'Moderato' : bpm < 168 ? 'Allegro' : 'Presto')}
                 </span>
               </div>
-              <span style={{
-                fontSize: '0.68rem',
-                fontWeight: 800,
-                color: '#854d0e',
-                background: '#fefce8',
-                border: '1px solid #fde047',
-                padding: '1px 8px',
-                borderRadius: '100px',
-                marginTop: '3px'
-              }}>
-                {effectiveUiLevel === 'junior'
-                  ? (bpm <= 70 ? '🐢 Schildkröte' : bpm <= 110 ? '🐕 Hund' : bpm <= 150 ? '🐇 Hase' : '🐆 Gepard')
-                  : (bpm < 60 ? 'Largo' : bpm < 76 ? 'Adagio' : bpm < 108 ? 'Andante' : bpm < 120 ? 'Moderato' : bpm < 168 ? 'Allegro' : 'Presto')}
-              </span>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setBpm(prev => Math.min(240, prev + 1))}
-              style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '12px',
-                border: '1px solid #cbd5e1',
-                background: '#ffffff',
-                color: '#0f172a',
-                fontWeight: 900,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
-              }}
-              title="1 BPM schneller"
-            >
-              <Plus size={16} strokeWidth={2.5} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setBpm(prev => Math.min(240, prev + 5))}
-              style={{
-                height: '38px',
-                padding: '0 10px',
-                borderRadius: '10px',
-                border: '1px solid #cbd5e1',
-                background: '#ffffff',
-                color: '#475569',
-                fontWeight: 800,
-                fontSize: '0.76rem',
-                cursor: 'pointer',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-              }}
-              title="5 BPM schneller"
-            >
-              +5
-            </button>
-          </div>
-
-          {/* Slider with integrated Tap-Tempo pill */}
-          <div style={{ width: '100%', maxWidth: '280px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-            <input
-              type="range"
-              min="40"
-              max="240"
-              value={bpm}
-              onChange={(e) => setBpm(Number(e.target.value))}
-              style={{ width: '100%', height: '6px', accentColor: '#eab308', cursor: 'pointer' }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.62rem', color: '#94a3b8', fontWeight: 700 }}>
-              <span>40 Langsam</span>
+            {/* Tactile Hardware Stepper Row: -5, -, +, +5 */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
               <button
                 type="button"
-                onClick={handleTapTempo}
+                onClick={() => setBpm(prev => Math.max(40, prev - 5))}
                 style={{
+                  height: '42px',
+                  padding: '0 14px',
+                  borderRadius: '12px',
                   border: '1px solid #cbd5e1',
-                  background: '#f8fafc',
-                  padding: '2px 8px',
-                  borderRadius: '6px',
-                  fontSize: '0.62rem',
-                  fontWeight: 800,
-                  color: '#0f172a',
-                  cursor: 'pointer'
+                  background: '#ffffff',
+                  color: '#475569',
+                  fontWeight: 850,
+                  fontSize: '0.84rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                  transition: 'all 0.12s ease'
                 }}
+                title="5 BPM langsamer"
               >
-                ⚡ Tempo einklopfen
+                -5
               </button>
-              <span>240 Schnell</span>
-            </div>
-          </div>
-
-          {/* ⚡ 1% Top Tools Bar (Speed-Trainer, Mute-Bar Challenge, Stimmgabel) */}
-          <div style={{ width: '100%', maxWidth: '280px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <button
-              type="button"
-              onClick={() => setShowToolsDrawer(prev => !prev)}
-              style={{
-                width: '100%',
-                padding: '7px 12px',
-                borderRadius: '10px',
-                border: showToolsDrawer ? '1.5px solid #ca8a04' : '1px solid #e2e8f0',
-                background: showToolsDrawer ? '#fefce8' : '#ffffff',
-                color: showToolsDrawer ? '#854d0e' : '#475569',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                cursor: 'pointer',
-                fontSize: '0.72rem',
-                fontWeight: 800,
-                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Flame size={14} style={{ color: speedTrainerActive ? '#ea580c' : '#ca8a04' }} />
-                <span>Übe-Werkzeuge {speedTrainerActive ? '🔥 Tempo-Trainer an' : muteBarActive ? '🧠 Stummtakt an' : ''}</span>
-              </div>
-              <span style={{ fontSize: '0.64rem', color: '#64748b' }}>
-                {showToolsDrawer ? 'Schließen ▲' : 'Öffnen ▼'}
-              </span>
-            </button>
-
-            {/* Expandable Tools Drawer */}
-            {showToolsDrawer && (
-              <div style={{
-                background: '#ffffff',
-                border: '1px solid #e2e8f0',
-                borderRadius: '12px',
-                padding: '10px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
-              }}>
-                {/* 1. Tempo-Trainer */}
-                <div style={{
-                  padding: '8px',
-                  borderRadius: '8px',
-                  background: speedTrainerActive ? '#fff7ed' : '#f8fafc',
-                  border: speedTrainerActive ? '1px solid #fdba74' : '1px solid #f1f5f9'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      <Flame size={13} style={{ color: '#ea580c' }} />
-                      <span style={{ fontSize: '0.72rem', fontWeight: 850, color: '#9a3412' }}>Tempo-Trainer</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setSpeedTrainerActive(prev => !prev)}
-                      style={{
-                        fontSize: '0.62rem',
-                        fontWeight: 800,
-                        padding: '2px 8px',
-                        borderRadius: '6px',
-                        border: 'none',
-                        background: speedTrainerActive ? '#ea580c' : '#cbd5e1',
-                        color: '#ffffff',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {speedTrainerActive ? 'Aktiv' : 'Aus'}
-                    </button>
-                  </div>
-                  {speedTrainerActive && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.64rem', color: '#7c2d12' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span>Ziel-Tempo: <strong>{speedTrainerTargetBpm} BPM</strong></span>
-                        <span>Alle <strong>{speedTrainerIntervalBars} Takte</strong> (+{speedTrainerStep} BPM)</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="60"
-                        max="220"
-                        value={speedTrainerTargetBpm}
-                        onChange={(e) => setSpeedTrainerTargetBpm(Number(e.target.value))}
-                        style={{ width: '100%', height: '4px', accentColor: '#ea580c' }}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* 2. Stummtakt-Herausforderung */}
-                <div style={{
-                  padding: '8px',
-                  borderRadius: '8px',
-                  background: muteBarActive ? '#f0fdf4' : '#f8fafc',
-                  border: muteBarActive ? '1px solid #86efac' : '1px solid #f1f5f9'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: muteBarActive ? '6px' : 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      <span style={{ fontSize: '0.78rem' }}>🧠</span>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 850, color: '#166534' }}>Stummtakt-Training</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMuteBarActive(prev => !prev);
-                        setIsCurrentBarMuted(false);
-                      }}
-                      style={{
-                        fontSize: '0.62rem',
-                        fontWeight: 850,
-                        padding: '2px 8px',
-                        borderRadius: '6px',
-                        border: 'none',
-                        background: muteBarActive ? '#16a34a' : '#cbd5e1',
-                        color: '#ffffff',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {muteBarActive ? 'Aktiv' : 'Aus'}
-                    </button>
-                  </div>
-                  {muteBarActive && (
-                    <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
-                      {[
-                        { mode: '3_plus_1' as const, label: '3 Takte Play + 1 Mute' },
-                        { mode: '1_plus_1' as const, label: '1 Takt Play + 1 Mute' }
-                      ].map(item => (
-                        <button
-                          key={item.label}
-                          type="button"
-                          onClick={() => setMuteBarMode(item.mode)}
-                          style={{
-                            flex: 1,
-                            padding: '3px 4px',
-                            fontSize: '0.6rem',
-                            fontWeight: muteBarMode === item.mode ? 800 : 600,
-                            borderRadius: '5px',
-                            border: '1px solid',
-                            borderColor: muteBarMode === item.mode ? '#16a34a' : '#cbd5e1',
-                            background: muteBarMode === item.mode ? '#dcfce7' : '#ffffff',
-                            color: muteBarMode === item.mode ? '#166534' : '#64748b',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* 3. Stimmgabel (440 Hz / 442 Hz) */}
-                <div style={{
-                  padding: '8px',
-                  borderRadius: '8px',
-                  background: chamberPitch > 0 ? '#fef3c7' : '#f8fafc',
-                  border: chamberPitch > 0 ? '1px solid #fcd34d' : '1px solid #f1f5f9',
+              <button
+                type="button"
+                onClick={() => setBpm(prev => Math.max(40, prev - 1))}
+                style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '50%',
+                  border: '1.5px solid #cbd5e1',
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'space-between'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <Bell size={13} style={{ color: '#b45309' }} />
-                    <span style={{ fontSize: '0.72rem', fontWeight: 850, color: '#78350f' }}>Kammerton A</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                    <button
-                      type="button"
-                      onClick={() => chamberPitch === 440 ? stopChamberPitch() : playChamberPitch(440)}
-                      style={{
-                        padding: '3px 7px',
-                        fontSize: '0.64rem',
-                        fontWeight: 800,
-                        borderRadius: '6px',
-                        border: 'none',
-                        background: chamberPitch === 440 ? '#d97706' : '#e2e8f0',
-                        color: chamberPitch === 440 ? '#ffffff' : '#475569',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {chamberPitch === 440 ? 'Stopp' : '440 Hz'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => chamberPitch === 442 ? stopChamberPitch() : playChamberPitch(442)}
-                      style={{
-                        padding: '3px 7px',
-                        fontSize: '0.64rem',
-                        fontWeight: 800,
-                        borderRadius: '6px',
-                        border: 'none',
-                        background: chamberPitch === 442 ? '#d97706' : '#e2e8f0',
-                        color: chamberPitch === 442 ? '#ffffff' : '#475569',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {chamberPitch === 442 ? 'Stopp' : '442 Hz'}
-                    </button>
-                  </div>
-                </div>
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                  transition: 'all 0.12s ease'
+                }}
+                title="1 BPM langsamer"
+              >
+                <Minus size={18} strokeWidth={2.8} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setBpm(prev => Math.min(240, prev + 1))}
+                style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '50%',
+                  border: '1.5px solid #cbd5e1',
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                  transition: 'all 0.12s ease'
+                }}
+                title="1 BPM schneller"
+              >
+                <Plus size={18} strokeWidth={2.8} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setBpm(prev => Math.min(240, prev + 5))}
+                style={{
+                  height: '42px',
+                  padding: '0 14px',
+                  borderRadius: '12px',
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  color: '#475569',
+                  fontWeight: 850,
+                  fontSize: '0.84rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                  transition: 'all 0.12s ease'
+                }}
+                title="5 BPM schneller"
+              >
+                +5
+              </button>
+            </div>
+
+            {/* Slider & Tap Tempo Row */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <input
+                type="range"
+                min="40"
+                max="240"
+                value={bpm}
+                onChange={(e) => setBpm(Number(e.target.value))}
+                style={{ width: '100%', height: '6px', accentColor: '#eab308', cursor: 'pointer' }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.70rem', color: '#64748b', fontWeight: 750 }}>
+                <span>40 Langsam</span>
+                <button
+                  type="button"
+                  onClick={handleTapTempo}
+                  style={{
+                    border: '1px solid #cbd5e1',
+                    background: '#ffffff',
+                    padding: '5px 14px',
+                    borderRadius: '10px',
+                    fontSize: '0.74rem',
+                    fontWeight: 850,
+                    color: '#0f172a',
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    transition: 'all 0.12s ease'
+                  }}
+                >
+                  <Zap size={12} color="#eab308" />
+                  <span>Tempo einklopfen (Tap)</span>
+                </button>
+                <span>240 Schnell</span>
               </div>
-            )}
+            </div>
           </div>
 
           {/* Active Song Context Banner */}
           {activeSongContext?.songTitle && (
             <div style={{
               width: '100%',
-              maxWidth: '280px',
+              maxWidth: '400px',
               background: 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
-              border: '1px solid #fde047',
-              borderRadius: '10px',
-              padding: '6px 10px',
+              border: '1.5px solid #fde047',
+              borderRadius: '14px',
+              padding: '8px 12px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between'
+              justifyContent: 'space-between',
+              boxShadow: '0 2px 6px rgba(234, 179, 8, 0.1)'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Music size={13} style={{ color: '#ca8a04' }} />
-                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#854d0e' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Music size={15} style={{ color: '#ca8a04' }} />
+                <span style={{ fontSize: '0.78rem', fontWeight: 850, color: '#854d0e' }}>
                   Song: <strong>{activeSongContext.songTitle}</strong>
                 </span>
               </div>
-              <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#854d0e', background: '#ffffff', padding: '1px 6px', borderRadius: '4px' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#854d0e', background: '#ffffff', padding: '2px 8px', borderRadius: '6px', border: '1px solid #fde047' }}>
                 {activeSongContext.targetBpm} BPM
               </span>
             </div>
           )}
 
-          {/* Dual Action: Starten & Aufnahme (52px Hero Buttons) */}
-          <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+          {/* Dual Action: Starten & Aufnahme (Desktop: Fest am Boden des Panels verankert, Mobile: Floating Sticky Pill) */}
+          <div style={isMobileView ? {
+            position: 'fixed',
+            bottom: 'calc(env(safe-area-inset-bottom, 20px) + 72px)',
+            left: '16px',
+            right: '16px',
+            zIndex: 900,
+            display: 'flex',
+            gap: '8px',
+            background: 'rgba(255, 255, 255, 0.92)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            padding: '8px',
+            borderRadius: '20px',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0,0,0,0.06)',
+            border: '1px solid rgba(226, 232, 240, 0.8)'
+          } : {
+            display: 'flex',
+            gap: '10px',
+            width: '100%',
+            maxWidth: '400px',
+            marginTop: 'auto',
+            paddingTop: '6px'
+          }}>
             <button
               type="button"
               onClick={handleTogglePlay}
               disabled={isRecording || isCountingIn}
               style={{
-                flex: 1.2,
+                flex: 1.3,
                 minHeight: '52px',
                 background: (isPlaying && !isRecording) ? '#0f172a' : (isRecording || isCountingIn ? '#cbd5e1' : 'linear-gradient(135deg, #facc15 0%, #eab308 100%)'),
                 color: (isPlaying && !isRecording) ? '#ffffff' : (isRecording || isCountingIn ? '#ffffff' : '#0f172a'),
@@ -4504,17 +4782,17 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             )}
           </div>
 
-          {/* ANKER 2: DIE 4 BELIEBTESTEN RHYTHMEN (Primärer Fokus) */}
+          {/* ANKER 2: DIE 4 BELIEBTESTEN RHYTHMEN (Tactile Studio Groove-Pads) */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(2, 1fr)',
-            gap: '10px'
+            gap: '12px'
           }}>
             {[
-              { id: 'metronome', label: 'Metronom Klick', desc: 'Klassischer Klick' },
-              { id: 'rock', label: 'Rock & Pop Rhythmus', desc: 'Kräftiger Schlagzeug-Takt' },
-              { id: 'hiphop', label: 'Hip-Hop Rhythmus', desc: 'Lässiger Boom-Bap Takt' },
-              { id: 'singersongwriter', label: 'Liedermacher', desc: 'Akustik-Schlagzeug' }
+              { id: 'metronome', label: 'Metronom Klick', desc: 'Klassischer Klick', icon: '⏱️' },
+              { id: 'rock', label: 'Rock & Pop', desc: 'Kräftiger Schlagzeug-Takt', icon: '🥁' },
+              { id: 'hiphop', label: 'Hip-Hop Pocket', desc: 'Lässiger Boom-Bap Takt', icon: '🎧' },
+              { id: 'singersongwriter', label: 'Liedermacher', desc: 'Akustik-Drum & Shaker', icon: '🎸' }
             ].map((styleOpt) => {
               const isSelected = selectedStyle === styleOpt.id;
               return (
@@ -4530,39 +4808,52 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   }}
                   className="tactile-btn"
                   style={{
-                    background: isSelected ? 'linear-gradient(135deg, #facc15 0%, #eab308 100%)' : '#f8fafc',
+                    background: isSelected ? 'linear-gradient(135deg, #facc15 0%, #eab308 100%)' : '#ffffff',
                     color: isSelected ? '#0f172a' : '#1e293b',
-                    border: isSelected ? '2px solid #ca8a04' : '1px solid #e2e8f0',
-                    borderRadius: '14px',
-                    padding: '12px 14px',
+                    border: isSelected ? '2px solid #ca8a04' : '1.5px solid #e2e8f0',
+                    borderRadius: '16px',
+                    padding: '14px 16px',
                     cursor: 'pointer',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'flex-start',
-                    justifyContent: 'center',
-                    gap: '2px',
-                    minHeight: '56px',
-                    transition: 'all 0.15s ease',
-                    boxShadow: isSelected ? '0 4px 14px rgba(234, 179, 8, 0.35)' : 'none',
-                    textAlign: 'left'
+                    justifyContent: 'space-between',
+                    gap: '4px',
+                    minHeight: '74px',
+                    transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
+                    boxShadow: isSelected ? '0 6px 20px rgba(234, 179, 8, 0.35)' : '0 1px 3px rgba(0,0,0,0.03)',
+                    textAlign: 'left',
+                    position: 'relative'
                   }}
                 >
                   <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.86rem', fontWeight: 900 }}>{styleOpt.label}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>{styleOpt.icon}</span>
+                      <span style={{ fontSize: '0.90rem', fontWeight: 950 }}>{styleOpt.label}</span>
+                    </div>
                     {isSelected && (
-                      <span style={{
-                        fontSize: '0.62rem',
-                        fontWeight: 900,
-                        background: 'rgba(15, 23, 42, 0.12)',
-                        color: '#0f172a',
-                        padding: '2px 6px',
-                        borderRadius: '100px'
-                      }}>
-                        Aktiv
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {isPlaying && (
+                          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: '14px', marginRight: '2px' }}>
+                            <span className="eq-bar-1" style={{ width: '3px', background: '#0f172a', borderRadius: '1px' }} />
+                            <span className="eq-bar-2" style={{ width: '3px', background: '#0f172a', borderRadius: '1px' }} />
+                            <span className="eq-bar-3" style={{ width: '3px', background: '#0f172a', borderRadius: '1px' }} />
+                          </div>
+                        )}
+                        <span style={{
+                          fontSize: '0.62rem',
+                          fontWeight: 900,
+                          background: 'rgba(15, 23, 42, 0.14)',
+                          color: '#0f172a',
+                          padding: '2px 7px',
+                          borderRadius: '100px'
+                        }}>
+                          Aktiv
+                        </span>
+                      </div>
                     )}
                   </div>
-                  <span style={{ fontSize: '0.66rem', color: isSelected ? 'rgba(15, 23, 42, 0.75)' : '#64748b', fontWeight: 650 }}>
+                  <span style={{ fontSize: '0.68rem', color: isSelected ? 'rgba(15, 23, 42, 0.85)' : '#64748b', fontWeight: 650, marginTop: '2px' }}>
                     {styleOpt.desc}
                   </span>
                 </button>
@@ -4576,22 +4867,22 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             onClick={() => setShowAllStyles(!showAllStyles)}
             style={{
               width: '100%',
-              padding: '8px 12px',
-              borderRadius: '10px',
-              border: '1px dashed #cbd5e1',
-              background: showAllStyles ? '#f1f5f9' : '#ffffff',
-              color: '#475569',
-              fontSize: '0.74rem',
-              fontWeight: 800,
+              padding: '10px 14px',
+              borderRadius: '12px',
+              border: '1.5px dashed #cbd5e1',
+              background: showAllStyles ? '#f1f5f9' : '#f8fafc',
+              color: '#334155',
+              fontSize: '0.78rem',
+              fontWeight: 850,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px',
+              gap: '8px',
               transition: 'all 0.15s ease'
             }}
           >
-            <span>{showAllStyles ? '▴ Weniger Rhythmen anzeigen' : '▾ Weitere 7 Rhythmen anzeigen (Walzer, Jazz, Latin, Disco...)'}</span>
+            <span>{showAllStyles ? '▴ Weniger Rhythmen anzeigen' : '▾ Weitere 7 Rhythmen anzeigen (Jazz, Latin, Funk, Walzer...)'}</span>
           </button>
 
           {/* Ausgeklappte Rhythmus-Karten */}
@@ -4599,21 +4890,21 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(2, 1fr)',
-              gap: '8px',
-              padding: '10px',
+              gap: '10px',
+              padding: '12px',
               background: '#f8fafc',
-              borderRadius: '14px',
+              borderRadius: '16px',
               border: '1px solid #e2e8f0',
               animation: 'fadeIn 0.15s ease'
             }}>
               {[
-                { id: 'swing', label: 'Jazz Swing' },
-                { id: 'latin', label: 'Latin Bossa' },
-                { id: 'funk', label: 'Funk Break' },
-                { id: 'reggae', label: 'Reggae One-Drop' },
-                { id: 'walzer', label: 'Walzer (3/4 Takt)' },
-                { id: 'ballad68', label: '6/8 Ballade' },
-                { id: 'disco', label: 'Disco (4-on-the-Floor)', spanFull: true }
+                { id: 'swing', label: 'Jazz Swing', icon: '🎷', desc: 'Triolen-Swing' },
+                { id: 'latin', label: 'Latin Bossa', icon: '🪇', desc: 'Bossa-Nova' },
+                { id: 'funk', label: 'Funk Break', icon: '🕺', desc: 'Synkopiert' },
+                { id: 'reggae', label: 'Reggae One-Drop', icon: '🌴', desc: 'Offbeat' },
+                { id: 'walzer', label: 'Walzer (3/4)', icon: '💃', desc: 'Klassischer Takt' },
+                { id: 'ballad68', label: '6/8 Ballade', icon: '🌙', desc: 'Sanfter Beat' },
+                { id: 'disco', label: 'Disco (4-on-the-Floor)', icon: '🪩', desc: 'Tanz-Groove', spanFull: true }
               ].map((styleOpt) => {
                 const isSelected = selectedStyle === styleOpt.id;
                 return (
@@ -4631,22 +4922,26 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                       gridColumn: (styleOpt as any).spanFull ? '1 / -1' : undefined,
                       background: isSelected ? 'linear-gradient(135deg, #facc15 0%, #eab308 100%)' : '#ffffff',
                       color: isSelected ? '#0f172a' : '#1e293b',
-                      border: isSelected ? '1.5px solid #ca8a04' : '1px solid #cbd5e1',
-                      borderRadius: '10px',
-                      padding: '8px 12px',
-                      fontSize: '0.78rem',
-                      fontWeight: isSelected ? 850 : 700,
+                      border: isSelected ? '2px solid #ca8a04' : '1px solid #cbd5e1',
+                      borderRadius: '12px',
+                      padding: '10px 12px',
+                      fontSize: '0.80rem',
+                      fontWeight: isSelected ? 900 : 750,
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      minHeight: '38px',
-                      boxShadow: isSelected ? '0 2px 8px rgba(234, 179, 8, 0.25)' : 'none'
+                      minHeight: '44px',
+                      boxShadow: isSelected ? '0 2px 8px rgba(234, 179, 8, 0.25)' : 'none',
+                      transition: 'all 0.12s ease'
                     }}
                   >
-                    <span>{styleOpt.label}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>{styleOpt.icon}</span>
+                      <span>{styleOpt.label}</span>
+                    </div>
                     {isSelected && (
-                      <span style={{ fontSize: '0.60rem', fontWeight: 900, background: 'rgba(15, 23, 42, 0.12)', color: '#0f172a', padding: '2px 6px', borderRadius: '100px' }}>
+                      <span style={{ fontSize: '0.62rem', fontWeight: 900, background: 'rgba(15, 23, 42, 0.12)', color: '#0f172a', padding: '2px 6px', borderRadius: '100px' }}>
                         Aktiv
                       </span>
                     )}
@@ -4660,19 +4955,19 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
           <div style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '6px',
+            gap: '8px',
             background: '#f8fafc',
             border: '1px solid #e2e8f0',
-            borderRadius: '14px',
-            padding: '10px 14px'
+            borderRadius: '16px',
+            padding: '12px 16px'
           }}>
-            <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               Rhythmus-Variante
             </span>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               {[
-                { id: 'A', label: 'Grund-Rhythmus' },
-                { id: 'B', label: 'Mehr Schwung (Variante)' }
+                { id: 'A', label: 'Grund-Rhythmus', desc: 'Standard Groove' },
+                { id: 'B', label: 'Mehr Schwung', desc: 'Variante mit Kick & Snare' }
               ].map((varOpt) => {
                 const isSelected = selectedVariation === varOpt.id;
                 return (
@@ -4683,17 +4978,21 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     style={{
                       background: isSelected ? '#fefce8' : '#ffffff',
                       color: isSelected ? '#854d0e' : '#475569',
-                      border: isSelected ? '1.5px solid #eab308' : '1px solid #cbd5e1',
-                      borderRadius: '10px',
-                      padding: '8px 10px',
-                      fontSize: '0.76rem',
-                      fontWeight: 850,
+                      border: isSelected ? '2px solid #eab308' : '1px solid #cbd5e1',
+                      borderRadius: '12px',
+                      padding: '10px 12px',
+                      fontSize: '0.80rem',
+                      fontWeight: 900,
                       cursor: 'pointer',
                       textAlign: 'center',
+                      boxShadow: isSelected ? '0 2px 6px rgba(234, 179, 8, 0.15)' : 'none',
                       transition: 'all 0.15s ease'
                     }}
                   >
-                    {varOpt.label}
+                    <div>{varOpt.label}</div>
+                    <span style={{ fontSize: '0.64rem', fontWeight: 650, color: isSelected ? '#a16207' : '#94a3b8' }}>
+                      {varOpt.desc}
+                    </span>
                   </button>
                 );
               })}

@@ -43,8 +43,7 @@ const DeviceOnboardingPage = lazy(() => import('./components/DeviceOnboardingPag
 const SchoolSelfOnboardingModal = lazy(() => import('./components/SchoolSelfOnboardingModal').then(m => ({ default: m.SchoolSelfOnboardingModal })));
 const GhostSupportCapsule = lazy(() => import('./components/masterAdmin/GhostSupportCapsule').then(m => ({ default: m.GhostSupportCapsule })));
 const SharedAudioBiographyPage = lazy(() => import('./components/campus/SharedAudioBiographyPage').then(m => ({ default: m.SharedAudioBiographyPage })));
-const HelpCenterModal = lazy(() => import('./components/help/HelpCenterModal').then(m => ({ default: m.HelpCenterModal })));
-const TrialInfoModal = lazy(() => import('./components/TrialInfoModal').then(m => ({ default: m.TrialInfoModal })));
+import { OnboardingHelpModalsHub } from './components/modals/OnboardingHelpModalsHub';
 import { LegalModalsHub } from './components/modals/LegalModalsHub';
 import { SecurityAuthModalsHub } from './components/modals/SecurityAuthModalsHub';
 const ConfettiModal = lazy(() => import('./components/ConfettiModal'));
@@ -14739,151 +14738,42 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
         </div>
       )}
 
-      {/* Modal: QR Code anzeigen */}
-      {showQR && (user?.qr_token || user?.teacher_qr_token) && (
-        <Suspense fallback={null}>
-          <QRCodeModal user={user} activePlatform={activePlatform} onClose={() => setShowQR(false)} />
-        </Suspense>
-      )}
-
-
-
-      {/* Global Leitfäden & Akademie Modal */}
-      {isGlobalHelpCenterOpen && (
-        <Suspense fallback={null}>
-          <HelpCenterModal
-            isOpen={isGlobalHelpCenterOpen}
-            onClose={() => setIsGlobalHelpCenterOpen(false)}
-            userRole={(() => {
-              // 1. If currently authenticated user is master admin, ALWAYS return 'master_admin'
-              if (user?.role?.toLowerCase() === 'master_admin') return 'master_admin';
-
-              // 2. If currently authenticated user is a student, ALWAYS return 'student'
-              if (user?.role?.toLowerCase() === 'student') return 'student';
-              
-              const activeWs = typeof window !== 'undefined'
-                ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace'))
-                : null;
-              
-              // 3. Active workspace overrides for dual-role users (teachers/admins)
-              if (activeWs === 'student') return 'student';
-              if (activeWs === 'teacher') return 'teacher';
-              if (activeWs === 'secretary') return 'secretary';
-              
-              // 4. User role fallbacks
-              if (user?.role?.toLowerCase() === 'teacher') return 'teacher';
-              if (user?.role?.toLowerCase() === 'secretary') return 'secretary';
-              return (user?.role as any) || 'admin';
-            })()}
-            activePlatform={activePlatform as any}
-            schoolName={school?.name || 'Meine Musikschule'}
-          />
-        </Suspense>
-      )}
-
-      {/* 30-Tage Probezeit Status & Upgrade Modal */}
-      {showTrialInfoModal && (
-        <Suspense fallback={null}>
-          <TrialInfoModal
-            isOpen={showTrialInfoModal}
-            onClose={() => setShowTrialInfoModal(false)}
-            school={school}
-            userRole={user?.role}
-            trialDaysLeft={trialDaysLeft}
-            onNavigateToBilling={() => {
-              setShowTrialInfoModal(false);
-              if (user?.role === 'admin' || user?.role === 'secretary') {
-                sessionStorage.setItem('groovelab_active_workspace', 'secretary');
-                handleSwitchActiveRole('admin');
-              }
-            }}
-          />
-        </Suspense>
-      )}
+      {/* 🧭 Onboarding, Guidance & Help Modals Hub */}
+      <OnboardingHelpModalsHub
+        user={user}
+        school={school}
+        activePlatform={activePlatform}
+        showQR={showQR}
+        onCloseQR={() => setShowQR(false)}
+        isHelpCenterOpen={isGlobalHelpCenterOpen}
+        onCloseHelpCenter={() => setIsGlobalHelpCenterOpen(false)}
+        showTrialInfo={showTrialInfoModal}
+        onCloseTrialInfo={() => setShowTrialInfoModal(false)}
+        trialDaysLeft={trialDaysLeft}
+        onNavigateToBilling={() => {
+          setShowTrialInfoModal(false);
+          if (user?.role === 'admin' || user?.role === 'secretary') {
+            sessionStorage.setItem('groovelab_active_workspace', 'secretary');
+            handleSwitchActiveRole('admin');
+          }
+        }}
+        showMobileInfo={showMobileInfo}
+        onCloseMobileInfo={() => setShowMobileInfo(false)}
+        locationMode={locationMode}
+        stationName={session?.stations?.name}
+        showSchoolOnboardingModal={showSchoolOnboardingModal}
+        onCloseSchoolOnboarding={() => setShowSchoolOnboardingModal(false)}
+        onSchoolOnboardingSuccess={(schoolData, userData) => {
+          setShowSchoolOnboardingModal(false);
+          if (typeof window !== 'undefined' && window.history) {
+            safeReplaceState({}, document.title, window.location.pathname);
+          }
+          window.location.reload();
+        }}
+      />
 
       {/* Render Legal Modals Helper Call */}
       {renderLegalModals()}
-
-
-      {/* Mobile Info Overlay Modal for Consolidated Status Pills */}
-      {showMobileInfo && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(9, 9, 11, 0.40)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 10001,
-          padding: '20px'
-        }}>
-          <div style={{
-            background: 'white',
-            borderRadius: '24px',
-            padding: '24px',
-            width: '100%',
-            maxWidth: '380px',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
-            border: '1px solid rgba(0,0,0,0.05)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px'
-          }}>
-            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#09090b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Status & Details</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Musikschule:</span>
-                <span style={{ fontSize: '0.85rem', color: '#09090b', fontWeight: 800 }}>{school?.name || 'Meine Musikschule'}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Benutzer:</span>
-                <span style={{ fontSize: '0.85rem', color: '#09090b', fontWeight: 800 }}>{user?.first_name} {user?.last_name}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Rolle:</span>
-                <span style={{ fontSize: '0.85rem', color: '#09090b', fontWeight: 800, textTransform: 'uppercase' }}>
-                  {user?.role === 'admin' ? 'Administrator' : user?.role === 'teacher' ? 'Lehrer' : user?.role === 'secretary' ? 'Sekretariat' : 'Schüler'}
-                </span>
-              </div>
-              {school?.is_trial && !school?.subscription_bypass && trialDaysLeft !== null && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Probezeit:</span>
-                  <span style={{ fontSize: '0.85rem', color: '#eab308', fontWeight: 800 }}>
-                    {trialDaysLeft > 0 ? `${trialDaysLeft} Tage verbleibend` : 'Abgelaufen'}
-                  </span>
-                </div>
-              )}
-              {locationMode === 'lab' && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Station:</span>
-                  <span style={{ fontSize: '0.85rem', color: '#34a853', fontWeight: 800 }}>
-                    {session?.stations?.name || 'Labor iPad'}
-                  </span>
-                </div>
-              )}
-            </div>
-            <button
-              onClick={() => setShowMobileInfo(false)}
-              style={{
-                width: '100%',
-                padding: '12px',
-                background: activePlatform === 'campus' ? '#34a853' : (activePlatform === 'ensembles' ? '#3b82f6' : '#eab308'),
-                color: activePlatform === 'groovelab' ? '#09090b' : 'white',
-                border: 'none',
-                borderRadius: '14px',
-                fontWeight: 800,
-                fontSize: '0.9rem',
-                cursor: 'pointer',
-                fontFamily: "'Plus Jakarta Sans', sans-serif"
-              }}
-            >
-              Schließen
-            </button>
-          </div>
-        </div>
-      )}
       {/* Mobile Bottom Navigation */}
       {/* Mobile Bottom Navigation */}
       {/* Mobile Bottom Navigation */}
@@ -16026,18 +15916,6 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
           APP_INSTRUMENT_ICONS={APP_INSTRUMENT_ICONS}
         />
       </Suspense>
-      {showSchoolOnboardingModal && (
-        <SchoolSelfOnboardingModal
-          onClose={() => setShowSchoolOnboardingModal(false)}
-          onSuccess={(schoolData, userData) => {
-            setShowSchoolOnboardingModal(false);
-            if (typeof window !== 'undefined' && window.history) {
-              safeReplaceState({}, document.title, window.location.pathname);
-            }
-            window.location.reload();
-          }}
-        />
-      )}
 
       {/* 🛡️ Universal Security & Auth Modals Hub (OWASP ASVS Level 3) */}
       <SecurityAuthModalsHub
