@@ -1275,8 +1275,6 @@ export function AdminDashboard({
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  const [manualCoords, setManualCoords] = useState<Record<string, string>>({});
-  const [showManualInput, setShowManualInput] = useState<string | null>(null);
   const [showBatchiPadModal, setShowBatchiPadModal] = useState<{ roomId: string } | null>(null);
   const [batchiPadCount, setBatchiPadCount] = useState<string>('1');
 
@@ -3400,20 +3398,6 @@ export function AdminDashboard({
     }
   };
 
-  const captureGPSForRoom = () => {
-    if (!navigator.geolocation) {
-      alert('GPS wird nicht unterstützt.');
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setNewRoomLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-      },
-      () => alert('Fehler beim Abrufen des Standorts. Bitte Berechtigungen prüfen.'),
-      { enableHighAccuracy: true }
-    );
-  };
-
   const handleAddStation = async (e: React.FormEvent, roomId: string) => {
     e.preventDefault();
     const { data, error } = await supabase.from('stations').insert({
@@ -3619,136 +3603,6 @@ export function AdminDashboard({
     } else {
       setStations(stations.map(s => idsToUpdate.includes(s.id) ? { ...s, color: newColor } : s));
     }
-  };
-
-  const handleAddGeofencePoint = async (roomId: string, manualLat?: number, manualLng?: number) => {
-    if (!manualLat && !window.confirm('Aktuellen Standort als weiteren Kalibrierungs-Punkt für diesen Raum hinzufügen? (Radius: 20m)')) return;
-    
-    const updatePoint = async (lat: number, lng: number) => {
-      console.log(`[Admin] Punkt hinzufügen: ${lat}, ${lng}`);
-      
-      const { data: latestRoom, error: fetchError } = await supabase
-        .from('rooms')
-        .select('geofence_points')
-        .eq('id', roomId)
-        .single();
-
-      if (fetchError || !latestRoom) return;
-
-      const currentPoints = Array.isArray(latestRoom.geofence_points) ? [...latestRoom.geofence_points] : [];
-      const newPoint = { lat, lng, timestamp: new Date().toISOString() };
-      currentPoints.push(newPoint);
-
-      await supabase.from('rooms').update({ 
-        geofence_points: currentPoints,
-        latitude: lat,
-        longitude: lng
-      }).eq('id', roomId);
-      
-      fetchData();
-    };
-
-    if (manualLat && manualLng) {
-      updatePoint(manualLat, manualLng);
-      return;
-    }
-    
-    const tryScan = (highAccuracy: boolean) => {
-      const geoOptions = {
-        enableHighAccuracy: highAccuracy,
-        timeout: highAccuracy ? 5000 : 10000,
-        maximumAge: 0 
-      };
-
-      navigator.geolocation.getCurrentPosition(async (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        
-        console.log(`[Admin] Scan erfolgreich: ${lat}, ${lng}`);
-
-        // 1. Frischesten Stand des Raumes direkt aus der DB holen (verhindert Race Conditions)
-        const { data: latestRoom, error: fetchError } = await supabase
-          .from('rooms')
-          .select('name, geofence_points')
-          .eq('id', roomId)
-          .single();
-
-        if (fetchError || !latestRoom) {
-          alert('Fehler beim Abrufen der aktuellen Raumdaten: ' + (fetchError?.message || 'Nicht gefunden'));
-          return;
-        }
-
-        // 2. Punkte sicher zusammenführen
-        let currentPoints: Array<{ lat: number, lng: number, timestamp: string }> = [];
-        if (latestRoom.geofence_points && Array.isArray(latestRoom.geofence_points)) {
-          currentPoints = [...latestRoom.geofence_points];
-        }
-
-        const newPoint = { 
-          lat: Number(lat.toFixed(8)), 
-          lng: Number(lng.toFixed(8)), 
-          timestamp: new Date().toISOString() 
-        };
-        
-        currentPoints.push(newPoint);
-
-        // 3. Update an Supabase senden
-        const { error: updateError } = await supabase.from('rooms').update({
-          geofence_points: currentPoints,
-          latitude: Number(lat.toFixed(8)),
-          longitude: Number(lng.toFixed(8))
-        }).eq('id', roomId);
-        
-        if (updateError) {
-          console.error('[Admin] DB Fehler:', updateError);
-          alert('Datenbank-Fehler beim Speichern: ' + updateError.message);
-        } else {
-          alert(`Punkt ${currentPoints.length} erfolgreich für "${latestRoom.name}" hinzugefügt! ✅`);
-          await fetchData(); 
-        }
-      }, (err) => {
-        if (highAccuracy) {
-          console.log('[Admin] High Accuracy failed, trying normal...');
-          tryScan(false);
-        } else {
-          alert('Standort-Fehler: ' + err.message);
-        }
-      }, geoOptions);
-    };
-
-    tryScan(true);
-  };
-
-  const handleDeleteGeofencePoint = async (roomId: string, index: number) => {
-    if (!window.confirm('Diesen Geofence-Punkt wirklich löschen?')) return;
-    const room = rooms.find(r => r.id === roomId);
-    if (!room) return;
-    
-    const points: any[] = Array.isArray(room.geofence_points) ? [...room.geofence_points] : [];
-    points.splice(index, 1);
-    
-    // Update lat/lng to the last remaining point or null
-    const lastPoint = points.length > 0 ? points[points.length - 1] : null;
-
-    const { error } = await supabase.from('rooms').update({
-      geofence_points: points,
-      latitude: lastPoint?.lat || null,
-      longitude: lastPoint?.lng || null
-    }).eq('id', roomId);
-    
-    if (error) alert(error.message);
-    else fetchData();
-  };
-
-  const handleClearGeofencePoints = async (roomId: string) => {
-    if (!window.confirm('Alle gespeicherten Kalibrierungs-Punkte für diesen Raum löschen?')) return;
-    const { error } = await supabase.from('rooms').update({
-      geofence_points: [],
-      latitude: null,
-      longitude: null
-    }).eq('id', roomId);
-    if (error) alert(error.message);
-    else fetchData();
   };
 
   const handleAutoParseLinks = (text: string, isEditing: boolean) => {
@@ -4539,119 +4393,7 @@ export function AdminDashboard({
                     </button>
                   </div>
                 </div>
-
-                {/* Fußzeile: Sekundäre Einstellungen (Geofence) */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderTop: '1px solid #f8fafc', paddingTop: '16px' }}>
-                  {/* Linke Seite: Geofence Tags & Löschen-Link */}
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
-                    {(room.geofence_points || []).map((pt: any, idx: number) => (
-                      <div key={idx} style={{ 
-                        background: '#fef9c3', 
-                        border: '1px solid #fef08a', 
-                        borderRadius: '8px', 
-                        padding: '6px 10px', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '6px', 
-                        fontSize: '0.7rem', 
-                        color: '#854d0e', 
-                        fontWeight: 700
-                      }}>
-                        <MapPin size={10} /> Punkt {idx + 1}
-                        <button 
-                          onClick={() => handleDeleteGeofencePoint(room.id, idx)}
-                          aria-label={`Geofence Punkt ${idx + 1} für Raum ${room.name} löschen`}
-                          style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }}
-                          title="Punkt löschen"
-                        >
-                          <X size={12} />
-                        </button>
-                      </div>
-                    ))}
-                    
-                    {(room.geofence_points?.length > 0 || room.latitude) && (
-                      <button 
-                        onClick={() => handleClearGeofencePoints(room.id)}
-                        aria-label={`Alle Geofence-Punkte für Raum ${room.name} löschen`}
-                        style={{ background: 'transparent', border: 'none', color: '#cbd5e1', fontSize: '0.65rem', fontWeight: 700, cursor: 'pointer', padding: '6px' }}
-                      >
-                        Alle löschen
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Rechte Seite: Geofence Kontrollen (Scan / Manuell) */}
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <button 
-                      onClick={() => handleAddGeofencePoint(room.id)}
-                      aria-label={`Aktuellen GPS-Standort für Raum ${room.name} scannen`}
-                      style={{ 
-                        background: '#fffbeb', 
-                        border: '1px dashed #fcd34d', 
-                        borderRadius: '8px', 
-                        padding: '6px 10px', 
-                        color: '#92400e', 
-                        fontSize: '0.7rem', 
-                        fontWeight: 800, 
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                      title="Aktuellen Standort scannen"
-                    >
-                      <MapPin size={12} /> Scan
-                    </button>
-
-                    <button 
-                      onClick={() => setShowManualInput(showManualInput === room.id ? null : room.id)}
-                      aria-label="Manuelle Koordinateneingabe umschalten"
-                      style={{ 
-                        background: '#f8fafc', 
-                        border: '1px dashed #cbd5e1', 
-                        borderRadius: '8px', 
-                        padding: '6px 10px', 
-                        color: '#64748b', 
-                        fontSize: '0.7rem', 
-                        fontWeight: 800, 
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                    >
-                      <Plus size={12} /> Manuell
-                    </button>
-
-                    {showManualInput === room.id && (
-                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', animation: 'fadeIn 0.2s' }}>
-                        <input 
-                          aria-label="Geokoordinaten Breitengrad und Längengrad eingeben"
-                          placeholder="Lat, Lng" 
-                          value={manualCoords[room.id] || ''} 
-                          onChange={e => setManualCoords({...manualCoords, [room.id]: e.target.value})}
-                          style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.7rem', width: '140px' }} 
-                        />
-                        <button 
-                          onClick={() => {
-                            const parts = manualCoords[room.id]?.split(',').map(s => s.trim());
-                            if (parts?.length === 2 && !isNaN(Number(parts[0])) && !isNaN(Number(parts[1]))) {
-                              handleAddGeofencePoint(room.id, Number(parts[0]), Number(parts[1]));
-                              setManualCoords({...manualCoords, [room.id]: ''});
-                              setShowManualInput(null);
-                            } else {
-                              alert('Format: 47.123, 7.456');
-                            }
-                          }}
-                          aria-label="Geokoordinaten setzen"
-                          style={{ background: groovelabBrandColor, color: 'white', border: 'none', borderRadius: '8px', padding: '6px 10px', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer' }}
-                        >
-                          Set
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <div style={{ height: '1px', background: '#f1f5f9', margin: '4px 0 16px 0' }} />
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {stations
@@ -6718,9 +6460,9 @@ function DeviceSetupScreen({
     },
     {
       id: 'security',
-      title: 'Geofencing & Login-Schutz',
-      subtitle: hours.geofence_bypass !== true ? `${radius || 100}m Geofence aktiv` : 'Bypass Aktiv',
-      badge: hours.geofence_bypass !== true ? `${radius || 100}m Radius` : 'Bypass',
+      title: 'Kiosk- & Terminal-Sicherheit',
+      subtitle: 'Physische Hardware-Kopplung & PIN-Schutz',
+      badge: 'Aktiv',
       gradient: 'linear-gradient(135deg, #facc15 0%, #d97706 100%)',
       shadowColor: 'rgba(250, 204, 21, 0.40)',
       icon: ShieldCheck
@@ -7024,14 +6766,14 @@ function DeviceSetupScreen({
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
                     {activeGrooveSettingsModal === 'hours' && 'Betriebszeiten & Studio-Zeiten'}
-                    {activeGrooveSettingsModal === 'security' && 'Geofencing & Login-Schutz'}
+                    {activeGrooveSettingsModal === 'security' && 'Kiosk- & Terminal-Sicherheit'}
                     {activeGrooveSettingsModal === 'devices' && 'Kiosk-Geräte & Stations-Setup'}
                     {activeGrooveSettingsModal === 'analytics' && 'Anwesenheit & Check-In Protokolle'}
                     {activeGrooveSettingsModal === 'maintenance' && 'Systemwartung & Bereinigung'}
                   </h3>
                   <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748b', fontWeight: 500 }}>
                     {activeGrooveSettingsModal === 'hours' && 'Öffnungszeiten und Login-Regeln für das GrooveLab Studio.'}
-                    {activeGrooveSettingsModal === 'security' && 'Standort-Validierung (Geofence) und Sicherheitsregeln konfigurieren.'}
+                    {activeGrooveSettingsModal === 'security' && 'Physische Kiosk-Hardware-Kopplung und Terminal-Sicherheitsregeln konfigurieren.'}
                     {activeGrooveSettingsModal === 'devices' && 'Kiosk-iPads den GrooveLab-Stationen zuweisen und verwalten.'}
                     {activeGrooveSettingsModal === 'analytics' && 'Anwesenheits- und Probenprotokolle aller Band-Mitglieder herunterladen.'}
                     {activeGrooveSettingsModal === 'maintenance' && 'Scheduler-Datenleichen bereinigen und Semester-Resets vornehmen.'}
@@ -7187,142 +6929,81 @@ function DeviceSetupScreen({
                 </div>
               )}
 
-              {/* TAB 2: GEOFENCING & SICHERHEIT */}
+              {/* TAB 2: KIOSK & TERMINAL SICHERHEIT */}
               {activeGrooveSettingsModal === 'security' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                  {/* Mode Selector */}
-                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
-                    <button 
-                      type="button"
-                      onClick={() => setHours({ ...hours, geofence_bypass: false })}
-                      style={{ 
-                        padding: '14px',
-                        borderRadius: '14px',
-                        border: `2px solid ${hours.geofence_bypass !== true ? '#eab308' : '#e2e8f0'}`,
-                        background: hours.geofence_bypass !== true ? '#fefce8' : '#ffffff',
-                        cursor: 'pointer',
-                        textAlign: 'left'
-                      }}
-                      className="hover-scale"
-                    >
-                      <div style={{ fontWeight: 850, fontSize: '0.88rem', color: hours.geofence_bypass !== true ? '#ca8a04' : '#1e293b', marginBottom: '3px' }}>Geofencing Aktivieren (Standard)</div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: 1.35 }}>Login wird mit den Koordinaten des Raums abgeglichen.</div>
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => setHours({ ...hours, geofence_bypass: true })}
-                      style={{ 
-                        padding: '14px',
-                        borderRadius: '14px',
-                        border: `2px solid ${hours.geofence_bypass === true ? '#eab308' : '#e2e8f0'}`,
-                        background: hours.geofence_bypass === true ? '#fefce8' : '#ffffff',
-                        cursor: 'pointer',
-                        textAlign: 'left'
-                      }}
-                      className="hover-scale"
-                    >
-                      <div style={{ fontWeight: 850, fontSize: '0.88rem', color: hours.geofence_bypass === true ? '#ca8a04' : '#1e293b', marginBottom: '3px' }}>Geofencing Ausschalten (Bypass)</div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: 1.35 }}>Jeder Login führt direkt ins Live Lab ohne GPS-Abfrage.</div>
-                    </button>
-                  </div>
-
-                  {/* Geofence Radius */}
-                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <label style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Erlaubter Geofence-Radius</label>
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                      {['50', '100', '200', '500'].map((rVal) => {
-                        const isSelected = (radius || '100') === rVal;
-                        return (
-                          <button
-                            key={rVal}
-                            type="button"
-                            onClick={() => setRadius(rVal)}
-                            style={{
-                              flex: 1,
-                              padding: '10px',
-                              borderRadius: '10px',
-                              border: isSelected ? '2px solid #eab308' : '1px solid #cbd5e1',
-                              background: isSelected ? '#fefce8' : '#ffffff',
-                              color: isSelected ? '#ca8a04' : '#475569',
-                              fontWeight: 850,
-                              fontSize: '0.84rem',
-                              cursor: 'pointer'
-                            }}
-                            className="hover-scale"
-                          >
-                            {rVal} Meter
-                          </button>
-                        );
-                      })}
+                  {/* Info Header Card */}
+                  <div style={{ 
+                    background: '#fefce8', 
+                    border: '1px solid #fef08a', 
+                    borderRadius: '16px', 
+                    padding: '18px', 
+                    display: 'flex', 
+                    alignItems: 'flex-start', 
+                    gap: '14px' 
+                  }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#fef08a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Tablet size={20} color="#854d0e" />
                     </div>
-                  </div>
-
-                  {/* Coordinates GPS */}
-                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <label style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Schul-Koordinaten (GPS)</label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (navigator.geolocation) {
-                            navigator.geolocation.getCurrentPosition(
-                              (pos) => {
-                                setLat(pos.coords.latitude.toFixed(6));
-                                setLng(pos.coords.longitude.toFixed(6));
-                                alert('GPS-Koordinaten erfolgreich ermittelt! 📍');
-                              },
-                              (err) => alert('Standort konnte nicht ermittelt werden: ' + err.message)
-                            );
-                          } else {
-                            alert('Geolocation wird von diesem Browser nicht unterstützt.');
-                          }
-                        }}
-                        style={{
-                          background: '#fefce8',
-                          border: '1px solid #fef08a',
-                          color: '#ca8a04',
-                          padding: '4px 10px',
-                          borderRadius: '8px',
-                          fontSize: '0.72rem',
-                          fontWeight: 800,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}
-                        className="hover-scale"
-                      >
-                        <MapPin size={12} /> Standort ermitteln
-                      </button>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                      <input 
-                        type="text" 
-                        placeholder="Breitengrad (z.B. 47.5584)" 
-                        value={lat} 
-                        onChange={e => setLat(e.target.value)}
-                        style={{ padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, outline: 'none' }}
-                      />
-                      <input 
-                        type="text" 
-                        placeholder="Längengrad (z.B. 7.9472)" 
-                        value={lng} 
-                        onChange={e => setLng(e.target.value)}
-                        style={{ padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontWeight: 600, outline: 'none' }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* GDPR Status */}
-                  <div style={{ background: '#fefce8', border: '1px solid #fef08a', borderRadius: '16px', padding: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <ShieldCheck size={24} color="#ca8a04" />
                     <div>
-                      <strong style={{ fontSize: '0.84rem', color: '#713f12', display: 'block' }}>Art. 32 DSGVO Konforme Speicherung</strong>
-                      <span style={{ fontSize: '0.72rem', color: '#a16207' }}>
-                        Standortdaten werden ausschließlich temporär zur Check-in-Validierung verarbeitet und niemals in Bewegungsprofilen gespeichert.
-                      </span>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '0.9rem', fontWeight: 850, color: '#854d0e' }}>
+                        Single Source of Hardware Truth
+                      </h4>
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#a16207', lineHeight: 1.45 }}>
+                        Im GrooveLab Studio sind Raum-iPads über ihren individuellen Kiosk-Setup QR-Code fest an eine Station (z. B. iPad 1, iPad 2) gekoppelt. Geolocating / GPS ist zu 100 % deaktiviert. Jeder Schüler-Login platziert den Schüler ohne Klicks direkt am richtigen Platz im Live Lab.
+                      </p>
                     </div>
+                  </div>
+
+                  {/* Security Axioms Grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
+                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                        <Lock size={16} color="#ca8a04" />
+                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>PIN-geschütztes Setup</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b', lineHeight: 1.4 }}>
+                        Das Neuzuweisen oder Entkoppeln einer Kiosk-Station auf einem Raum-Tablet erfordert zwingend den 4-stelligen Kiosk-Einrichtungs-PIN der Musikschule.
+                      </p>
+                    </div>
+
+                    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                        <ShieldCheck size={16} color="#15803d" />
+                        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>Zero-Trust & DSGVO-Parität</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b', lineHeight: 1.4 }}>
+                        Keine Erfassung von Standort- oder GPS-Koordinaten (§ 87 BetrVG / Art. 5 & 8 DSGVO). Schüler-Anwesenheit wird ausschließlich über die physische Station autorisiert.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Quick Action Link to Devices */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '14px 18px' }}>
+                    <div>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', display: 'block' }}>Kiosk-Stationen & QR-Setup verwalten</span>
+                      <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Öffnet die Übersicht aller Kiosk-Kopplungs-Links und den Schul-PIN.</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveGrooveSettingsModal('devices')}
+                      style={{
+                        padding: '8px 14px',
+                        borderRadius: '10px',
+                        background: '#fefce8',
+                        border: '1px solid #fef08a',
+                        color: '#854d0e',
+                        fontWeight: 850,
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                      className="hover-scale"
+                    >
+                      <Monitor size={14} /> Zu den Stationen
+                    </button>
                   </div>
                 </div>
               )}

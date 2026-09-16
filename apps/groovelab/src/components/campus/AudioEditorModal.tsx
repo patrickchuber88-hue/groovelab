@@ -31,6 +31,7 @@ export interface AudioEditorSaveResult {
   pitch_semitones?: number;
   cut_start_time?: number;
   cut_end_time?: number;
+  loop_locator?: any;
 }
 
 export interface AudioEditorModalProps {
@@ -47,6 +48,9 @@ export interface AudioEditorModalProps {
   onRevertToOriginal?: () => void;
   editorMode?: 'locator' | 'crop';
   uiLevel?: 'junior' | 'teen' | 'pro';
+  schoolId?: string;
+  userId?: string;
+  recordingId?: string;
 }
 
 export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
@@ -62,7 +66,10 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
   onSave,
   onRevertToOriginal,
   editorMode = 'locator',
-  uiLevel = 'junior'
+  uiLevel = 'junior',
+  schoolId,
+  userId,
+  recordingId
 }) => {
   const [activeUrl, setActiveUrl] = useState<string>(audioUrl);
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
@@ -1283,7 +1290,17 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
               type="button"
               onClick={() => {
                 stopPlayback();
-                saveLoopLocator(activeUrl || audioUrl, { startSec: startTime, endSec: endTime, enabled: true });
+                const savedLocator = saveLoopLocator(
+                  activeUrl || audioUrl,
+                  { startSec: startTime, endSec: endTime, enabled: true },
+                  {
+                    schoolId,
+                    userId,
+                    recordingId,
+                    recordingTitle: editLabel || initialLabel,
+                    totalDuration: duration
+                  }
+                );
                 if (onSave) {
                   onSave({
                     url: activeUrl || audioUrl,
@@ -1292,7 +1309,8 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
                     mode: 'overwrite',
                     is_edited: false,
                     cut_start_time: startTime,
-                    cut_end_time: endTime
+                    cut_end_time: endTime,
+                    loop_locator: savedLocator
                   });
                 }
                 onClose();
@@ -1327,7 +1345,25 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
                 type="button"
                 onClick={() => {
                   stopPlayback();
-                  removeLoopLocator(activeUrl || audioUrl);
+                  removeLoopLocator(activeUrl || audioUrl, {
+                    schoolId,
+                    userId,
+                    recordingId,
+                    recordingTitle: editLabel || initialLabel,
+                    totalDuration: duration
+                  });
+                  if (onSave) {
+                    onSave({
+                      url: activeUrl || audioUrl,
+                      duration: duration,
+                      label: editLabel,
+                      mode: 'overwrite',
+                      is_edited: false,
+                      cut_start_time: 0,
+                      cut_end_time: duration,
+                      loop_locator: null
+                    });
+                  }
                   onClose();
                 }}
                 style={{

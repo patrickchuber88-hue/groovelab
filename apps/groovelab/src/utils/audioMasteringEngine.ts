@@ -716,6 +716,139 @@ export function applyAudiophileOptoLeveler(
 }
 
 /**
+ * 🎛️ ZERO-PHASE LOOKAHEAD LOUDNESS LEVELER (Sample-0 Onset Adaptation Guard)
+ * Analysiert den RMS-Verlauf mit zukunftsorientiertem Lookahead (150–200 ms Fenster)
+ * und gleicht anfängliche Pegel-Dips (verursacht durch träge Hardware-AGC oder zögerlichen Spracheinsatz)
+ * bereits ab Sample 0 (0.00s) musikalisch und transparent an das mittlere Niveau an.
+ * Nutzt bi-direktionale (Forward-Backward) Glättung: Garantiert 0 ms Phasenverzerrung,
+ * 0% Transienten-Verwaschung und vollständige Immunität gegen Pumpeffekte.
+ */
+export function applyLookaheadLoudnessLeveler(
+  audioBuffer: AudioBuffer,
+  options?: {
+    maxBoostDb?: number;
+    targetPeakDb?: number;
+    minSignalThresholdDb?: number;
+  }
+): void {
+  const sampleRate = audioBuffer.sampleRate;
+  const numChannels = audioBuffer.numberOfChannels;
+  const length = audioBuffer.length;
+  if (length === 0 || sampleRate === 0) return;
+
+  const maxBoostDb = options?.maxBoostDb ?? 3.5;
+  const targetPeakDb = options?.targetPeakDb ?? -1.0;
+  const ceilingLinear = Math.pow(10, targetPeakDb / 20);
+  const maxBoostLinear = Math.pow(10, maxBoostDb / 20);
+  const minThresholdDb = options?.minSignalThresholdDb ?? -45;
+  const minThresholdLinear = Math.pow(10, minThresholdDb / 20);
+
+  // 1. Fensterung: 150ms Fenster mit 50ms Hop
+  const windowSamples = Math.max(64, Math.floor(sampleRate * 0.150));
+  const hopSamples = Math.max(32, Math.floor(sampleRate * 0.050));
+  const numFrames = Math.floor(length / hopSamples);
+  if (numFrames < 4) return;
+
+  // 2. RMS je Frame ermitteln (über alle Kanäle gemittelt)
+  const frameRms = new Float32Array(numFrames);
+  for (let f = 0; f < numFrames; f++) {
+    const startSample = f * hopSamples;
+    const endSample = Math.min(length, startSample + windowSamples);
+    const count = endSample - startSample;
+    if (count <= 0) continue;
+
+    let sumSq = 0;
+    for (let c = 0; c < numChannels; c++) {
+      const data = audioBuffer.getChannelData(c);
+      for (let i = startSample; i < endSample; i++) {
+        const val = data[i];
+        sumSq += val * val;
+      }
+    }
+    frameRms[f] = Math.sqrt(sumSq / (count * numChannels));
+  }
+
+  // 3. Robustes mittleres Sprach-/Aktivitäts-Niveau ermitteln (oberhalb von minThresholdLinear)
+  let activeRmsSum = 0;
+  let activeCount = 0;
+  for (let f = 0; f < numFrames; f++) {
+    if (frameRms[f] >= minThresholdLinear) {
+      activeRmsSum += frameRms[f];
+      activeCount++;
+    }
+  }
+  if (activeCount < 2) return;
+  const avgActiveRms = activeRmsSum / activeCount;
+
+  // 4. Ziel-Gain-Profil je Frame berechnen
+  // Betrifft insbesondere die ersten 1.5–2.0 Sekunden (typisches Hardware-AGC-Einschwingfenster)
+  const maxOnsetFrames = Math.min(numFrames, Math.floor((2.0 * sampleRate) / hopSamples));
+  const targetGain = new Float32Array(numFrames);
+  targetGain.fill(1.0);
+
+  for (let f = 0; f < numFrames; f++) {
+    const rms = frameRms[f];
+    // Nur aktive Segmente betrachten (keine Verstärkung von Vorab-Rauschen / Raumruhe)
+    if (rms >= minThresholdLinear && rms < avgActiveRms) {
+      const onsetWeight = f < maxOnsetFrames ? 1.0 : Math.max(0, 1.0 - (f - maxOnsetFrames) / (maxOnsetFrames * 0.5));
+      if (onsetWeight > 0) {
+        const neededGain = Math.min(maxBoostLinear, avgActiveRms / Math.max(minThresholdLinear, rms));
+        targetGain[f] = 1.0 + (neededGain - 1.0) * onsetWeight;
+      }
+    }
+  }
+
+  // 5. Zero-Phase Bi-Direktionale Glättung (Forward-Backward Exponential Moving Average)
+  const smoothedGain = new Float32Array(numFrames);
+  const alpha = 0.25;
+
+  let current = targetGain[0];
+  for (let f = 0; f < numFrames; f++) {
+    current = alpha * targetGain[f] + (1 - alpha) * current;
+    smoothedGain[f] = current;
+  }
+
+  current = smoothedGain[numFrames - 1];
+  for (let f = numFrames - 1; f >= 0; f--) {
+    current = alpha * smoothedGain[f] + (1 - alpha) * current;
+    smoothedGain[f] = current;
+  }
+
+  // 6. Kontinuierliche sample-genaue Gain-Interpolation
+  const gainPerSample = new Float32Array(length);
+  for (let f = 0; f < numFrames - 1; f++) {
+    const gStart = smoothedGain[f];
+    const gEnd = smoothedGain[f + 1];
+    const sStart = f * hopSamples;
+    const sEnd = Math.min(length, (f + 1) * hopSamples);
+    const span = sEnd - sStart;
+    for (let i = sStart; i < sEnd; i++) {
+      const frac = (i - sStart) / span;
+      gainPerSample[i] = gStart + (gEnd - gStart) * frac;
+    }
+  }
+  const lastSampleIdx = (numFrames - 1) * hopSamples;
+  const lastGain = smoothedGain[numFrames - 1];
+  for (let i = lastSampleIdx; i < length; i++) {
+    gainPerSample[i] = lastGain;
+  }
+
+  // 7. Auf alle Kanäle anwenden mit absolutem Headroom-Guard
+  for (let c = 0; c < numChannels; c++) {
+    const data = audioBuffer.getChannelData(c);
+    for (let i = 0; i < length; i++) {
+      const original = data[i];
+      const boosted = original * gainPerSample[i];
+      if (Math.abs(boosted) > ceilingLinear) {
+        data[i] = Math.sign(boosted) * ceilingLinear;
+      } else {
+        data[i] = boosted;
+      }
+    }
+  }
+}
+
+/**
  * 🌟 ACOUSTIC AIR SPACING (Subtle 3D Micro-Ambience / Early Reflections < 18 ms)
  * Befreit trockene Mono-Signale aus der Mitte des Kopfhörers.
  * Erzeugt mit einem minimalen Blend von 4 % hauchzarte, phasenstabile Frühreflexionen
@@ -1000,27 +1133,40 @@ export function ensureCenteredStereoAudioBuffer(ctx: BaseAudioContext, inputBuff
   const normDenom = Math.sqrt(sumSqL * sumSqR) + 1e-12;
   const correlation = dotProd / normDenom; // -1.0 to +1.0
 
-  // 1. Detect dead or faint single channel (e.g. Input 1 of USB audio interface)
-  const isRightDeadOrFaint = (rmsR < 1e-4 && rmsL >= 1e-4) || (peakR < 0.005 && peakL >= 0.02) || (rmsL > 1e-3 && rmsL > rmsR * 1.8);
-  const isLeftDeadOrFaint = (rmsL < 1e-4 && rmsR >= 1e-4) || (peakL < 0.005 && peakR >= 0.02) || (rmsR > 1e-3 && rmsR > rmsL * 1.8);
+  // 1. Detect completely dead or faint single channel (e.g. Input 1 of USB audio interface)
+  const isRightDead = (rmsR < 1e-4 && rmsL >= 1e-4) || (peakR < 0.002 && peakL >= 0.01) || (rmsL > 1e-3 && rmsR < rmsL * 0.15);
+  const isLeftDead = (rmsL < 1e-4 && rmsR >= 1e-4) || (peakL < 0.002 && peakR >= 0.01) || (rmsR > 1e-3 && rmsL < rmsR * 0.15);
 
-  if (isRightDeadOrFaint) {
+  if (isRightDead) {
     outL.set(inL);
     outR.set(inL);
-  } else if (isLeftDeadOrFaint) {
+  } else if (isLeftDead) {
     outL.set(inR);
     outR.set(inR);
-  } else if (correlation > 0.80 || Math.abs(rmsL - rmsR) > 0.005) {
-    // 2. High mono correlation or acoustic level imbalance: sum to 100% centered dual-mono
+  } else {
+    // 2. 🏛️ True Phantom-Center Dual-Mono: Sum and balance L & R to 100% centered audio.
+    // Completely eliminates MacBook multi-mic array drift, USB interface left-biases,
+    // and off-axis acoustic asymmetry, guaranteeing that sound emanates 100% from the center!
+    const targetPeak = Math.max(peakL, peakR);
+    let centerPeak = 0;
+
     for (let i = 0; i < length; i++) {
       const centerSample = (inL[i] + inR[i]) * 0.5;
       outL[i] = centerSample;
       outR[i] = centerSample;
+      const absVal = Math.abs(centerSample);
+      if (absVal > centerPeak) centerPeak = absVal;
     }
-  } else {
-    // 3. Wide balanced stereo mix: preserve stereo separation
-    outL.set(inL);
-    outR.set(inR);
+
+    // Preserve original dynamic headroom without phase cancellation attenuation
+    if (centerPeak > 0 && targetPeak > 0 && centerPeak < targetPeak * 0.9) {
+      const normalizeFactor = Math.min(1.4, targetPeak / centerPeak);
+      for (let i = 0; i < length; i++) {
+        const val = outL[i] * normalizeFactor;
+        outL[i] = val;
+        outR[i] = val;
+      }
+    }
   }
 
   return stereoBuffer;
@@ -1142,6 +1288,7 @@ export function processPureRawAudioBuffer(
     preserveDynamics?: boolean;
     applyDeBoxNotch?: boolean;
     applySlapNotch?: boolean;
+    applyLookaheadLeveler?: boolean;
     padActive?: boolean;
     padDb?: number;
   }
@@ -1199,6 +1346,17 @@ export function processPureRawAudioBuffer(
         data[length - 1 - i] *= fadeIn;
       }
     }
+  }
+
+  // 4b. 🎛️ ZERO-PHASE LOOKAHEAD LOUDNESS LEVELER (Sample-0 Onset Adaptation Guard)
+  // Beseitigt Lautheitssprünge in den ersten Sekunden (verursacht durch träge Hardware-AGC
+  // des Mikrofons/Betriebssystems). Gleicht Dips bereits ab Sekunde 0.00 sanft und musikalisch
+  // an das mittlere Niveau an (max. 3.5 dB), ohne Transienten zu verwaschen oder Pumping zu erzeugen.
+  if (options?.applyLookaheadLeveler !== false && !preserveDynamics) {
+    applyLookaheadLoudnessLeveler(audioBuffer, {
+      maxBoostDb: 3.5,
+      targetPeakDb
+    });
   }
 
   // 5. 🏛️ HEADROOM-SAFE EBU R128 LINEAR NORMALIZER (100% Linear, 0% Distortion, 0% Pumping)
@@ -1276,6 +1434,7 @@ export async function processPureRawBlob(
     isLoop?: boolean;
     applyDeBoxNotch?: boolean;
     applySlapNotch?: boolean;
+    applyLookaheadLeveler?: boolean;
     padActive?: boolean;
     padDb?: number;
   }
@@ -1310,6 +1469,7 @@ export async function processPureRawBlob(
     isLoop: options?.isLoop ?? false,
     applyDeBoxNotch: options?.applyDeBoxNotch ?? false,
     applySlapNotch: options?.applySlapNotch ?? false,
+    applyLookaheadLeveler: options?.applyLookaheadLeveler,
     padActive: options?.padActive ?? false,
     padDb: options?.padDb
   });

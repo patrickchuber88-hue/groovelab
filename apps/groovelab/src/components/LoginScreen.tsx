@@ -2128,14 +2128,25 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         }
       }
  
-      // Geofence check
-      // For Campus logins, we always bypass geofencing and sessions (force isHome = true).
-      // For GrooveLab kiosk logins, we only force Home mode if teachers chose to hide presence or users are outside geofence.
-      const shouldForceHome = isCampus || (isTeacher ? hidePresence : (!isWithinAnyRoom));
-      if (shouldForceHome) {
-        console.log(`[Login] Outside geofence, Campus platform or hiding presence. Forcing Home mode.`);
+      // Zero-Touch Hardware Binding & Session Presence Mode
+      // Campus logins: Always Home mode (no physical station assignment).
+      // GrooveLab Kiosk logins: Physical station is authoritative; Home mode only if teacher explicitly chooses hidePresence.
+      if (isCampus) {
         isHome = true;
         finalStationId = null;
+      } else {
+        if (isTeacher) {
+          isHome = hidePresence;
+        } else {
+          // Student on GrooveLab Kiosk iPad
+          if (!finalStationId) {
+            alert("Dieses iPad ist noch keiner Station zugewiesen. Bitte weise das Gerät zuerst über den Kiosk-Einrichtungsplan einem Platz zu.");
+            await supabase.auth.signOut();
+            setLoading(false);
+            return;
+          }
+          isHome = false;
+        }
       }
 
       // Set user_id immediately so customFetch interceptor injects user_id into x-client-info for RLS authorization
@@ -2143,26 +2154,15 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         sessionStorage.setItem('groovelab_user_id', user.id);
       }
 
-      // 1.5 Check opening hours for sessions (Students only) - Bypassed per user request
       const withinHours = true;
       const enforceHours = false;
-      console.log('[Login] Opening hours check bypassed.');
-
 
       console.log(`[Login] Final Station ID: ${finalStationId}, isHome: ${isHome}, withinHours: ${withinHours}`);
 
-      // Save station ID to localStorage based on geofence & check-in result
+      // Ensure station ID in localStorage is preserved on coupled GrooveLab kiosks (never accidentally wiped)
       const activePlatform = (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_platform') || localStorage.getItem('groovelab_active_platform')) : 'groovelab') || 'groovelab';
-      if (activePlatform === 'groovelab') {
-        if (isHome) {
-          localStorage.removeItem('groovelab_station_id');
-        } else {
-          if (finalStationId) {
-            localStorage.setItem('groovelab_station_id', finalStationId);
-          } else {
-            localStorage.setItem('groovelab_station_id', 'skip');
-          }
-        }
+      if (activePlatform === 'groovelab' && finalStationId) {
+        localStorage.setItem('groovelab_station_id', finalStationId);
       }
 
       // 2. Session Management (Only for Academy/Lab sessions)
@@ -2211,6 +2211,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       sessionStorage.setItem('groovelab_user_id', user.id);
       sessionStorage.setItem('groovelab_location_mode', isHome ? 'home' : 'lab');
+      try {
+        const isStudentRole = (user.role || '').toLowerCase() === 'student';
+        const userToCache = isStudentRole ? { ...user, last_name: undefined } : user;
+        sessionStorage.setItem('groovelab_cached_user', JSON.stringify(userToCache));
+      } catch (e) {}
 
       // Automatically register/update student profile in local vault with their instrument avatar
       if (user.role === 'student' && typeof window !== 'undefined') {
@@ -3939,7 +3944,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             </div>
 
             <button
-              onClick={() => onLogin(registeredUser.id, true)}
+              onClick={() => {
+                if (registeredUser) {
+                  sessionStorage.setItem('groovelab_cached_user', JSON.stringify(registeredUser));
+                }
+                onLogin(registeredUser.id, true);
+              }}
               style={{
                 width: '100%', padding: '14px 20px', borderRadius: '100px',
                 background: isSecretary ? '#34a853' : 'linear-gradient(135deg, #eab308 0%, #ca8a04 100%)',
@@ -7096,7 +7106,12 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             </div>
 
             <button
-              onClick={() => onLogin(verifiedStudentDetails.id, false)}
+              onClick={() => {
+                if (verifiedStudentDetails) {
+                  sessionStorage.setItem('groovelab_cached_user', JSON.stringify(verifiedStudentDetails));
+                }
+                onLogin(verifiedStudentDetails.id, false);
+              }}
               style={{
                 width: '100%', padding: '14px', borderRadius: '16px', border: 'none',
                 background: '#34a853',
@@ -7227,6 +7242,14 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 sessionStorage.setItem('groovelab_active_platform', 'campus');
                 sessionStorage.setItem('campus_active_tab', 'briefing');
                 sessionStorage.setItem('groovelab_user_id', targetId);
+                sessionStorage.setItem('groovelab_cached_user', JSON.stringify({
+                  id: targetId,
+                  role: 'master_admin',
+                  is_master_admin: true,
+                  first_name: 'Master',
+                  last_name: 'Admin',
+                  email: 'admin@groovelab.de'
+                }));
                 sessionStorage.removeItem('groovelab_qr_token');
                 localStorage.removeItem('groovelab_last_qr_token');
                 localStorage.removeItem('groovelab_qr_token');
@@ -7274,7 +7297,19 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   school_id: '53e83805-1d5a-4ed8-988e-1fb0b8200b9c'
                 };
                 console.log('[Bypass] Logging in as Verwaltung / Schulleitung:', targetUser.name);
-                await registerClientSessionLease({ id: targetUser.id, role: targetUser.role }, targetUser.school_id || '53e83805-1d5a-4ed8-988e-1fb0b8200b9c').catch(() => {});
+                const effectiveSchoolId = targetUser.school_id || '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
+                try {
+                  const { data: authResult, error: rpcErr } = await supabase.rpc('authenticate_by_credential', {
+                    p_credential: targetUser.id,
+                    p_school_id: effectiveSchoolId
+                  });
+                  if (!rpcErr && authResult?.success && authResult?.lease_token) {
+                    sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+                  }
+                } catch (authErr) {
+                  console.warn('[Bypass] Auth credential notice:', authErr);
+                }
+                await registerClientSessionLease({ id: targetUser.id, role: targetUser.role }, effectiveSchoolId).catch(() => {});
                 sessionStorage.removeItem('groovelab_is_master_admin');
                 localStorage.removeItem('groovelab_is_master_admin');
                 sessionStorage.removeItem('groovelab_support_ghost');
@@ -7283,6 +7318,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 sessionStorage.setItem('campus_active_tab', 'briefing');
                 sessionStorage.setItem('groovelab_secretary_subtab', 'briefing');
                 sessionStorage.setItem('groovelab_user_id', targetUser.id);
+                sessionStorage.setItem('groovelab_cached_user', JSON.stringify(targetUser));
                 sessionStorage.removeItem('groovelab_qr_token');
                 localStorage.removeItem('groovelab_last_qr_token');
                 localStorage.removeItem('groovelab_qr_token');
@@ -7325,7 +7361,19 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   school_id: '53e83805-1d5a-4ed8-988e-1fb0b8200b9c'
                 };
                 console.log('[Bypass] Logging in as Lehrer:', targetUser.name);
-                await registerClientSessionLease({ id: targetUser.id, role: targetUser.role }, targetUser.school_id || '53e83805-1d5a-4ed8-988e-1fb0b8200b9c').catch(() => {});
+                const effectiveSchoolId = targetUser.school_id || '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
+                try {
+                  const { data: authResult, error: rpcErr } = await supabase.rpc('authenticate_by_credential', {
+                    p_credential: targetUser.id,
+                    p_school_id: effectiveSchoolId
+                  });
+                  if (!rpcErr && authResult?.success && authResult?.lease_token) {
+                    sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+                  }
+                } catch (authErr) {
+                  console.warn('[Bypass] Auth credential notice:', authErr);
+                }
+                await registerClientSessionLease({ id: targetUser.id, role: targetUser.role }, effectiveSchoolId).catch(() => {});
                 sessionStorage.removeItem('groovelab_is_master_admin');
                 localStorage.removeItem('groovelab_is_master_admin');
                 sessionStorage.removeItem('groovelab_support_ghost');
@@ -7333,6 +7381,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 sessionStorage.setItem('groovelab_active_platform', 'campus');
                 sessionStorage.setItem('campus_active_tab', 'briefing');
                 sessionStorage.setItem('groovelab_user_id', targetUser.id);
+                sessionStorage.setItem('groovelab_cached_user', JSON.stringify(targetUser));
                 sessionStorage.removeItem('groovelab_qr_token');
                 localStorage.removeItem('groovelab_last_qr_token');
                 localStorage.removeItem('groovelab_qr_token');
@@ -7375,7 +7424,19 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   school_id: '53e83805-1d5a-4ed8-988e-1fb0b8200b9c'
                 };
                 console.log('[Bypass] Logging in as Schüler:', targetUser.name);
-                await registerClientSessionLease({ id: targetUser.id, role: targetUser.role }, targetUser.school_id || '53e83805-1d5a-4ed8-988e-1fb0b8200b9c').catch(() => {});
+                const effectiveSchoolId = targetUser.school_id || '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
+                try {
+                  const { data: authResult, error: rpcErr } = await supabase.rpc('authenticate_by_credential', {
+                    p_credential: targetUser.id,
+                    p_school_id: effectiveSchoolId
+                  });
+                  if (!rpcErr && authResult?.success && authResult?.lease_token) {
+                    sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+                  }
+                } catch (authErr) {
+                  console.warn('[Bypass] Auth credential notice:', authErr);
+                }
+                await registerClientSessionLease({ id: targetUser.id, role: targetUser.role }, effectiveSchoolId).catch(() => {});
                 sessionStorage.removeItem('groovelab_is_master_admin');
                 localStorage.removeItem('groovelab_is_master_admin');
                 sessionStorage.removeItem('groovelab_support_ghost');
@@ -7385,6 +7446,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 sessionStorage.setItem('groovelab_active_tab', 'briefing');
                 sessionStorage.setItem('groovelab_location_mode', 'home');
                 sessionStorage.setItem('groovelab_user_id', targetUser.id);
+                sessionStorage.setItem('groovelab_cached_user', JSON.stringify(targetUser));
                 // 🛡️ Anti-Date-Drift: Clear any stale teacher simulation date
                 localStorage.removeItem('groovelab_simulated_date');
                 localStorage.removeItem('groovelab_simulated_start_timestamp');

@@ -33,7 +33,7 @@ export interface MeisterwerkRecordingsTabProps {
   handleDeleteStudentAudio?: (url: string, id?: string, audMeta?: any) => Promise<void> | void;
   handleRenameStudentAudio: (url: string, newTitle: string, id?: string) => void;
   handleRenameTeacherAudio: (url: string, newTitle: string, originalIdx?: number) => void;
-  handleSaveEditedTeacherAudio?: (result: { url: string; original_url?: string; duration: number; original_duration?: number; label: string; mode: 'overwrite' | 'duplicate' }, originalIdx?: number, currentUrl?: string) => Promise<void>;
+  handleSaveEditedTeacherAudio?: (result: { url: string; original_url?: string; duration: number; original_duration?: number; label: string; mode: 'overwrite' | 'duplicate'; is_edited?: boolean; loop_locator?: any }, originalIdx?: number, currentUrl?: string) => Promise<void>;
   handleRevertTeacherAudioToOriginal?: (originalIdx?: number, currentUrl?: string) => Promise<void>;
   handleSaveShareToPlaylist: () => Promise<void>;
   handleUpdateAudioSongTag: (url: string, tag: string | null) => void;
@@ -3164,7 +3164,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                                     if (r.url === aud.url || r.id === aud.id) {
                                       const masterOrig = r.original_url || aud.original_url || r.url;
                                       const masterOrigDur = r.original_duration || aud.original_duration || r.duration;
-                                      return { ...r, url: res.url, original_url: masterOrig, duration: res.duration, original_duration: masterOrigDur, label: res.label, title: res.label };
+                                      return { ...r, url: res.url, original_url: masterOrig, duration: res.duration, original_duration: masterOrigDur, label: res.label, title: res.label, loop_locator: res.loop_locator !== undefined ? res.loop_locator : r.loop_locator };
                                     }
                                     return r;
                                   });

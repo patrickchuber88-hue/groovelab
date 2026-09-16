@@ -2941,7 +2941,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     let durationInSeconds = 0;
     try {
       const stream = await acquireAudioStream({ audio: STUDIO_AUDIO_CONSTRAINTS });
-      await stabilizeAudioStream(stream, 350);
+      await stabilizeAudioStream(stream, 500);
 
       // 🎙️ Direct Hardware Stream Capture (Zero WebAudio resampler / Zero pitch shift):
       // Passes hardware stream directly to MediaRecorder, eliminating clock drift & Safari WebKit pitch artifacts.
@@ -6682,7 +6682,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   };
 
   const handleSaveEditedTeacherAudio = async (
-    result: { url: string; original_url?: string; duration: number; original_duration?: number; label: string; mode: 'overwrite' | 'duplicate' },
+    result: { url: string; original_url?: string; duration: number; original_duration?: number; label: string; mode: 'overwrite' | 'duplicate'; is_edited?: boolean; loop_locator?: any },
     originalIdx?: number,
     currentUrl?: string
   ) => {

@@ -17,15 +17,17 @@ import {
   Search,
   X,
   Layers,
-  MessageSquareQuote
+  MessageSquareQuote,
+  SlidersHorizontal
 } from 'lucide-react';
 import { getBlob } from '../../../utils/blobStorage';
 import { formatHarmonizedAudioTitle } from '../../../utils/audioNamingHelper';
-import { safeDecodeAudioData, ensureWavBlob } from '../../../utils/audioMasteringEngine';
+import { safeDecodeAudioData, ensureWavBlob, ensureCenteredStereoAudioBuffer } from '../../../utils/audioMasteringEngine';
 import { getAudioNotesCount, getAudioNotes, addAudioNote, updateAudioNote, deleteAudioNote, fetchAudioNotesFromServer } from '../../../utils/audioNotesStorage';
 import { getSecureAudioUrl } from '../../../utils/audioStorageHelper';
 import { SharedAudioEngine } from '../../../utils/sharedAudioEngine';
 import { resampleWaveformPeaks, extractWaveformPeaks, detectAudioMimeType } from '../../../utils/waveformHelper';
+import { AudioLoopLocator, getLoopLocator } from '../../../utils/audioLoopLocatorStorage';
 
 const AudioEditorModal = React.lazy(() => import('../../campus/AudioEditorModal').then(m => ({ default: m.AudioEditorModal })));
 const AudioNotesModal = React.lazy(() => import('../../campus/AudioNotesModal').then(m => ({ default: m.AudioNotesModal })));
@@ -79,9 +81,11 @@ export const CassetteIcon: React.FC<{ isPlaying: boolean; color?: string }> = ({
 // Lightweight WebAudio beep helper for 4-beat count-in
 export const playCountInBeep = (isAccent: boolean) => {
   try {
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
+    const ctx = SharedAudioEngine.getContext();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'sine';
@@ -391,7 +395,7 @@ export interface InlineAudioPlayerProps {
   date?: string;
   isFavorite?: boolean;
   onToggleFavorite?: () => void;
-  onSaveEdited?: (result: { url: string; duration: number; label: string; mode: 'overwrite' | 'duplicate' }) => void;
+  onSaveEdited?: (result: { url: string; duration: number; label: string; mode: 'overwrite' | 'duplicate'; is_edited?: boolean; loop_locator?: any }) => void;
   isHero?: boolean;
   canEdit?: boolean;
   allowDownload?: boolean;
@@ -405,6 +409,7 @@ export interface InlineAudioPlayerProps {
   onOpenDuettDeck?: () => void;
   metronomeBpm?: number;
   waveformPeaks?: number[];
+  uiLevel?: 'junior' | 'teen' | 'pro';
 }
 
 export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({ 
@@ -439,7 +444,8 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
   onRevertToOriginal,
   onOpenDuettDeck,
   metronomeBpm,
-  waveformPeaks
+  waveformPeaks,
+  uiLevel = 'junior'
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState<number>(initialDuration || 0);
@@ -459,9 +465,10 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       setPeaks(waveformPeaks);
     }
   }, [waveformPeaks]);
+  const effectiveUiLevel: 'junior' | 'teen' | 'pro' = uiLevel || (typeof window !== 'undefined' ? (localStorage.getItem('campus_student_ui_level') as any) : null) || 'junior';
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isLooping, setIsLooping] = useState(false);
-  const [countInActive, setCountInActive] = useState(false);
+  const [countInActive, setCountInActive] = useState<boolean>(() => effectiveUiLevel === 'junior');
   const [countInStep, setCountInStep] = useState<number | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
@@ -471,6 +478,17 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
   // 🛡️ Stabiler Audio-Schlüssel für Notizen (bevorzugt ID / campus_blob Key vor volatilen blob: URLs)
   const persistentAudioKey = audioId || id || (url && !url.startsWith('blob:') ? url : '') || (resolvedUrl && !resolvedUrl.startsWith('blob:') ? resolvedUrl : '') || url || resolvedUrl;
   const [notesCount, setNotesCount] = useState<number>(() => getAudioNotesCount(persistentAudioKey));
+
+  // 🎛️ A/B Loop-Locator State (Non-destructive Übe-Schleife)
+  const [loopLocator, setLoopLocator] = useState<AudioLoopLocator | null>(() => getLoopLocator(persistentAudioKey || url || resolvedUrl));
+
+  useEffect(() => {
+    const audioKey = persistentAudioKey || url || resolvedUrl;
+    setLoopLocator(getLoopLocator(audioKey));
+    const handleLocatorChange = () => setLoopLocator(getLoopLocator(audioKey));
+    window.addEventListener('campus-audio-loop-locator-changed', handleLocatorChange);
+    return () => window.removeEventListener('campus-audio-loop-locator-changed', handleLocatorChange);
+  }, [persistentAudioKey, url, resolvedUrl]);
 
   // 🔔 Reaktiv synchronisierte Notizen-Anzahl (SoundCloud-Style Marker)
   useEffect(() => {
@@ -743,14 +761,15 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
 
       if (arrayBuffer) {
         const decoded = await safeDecodeAudioData(ctx, arrayBuffer);
-        audioBufferRef.current = decoded;
-        if (decoded.duration && isFinite(decoded.duration)) {
-          setDuration(Number(decoded.duration.toFixed(2)));
+        const centered = ensureCenteredStereoAudioBuffer(ctx, decoded);
+        audioBufferRef.current = centered;
+        if (centered.duration && isFinite(centered.duration)) {
+          setDuration(Number(centered.duration.toFixed(2)));
         }
 
         // 🌟 Auto-Retrofit Wellenform-Peaks für Bestandsaufnahmen
-        if (decoded && (!peaks || peaks.length === 0)) {
-          const newPeaks = extractWaveformPeaks(decoded, 80);
+        if (centered && (!peaks || peaks.length === 0)) {
+          const newPeaks = extractWaveformPeaks(centered, 80);
           if (newPeaks.length > 0) {
             setPeaks(newPeaks);
             try {
@@ -832,17 +851,26 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
 
       const source = ctx.createBufferSource();
       source.buffer = buffer;
-      source.playbackRate.value = playbackRate;
+      const hasLocatorLoop = Boolean(options.loop && loopLocator?.enabled && loopLocator.endSec > loopLocator.startSec);
+      const loopStartBound = hasLocatorLoop ? loopLocator!.startSec : 0;
+      const loopEndBound = hasLocatorLoop ? Math.min(buffer.duration, loopLocator!.endSec) : buffer.duration;
+
       source.loop = options.loop;
       if (options.loop) {
-        source.loopStart = 0;
-        source.loopEnd = buffer.duration;
+        source.loopStart = loopStartBound;
+        source.loopEnd = loopEndBound;
       }
       source.connect(ctx.destination);
 
       const bufDur = buffer.duration;
       let playStart = options.offsetSec !== undefined ? options.offsetSec : currentTime;
-      if (bufDur > 0 && playStart >= bufDur - 0.05) playStart = 0;
+      if (hasLocatorLoop) {
+        if (playStart < loopStartBound || playStart >= loopEndBound - 0.05) {
+          playStart = loopStartBound;
+        }
+      } else {
+        if (bufDur > 0 && playStart >= bufDur - 0.05) playStart = 0;
+      }
 
       source.start(0, playStart);
       loopSourceRef.current = source;
@@ -867,7 +895,13 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
           const elapsed = (ctx.currentTime - loopStartTimestampRef.current) * playbackRate;
           const current = (loopOffsetSecRef.current + elapsed);
           if (options.loop) {
-            setCurrentTime(current % curBufDur);
+            if (hasLocatorLoop) {
+              const loopSpan = Math.max(0.05, loopEndBound - loopStartBound);
+              const offsetInLoop = (current - loopStartBound) % loopSpan;
+              setCurrentTime(loopStartBound + (offsetInLoop < 0 ? offsetInLoop + loopSpan : offsetInLoop));
+            } else {
+              setCurrentTime(current % curBufDur);
+            }
           } else {
             setCurrentTime(Math.min(curBufDur, current));
             if (current >= curBufDur) {
@@ -898,7 +932,10 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
     if (isPlaying) {
       if (nextLoop) {
         // Nahtloser Übergang: HTML5-Audio stoppen, Web Audio Gapless Loop an aktueller Position starten
-        const cur = audioRef.current && !isWebAudioPlayingRef.current ? audioRef.current.currentTime : currentTime;
+        let cur = audioRef.current && !isWebAudioPlayingRef.current ? audioRef.current.currentTime : currentTime;
+        if (loopLocator?.enabled && (cur < loopLocator.startSec || cur >= loopLocator.endSec - 0.05)) {
+          cur = loopLocator.startSec;
+        }
         if (audioRef.current) audioRef.current.pause();
         startWebAudioPlayback({ loop: true, offsetSec: cur });
       } else {
@@ -958,6 +995,22 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       }
     } catch {}
 
+    // 2. Synchronous HTML5 Audio unlock & priming for iOS Safari & Chrome
+    if (audioRef.current && isPlayableUrl(resolvedUrl || url)) {
+      try {
+        audioRef.current.load();
+        const primePromise = audioRef.current.play();
+        if (primePromise !== undefined) {
+          primePromise.then(() => {
+            if (countInActive && !isPlaying) {
+              audioRef.current?.pause();
+              if (audioRef.current) audioRef.current.currentTime = 0;
+            }
+          }).catch(() => {});
+        }
+      } catch {}
+    }
+
     if (countInTimerRef.current) {
       clearTimeout(countInTimerRef.current);
       countInTimerRef.current = null;
@@ -981,6 +1034,9 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
           let step = 4;
           setCountInStep(step);
           playCountInBeep(true);
+
+          // 🚀 Preload AudioBuffer during count-in so memory buffer is 100% ready on beat 0
+          loadAudioBuffer().catch(() => {});
 
           const runCount = () => {
             step -= 1;
@@ -1034,6 +1090,9 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
           setCountInStep(step);
           playCountInBeep(true);
 
+          // 🚀 Preload AudioBuffer during count-in so Web Audio fallback is instantly available
+          loadAudioBuffer().catch(() => {});
+
           const runCount = () => {
             step -= 1;
             if (step > 0) {
@@ -1064,6 +1123,11 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
     };
     const handleTimeUpdate = () => {
       if (!isWebAudioPlayingRef.current) {
+        if (isLooping && loopLocator?.enabled && loopLocator.endSec > loopLocator.startSec) {
+          if (audio.currentTime >= loopLocator.endSec) {
+            audio.currentTime = loopLocator.startSec;
+          }
+        }
         setCurrentTime(audio.currentTime);
       }
     };
@@ -1087,12 +1151,14 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [resolvedUrl, isLooping]);
+  }, [resolvedUrl, isLooping, loopLocator]);
 
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.playbackRate = playbackRate;
       (audioRef.current as any).preservesPitch = true;
+      (audioRef.current as any).webkitPreservesPitch = true;
+      (audioRef.current as any).mozPreservesPitch = true;
     }
     if (loopSourceRef.current && isWebAudioPlayingRef.current && audioCtxRef.current) {
       loopSourceRef.current.playbackRate.value = playbackRate;
@@ -1649,6 +1715,14 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
         const barRatio = i / effective16Bars.length;
         const isFilled = barRatio <= progressRatio;
         const heightPct = Math.max(20, Math.round(val * 100));
+
+        // A/B Loop-Locator Visualisierung (32% Opacity außerhalb des Loop-Bereichs bei aktivem Looping)
+        const isWithinLocator = !loopLocator?.enabled || !duration || duration <= 0 || (
+          (barRatio * duration) >= (loopLocator.startSec - 0.05) &&
+          (barRatio * duration) <= (loopLocator.endSec + 0.05)
+        );
+        const opacity = (isLooping && loopLocator?.enabled && !isWithinLocator) ? 0.32 : 1;
+
         return (
           <div
             key={i}
@@ -1657,10 +1731,11 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
               minWidth: "2.5px",
               height: `${heightPct}%`,
               borderRadius: "1.5px",
+              opacity,
               background: isFilled
                 ? (isIndigoPurple ? (isPlaying ? "#7c3aed" : "#6d28d9") : (isPlaying ? "#16a34a" : "#15803d"))
                 : (isShared ? "#bbf7d0" : "#e2e8f0"),
-              transition: "background 0.1s ease"
+              transition: "background 0.1s ease, opacity 0.2s ease"
             }}
           />
         );
@@ -1707,15 +1782,38 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            position: 'relative',
             boxShadow: isLooping 
               ? (isIndigoPurple ? '0 1px 3px rgba(109, 40, 217, 0.2)' : '0 1px 3px rgba(22, 163, 74, 0.2)') 
               : '0 1px 2px rgba(0, 0, 0, 0.02)',
             transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
           }}
           className="hover-scale-mini"
-          title={isLooping ? "Loop aktiv (Endlos-Wiedergabe) – Tippen zum Deaktivieren" : "Loop aktivieren (Endlos-Wiedergabe)"}
+          title={
+            isLooping 
+              ? (loopLocator?.enabled ? `A/B Loop aktiv (${Math.round(loopLocator.startSec)}s - ${Math.round(loopLocator.endSec)}s) – Tippen zum Deaktivieren` : "Loop aktiv (Endlos-Wiedergabe) – Tippen zum Deaktivieren")
+              : (loopLocator?.enabled ? `A/B Loop aktivieren (${Math.round(loopLocator.startSec)}s - ${Math.round(loopLocator.endSec)}s)` : "Loop aktivieren (Endlos-Wiedergabe)")
+          }
         >
-          <Repeat size={isMobile ? 14 : 15} strokeWidth={isLooping ? 2.6 : 2.2} />
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Repeat size={isMobile ? 14 : 15} strokeWidth={isLooping ? 2.6 : 2.2} />
+            {loopLocator?.enabled && (
+              <span style={{
+                position: 'absolute',
+                top: '-5px',
+                right: '-6px',
+                fontSize: '0.48rem',
+                fontWeight: 900,
+                lineHeight: 1,
+                background: isLooping ? '#7c3aed' : '#94a3b8',
+                color: '#ffffff',
+                borderRadius: '3px',
+                padding: '1px 2px'
+              }}>
+                A/B
+              </span>
+            )}
+          </div>
         </button>
 
         {/* ⏱️ 4-Beat Einzähler Toggle (Icon only) */}
@@ -1755,14 +1853,22 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
           <Timer size={isMobile ? 14 : 15} strokeWidth={countInActive ? 2.6 : 2.2} />
         </button>
 
-        {/* 🎛️ Tempo Button (100, 85, 75, 50) */}
+        {/* 🎛️ Adaptiver Tempo Button (Junior: 🐢/🐰, Teen: 3 Stufen, Pro: Feinstufen) */}
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            const rates = [1, 0.85, 0.75, 0.5];
-            const nextRate = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
-            setPlaybackRate(nextRate);
+            if (effectiveUiLevel === 'junior') {
+              setPlaybackRate(prev => (prev === 1 ? 0.75 : 1));
+            } else if (effectiveUiLevel === 'teen') {
+              const rates = [1, 0.85, 0.75];
+              const nextRate = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
+              setPlaybackRate(nextRate);
+            } else {
+              const rates = [1, 0.85, 0.75, 0.6, 0.5];
+              const nextRate = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
+              setPlaybackRate(nextRate);
+            }
           }}
           style={{
             border: playbackRate !== 1 
@@ -1775,8 +1881,8 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
               ? (isIndigoPurple ? '#6d28d9' : '#15803d') 
               : '#64748b',
             height: isMobile ? '30px' : '34px',
-            width: isMobile ? '32px' : '36px',
-            minWidth: isMobile ? '32px' : '36px',
+            width: isMobile ? (effectiveUiLevel === 'junior' ? '44px' : '32px') : (effectiveUiLevel === 'junior' ? '48px' : '36px'),
+            minWidth: isMobile ? (effectiveUiLevel === 'junior' ? '44px' : '32px') : (effectiveUiLevel === 'junior' ? '48px' : '36px'),
             padding: 0,
             borderRadius: isMobile ? '8px' : '10px',
             cursor: 'pointer',
@@ -1789,10 +1895,17 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
             transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
           }}
           className="hover-scale-mini"
-          title={playbackRate !== 1 ? `Tempo: ${Math.round(playbackRate * 100)}% (Tippen für nächstes Tempo)` : "Tempo: 100% (Tippen für 85%, 75%, 50%)"}
+          title={
+            effectiveUiLevel === 'junior'
+              ? (playbackRate < 1 ? '🐢 Langsam (75%) – Tippen für 🐰 Normal (100%)' : '🐰 Normal (100%) – Tippen für 🐢 Langsam (75%)')
+              : (playbackRate !== 1 ? `Tempo: ${Math.round(playbackRate * 100)}% (Tippen für nächstes Tempo)` : 'Tempo: 100% (Tippen zum Verlangsamen)')
+          }
         >
-          <span style={{ fontSize: isMobile ? '0.66rem' : '0.74rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1 }}>
-            {Math.round(playbackRate * 100)}
+          <span style={{ fontSize: isMobile ? (effectiveUiLevel === 'junior' ? '0.62rem' : '0.66rem') : (effectiveUiLevel === 'junior' ? '0.70rem' : '0.74rem'), fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1 }}>
+            {effectiveUiLevel === 'junior'
+              ? (playbackRate < 1 ? '🐢 75' : '🐰 100')
+              : Math.round(playbackRate * 100)
+            }
           </span>
         </button>
 
@@ -2002,14 +2115,14 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
             <span>{notesCount > 0 ? `Notizen (${notesCount})` : 'Notizen'}</span>
           </button>
 
-          {/* ✂️ Studio Trimmer */}
+          {/* 🎛️ A/B Loop-Studio */}
           <button
             type="button"
             onClick={() => setIsEditorOpen(true)}
             style={{
-              border: '1px solid #cbd5e1',
-              background: '#ffffff',
-              color: '#334155',
+              border: loopLocator?.enabled ? '1.5px solid #a855f7' : '1px solid #cbd5e1',
+              background: loopLocator?.enabled ? '#faf5ff' : '#ffffff',
+              color: loopLocator?.enabled ? '#7c3aed' : '#334155',
               fontSize: '0.74rem',
               fontWeight: 700,
               height: '32px',
@@ -2019,16 +2132,20 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: '5px',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+              boxShadow: loopLocator?.enabled ? '0 0 0 2px rgba(168, 85, 247, 0.15)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
               transition: 'all 0.15s ease',
               flexShrink: 0,
               whiteSpace: 'nowrap'
             }}
             className="hover-scale-mini"
-            title="Audio zuschneiden, einblenden & Pitch anpassen"
+            title={loopLocator?.enabled ? `A/B Loop aktiv (${Math.round(loopLocator.startSec)}s - ${Math.round(loopLocator.endSec)}s)` : 'A/B Loop-Schleife festlegen'}
+            aria-label={loopLocator?.enabled ? `Loop-Studio öffnen (A/B Loop aktiv ${Math.round(loopLocator.startSec)} bis ${Math.round(loopLocator.endSec)} Sekunden)` : 'Loop-Studio öffnen'}
           >
-            <Scissors size={13} strokeWidth={2.2} />
-            <span>Zuschneiden</span>
+            <SlidersHorizontal size={13} strokeWidth={2.2} />
+            <span>Loop</span>
+            {loopLocator?.enabled && (
+              <span style={{ fontSize: '0.62rem', fontWeight: 900, color: '#7c3aed' }}>A/B</span>
+            )}
           </button>
 
           {/* 👥 Duett-Deck (Dual Layer): Synchrones Play-Along Deck (nur bei aktivem Metronom mit BPM-Timecode) */}
@@ -2472,6 +2589,11 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
             initialLabel={displayTitle}
             initialDuration={duration}
             initialOriginalDuration={originalDuration}
+            editorMode="locator"
+            uiLevel={uiLevel || (typeof window !== 'undefined' ? (localStorage.getItem('campus_student_ui_level') as any) : null) || 'junior'}
+            recordingId={audioId || id}
+            userId={typeof window !== 'undefined' ? (localStorage.getItem('campus_auth_user_id') || localStorage.getItem('auth_user_id') || undefined) : undefined}
+            schoolId={typeof window !== 'undefined' ? (localStorage.getItem('campus_current_school_id') || localStorage.getItem('last_active_school_id') || undefined) : undefined}
             onSave={(res) => {
               // 1. Wiedergabe sofort stoppen und Playhead zurücksetzen
               stopWebAudioLoop(true);
@@ -2482,10 +2604,15 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
               setIsPlaying(false);
               setCurrentTime(0);
 
-              // 2. Veralteten AudioBuffer-Cache sofort leeren
+              // 2. Revisionssichere Spiegelung des Locators im lokalen State
+              if (res.loop_locator !== undefined) {
+                setLoopLocator(res.loop_locator);
+              }
+
+              // 3. Veralteten AudioBuffer-Cache sofort leeren
               audioBufferRef.current = null;
 
-              // 3. Neue gekürzte Dauer sofort im Player-State spiegeln
+              // 4. Neue gekürzte Dauer sofort im Player-State spiegeln
               if (res.duration && res.duration > 0) {
                 setDuration(res.duration);
               }
@@ -2502,9 +2629,10 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
                         const getAb = raw instanceof Blob ? raw.arrayBuffer() : Promise.resolve(raw as ArrayBuffer);
                         getAb.then(ab => {
                           safeDecodeAudioData(ctx, ab).then(decoded => {
-                            audioBufferRef.current = decoded;
-                            if (decoded.duration && isFinite(decoded.duration)) {
-                              setDuration(Number(decoded.duration.toFixed(2)));
+                            const centered = ensureCenteredStereoAudioBuffer(ctx, decoded);
+                            audioBufferRef.current = centered;
+                            if (centered.duration && isFinite(centered.duration)) {
+                              setDuration(Number(centered.duration.toFixed(2)));
                             }
                           }).catch(() => {});
                         });

@@ -394,7 +394,7 @@ interface CompactAudioStripProps {
   onDelete?: () => void;
   onKeep?: () => void;
   onHide?: () => void;
-  onSaveEdited?: (result: { url: string; duration: number; label: string; mode: 'overwrite' | 'duplicate' }) => void;
+  onSaveEdited?: (result: { url: string; duration: number; label: string; mode: 'overwrite' | 'duplicate'; is_edited?: boolean; loop_locator?: any }) => void;
   isFutureWeek?: boolean;
   isTeacher?: boolean;
   readOnly?: boolean;
@@ -530,8 +530,22 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
 
   const togglePlay = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    // 🔓 Safari AudioContext Unlock on user gesture
+    // 🔓 Safari AudioContext & HTMLMediaElement Unlock on user gesture
     SharedAudioEngine.getContext().resume().catch(() => {});
+    if (audioRef.current) {
+      try {
+        audioRef.current.load();
+        const primePromise = audioRef.current.play();
+        if (primePromise !== undefined) {
+          primePromise.then(() => {
+            if (countInActive && !isPlaying) {
+              audioRef.current?.pause();
+              if (audioRef.current) audioRef.current.currentTime = 0;
+            }
+          }).catch(() => {});
+        }
+      } catch {}
+    }
 
     if (countInTimerRef.current) {
       clearTimeout(countInTimerRef.current);
@@ -1079,7 +1093,13 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
             initialDuration={duration}
             editorMode={!isTeacher || readOnly ? 'locator' : 'locator'}
             uiLevel={uiLevel}
+            recordingId={url || resolvedUrl}
+            userId={typeof window !== 'undefined' ? (localStorage.getItem('campus_auth_user_id') || localStorage.getItem('auth_user_id') || undefined) : undefined}
+            schoolId={typeof window !== 'undefined' ? (localStorage.getItem('campus_current_school_id') || localStorage.getItem('last_active_school_id') || undefined) : undefined}
             onSave={(res) => {
+              if (res.loop_locator !== undefined) {
+                setLoopLocator(res.loop_locator);
+              }
               if (onSaveEdited) {
                 onSaveEdited(res);
               }
@@ -1255,8 +1275,22 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
 
   const togglePlay = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    // 🔓 Safari AudioContext Unlock on user gesture
+    // 🔓 Safari AudioContext & HTMLMediaElement Unlock on user gesture
     SharedAudioEngine.getContext().resume().catch(() => {});
+    if (audioRef.current) {
+      try {
+        audioRef.current.load();
+        const primePromise = audioRef.current.play();
+        if (primePromise !== undefined) {
+          primePromise.then(() => {
+            if (countInActive && !isPlaying) {
+              audioRef.current?.pause();
+              if (audioRef.current) audioRef.current.currentTime = 0;
+            }
+          }).catch(() => {});
+        }
+      } catch {}
+    }
 
     if (countInTimerRef.current) {
       clearTimeout(countInTimerRef.current);
@@ -1947,7 +1981,13 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
             initialDuration={duration}
             editorMode={!isTeacher || readOnly ? 'locator' : 'locator'}
             uiLevel={uiLevel}
-            onSave={(_res) => {
+            recordingId={url || resolvedUrl}
+            userId={typeof window !== 'undefined' ? (localStorage.getItem('campus_auth_user_id') || localStorage.getItem('auth_user_id') || undefined) : undefined}
+            schoolId={typeof window !== 'undefined' ? (localStorage.getItem('campus_current_school_id') || localStorage.getItem('last_active_school_id') || undefined) : undefined}
+            onSave={(res) => {
+              if (res.loop_locator !== undefined) {
+                setLoopLocator(res.loop_locator);
+              }
               setIsEditorOpen(false);
             }}
           />
