@@ -53,13 +53,29 @@ const playKlopfgeistClick = (
   time: number,
   isAccent: boolean,
   volume: number,
-  destination: AudioNode
+  destination: AudioNode,
+  presence: 'soft' | 'standard' | 'punchy' = 'standard'
 ) => {
   if (volume <= 0.001) return;
   try {
     const primaryFreq = isAccent ? 1760 : 880;
-    const snapFreq = isAccent ? 3520 : 1760;
     const bodyFreq = isAccent ? 880 : 440;
+    let snapFreq = isAccent ? 3520 : 1760;
+    let snapGainLevel = 0.45;
+    let decayTime = isAccent ? 0.026 : 0.020;
+    let peakLevel = volume * (isAccent ? 0.95 : 0.68);
+
+    if (presence === 'soft') {
+      snapGainLevel = 0.18;
+      snapFreq = isAccent ? 2640 : 1320;
+      decayTime = isAccent ? 0.032 : 0.026;
+      peakLevel = volume * (isAccent ? 0.85 : 0.60);
+    } else if (presence === 'punchy') {
+      snapGainLevel = 0.68;
+      snapFreq = isAccent ? 4400 : 2200;
+      decayTime = isAccent ? 0.022 : 0.017;
+      peakLevel = volume * (isAccent ? 1.05 : 0.76);
+    }
 
     const primaryOsc = ctx.createOscillator();
     primaryOsc.type = 'sine';
@@ -74,16 +90,14 @@ const playKlopfgeistClick = (
     bodyOsc.frequency.setValueAtTime(bodyFreq, time);
 
     const clickGain = ctx.createGain();
-    const peakLevel = volume * (isAccent ? 0.95 : 0.68);
-    const decayTime = isAccent ? 0.026 : 0.020;
 
     clickGain.gain.setValueAtTime(0.0001, time);
     clickGain.gain.linearRampToValueAtTime(peakLevel, time + 0.0008);
     clickGain.gain.exponentialRampToValueAtTime(0.00001, time + decayTime);
 
     const snapGain = ctx.createGain();
-    snapGain.gain.setValueAtTime(0.45, time);
-    snapGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.012);
+    snapGain.gain.setValueAtTime(snapGainLevel, time);
+    snapGain.gain.exponentialRampToValueAtTime(0.0001, time + (presence === 'soft' ? 0.008 : 0.015));
 
     const bodyGain = ctx.createGain();
     bodyGain.gain.setValueAtTime(0.35, time);
@@ -102,7 +116,7 @@ const playKlopfgeistClick = (
     bodyOsc.start(time);
 
     primaryOsc.stop(time + decayTime + 0.005);
-    snapOsc.stop(time + 0.015);
+    snapOsc.stop(time + 0.018);
     bodyOsc.stop(time + decayTime + 0.005);
   } catch (_) {}
 };
@@ -659,7 +673,9 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
   useEffect(() => { metronomeMeterRef.current = metronomeMeter; }, [metronomeMeter]);
 
   const activeMeterInfo = getActiveMeter(selectedStyle, metronomeMeter);
-  const [volMaster, setVolMaster] = useState(100);
+  const [volMaster, setVolMaster] = useState(80);
+  const [prevVolMaster, setPrevVolMaster] = useState(80);
+  const [clickPresence, setClickPresence] = useState<'soft' | 'standard' | 'punchy'>('standard');
   const [volKick, setVolKick] = useState(100);
   const [volSnare, setVolSnare] = useState(100);
   const [volHat, setVolHat] = useState(100);
@@ -668,6 +684,27 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
   // 🎯 Kindgerechte Fokus-Ebenen (Sekundär-Toolbox Drawer)
   const [showAllStyles, setShowAllStyles] = useState(false);
   const [showStudioMixer, setShowStudioMixer] = useState(false);
+  const [showTempoDeck, setShowTempoDeck] = useState(false);
+  const [isEditingBpm, setIsEditingBpm] = useState(false);
+  const [tempBpmInput, setTempBpmInput] = useState<string>('');
+
+  const handleCommitBpmInput = () => {
+    setIsEditingBpm(false);
+    const parsed = parseInt(tempBpmInput.trim(), 10);
+    if (!isNaN(parsed)) {
+      const clamped = Math.min(240, Math.max(40, parsed));
+      setBpm(clamped);
+    }
+  };
+
+  useEffect(() => {
+    if (!showTempoDeck) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowTempoDeck(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showTempoDeck]);
 
   // 🎙️ Campus Rhythmus-Coach States & Realtime Audio Tracking
   const [rhythmCoachActive, setRhythmCoachActive] = useState(false);
@@ -1343,6 +1380,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
   const volHatRef = useRef(volHat);
   const volMetronomeRef = useRef(volMetronome);
   const selectedVariationRef = useRef(selectedVariation);
+  const clickPresenceRef = useRef(clickPresence);
   const mutedInstrumentsRef = useRef(mutedInstruments);
   const soloedInstrumentsRef = useRef(soloedInstruments);
 
@@ -1356,6 +1394,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
   useEffect(() => { volSnareRef.current = volSnare; }, [volSnare]);
   useEffect(() => { volHatRef.current = volHat; }, [volHat]);
   useEffect(() => { volMetronomeRef.current = volMetronome; }, [volMetronome]);
+  useEffect(() => { clickPresenceRef.current = clickPresence; }, [clickPresence]);
   useEffect(() => { selectedVariationRef.current = selectedVariation; }, [selectedVariation]);
   useEffect(() => { mutedInstrumentsRef.current = mutedInstruments; }, [mutedInstruments]);
   useEffect(() => { soloedInstrumentsRef.current = soloedInstruments; }, [soloedInstruments]);
@@ -1889,6 +1928,9 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
 
     const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
     audioCtxRef.current = audioCtx;
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
     
     const masterGain = audioCtx.createGain();
     masterGain.gain.value = (volMasterRef.current / 100) * 1.5;
@@ -1953,7 +1995,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
       for (let b = 0; b < totalCountInBeats; b++) {
         const clickTime = initialStartTime + b * countInInterval;
         const isAccent = b === 0;
-        playKlopfgeistClick(audioCtx, clickTime, isAccent, isAccent ? 0.95 : 0.75, masterGain);
+        playKlopfgeistClick(audioCtx, clickTime, isAccent, isAccent ? 0.95 : 0.75, masterGain, clickPresenceRef.current);
       }
 
       // 2. Visual UI Counters (Synchronized to Audio Clock)
@@ -2329,7 +2371,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
     // 🌟 Supplementary Studio Instruments (Warm Ride & Organic Shaker)
     const playRide = (volMul = 1.0) => playSample(kitBuffers.ride, hVol, volMul * 0.33, 0.012);
     const playShaker = (forward = true, volMul = 1.0) => playSample(forward ? kitBuffers.shakerFwd : kitBuffers.shakerBack, hVol, volMul * 0.26, 0.025);
-    const playClick = (isAccent = false) => playKlopfgeistClick(ctx, noteTime, isAccent, selectedStyleRef.current === 'metronome' ? mVol : mVol * 0.75, masterGain);
+    const playClick = (isAccent = false) => playKlopfgeistClick(ctx, noteTime, isAccent, selectedStyleRef.current === 'metronome' ? mVol : mVol * 0.75, masterGain, clickPresenceRef.current);
 
     const triggerVisualBeat = (beatIdx: number) => {
       // Record scheduled quarter beat timestamp for Rhythmus-Coach transient alignment
@@ -2366,7 +2408,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
           if (!isMutedBar && accentType !== 'mute') {
             const isAcc = accentType === 'accent';
             const gainMul = accentType === 'ghost' ? 0.30 : (isAcc ? 1.0 : 0.75);
-            playKlopfgeistClick(ctx, noteTime, isAcc, mVol * gainMul, masterGain);
+            playKlopfgeistClick(ctx, noteTime, isAcc, mVol * gainMul, masterGain, clickPresenceRef.current);
           }
           triggerVisualBeat(beatIdx);
         }
@@ -2378,7 +2420,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
           if (!isMutedBar && accentType !== 'mute') {
             const isAcc = accentType === 'accent';
             const gainMul = accentType === 'ghost' ? 0.30 : (isAcc ? 1.0 : 0.75);
-            playKlopfgeistClick(ctx, noteTime, isAcc, mVol * gainMul, masterGain);
+            playKlopfgeistClick(ctx, noteTime, isAcc, mVol * gainMul, masterGain, clickPresenceRef.current);
           }
           triggerVisualBeat(beatIdx);
 
@@ -3019,7 +3061,7 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     Übe-Werkzeuge
                   </h3>
                   <p style={{ margin: 0, fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
-                    Tempo-Trainer, Innere Rhythmusuhr & Stimmgabel
+                    Master-Lautstärke, Tempo-Trainer, Rhythmusuhr & Stimmton
                   </p>
                 </div>
               </div>
@@ -3046,7 +3088,215 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               </button>
             </div>
 
-            {/* 1. Tempo-Trainer */}
+            {/* 🔊 1. Master-Lautstärke & Klick-Klangfarbe (Studio-Goldstandard) */}
+            <div style={{
+              padding: '16px',
+              borderRadius: '16px',
+              background: '#ffffff',
+              border: '1.5px solid #e2e8f0',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px'
+            }}>
+              {/* Header row: Icon, Title, Volume Badge, Quick Mute Button */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{
+                    width: '34px',
+                    height: '34px',
+                    borderRadius: '10px',
+                    background: volMaster === 0 ? '#f1f5f9' : '#fef9c3',
+                    border: volMaster === 0 ? '1px solid #cbd5e1' : '1px solid #fde047',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    {volMaster === 0 ? (
+                      <VolumeX size={18} color="#64748b" />
+                    ) : (
+                      <Volume2 size={18} color="#a16207" />
+                    )}
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '0.90rem', fontWeight: 900, color: '#0f172a' }}>
+                        Master-Lautstärke
+                      </span>
+                      {volMaster > 100 && (
+                        <span style={{
+                          fontSize: '0.58rem',
+                          fontWeight: 900,
+                          padding: '1.5px 6px',
+                          borderRadius: '6px',
+                          background: '#eab308',
+                          color: '#0f172a',
+                          letterSpacing: '0.04em'
+                        }}>
+                          BOOST
+                        </span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600 }}>
+                      Standard: 80% (-3 dBFS Headroom) • Max: 150%
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                  <span style={{
+                    fontSize: '0.88rem',
+                    fontWeight: 900,
+                    fontVariantNumeric: 'tabular-nums',
+                    color: volMaster === 0 ? '#94a3b8' : (volMaster > 100 ? '#b45309' : '#0f172a'),
+                    minWidth: '40px',
+                    textAlign: 'right'
+                  }}>
+                    {volMaster}%
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (volMaster > 0) {
+                        setPrevVolMaster(volMaster);
+                        setVolMaster(0);
+                      } else {
+                        setVolMaster(prevVolMaster > 0 ? prevVolMaster : 80);
+                      }
+                    }}
+                    title={volMaster === 0 ? "Stummschaltung aufheben" : "Stummschalten"}
+                    aria-label={volMaster === 0 ? "Stummschaltung aufheben" : "Stummschalten"}
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: '10px',
+                      border: volMaster === 0 ? '1.5px solid #ef4444' : '1px solid #e2e8f0',
+                      background: volMaster === 0 ? '#fef2f2' : '#f8fafc',
+                      color: volMaster === 0 ? '#dc2626' : '#475569',
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      touchAction: 'manipulation'
+                    }}
+                  >
+                    {volMaster === 0 ? (
+                      <>
+                        <VolumeX size={13} />
+                        <span>Stumm</span>
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 size={13} />
+                        <span>Mute</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Slider Lane */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8' }}>0%</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="150"
+                  step="1"
+                  value={volMaster}
+                  onChange={(e) => setVolMaster(Number(e.target.value))}
+                  aria-label="Master-Lautstärke Regler"
+                  style={{
+                    flex: 1,
+                    accentColor: '#eab308',
+                    cursor: 'pointer',
+                    height: '6px',
+                    borderRadius: '3px'
+                  }}
+                />
+                <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8' }}>150%</span>
+              </div>
+
+              {/* Click Sound Presence / Timbre Selector */}
+              <div style={{
+                paddingTop: '10px',
+                borderTop: '1px solid #f1f5f9',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 850, color: '#334155' }}>
+                    Klick-Klangfarbe (Präsenz)
+                  </span>
+                  <span style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 600 }}>
+                    Synthesizer-Charakteristik
+                  </span>
+                </div>
+
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gap: '6px'
+                }}>
+                  {[
+                    { id: 'soft', label: 'Sanft', hint: 'Klavier / Akustik' },
+                    { id: 'standard', label: 'Standard', hint: 'Logic Klopfgeist' },
+                    { id: 'punchy', label: 'Prägnant', hint: 'Drums / Bläser' }
+                  ].map((p) => {
+                    const isSel = clickPresence === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          setClickPresence(p.id as 'soft' | 'standard' | 'punchy');
+                          try {
+                            const ctx = audioCtxRef.current || new (window.AudioContext || (window as any).webkitAudioContext)();
+                            ctx.resume().then(() => {
+                              playKlopfgeistClick(
+                                ctx,
+                                ctx.currentTime + 0.02,
+                                true,
+                                Math.max(0.2, (volMaster / 100) * 0.9),
+                                masterGainRef.current && audioCtxRef.current ? masterGainRef.current : ctx.destination,
+                                p.id as 'soft' | 'standard' | 'punchy'
+                              );
+                            });
+                          } catch (_) {}
+                        }}
+                        style={{
+                          padding: '8px 6px',
+                          borderRadius: '10px',
+                          border: isSel ? '1.5px solid #eab308' : '1px solid #e2e8f0',
+                          background: isSel ? '#fefce8' : '#f8fafc',
+                          color: isSel ? '#854d0e' : '#475569',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '2px',
+                          textAlign: 'center',
+                          touchAction: 'manipulation',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <span style={{ fontSize: '0.74rem', fontWeight: 900 }}>
+                          {p.label}
+                        </span>
+                        <span style={{ fontSize: '0.60rem', color: isSel ? '#a16207' : '#94a3b8', fontWeight: 600 }}>
+                          {p.hint}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Tempo-Trainer */}
             <div style={{
               padding: '16px',
               borderRadius: '16px',
@@ -3397,23 +3647,24 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                 type="button"
                 onClick={() => setIsStageView(true)}
                 style={{
-                  background: 'linear-gradient(135deg, #fefce8 0%, #fef08a 100%)',
-                  border: '1.5px solid #facc15',
+                  background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
+                  border: '1.5px solid #ca8a04',
                   borderRadius: '10px',
-                  padding: '6px 12px',
+                  padding: '6px 13px',
                   fontSize: '0.74rem',
                   fontWeight: 900,
-                  color: '#854d0e',
+                  color: '#0f172a',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '5px',
-                  boxShadow: '0 2px 8px rgba(234, 179, 8, 0.25)',
-                  transition: 'all 0.15s ease'
+                  gap: '6px',
+                  boxShadow: '0 2px 10px rgba(234, 179, 8, 0.40)',
+                  transition: 'all 0.15s ease',
+                  touchAction: 'manipulation'
                 }}
-                title="Notenständer-Großansicht"
+                title="Notenständer-Großansicht öffnen"
               >
-                <Maximize2 size={13} strokeWidth={2.5} />
+                <Maximize2 size={13} strokeWidth={2.8} color="#0f172a" />
                 <span>Notenständer</span>
               </button>
             </div>
@@ -3433,7 +3684,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: '12px',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)'
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
+            position: 'relative'
           }}>
             {/* Linke Zelle: Visualizer (Teen Wave-Ring oder Nussbaum-Metronom) */}
             <div style={{
@@ -3691,17 +3943,156 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
               alignItems: 'center',
               gap: '8px'
             }}>
-              {/* Apple Symmetrie-Achse: Tier-Avatar, BPM-Hero & Tempo-Kapsel */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', width: '100%' }}>
-                {/* Junior Animated Animal Medallion */}
-                {effectiveUiLevel === 'junior' && (() => {
+              {/* Apple Hero: (-) 120 BPM (+) Flank & All-in-One Tempo-Kapsel */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '100%' }}>
+                {/* 120 BPM Hero Number geflankt von schnellen tactile Steppern (-) und (+) */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBpm(prev => Math.max(40, prev - 1));
+                      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                        try { navigator.vibrate(10); } catch (_) {}
+                      }
+                    }}
+                    aria-label="1 BPM langsamer"
+                    title="1 BPM langsamer"
+                    style={{
+                      width: '34px',
+                      height: '34px',
+                      borderRadius: '50%',
+                      border: '1.5px solid #cbd5e1',
+                      background: '#ffffff',
+                      color: '#0f172a',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                      transition: 'all 0.12s ease',
+                      touchAction: 'manipulation'
+                    }}
+                  >
+                    <Minus size={15} strokeWidth={2.8} />
+                  </button>
+
+                  {isEditingBpm ? (
+                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '4px', minWidth: '105px' }}>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        autoFocus
+                        value={tempBpmInput}
+                        onChange={(e) => setTempBpmInput(e.target.value.replace(/[^0-9]/g, '').slice(0, 3))}
+                        onFocus={(e) => e.target.select()}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleCommitBpmInput();
+                          if (e.key === 'Escape') setIsEditingBpm(false);
+                        }}
+                        onBlur={handleCommitBpmInput}
+                        aria-label="Tempo in BPM direkt eingeben"
+                        style={{
+                          width: '90px',
+                          fontSize: '2.5rem',
+                          fontWeight: 950,
+                          textAlign: 'center',
+                          fontFamily: 'SF Mono, monospace',
+                          color: '#0f172a',
+                          background: '#fefce8',
+                          border: '2px solid #eab308',
+                          borderRadius: '12px',
+                          padding: '2px 4px',
+                          lineHeight: 1,
+                          outline: 'none',
+                          boxShadow: '0 0 0 3px rgba(234, 179, 8, 0.25)'
+                        }}
+                      />
+                      <span style={{ fontSize: '0.80rem', color: '#64748b', fontWeight: 900 }}>
+                        BPM
+                      </span>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTempBpmInput(String(bpm));
+                        setIsEditingBpm(true);
+                      }}
+                      title="Klicken, um Tempo direkt als Zahl einzugeben"
+                      aria-label={`Tempo: ${bpm} BPM. Klicken zum direkten Bearbeiten`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'baseline',
+                        justifyContent: 'center',
+                        gap: '4px',
+                        minWidth: '105px',
+                        background: 'transparent',
+                        border: 'none',
+                        padding: '2px 4px',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        transition: 'background 0.12s ease',
+                        touchAction: 'manipulation'
+                      }}
+                    >
+                      <span style={{
+                        fontSize: '2.9rem',
+                        fontWeight: 950,
+                        color: '#0f172a',
+                        lineHeight: 1,
+                        fontFamily: 'SF Mono, monospace',
+                        letterSpacing: '-0.03em'
+                      }}>
+                        {bpm}
+                      </span>
+                      <span style={{ fontSize: '0.80rem', color: '#64748b', fontWeight: 900 }}>
+                        BPM
+                      </span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBpm(prev => Math.min(240, prev + 1));
+                      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                        try { navigator.vibrate(10); } catch (_) {}
+                      }
+                    }}
+                    aria-label="1 BPM schneller"
+                    title="1 BPM schneller"
+                    style={{
+                      width: '34px',
+                      height: '34px',
+                      borderRadius: '50%',
+                      border: '1.5px solid #cbd5e1',
+                      background: '#ffffff',
+                      color: '#0f172a',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                      transition: 'all 0.12s ease',
+                      touchAction: 'manipulation'
+                    }}
+                  >
+                    <Plus size={15} strokeWidth={2.8} />
+                  </button>
+                </div>
+
+                {/* All-in-One Tier- & Tempo-Kapsel mit eindeutigem '▾' Indikator */}
+                {(() => {
                   const animalInfo = bpm <= 75
-                    ? { emoji: '🐢', name: 'Leo', bg: '#dcfce7', border: '#86efac', text: '#166534' }
+                    ? { emoji: '🐢', name: 'Leo', desc: 'Gemütlich', bg: '#dcfce7', border: '#86efac', text: '#166534' }
                     : bpm <= 110
-                    ? { emoji: '🐕', name: 'Bello', bg: '#fef3c7', border: '#fcd34d', text: '#854d0e' }
+                    ? { emoji: '🐕', name: 'Bello', desc: 'Spazieren', bg: '#fef3c7', border: '#fcd34d', text: '#854d0e' }
                     : bpm <= 155
-                    ? { emoji: '🐇', name: 'Flitzi', bg: '#e0f2fe', border: '#7dd3fc', text: '#0369a1' }
-                    : { emoji: '🐆', name: 'Gepard', bg: '#fee2e2', border: '#fca5a5', text: '#991b1b' };
+                    ? { emoji: '🐇', name: 'Flitzi', desc: 'Schwungvoll', bg: '#e0f2fe', border: '#7dd3fc', text: '#0369a1' }
+                    : { emoji: '🐆', name: 'Gepard', desc: 'Turbo', bg: '#fee2e2', border: '#fca5a5', text: '#991b1b' };
 
                   const isBeatBounce = isPlaying && (activeBeatIndex !== null);
 
@@ -3709,189 +4100,318 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                     <button
                       type="button"
                       onClick={() => {
+                        setShowTempoDeck(prev => !prev);
                         if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
                           try { navigator.vibrate(15); } catch (_) {}
                         }
                       }}
+                      aria-expanded={showTempoDeck}
+                      aria-haspopup="dialog"
+                      aria-label={`Tempo-Feineinstellung öffnen (Slider, Tap & Tasten): ${bpm} BPM, ${animalInfo.name}`}
                       style={{
-                        width: '36px',
-                        height: '36px',
-                        borderRadius: '50%',
-                        background: animalInfo.bg,
-                        border: `2px solid ${animalInfo.border}`,
                         display: 'flex',
-                        flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        boxShadow: isBeatBounce ? `0 0 14px ${animalInfo.border}` : '0 2px 5px rgba(0,0,0,0.05)',
-                        transform: isBeatBounce ? 'scale(1.18)' : 'scale(1)',
-                        transition: 'transform 0.08s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                        gap: '6px',
+                        background: effectiveUiLevel === 'junior' ? animalInfo.bg : '#fefce8',
+                        border: `1.5px solid ${effectiveUiLevel === 'junior' ? animalInfo.border : '#fde047'}`,
+                        padding: '5px 12px 5px 14px',
+                        borderRadius: '100px',
+                        transform: isBeatBounce ? 'scale(1.08)' : 'scale(1)',
+                        transition: 'transform 0.08s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.15s ease',
+                        boxShadow: isBeatBounce 
+                          ? `0 0 12px ${animalInfo.border}` 
+                          : (showTempoDeck ? '0 0 0 3px rgba(234, 179, 8, 0.35)' : '0 1px 3px rgba(0,0,0,0.05)'),
                         cursor: 'pointer',
-                        padding: 0,
-                        flexShrink: 0
+                        touchAction: 'manipulation'
                       }}
-                      title={`${animalInfo.name} wippt im Takt mit!`}
+                      title="Klicken für Tempo-Feineinstellung (Schieberegler, Tap & Schnelltasten)"
                     >
-                      <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>{animalInfo.emoji}</span>
+                      {effectiveUiLevel === 'junior' ? (
+                        <>
+                          <span style={{ fontSize: '1.15rem', lineHeight: 1 }}>{animalInfo.emoji}</span>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 900, color: animalInfo.text, whiteSpace: 'nowrap' }}>
+                            {animalInfo.name} • {animalInfo.desc}
+                          </span>
+                        </>
+                      ) : (
+                        <span style={{ fontSize: '0.78rem', fontWeight: 900, color: '#854d0e', whiteSpace: 'nowrap' }}>
+                          {bpm < 60 ? 'Largo' : bpm < 76 ? 'Adagio' : bpm < 108 ? 'Andante' : bpm < 120 ? 'Moderato' : bpm < 168 ? 'Allegro' : 'Presto'}
+                        </span>
+                      )}
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        background: showTempoDeck ? 'rgba(0,0,0,0.12)' : 'rgba(0,0,0,0.06)',
+                        color: effectiveUiLevel === 'junior' ? animalInfo.text : '#854d0e',
+                        fontSize: '0.70rem',
+                        fontWeight: 900,
+                        marginLeft: '2px',
+                        lineHeight: 1,
+                        transform: showTempoDeck ? 'rotate(180deg)' : 'none',
+                        transition: 'transform 0.15s ease'
+                      }}>
+                        ▾
+                      </span>
                     </button>
                   );
                 })()}
-
-                {/* BPM Hero Number */}
-                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '3px' }}>
-                  <span style={{ fontSize: '2.3rem', fontWeight: 950, color: '#0f172a', lineHeight: 1, fontFamily: 'SF Mono, monospace', letterSpacing: '-0.03em' }}>
-                    {bpm}
-                  </span>
-                  <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 900 }}>
-                    BPM
-                  </span>
-                </div>
-
-                {/* Didaktische Tempo-Pille */}
-                <span style={{
-                  fontSize: '0.66rem',
-                  fontWeight: 850,
-                  color: '#854d0e',
-                  background: '#fefce8',
-                  border: '1px solid #fde047',
-                  padding: '2px 10px',
-                  borderRadius: '100px',
-                  whiteSpace: 'nowrap'
-                }}>
-                  {effectiveUiLevel === 'junior'
-                    ? (bpm <= 75 ? 'Leo (Gemütlich)' : bpm <= 110 ? 'Bello (Spazieren)' : bpm <= 155 ? 'Flitzi (Schwungvoll)' : 'Gepard (Turbo)')
-                    : (bpm < 60 ? 'Largo' : bpm < 76 ? 'Adagio' : bpm < 108 ? 'Andante' : bpm < 120 ? 'Moderato' : bpm < 168 ? 'Allegro' : 'Presto')}
-                </span>
               </div>
 
-              {/* Tactile Hardware Stepper Row: -5, -, +, +5 */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%' }}>
-                <button
-                  type="button"
-                  onClick={() => setBpm(prev => Math.max(40, prev - 5))}
-                  style={{
-                    height: '34px',
-                    padding: '0 8px',
-                    borderRadius: '10px',
-                    border: '1px solid #cbd5e1',
-                    background: '#ffffff',
-                    color: '#475569',
-                    fontWeight: 850,
-                    fontSize: '0.76rem',
-                    cursor: 'pointer',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                    transition: 'all 0.12s ease'
-                  }}
-                  title="5 BPM langsamer"
-                >
-                  -5
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setBpm(prev => Math.max(40, prev - 1))}
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '50%',
-                    border: '1.5px solid #cbd5e1',
-                    background: '#ffffff',
-                    color: '#0f172a',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.06)',
-                    transition: 'all 0.12s ease',
-                    flexShrink: 0
-                  }}
-                  title="1 BPM langsamer"
-                >
-                  <Minus size={15} strokeWidth={2.8} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setBpm(prev => Math.min(240, prev + 1))}
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '50%',
-                    border: '1.5px solid #cbd5e1',
-                    background: '#ffffff',
-                    color: '#0f172a',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.06)',
-                    transition: 'all 0.12s ease',
-                    flexShrink: 0
-                  }}
-                  title="1 BPM schneller"
-                >
-                  <Plus size={15} strokeWidth={2.8} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setBpm(prev => Math.min(240, prev + 5))}
-                  style={{
-                    height: '34px',
-                    padding: '0 8px',
-                    borderRadius: '10px',
-                    border: '1px solid #cbd5e1',
-                    background: '#ffffff',
-                    color: '#475569',
-                    fontWeight: 850,
-                    fontSize: '0.76rem',
-                    cursor: 'pointer',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                    transition: 'all 0.12s ease'
-                  }}
-                  title="5 BPM schneller"
-                >
-                  +5
-                </button>
-              </div>
+              {/* Apple-Grade Floating Tempo-Popover Deck */}
+              {showTempoDeck && (
+                <>
+                  {/* Backdrop Overlay to capture click outside */}
+                  <div
+                    onClick={() => setShowTempoDeck(false)}
+                    style={{
+                      position: 'fixed',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      zIndex: 85,
+                      background: 'rgba(15, 23, 42, 0.12)',
+                      backdropFilter: 'blur(2px)',
+                      WebkitBackdropFilter: 'blur(2px)'
+                    }}
+                    aria-hidden="true"
+                  />
 
-              {/* Ungestörte Slider-Spur mit 40 / 240 BPM Endmarken */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '0 2px' }}>
-                <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#94a3b8', fontFamily: 'SF Mono, monospace' }}>40</span>
-                <input
-                  type="range"
-                  min="40"
-                  max="240"
-                  value={bpm}
-                  onChange={(e) => setBpm(Number(e.target.value))}
-                  style={{ flex: 1, height: '5px', accentColor: '#eab308', cursor: 'pointer' }}
-                />
-                <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#94a3b8', fontFamily: 'SF Mono, monospace' }}>240</span>
-              </div>
+                  {/* Popover Card */}
+                  <div
+                    role="dialog"
+                    aria-label="Tempo-Feineinstellung"
+                    style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 8px)',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: 'min(310px, 92vw)',
+                      background: '#ffffff',
+                      border: '1.5px solid #e2e8f0',
+                      borderRadius: '20px',
+                      padding: '16px',
+                      boxShadow: '0 20px 40px -8px rgba(15, 23, 42, 0.22), 0 0 0 1px rgba(0,0,0,0.04)',
+                      zIndex: 90,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px'
+                    }}
+                  >
+                    {/* Header: Title, Live BPM Badge & Close Button */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#0f172a' }}>
+                          Tempo-Feineinstellung
+                        </span>
+                        {isEditingBpm ? (
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            autoFocus
+                            value={tempBpmInput}
+                            onChange={(e) => setTempBpmInput(e.target.value.replace(/[^0-9]/g, '').slice(0, 3))}
+                            onFocus={(e) => e.target.select()}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleCommitBpmInput();
+                              if (e.key === 'Escape') setIsEditingBpm(false);
+                            }}
+                            onBlur={handleCommitBpmInput}
+                            aria-label="Tempo in BPM direkt eingeben"
+                            style={{
+                              width: '54px',
+                              fontSize: '0.74rem',
+                              fontWeight: 900,
+                              fontFamily: 'SF Mono, monospace',
+                              padding: '2px 4px',
+                              borderRadius: '6px',
+                              background: '#fefce8',
+                              border: '1.5px solid #eab308',
+                              color: '#854d0e',
+                              textAlign: 'center',
+                              outline: 'none'
+                            }}
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTempBpmInput(String(bpm));
+                              setIsEditingBpm(true);
+                            }}
+                            title="Klicken zum direkten Eintippen des Tempos"
+                            style={{
+                              fontSize: '0.74rem',
+                              fontWeight: 900,
+                              fontFamily: 'SF Mono, monospace',
+                              padding: '2px 7px',
+                              borderRadius: '6px',
+                              background: '#fef3c7',
+                              border: '1px solid #fde047',
+                              color: '#854d0e',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {bpm} BPM ✎
+                          </button>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowTempoDeck(false)}
+                        aria-label="Schließen"
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: '8px',
+                          border: '1px solid #cbd5e1',
+                          background: '#f8fafc',
+                          color: '#475569',
+                          fontSize: '0.72rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          touchAction: 'manipulation'
+                        }}
+                      >
+                        Fertig
+                      </button>
+                    </div>
 
-              {/* Aufgeräumte Tap-Tempo-Leiste (0% Kollision) */}
-              <button
-                type="button"
-                onClick={handleTapTempo}
-                style={{
-                  width: '100%',
-                  height: '28px',
-                  borderRadius: '10px',
-                  border: '1px solid #cbd5e1',
-                  background: '#ffffff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '5px',
-                  fontSize: '0.72rem',
-                  fontWeight: 850,
-                  color: '#0f172a',
-                  cursor: 'pointer',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                  transition: 'all 0.12s ease'
-                }}
-                title="Takt tippen um Tempo zu ermitteln"
-              >
-                <Zap size={12} color="#eab308" />
-                <span>Tempo einklopfen (Tap)</span>
-              </button>
+                    {/* Steppers Row: -5, -, +, +5 */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%' }}>
+                      <button
+                        type="button"
+                        onClick={() => setBpm(prev => Math.max(40, prev - 5))}
+                        style={{
+                          flex: 1,
+                          height: '36px',
+                          borderRadius: '10px',
+                          border: '1px solid #cbd5e1',
+                          background: '#f8fafc',
+                          color: '#334155',
+                          fontWeight: 850,
+                          fontSize: '0.78rem',
+                          cursor: 'pointer',
+                          touchAction: 'manipulation'
+                        }}
+                        title="5 BPM langsamer"
+                      >
+                        -5
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBpm(prev => Math.max(40, prev - 1))}
+                        style={{
+                          width: '38px',
+                          height: '38px',
+                          borderRadius: '50%',
+                          border: '1.5px solid #cbd5e1',
+                          background: '#ffffff',
+                          color: '#0f172a',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                          touchAction: 'manipulation'
+                        }}
+                        title="1 BPM langsamer"
+                      >
+                        <Minus size={16} strokeWidth={2.8} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBpm(prev => Math.min(240, prev + 1))}
+                        style={{
+                          width: '38px',
+                          height: '38px',
+                          borderRadius: '50%',
+                          border: '1.5px solid #cbd5e1',
+                          background: '#ffffff',
+                          color: '#0f172a',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                          touchAction: 'manipulation'
+                        }}
+                        title="1 BPM schneller"
+                      >
+                        <Plus size={16} strokeWidth={2.8} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBpm(prev => Math.min(240, prev + 5))}
+                        style={{
+                          flex: 1,
+                          height: '36px',
+                          borderRadius: '10px',
+                          border: '1px solid #cbd5e1',
+                          background: '#f8fafc',
+                          color: '#334155',
+                          fontWeight: 850,
+                          fontSize: '0.78rem',
+                          cursor: 'pointer',
+                          touchAction: 'manipulation'
+                        }}
+                        title="5 BPM schneller"
+                      >
+                        +5
+                      </button>
+                    </div>
+
+                    {/* Precision Slider with 40 / 240 BPM limits */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '0 2px' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#94a3b8', fontFamily: 'SF Mono, monospace' }}>40</span>
+                      <input
+                        type="range"
+                        min="40"
+                        max="240"
+                        value={bpm}
+                        onChange={(e) => setBpm(Number(e.target.value))}
+                        aria-label="BPM Schieberegler"
+                        style={{ flex: 1, height: '6px', accentColor: '#eab308', cursor: 'pointer' }}
+                      />
+                      <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#94a3b8', fontFamily: 'SF Mono, monospace' }}>240</span>
+                    </div>
+
+                    {/* Tap-Tempo Button */}
+                    <button
+                      type="button"
+                      onClick={handleTapTempo}
+                      style={{
+                        width: '100%',
+                        height: '34px',
+                        borderRadius: '10px',
+                        border: '1.5px solid #facc15',
+                        background: 'linear-gradient(135deg, #fefce8 0%, #fef08a 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        fontSize: '0.76rem',
+                        fontWeight: 850,
+                        color: '#854d0e',
+                        cursor: 'pointer',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                        touchAction: 'manipulation'
+                      }}
+                      title="Takt tippen um Tempo zu ermitteln"
+                    >
+                      <Zap size={14} color="#a16207" />
+                      <span>Tempo einklopfen (Tap)</span>
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -5079,9 +5599,10 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
                   <input
                     type="range"
                     min="0"
-                    max="200"
+                    max="150"
                     value={volMaster}
                     onChange={(e) => setVolMaster(Number(e.target.value))}
+                    aria-label="Master-Lautstärke Regler Mischpult"
                     style={{ width: '100%', accentColor: '#eab308', cursor: 'pointer' }}
                   />
                 </div>

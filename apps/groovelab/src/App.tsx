@@ -33,8 +33,6 @@ const DeviceSetupScreen = lazy(() => import('./components/DeviceSetupScreen').th
 const ContractEndPrompt = lazy(() => import('./components/ContractEndPrompt').then(m => ({ default: m.ContractEndPrompt })));
 const SignupWizard = lazy(() => import('./components/SignupWizard').then(m => ({ default: m.SignupWizard })));
 const StudentRadarChart = lazy(() => import('./components/StudentRadarChart'));
-const CampusDirectMessages = lazy(() => import('./components/CampusDirectMessages').then(m => ({ default: m.default || m.CampusDirectMessages })));
-const GrooveLabMessagesBoard = lazy(() => import('./components/GrooveLabMessagesBoard'));
 const StudentOnboardingPage = lazy(() => import('./components/StudentOnboardingPage').then(m => ({ default: m.StudentOnboardingPage })));
 const DeviceOnboardingPage = lazy(() => import('./components/DeviceOnboardingPage').then(m => ({ default: m.DeviceOnboardingPage })));
 const SchoolSelfOnboardingModal = lazy(() => import('./components/SchoolSelfOnboardingModal').then(m => ({ default: m.SchoolSelfOnboardingModal })));
@@ -46,6 +44,7 @@ import { SecurityAuthModalsHub } from './components/modals/SecurityAuthModalsHub
 import { DetailProfilesModalsHub } from './components/modals/DetailProfilesModalsHub';
 import { BandFoundingModalsHub } from './components/modals/BandFoundingModalsHub';
 import { ProfileBandModalsHub } from './components/modals/ProfileBandModalsHub';
+import { MessagesTabContainer } from './components/messages/MessagesTabContainer';
 const MaintenanceLockoutOverlay = lazy(() => import('./components/MaintenanceLockoutOverlay').then(m => ({ default: m.MaintenanceLockoutOverlay })));
 const GlobalBroadcastBanner = lazy(() => import('./components/GlobalBroadcastBanner').then(m => ({ default: m.GlobalBroadcastBanner })));
 const PwaUpdateToast = lazy(() => import('./components/ui/PwaUpdateToast').then(m => ({ default: m.PwaUpdateToast })));
@@ -12589,45 +12588,29 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
 
         {/* Messages Tab */}
         {activeStudentTab === 'messages' && (
-          activePlatform === 'campus' ? (
-            <ErrorBoundary>
-              <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b', fontWeight: 600 }}>Lade Chats...</div>}>
-                <CampusDirectMessages
-                  user={user}
-                  currentUserId={typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_selected_student_id') || sessionStorage.getItem('groovelab_user_id') || user?.id) : user?.id}
-                  schoolUsers={schoolUsers}
-                  campusMessages={campusMessages}
-                  onSendMessage={handleSendCampusMessage}
-                  onMarkAsRead={handleMarkCampusMessagesAsRead}
-                  onMarkGroupAsRead={handleMarkCampusGroupAsRead}
-                  onMarkChannelAsRead={handleMarkCampusChannelAsRead}
-                  selectedRecipient={selectedCampusRecipient}
-                  setSelectedRecipient={setSelectedCampusRecipient}
-                  studentToTeacherChat={user?.schools?.opening_hours?.campus_settings?.student_to_teacher_chat !== false}
-                />
-              </Suspense>
-            </ErrorBoundary>
-          ) : (
-            <ErrorBoundary>
-              <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b', fontWeight: 600 }}>Lade Pinnwand...</div>}>
-                <GrooveLabMessagesBoard
-                  user={user}
-                  schoolUsers={schoolUsers}
-                  announcements={announcements}
-                  studentMessages={studentMessages}
-                  onPostAnnouncement={async (title, message, targetType, targetUserIds) => {
-                    setAnnouncementTitle(title);
-                    setAnnouncementMessage(message);
-                    setAnnouncementTarget(targetType as any);
-                    setSelectedTargetUserIds(targetUserIds);
-                    await handlePostAnnouncement({ preventDefault: () => {} } as any);
-                  }}
-                  onDeleteAnnouncement={handleDeleteAnnouncement}
-                  onAcknowledgeMessage={handleAcknowledgeStudentMessage}
-                />
-              </Suspense>
-            </ErrorBoundary>
-          )
+          <MessagesTabContainer
+            user={user}
+            activePlatform={activePlatform}
+            schoolUsers={schoolUsers}
+            campusMessages={campusMessages}
+            announcements={announcements}
+            studentMessages={studentMessages}
+            selectedCampusRecipient={selectedCampusRecipient}
+            setSelectedCampusRecipient={setSelectedCampusRecipient}
+            onSendCampusMessage={handleSendCampusMessage}
+            onMarkCampusMessagesAsRead={handleMarkCampusMessagesAsRead}
+            onMarkCampusGroupAsRead={handleMarkCampusGroupAsRead}
+            onMarkCampusChannelAsRead={handleMarkCampusChannelAsRead}
+            onPostAnnouncement={async (title, message, targetType, targetUserIds) => {
+              setAnnouncementTitle(title);
+              setAnnouncementMessage(message);
+              setAnnouncementTarget(targetType as any);
+              setSelectedTargetUserIds(targetUserIds);
+              await handlePostAnnouncement({ preventDefault: () => {} } as any);
+            }}
+            onDeleteAnnouncement={handleDeleteAnnouncement}
+            onAcknowledgeMessage={handleAcknowledgeStudentMessage}
+          />
         )}
 
         {/* Practice Tab */}
@@ -14255,246 +14238,6 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
 
       {/* Render Legal Modals Helper Call */}
       {renderLegalModals()}
-      {/* Mobile Bottom Navigation */}
-      {/* Mobile Bottom Navigation */}
-      {/* Mobile Bottom Navigation */}
-      {/* Mobile Bottom Navigation */}
-      {(() => {
-        const getMobileButtonStyle = (tabName: string, activeClass: string = '') => {
-          let isActive = false;
-          if (tabName === 'briefing' && user?.role === 'student' && activePlatform === 'campus') {
-            isActive = ['briefing', 'profile'].includes(activeStudentTab);
-          } else {
-            isActive = activeStudentTab === tabName;
-          }
-
-          let activeBg = '#fef3c7';
-          let activeTextColor = '#b45309';
-
-          if (activeClass === 'campus') {
-            activeBg = '#34a853';
-            activeTextColor = '#ffffff';
-          } else if (activeClass === 'briefing') {
-            activeBg = '#ea4335';
-            activeTextColor = '#ffffff';
-          } else if (activeClass === 'groovelab') {
-            activeBg = '#eab308';
-            activeTextColor = '#1e293b';
-          }
-
-          return {
-            display: 'inline-flex',
-            flexDirection: 'row' as const,
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px',
-            padding: '8px 14px',
-            borderRadius: '12px',
-            border: isActive ? 'none' : '1px solid #e2e8f0',
-            background: isActive ? activeBg : '#ffffff',
-            color: isActive ? activeTextColor : '#475569',
-            cursor: 'pointer',
-            fontSize: '0.8rem',
-            fontWeight: 800,
-            fontFamily: "'Plus Jakarta Sans', sans-serif",
-            transition: 'all 0.2s ease',
-            whiteSpace: 'nowrap' as const,
-            flexShrink: 0,
-            boxShadow: isActive 
-              ? (activeClass === 'campus' ? '0 4px 12px rgba(52, 168, 83, 0.25)' : '0 4px 12px rgba(234, 179, 8, 0.25)') 
-              : '0 2px 5px rgba(0,0,0,0.02)',
-            height: '44px',
-            minHeight: '44px',
-            touchAction: 'manipulation',
-            boxSizing: 'border-box' as const
-          };
-        };
-
-        return (
-          <nav 
-            className="mobile-nav" 
-            style={{ 
-              display: windowWidth <= 1024 ? 'flex' : 'none',
-              justifyContent: 'flex-start',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '10px 14px max(14px, env(safe-area-inset-bottom)) 14px',
-              overflowX: 'auto',
-              overflowY: 'hidden',
-              WebkitOverflowScrolling: 'touch',
-              whiteSpace: 'nowrap',
-              scrollbarWidth: 'none',
-              msOverflowStyle: 'none'
-            }}
-          >
-            {user?.role?.toLowerCase() === 'student' ? (
-              activePlatform === 'campus' ? (() => {
-                const campusSettings = user?.schools?.opening_hours?.campus_settings || {};
-                const showLeaderboard = campusSettings.show_leaderboard !== false;
-                const showDetailedStats = campusSettings.show_detailed_stats !== false;
-                const flamesActive = campusSettings.flames_active !== false;
-
-                return (
-                  <>
-                    <button onClick={() => setActiveStudentTab('briefing')} style={getMobileButtonStyle('briefing', 'campus')} className="hover-scale" title="Briefing">
-                      <Monitor size={18} /> <span>Briefing</span>
-                    </button>
-                    <button onClick={() => { setActiveStudentTab('homework_book'); window.dispatchEvent(new CustomEvent('campus_reset_homework_board')); }} style={getMobileButtonStyle('homework_book', 'campus')} className="hover-scale" title="Aufgaben">
-                      <BookOpen size={18} /> <span>Aufgaben</span>
-                    </button>
-                    {flamesActive && (
-                      <button onClick={() => setActiveStudentTab('practice_board')} style={getMobileButtonStyle('practice_board', 'campus')} className="hover-scale" title="Übe-Pfad">
-                        <Zap size={18} /> <span>Übe-Pfad</span>
-                      </button>
-                    )}
-                    <button onClick={() => setActiveStudentTab('mediathek')} style={getMobileButtonStyle('mediathek', 'campus')} className="hover-scale" title="Mediathek">
-                      <Library size={18} /> <span>Mediathek</span>
-                    </button>
-                    <button onClick={() => setActiveStudentTab('events')} style={getMobileButtonStyle('events', 'campus')} className="hover-scale" title="Termine">
-                      <Calendar size={18} /> <span>Termine</span>
-                    </button>
-                    {showLeaderboard && (
-                      <button onClick={() => setActiveStudentTab('campus_cup')} style={getMobileButtonStyle('campus_cup', 'campus')} className="hover-scale" title="Highlights & Fortschritt">
-                        <Trophy size={18} /> <span>Highlights & Fortschritt</span>
-                      </button>
-                    )}
-                    <button onClick={() => setActiveStudentTab('profile')} style={getMobileButtonStyle('profile', 'campus')} className="hover-scale" title="Profil">
-                      <User size={18} /> <span>Profil</span>
-                    </button>
-                    <button onClick={() => setActiveStudentTab('settings')} style={getMobileButtonStyle('settings', 'campus')} className="hover-scale" title="Einstellungen">
-                      <Settings size={18} /> <span>Einstellungen</span>
-                    </button>
-                  </>
-                );
-              })()
-              : (
-                <>
-                  <button onClick={() => setActiveStudentTab('live')} style={{ ...getMobileButtonStyle('live', 'groovelab'), position: 'relative' }} className="hover-scale" title="Live Lab">
-                    <Monitor size={18} /> <span>Live Lab</span>
-                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444', position: 'absolute', top: '4px', right: '4px' }} className="animate-pulse"></div>
-                  </button>
-                  {!user.is_external_vocalist && (
-                    <>
-                      <button onClick={() => setActiveStudentTab('practice')} style={getMobileButtonStyle('practice', 'groovelab')} className="hover-scale" title="Üben">
-                        <Play size={18} fill={activeStudentTab === 'practice' ? '#1e293b' : 'none'} /> <span>Üben</span>
-                      </button>
-                      <button onClick={() => setActiveStudentTab('library')} style={getMobileButtonStyle('library', 'groovelab')} className="hover-scale" title="Bibliothek">
-                        <Library size={18} /> <span>Bibliothek</span>
-                      </button>
-                    </>
-                  )}
-                  <button onClick={() => setActiveStudentTab('repertoire')} style={getMobileButtonStyle('repertoire', 'groovelab')} className="hover-scale" title="Repertoire">
-                    <Award size={18} /> <span>Repertoire</span>
-                  </button>
-                  {!user.is_external_vocalist && (
-                    <button onClick={() => setActiveStudentTab('matching')} style={getMobileButtonStyle('matching', 'groovelab')} className="hover-scale" title="Band-Matching">
-                      <Users size={18} /> <span>Band-Matching</span>
-                    </button>
-                  )}
-                  <button onClick={() => setActiveStudentTab('bands')} style={getMobileButtonStyle('bands', 'groovelab')} className="hover-scale" title="Bands">
-                    <Box size={18} /> <span>Bands</span>
-                  </button>
-                  <button onClick={() => setActiveStudentTab('messages')} style={{ ...getMobileButtonStyle('messages', 'groovelab'), position: 'relative' }} className="hover-scale" title="Nachrichten">
-                    <Megaphone size={18} /> <span>Nachrichten</span>
-                    {studentMessages.filter(m => !m.read_by?.includes(user?.id)).length > 0 && (
-                      <div style={{ 
-                        background: '#ef4444', 
-                        color: 'white', 
-                        borderRadius: '50%', 
-                        minWidth: '16px', 
-                        height: '16px', 
-                        padding: '0 4px',
-                        fontSize: '0.6rem', 
-                        fontWeight: 900, 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center',
-                        position: 'absolute',
-                        top: '2px',
-                        right: '4px'
-                      }}>{studentMessages.filter(m => !m.read_by?.includes(user?.id)).length}</div>
-                    )}
-                  </button>
-                  <button onClick={() => setActiveStudentTab('profile')} style={getMobileButtonStyle('profile', 'groovelab')} className="hover-scale" title="Profil">
-                    <User size={18} /> <span>Profil</span>
-                  </button>
-                </>
-              )
-            ) : (
-              activePlatform === 'campus' ? (
-                <>
-                  <button onClick={() => setActiveStudentTab('briefing')} style={getMobileButtonStyle('briefing', 'campus')} className="hover-scale" title="Briefing">
-                    <Monitor size={18} /> <span>Briefing</span>
-                  </button>
-                  <button onClick={() => setActiveStudentTab('schedule')} style={getMobileButtonStyle('schedule', 'campus')} className="hover-scale" title="Stundenplan">
-                    <Calendar size={18} /> <span>Stundenplan</span>
-                  </button>
-                  <button onClick={() => setActiveStudentTab('students')} style={getMobileButtonStyle('students', 'campus')} className="hover-scale" title="Schüler">
-                    <Users size={18} /> <span>Schüler</span>
-                  </button>
-                  <button onClick={() => setActiveStudentTab('songs')} style={getMobileButtonStyle('songs', 'campus')} className="hover-scale" title="Mediathek">
-                    <Library size={18} /> <span>Mediathek</span>
-                  </button>
-                  <button onClick={() => setActiveStudentTab('rooms')} style={getMobileButtonStyle('rooms', 'campus')} className="hover-scale" title="Räume">
-                    <Box size={18} /> <span>Räume</span>
-                  </button>
-                  {showMissionsFeature && (
-                    <button onClick={() => setActiveStudentTab('missions')} style={getMobileButtonStyle('missions', 'campus')} className="hover-scale" title="Missions">
-                      <Compass size={18} /> <span>Missions</span>
-                    </button>
-                  )}
-                  <button onClick={() => setActiveStudentTab('stats')} style={getMobileButtonStyle('stats', 'campus')} className="hover-scale" title="Highlights & Fortschritt">
-                    <Trophy size={18} /> <span>Highlights & Fortschritt</span>
-                  </button>
-                  <button onClick={() => setActiveStudentTab('setup')} style={getMobileButtonStyle('setup', 'campus')} className="hover-scale" title="Einstellungen">
-                    <Settings size={18} /> <span>Einstellungen</span>
-                  </button>
-                  <button onClick={() => setActiveStudentTab('profile')} style={getMobileButtonStyle('profile', 'campus')} className="hover-scale" title="Profil">
-                    <User size={18} /> <span>Profil</span>
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button onClick={() => setActiveStudentTab('live')} style={{ ...getMobileButtonStyle('live', 'groovelab'), position: 'relative' }} className="hover-scale" title="Live Lab">
-                    <Monitor size={18} /> <span>Live Lab</span>
-                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444', position: 'absolute', top: '4px', right: '4px' }} className="animate-pulse"></div>
-                  </button>
-                  <button onClick={() => setActiveStudentTab('messages')} style={getMobileButtonStyle('messages', 'groovelab')} className="hover-scale" title="Nachrichten">
-                    <Mail size={18} /> <span>Nachrichten</span>
-                  </button>
-                  <button onClick={() => setActiveStudentTab('students')} style={getMobileButtonStyle('students', 'groovelab')} className="hover-scale" title="Schüler">
-                    <Users size={18} /> <span>Schüler</span>
-                  </button>
-                  <button onClick={() => setActiveStudentTab('team')} style={getMobileButtonStyle('team', 'groovelab')} className="hover-scale" title="Team">
-                    <Shield size={18} /> <span>Team</span>
-                  </button>
-                  <button onClick={() => setActiveStudentTab('rooms')} style={getMobileButtonStyle('rooms', 'groovelab')} className="hover-scale" title="Räume">
-                    <Box size={18} /> <span>Räume</span>
-                  </button>
-                  <button onClick={() => setActiveStudentTab('songs')} style={getMobileButtonStyle('songs', 'groovelab')} className="hover-scale" title="Songs">
-                    <Library size={18} /> <span>Songs</span>
-                  </button>
-                  <button onClick={() => setActiveStudentTab('bands')} style={getMobileButtonStyle('bands', 'groovelab')} className="hover-scale" title="Bands">
-                    <Box size={18} /> <span>Bands</span>
-                  </button>
-                  <button onClick={() => setActiveStudentTab('stats')} style={getMobileButtonStyle('stats', 'groovelab')} className="hover-scale" title="Statistik">
-                    <Music size={18} /> <span>Statistik</span>
-                  </button>
-                  <button onClick={() => setActiveStudentTab('gallery')} style={getMobileButtonStyle('gallery', 'groovelab')} className="hover-scale" title="ID Galerie">
-                    <QrCode size={18} /> <span>ID Galerie</span>
-                  </button>
-                  <button onClick={() => setActiveStudentTab('setup')} style={getMobileButtonStyle('setup', 'groovelab')} className="hover-scale" title="Einstellungen">
-                    <Settings size={18} /> <span>Einstellungen</span>
-                  </button>
-                  <button onClick={() => setActiveStudentTab('profile')} style={getMobileButtonStyle('profile', 'groovelab')} className="hover-scale" title="Profil">
-                    <User size={18} /> <span>Profil</span>
-                  </button>
-                </>
-              )
-            )}
-          </nav>
-        );
-      })()}
 
       {/* 📇 Detail Profiles & Reward Modals Hub */}
       <DetailProfilesModalsHub
