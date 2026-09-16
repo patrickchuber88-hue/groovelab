@@ -45,6 +45,7 @@ import {
 import { GrooveLeaderboardWidget } from './GrooveLeaderboardWidget';
 import { GrooveSessionCelebrationModal } from './GrooveSessionCelebrationModal';
 import { getOptimalDeviceLatency, detectDeviceLatencyInfo } from '../../utils/deviceLatencyDetector';
+import { UniversalLatencyEngine } from '../../utils/universalLatencyEngine';
 
 export interface GrooveTrainerProps {
   student?: any;
@@ -489,32 +490,17 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
   // Source of calibration detection
   const [calibrationSource, setCalibrationSource] = useState<'trainer' | 'loopstation' | 'bluetooth' | 'default'>('default');
 
-  // Hardware Latency Calibration state (in milliseconds) with Loopstation Sync Cascade
+  // Hardware Latency Calibration state (in milliseconds) with Universal Platform SSOT
   const [latencyOffsetMs, setLatencyOffsetMs] = useState<number>(() => {
-    if (typeof window !== 'undefined') {
-      const trainerStored = localStorage.getItem('campus_timing_latency_offset');
-      if (trainerStored !== null) {
-        const val = Number(trainerStored);
-        if (!isNaN(val) && val >= -100 && val <= 250) return val;
-      }
-
-      const loopstationStored = localStorage.getItem('groovelab_latency_offset');
-      if (loopstationStored !== null) {
-        const val = Number(loopstationStored);
-        if (!isNaN(val) && val >= -100 && val <= 250) return val;
-      }
-
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && k.startsWith('groovelab_latency_dev_')) {
-          const val = Number(localStorage.getItem(k));
-          if (!isNaN(val) && val >= -100 && val <= 250) return val;
-        }
-      }
-    }
-    // 🎧 Zero-Touch Endgeräte-Erkennung: macOS (70ms), iOS (60ms), Android (105ms), Windows (95ms)
-    return getOptimalDeviceLatency(null);
+    return UniversalLatencyEngine.getLatencyMs();
   });
+
+  // 🔄 Cross-Module Realtime Latency Sync
+  useEffect(() => {
+    return UniversalLatencyEngine.subscribe((newMs) => {
+      setLatencyOffsetMs(newMs);
+    });
+  }, []);
 
   const [isBluetoothDetected, setIsBluetoothDetected] = useState<boolean>(false);
   const [showCalibrationModal, setShowCalibrationModal] = useState<boolean>(false);
@@ -612,26 +598,20 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
     return audioCtxRef.current;
   }, []);
 
-  // Hardware Latency Auto-Detection & Loopstation/Platform Sync
+  // Hardware Latency Auto-Detection & Platform SSOT Sync
   useEffect(() => {
     let isMounted = true;
     const initHardwareLatency = async () => {
       try {
         const ctx = getAudioContext();
-        const detectedInfo = detectDeviceLatencyInfo(ctx);
+        const detectedInfo = UniversalLatencyEngine.getDeviceInfo(ctx);
         if (detectedInfo.isBluetoothSuspected && isMounted) {
           setIsBluetoothDetected(true);
         }
-
-        const { hash } = await getAudioDeviceFingerprint(ctx?.sampleRate || 44100);
-        const savedDeviceOffset = getDeviceLatency(hash);
-
-        if (savedDeviceOffset !== null && isMounted) {
-          setLatencyOffsetMs(savedDeviceOffset);
-          setCalibrationSource('loopstation');
-        } else if (isMounted) {
-          setLatencyOffsetMs(detectedInfo.baselineLatencyMs);
-          setCalibrationSource(detectedInfo.isBluetoothSuspected ? 'bluetooth' : 'trainer');
+        if (isMounted) {
+          const lat = UniversalLatencyEngine.getLatencyMs(ctx);
+          setLatencyOffsetMs(lat);
+          setCalibrationSource(detectedInfo.isBluetoothSuspected ? 'bluetooth' : 'loopstation');
         }
       } catch (_) {}
     };
@@ -1843,9 +1823,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
       const finalOffset = Math.max(0, Math.min(220, medianOffset));
       
       setLatencyOffsetMs(finalOffset);
-      try {
-        localStorage.setItem('campus_timing_latency_offset', String(finalOffset));
-      } catch (_) {}
+      UniversalLatencyEngine.saveLatencyMs(finalOffset, student?.id);
       setCalibrationSource('trainer');
       setWizardSuccessMessage(`Perfekt eingemessen! Dein realer Hardware-Offset beträgt ${finalOffset}ms.`);
     }
@@ -3278,7 +3256,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
                   onClick={() => {
                     const next = Math.max(-50, latencyOffsetMs - 5);
                     setLatencyOffsetMs(next);
-                    localStorage.setItem('campus_timing_latency_offset', String(next));
+                    UniversalLatencyEngine.saveLatencyMs(next, student?.id);
                     setCalibrationSource('trainer');
                   }}
                   style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontWeight: 800, cursor: 'pointer' }}
@@ -3290,7 +3268,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
                   onClick={() => {
                     const next = Math.min(220, latencyOffsetMs + 5);
                     setLatencyOffsetMs(next);
-                    localStorage.setItem('campus_timing_latency_offset', String(next));
+                    UniversalLatencyEngine.saveLatencyMs(next, student?.id);
                     setCalibrationSource('trainer');
                   }}
                   style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#0f172a', fontWeight: 800, cursor: 'pointer' }}
@@ -3375,7 +3353,7 @@ export const GrooveTrainerStudioView: React.FC<GrooveTrainerProps> = ({
                 type="button"
                 onClick={() => {
                   setLatencyOffsetMs(25);
-                  localStorage.setItem('campus_timing_latency_offset', '25');
+                  UniversalLatencyEngine.saveLatencyMs(25, student?.id);
                   setCalibrationSource('trainer');
                 }}
                 style={{
