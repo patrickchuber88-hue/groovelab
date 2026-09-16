@@ -1066,13 +1066,15 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
     setIsPlaying(false);
   };
 
-  const togglePlay = (e?: React.MouseEvent) => {
+  const togglePlay = async (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
 
     // 1. Synchronous WebAudio unlock directly in user gesture stack
     const ctx = SharedAudioEngine.getContext();
     if (ctx && ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
+      try {
+        await ctx.resume();
+      } catch {}
     }
 
     // Cancel active count-in or pause if already active
@@ -1087,6 +1089,14 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
     const isPlayable = Boolean(resolvedUrl && isPlayableUrl(resolvedUrl));
     const startOffset = (duration > 0 && currentTime >= duration - 0.05) ? 0 : currentTime;
 
+    // Reset currentTime to startOffset if track had ended so waveform and timer reset cleanly
+    if (startOffset === 0 && currentTime !== 0) {
+      setCurrentTime(0);
+      if (audio && audio.readyState > 0) {
+        try { audio.currentTime = 0; } catch {}
+      }
+    }
+
     if (countInActive) {
       // 🎯 Exact Tempo Calculation from Track BPM (fallback: 100 BPM)
       const effectiveBpm = (metronomeBpm && metronomeBpm > 0) ? metronomeBpm : 100;
@@ -1096,39 +1106,42 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       // 🚀 Preload buffer in background
       loadAudioBuffer().catch(() => {});
 
-      // 📱 Safari-Resilient Rolling Start:
-      // Start audio muted in gesture stack so WebKit authorizes playback without sound
+      // 🛑 Ensure audio is at startOffset and completely paused during count-in
       if (audio && isPlayable) {
         try {
-          audio.muted = true;
-          try {
-            if (audio.readyState > 0) audio.currentTime = startOffset;
-          } catch {}
+          if (!audio.paused) audio.pause();
+          if (audio.readyState > 0) audio.currentTime = startOffset;
           audio.playbackRate = playbackRate || 1;
-          const p = audio.play();
-          if (p) p.catch(() => {});
         } catch {}
       }
 
       // ⏱️ Sample-accurate count-in beeps scheduled directly on Web Audio hardware clock
+      // 50ms headroom on the active running clock ensures Schlag 1 is NEVER swallowed by hardware latency
+      const now = ctx ? ctx.currentTime : 0;
+      const leadTime = 0.05; // 50ms scheduling headroom
+      const scheduleStart = now + leadTime;
+
       if (ctx) {
-        const scheduleStart = ctx.currentTime + 0.03; // 30ms hardware lookahead
         for (let i = 0; i < 4; i++) {
           scheduleCountInBeep(ctx, scheduleStart + i * beatDurationSec, i === 0);
         }
       }
 
-      // 🎨 Synchronized Visual UI Countdown (4 -> 3 -> 2 -> 1 -> Play)
-      setCountInStep(4);
+      // 🎨 Musikalische Zählung: Schlag 1 -> 2 -> 3 -> 4 im ersten Takt
+      // Exakt synchron mit den 4 Metronom-Schlägen
+      setCountInStep(1);
       const timers: any[] = [];
       const clearTimers = () => timers.forEach(t => clearTimeout(t));
       countInTimerRef.current = { clear: clearTimers };
 
-      timers.push(setTimeout(() => setCountInStep(3), beatDurationMs));
-      timers.push(setTimeout(() => setCountInStep(2), 2 * beatDurationMs));
-      timers.push(setTimeout(() => setCountInStep(1), 3 * beatDurationMs));
+      const leadTimeMs = Math.round(leadTime * 1000);
+      timers.push(setTimeout(() => setCountInStep(2), leadTimeMs + beatDurationMs));
+      timers.push(setTimeout(() => setCountInStep(3), leadTimeMs + 2 * beatDurationMs));
+      timers.push(setTimeout(() => setCountInStep(4), leadTimeMs + 3 * beatDurationMs));
 
-      // 🚀 Launch Track Playback exactly on beat 4 finish!
+      // 🚀 Launch Track Playback and Waveform Visualization EXACTLY on Beat 1 of Bar 2!
+      // (Exakt nach Ablauf aller 4 Viertelnoten des Einzähl-Taktes)
+      const songStartDelayMs = Math.max(0, leadTimeMs + 4 * beatDurationMs);
       timers.push(setTimeout(() => {
         setCountInStep(null);
         countInTimerRef.current = null;
@@ -1158,7 +1171,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
         } else {
           startWebAudioPlayback({ loop: isLooping, offsetSec: startOffset });
         }
-      }, 4 * beatDurationMs));
+      }, songStartDelayMs));
 
     } else {
       // ⚡ Instant Play (No Count-In)
@@ -1204,7 +1217,8 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       }
     };
     const handleTimeUpdate = () => {
-      if (!isWebAudioPlayingRef.current) {
+      // 🛡️ Freeze visualizer and playhead while count-in is active
+      if (!isWebAudioPlayingRef.current && !countInTimerRef.current) {
         if (isLooping && loopLocator?.enabled && loopLocator.endSec > loopLocator.startSec) {
           if (audio.currentTime >= loopLocator.endSec) {
             audio.currentTime = loopLocator.startSec;
@@ -1225,10 +1239,10 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
     }
 
     const handlePlay = () => {
-      if (!audio.muted) setIsPlaying(true);
+      if (!audio.muted && !countInTimerRef.current) setIsPlaying(true);
     };
     const handlePause = () => {
-      if (!isWebAudioPlayingRef.current && countInStep === null && !audio.muted) {
+      if (!isWebAudioPlayingRef.current && !countInTimerRef.current && !audio.muted) {
         setIsPlaying(false);
       }
     };

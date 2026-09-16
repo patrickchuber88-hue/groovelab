@@ -324,33 +324,37 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
           });
       };
 
-      // Falls Einzählen aktiv ist: 4 -> 3 -> 2 -> 1 (akustisch & optisch im Button)
+      // 🎯 Musikalische Zählung (Schlag 1 -> 2 -> 3 -> 4) und Start exakt auf Takt 2, Schlag 1
       if (isCountInActive) {
         const bpmMatch = currentTrack?.label ? currentTrack.label.match(/(?:BPM:|\b)(\d{2,3})\s*(?:BPM|\b)/i) : null;
         const effectiveBpm = bpmMatch ? parseInt(bpmMatch[1], 10) : 100;
         const beatDurationSec = 60 / effectiveBpm;
         const beatDurationMs = beatDurationSec * 1000;
 
+        const now = ctx ? ctx.currentTime : 0;
+        const leadTime = 0.05; // 50ms scheduling headroom gegen Hardware-Latenz
+        const scheduleStart = now + leadTime;
+
         if (ctx) {
-          const scheduleStart = ctx.currentTime + 0.03;
           for (let i = 0; i < 4; i++) {
             scheduleCountInBeep(ctx, scheduleStart + i * beatDurationSec, i === 0);
           }
         }
 
-        setCountInStep(4);
+        setCountInStep(1);
         const timers: any[] = [];
         const clearTimers = () => timers.forEach(t => clearTimeout(t));
         countInTimerRef.current = { clear: clearTimers };
 
-        timers.push(setTimeout(() => setCountInStep(3), beatDurationMs));
-        timers.push(setTimeout(() => setCountInStep(2), 2 * beatDurationMs));
-        timers.push(setTimeout(() => setCountInStep(1), 3 * beatDurationMs));
+        const leadTimeMs = Math.round(leadTime * 1000);
+        timers.push(setTimeout(() => setCountInStep(2), leadTimeMs + beatDurationMs));
+        timers.push(setTimeout(() => setCountInStep(3), leadTimeMs + 2 * beatDurationMs));
+        timers.push(setTimeout(() => setCountInStep(4), leadTimeMs + 3 * beatDurationMs));
         timers.push(setTimeout(() => {
           setCountInStep(null);
           countInTimerRef.current = null;
           playNative();
-        }, 4 * beatDurationMs));
+        }, leadTimeMs + 4 * beatDurationMs));
       } else {
         playNative();
       }
