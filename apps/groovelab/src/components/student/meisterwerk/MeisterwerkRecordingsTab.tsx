@@ -1104,38 +1104,48 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
 
                   const sortedMonths = Object.values(monthGroups).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
 
-                  const renderTeacherPlayer = (aud: any, key: string, isHero = false, customThemeColor = "#15803d", customThemeBg = "#e6f4ea") => (
-                    <InlineAudioPlayer 
-                      key={key}
-                      id={aud.id || aud.url}
-                      url={aud.url} 
-                      label={aud.label} 
-                      duration={aud.duration}
-                      date={aud.date}
-                      isHero={isHero || (Boolean(justRecordedAudioUrl) && aud.url === justRecordedAudioUrl)}
-                      contextBadge={aud.songTag}
-                      onContextBadgeClick={aud.songTag ? () => { setSelectedTeacherMonth(null); setShowTeacherFavoritesOnly(false); setShowTeacherHomeworkArchive(false); setSelectedTeacherSongAlbum(aud.songTag); } : undefined}
-                      availableSongs={availableSongsForTagging}
-                      onSelectSongTag={(newTag) => handleUpdateAudioSongTag(aud.url, newTag)}
-                      isFavorite={favoriteAudioUrls.includes(aud.url)}
-                      onToggleFavorite={() => toggleFavoriteAudio(aud.url)}
-                      themeColor={customThemeColor}
-                      themeBg={customThemeBg}
-                      onRename={!readOnly ? (newTitle) => handleRenameTeacherAudio(aud.url, newTitle, aud.originalIdx) : undefined}
-                      onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx, aud.url) : undefined}
-                      originalAudioUrl={aud.originalUrl}
-                      originalDuration={aud.originalDuration}
-                      onRevertToOriginal={!readOnly && aud.originalUrl && handleRevertTeacherAudioToOriginal ? () => handleRevertTeacherAudioToOriginal(aud.originalIdx, aud.url) : undefined}
-                      onSaveEdited={!readOnly && handleSaveEditedTeacherAudio ? (res) => handleSaveEditedTeacherAudio(res, aud.originalIdx, aud.url) : undefined}
-                      metronomeBpm={aud.metronomeBpm && Number(aud.metronomeBpm) > 0 ? Number(aud.metronomeBpm) : undefined}
-                      onOpenDuettDeck={aud.metronomeBpm && Number(aud.metronomeBpm) > 0 ? () => setDuettModalData({
-                        teacherUrl: aud.url,
-                        teacherTitle: aud.label || 'Lehrer-Aufnahme',
-                        teacherBpm: Number(aud.metronomeBpm),
-                        songTag: aud.songTag
-                      }) : undefined}
-                    />
-                  );
+                  const renderTeacherPlayer = (aud: any, key: string, isHero = false, customThemeColor = "#15803d", customThemeBg = "#e6f4ea") => {
+                    const playerKey = aud.id || aud.blobKey || aud.url || `${key}-${aud.date || ''}`;
+                    const effectiveBpm = (aud.metronomeBpm && Number(aud.metronomeBpm) > 0) 
+                      ? Number(aud.metronomeBpm) 
+                      : ((aud.bpm && Number(aud.bpm) > 0) 
+                        ? Number(aud.bpm) 
+                        : ((aud.teacherBpm && Number(aud.teacherBpm) > 0) ? Number(aud.teacherBpm) : undefined));
+                    return (
+                      <InlineAudioPlayer 
+                        key={playerKey}
+                        id={playerKey}
+                        audioId={aud.id || aud.blobKey || aud.url}
+                        url={aud.url} 
+                        label={aud.label} 
+                        duration={aud.duration}
+                        waveformPeaks={aud.waveformPeaks}
+                        date={aud.date}
+                        isHero={isHero || (Boolean(justRecordedAudioUrl) && aud.url === justRecordedAudioUrl)}
+                        contextBadge={aud.songTag}
+                        onContextBadgeClick={aud.songTag ? () => { setSelectedTeacherMonth(null); setShowTeacherFavoritesOnly(false); setShowTeacherHomeworkArchive(false); setSelectedTeacherSongAlbum(aud.songTag); } : undefined}
+                        availableSongs={availableSongsForTagging}
+                        onSelectSongTag={(newTag) => handleUpdateAudioSongTag(aud.url, newTag)}
+                        isFavorite={favoriteAudioUrls.includes(aud.url)}
+                        onToggleFavorite={() => toggleFavoriteAudio(aud.url)}
+                        themeColor={customThemeColor}
+                        themeBg={customThemeBg}
+                        onRename={!readOnly ? (newTitle) => handleRenameTeacherAudio(aud.url, newTitle, aud.originalIdx) : undefined}
+                        onDelete={!readOnly ? () => handleDeleteNote(aud.originalIdx, aud.url) : undefined}
+                        originalAudioUrl={aud.originalUrl}
+                        originalDuration={aud.originalDuration}
+                        onRevertToOriginal={!readOnly && aud.originalUrl && handleRevertTeacherAudioToOriginal ? () => handleRevertTeacherAudioToOriginal(aud.originalIdx, aud.url) : undefined}
+                        onSaveEdited={!readOnly && handleSaveEditedTeacherAudio ? (res) => handleSaveEditedTeacherAudio(res, aud.originalIdx, aud.url) : undefined}
+                        metronomeBpm={effectiveBpm}
+                        onOpenDuettDeck={effectiveBpm ? () => setDuettModalData({
+                          teacherUrl: aud.url,
+                          teacherTitle: aud.label || 'Lehrer-Aufnahme',
+                          teacherBpm: effectiveBpm,
+                          songTag: aud.songTag
+                        }) : undefined}
+                      />
+                    );
+                  };
 
                   // 🔍 SEARCH RESULTS VIEW
                   if (isSearching) {
@@ -1533,10 +1543,10 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                           </div>
                         ) : (
                           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                            {((isTeacherHomeworkExpanded || readOnly) ? currentWeekAudios : currentWeekAudios.slice(0, 3)).map((aud, idx) => 
+                            {(isTeacherHomeworkExpanded ? currentWeekAudios : currentWeekAudios.slice(0, 3)).map((aud, idx) => 
                               renderTeacherPlayer(aud, `teacher-curr-aud-${idx}`, idx === 0)
                             )}
-                            {currentWeekAudios.length > 3 && !readOnly && (
+                            {currentWeekAudios.length > 3 && (
                               <button
                                 type="button"
                                 onClick={() => setIsTeacherHomeworkExpanded(!isTeacherHomeworkExpanded)}

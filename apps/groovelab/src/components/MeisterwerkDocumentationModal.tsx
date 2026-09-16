@@ -535,22 +535,34 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
       let initialNotes: string[] = [];
       for (const cid of candidateStudentIds) {
-        const cachedWeek = localStorage.getItem(`campus_homework_week_${cid}`);
-        if (cachedWeek && cachedWeek !== currentWeek) {
-          continue;
-        }
         const cached = localStorage.getItem(`campus_homework_notes_${cid}`);
-        if (cached && cached.startsWith('[') && cached.endsWith(']')) {
-          try {
-            const parsed = JSON.parse(cached);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              initialNotes = parsed;
-              break;
-            }
-          } catch {}
-        } else if (cached && cached.trim()) {
-          initialNotes = [cached.trim()];
-          break;
+        if (cached) {
+          let list: string[] = [];
+          if (cached.startsWith('[') && cached.endsWith(']')) {
+            try {
+              const parsed = JSON.parse(cached);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                list = parsed.map(String);
+              }
+            } catch {}
+          } else if (cached.trim()) {
+            list = [cached.trim()];
+          }
+          if (list.length > 0) {
+            const cachedWeek = localStorage.getItem(`campus_homework_week_${cid}`);
+            const isOldWeek = Boolean(cachedWeek && cachedWeek !== currentWeek);
+            list.forEach(item => {
+              if (!item || typeof item !== 'string') return;
+              if (item.includes('AUDIO:')) {
+                const cParts = item.substring(item.indexOf('AUDIO:') + 6).split('|');
+                const cUrl = cParts[0]?.trim();
+                const exists = initialNotes.some(m => typeof m === 'string' && m.includes('AUDIO:') && m.includes(cUrl));
+                if (!exists) initialNotes.push(item);
+              } else if (!isOldWeek && !initialNotes.includes(item)) {
+                initialNotes.push(item);
+              }
+            });
+          }
         }
       }
 
@@ -4390,29 +4402,23 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           (student as any)?.slot_id
         ].filter(Boolean))) as string[];
 
-        let cachedHW: string | null = null;
-        for (const cid of candidateStudentIds) {
+        // Combine loadedHomeworkNotesList and cachedList from all candidate IDs preserving all AUDIO: entries
+        const mergedList = [...loadedHomeworkNotesList];
+        candidateStudentIds.forEach(cid => {
           const raw = localStorage.getItem(`campus_homework_notes_${cid}`);
           if (raw) {
-            cachedHW = raw;
-            break;
-          }
-        }
-
-        if (cachedHW) {
-          let cachedList: string[] = [];
-          if (cachedHW.startsWith('[') && cachedHW.endsWith(']')) {
-            const parsed = JSON.parse(cachedHW);
-            if (Array.isArray(parsed)) {
-              cachedList = parsed.map(String);
+            let cachedList: string[] = [];
+            if (raw.startsWith('[') && raw.endsWith(']')) {
+              try {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                  cachedList = parsed.map(String);
+                }
+              } catch {}
+            } else if (raw.trim()) {
+              cachedList = [raw.trim()];
             }
-          } else if (cachedHW.trim()) {
-            cachedList = [cachedHW.trim()];
-          }
 
-          if (cachedList.length > 0) {
-            // Combine loadedHomeworkNotesList and cachedList preserving all AUDIO: entries
-            const mergedList = [...loadedHomeworkNotesList];
             cachedList.forEach(cachedItem => {
               if (!cachedItem || typeof cachedItem !== 'string') return;
               if (cachedItem.includes('AUDIO:')) {
@@ -4428,9 +4434,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
                 }
               }
             });
-            loadedHomeworkNotesList = mergedList;
           }
-        }
+        });
+        loadedHomeworkNotesList = mergedList;
 
         // 🛡️ Fail-Safe: Always merge all takes from campus_teacher_audio_vault across all candidate IDs
         candidateStudentIds.forEach(cid => {
@@ -4471,7 +4477,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         } catch (lsErr) {}
       }
 
-      setHomeworkNotesList(loadedHomeworkNotesList);
+      // 🛡️ Zero-Flicker Identity Guard: Only update state if list actually changed
+      setHomeworkNotesList(prev => {
+        if (JSON.stringify(prev) === JSON.stringify(loadedHomeworkNotesList)) {
+          return prev;
+        }
+        return loadedHomeworkNotesList;
+      });
       try {
         const candIds = Array.from(new Set([
           student.id,
@@ -4479,8 +4491,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           (student as any)?.studentId,
           (student as any)?.canonical_uuid
         ].filter(Boolean))) as string[];
+        const nextJson = JSON.stringify(loadedHomeworkNotesList);
         candIds.forEach(cid => {
-          localStorage.setItem(`campus_homework_notes_${cid}`, JSON.stringify(loadedHomeworkNotesList));
+          const cur = localStorage.getItem(`campus_homework_notes_${cid}`);
+          if (cur !== nextJson) {
+            localStorage.setItem(`campus_homework_notes_${cid}`, nextJson);
+          }
         });
       } catch {}
       const isStudentNotesFocused = typeof document !== 'undefined' && studentNotesTextareaRef.current && document.activeElement === studentNotesTextareaRef.current;

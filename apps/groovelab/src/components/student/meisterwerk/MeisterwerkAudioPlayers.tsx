@@ -663,13 +663,20 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
     const handleOtherPlay = (e: any) => {
       if (e?.detail?.playerId && e.detail.playerId !== playerIdRef.current) {
         if (countInTimerRef.current) {
-          clearTimeout(countInTimerRef.current);
+          if (typeof countInTimerRef.current === 'object' && countInTimerRef.current.clear) {
+            countInTimerRef.current.clear();
+          } else {
+            clearTimeout(countInTimerRef.current);
+          }
           countInTimerRef.current = null;
           setCountInStep(null);
         }
         stopWebAudioLoop();
-        if (audioRef.current && !audioRef.current.paused) {
-          audioRef.current.pause();
+        if (audioRef.current) {
+          try {
+            audioRef.current.pause();
+            audioRef.current.muted = false;
+          } catch {}
         }
         setIsPlaying(false);
       }
@@ -882,8 +889,15 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
         buffer = await loadAudioBuffer();
       }
       if (!ctx || !buffer) {
-        if (audioRef.current && !options.loop) {
-          audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+        if (audioRef.current) {
+          const audio = audioRef.current;
+          audio.loop = Boolean(options.loop);
+          if (options.offsetSec !== undefined) {
+            try { audio.currentTime = options.offsetSec; } catch {}
+          }
+          audio.play().then(() => setIsPlaying(true)).catch((e) => {
+            console.warn('[InlineAudioPlayer] HTML5 fallback error:', e);
+          });
         }
         return;
       }
@@ -1029,6 +1043,29 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
     }
   }, [url, resolvedUrl]);
 
+  const stopPlayback = () => {
+    if (countInTimerRef.current) {
+      if (typeof countInTimerRef.current === 'object' && countInTimerRef.current.clear) {
+        countInTimerRef.current.clear();
+      } else {
+        clearTimeout(countInTimerRef.current);
+      }
+      countInTimerRef.current = null;
+    }
+    setCountInStep(null);
+    if (isWebAudioPlayingRef.current) {
+      stopWebAudio();
+    }
+    const audio = audioRef.current;
+    if (audio) {
+      try {
+        audio.pause();
+        audio.muted = false;
+      } catch {}
+    }
+    setIsPlaying(false);
+  };
+
   const togglePlay = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
 
@@ -1038,100 +1075,122 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       ctx.resume().catch(() => {});
     }
 
-    if (countInTimerRef.current) {
-      if (typeof countInTimerRef.current === 'object' && countInTimerRef.current.clear) {
-        countInTimerRef.current.clear();
-      } else {
-        clearTimeout(countInTimerRef.current);
-      }
-      countInTimerRef.current = null;
-      setCountInStep(null);
+    // Cancel active count-in or pause if already active
+    if (countInTimerRef.current || isPlaying) {
+      stopPlayback();
       return;
     }
 
-    if (isPlaying) {
-      if (isWebAudioPlayingRef.current) {
-        stopWebAudio();
+    notifyGlobalPlay();
+
+    const audio = audioRef.current;
+    const isPlayable = Boolean(resolvedUrl && isPlayableUrl(resolvedUrl));
+    const startOffset = (duration > 0 && currentTime >= duration - 0.05) ? 0 : currentTime;
+
+    if (countInActive) {
+      // 🎯 Exact Tempo Calculation from Track BPM (fallback: 100 BPM)
+      const effectiveBpm = (metronomeBpm && metronomeBpm > 0) ? metronomeBpm : 100;
+      const beatDurationSec = (60 / effectiveBpm) / (playbackRate || 1);
+      const beatDurationMs = beatDurationSec * 1000;
+
+      // 🚀 Preload buffer in background
+      loadAudioBuffer().catch(() => {});
+
+      // 📱 Safari-Resilient Rolling Start:
+      // Start audio muted in gesture stack so WebKit authorizes playback without sound
+      if (audio && isPlayable) {
+        try {
+          audio.muted = true;
+          try {
+            if (audio.readyState > 0) audio.currentTime = startOffset;
+          } catch {}
+          audio.playbackRate = playbackRate || 1;
+          const p = audio.play();
+          if (p) p.catch(() => {});
+        } catch {}
       }
-      if (audioRef.current && !audioRef.current.paused) {
-        audioRef.current.pause();
-      }
-      setIsPlaying(false);
-    } else {
-      notifyGlobalPlay();
 
-      if (countInActive) {
-        // 🎯 Exact Tempo Calculation from Track BPM
-        const effectiveBpm = (metronomeBpm && metronomeBpm > 0) ? metronomeBpm : 100;
-        const beatDurationSec = (60 / effectiveBpm) / (playbackRate || 1);
-        const beatDurationMs = beatDurationSec * 1000;
-
-        // 🚀 Preload and decode AudioBuffer into RAM immediately during the 4 beats
-        loadAudioBuffer().catch(() => {});
-
-        // ⏱️ Sample-accurate count-in beeps scheduled directly on Web Audio hardware clock
-        if (ctx) {
-          const scheduleStart = ctx.currentTime + 0.03; // 30ms hardware lookahead
-          for (let i = 0; i < 4; i++) {
-            scheduleCountInBeep(ctx, scheduleStart + i * beatDurationSec, i === 0);
-          }
+      // ⏱️ Sample-accurate count-in beeps scheduled directly on Web Audio hardware clock
+      if (ctx) {
+        const scheduleStart = ctx.currentTime + 0.03; // 30ms hardware lookahead
+        for (let i = 0; i < 4; i++) {
+          scheduleCountInBeep(ctx, scheduleStart + i * beatDurationSec, i === 0);
         }
+      }
 
-        // 🎨 Synchronized Visual UI Countdown (4 -> 3 -> 2 -> 1 -> Play)
-        setCountInStep(4);
-        const timers: any[] = [];
-        const clearTimers = () => {
-          timers.forEach(t => clearTimeout(t));
-        };
-        countInTimerRef.current = { clear: clearTimers };
+      // 🎨 Synchronized Visual UI Countdown (4 -> 3 -> 2 -> 1 -> Play)
+      setCountInStep(4);
+      const timers: any[] = [];
+      const clearTimers = () => timers.forEach(t => clearTimeout(t));
+      countInTimerRef.current = { clear: clearTimers };
 
-        // Step 3
-        timers.push(setTimeout(() => setCountInStep(3), beatDurationMs));
-        // Step 2
-        timers.push(setTimeout(() => setCountInStep(2), 2 * beatDurationMs));
-        // Step 1
-        timers.push(setTimeout(() => setCountInStep(1), 3 * beatDurationMs));
-        // Launch Track Playback exactly on beat 4 finish!
-        timers.push(setTimeout(() => {
-          setCountInStep(null);
-          countInTimerRef.current = null;
-          const startOffset = (duration > 0 && currentTime >= duration - 0.05) ? 0 : currentTime;
-          startWebAudioPlayback({ loop: isLooping, offsetSec: startOffset });
-        }, 4 * beatDurationMs));
+      timers.push(setTimeout(() => setCountInStep(3), beatDurationMs));
+      timers.push(setTimeout(() => setCountInStep(2), 2 * beatDurationMs));
+      timers.push(setTimeout(() => setCountInStep(1), 3 * beatDurationMs));
 
-      } else {
-        // Instant Play (No Count-In)
-        if (isLooping) {
-          startWebAudioPlayback({ loop: true });
-        } else {
-          const audio = audioRef.current;
-          const isPlayable = Boolean(resolvedUrl && isPlayableUrl(resolvedUrl));
+      // 🚀 Launch Track Playback exactly on beat 4 finish!
+      timers.push(setTimeout(() => {
+        setCountInStep(null);
+        countInTimerRef.current = null;
 
-          if (audio && isPlayable) {
-            if (audio.ended || (duration > 0 && audio.currentTime >= duration)) {
-              audio.currentTime = 0;
-            }
-            audio.loop = false;
-            if (audio.readyState === 0) {
-              try { audio.load(); } catch {}
-            }
-            const playPromise = audio.play();
-            if (playPromise !== undefined) {
-              playPromise
-                .then(() => setIsPlaying(true))
-                .catch(err => {
-                  console.warn('[InlineAudioPlayer] HTML5 play failed, falling back to Web Audio Engine:', err);
-                  const startOffset = (duration > 0 && currentTime >= duration - 0.05) ? 0 : currentTime;
-                  startWebAudioPlayback({ loop: false, offsetSec: startOffset });
+        if (audio && isPlayable) {
+          try {
+            try { audio.currentTime = startOffset; } catch {}
+            audio.loop = Boolean(isLooping);
+            audio.playbackRate = playbackRate || 1;
+            audio.muted = false;
+            audio.volume = 1;
+            if (audio.paused) {
+              const playPromise = audio.play();
+              if (playPromise !== undefined) {
+                playPromise.then(() => setIsPlaying(true)).catch(() => {
+                  startWebAudioPlayback({ loop: isLooping, offsetSec: startOffset });
                 });
+              } else {
+                setIsPlaying(true);
+              }
             } else {
               setIsPlaying(true);
             }
-          } else {
-            const startOffset = (duration > 0 && currentTime >= duration - 0.05) ? 0 : currentTime;
-            startWebAudioPlayback({ loop: false, offsetSec: startOffset });
+          } catch {
+            startWebAudioPlayback({ loop: isLooping, offsetSec: startOffset });
           }
+        } else {
+          startWebAudioPlayback({ loop: isLooping, offsetSec: startOffset });
         }
+      }, 4 * beatDurationMs));
+
+    } else {
+      // ⚡ Instant Play (No Count-In)
+      if (audio && isPlayable) {
+        try {
+          if (audio.ended || (duration > 0 && audio.currentTime >= duration - 0.05)) {
+            try { audio.currentTime = 0; } catch {}
+          } else {
+            try {
+              if (audio.readyState > 0) audio.currentTime = startOffset;
+            } catch {}
+          }
+          audio.muted = false;
+          audio.volume = 1;
+          audio.loop = Boolean(isLooping);
+          audio.playbackRate = playbackRate || 1;
+          const playPromise = audio.play();
+          if (playPromise !== undefined) {
+            playPromise
+              .then(() => setIsPlaying(true))
+              .catch(err => {
+                console.warn('[InlineAudioPlayer] HTML5 play failed, trying WebAudio:', err);
+                startWebAudioPlayback({ loop: Boolean(isLooping), offsetSec: startOffset });
+              });
+          } else {
+            setIsPlaying(true);
+          }
+        } catch {
+          startWebAudioPlayback({ loop: Boolean(isLooping), offsetSec: startOffset });
+        }
+      } else {
+        startWebAudioPlayback({ loop: Boolean(isLooping), offsetSec: startOffset });
       }
     }
   };
@@ -1165,14 +1224,27 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       setDuration(Math.round(audio.duration));
     }
 
+    const handlePlay = () => {
+      if (!audio.muted) setIsPlaying(true);
+    };
+    const handlePause = () => {
+      if (!isWebAudioPlayingRef.current && countInStep === null && !audio.muted) {
+        setIsPlaying(false);
+      }
+    };
+
     audio.loop = isLooping;
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('play', handlePlay);
+    audio.addEventListener('pause', handlePause);
     return () => {
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('pause', handlePause);
     };
   }, [resolvedUrl, isLooping, loopLocator]);
 
