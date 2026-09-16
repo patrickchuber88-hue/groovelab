@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import { Play, Pause, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Trash2, Mic, Repeat, Timer, Scissors, Pin, EyeOff, MessageSquareQuote, SlidersHorizontal } from 'lucide-react';
+import { Play, Pause, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Trash2, Mic, Repeat, Timer, Scissors, Pin, EyeOff, MessageSquareQuote, SlidersHorizontal, Loader2 } from 'lucide-react';
 import { getBlob, storeBlob } from '../utils/blobStorage';
 import { harmonizeAudioList, formatHarmonizedAudioTitle } from '../utils/audioNamingHelper';
 import { getAudioNotesCount, fetchAudioNotesFromServer } from '../utils/audioNotesStorage';
@@ -440,6 +440,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
   const [resolvedUrl, setResolvedUrl] = useState<string>(() => isPlayableUrl(url) ? url : '');
   const [notesCount, setNotesCount] = useState<number>(() => getAudioNotesCount(url || ''));
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   const [loopLocator, setLoopLocator] = useState<AudioLoopLocator | null>(() => getLoopLocator(url || resolvedUrl));
   useEffect(() => {
@@ -884,15 +885,23 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
       {onDelete && (
         <button
           type="button"
-          onClick={(e) => {
+          disabled={isDeleting}
+          onClick={async (e) => {
             e.stopPropagation();
-            onDelete();
+            if (isDeleting) return;
+            setIsDeleting(true);
+            try {
+              await Promise.resolve(onDelete());
+            } catch (err) {
+              console.error('[CompactAudioStrip] Delete error:', err);
+              setIsDeleting(false);
+            }
           }}
           style={{
             border: 'none',
-            background: 'none',
+            background: isDeleting ? '#fee2e2' : 'none',
             color: '#ef4444',
-            cursor: 'pointer',
+            cursor: isDeleting ? 'wait' : 'pointer',
             height: isMobile ? '38px' : '34px',
             width: isMobile ? '36px' : '32px',
             padding: 0,
@@ -900,15 +909,20 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            opacity: 0.6,
+            opacity: isDeleting ? 1 : 0.6,
             transition: 'opacity 0.15s ease',
             touchAction: 'manipulation'
           }}
-          onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-          onMouseLeave={e => e.currentTarget.style.opacity = '0.6'}
-          title="Aufnahme entfernen"
+          onMouseEnter={e => { if (!isDeleting) e.currentTarget.style.opacity = '1'; }}
+          onMouseLeave={e => { if (!isDeleting) e.currentTarget.style.opacity = '0.6'; }}
+          title={isDeleting ? "Wird gelöscht..." : "Aufnahme entfernen"}
+          aria-label={isDeleting ? "Aufnahme wird gelöscht..." : "Aufnahme entfernen"}
         >
-          <Trash2 size={16} />
+          {isDeleting ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <Trash2 size={16} />
+          )}
         </button>
       )}
     </div>
@@ -1185,6 +1199,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
   const [resolvedUrl, setResolvedUrl] = useState<string>(() => isPlayableUrl(url) ? url : '');
   const [notesCount, setNotesCount] = useState<number>(() => getAudioNotesCount(url || ''));
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   const [loopLocator, setLoopLocator] = useState<AudioLoopLocator | null>(() => getLoopLocator(url || resolvedUrl));
   useEffect(() => {
@@ -1628,12 +1643,23 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
     onDelete ? (
       <button
         type="button"
-        onClick={onDelete}
+        disabled={isDeleting}
+        onClick={async (e) => {
+          e.stopPropagation();
+          if (isDeleting) return;
+          setIsDeleting(true);
+          try {
+            await Promise.resolve(onDelete(e));
+          } catch (err) {
+            console.error('[AppleSplitCapsulePlayer] Delete error:', err);
+            setIsDeleting(false);
+          }
+        }}
         style={{
           border: 'none',
-          background: 'none',
+          background: isDeleting ? '#fee2e2' : 'none',
           color: '#ef4444',
-          cursor: 'pointer',
+          cursor: isDeleting ? 'wait' : 'pointer',
           height: isMobile ? '38px' : '34px',
           width: isMobile ? '36px' : '32px',
           padding: 0,
@@ -1641,16 +1667,21 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          opacity: 0.6,
+          opacity: isDeleting ? 1 : 0.6,
           transition: 'opacity 0.15s ease',
           flexShrink: 0,
           touchAction: 'manipulation'
         }}
-        onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-        onMouseLeave={e => e.currentTarget.style.opacity = '0.6'}
-        title="Aufnahme entfernen"
+        onMouseEnter={e => { if (!isDeleting) e.currentTarget.style.opacity = '1'; }}
+        onMouseLeave={e => { if (!isDeleting) e.currentTarget.style.opacity = '0.6'; }}
+        title={isDeleting ? "Wird gelöscht..." : "Aufnahme entfernen"}
+        aria-label={isDeleting ? "Aufnahme wird gelöscht..." : "Aufnahme entfernen"}
       >
-        <Trash2 size={16} />
+        {isDeleting ? (
+          <Loader2 size={16} className="animate-spin" />
+        ) : (
+          <Trash2 size={16} />
+        )}
       </button>
     ) : null
   );
@@ -1801,26 +1832,42 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
           {onDelete && (
             <button
               type="button"
-              onClick={onDelete}
+              disabled={isDeleting}
+              onClick={async (e) => {
+                e.stopPropagation();
+                if (isDeleting) return;
+                setIsDeleting(true);
+                try {
+                  await Promise.resolve(onDelete(e));
+                } catch (err) {
+                  console.error('[AppleSplitCapsulePlayer] Mobile delete error:', err);
+                  setIsDeleting(false);
+                }
+              }}
               style={{
                 border: 'none',
-                background: 'none',
+                background: isDeleting ? '#fee2e2' : 'none',
                 color: '#ef4444',
-                cursor: 'pointer',
+                cursor: isDeleting ? 'wait' : 'pointer',
                 padding: '4px',
                 borderRadius: '6px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                opacity: 0.6,
+                opacity: isDeleting ? 1 : 0.6,
                 flexShrink: 0,
                 transition: 'opacity 0.15s ease'
               }}
-              onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-              onMouseLeave={e => e.currentTarget.style.opacity = '0.6'}
-              title="Diese Aufnahme löschen"
+              onMouseEnter={e => { if (!isDeleting) e.currentTarget.style.opacity = '1'; }}
+              onMouseLeave={e => { if (!isDeleting) e.currentTarget.style.opacity = '0.6'; }}
+              title={isDeleting ? "Wird gelöscht..." : "Diese Aufnahme löschen"}
+              aria-label={isDeleting ? "Aufnahme wird gelöscht..." : "Diese Aufnahme löschen"}
             >
-              <Trash2 size={13} />
+              {isDeleting ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : (
+                <Trash2 size={13} />
+              )}
             </button>
           )}
         </div>

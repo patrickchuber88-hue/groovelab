@@ -64,6 +64,8 @@ import { announceA11y } from './components/common/A11yLiveAnnouncer';
 import { MobileBottomNav } from './components/ui/MobileBottomNav';
 import { CampusDesktopSidebar } from './components/layout/CampusDesktopSidebar';
 import { CampusDesktopHeader } from './components/layout/CampusDesktopHeader';
+import { CampusMainContentRouter } from './components/layout/CampusMainContentRouter';
+import { renderCampusStartupGates } from './components/layout/CampusStartupGates';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { generateRandomBandName } from './utils/bandNameGenerator';
 import { APP_INSTRUMENT_ICONS, APP_INSTRUMENT_COLORS, brandColor } from './constants/instruments';
@@ -7412,530 +7414,6 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     return false;
   }, [maintenanceState, maintenanceBypass, isMasterAdminSession, activePlatform, currentSchoolId]);
 
-  const urlBandId = searchParams.get('band');
-
-  // 1. PUBLIC BAND VIEW (Prioritized for sharing)
-  if (urlBandId) {
-    if (selectedBandForProfile && showBandProfile) {
-      return (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: '#09090b', overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
-           {/* Small non-clickable brand indicator for public visitors */}
-           <div style={{ position: 'absolute', top: '40px', left: '40px', zIndex: 10, display: 'flex', alignItems: 'center', gap: '12px', opacity: 0.5 }}>
-              <div style={{ width: '32px', height: '32px', background: '#fefce8', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Music size={18} color="#eab308" />
-              </div>
-              <div style={{ color: 'white', fontWeight: 900, fontSize: '1rem', letterSpacing: '0.05em' }}>GROOVELAB</div>
-           </div>
-           <BandProfileContent 
-             selectedBandForProfile={selectedBandForProfile} 
-             user={user} 
-             bandProfileView={bandProfileView} 
-             setBandProfileView={setBandProfileView} 
-             brandColor={brandColor} 
-             width={width} 
-             APP_INSTRUMENT_COLORS={APP_INSTRUMENT_COLORS} 
-             APP_INSTRUMENT_ICONS={APP_INSTRUMENT_ICONS} 
-             setShowBandProfile={setShowBandProfile} 
-             setEditingBand={setEditingBand} 
-             setShowEditBand={setShowEditBand} 
-             setShowAvatarPicker={setShowAvatarPicker}
-             setAvatarPickerType={setAvatarPickerType}
-             isSharedView={isSharedView}
-           />
-        </div>
-      );
-    }
-    // Show a minimalist loading state for public visitors
-    return (
-      <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div className="animate-spin" style={{ width: '24px', height: '24px', border: '2px solid #e2e8f0', borderTopColor: '#eab308', borderRadius: '50%' }}></div>
-      </div>
-    );
-  }
-
-  // 1.5 PUBLIC CAMPUS PASS VIEW
-  const urlCampusPassToken = searchParams.get('campus_pass');
-  if (urlCampusPassToken) {
-    if (publicPassUser) {
-      return (
-        <div style={{ 
-          position: 'fixed', 
-          inset: 0, 
-          zIndex: 6000, 
-          background: '#09090b', 
-          display: 'flex', 
-          flexDirection: 'column',
-          alignItems: 'center', 
-          justifyContent: 'center',
-          padding: '24px',
-          overflowY: 'auto'
-        }}>
-          {/* Brand header */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-            <div style={{ width: '32px', height: '32px', background: '#e6f4ea', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ color: '#34a853', fontWeight: 900, fontSize: '1.2rem' }}>C</span>
-            </div>
-            <div style={{ color: 'white', fontWeight: 900, fontSize: '1rem', letterSpacing: '0.05em' }}>CAMPUS PASS</div>
-          </div>
-          
-          {/* Standing credit-card style layout */}
-          <div style={{ maxWidth: '380px', width: '100%' }}>
-            <Suspense fallback={<div style={{ color: 'white', textAlign: 'center', fontSize: '0.85rem' }}>Lade QR Code...</div>}>
-              <QRCodeModal 
-                user={publicPassUser} 
-                activePlatform="campus" 
-                onClose={() => {
-                  window.close();
-                }} 
-              />
-            </Suspense>
-          </div>
-        </div>
-      );
-    }
-    // Show a minimalist loading state for public visitors
-    return (
-      <div style={{ position: 'fixed', inset: 0, zIndex: 6000, background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
-        <div className="animate-spin" style={{ width: '24px', height: '24px', border: '2px solid #e2e8f0', borderTopColor: '#34a853', borderRadius: '50%' }}></div>
-        <div style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600 }}>Lade Campus Pass...</div>
-      </div>
-    );
-  }
-
-  // 1.7 KIOSK RESOLUTION SPINNER
-  if (loadingKiosk) {
-    return (
-      <div style={{ position: 'fixed', inset: 0, background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px' }}>
-        <div className="animate-spin" style={{ width: '32px', height: '32px', border: '3px solid #e2e8f0', borderTopColor: '#eab308', borderRadius: '50%' }}></div>
-        <div style={{ fontSize: '13px', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Lade Kiosk-Konfiguration…</div>
-      </div>
-    );
-  }
-
-  // 1.8a KIOSK SETUP MODE: kiosk_room_id + kiosk_setup=1 → show DeviceSetupScreen
-  if (kioskRoomIdParam && kioskSetupParam === '1') {
-    return (
-      <Suspense fallback={<div style={{ position: 'fixed', inset: 0, background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px' }}><div style={{ fontSize: '13px', fontWeight: 700, color: '#94a3b8' }}>Lade Setup...</div></div>}>
-        <DeviceSetupScreen />
-      </Suspense>
-    );
-  }
-
-  // 1.8b KIOSK ROOM AUTO-BOOTSTRAP (show spinner while resolving station)
-  if (kioskBootstrapping) {
-    return (
-      <div style={{ position: 'fixed', inset: 0, background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '16px' }}>
-        <div className="animate-spin" style={{ width: '32px', height: '32px', border: '3px solid #e2e8f0', borderTopColor: '#eab308', borderRadius: '50%' }}></div>
-        <div style={{ fontSize: '13px', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Kiosk wird gestartet…</div>
-      </div>
-    );
-  }
-
-  // 0. ONBOARDING PAGE
-  const onboardingPathMatch = location.pathname.match(/^\/onboarding\/([^/?#]+)/);
-  if (onboardingPathMatch) {
-    return (
-      <Suspense fallback={<DashboardLoader />}>
-        <StudentOnboardingPage token={onboardingPathMatch[1]} />
-      </Suspense>
-    );
-  }
-
-  // 0.0 DEVICE ONBOARDING PAGE
-  const deviceOnboardingPathMatch = location.pathname.match(/^\/device-onboarding\/([^/?#]+)/);
-  if (deviceOnboardingPathMatch) {
-    return (
-      <Suspense fallback={<DashboardLoader />}>
-        <DeviceOnboardingPage token={deviceOnboardingPathMatch[1]} />
-      </Suspense>
-    );
-  }
-
-  // 0.1 QR LANDING PAGE — Weg 2: Nativer Kamera-Scan oder fixer QR-Token-Link (Sofort abfangen vor allen States!)
-  const urlParams = new URLSearchParams(location.search);
-  const isInviteSchoolLink = urlParams.has('invite_school_id');
-  const queryQrToken = !isInviteSchoolLink ? (urlParams.get('token') || urlParams.get('qr_token')) : null;
-
-  const sessionQrToken = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_qr_token') : null;
-  const localLastQrToken = typeof window !== 'undefined' ? localStorage.getItem('groovelab_last_qr_token') : null;
-  const activeSessionUserId = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null;
-
-  const effectiveQrToken = !isInviteSchoolLink && (qrPathMatch 
-    ? qrPathMatch[1] 
-    : (queryQrToken || (!activeSessionUserId && sessionQrToken) || (location.pathname.startsWith('/qr/') ? localLastQrToken : null)));
-
-  if (effectiveQrToken) {
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('groovelab_qr_token', effectiveQrToken);
-      localStorage.setItem('groovelab_last_qr_token', effectiveQrToken);
-      if (!location.pathname.startsWith('/qr/')) {
-        safeReplaceState(null, '', `/qr/${effectiveQrToken}`);
-      }
-    }
-
-    const isStandalone = typeof window !== 'undefined' && ((window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches);
-    const currentUserId = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null;
-
-    if (isStandalone && currentUserId) {
-      // User is logged in via PWA standalone app.
-      // Redirect the QR link to the external browser (Safari/Chrome) and auto-pair it
-      const externalUrl = `${window.location.origin}/qr/${effectiveQrToken}?auto_pair=true`;
-      window.open(externalUrl, '_blank');
-      
-      // Clean up the URL in the PWA so it returns to the dashboard
-      navigate('/dashboard', { replace: true });
-    } else {
-      return (
-        <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b' }}>Lade Campus Pass...</div>}>
-          <QRLandingPage token={effectiveQrToken} />
-        </Suspense>
-      );
-    }
-  }
-
-  // 0.9 PUBLIC SHARED AUDIO-BIOGRAPHY LANDING PAGE
-  if (location.pathname.startsWith('/shared-biography/') || location.pathname.startsWith('/shared/') || location.pathname.startsWith('/bio/')) {
-    const studentIdParam = location.pathname.split('/').filter(Boolean).pop();
-    return (
-      <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#090d16', color: '#64748b' }}>Lade Audio-Biografie...</div>}>
-        <SharedAudioBiographyPage studentId={studentIdParam} />
-      </Suspense>
-    );
-  }
-
-  // 1. SIGNUP WIZARD
-  if (location.pathname === '/signup') {
-    return (
-      <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b' }}>Lade Registrierung...</div>}>
-        <SignupWizard 
-          onBackToLogin={() => {
-            navigate('/login');
-          }} 
-          onSignupSuccess={(uid) => {
-            handleLogin(uid, false);
-          }}
-        />
-      </Suspense>
-    );
-  }
-
-  // 1.1 STARTSEITE & DETAILED LANDING PAGES
-  // localhost:5173 und campus-groovelab.de öffnen an der Root (/) IMMER die Startseite ("Finde deine Musikschule"),
-  // es sei denn, es ist eine Schul-Subdomain oder ein Onboarding-Link aktiv, oder die PWA läuft im Standalone-Modus.
-  if (location.pathname === '/' || location.pathname === '/landingpage' || location.pathname === '/startseite') {
-    const isStandalone = typeof window !== 'undefined' && ((window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches);
-    
-    // Bei bestehendem Login im aktuellen Tab direkt ins Dashboard springen
-    if (loggedInUserId && (location.pathname === '/' || location.pathname === '/landingpage' || location.pathname === '/startseite')) {
-      return <Navigate to="/dashboard" replace />;
-    }
-
-    const urlParams = new URLSearchParams(location.search);
-    const hasSubdomain = (() => {
-      if (typeof window === 'undefined') return false;
-      const host = window.location.hostname;
-      let sub = null;
-      const mainDomains = ['.campus-groovelab.de', '.groovelab.de', '.campus-groovelab.com'];
-      for (const domain of mainDomains) {
-        if (host.endsWith(domain)) {
-          sub = host.substring(0, host.length - domain.length);
-          break;
-        }
-      }
-      if (!sub) {
-        const parts = host.split('.');
-        if (parts.length >= 3) {
-          const first = parts[0];
-          if (first !== 'www' && first !== 'admin' && first !== 'campus-groovelab') {
-            sub = first;
-          }
-        } else if (parts.length === 2 && parts[1] === 'localhost') {
-          sub = parts[0];
-        }
-      }
-      if (!sub) {
-        sub = urlParams.get('school') || urlParams.get('subdomain');
-      }
-      return !!sub;
-    })();
-
-    const isExplicitSchoolLogin = !loggedInUserId && location.pathname === '/' && (
-      urlParams.has('invite_school_id') || 
-      urlParams.get('onboarding') === 'parent' || 
-      urlParams.get('platform') === 'groovelab' ||
-      urlParams.has('school_id') ||
-      urlParams.has('school') ||
-      urlParams.has('subdomain') ||
-      hasSubdomain || 
-      urlParams.has('kiosk')
-    );
-
-    if (isExplicitSchoolLogin) {
-      return (
-        <ErrorBoundary>
-          <Suspense fallback={<DashboardLoader />}>
-            <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />
-          </Suspense>
-        </ErrorBoundary>
-      );
-    }
-
-    return (
-      <Suspense fallback={<DashboardLoader />}>
-        <Startseite 
-          onLogin={() => navigate(loggedInUserId ? '/dashboard' : '/login')} 
-          onRegister={(email) => navigate(email ? `/signup?email=${encodeURIComponent(email)}` : '/signup')} 
-          onShowPrivacy={() => setShowPrivacy(true)}
-          onShowAgb={() => setShowAgb(true)}
-          onShowImpressum={() => setShowImpressum(true)}
-          onShowAccessibility={() => setShowAccessibility(true)}
-        />
-        {renderLegalModals()}
-      </Suspense>
-    );
-  }
-
-  if (location.pathname === '/landingpage2' || location.pathname === '/startseite2') {
-    if (loggedInUserId) {
-      return <Navigate to="/dashboard" replace />;
-    }
-    return (
-      <Suspense fallback={<DashboardLoader />}>
-        <Startseite2 
-          onLogin={() => navigate('/login')} 
-          onRegister={(email) => navigate(email ? `/signup?email=${encodeURIComponent(email)}` : '/signup')} 
-          onShowPrivacy={() => setShowPrivacy(true)}
-          onShowAgb={() => setShowAgb(true)}
-          onShowImpressum={() => setShowImpressum(true)}
-        />
-        {renderLegalModals()}
-      </Suspense>
-    );
-  }
-
-  // 2. AUTHENTICATION CHECK
-  if (!loggedInUserId && !showDeletionPrompt) {
-    if (showSchoolOnboardingModal) {
-      return (
-        <div style={{ position: 'relative', minHeight: '100vh', background: '#0f172a' }}>
-          <Suspense fallback={<DashboardLoader />}>
-            <SchoolSelfOnboardingModal
-              onClose={() => {
-                setShowSchoolOnboardingModal(false);
-                navigate('/', { replace: true });
-              }}
-              onSuccess={(schoolData, userData) => {
-                setShowSchoolOnboardingModal(false);
-                if (userData?.id) {
-                  handleLogin(userData.id, false);
-                } else {
-                  navigate('/login', { replace: true });
-                  window.location.reload();
-                }
-              }}
-            />
-          </Suspense>
-        </div>
-      );
-    }
-
-
-    if (location.pathname === '/login' || location.pathname === '/master-admin' || location.pathname === '/admin') {
-      return (
-        <ErrorBoundary>
-          <Suspense fallback={<DashboardLoader />}>
-            <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />
-          </Suspense>
-        </ErrorBoundary>
-      );
-    }
-    return (
-      <ErrorBoundary>
-        <Suspense fallback={<DashboardLoader />}>
-          <LoginScreen onLogin={handleLogin} kioskStationId={isKioskMode ? stationIdFromStorage : null} />
-        </Suspense>
-      </ErrorBoundary>
-    );
-  }
-
-  if (showDeletionPrompt && deletionPromptUserId) {
-    return (
-      <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b' }}>Lade Kündigungs-Abfrage...</div>}>
-        <ContractEndPrompt
-          userId={deletionPromptUserId}
-          isHome={deletionPromptIsHome}
-          onDecisionComplete={(uid, home) => {
-            setShowDeletionPrompt(false);
-            setDeletionPromptUserId(null);
-            handleLogin(uid, home);
-          }}
-          onCancel={() => {
-            setShowDeletionPrompt(false);
-            setDeletionPromptUserId(null);
-          }}
-        />
-      </Suspense>
-    );
-  }
-
-  // 2.5 MASTER ADMIN PORTAL — nur via is_master_admin DB-Flag
-  // SECURITY: Niemals per Vorname oder Rolle erkennen — ausschließlich das is_master_admin-Flag aus der DB ist maßgeblich.
-  if (isMasterAdminSession) {
-    return (
-      <>
-        <Suspense fallback={<DashboardLoader />}>
-          <MasterAdminDashboard onLogout={handleLogout} currentUser={{ ...user, is_master_admin: true }} />
-        </Suspense>
-        {showSchoolOnboardingModal && (
-          <SchoolSelfOnboardingModal
-            onClose={() => setShowSchoolOnboardingModal(false)}
-            onSuccess={(schoolData, userData) => {
-              setShowSchoolOnboardingModal(false);
-              window.location.reload();
-            }}
-          />
-        )}
-      </>
-    );
-  }
-
-  if (loading || !user) {
-    const debugError = typeof window !== 'undefined' ? (window as any).fetchDashboardDataError : null;
-    const debugStack = typeof window !== 'undefined' ? (window as any).fetchDashboardDataStack : null;
-
-    return (
-      <div style={{ 
-        position: 'fixed', 
-        inset: 0, 
-        background: '#09090b', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        flexDirection: 'column', 
-        gap: '16px',
-        padding: '20px',
-        boxSizing: 'border-box'
-      }}>
-        {loading && (
-          <div className="animate-spin" style={{ 
-            width: '40px', 
-            height: '40px', 
-            border: '3px solid rgba(255, 255, 255, 0.05)', 
-            borderTopColor: '#facc15', 
-            borderRadius: '50%',
-            marginBottom: '8px'
-          }}></div>
-        )}
-        <div style={{ fontSize: '14px', fontWeight: 600, color: '#a1a1aa', letterSpacing: '0.05em', textAlign: 'center' }}>
-          {loading ? 'Sitzung wird wiederhergestellt...' : 'Sitzungs-Daten konnten nicht geladen werden.'}
-        </div>
-
-        {debugError && (
-          <div style={{ 
-            marginTop: '20px', 
-            color: '#ef4444', 
-            fontSize: '12px', 
-            textAlign: 'center', 
-            maxWidth: '100%', 
-            wordBreak: 'break-all',
-            background: 'rgba(239, 68, 68, 0.1)',
-            border: '1px solid rgba(239, 68, 68, 0.2)',
-            padding: '12px',
-            borderRadius: '8px'
-          }}>
-            <strong>Fehlerdetails:</strong> {typeof debugError === 'object' ? (debugError?.message || JSON.stringify(debugError)) : String(debugError)}
-            {debugStack && (
-              <pre style={{ 
-                marginTop: '10px', 
-                fontSize: '10px', 
-                color: '#f87171', 
-                textAlign: 'left', 
-                whiteSpace: 'pre-wrap', 
-                maxHeight: '150px', 
-                overflowY: 'auto'
-              }}>{debugStack}</pre>
-            )}
-          </div>
-        )}
-
-        {/* Exit Hatch: allow manual reset if stuck or database is unreachable */}
-        {(!loading || debugError) && (
-          <button
-            type="button"
-            role="button"
-            tabIndex={0}
-            aria-label="Zurück zum Login und neu anmelden"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                e.currentTarget.click();
-              }
-            }}
-            onClick={async () => {
-              try {
-                await supabase.auth.signOut();
-              } catch (e) {}
-              try {
-                sessionStorage.clear();
-              } catch (e) {}
-              try {
-                localStorage.removeItem('groovelab_user_id');
-                localStorage.removeItem('groovelab_current_user_id');
-                localStorage.removeItem('campus_active_user_id');
-                localStorage.removeItem('groovelab_cached_user');
-                localStorage.removeItem('groovelab_location_mode');
-                localStorage.removeItem('gl_active_session_lease_id');
-                localStorage.removeItem('gl_global_device_key');
-              } catch (e) {}
-              setLoggedInUserId(null);
-              setUser(null);
-              setLoading(false);
-              window.location.href = '/';
-            }}
-            style={{
-              marginTop: '20px',
-              background: '#facc15',
-              border: 'none',
-              color: '#0f172a',
-              fontSize: '14px',
-              fontWeight: 700,
-              padding: '12px 28px',
-              borderRadius: '12px',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              minHeight: '44px',
-              boxShadow: '0 4px 14px rgba(250, 204, 21, 0.3)',
-              transition: 'all 0.15s ease-in-out',
-              userSelect: 'none',
-              WebkitTapHighlightColor: 'transparent',
-              touchAction: 'manipulation',
-              outline: 'none'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.background = '#eab308';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.background = '#facc15';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-            onFocus={(e) => {
-              e.currentTarget.style.boxShadow = '0 0 0 3px rgba(250, 204, 21, 0.6)';
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.boxShadow = '0 4px 14px rgba(250, 204, 21, 0.3)';
-            }}
-          >
-            Zurück zum Login (Neu anmelden)
-          </button>
-        )}
-      </div>
-    );
-  }
-
   const handleSwitchActiveRole = async (newRole: string) => {
     try {
       const userId = user?.id;
@@ -8087,122 +7565,63 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     }
   };
 
-  // 2.5b SECRETARY DASHBOARD BYPASS
-  const currentWorkspace = activeWorkspace || (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_workspace') : null);
-  if ((user.role?.toLowerCase() === 'secretary' || user.role?.toLowerCase() === 'admin') && currentWorkspace !== 'teacher') {
-    return (
-      <LegalConsentGate user={user}>
-        <ErrorBoundary>
-          {isGhostParam && (
-            <GhostSupportCapsule 
-              schoolName={user?.schools?.name || (Array.isArray(user?.schools) ? user.schools[0]?.name : undefined)} 
-              currentRole={user?.role}
-              onRoleChange={handleSwitchActiveRole}
-            />
-          )}
-          <Suspense fallback={<DashboardLoader />}>
-            <SecretaryDashboard 
-              schoolId={user?.school_id || (Array.isArray(user?.schools) ? user.schools[0]?.id : user?.schools?.id) || ''} 
-              userId={user?.id || ''} 
-              userRole={user?.role || 'secretary'}
-              userRoles={user?.roles || []}
-              onLogout={handleLogout} 
-              onRoleSwitched={handleSwitchActiveRole}
-              activePlatform={activePlatform}
-            />
-          </Suspense>
-        </ErrorBoundary>
-      </LegalConsentGate>
-    );
-  }
+  const startupGate = renderCampusStartupGates({
+    location,
+    searchParams,
+    selectedBandForProfile,
+    showBandProfile,
+    user,
+    bandProfileView,
+    setBandProfileView,
+    brandColor,
+    width,
+    APP_INSTRUMENT_COLORS,
+    APP_INSTRUMENT_ICONS,
+    setShowBandProfile,
+    setEditingBand,
+    setShowEditBand,
+    setShowAvatarPicker,
+    setAvatarPickerType,
+    isSharedView,
+    publicPassUser,
+    loadingKiosk,
+    kioskRoomIdParam,
+    kioskSetupParam,
+    kioskBootstrapping,
+    qrPathMatch,
+    navigate,
+    handleLogin,
+    loggedInUserId,
+    isKioskMode,
+    stationIdFromStorage,
+    setShowPrivacy,
+    setShowAgb,
+    setShowImpressum,
+    setShowAccessibility,
+    renderLegalModals,
+    showSchoolOnboardingModal,
+    setShowSchoolOnboardingModal,
+    showDeletionPrompt,
+    deletionPromptUserId,
+    deletionPromptIsHome,
+    setShowDeletionPrompt,
+    setDeletionPromptUserId,
+    isMasterAdminSession,
+    handleLogout,
+    loading,
+    supabase,
+    setLoggedInUserId,
+    setUser,
+    setLoading,
+    activeWorkspace,
+    isGhostParam,
+    handleSwitchActiveRole,
+    activePlatform,
+    isSchoolPaused,
+  });
 
-  // 2.5c INACTIVE STUDENT MODULE ACCESS SECURITY GUARD
-  if (user.role?.toLowerCase() === 'student') {
-    const isCampusActive = user.is_campus_active === true;
-    const isGroovelabActive = user.is_groovelab_active === true;
-
-    // Case 1: Student has NO active modules -> Strictly block entry to GrooveLab & Campus dashboards, force QRLandingPage!
-    if (!isCampusActive && !isGroovelabActive) {
-      const tokenToUse = user.qr_token || user.ausweis_nummer || user.id;
-      return (
-        <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#64748b' }}>Lade Campus Pass...</div>}>
-          <QRLandingPage token={tokenToUse} />
-        </Suspense>
-      );
-    }
-  }
-
-  // 2.6 DEACTIVATED / PAUSED SCHOOL CHECK (Students possess Didactic Immunity)
-  if (isSchoolPaused && user?.role?.toLowerCase() !== 'student') {
-    return (
-      <div style={{
-        position: 'fixed',
-        inset: 0,
-        background: '#09090b',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: '#ffffff',
-        padding: '24px',
-        textAlign: 'center',
-        fontFamily: '"Outfit", "Inter", sans-serif',
-        zIndex: 9999
-      }}>
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.03)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          padding: '48px 32px',
-          borderRadius: '32px',
-          maxWidth: '480px',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
-        }}>
-          <div style={{
-            width: '80px',
-            height: '80px',
-            borderRadius: '24px',
-            background: 'rgba(239, 68, 68, 0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: '24px',
-            border: '1px solid rgba(239, 68, 68, 0.2)'
-          }}>
-            <Clock size={40} color="#ef4444" className="animate-pulse" />
-          </div>
-          <h1 style={{ fontSize: '1.8rem', fontWeight: 900, margin: '0 0 16px 0', letterSpacing: '-0.02em', color: '#f8fafc' }}>
-            Zugang pausiert
-          </h1>
-          <p style={{ color: '#94a3b8', fontSize: '0.95rem', lineHeight: '1.6', margin: '0 0 32px 0' }}>
-            Diese Schule wurde vorübergehend deaktiviert. Schüler- und Lehrerprofile sind für die Dauer der Deaktivierung nicht nutzbar und es können keine Daten geladen oder gesendet werden.
-          </p>
-          <button
-            onClick={() => handleLogout(false)}
-            style={{
-              padding: '14px 28px',
-              borderRadius: '14px',
-              background: '#ffffff',
-              color: '#09090b',
-              border: 'none',
-              fontWeight: 800,
-              fontSize: '0.95rem',
-              cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(255,255,255,0.1)',
-              transition: 'all 0.2s'
-            }}
-            
-            
-          >
-            Abmelden
-          </button>
-        </div>
-      </div>
-    );
+  if (startupGate) {
+    return startupGate;
   }
 
   // 3. MAIN DASHBOARD LOGIC (Resumes here after Auth/Loading checks)
@@ -9216,460 +8635,105 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
         />
 
 
-      <main id="main-content" tabIndex={-1} className="main-content" style={{ 
-        overflow: (windowWidth <= 768 || activeStudentTab !== 'live') ? 'auto' : 'hidden', 
-        flex: 1, 
-        display: 'flex', 
-        flexDirection: 'column', 
-        padding: windowWidth <= 768 
-          ? (activeStudentTab === 'live' ? '4px 4px 0 4px' : '4px 4px var(--mobile-scroll-clearance-bottom, calc(96px + env(safe-area-inset-bottom, 16px))) 4px') 
-          : '10px',
-        scrollPaddingTop: windowWidth <= 768 ? 'var(--mobile-scroll-clearance-top, calc(56px + env(safe-area-inset-top, 0px)))' : undefined,
-        scrollPaddingBottom: windowWidth <= 768 ? 'var(--mobile-scroll-clearance-bottom, calc(96px + env(safe-area-inset-bottom, 16px)))' : undefined,
-        boxSizing: 'border-box',
-        minWidth: 0,
-        width: '100%'
-      }}>
-        {/* 🛡️ Persistent Sticky Safety Banner when Parent Mode is active */}
-        {parentUnlocked && user?.role?.toLowerCase() === 'student' && (
-          <div style={{
-            position: 'sticky',
-            top: windowWidth <= 768 ? 'calc(54px + env(safe-area-inset-top, 0px))' : 0,
-            zIndex: 890,
-            background: 'linear-gradient(90deg, #0284c7 0%, #0369a1 100%)',
-            color: '#ffffff',
-            padding: '8px 16px',
-            borderRadius: '14px',
-            marginBottom: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            fontSize: '0.78rem',
-            fontWeight: 700,
-            boxShadow: '0 2px 10px rgba(2, 132, 199, 0.25)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            flexWrap: 'wrap',
-            gap: '8px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <ShieldCheck size={16} color="#ffffff" />
-                <span>Eltern-Vorschau aktiv</span>
-              </div>
-
-              {/* If active tab is a togglable board, show quick release toggle in the header */}
-              {['practice_board', 'mediathek', 'events', 'campus_cup', 'messages'].includes(activeStudentTab) && (() => {
-                const boardNames: Record<string, string> = {
-                  practice_board: 'Übe-Pfad',
-                  mediathek: 'Mediathek',
-                  events: 'Termine',
-                  campus_cup: 'Klassen-Highlights & Team-Power',
-                  messages: 'Nachrichten'
-                };
-                let allowed = true;
-                if (campusStudentUiLevel === 'junior') {
-                  const juniorAllowed = ['briefing', 'homework_book', 'practice_board', 'events', 'settings'];
-                  allowed = juniorAllowed.includes(activeStudentTab);
-                }
-                const override = typeof window !== 'undefined' ? localStorage.getItem(`campus_board_override_${activeStudentTab}`) : null;
-                if (override === 'true') allowed = true;
-                if (override === 'false') allowed = false;
-
-                const toggleActiveBoard = () => {
-                  const next = !allowed;
-                  localStorage.setItem(`campus_board_override_${activeStudentTab}`, String(next));
-                  if (activeStudentTab === 'messages') {
-                    localStorage.setItem('campus_allow_chat', String(next));
-                  }
-                  if (activeStudentTab === 'campus_cup') {
-                    localStorage.setItem('campus_allow_leaderboard', String(next));
-                  }
-                  if (user?.id) {
-                    const nextPerms = {
-                      ...(user?.parent_permissions || {}),
-                      [`board_${activeStudentTab}`]: next
-                    };
-                    (async () => {
-                      try {
-                        const activeLeaseToken = typeof window !== 'undefined'
-                          ? (sessionStorage.getItem('gl_parent_session_lease') || sessionStorage.getItem('gl_active_session_lease_id'))
-                          : null;
-                        const { error } = await supabase.rpc('save_parent_controls', {
-                          p_student_id: user.id,
-                          p_settings: {
-                            parent_permissions: nextPerms,
-                            ...(activeLeaseToken ? { lease_token: activeLeaseToken } : {})
-                          }
-                        });
-                        if (error) throw error;
-                      } catch {
-                        try {
-                          await supabase.from('users').update({
-                            parent_permissions: nextPerms
-                          }).eq('id', user.id);
-                        } catch(err) {}
-                      }
-                    })();
-                  }
-                  window.dispatchEvent(new CustomEvent('campus_board_permission_changed', { detail: { boardId: activeStudentTab, allowed: next } }));
-                  setParentPermissionsVersion(v => v + 1);
-                };
-
-                return (
-                  <button
-                    type="button"
-                    onClick={toggleActiveBoard}
-                    style={{
-                      background: allowed ? 'rgba(34, 197, 94, 0.25)' : 'rgba(239, 68, 68, 0.25)',
-                      border: allowed ? '1px solid #86efac' : '1px solid #fca5a5',
-                      color: '#ffffff',
-                      padding: '3px 10px',
-                      borderRadius: '100px',
-                      fontSize: '0.72rem',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      transition: 'all 0.15s ease'
-                    }}
-                    title="Klicken, um dieses Board für dein Kind freizugeben oder zu sperren"
-                    className="hover-scale-subtle"
-                  >
-                    <span>Board {boardNames[activeStudentTab]}:</span>
-                    <span style={{ fontWeight: 900, textDecoration: 'underline' }}>
-                      {allowed ? '✓ Für Kind freigegeben' : '🔒 Für Kind gesperrt'}
-                    </span>
-                  </button>
-                );
-              })()}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                sessionStorage.removeItem('groovelab_parent_unlocked_global');
-                if (user?.id) {
-                  sessionStorage.removeItem(`groovelab_parent_unlocked_${user.id}`);
-                  sessionStorage.removeItem(`groovelab_parent_session_${user.id}`);
-                }
-                setParentUnlocked(false);
-                window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: false }));
-                setActiveStudentTab('briefing');
-              }}
-              style={{
-                background: '#ffffff',
-                color: '#0369a1',
-                border: 'none',
-                borderRadius: '16px',
-                padding: '4px 12px',
-                fontSize: '0.72rem',
-                fontWeight: 800,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
-                whiteSpace: 'nowrap'
-              }}
-              title="Eltern-Modus beenden und zur geschützten Schüleransicht wechseln"
-            >
-              <User size={12} color="#0369a1" />
-              <span>Schüleransicht aktivieren</span>
-            </button>
-          </div>
-        )}
-        {/* Ensemble & Bands Platform View */}
-        {activePlatform === 'ensembles' && (
-          <ErrorBoundary>
-            <Suspense fallback={<DashboardLoader />}>
-              <EnsembleDashboard 
-                user={user}
-                schoolId={user.school_id}
-                supabase={supabase}
-              />
-            </Suspense>
-          </ErrorBoundary>
-        )}
-
-        {/* Live Lab Tab for Students (Kept mounted for instant platform switching) */}
-        {user.role?.toLowerCase() === 'student' && (
-          <div style={{ 
-            display: (activePlatform === 'groovelab' || (activePlatform !== 'ensembles' && activePlatform !== 'campus' && activeStudentTab === 'live')) ? 'flex' : 'none', 
-            flexDirection: 'column', 
-            flex: 1, 
-            minHeight: 0,
-            width: '100%' 
-          }}>
-            <ErrorBoundary>
-              <div className="animation-slide-up" style={{ width: '100%', padding: windowWidth <= 768 ? '8px 4px 4px 4px' : '24px 16px 16px 16px', display: 'flex', flexDirection: 'column', flex: 1, height: '100%' }}>
-                <Suspense fallback={<DashboardLoader />}>
-                  <TeacherDashboard 
-                    key="student-live-dashboard"
-                    userId={user.id} 
-                    initialTeacher={user}
-                    hideHeader={true} 
-                    viewMode="student" 
-                    onTabChange={setActiveStudentTab}
-                    isSidebarCollapsed={isSidebarCollapsed}
-                    setIsSidebarCollapsed={setIsSidebarCollapsed}
-                    onSidebarNotificationsChange={setSidebarNotificationsCount}
-                    activePlatform="groovelab"
-                    session={session}
-                    onSessionChange={setSession}
-                    locationMode={locationMode}
-                    onLocationModeChange={(mode) => {
-                      setLocationMode(mode);
-                      sessionStorage.setItem('groovelab_location_mode', mode);
-                    }}
-                    onSwitchPlatform={(newPlatform) => {
-                      setActivePlatform(newPlatform);
-                    }}
-                    onFoundBand={(form, mySlot) => {
-                      console.log('[DEBUG-Groovelab] setSuggestingSkill (manual click) in TeacherDashboard onFoundBand');
-                      setSuggestingSkill({
-                        ...mySlot,
-                        isLeader: true,
-                        leaderName: 'Du',
-                        song_id: form.song?.id || form.song_id,
-                        songs: { id: form.song?.id || form.song_id, title: form.song?.title },
-                        formation_group: form.groupKey || form.id,
-                        members: form.members
-                      });
-                      setFoundingName(generateRandomBandName(foundingLanguage));
-                    }}
-                  />
-                </Suspense>
-              </div>
-            </ErrorBoundary>
-          </div>
-        )}
-
-        {/* Student Campus Dashboard Tabs (Kept mounted for instant platform switching) */}
-        {user.role?.toLowerCase() === 'student' && (
-          <div style={{ 
-            display: (activePlatform === 'campus' && activeStudentTab !== 'messages') ? 'block' : 'none',
-            width: '100%'
-          }}>
-            <ErrorBoundary>
-              <Suspense fallback={<DashboardLoader />}>
-                <StudentAvatarDashboard 
-                  studentId={user.id} 
-                  initialUser={user}
-                  parentActiveTab={activeStudentTab}
-                  onTabChange={(tab) => setActiveStudentTab(tab)}
-                  onProfileUpdate={(updatedFields: any) => {
-                    setUser((prev: any) => prev ? { ...prev, ...updatedFields } : null);
-                  }}
-                />
-              </Suspense>
-            </ErrorBoundary>
-          </div>
-        )}
-
-        {/* Profile Tab */}
-        {activeStudentTab === 'profile' && !(user.role?.toLowerCase() === 'student' && activePlatform === 'campus') && (
-          <ErrorBoundary>
-            {(user.role === 'teacher' || user.role === 'admin' || user.role === 'secretary') && activePlatform === 'campus' ? (
-              /* --- WORLD-CLASS CAMPUS TEACHER PROFILE DESIGN --- */
-              <CampusStaffProfileView
-                user={user}
-                teachers={teachers}
-                campusTeacherStats={campusTeacherStats}
-                activeWorkspace={activeWorkspace}
-                activePlatform={activePlatform}
-                onShowQr={() => setShowQR(true)}
-                onOpenPrivacy={() => setShowPrivacy(true)}
-                onOpenAgb={() => setShowAgb(true)}
-                onOpenCancellation={() => setShowCancellation(true)}
-                onOpenImpressum={() => setShowImpressum(true)}
-                onOpenAccessibility={() => setShowAccessibility(true)}
-              />
-            ) : (
-              /* --- GROOVELAB PROFILE LOOK (ORIGINAL) --- */
-              <GrooveLabProfileView
-                user={user}
-                setUser={setUser}
-                teachers={teachers}
-                userSongs={userSongs}
-                userBands={userBands}
-                allBands={allBands}
-                brandColor={brandColor}
-                activePlatform={activePlatform}
-                supabase={supabase}
-                fetchPlanningData={fetchPlanningData}
-                onChangeAvatar={() => {
-                  setAvatarPickerType('teacher');
-                  setShowAvatarPicker(true);
-                }}
-                onShowQr={() => setShowQR(true)}
-                onOpenBandProfile={(band) => {
-                  setSelectedBandForProfile(band);
-                  setShowBandProfile(true);
-                }}
-                onOpenPrivacy={() => setShowPrivacy(true)}
-                onOpenAgb={() => setShowAgb(true)}
-                onOpenCancellation={() => setShowCancellation(true)}
-                onOpenImpressum={() => setShowImpressum(true)}
-                onOpenAccessibility={() => setShowAccessibility(true)}
-                globalPlannedSlots={globalPlannedSlots}
-                plannedSlots={plannedSlots}
-                toggleSlot={toggleSlot}
-                loggedInUserId={loggedInUserId}
-              />
-            )}
-        </ErrorBoundary>
-      )}
-
-        {/* Admin/Teacher Section Tabs (Unified) */}
-        {((user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'secretary')) && activePlatform !== 'ensembles' && activeStudentTab !== 'profile' && activeStudentTab !== 'messages' && (
-          <ErrorBoundary key={`admin-teacher-suite-${activePlatform}`}>
-            <AdminDashboard 
-              key={`admin-dashboard-${activePlatform}`}
-              userId={user.id} 
-              onLogout={handleLogout} 
-              forceTab={['schedule', 'students', 'team', 'rooms', 'songs', 'stats', 'gallery', 'setup', 'bands', 'events', 'briefing', 'live', showMissionsFeature ? 'missions' : ''].includes(activeStudentTab) ? activeStudentTab : undefined}
-              activePlatform={activePlatform as any}
-              onTabChange={(tabId: any) => setActiveStudentTab(tabId)}
-              onSwitchPlatform={(platform) => setActivePlatform(platform)}
-              onOpenBandProfile={(band: any) => {
-                setSelectedBandForProfile(band);
-                setShowBandProfile(true);
-              }}
-              session={session}
-              onSessionChange={setSession}
-              locationMode={locationMode}
-              onLocationModeChange={(mode) => {
-                setLocationMode(mode);
-                sessionStorage.setItem('groovelab_location_mode', mode);
-              }}
-            />
-          </ErrorBoundary>
-        )}
-
-        {/* Messages Tab */}
-        {activeStudentTab === 'messages' && (
-          <MessagesTabContainer
-            user={user}
-            activePlatform={activePlatform}
-            schoolUsers={schoolUsers}
-            campusMessages={campusMessages}
-            announcements={announcements}
-            studentMessages={studentMessages}
-            selectedCampusRecipient={selectedCampusRecipient}
-            setSelectedCampusRecipient={setSelectedCampusRecipient}
-            onSendCampusMessage={handleSendCampusMessage}
-            onMarkCampusMessagesAsRead={handleMarkCampusMessagesAsRead}
-            onMarkCampusGroupAsRead={handleMarkCampusGroupAsRead}
-            onMarkCampusChannelAsRead={handleMarkCampusChannelAsRead}
-            onPostAnnouncement={async (title, message, targetType, targetUserIds) => {
-              setAnnouncementTitle(title);
-              setAnnouncementMessage(message);
-              setAnnouncementTarget(targetType as any);
-              setSelectedTargetUserIds(targetUserIds);
-              await handlePostAnnouncement({ preventDefault: () => {} } as any);
-            }}
-            onDeleteAnnouncement={handleDeleteAnnouncement}
-            onAcknowledgeMessage={handleAcknowledgeStudentMessage}
-          />
-        )}
-
-        {/* Practice & Repertoire Tabs */}
-        {['practice', 'repertoire'].includes(activeStudentTab) && (
-          <StudentPracticeRepertoireTabs
-            activeStudentTab={activeStudentTab as 'practice' | 'repertoire'}
-            user={user}
-            userSongs={userSongs}
-            practiceSongs={practiceSongs}
-            groupedPracticeSongs={groupedPracticeSongs}
-            groupedRepertoireSongs={groupedRepertoireSongs}
-            userBands={userBands}
-            brandColor={brandColor}
-            practiceSearchQuery={practiceSearchQuery}
-            setPracticeSearchQuery={setPracticeSearchQuery}
-            practiceSearchType={practiceSearchType}
-            setPracticeSearchType={setPracticeSearchType}
-            practiceAlphaFilter={practiceAlphaFilter}
-            setPracticeAlphaFilter={setPracticeAlphaFilter}
-            expandedSongId={expandedSongId}
-            setExpandedSongId={setExpandedSongId}
-            updateProgress={updateProgress}
-            handleSubmitForApproval={handleSubmitForApproval}
-            handleDeleteSong={handleDeleteSong}
-            onOpenPdfViewer={(song, folderUrl) => {
-              setActivePdfSong(song);
-              setActivePdfFolderUrl(folderUrl);
-            }}
-            isMobile={isMobile}
-          />
-        )}
-
-
-        {/* Band Matching & Bands Tabs (Students) */}
-        {['matching', 'bands'].includes(activeStudentTab) && user.role === 'student' && (
-          <StudentBandMatchingSuite
-            activeStudentTab={activeStudentTab as 'matching' | 'bands'}
-            user={user}
-            brandColor={brandColor}
-            wallSongs={wallSongs}
-            userSongs={userSongs}
-            userBands={userBands}
-            allBands={allBands}
-            matchingLevelFilter={matchingLevelFilter}
-            setMatchingLevelFilter={setMatchingLevelFilter}
-            activeBandSubTab={activeBandSubTab}
-            setActiveBandSubTab={setActiveBandSubTab}
-            bandSearchText={bandSearchText}
-            setBandSearchText={setBandSearchText}
-            bandSearchLetter={bandSearchLetter}
-            setBandSearchLetter={setBandSearchLetter}
-            onOpenBandProfile={(band) => {
-              setSelectedBandForProfile(band);
-              setShowBandProfile(true);
-            }}
-            onPreviewStudent={(student) => {
-              setSelectedStudentForPreview(student);
-            }}
-            onFoundBandFromSlot={(mySlot, song, form) => {
-              console.log('[DEBUG-Groovelab] setSuggestingSkill (Matching Board click) in App.tsx');
-              setSuggestingSkill({
-                ...mySlot,
-                isLeader: true,
-                leaderName: 'Du',
-                song_id: song.song_id,
-                songs: { id: song.song_id, title: song.title },
-                formation_group: form.id,
-                members: form.members
-              });
-              if (!foundingName) setFoundingName(generateRandomBandName(foundingLanguage));
-            }}
-            onRefreshDashboard={(userId) => fetchDashboardData(userId)}
-            isMobile={isMobile}
-            width={width}
-          />
-        )}
-        {activeStudentTab === 'library' && (
-          <StudentLibraryTab
-            globalSongs={globalSongs}
-            userSongs={userSongs}
-            brandColor={brandColor}
-            onAddSongToRepertoire={handleAddSongToRepertoire}
-            isMobile={isMobile}
-          />
-        )}
-
-
-
-        {/* Team Tab */}
-        {user.role?.toLowerCase() === 'student' && activeStudentTab === 'team' && (
-          <StudentTeamTab
-            teachers={teachers}
-            brandColor={brandColor}
-            onSelectTeacher={(t) => setSelectedTeacher(t)}
-            isMobile={isMobile}
-          />
-        )}
-      </main>
+      <CampusMainContentRouter
+        windowWidth={windowWidth}
+        activeStudentTab={activeStudentTab}
+        parentUnlocked={parentUnlocked}
+        setParentUnlocked={setParentUnlocked}
+        user={user}
+        setUser={setUser}
+        school={school}
+        activePlatform={activePlatform}
+        setActivePlatform={setActivePlatform}
+        setActiveStudentTab={setActiveStudentTab}
+        campusStudentUiLevel={campusStudentUiLevel}
+        setParentPermissionsVersion={setParentPermissionsVersion}
+        supabase={supabase}
+        isSidebarCollapsed={isSidebarCollapsed}
+        setIsSidebarCollapsed={setIsSidebarCollapsed}
+        setSidebarNotificationsCount={setSidebarNotificationsCount}
+        session={session}
+        setSession={setSession}
+        locationMode={locationMode}
+        setLocationMode={setLocationMode}
+        setSuggestingSkill={setSuggestingSkill}
+        foundingName={foundingName}
+        setFoundingName={setFoundingName}
+        foundingLanguage={foundingLanguage}
+        teachers={teachers}
+        campusTeacherStats={campusTeacherStats}
+        activeWorkspace={activeWorkspace}
+        setShowQR={setShowQR}
+        setShowPrivacy={setShowPrivacy}
+        setShowAgb={setShowAgb}
+        setShowCancellation={setShowCancellation}
+        setShowImpressum={setShowImpressum}
+        setShowAccessibility={setShowAccessibility}
+        userSongs={userSongs}
+        userBands={userBands}
+        allBands={allBands}
+        brandColor={brandColor}
+        fetchPlanningData={fetchPlanningData}
+        setAvatarPickerType={setAvatarPickerType}
+        setShowAvatarPicker={setShowAvatarPicker}
+        setSelectedBandForProfile={setSelectedBandForProfile}
+        setShowBandProfile={setShowBandProfile}
+        globalPlannedSlots={globalPlannedSlots}
+        plannedSlots={plannedSlots}
+        toggleSlot={toggleSlot}
+        loggedInUserId={loggedInUserId}
+        handleLogout={handleLogout}
+        showMissionsFeature={showMissionsFeature}
+        schoolUsers={schoolUsers}
+        campusMessages={campusMessages}
+        announcements={announcements}
+        studentMessages={studentMessages}
+        selectedCampusRecipient={selectedCampusRecipient}
+        setSelectedCampusRecipient={setSelectedCampusRecipient}
+        handleSendCampusMessage={handleSendCampusMessage}
+        handleMarkCampusMessagesAsRead={handleMarkCampusMessagesAsRead}
+        handleMarkCampusGroupAsRead={handleMarkCampusGroupAsRead}
+        handleMarkCampusChannelAsRead={handleMarkCampusChannelAsRead}
+        setAnnouncementTitle={setAnnouncementTitle}
+        setAnnouncementMessage={setAnnouncementMessage}
+        setAnnouncementTarget={setAnnouncementTarget}
+        setSelectedTargetUserIds={setSelectedTargetUserIds}
+        handlePostAnnouncement={handlePostAnnouncement}
+        handleDeleteAnnouncement={handleDeleteAnnouncement}
+        handleAcknowledgeStudentMessage={handleAcknowledgeStudentMessage}
+        practiceSongs={practiceSongs}
+        groupedPracticeSongs={groupedPracticeSongs}
+        groupedRepertoireSongs={groupedRepertoireSongs}
+        practiceSearchQuery={practiceSearchQuery}
+        setPracticeSearchQuery={setPracticeSearchQuery}
+        practiceSearchType={practiceSearchType}
+        setPracticeSearchType={setPracticeSearchType}
+        practiceAlphaFilter={practiceAlphaFilter}
+        setPracticeAlphaFilter={setPracticeAlphaFilter}
+        expandedSongId={expandedSongId}
+        setExpandedSongId={setExpandedSongId}
+        updateProgress={updateProgress}
+        handleSubmitForApproval={handleSubmitForApproval}
+        handleDeleteSong={handleDeleteSong}
+        setActivePdfSong={setActivePdfSong}
+        setActivePdfFolderUrl={setActivePdfFolderUrl}
+        isMobile={isMobile}
+        wallSongs={wallSongs}
+        matchingLevelFilter={matchingLevelFilter}
+        setMatchingLevelFilter={setMatchingLevelFilter}
+        activeBandSubTab={activeBandSubTab}
+        setActiveBandSubTab={setActiveBandSubTab}
+        bandSearchText={bandSearchText}
+        setBandSearchText={setBandSearchText}
+        bandSearchLetter={bandSearchLetter}
+        setBandSearchLetter={setBandSearchLetter}
+        setSelectedStudentForPreview={setSelectedStudentForPreview}
+        fetchDashboardData={fetchDashboardData}
+        width={width}
+        globalSongs={globalSongs}
+        handleAddSongToRepertoire={handleAddSongToRepertoire}
+        setSelectedTeacher={setSelectedTeacher}
+      />
 
       {/* Mobile Native Bottom Navigation Bar (Controlled via CSS for Mobile & Simulator) */}
       {user && (() => {

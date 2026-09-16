@@ -18,7 +18,8 @@ import {
   X,
   Layers,
   MessageSquareQuote,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Loader2
 } from 'lucide-react';
 import { getBlob } from '../../../utils/blobStorage';
 import { formatHarmonizedAudioTitle } from '../../../utils/audioNamingHelper';
@@ -123,6 +124,7 @@ export const MasterworkAudioCapsule: React.FC<MasterworkAudioCapsuleProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState<number>(0);
   const [currentTime, setCurrentTime] = useState<number>(0);
+  const [isDeleting, setIsDeleting] = useState(false);
   const isPlayableUrl = (u?: string | null) => Boolean(u && (u.startsWith('http://') || u.startsWith('https://') || u.startsWith('blob:') || u.startsWith('data:')));
   const [resolvedUrl, setResolvedUrl] = useState<string>(() => isPlayableUrl(url) ? url : '');
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
@@ -356,15 +358,22 @@ export const MasterworkAudioCapsule: React.FC<MasterworkAudioCapsuleProps> = ({
       {onDelete && (
         <button
           type="button"
-          onClick={(e) => {
+          disabled={isDeleting}
+          onClick={async (e) => {
             e.stopPropagation();
-            onDelete();
+            setIsDeleting(true);
+            try {
+              await Promise.resolve(onDelete());
+            } catch (err) {
+              console.warn('[MasterworkAudioCapsule] Delete error:', err);
+              setIsDeleting(false);
+            }
           }}
           style={{
             border: '1px solid #fecdd3',
-            background: '#fff1f2',
+            background: isDeleting ? '#fee2e2' : '#fff1f2',
             color: '#dc2626',
-            cursor: 'pointer',
+            cursor: isDeleting ? 'wait' : 'pointer',
             height: '24px',
             width: '24px',
             borderRadius: '6px',
@@ -374,10 +383,15 @@ export const MasterworkAudioCapsule: React.FC<MasterworkAudioCapsuleProps> = ({
             flexShrink: 0,
             transition: 'all 0.15s ease'
           }}
-          className="hover-scale-mini"
-          title="Meisterwerk-Aufnahme löschen"
+          className={isDeleting ? undefined : "hover-scale-mini"}
+          title={isDeleting ? "Wird gelöscht..." : "Meisterwerk-Aufnahme löschen"}
+          aria-label={isDeleting ? "Wird gelöscht..." : "Meisterwerk-Aufnahme löschen"}
         >
-          <Trash2 size={12} strokeWidth={2.2} />
+          {isDeleting ? (
+            <Loader2 size={12} className="animate-spin" />
+          ) : (
+            <Trash2 size={12} strokeWidth={2.2} />
+          )}
         </button>
       )}
     </div>
@@ -539,6 +553,8 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
   };
   const [isMobile, setIsMobile] = useState(checkIsMobile);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteProgress, setDeleteProgress] = useState(0);
   const [isToolsOpen, setIsToolsOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -2015,6 +2031,62 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
     >
       <audio ref={audioRef} src={resolvedUrl || undefined} preload="metadata" playsInline />
 
+      {/* 🛡️ Instant Deleting Visual Feedback Overlay & Progress Bar */}
+      {isDeleting && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 60,
+            borderRadius: isHero ? '18px' : '14px',
+            background: 'rgba(255, 255, 255, 0.94)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            padding: '12px 24px',
+            pointerEvents: 'all',
+            boxShadow: 'inset 0 0 0 1.5px rgba(239, 68, 68, 0.3)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#dc2626', fontWeight: 800, fontSize: '0.84rem' }}>
+            <Loader2 size={18} className="animate-spin" />
+            <span>Aufnahme wird sicher gelöscht...</span>
+          </div>
+          <div
+            role="progressbar"
+            aria-valuenow={Math.round(deleteProgress)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Löschfortschritt"
+            style={{
+              width: '100%',
+              maxWidth: '220px',
+              height: '6px',
+              background: '#fee2e2',
+              borderRadius: '999px',
+              overflow: 'hidden'
+            }}
+          >
+            <div
+              style={{
+                width: `${Math.max(8, deleteProgress)}%`,
+                height: '100%',
+                background: 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)',
+                borderRadius: '999px',
+                transition: 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: '0 0 6px rgba(239, 68, 68, 0.4)'
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* 1. Main Row: On Desktop, single line with title, waveform, time and action buttons */}
       {isMobile ? (
         <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
@@ -2226,30 +2298,41 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
           {onDelete && (
             <button
               type="button"
+              disabled={isDeleting}
               onClick={() => setShowDeleteConfirmModal(true)}
               style={{
-                border: '1px solid #cbd5e1',
-                background: '#ffffff',
-                color: '#334155',
+                border: '1px solid #fecaca',
+                background: isDeleting ? '#fee2e2' : '#fff1f2',
+                color: '#dc2626',
                 fontSize: '0.74rem',
                 fontWeight: 700,
                 height: '32px',
                 padding: '0 10px',
                 borderRadius: '9px',
-                cursor: 'pointer',
+                cursor: isDeleting ? 'wait' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '5px',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+                boxShadow: '0 1px 2px rgba(220, 38, 38, 0.06)',
                 transition: 'all 0.15s ease',
                 flexShrink: 0,
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                opacity: isDeleting ? 0.6 : 1
               }}
               className="hover-scale-mini"
-              title="Audioaufnahme unwiderruflich löschen"
+              title={isDeleting ? "Wird gelöscht..." : "Audioaufnahme unwiderruflich löschen"}
             >
-              <Trash2 size={13} strokeWidth={2.2} />
-              <span>Löschen</span>
+              {isDeleting ? (
+                <>
+                  <Loader2 size={13} className="animate-spin" />
+                  <span>Löschen...</span>
+                </>
+              ) : (
+                <>
+                  <Trash2 size={13} strokeWidth={2.2} />
+                  <span>Löschen</span>
+                </>
+              )}
             </button>
           )}
         </div>
@@ -2486,7 +2569,14 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       {/* Delete Confirmation Modal */}
       {showDeleteConfirmModal && (
         <div
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            if (!isDeleting) {
+              setShowDeleteConfirmModal(false);
+            }
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Aufnahme löschen Bestätigung"
           style={{
             position: 'fixed',
             inset: 0,
@@ -2501,6 +2591,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
           }}
         >
           <div
+            onClick={(e) => e.stopPropagation()}
             style={{
               background: '#ffffff',
               borderRadius: '24px',
@@ -2527,20 +2618,56 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
                 margin: '0 auto'
               }}
             >
-              <Trash2 size={28} />
+              {isDeleting ? (
+                <Loader2 size={28} className="animate-spin" />
+              ) : (
+                <Trash2 size={28} />
+              )}
             </div>
 
             <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#0f172a' }}>
-              Aufnahme löschen?
+              {isDeleting ? 'Aufnahme wird gelöscht...' : 'Aufnahme löschen?'}
             </h3>
 
             <p style={{ margin: 0, fontSize: '0.86rem', color: '#64748b', lineHeight: 1.4 }}>
-              Möchtest du &quot;{displayTitle}&quot; wirklich unwiderruflich aus deinem Hausaufgabenheft & Tresor entfernen?
+              {isDeleting 
+                ? `Die Aufnahme "${displayTitle}" wird sicher aus deinem Speicher und Tresor entfernt.`
+                : `Möchtest du "${displayTitle}" wirklich unwiderruflich aus deinem Hausaufgabenheft & Tresor entfernen?`}
             </p>
+
+            {/* 📊 Ladebalken / Progress Bar */}
+            {isDeleting && (
+              <div style={{ width: '100%', padding: '4px 0', marginTop: '2px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: '#64748b', fontWeight: 700, marginBottom: '6px' }}>
+                  <span>Sicheres Löschen...</span>
+                  <span>{Math.round(deleteProgress)}%</span>
+                </div>
+                <div 
+                  role="progressbar" 
+                  aria-valuenow={Math.round(deleteProgress)} 
+                  aria-valuemin={0} 
+                  aria-valuemax={100}
+                  aria-label="Löschfortschritt"
+                  style={{ width: '100%', height: '8px', background: '#fee2e2', borderRadius: '999px', overflow: 'hidden' }}
+                >
+                  <div 
+                    style={{
+                      width: `${Math.max(8, deleteProgress)}%`,
+                      height: '100%',
+                      background: 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)',
+                      borderRadius: '999px',
+                      transition: 'width 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                      boxShadow: '0 0 8px rgba(239, 68, 68, 0.4)'
+                    }} 
+                  />
+                </div>
+              </div>
+            )}
 
             <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
               <button
                 type="button"
+                disabled={isDeleting}
                 onClick={() => setShowDeleteConfirmModal(false)}
                 style={{
                   flex: 1,
@@ -2551,7 +2678,8 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
                   color: '#475569',
                   fontSize: '0.86rem',
                   fontWeight: 800,
-                  cursor: 'pointer'
+                  cursor: isDeleting ? 'not-allowed' : 'pointer',
+                  opacity: isDeleting ? 0.5 : 1
                 }}
                 className="hover-scale-mini"
               >
@@ -2559,26 +2687,56 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setShowDeleteConfirmModal(false);
-                  if (onDelete) onDelete();
+                disabled={isDeleting}
+                onClick={async () => {
+                  if (isDeleting || !onDelete) return;
+                  setIsDeleting(true);
+                  setDeleteProgress(20);
+                  const t1 = setTimeout(() => setDeleteProgress(55), 100);
+                  const t2 = setTimeout(() => setDeleteProgress(85), 250);
+                  try {
+                    await Promise.resolve(onDelete());
+                    setDeleteProgress(100);
+                    setTimeout(() => {
+                      setShowDeleteConfirmModal(false);
+                    }, 150);
+                  } catch (e) {
+                    console.error('[InlineAudioPlayer] Delete error:', e);
+                    clearTimeout(t1);
+                    clearTimeout(t2);
+                    setIsDeleting(false);
+                    setDeleteProgress(0);
+                  }
                 }}
                 style={{
                   flex: 1,
                   height: '42px',
                   borderRadius: '14px',
                   border: 'none',
-                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  background: isDeleting 
+                    ? '#ef4444' 
+                    : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
                   color: '#ffffff',
                   fontSize: '0.86rem',
                   fontWeight: 950,
-                  cursor: 'pointer',
+                  cursor: isDeleting ? 'wait' : 'pointer',
                   boxShadow: '0 2px 10px rgba(239, 68, 68, 0.35)',
-                  transition: 'all 0.15s ease'
+                  transition: 'all 0.15s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
                 }}
                 className="hover-scale-mini"
               >
-                Löschen
+                {isDeleting ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Wird gelöscht...</span>
+                  </>
+                ) : (
+                  <span>Löschen</span>
+                )}
               </button>
             </div>
           </div>
