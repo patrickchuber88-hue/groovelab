@@ -104,6 +104,9 @@ import { useCampusProfileInspector } from './hooks/useCampusProfileInspector';
 import { useBandFormationActions } from './hooks/useBandFormationActions';
 import { useCampusAnnouncementsAndMail } from './hooks/useCampusAnnouncementsAndMail';
 import { useCampusPublicViewsAndAvatars } from './hooks/useCampusPublicViewsAndAvatars';
+import { useCampusMessagingState } from './hooks/useCampusMessagingState';
+import { useCampusPracticeSearchAndPdfSuite } from './hooks/useCampusPracticeSearchAndPdfSuite';
+import { useCampusBandGatewayNavigation } from './hooks/useCampusBandGatewayNavigation';
 import { safeReplaceState } from './utils/historyUtils';
 import './App.css';
 
@@ -1287,90 +1290,78 @@ function App() {
     }
   }, [user?.id, activePlatform, activeStudentTab]);
 
-  const [selectedMatchingInsts, setSelectedMatchingInsts] = useState<Record<string, string>>({});
-  const [selectedBandForProfile, setSelectedBandForProfileRaw] = useState<any>(null);
-  const setSelectedBandForProfile = React.useCallback((val: any) => {
-    React.startTransition(() => {
-      setSelectedBandForProfileRaw(val);
-    });
-  }, []);
+  // 🏛️ Campus Band Gateway & Profile Navigation Hook
+  const {
+    selectedMatchingInsts,
+    setSelectedMatchingInsts,
+    selectedBandForProfile,
+    setSelectedBandForProfile,
+    selectedBandForGateway,
+    setSelectedBandForGateway,
+    expandedSongId,
+    setExpandedSongId,
+    showBandProfile,
+    setShowBandProfile,
+    bandProfileView,
+    setBandProfileView
+  } = useCampusBandGatewayNavigation();
 
-  const [selectedBandForGateway, setSelectedBandForGatewayRaw] = useState<any>(null);
-  const setSelectedBandForGateway = React.useCallback((val: any) => {
-    React.startTransition(() => {
-      setSelectedBandForGatewayRaw(val);
-    });
-  }, []);
 
-  const [expandedSongId, setExpandedSongId] = useState<string | null>(null);
-
-  const [showBandProfile, setShowBandProfileRaw] = useState(() => localStorage.getItem('groovelab_show_band_profile') === 'true');
-  const setShowBandProfile = React.useCallback((val: any) => {
-    React.startTransition(() => {
-      setShowBandProfileRaw(val);
-    });
-  }, []);
-
-  const [bandProfileView, setBandProfileView] = useState<'public' | 'backstage'>(() => {
-    const saved = localStorage.getItem('groovelab_band_profile_view');
-    return (saved === 'public' || saved === 'backstage') ? saved : 'public';
+  // 🏛️ Campus Practice Repertoire Search, Matching & PDF Suite Hook
+  const {
+    bandSearchText,
+    setBandSearchText,
+    bandSearchLetter,
+    setBandSearchLetter,
+    expandedMatchingSong,
+    setExpandedMatchingSong,
+    showQR,
+    setShowQR,
+    toastMessage,
+    setToastMessage,
+    activePdfFolderUrl,
+    setActivePdfFolderUrl,
+    activePdfSong,
+    setActivePdfSong,
+    showConfetti,
+    setShowConfetti,
+    selectedEqCat,
+    setSelectedEqCat,
+    practiceSearchQuery,
+    setPracticeSearchQuery,
+    practiceAlphaFilter,
+    setPracticeAlphaFilter,
+    practiceSearchType,
+    setPracticeSearchType,
+    activeStudentsCount,
+    setActiveStudentsCount,
+    personalRejections,
+    teachers,
+    setTeachers
+  } = useCampusPracticeSearchAndPdfSuite();
+  // 🏛️ Campus & Student Messaging State Hook
+  const {
+    studentMessages,
+    setStudentMessages,
+    studentMessagesLoading,
+    setStudentMessagesLoading,
+    selectedStudentMessage,
+    setSelectedStudentMessage,
+    studentMessagesFilter,
+    setStudentMessagesFilter,
+    deletedMessageIds,
+    setDeletedMessageIds,
+    campusMessages,
+    setCampusMessages,
+    campusMessagesLoading,
+    setCampusMessagesLoading,
+    campusUnreadCount,
+    setCampusUnreadCount,
+    selectedCampusRecipient,
+    setSelectedCampusRecipient
+  } = useCampusMessagingState({
+    userId: user?.id
   });
-
-
-  const [bandSearchText, setBandSearchText] = useState('');
-  const [bandSearchLetter, setBandSearchLetter] = useState<string | null>(null);
-  const [expandedMatchingSong, setExpandedMatchingSong] = useState<string | null>(null);
-  const [showQR, setShowQR] = useState(false);
-
-  const [toastMessage, setToastMessage] = useState<{ text: string, type: 'success' | 'error' | 'info' } | null>(null);
-  
-  useEffect(() => {
-    if (toastMessage) {
-      const timer = setTimeout(() => {
-        setToastMessage(null);
-      }, 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [toastMessage]);
-
-  const [activePdfFolderUrl, setActivePdfFolderUrl] = useState<string | null>(null);
-  const [activePdfSong, setActivePdfSong] = useState<any>(null);
-  const [showConfetti, setShowConfetti] = useState<any>(null);
-  const [selectedEqCat, setSelectedEqCat] = useState('E-Gitarre');
-  const [practiceSearchQuery, setPracticeSearchQuery] = useState('');
-  const [practiceAlphaFilter, setPracticeAlphaFilter] = useState<string | null>(null);
-  const [practiceSearchType, setPracticeSearchType] = useState<'title' | 'artist'>('title');
-  const [activeStudentsCount, setActiveStudentsCount] = useState(0);
-  const [personalRejections] = useState<any[]>([]);
-  const [teachers, setTeachers] = useState<any[]>([]);
-  const [studentMessages, setStudentMessages] = useState<any[]>([]);
-  const [studentMessagesLoading, setStudentMessagesLoading] = useState(false);
-  const [selectedStudentMessage, setSelectedStudentMessage] = useState<any>(null);
-  const [studentMessagesFilter, setStudentMessagesFilter] = useState<'all' | 'school' | 'band'>('all');
-  const [deletedMessageIds, setDeletedMessageIds] = useState<string[]>([]);
-
-  // Campus 1-on-1 Direct Messaging states
-  const [campusMessages, setCampusMessages] = useState<any[]>([]);
-  const [campusMessagesLoading, setCampusMessagesLoading] = useState(false);
-  const [campusUnreadCount, setCampusUnreadCount] = useState(0);
-  const [selectedCampusRecipient, setSelectedCampusRecipient] = useState<any>(null);
-
-  useEffect(() => {
-    if (user?.id) {
-      const stored = localStorage.getItem(`groovelab_deleted_messages_${user.id}`);
-      if (stored) {
-        try {
-          setDeletedMessageIds(JSON.parse(stored));
-        } catch (e) {
-          setDeletedMessageIds([]);
-        }
-      } else {
-        setDeletedMessageIds([]);
-      }
-    } else {
-      setDeletedMessageIds([]);
-    }
-  }, [user?.id]);
 
   // 🏛️ Campus Profile Inspector Hook (Teacher & Student inspection states & restore)
   const {
