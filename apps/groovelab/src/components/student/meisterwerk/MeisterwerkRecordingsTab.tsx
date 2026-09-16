@@ -233,6 +233,9 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
   const [selectedPracticeCompanionAlbum, setSelectedPracticeCompanionAlbum] = useState<boolean>(false);
   const [selectedDuettAlbum, setSelectedDuettAlbum] = useState<boolean>(false);
   const [selectedPracticeStyleFilter, setSelectedPracticeStyleFilter] = useState<string>('all');
+  const [selectedTeacherPracticeAlbum, setSelectedTeacherPracticeAlbum] = useState<boolean>(false);
+  const [selectedTeacherDuettAlbum, setSelectedTeacherDuettAlbum] = useState<boolean>(false);
+  const [selectedTeacherPracticeStyleFilter, setSelectedTeacherPracticeStyleFilter] = useState<string>('all');
 
   useEffect(() => {
     const handleRecordingsChange = () => {
@@ -1063,15 +1066,34 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                   const favoriteTeacherAudios = teacherAudios.filter(aud => favoriteAudioUrls.includes(aud.url));
                   favoriteTeacherAudios.sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0));
 
-                  // Group audios with songTag into Song-Alben
+                  // ⏱️ Practice Companion (Übe-Begleiter) Audios (Teacher)
+                  const teacherPracticeAudios = teacherAudios.filter(aud => 
+                    aud.source === 'practice_companion' || 
+                    (typeof aud.label === 'string' && (aud.label.startsWith('Übe-Begleiter:') || aud.label.includes('Übe-Begleiter') || aud.label.includes('Metronom') || aud.label.includes('Rhythmus'))) ||
+                    (typeof aud.title === 'string' && (aud.title.startsWith('Übe-Begleiter:') || aud.title.includes('Übe-Begleiter') || aud.title.includes('Metronom') || aud.title.includes('Rhythmus')))
+                  );
+                  teacherPracticeAudios.sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0));
+
+                  // 👥 Duett Audios (Teacher)
+                  const teacherDuettAudios = teacherAudios.filter(aud => 
+                    aud.source === 'duet' || 
+                    aud.isDuettTake === true ||
+                    (typeof aud.label === 'string' && (aud.label.startsWith('Duett:') || aud.label.includes('Duett') || aud.label.includes('2. Stimme'))) ||
+                    (typeof aud.title === 'string' && (aud.title.startsWith('Duett:') || aud.title.includes('Duett') || aud.title.includes('2. Stimme')))
+                  );
+                  teacherDuettAudios.sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0));
+
+                  // Group audios with songTag into Song-Alben (excluding generic and system tags)
                   const songGroups: { [songTitle: string]: { songTitle: string; takes: any[] } } = {};
                   teacherAudios.forEach(aud => {
-                    if (aud.songTag && aud.songTag.trim() !== '') {
+                    if (aud.songTag && aud.songTag.trim() !== '' && !isGenericSongTag(aud.songTag)) {
                       const sTitle = aud.songTag.trim();
-                      if (!songGroups[sTitle]) {
-                        songGroups[sTitle] = { songTitle: sTitle, takes: [] };
+                      if (sTitle.toLowerCase() !== 'übe-begleiter' && sTitle.toLowerCase() !== 'duett') {
+                        if (!songGroups[sTitle]) {
+                          songGroups[sTitle] = { songTitle: sTitle, takes: [] };
+                        }
+                        songGroups[sTitle].takes.push(aud);
                       }
-                      songGroups[sTitle].takes.push(aud);
                     }
                   });
                   Object.values(songGroups).forEach(sg => {
@@ -1345,6 +1367,302 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                     );
                   }
 
+                  // ⏱️ TEACHER ÜBE-BEGLEITER SYSTEM-ALBUM DRILLDOWN VIEW
+                  if (selectedTeacherPracticeAlbum) {
+                    const filteredPracticeTakes = selectedTeacherPracticeStyleFilter === 'all'
+                      ? teacherPracticeAudios
+                      : teacherPracticeAudios.filter(aud => 
+                          aud.style === selectedTeacherPracticeStyleFilter || 
+                          (typeof aud.label === 'string' && aud.label.toLowerCase().includes(selectedTeacherPracticeStyleFilter.toLowerCase()))
+                        );
+                    
+                    const totalDurationSec = teacherPracticeAudios.reduce((acc, a) => acc + (a.duration || 0), 0);
+                    const totalMinutes = Math.max(1, Math.round(totalDurationSec / 60));
+
+                    const availableStyles = [
+                      { id: 'all', label: 'Alle Grooves' },
+                      { id: 'metronome', label: '⏱️ Metronom' },
+                      { id: 'rock', label: '🥁 Rock & Pop' },
+                      { id: 'hiphop', label: '🎧 Hip-Hop' },
+                      { id: 'singersongwriter', label: '🎸 Singer-Songwriter' },
+                      { id: 'swing', label: '🎺 Jazz Swing' },
+                      { id: 'funk', label: '⚡ Funk' },
+                      { id: 'latin', label: '🌴 Latin' }
+                    ];
+
+                    return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedTeacherPracticeAlbum(false)}
+                            style={{
+                              background: "#ffffff",
+                              border: "1px solid #cbd5e1",
+                              borderRadius: "100px",
+                              padding: "5px 14px",
+                              fontSize: "0.74rem",
+                              fontWeight: 800,
+                              color: "#475569",
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "6px"
+                            }}
+                            className="hover-scale"
+                          >
+                            <ArrowLeft size={13} /> Zurück zur Übersicht
+                          </button>
+                          <span style={{ fontSize: "0.74rem", fontWeight: 850, background: "#fef3c7", color: "#92400e", padding: "3px 10px", borderRadius: "100px", border: "1px solid #fde68a" }}>
+                            ⏱️ {teacherPracticeAudios.length} {teacherPracticeAudios.length === 1 ? "Take" : "Takes"} {totalDurationSec > 0 ? `• ${totalMinutes} min` : ''}
+                          </span>
+                        </div>
+
+                        {/* Übe-Begleiter Banner */}
+                        <div style={{
+                          background: "linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)",
+                          border: "1.5px solid #fde68a",
+                          borderRadius: "16px",
+                          padding: "14px 16px",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "12px",
+                          boxShadow: "0 2px 8px rgba(217, 119, 6, 0.10)"
+                        }}>
+                          <div style={{
+                            width: "44px",
+                            height: "44px",
+                            borderRadius: "12px",
+                            background: "linear-gradient(135deg, #f8ca1d 0%, #f7c714 45%, #ebb50d 100%)",
+                            color: "#ffffff",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            boxShadow: "0 4px 14px -2px rgba(235, 181, 13, 0.45)",
+                            flexShrink: 0
+                          }}>
+                            <Clock size={22} strokeWidth={2.4} style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.20))" }} />
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <span style={{ fontSize: "0.68rem", fontWeight: 900, color: "#b45309", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                              Übe-Begleiter & Rhythmus-Labor
+                            </span>
+                            <h4 style={{ margin: "2px 0 0", fontSize: "1.05rem", fontWeight: 900, color: "#0f172a", letterSpacing: "-0.02em" }}>
+                              Lehrer-Begleitspuren & Klicks
+                            </h4>
+                            <p style={{ margin: "2px 0 0", fontSize: "0.74rem", color: "#78350f", fontWeight: 650 }}>
+                              Alle Metronom- und Übe-Begleitspuren deiner Lehrkraft auf einen Blick
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Rhythmus & Groove Filter Pills */}
+                        {teacherPracticeAudios.length > 0 && (
+                          <div style={{
+                            display: "flex",
+                            gap: "6px",
+                            overflowX: "auto",
+                            paddingBottom: "4px",
+                            WebkitOverflowScrolling: "touch"
+                          }}>
+                            {availableStyles.map(st => {
+                              const isSelected = selectedTeacherPracticeStyleFilter === st.id;
+                              const count = st.id === 'all'
+                                ? teacherPracticeAudios.length
+                                : teacherPracticeAudios.filter(a => a.style === st.id || (typeof a.label === 'string' && a.label.toLowerCase().includes(st.id))).length;
+                              
+                              if (st.id !== 'all' && count === 0) return null;
+
+                              return (
+                                <button
+                                  key={`filter-${st.id}`}
+                                  type="button"
+                                  onClick={() => setSelectedTeacherPracticeStyleFilter(st.id)}
+                                  style={{
+                                    padding: "4px 10px",
+                                    borderRadius: "100px",
+                                    fontSize: "0.70rem",
+                                    fontWeight: 800,
+                                    whiteSpace: "nowrap",
+                                    cursor: "pointer",
+                                    border: isSelected ? "1.5px solid #d97706" : "1px solid #e2e8f0",
+                                    background: isSelected ? "#f59e0b" : "#ffffff",
+                                    color: isSelected ? "#ffffff" : "#64748b",
+                                    boxShadow: isSelected ? "0 2px 6px rgba(217, 119, 6, 0.25)" : "none",
+                                    transition: "all 0.15s ease"
+                                  }}
+                                >
+                                  {st.label} ({count})
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Takes List or Empty State */}
+                        {filteredPracticeTakes.length === 0 ? (
+                          <div style={{
+                            textAlign: "center",
+                            padding: "32px 20px",
+                            background: "linear-gradient(135deg, #fffdf5 0%, #fefce8 100%)",
+                            borderRadius: "16px",
+                            border: "1.5px dashed #fde047",
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            gap: "8px"
+                          }}>
+                            <div style={{
+                              width: "40px",
+                              height: "40px",
+                              borderRadius: "12px",
+                              background: "#fef3c7",
+                              color: "#d97706",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center"
+                            }}>
+                              <Clock size={20} strokeWidth={2.4} />
+                            </div>
+                            <div style={{ fontSize: "0.84rem", fontWeight: 900, color: "#854d0e" }}>
+                              Noch keine Übe-Begleiter Aufnahmen vorhanden
+                            </div>
+                            <p style={{ margin: 0, fontSize: "0.74rem", color: "#a16207", fontWeight: 650, maxWidth: "320px", lineHeight: 1.35 }}>
+                              Deine Lehrkraft kann hier Metronom-Tracks, Groove-Drills oder Übe-Begleiter für dich einspielen!
+                            </p>
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                            {filteredPracticeTakes.map((aud, idx) => renderTeacherPlayer(aud, `teacher-practice-${idx}`))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  // 👥 TEACHER DUETT SYSTEM-ALBUM DRILLDOWN VIEW
+                  if (selectedTeacherDuettAlbum) {
+                    const totalDurationSec = teacherDuettAudios.reduce((acc, a) => acc + (a.duration || 0), 0);
+                    const totalMinutes = Math.max(1, Math.round(totalDurationSec / 60));
+
+                    return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedTeacherDuettAlbum(false)}
+                            style={{
+                              background: "#ffffff",
+                              border: "1px solid #cbd5e1",
+                              borderRadius: "100px",
+                              padding: "5px 14px",
+                              fontSize: "0.74rem",
+                              fontWeight: 800,
+                              color: "#475569",
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "6px"
+                            }}
+                            className="hover-scale"
+                          >
+                            <ArrowLeft size={13} /> Zurück zur Übersicht
+                          </button>
+                          <span style={{ fontSize: "0.74rem", fontWeight: 850, background: "#f3e8ff", color: "#6b21a8", padding: "3px 10px", borderRadius: "100px" }}>
+                            👥 {teacherDuettAudios.length} {teacherDuettAudios.length === 1 ? "Duett" : "Duette"} {totalDurationSec > 0 ? `• ${totalMinutes} min` : ''}
+                          </span>
+                        </div>
+
+                        {/* Duett Album Banner */}
+                        <div style={{
+                          background: "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 60%, #6d28d9 100%)",
+                          borderRadius: "16px",
+                          padding: "16px 18px",
+                          color: "#ffffff",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          boxShadow: "0 8px 24px -4px rgba(124, 58, 237, 0.35)",
+                          position: "relative",
+                          overflow: "hidden"
+                        }}>
+                          <div style={{
+                            position: "absolute",
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            height: "50%",
+                            background: "linear-gradient(180deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 100%)",
+                            pointerEvents: "none"
+                          }} />
+                          <div style={{ display: "flex", alignItems: "center", gap: "14px", position: "relative", zIndex: 1 }}>
+                            <div style={{
+                              width: "46px",
+                              height: "46px",
+                              borderRadius: "14px",
+                              background: "rgba(255,255,255,0.22)",
+                              backdropFilter: "blur(8px)",
+                              WebkitBackdropFilter: "blur(8px)",
+                              border: "1px solid rgba(255,255,255,0.6)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              boxShadow: "0 2px 8px rgba(0,0,0,0.15)"
+                            }}>
+                              <Users size={24} strokeWidth={2.4} color="#ffffff" />
+                            </div>
+                            <div>
+                              <div style={{ fontSize: "1.05rem", fontWeight: 900, letterSpacing: "-0.02em", lineHeight: 1.2 }}>
+                                Lehrer-Duett-Album
+                              </div>
+                              <div style={{ fontSize: "0.74rem", opacity: 0.9, marginTop: "2px", fontWeight: 600 }}>
+                                Alle 1. Stimmen & Duett-Takes deiner Lehrkraft zum synchronen Zusammenspiel
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Takes List or Empty State */}
+                        {teacherDuettAudios.length === 0 ? (
+                          <div style={{
+                            textAlign: "center",
+                            padding: "32px 20px",
+                            background: "linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)",
+                            borderRadius: "16px",
+                            border: "1.5px dashed #c084fc",
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            gap: "8px"
+                          }}>
+                            <div style={{
+                              width: "40px",
+                              height: "40px",
+                              borderRadius: "12px",
+                              background: "#ede9fe",
+                              color: "#7c3aed",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center"
+                            }}>
+                              <Users size={20} strokeWidth={2.4} />
+                            </div>
+                            <div style={{ fontSize: "0.84rem", fontWeight: 900, color: "#581c87" }}>
+                              Noch keine Duett-Aufnahmen vorhanden
+                            </div>
+                            <p style={{ margin: 0, fontSize: "0.74rem", color: "#7e22ce", fontWeight: 650, maxWidth: "320px", lineHeight: 1.35 }}>
+                              Deine Lehrkraft kann hier Duett-Parts (1. Stimme) einspielen, zu denen du daheim die 2. Stimme üben kannst!
+                            </p>
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                            {teacherDuettAudios.map((aud, idx) => renderTeacherPlayer(aud, `teacher-duett-${idx}`))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
                   // 🎵 SONG ALBUM DRILLDOWN VIEW
                   if (selectedTeacherSongAlbum) {
                     const albumData = songGroups[selectedTeacherSongAlbum];
@@ -1587,7 +1905,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                             Monats-Alben, Songs & Archiv
                           </span>
                           <span style={{ fontSize: "0.66rem", color: "#94a3b8", fontWeight: 700 }}>
-                            {1 + sortedMonths.length + songAlbumsList.length} Alben
+                            {3 + sortedMonths.length + songAlbumsList.length} Alben
                           </span>
                         </div>
 
@@ -1601,9 +1919,26 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                             const isFilled = favoriteTeacherAudios.length > 0;
                             return (
                               <div
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`Favoriten Album, ${favoriteTeacherAudios.length} Takes`}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    setSelectedTeacherMonth(null);
+                                    setSelectedTeacherSongAlbum(null);
+                                    setShowTeacherHomeworkArchive(false);
+                                    setSelectedTeacherPracticeAlbum(false);
+                                    setSelectedTeacherDuettAlbum(false);
+                                    setShowTeacherFavoritesOnly(true);
+                                  }
+                                }}
                                 onClick={() => {
                                   setSelectedTeacherMonth(null);
                                   setSelectedTeacherSongAlbum(null);
+                                  setShowTeacherHomeworkArchive(false);
+                                  setSelectedTeacherPracticeAlbum(false);
+                                  setSelectedTeacherDuettAlbum(false);
                                   setShowTeacherFavoritesOnly(true);
                                 }}
                                 style={{
@@ -1694,15 +2029,244 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                             );
                           })()}
 
+                          {/* ⏱️ Übe-Begleiter & Rhythmen System Album Cover Card (Lehrer, Vollflächig Sonnengelb) */}
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`Übe-Begleiter Album, ${teacherPracticeAudios.length} Takes`}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setSelectedTeacherMonth(null);
+                                setSelectedTeacherSongAlbum(null);
+                                setShowTeacherFavoritesOnly(false);
+                                setShowTeacherHomeworkArchive(false);
+                                setSelectedTeacherDuettAlbum(false);
+                                setSelectedTeacherPracticeAlbum(true);
+                              }
+                            }}
+                            onClick={() => {
+                              setSelectedTeacherMonth(null);
+                              setSelectedTeacherSongAlbum(null);
+                              setShowTeacherFavoritesOnly(false);
+                              setShowTeacherHomeworkArchive(false);
+                              setSelectedTeacherDuettAlbum(false);
+                              setSelectedTeacherPracticeAlbum(true);
+                            }}
+                            style={{
+                              aspectRatio: "1 / 1",
+                              background: "linear-gradient(135deg, #f8ca1d 0%, #f7c714 45%, #ebb50d 100%)",
+                              borderRadius: "16px",
+                              border: "1.5px solid rgba(255, 255, 255, 0.45)",
+                              padding: "8px 4px",
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              cursor: "pointer",
+                              boxShadow: "0 6px 18px -2px rgba(235, 181, 13, 0.48), 0 2px 6px rgba(0,0,0,0.06)",
+                              position: "relative",
+                              overflow: "hidden",
+                              transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
+                              textAlign: "center"
+                            }}
+                            className="hover-scale"
+                          >
+                            {/* Specular Highlight Sheen */}
+                            <div style={{
+                              position: "absolute",
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              height: "50%",
+                              background: "linear-gradient(180deg, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0) 100%)",
+                              pointerEvents: "none"
+                            }} />
+
+                            {/* Luminous Floating Capsule with Clock Icon (1:1 Duett-Style) */}
+                            <div style={{
+                              width: "36px",
+                              height: "36px",
+                              borderRadius: "11px",
+                              background: "rgba(255, 255, 255, 0.25)",
+                              backdropFilter: "blur(8px)",
+                              WebkitBackdropFilter: "blur(8px)",
+                              border: "1px solid rgba(255, 255, 255, 0.70)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.8)",
+                              marginTop: "2px",
+                              color: "#ffffff"
+                            }}>
+                              <Clock size={20} strokeWidth={2.4} color="#ffffff" style={{ filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.25))" }} />
+                            </div>
+
+                            {/* Typography */}
+                            <div style={{ width: "100%", position: "relative", zIndex: 1, padding: "0 2px" }}>
+                              <div style={{
+                                fontSize: "0.70rem",
+                                fontWeight: 900,
+                                color: "#ffffff",
+                                letterSpacing: "-0.01em",
+                                lineHeight: 1.15,
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                textShadow: "0 1px 3px rgba(0,0,0,0.30)"
+                              }}>
+                                Übe-Begleiter
+                              </div>
+                              <div style={{
+                                display: "inline-block",
+                                background: "rgba(0, 0, 0, 0.22)",
+                                backdropFilter: "blur(4px)",
+                                WebkitBackdropFilter: "blur(4px)",
+                                padding: "1px 6px",
+                                borderRadius: "999px",
+                                fontSize: "0.55rem",
+                                fontWeight: 800,
+                                color: "#fef9c3",
+                                marginTop: "2px",
+                                border: "1px solid rgba(255, 255, 255, 0.22)"
+                              }}>
+                                {teacherPracticeAudios.length} {teacherPracticeAudios.length === 1 ? "Take" : "Takes"}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 👥 Duett System Album Cover Card (Lehrer, Studio-Violett) */}
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`Duett Album, ${teacherDuettAudios.length} Duette`}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setSelectedTeacherMonth(null);
+                                setSelectedTeacherSongAlbum(null);
+                                setShowTeacherFavoritesOnly(false);
+                                setShowTeacherHomeworkArchive(false);
+                                setSelectedTeacherPracticeAlbum(false);
+                                setSelectedTeacherDuettAlbum(true);
+                              }
+                            }}
+                            onClick={() => {
+                              setSelectedTeacherMonth(null);
+                              setSelectedTeacherSongAlbum(null);
+                              setShowTeacherFavoritesOnly(false);
+                              setShowTeacherHomeworkArchive(false);
+                              setSelectedTeacherPracticeAlbum(false);
+                              setSelectedTeacherDuettAlbum(true);
+                            }}
+                            style={{
+                              aspectRatio: "1 / 1",
+                              background: "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 60%, #6d28d9 100%)",
+                              borderRadius: "16px",
+                              border: "1.5px solid rgba(255, 255, 255, 0.4)",
+                              padding: "8px 4px",
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              cursor: "pointer",
+                              boxShadow: "0 6px 18px -2px rgba(124, 58, 237, 0.38), 0 2px 6px rgba(0,0,0,0.06)",
+                              position: "relative",
+                              overflow: "hidden",
+                              transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
+                              textAlign: "center"
+                            }}
+                            className="hover-scale"
+                          >
+                            {/* Specular Highlight Sheen */}
+                            <div style={{
+                              position: "absolute",
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              height: "50%",
+                              background: "linear-gradient(180deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0) 100%)",
+                              pointerEvents: "none"
+                            }} />
+
+                            {/* Luminous Floating Capsule with Users Icon */}
+                            <div style={{
+                              width: "36px",
+                              height: "36px",
+                              borderRadius: "11px",
+                              background: "rgba(255, 255, 255, 0.24)",
+                              backdropFilter: "blur(8px)",
+                              WebkitBackdropFilter: "blur(8px)",
+                              border: "1px solid rgba(255, 255, 255, 0.65)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.8)",
+                              marginTop: "2px",
+                              color: "#ffffff"
+                            }}>
+                              <Users size={20} strokeWidth={2.4} color="#ffffff" />
+                            </div>
+
+                            {/* Typography */}
+                            <div style={{ width: "100%", position: "relative", zIndex: 1, padding: "0 2px" }}>
+                              <div style={{
+                                fontSize: "0.70rem",
+                                fontWeight: 900,
+                                color: "#ffffff",
+                                letterSpacing: "-0.01em",
+                                lineHeight: 1.15,
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                textShadow: "0 1px 3px rgba(0,0,0,0.25)"
+                              }}>
+                                Duett
+                              </div>
+                              <div style={{
+                                display: "inline-block",
+                                background: "rgba(0, 0, 0, 0.2)",
+                                backdropFilter: "blur(4px)",
+                                WebkitBackdropFilter: "blur(4px)",
+                                padding: "1px 6px",
+                                borderRadius: "999px",
+                                fontSize: "0.55rem",
+                                fontWeight: 800,
+                                color: "#f3e8ff",
+                                marginTop: "2px",
+                                border: "1px solid rgba(255, 255, 255, 0.2)"
+                              }}>
+                                {teacherDuettAudios.length} {teacherDuettAudios.length === 1 ? "Duett" : "Duette"}
+                              </div>
+                            </div>
+                          </div>
+
                           {/* 🎵 Song- & Lehrwerk-Alben Covers */}
                           {songAlbumsList.map(songAlb => {
                             const isBook = isBookAlbum(songAlb.songTitle);
                             return (
                               <div
                                 key={`teacher-song-album-${songAlb.songTitle}`}
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`${isBook ? 'Lehrwerk' : 'Song-Album'} ${songAlb.songTitle}`}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    setSelectedTeacherMonth(null);
+                                    setShowTeacherFavoritesOnly(false);
+                                    setShowTeacherHomeworkArchive(false);
+                                    setSelectedTeacherPracticeAlbum(false);
+                                    setSelectedTeacherDuettAlbum(false);
+                                    setSelectedTeacherSongAlbum(songAlb.songTitle);
+                                  }
+                                }}
                                 onClick={() => {
                                   setSelectedTeacherMonth(null);
                                   setShowTeacherFavoritesOnly(false);
+                                  setShowTeacherHomeworkArchive(false);
+                                  setSelectedTeacherPracticeAlbum(false);
+                                  setSelectedTeacherDuettAlbum(false);
                                   setSelectedTeacherSongAlbum(songAlb.songTitle);
                                 }}
                                 style={{
@@ -1829,9 +2393,26 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                             return (
                               <div
                                 key={`teacher-month-card-${m.monthKey}`}
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`Monats-Album: ${m.monthLabel}`}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    setSelectedTeacherSongAlbum(null);
+                                    setShowTeacherFavoritesOnly(false);
+                                    setShowTeacherHomeworkArchive(false);
+                                    setSelectedTeacherPracticeAlbum(false);
+                                    setSelectedTeacherDuettAlbum(false);
+                                    setSelectedTeacherMonth({ key: m.monthKey, label: m.monthLabel });
+                                  }
+                                }}
                                 onClick={() => {
                                   setSelectedTeacherSongAlbum(null);
                                   setShowTeacherFavoritesOnly(false);
+                                  setShowTeacherHomeworkArchive(false);
+                                  setSelectedTeacherPracticeAlbum(false);
+                                  setSelectedTeacherDuettAlbum(false);
                                   setSelectedTeacherMonth({ key: m.monthKey, label: m.monthLabel });
                                 }}
                                 style={{
@@ -3452,12 +4033,12 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                             width: "44px",
                             height: "44px",
                             borderRadius: "12px",
-                            background: "linear-gradient(135deg, #facc15 0%, #eab308 100%)",
+                            background: "linear-gradient(135deg, #f8ca17 0%, #f5c412 40%, #ecb808 100%)",
                             color: "#ffffff",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            boxShadow: "0 4px 14px -2px rgba(234, 179, 8, 0.40)",
+                            boxShadow: "0 4px 14px -2px rgba(236, 184, 8, 0.45)",
                             flexShrink: 0
                           }}>
                             <Clock size={22} strokeWidth={2.4} style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.20))" }} />
@@ -3616,10 +4197,37 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                           </div>
                         </div>
 
-                        {/* Takes List */}
+                        {/* Takes List or Empty State */}
                         {duettAudios.length === 0 ? (
-                          <div style={{ textAlign: "center", padding: "30px 16px", color: "#94a3b8", fontSize: "0.80rem", fontWeight: 700, background: "#faf5ff", borderRadius: "12px", border: "1px dashed #d8b4fe" }}>
-                            Noch keine Duett-Aufnahmen vorhanden.
+                          <div style={{
+                            textAlign: "center",
+                            padding: "32px 20px",
+                            background: "linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)",
+                            borderRadius: "16px",
+                            border: "1.5px dashed #c084fc",
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            gap: "8px"
+                          }}>
+                            <div style={{
+                              width: "40px",
+                              height: "40px",
+                              borderRadius: "12px",
+                              background: "#ede9fe",
+                              color: "#7c3aed",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center"
+                            }}>
+                              <Users size={20} strokeWidth={2.4} />
+                            </div>
+                            <div style={{ fontSize: "0.84rem", fontWeight: 900, color: "#581c87" }}>
+                              Noch keine Duett-Aufnahmen vorhanden
+                            </div>
+                            <p style={{ margin: 0, fontSize: "0.74rem", color: "#7e22ce", fontWeight: 650, maxWidth: "320px", lineHeight: 1.35 }}>
+                              Nimm im Duett-Studio eine 2. Stimme auf oder spiele mit deiner Lehrkraft synchron im Duo!
+                            </p>
                           </div>
                         ) : (
                           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -3794,7 +4402,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                             Monats-Alben, Songs & Archiv
                           </span>
                           <span style={{ fontSize: "0.66rem", color: "#94a3b8", fontWeight: 700 }}>
-                            {2 + sortedMonths.length + studentSongAlbumsList.length} Alben
+                            {3 + sortedMonths.length + studentSongAlbumsList.length} Alben
                           </span>
                         </div>
 
@@ -3916,225 +4524,213 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                             );
                           })()}
 
-                          {/* ⏱️ Übe-Begleiter & Rhythmen System Album Cover Card (Modul-Gelb) */}
-                          {(() => {
-                            const isFilled = practiceCompanionAudios.length > 0;
-                            return (
-                              <div
-                                role="button"
-                                tabIndex={0}
-                                aria-label={`Übe-Begleiter Album, ${practiceCompanionAudios.length} Takes`}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault();
-                                    setSelectedStudentMonth(null);
-                                    setSelectedStudentSongAlbum(null);
-                                    setShowStudentFavoritesOnly(false);
-                                    setSelectedDuettAlbum(false);
-                                    setSelectedPracticeCompanionAlbum(true);
-                                  }
-                                }}
-                                onClick={() => {
-                                  setSelectedStudentMonth(null);
-                                  setSelectedStudentSongAlbum(null);
-                                  setShowStudentFavoritesOnly(false);
-                                  setSelectedDuettAlbum(false);
-                                  setSelectedPracticeCompanionAlbum(true);
-                                }}
-                                style={{
-                                  aspectRatio: "1 / 1",
-                                  background: isFilled 
-                                    ? "linear-gradient(135deg, #facc15 0%, #eab308 100%)" 
-                                    : "linear-gradient(145deg, #ffffff 0%, #fefce8 100%)",
-                                  borderRadius: "16px",
-                                  border: isFilled ? "1.5px solid rgba(255, 255, 255, 0.65)" : "1.5px solid #fef08a",
-                                  padding: "8px 4px",
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  alignItems: "center",
-                                  justifyContent: "space-between",
-                                  cursor: "pointer",
-                                  boxShadow: isFilled ? "0 6px 18px -2px rgba(234, 179, 8, 0.45), 0 2px 6px rgba(0,0,0,0.06)" : "0 2px 6px rgba(0,0,0,0.03)",
-                                  position: "relative",
-                                  overflow: "hidden",
-                                  transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
-                                  textAlign: "center"
-                                }}
-                                className="hover-scale"
-                              >
-                                {/* Specular Highlight Sheen */}
-                                {isFilled && (
-                                  <div style={{
-                                    position: "absolute",
-                                    top: 0,
-                                    left: 0,
-                                    right: 0,
-                                    height: "50%",
-                                    background: "linear-gradient(180deg, rgba(255,255,255,0.32) 0%, rgba(255,255,255,0) 100%)",
-                                    pointerEvents: "none"
-                                  }} />
-                                )}
+                          {/* ⏱️ Übe-Begleiter & Rhythmen System Album Cover Card (Vollflächig Sonnengelb im Duett-Stil) */}
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`Übe-Begleiter Album, ${practiceCompanionAudios.length} Takes`}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setSelectedStudentMonth(null);
+                                setSelectedStudentSongAlbum(null);
+                                setShowStudentFavoritesOnly(false);
+                                setSelectedDuettAlbum(false);
+                                setSelectedPracticeCompanionAlbum(true);
+                              }
+                            }}
+                            onClick={() => {
+                              setSelectedStudentMonth(null);
+                              setSelectedStudentSongAlbum(null);
+                              setShowStudentFavoritesOnly(false);
+                              setSelectedDuettAlbum(false);
+                              setSelectedPracticeCompanionAlbum(true);
+                            }}
+                            style={{
+                              aspectRatio: "1 / 1",
+                              background: "linear-gradient(135deg, #f8ca1d 0%, #f7c714 45%, #ebb50d 100%)",
+                              borderRadius: "16px",
+                              border: "1.5px solid rgba(255, 255, 255, 0.45)",
+                              padding: "8px 4px",
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              cursor: "pointer",
+                              boxShadow: "0 6px 18px -2px rgba(235, 181, 13, 0.48), 0 2px 6px rgba(0,0,0,0.06)",
+                              position: "relative",
+                              overflow: "hidden",
+                              transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
+                              textAlign: "center"
+                            }}
+                            className="hover-scale"
+                          >
+                            {/* Specular Highlight Sheen */}
+                            <div style={{
+                              position: "absolute",
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              height: "50%",
+                              background: "linear-gradient(180deg, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0) 100%)",
+                              pointerEvents: "none"
+                            }} />
 
-                                {/* Luminous Floating Capsule with Clock Icon (Duett-Style with Drop-Shadow) */}
-                                <div style={{
-                                  width: "36px",
-                                  height: "36px",
-                                  borderRadius: "11px",
-                                  background: isFilled ? "rgba(255, 255, 255, 0.28)" : "#fef3c7",
-                                  backdropFilter: isFilled ? "blur(8px)" : "none",
-                                  WebkitBackdropFilter: isFilled ? "blur(8px)" : "none",
-                                  border: isFilled ? "1px solid rgba(255, 255, 255, 0.75)" : "1px solid #fde68a",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  boxShadow: isFilled ? "0 2px 8px rgba(0, 0, 0, 0.12), inset 0 1px 1px rgba(255, 255, 255, 0.8)" : "none",
-                                  marginTop: "2px",
-                                  color: isFilled ? "#ffffff" : "#d97706"
-                                }}>
-                                  <Clock size={20} strokeWidth={2.4} color={isFilled ? "#ffffff" : "#d97706"} style={{ filter: isFilled ? "drop-shadow(0 1px 3px rgba(0,0,0,0.22))" : "none" }} />
-                                </div>
+                            {/* Luminous Floating Capsule with Clock Icon (1:1 Duett-Style) */}
+                            <div style={{
+                              width: "36px",
+                              height: "36px",
+                              borderRadius: "11px",
+                              background: "rgba(255, 255, 255, 0.25)",
+                              backdropFilter: "blur(8px)",
+                              WebkitBackdropFilter: "blur(8px)",
+                              border: "1px solid rgba(255, 255, 255, 0.70)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.8)",
+                              marginTop: "2px",
+                              color: "#ffffff"
+                            }}>
+                              <Clock size={20} strokeWidth={2.4} color="#ffffff" style={{ filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.25))" }} />
+                            </div>
 
-                                {/* Typography */}
-                                <div style={{ width: "100%", position: "relative", zIndex: 1, padding: "0 2px" }}>
-                                  <div style={{
-                                    fontSize: "0.70rem",
-                                    fontWeight: 900,
-                                    color: "#78350f",
-                                    letterSpacing: "-0.01em",
-                                    lineHeight: 1.15,
-                                    whiteSpace: "nowrap",
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis"
-                                  }}>
-                                    Übe-Begleiter
-                                  </div>
-                                  <div style={{
-                                    display: "inline-block",
-                                    background: isFilled ? "rgba(255, 255, 255, 0.55)" : "#fef3c7",
-                                    backdropFilter: isFilled ? "blur(4px)" : "none",
-                                    WebkitBackdropFilter: isFilled ? "blur(4px)" : "none",
-                                    padding: "1px 6px",
-                                    borderRadius: "999px",
-                                    fontSize: "0.55rem",
-                                    fontWeight: 800,
-                                    color: isFilled ? "#78350f" : "#92400e",
-                                    marginTop: "2px",
-                                    border: isFilled ? "1px solid rgba(255, 255, 255, 0.75)" : "1px solid #fde68a"
-                                  }}>
-                                    {practiceCompanionAudios.length} {practiceCompanionAudios.length === 1 ? "Take" : "Takes"}
-                                  </div>
-                                </div>
+                            {/* Typography (1:1 Duett-Stil mit Pure White & Dark Pill) */}
+                            <div style={{ width: "100%", position: "relative", zIndex: 1, padding: "0 2px" }}>
+                              <div style={{
+                                fontSize: "0.70rem",
+                                fontWeight: 900,
+                                color: "#ffffff",
+                                letterSpacing: "-0.01em",
+                                lineHeight: 1.15,
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                textShadow: "0 1px 3px rgba(0,0,0,0.30)"
+                              }}>
+                                Übe-Begleiter
                               </div>
-                            );
-                          })()}
-
-                          {/* 👥 Duett System Album Cover Card (nur sichtbar, sobald mind. 1 Duett existiert) */}
-                          {duettAudios.length > 0 && (() => {
-                            return (
-                              <div
-                                role="button"
-                                tabIndex={0}
-                                aria-label={`Duett Album, ${duettAudios.length} Duette`}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault();
-                                    setSelectedStudentMonth(null);
-                                    setSelectedStudentSongAlbum(null);
-                                    setShowStudentFavoritesOnly(false);
-                                    setSelectedPracticeCompanionAlbum(false);
-                                    setSelectedDuettAlbum(true);
-                                  }
-                                }}
-                                onClick={() => {
-                                  setSelectedStudentMonth(null);
-                                  setSelectedStudentSongAlbum(null);
-                                  setShowStudentFavoritesOnly(false);
-                                  setSelectedPracticeCompanionAlbum(false);
-                                  setSelectedDuettAlbum(true);
-                                }}
-                                style={{
-                                  aspectRatio: "1 / 1",
-                                  background: "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 60%, #6d28d9 100%)",
-                                  borderRadius: "16px",
-                                  border: "1.5px solid rgba(255, 255, 255, 0.4)",
-                                  padding: "8px 4px",
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  alignItems: "center",
-                                  justifyContent: "space-between",
-                                  cursor: "pointer",
-                                  boxShadow: "0 6px 18px -2px rgba(124, 58, 237, 0.38), 0 2px 6px rgba(0,0,0,0.06)",
-                                  position: "relative",
-                                  overflow: "hidden",
-                                  transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
-                                  textAlign: "center"
-                                }}
-                                className="hover-scale"
-                              >
-                                {/* Specular Highlight Sheen */}
-                                <div style={{
-                                  position: "absolute",
-                                  top: 0,
-                                  left: 0,
-                                  right: 0,
-                                  height: "50%",
-                                  background: "linear-gradient(180deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0) 100%)",
-                                  pointerEvents: "none"
-                                }} />
-
-                                {/* Luminous Floating Capsule with Users Icon */}
-                                <div style={{
-                                  width: "36px",
-                                  height: "36px",
-                                  borderRadius: "11px",
-                                  background: "rgba(255, 255, 255, 0.24)",
-                                  backdropFilter: "blur(8px)",
-                                  WebkitBackdropFilter: "blur(8px)",
-                                  border: "1px solid rgba(255, 255, 255, 0.65)",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.8)",
-                                  marginTop: "2px",
-                                  color: "#ffffff"
-                                }}>
-                                  <Users size={20} strokeWidth={2.4} color="#ffffff" />
-                                </div>
-
-                                {/* Typography */}
-                                <div style={{ width: "100%", position: "relative", zIndex: 1, padding: "0 2px" }}>
-                                  <div style={{
-                                    fontSize: "0.70rem",
-                                    fontWeight: 900,
-                                    color: "#ffffff",
-                                    letterSpacing: "-0.01em",
-                                    lineHeight: 1.15,
-                                    whiteSpace: "nowrap",
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    textShadow: "0 1px 3px rgba(0,0,0,0.25)"
-                                  }}>
-                                    Duett
-                                  </div>
-                                  <div style={{
-                                    display: "inline-block",
-                                    background: "rgba(0, 0, 0, 0.2)",
-                                    backdropFilter: "blur(4px)",
-                                    WebkitBackdropFilter: "blur(4px)",
-                                    padding: "1px 6px",
-                                    borderRadius: "999px",
-                                    fontSize: "0.55rem",
-                                    fontWeight: 800,
-                                    color: "#f3e8ff",
-                                    marginTop: "2px",
-                                    border: "1px solid rgba(255, 255, 255, 0.25)"
-                                  }}>
-                                    {duettAudios.length} {duettAudios.length === 1 ? "Duett" : "Duette"}
-                                  </div>
-                                </div>
+                              <div style={{
+                                display: "inline-block",
+                                background: "rgba(0, 0, 0, 0.22)",
+                                backdropFilter: "blur(4px)",
+                                WebkitBackdropFilter: "blur(4px)",
+                                padding: "1px 6px",
+                                borderRadius: "999px",
+                                fontSize: "0.55rem",
+                                fontWeight: 800,
+                                color: "#fef9c3",
+                                marginTop: "2px",
+                                border: "1px solid rgba(255, 255, 255, 0.22)"
+                              }}>
+                                {practiceCompanionAudios.length} {practiceCompanionAudios.length === 1 ? "Take" : "Takes"}
                               </div>
-                            );
-                          })()}
+                            </div>
+                          </div>
+
+                          {/* 👥 Duett System Album Cover Card (Permanenter System-Anker) */}
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`Duett Album, ${duettAudios.length} Duette`}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setSelectedStudentMonth(null);
+                                setSelectedStudentSongAlbum(null);
+                                setShowStudentFavoritesOnly(false);
+                                setSelectedPracticeCompanionAlbum(false);
+                                setSelectedDuettAlbum(true);
+                              }
+                            }}
+                            onClick={() => {
+                              setSelectedStudentMonth(null);
+                              setSelectedStudentSongAlbum(null);
+                              setShowStudentFavoritesOnly(false);
+                              setSelectedPracticeCompanionAlbum(false);
+                              setSelectedDuettAlbum(true);
+                            }}
+                            style={{
+                              aspectRatio: "1 / 1",
+                              background: "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 60%, #6d28d9 100%)",
+                              borderRadius: "16px",
+                              border: "1.5px solid rgba(255, 255, 255, 0.4)",
+                              padding: "8px 4px",
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              cursor: "pointer",
+                              boxShadow: "0 6px 18px -2px rgba(124, 58, 237, 0.38), 0 2px 6px rgba(0,0,0,0.06)",
+                              position: "relative",
+                              overflow: "hidden",
+                              transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
+                              textAlign: "center"
+                            }}
+                            className="hover-scale"
+                          >
+                            {/* Specular Highlight Sheen */}
+                            <div style={{
+                              position: "absolute",
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              height: "50%",
+                              background: "linear-gradient(180deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0) 100%)",
+                              pointerEvents: "none"
+                            }} />
+
+                            {/* Luminous Floating Capsule with Users Icon */}
+                            <div style={{
+                              width: "36px",
+                              height: "36px",
+                              borderRadius: "11px",
+                              background: "rgba(255, 255, 255, 0.24)",
+                              backdropFilter: "blur(8px)",
+                              WebkitBackdropFilter: "blur(8px)",
+                              border: "1px solid rgba(255, 255, 255, 0.65)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.8)",
+                              marginTop: "2px",
+                              color: "#ffffff"
+                            }}>
+                              <Users size={20} strokeWidth={2.4} color="#ffffff" />
+                            </div>
+
+                            {/* Typography */}
+                            <div style={{ width: "100%", position: "relative", zIndex: 1, padding: "0 2px" }}>
+                              <div style={{
+                                fontSize: "0.70rem",
+                                fontWeight: 900,
+                                color: "#ffffff",
+                                letterSpacing: "-0.01em",
+                                lineHeight: 1.15,
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                textShadow: "0 1px 3px rgba(0,0,0,0.25)"
+                              }}>
+                                Duett
+                              </div>
+                              <div style={{
+                                display: "inline-block",
+                                background: "rgba(0, 0, 0, 0.2)",
+                                backdropFilter: "blur(4px)",
+                                WebkitBackdropFilter: "blur(4px)",
+                                padding: "1px 6px",
+                                borderRadius: "999px",
+                                fontSize: "0.55rem",
+                                fontWeight: 800,
+                                color: "#f3e8ff",
+                                marginTop: "2px",
+                                border: "1px solid rgba(255, 255, 255, 0.25)"
+                              }}>
+                                {duettAudios.length} {duettAudios.length === 1 ? "Duett" : "Duette"}
+                              </div>
+                            </div>
+                          </div>
 
                           {/* 🎵 Song- & Lehrwerk-Alben Covers (für jeden Song/Lehrwerk mit Snippets) */}
                           {studentSongAlbumsList.map(songAlb => {
