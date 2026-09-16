@@ -3741,7 +3741,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         try {
           const { data: dbUsers, error: dbErr } = await supabase
             .from('users')
-            .select('id, first_name, last_name, name, role, school_id')
+            .select('id, first_name, last_name, name, role, school_id, has_personal_pin, is_pin_activated, has_parent_pin, parent_pin_configured')
             .eq('school_id', targetSchoolId);
 
           if (!dbErr && Array.isArray(dbUsers) && dbUsers.length > 0) {
@@ -3788,7 +3788,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 id: foundStudent.id,
                 name: studentName,
                 role: 'student',
-                school_id: targetSchoolId
+                school_id: targetSchoolId,
+                has_personal_pin: foundStudent.has_personal_pin,
+                is_pin_activated: foundStudent.is_pin_activated,
+                has_parent_pin: foundStudent.has_parent_pin,
+                parent_pin_configured: foundStudent.parent_pin_configured
               };
             }
           }

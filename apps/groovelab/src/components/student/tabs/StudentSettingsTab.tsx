@@ -11,6 +11,7 @@ import {
 import { formatTeacherFullName } from '../../../utils/nameHelper';
 import { CampusGroovelabText } from '../../CampusGroovelabBrand';
 import { validateNewPin } from '../../../utils/pinValidation';
+import { secureVault } from '../../../utils/secureVault';
 import { AddSiblingModal } from '../../campus/AddSiblingModal';
 import { Avatar, getInstrumentAvatarUrl, STUDENT_AVATARS } from '../studentAvatars.constants';
 import { CAMPUS_AGE_STANDARDS } from '../studentAgeStandards';
@@ -2703,17 +2704,33 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                                     if (!rpcSuccess) {
                                       setPinFormError('Fehler beim Speichern der Schüler-PIN: ' + (rpcErrorMsg || 'Serverfehler'));
                                     } else {
-                                      setPinFormSuccess('Deine 4-stellige Schüler-PIN wurde erfolgreich gespeichert!');
-                                      setStudentUser((prev: any) => prev ? {
-                                        ...prev,
-                                        is_pin_activated: true,
-                                        has_personal_pin: true
-                                      } : prev);
-                                      if (onProfileUpdate) {
-                                        try { onProfileUpdate({ is_pin_activated: true, has_personal_pin: true }); } catch (e) {}
-                                      }
-                                      setPinFormNew('');
-                                      setPinFormConfirm('');
+                                       setPinFormSuccess('Deine 4-stellige Schüler-PIN wurde erfolgreich gespeichert!');
+                                       setStudentUser((prev: any) => {
+                                         const updated = prev ? {
+                                           ...prev,
+                                           is_pin_activated: true,
+                                           has_personal_pin: true
+                                         } : prev;
+                                         if (studentId && updated) {
+                                           try {
+                                             secureVault.set(`cg_secure_vault_user_${studentId}`, updated);
+                                           } catch (e) {}
+                                         }
+                                         return updated;
+                                       });
+                                       if (studentId) {
+                                         try {
+                                           secureVault.get<any>(`cg_secure_vault_user_${studentId}`).then(existing => {
+                                             const merged = { ...(existing || {}), ...(studentUser || {}), is_pin_activated: true, has_personal_pin: true };
+                                             secureVault.set(`cg_secure_vault_user_${studentId}`, merged);
+                                           });
+                                         } catch (e) {}
+                                       }
+                                       if (onProfileUpdate) {
+                                         try { onProfileUpdate({ is_pin_activated: true, has_personal_pin: true }); } catch (e) {}
+                                       }
+                                       setPinFormNew('');
+                                       setPinFormConfirm('');
                                     }
                                   }
                                 } catch (err: any) {

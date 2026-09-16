@@ -45,7 +45,24 @@ interface AudioTrackCarouselProps {
   uiLevel?: 'junior' | 'teen' | 'pro';
 }
 
-// Lightweight WebAudio beep helper for 4-beat count-in
+// Precision WebAudio beep scheduler for 4-beat count-in
+export const scheduleCountInBeep = (ctx: AudioContext, time: number, isAccent: boolean) => {
+  try {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(isAccent ? 960 : 640, time);
+    gain.gain.setValueAtTime(0.28, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.09);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(time);
+    osc.stop(time + 0.10);
+  } catch {
+    // silent fallback
+  }
+};
+
 const playCountInBeep = (isAccent: boolean) => {
   try {
     const ctx = SharedAudioEngine.getContext();
@@ -53,16 +70,7 @@ const playCountInBeep = (isAccent: boolean) => {
     if (ctx.state === 'suspended') {
       ctx.resume().catch(() => {});
     }
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(isAccent ? 960 : 640, ctx.currentTime);
-    gain.gain.setValueAtTime(0.28, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.12);
+    scheduleCountInBeep(ctx, ctx.currentTime, isAccent);
   } catch {
     // silent fallback
   }
@@ -531,24 +539,17 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
   const togglePlay = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     // 🔓 Safari AudioContext & HTMLMediaElement Unlock on user gesture
-    SharedAudioEngine.getContext().resume().catch(() => {});
-    if (audioRef.current) {
-      try {
-        audioRef.current.load();
-        const primePromise = audioRef.current.play();
-        if (primePromise !== undefined) {
-          primePromise.then(() => {
-            if (countInActive && !isPlaying) {
-              audioRef.current?.pause();
-              if (audioRef.current) audioRef.current.currentTime = 0;
-            }
-          }).catch(() => {});
-        }
-      } catch {}
+    const ctx = SharedAudioEngine.getContext();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
     }
 
     if (countInTimerRef.current) {
-      clearTimeout(countInTimerRef.current);
+      if (typeof countInTimerRef.current === 'object' && countInTimerRef.current.clear) {
+        countInTimerRef.current.clear();
+      } else {
+        clearTimeout(countInTimerRef.current);
+      }
       countInTimerRef.current = null;
       setCountInStep(null);
       return;
@@ -580,23 +581,31 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
       };
 
       if (countInActive) {
-        let step = 4;
-        setCountInStep(step);
-        playCountInBeep(true);
+        const bpmMatch = label ? label.match(/(?:BPM:|\b)(\d{2,3})\s*(?:BPM|\b)/i) : null;
+        const effectiveBpm = bpmMatch ? parseInt(bpmMatch[1], 10) : 100;
+        const beatDurationSec = (60 / effectiveBpm) / (playbackRate || 1);
+        const beatDurationMs = beatDurationSec * 1000;
 
-        const runCount = () => {
-          step -= 1;
-          if (step > 0) {
-            setCountInStep(step);
-            playCountInBeep(false);
-            countInTimerRef.current = setTimeout(runCount, 550);
-          } else {
-            setCountInStep(null);
-            countInTimerRef.current = null;
-            playNative();
+        if (ctx) {
+          const scheduleStart = ctx.currentTime + 0.03;
+          for (let i = 0; i < 4; i++) {
+            scheduleCountInBeep(ctx, scheduleStart + i * beatDurationSec, i === 0);
           }
-        };
-        countInTimerRef.current = setTimeout(runCount, 550);
+        }
+
+        setCountInStep(4);
+        const timers: any[] = [];
+        const clearTimers = () => timers.forEach(t => clearTimeout(t));
+        countInTimerRef.current = { clear: clearTimers };
+
+        timers.push(setTimeout(() => setCountInStep(3), beatDurationMs));
+        timers.push(setTimeout(() => setCountInStep(2), 2 * beatDurationMs));
+        timers.push(setTimeout(() => setCountInStep(1), 3 * beatDurationMs));
+        timers.push(setTimeout(() => {
+          setCountInStep(null);
+          countInTimerRef.current = null;
+          playNative();
+        }, 4 * beatDurationMs));
       } else {
         playNative();
       }
@@ -1276,24 +1285,17 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
   const togglePlay = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     // 🔓 Safari AudioContext & HTMLMediaElement Unlock on user gesture
-    SharedAudioEngine.getContext().resume().catch(() => {});
-    if (audioRef.current) {
-      try {
-        audioRef.current.load();
-        const primePromise = audioRef.current.play();
-        if (primePromise !== undefined) {
-          primePromise.then(() => {
-            if (countInActive && !isPlaying) {
-              audioRef.current?.pause();
-              if (audioRef.current) audioRef.current.currentTime = 0;
-            }
-          }).catch(() => {});
-        }
-      } catch {}
+    const ctx = SharedAudioEngine.getContext();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
     }
 
     if (countInTimerRef.current) {
-      clearTimeout(countInTimerRef.current);
+      if (typeof countInTimerRef.current === 'object' && countInTimerRef.current.clear) {
+        countInTimerRef.current.clear();
+      } else {
+        clearTimeout(countInTimerRef.current);
+      }
       countInTimerRef.current = null;
       setCountInStep(null);
       return;
@@ -1325,23 +1327,31 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
       };
 
       if (countInActive) {
-        let step = 4;
-        setCountInStep(step);
-        playCountInBeep(true);
+        const bpmMatch = label ? label.match(/(?:BPM:|\b)(\d{2,3})\s*(?:BPM|\b)/i) : null;
+        const effectiveBpm = bpmMatch ? parseInt(bpmMatch[1], 10) : 100;
+        const beatDurationSec = (60 / effectiveBpm) / (playbackRate || 1);
+        const beatDurationMs = beatDurationSec * 1000;
 
-        const runCount = () => {
-          step -= 1;
-          if (step > 0) {
-            setCountInStep(step);
-            playCountInBeep(false);
-            countInTimerRef.current = setTimeout(runCount, 550);
-          } else {
-            setCountInStep(null);
-            countInTimerRef.current = null;
-            playNative();
+        if (ctx) {
+          const scheduleStart = ctx.currentTime + 0.03;
+          for (let i = 0; i < 4; i++) {
+            scheduleCountInBeep(ctx, scheduleStart + i * beatDurationSec, i === 0);
           }
-        };
-        countInTimerRef.current = setTimeout(runCount, 550);
+        }
+
+        setCountInStep(4);
+        const timers: any[] = [];
+        const clearTimers = () => timers.forEach(t => clearTimeout(t));
+        countInTimerRef.current = { clear: clearTimers };
+
+        timers.push(setTimeout(() => setCountInStep(3), beatDurationMs));
+        timers.push(setTimeout(() => setCountInStep(2), 2 * beatDurationMs));
+        timers.push(setTimeout(() => setCountInStep(1), 3 * beatDurationMs));
+        timers.push(setTimeout(() => {
+          setCountInStep(null);
+          countInTimerRef.current = null;
+          playNative();
+        }, 4 * beatDurationMs));
       } else {
         playNative();
       }

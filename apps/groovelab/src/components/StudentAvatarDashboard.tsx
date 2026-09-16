@@ -284,14 +284,27 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     }
   }, [initialUser, studentId]);
 
-  // 🛡️ Speculative SWR Fast-Path: Instantly recover profile from secureVault if initialUser is not available (0ms paint)
+  // 🛡️ Speculative SWR Fast-Path: Instantly recover profile from secureVault if initialUser is not available or missing security flags (0ms paint)
   useEffect(() => {
-    if (!studentUser && studentId) {
-      secureVault.get<any>(`cg_secure_vault_user_${studentId}`).then((cached) => {
-        if (cached) {
-          setStudentUser((prev: any) => prev || cached);
-        }
-      });
+    if (studentId) {
+      const isMissingPinFlags = !studentUser || (studentUser.has_personal_pin === undefined && studentUser.is_pin_activated === undefined);
+      if (isMissingPinFlags) {
+        secureVault.get<any>(`cg_secure_vault_user_${studentId}`).then((cached) => {
+          if (cached) {
+            setStudentUser((prev: any) => {
+              if (!prev) return cached;
+              return {
+                ...cached,
+                ...prev,
+                has_personal_pin: cached.has_personal_pin ?? prev.has_personal_pin,
+                is_pin_activated: cached.is_pin_activated ?? prev.is_pin_activated,
+                has_parent_pin: cached.has_parent_pin ?? prev.has_parent_pin,
+                parent_pin_configured: cached.parent_pin_configured ?? prev.parent_pin_configured,
+              };
+            });
+          }
+        });
+      }
     }
   }, [studentId, studentUser]);
 
@@ -5929,13 +5942,28 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     }
   };
 
-  // First-Login PIN Prompt Check
+  // 🛡️ Enterprise Goldstandard Guard: First-Login PIN Prompt Check
   useEffect(() => {
-    if (studentUser && studentId) {
+    // 1. Never prompt teachers, administrators or secretaries viewing a student dashboard
+    if (isTeacherSession) {
+      setShowFirstLoginPinModal(false);
+      return;
+    }
+    // 2. Do not prompt while authoritative database query is in flight (prevents race condition)
+    if (loading) return;
+
+    // 3. Only evaluate for authentic student profiles
+    if (studentUser && studentId && (studentUser.role || '').toLowerCase() === 'student') {
+      // 4. Undefined-Guard: If neither security flag is resolved yet, do not falsely assume no PIN exists
+      if (studentUser.has_personal_pin === undefined && studentUser.is_pin_activated === undefined) {
+        return;
+      }
+
       const hasPinConfigured = Boolean(
         studentUser.is_pin_activated ||
         studentUser.has_personal_pin ||
-        studentUser.has_parent_pin
+        studentUser.has_parent_pin ||
+        studentUser.parent_pin_configured
       );
       if (!hasPinConfigured) {
         setShowFirstLoginPinModal(true);
@@ -5943,7 +5971,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         setShowFirstLoginPinModal(false);
       }
     }
-  }, [studentUser, studentId]);
+  }, [studentUser, studentId, loading, isTeacherSession]);
 
   // Hardware Keyboard listener for First-Login PIN modal & Settings PIN modal
   useEffect(() => {

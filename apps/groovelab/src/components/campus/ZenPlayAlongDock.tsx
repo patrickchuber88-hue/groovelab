@@ -4,6 +4,7 @@ import { getBlob } from '../../utils/blobStorage';
 import { getSecureAudioUrl } from '../../utils/audioStorageHelper';
 import { AudioTrackItem } from '../AudioTrackCarousel';
 import { formatHarmonizedAudioTitle } from '../../utils/audioNamingHelper';
+import { SharedAudioEngine } from '../../utils/sharedAudioEngine';
 
 export interface ZenPlayAlongDockProps {
   tracks: AudioTrackItem[];
@@ -21,22 +22,32 @@ const formatTrackTime = (seconds: number) => {
   return `${mins}:${String(secs).padStart(2, '0')}`;
 };
 
-// WebAudio Sine Beep Generator für 4-Beat Einzähler & Start-Countdown (Akustischer Countdown am Instrument)
-export const playCountInBeep = (isAccent: boolean) => {
+// Precision WebAudio Sine Beep Generator für 4-Beat Einzähler & Start-Countdown
+export const scheduleCountInBeep = (ctx: AudioContext, time: number, isAccent: boolean) => {
   try {
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(isAccent ? 960 : 640, ctx.currentTime);
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+    osc.frequency.setValueAtTime(isAccent ? 960 : 640, time);
+    gain.gain.setValueAtTime(0.28, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.09);
     osc.connect(gain);
     gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.12);
+    osc.start(time);
+    osc.stop(time + 0.10);
+  } catch {
+    // silent fallback
+  }
+};
+
+export const playCountInBeep = (isAccent: boolean) => {
+  try {
+    const ctx = SharedAudioEngine.getContext();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+    scheduleCountInBeep(ctx, ctx.currentTime, isAccent);
   } catch {
     // silent fallback
   }
@@ -260,9 +271,19 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
   const togglePlay = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
 
+    // 🔓 Safari AudioContext & HTMLMediaElement Unlock on user gesture
+    const ctx = SharedAudioEngine.getContext();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+
     // Wenn gerade eingezählt wird -> Tippen bricht das Einzählen ab
     if (countInTimerRef.current) {
-      clearTimeout(countInTimerRef.current);
+      if (typeof countInTimerRef.current === 'object' && countInTimerRef.current.clear) {
+        countInTimerRef.current.clear();
+      } else {
+        clearTimeout(countInTimerRef.current);
+      }
       countInTimerRef.current = null;
       setCountInStep(null);
       return;
@@ -292,35 +313,8 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
 
       audioRef.current.loop = isLooping;
 
-      // Falls Einzählen aktiv ist: 4 -> 3 -> 2 -> 1 (akustisch & optisch im Button)
-      if (isCountInActive) {
-        let step = 4;
-        setCountInStep(step);
-        playCountInBeep(true);
-
-        const runCount = () => {
-          step -= 1;
-          if (step > 0) {
-            setCountInStep(step);
-            playCountInBeep(false);
-            countInTimerRef.current = setTimeout(runCount, 550);
-          } else {
-            setCountInStep(null);
-            countInTimerRef.current = null;
-            if (audioRef.current) {
-              audioRef.current.currentTime = 0;
-              audioRef.current
-                .play()
-                .then(() => setIsPlaying(true))
-                .catch(err => {
-                  console.warn('[ZenPlayAlongDock] Play failed:', err);
-                  setIsPlaying(false);
-                });
-            }
-          }
-        };
-        countInTimerRef.current = setTimeout(runCount, 550);
-      } else {
+      const playNative = () => {
+        if (!audioRef.current) return;
         audioRef.current
           .play()
           .then(() => setIsPlaying(true))
@@ -328,6 +322,37 @@ export const ZenPlayAlongDock: React.FC<ZenPlayAlongDockProps> = ({
             console.warn('[ZenPlayAlongDock] Play failed:', err);
             setIsPlaying(false);
           });
+      };
+
+      // Falls Einzählen aktiv ist: 4 -> 3 -> 2 -> 1 (akustisch & optisch im Button)
+      if (isCountInActive) {
+        const bpmMatch = currentTrack?.label ? currentTrack.label.match(/(?:BPM:|\b)(\d{2,3})\s*(?:BPM|\b)/i) : null;
+        const effectiveBpm = bpmMatch ? parseInt(bpmMatch[1], 10) : 100;
+        const beatDurationSec = 60 / effectiveBpm;
+        const beatDurationMs = beatDurationSec * 1000;
+
+        if (ctx) {
+          const scheduleStart = ctx.currentTime + 0.03;
+          for (let i = 0; i < 4; i++) {
+            scheduleCountInBeep(ctx, scheduleStart + i * beatDurationSec, i === 0);
+          }
+        }
+
+        setCountInStep(4);
+        const timers: any[] = [];
+        const clearTimers = () => timers.forEach(t => clearTimeout(t));
+        countInTimerRef.current = { clear: clearTimers };
+
+        timers.push(setTimeout(() => setCountInStep(3), beatDurationMs));
+        timers.push(setTimeout(() => setCountInStep(2), 2 * beatDurationMs));
+        timers.push(setTimeout(() => setCountInStep(1), 3 * beatDurationMs));
+        timers.push(setTimeout(() => {
+          setCountInStep(null);
+          countInTimerRef.current = null;
+          playNative();
+        }, 4 * beatDurationMs));
+      } else {
+        playNative();
       }
     }
   };

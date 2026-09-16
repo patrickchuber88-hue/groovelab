@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { AlertTriangle, Check, CheckCheck, CheckCircle, Delete, Eye, EyeOff, Lock, ShieldCheck } from "lucide-react";
 import { supabase } from "../../../lib/supabase";
 import { validateNewPin } from "../../../utils/pinValidation";
+import { secureVault } from "../../../utils/secureVault";
 
 export interface FirstLoginPinModalProps {
   isOpen: boolean;
@@ -450,11 +451,28 @@ export const FirstLoginPinModal: React.FC<FirstLoginPinModalProps> = ({
                     setPinFormError('Fehler beim Speichern: ' + (rpcErrorMsg || 'Serverfehler'));
                   } else {
                     setFirstPinSavedSuccess(true);
-                    setStudentUser((prev: any) => prev ? {
-                      ...prev,
-                      is_pin_activated: true,
-                      has_personal_pin: true
-                    } : prev);
+                    setStudentUser((prev: any) => {
+                      const updated = prev ? {
+                        ...prev,
+                        is_pin_activated: true,
+                        has_personal_pin: true
+                      } : prev;
+                      if (studentId && updated) {
+                        try {
+                          secureVault.set(`cg_secure_vault_user_${studentId}`, updated);
+                        } catch (e) {}
+                      }
+                      return updated;
+                    });
+                    
+                    if (studentId) {
+                      try {
+                        secureVault.get<any>(`cg_secure_vault_user_${studentId}`).then(existing => {
+                          const merged = { ...(existing || {}), ...(studentUser || {}), is_pin_activated: true, has_personal_pin: true };
+                          secureVault.set(`cg_secure_vault_user_${studentId}`, merged);
+                        });
+                      } catch (e) {}
+                    }
                     
                     if (onProfileUpdate) {
                       try { onProfileUpdate({ is_pin_activated: true, has_personal_pin: true }); } catch (e) {}
