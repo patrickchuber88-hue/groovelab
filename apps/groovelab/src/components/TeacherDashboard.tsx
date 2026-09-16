@@ -8741,7 +8741,7 @@ useEffect(() => {
         )}
 
         {/* Header - only if hideHeader is false */}
-        {!hideHeader && activeTab !== 'briefing' && (
+        {!hideHeader && activeTab !== 'briefing' && activeTab !== 'studio' && (
           <header className="mobile-header-flex" style={{ marginBottom: activeTab === 'live' ? '16px' : '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
             <div>
               {activeTab !== 'live' && (
@@ -8752,16 +8752,18 @@ useEffect(() => {
                         <GraduationCap size={windowWidth < 768 ? 22 : 28} color="#1e293b" />
                         <span>Schülerverwaltung ({allStudents.filter(s => activePlatform === 'campus' ? true : (s.is_groovelab_active === true || s.isGroovelabActive === true)).length})</span>
                       </>
-                    ) : (
+                    ) : activeTab === 'bands' ? (
                       <>
                         <Users size={windowWidth < 768 ? 22 : 28} color="#1e293b" />
                         <span>Bands ({allBands.length})</span>
                       </>
-                    )}
+                    ) : null}
                   </h2>
-                  <p style={{ color: '#64748b', fontWeight: 600, fontSize: '0.85rem', marginTop: '4px' }}>
-                    {teacher ? `${formatTeacherFullName(teacher)} • ${teacher.instrument || 'Coach'}` : 'Zentrale'}
-                  </p>
+                  {(activeTab === 'students' || activeTab === 'bands') && (
+                    <p style={{ color: '#64748b', fontWeight: 600, fontSize: '0.85rem', marginTop: '4px' }}>
+                      {teacher ? `${formatTeacherFullName(teacher)} • ${teacher.instrument || 'Coach'}` : 'Zentrale'}
+                    </p>
+                  )}
                 </>
               )}
             </div>

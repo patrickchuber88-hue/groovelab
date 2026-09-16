@@ -5,7 +5,7 @@ import {
   ChevronRight, Clock, Copy, Disc, Edit3, FileText, Hash, Headphones, HelpCircle, History, Lightbulb,
   Lock, Mail, Mic, Moon, Music, Pin, Plus, Radio, RotateCcw, Search, Share2, Sliders,
   Sparkles, Square, Star, Target, Timer, Trash2, User, Volume2, VolumeX, AlertCircle,
-  EyeOff, Hand, Info, MessageSquare, Printer, RotateCw, Unlock, Wrench, Zap, X
+  EyeOff, Hand, Info, MessageSquare, Printer, RotateCw, Unlock, Wrench, Zap, X, Send
 } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { AudioTrackCarousel } from '../../AudioTrackCarousel';
@@ -163,6 +163,7 @@ export interface MeisterwerkDocumentTabProps {
   newSongArtist: any;
   newSongTitle: any;
   onClose?: () => void;
+  onOpenAssignModal?: () => void;
   pageHomeworkNotes: string;
   pageNotesSelectionRef: React.MutableRefObject<any>;
   pageNotesTextareaRef: React.MutableRefObject<any>;
@@ -492,6 +493,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     newSongArtist,
     newSongTitle,
     onClose,
+    onOpenAssignModal,
     pageHomeworkNotes,
     pageNotesSelectionRef,
     pageNotesTextareaRef,
@@ -5902,11 +5904,36 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: '0.84rem', fontWeight: 850, color: '#0f172a' }}>
-                        3. Hausaufgaben gezielt an Schüler vergeben
+                        3. Vorbereitete Aufgaben & Referenzen an Schüler zuweisen
                       </div>
-                      <p style={{ margin: '3px 0 0 0', fontSize: '0.74rem', color: '#64748b', lineHeight: 1.45, fontWeight: 550 }}>
-                        Hausaufgaben verwaltest du personenspezifisch: Öffne dazu die Akte des gewünschten Schülers (über deinen Stundenplan oder die Schülerliste), um individuelle Notizen, Lehrwerkseiten und Sprachmemos zuzuweisen.
+                      <p style={{ margin: '3px 0 8px 0', fontSize: '0.74rem', color: '#64748b', lineHeight: 1.45, fontWeight: 550 }}>
+                        Erstelle deine didaktischen Play-Alongs, Lehrwerkseiten und Übenotizen zentral im Studio und weise sie per 1-Klick an alle heutigen Schüler oder Fachgruppen zu – spart 2–3 Stunden wöchentlich.
                       </p>
+                      {onOpenAssignModal && (
+                        <button
+                          type="button"
+                          onClick={onOpenAssignModal}
+                          style={{
+                            background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                            border: 'none',
+                            borderRadius: '100px',
+                            padding: '6px 14px',
+                            fontSize: '0.74rem',
+                            fontWeight: 850,
+                            color: '#ffffff',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            boxShadow: '0 2px 8px rgba(2, 132, 199, 0.25)',
+                            transition: 'transform 0.15s ease'
+                          }}
+                          className="hover-scale-mini"
+                        >
+                          <Send size={12} />
+                          <span>An Schüler zuweisen...</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

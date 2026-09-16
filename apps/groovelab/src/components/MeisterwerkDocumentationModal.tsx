@@ -11650,6 +11650,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               isTeacherTools={isTeacherTools}
               isTeacherSelf={isTeacherSelf}
               onClose={onClose}
+              onOpenAssignModal={onOpenAssignModal}
               isTtsSpeaking={isTtsSpeaking}
               isUploadingAudio={isUploadingAudio}
               lastClickRef={lastClickRef}
