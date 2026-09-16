@@ -39,7 +39,6 @@ const SchoolSelfOnboardingModal = lazy(() => import('./components/SchoolSelfOnbo
 const GhostSupportCapsule = lazy(() => import('./components/masterAdmin/GhostSupportCapsule').then(m => ({ default: m.GhostSupportCapsule })));
 const SharedAudioBiographyPage = lazy(() => import('./components/campus/SharedAudioBiographyPage').then(m => ({ default: m.SharedAudioBiographyPage })));
 import { OnboardingHelpModalsHub } from './components/modals/OnboardingHelpModalsHub';
-import { LegalModalsHub } from './components/modals/LegalModalsHub';
 import { SecurityAuthModalsHub } from './components/modals/SecurityAuthModalsHub';
 import { DetailProfilesModalsHub } from './components/modals/DetailProfilesModalsHub';
 import { BandFoundingModalsHub } from './components/modals/BandFoundingModalsHub';
@@ -97,7 +96,11 @@ import { runStorageJanitor, runClientStorageJanitor } from './services/storageJa
 import { scrubSensitiveUrlParams, scrubSensitiveUrlPath } from './utils/urlSecurityScrubber';
 import { executeSessionZeroize } from './utils/sessionZeroize';
 import { initAuthBroadcastListener } from './utils/authBroadcastSync';
-import { useInactivityTimeout } from './hooks/useInactivityTimeout';
+import { useCampusDeviceAndParentControls } from './hooks/useCampusDeviceAndParentControls';
+import { useCampusGhostAndRoutingSession } from './hooks/useCampusGhostAndRoutingSession';
+import { useCampusNavigationAndWorkspaces } from './hooks/useCampusNavigationAndWorkspaces';
+import { useCampusUserProfile } from './hooks/useCampusUserProfile';
+import { safeReplaceState } from './utils/historyUtils';
 import './App.css';
 
 // Initialize FinTech Zero-PII Crash Telemetry Sanitizer & Anti-Tamper Shield
@@ -147,31 +150,6 @@ if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.medi
   }
 }
 
-let _lastReplaceStateTime = 0;
-let _replaceStateCount = 0;
-
-const safeReplaceState = (data: any, unused: string, url?: string | URL | null) => {
-  if (typeof window === 'undefined' || !window.history) return;
-  try {
-    if (url) {
-      const urlStr = typeof url === 'string' ? url : url.toString();
-      const currentFull = window.location.pathname + window.location.search + window.location.hash;
-      if (currentFull === urlStr) return;
-    }
-    const now = Date.now();
-    if (now - _lastReplaceStateTime > 10000) {
-      _lastReplaceStateTime = now;
-      _replaceStateCount = 0;
-    }
-    _replaceStateCount++;
-    if (_replaceStateCount > 25) {
-      return;
-    }
-    window.history.replaceState(data, unused, url);
-  } catch (e) {
-    console.warn('[History] safeReplaceState caught error:', e);
-  }
-};
 
 const showMissionsFeature = false;
 const showEnsemblesFeature = false;
@@ -638,23 +616,6 @@ function App() {
     return null;
   }, [masterPricing?.specialOffers]);
 
-  // Declarative definition of renderLegalModals to ensure availability across all routes/landing pages via LegalModalsHub
-  const renderLegalModals = () => (
-    <LegalModalsHub
-      showPrivacy={showPrivacy}
-      showAgb={showAgb}
-      showImpressum={showImpressum}
-      showCancellation={showCancellation}
-      showAccessibility={showAccessibility}
-      onClose={() => {
-        setShowPrivacy(false);
-        setShowAgb(false);
-        setShowImpressum(false);
-        setShowCancellation(false);
-        setShowAccessibility(false);
-      }}
-    />
-  );
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -1000,256 +961,6 @@ function App() {
   }, [loggedInUserId]);
 
 
-  // States for Kiosk lookup and legal modals
-  const [kioskDetails, setKioskDetails] = useState<any>(null);
-  const [loadingKiosk, setLoadingKiosk] = useState<boolean>(() => typeof window !== 'undefined' ? !!localStorage.getItem('groovelab_kiosk_token') : false);
-  const [showPrivacy, setShowPrivacy] = useState(false);
-  const [showAgb, setShowAgb] = useState(false);
-  const [showImpressum, setShowImpressum] = useState(false);
-  const [showCancellation, setShowCancellation] = useState(false);
-  const [showAccessibility, setShowAccessibility] = useState(false);
-  const [showTrialInfoModal, setShowTrialInfoModal] = useState(false);
-  const [stationIdFromStorage, setStationIdFromStorage] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('groovelab_station_id') : null);
-  const [isCampusUnlocked, setIsCampusUnlocked] = useState(false);
-  const [showCampusPinPrompt, setShowCampusPinPrompt] = useState(false);
-  const [isGlobalHelpCenterOpen, setIsGlobalHelpCenterOpen] = useState(false);
-  const [simulatedDate, setSimulatedDate] = useState<string | null>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('groovelab_simulated_date') || null;
-    }
-    return null;
-  });
-
-  const [showDateSimulation, setShowDateSimulation] = useState<boolean>(() => {
-    if (typeof window === 'undefined' || !isDevEnvironment()) return false;
-    return localStorage.getItem('groovelab_dev_date_sim_visible') === 'true';
-  });
-
-  useEffect(() => {
-    if (!isDevEnvironment()) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.shiftKey && (e.key === 'T' || e.key === 't')) {
-        const tag = (e.target as HTMLElement)?.tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return;
-        e.preventDefault();
-        setShowDateSimulation(prev => {
-          const next = !prev;
-          try { localStorage.setItem('groovelab_dev_date_sim_visible', String(next)); } catch {}
-          window.dispatchEvent(new CustomEvent('groovelab_date_sim_toggle', { detail: next }));
-          return next;
-        });
-      }
-    };
-    const handleToggleSync = (e: any) => {
-      if (typeof e?.detail === 'boolean') {
-        setShowDateSimulation(e.detail);
-      } else {
-        const saved = localStorage.getItem('groovelab_dev_date_sim_visible') === 'true';
-        setShowDateSimulation(saved);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('groovelab_date_sim_toggle', handleToggleSync);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('groovelab_date_sim_toggle', handleToggleSync);
-    };
-  }, []);
-
-  const [campusStudentUiLevel, setCampusStudentUiLevel] = useState<CampusUiLevel>(() => {
-    if (typeof window === 'undefined') return 'junior';
-    try {
-      const activeId = localStorage.getItem('groovelab_current_user_id') || localStorage.getItem('campus_active_user_id');
-      if (activeId) {
-        const namespaced = localStorage.getItem(`campus_student_ui_level_${activeId}`);
-        if (namespaced === 'junior' || namespaced === 'teen' || namespaced === 'pro') return namespaced as CampusUiLevel;
-      }
-    } catch {}
-    const saved = localStorage.getItem('campus_student_ui_level');
-    if (saved === 'junior' || saved === 'teen' || saved === 'pro') return saved as CampusUiLevel;
-    return 'junior';
-  });
-
-  const [parentUnlocked, setParentUnlocked] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return sessionStorage.getItem('groovelab_parent_unlocked_global') === 'true';
-  });
-
-  const [, setParentPermissionsVersion] = useState<number>(0);
-
-  useEffect(() => {
-    const handleLevelChangeEvt = (e: any) => {
-      if (e?.detail) {
-        setCampusStudentUiLevel(e.detail);
-        try {
-          const activeId = localStorage.getItem('groovelab_current_user_id') || localStorage.getItem('campus_active_user_id');
-          if (activeId) {
-            localStorage.setItem(`campus_student_ui_level_${activeId}`, e.detail);
-          }
-        } catch {}
-        localStorage.setItem('campus_student_ui_level', e.detail);
-      }
-    };
-    const handleParentModeChange = (e: any) => {
-      if (typeof e?.detail === 'boolean') setParentUnlocked(e.detail);
-    };
-    const handlePermissionChange = () => {
-      setParentPermissionsVersion(v => v + 1);
-    };
-    const handleSimDateSync = () => {
-      const s = localStorage.getItem('groovelab_simulated_date');
-      setSimulatedDate(s || null);
-    };
-    const handleOpenHelpCenter = () => {
-      setIsGlobalHelpCenterOpen(true);
-    };
-    const handleFamilyStudentSwitched = (e: any) => {
-      if (e?.detail && typeof e.detail === 'string') {
-        console.log('[App] Family student switch event received:', e.detail);
-        setLoggedInUserId(e.detail);
-      }
-    };
-    window.addEventListener('campus_family_student_switched', handleFamilyStudentSwitched);
-    window.addEventListener('campus_ui_level_changed', handleLevelChangeEvt);
-    window.addEventListener('groovelab_parent_mode_changed', handleParentModeChange);
-    window.addEventListener('campus_board_permission_changed', handlePermissionChange);
-    window.addEventListener('campus_open_help_center', handleOpenHelpCenter);
-    window.addEventListener('storage', handleSimDateSync);
-    window.addEventListener('groovelab_simulated_date_changed', handleSimDateSync);
-    return () => {
-      window.removeEventListener('campus_family_student_switched', handleFamilyStudentSwitched);
-      window.removeEventListener('campus_ui_level_changed', handleLevelChangeEvt);
-      window.removeEventListener('groovelab_parent_mode_changed', handleParentModeChange);
-      window.removeEventListener('campus_board_permission_changed', handlePermissionChange);
-      window.removeEventListener('campus_open_help_center', handleOpenHelpCenter);
-      window.removeEventListener('storage', handleSimDateSync);
-      window.removeEventListener('groovelab_simulated_date_changed', handleSimDateSync);
-    };
-  }, []);
-
-  // Effect to resolve the kiosk token on mount
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    // Check query params to capture and persist the coupling state on this device
-    const params = new URLSearchParams(window.location.search);
-    const urlToken = params.get('kiosk_token');
-    const urlStationId = params.get('station_id');
-    const urlRoomId = params.get('kiosk_room_id');
-
-    if (urlToken && urlStationId) {
-      console.log('[KioskAutoSave] Found coupling parameters in URL, saving to localStorage:', { urlToken, urlStationId, urlRoomId });
-      localStorage.setItem('groovelab_kiosk_token', urlToken);
-      localStorage.setItem('groovelab_station_id', urlStationId);
-      if (urlRoomId) {
-        localStorage.setItem('groovelab_kiosk_room_id', urlRoomId);
-      }
-      localStorage.setItem('groovelab_active_platform', 'groovelab');
-      setStationIdFromStorage(urlStationId);
-
-      // Clean up the URL parameters if running in standalone (PWA) mode
-      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone;
-      if (isStandalone) {
-        const cleanUrl = window.location.origin + window.location.pathname;
-        safeReplaceState({}, document.title, cleanUrl);
-      }
-    }
-    
-    const token = localStorage.getItem('groovelab_kiosk_token');
-    if (!token) {
-      setLoadingKiosk(false);
-      return;
-    }
-    
-    async function loadKiosk() {
-      try {
-        console.log('[KioskResolver] Resolving kiosk token:', token);
-        const { data, error } = await supabase
-          .from('kiosks')
-          .select('*, stations(*), rooms(*)')
-          .eq('secret_token', token)
-          .maybeSingle();
-          
-        if (error) throw error;
-        if (data) {
-          console.log('[KioskResolver] Resolved Kiosk:', data);
-          setKioskDetails(data);
-          if (data.station_id) {
-            localStorage.setItem('groovelab_station_id', data.station_id);
-            setStationIdFromStorage(data.station_id);
-          }
-          if (data.room_id) {
-            localStorage.setItem('groovelab_kiosk_room_id', data.room_id);
-          }
-        } else {
-          console.warn("[KioskResolver] Invalid kiosk token. Clearing kiosk storage.");
-          localStorage.removeItem('groovelab_kiosk_token');
-          localStorage.removeItem('groovelab_station_id');
-          localStorage.removeItem('groovelab_kiosk_room_id');
-          setStationIdFromStorage(null);
-        }
-      } catch (err) {
-        console.error("[KioskResolver] Error loading kiosk details:", err);
-      } finally {
-        setLoadingKiosk(false);
-      }
-    }
-    loadKiosk();
-  }, []);
-
-
-  // Kiosk Room Auto-Bootstrap: when kiosk_room_id is in the URL WITHOUT kiosk_setup=1,
-  // automatically resolve a station ID for that room and go directly to the QR-scanner.
-  // When kiosk_setup=1 is present (= came from "Beenden" button), show DeviceSetupScreen instead.
-  // CRITICAL: Skip auto-bootstrap if pairing params (kiosk_token, station_id) are present.
-  const kioskRoomIdParam = searchParams.get('kiosk_room_id');
-  const kioskSetupParam = searchParams.get('kiosk_setup');
-  const isPairingRedirect = searchParams.has('kiosk_token') && searchParams.has('station_id');
-
-  const [kioskBootstrapping, setKioskBootstrapping] = useState<boolean>(() => {
-    // Only auto-bootstrap if kiosk_room_id is present AND kiosk_setup is NOT set AND we are NOT in a pairing redirect
-    return !!kioskRoomIdParam && kioskSetupParam !== '1' && !isPairingRedirect;
-  });
-
-  useEffect(() => {
-    const kioskRoomId = searchParams.get('kiosk_room_id');
-    const isSetupMode = searchParams.get('kiosk_setup') === '1';
-    // Skip auto-bootstrap when setup mode is requested or we are in a pairing redirect
-    if (!kioskRoomId || isSetupMode || isPairingRedirect) return;
-
-    const bootstrap = async () => {
-      try {
-        console.log('[KioskBootstrap] Auto-resolving station for room:', kioskRoomId);
-        // Fetch the first non-teacher station for this room
-        const { data: roomStations } = await supabase
-          .from('stations')
-          .select('id, name')
-          .eq('room_id', kioskRoomId)
-          .order('name');
-
-        if (roomStations && roomStations.length > 0) {
-          // Pick first non-teacher station, or first station as fallback
-          const nonTeacher = roomStations.find((s: any) => !s.name?.toLowerCase().includes('lehrer'));
-          const chosen = nonTeacher || roomStations[0];
-          localStorage.setItem('groovelab_station_id', chosen.id);
-          console.log('[KioskBootstrap] Station set to:', chosen.name, chosen.id);
-        } else {
-          // No stations found – set skip so LoginScreen opens in home mode
-          localStorage.setItem('groovelab_station_id', 'skip');
-          console.warn('[KioskBootstrap] No stations found for room. Falling back to skip.');
-        }
-      } catch (err) {
-        console.error('[KioskBootstrap] Failed to resolve station:', err);
-        localStorage.setItem('groovelab_station_id', 'skip');
-      }
-
-      // Remove kiosk_room_id from URL and reload cleanly → LoginScreen will show
-      const cleanUrl = window.location.origin + window.location.pathname;
-      window.location.replace(cleanUrl);
-    };
-
-    bootstrap();
-  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1419,391 +1130,61 @@ function App() {
     });
   }, []);
 
-  // 🛡️ REVISIONSSICHERE DATENBANK-SSOT-SYNCHRONISATION
-  // Sobald der autoritative Benutzer aus der Datenbank (Supabase) geladen wird, MUSS sein campus_ui_level sofort übernommen werden.
-  useEffect(() => {
-    if (user?.campus_ui_level && (user.campus_ui_level === 'junior' || user.campus_ui_level === 'teen' || user.campus_ui_level === 'pro')) {
-      setCampusStudentUiLevel(user.campus_ui_level);
-      if (user.id) {
-        localStorage.setItem(`campus_student_ui_level_${user.id}`, user.campus_ui_level);
-      }
-      localStorage.setItem('campus_student_ui_level', user.campus_ui_level);
-    }
-  }, [user?.campus_ui_level, user?.id]);
-
-  // 🛡️ REVISIONSSICHERE ECHTZEIT-SYNCHRONISATION (PWA <-> Localhost <-> Online)
-  // Reagiert sofort und ohne Reload auf UI-Level-Änderungen aus dem Elternbereich anderer Clients
-  useEffect(() => {
-    if (!user?.id) return;
-    const channel = supabase.channel(`realtime_student_progress_${user.id}`);
-    channel
-      .on('broadcast', { event: 'ui-level-changed' }, (payload: any) => {
-        const newLevel = payload?.payload?.uiLevel;
-        if (newLevel && (newLevel === 'junior' || newLevel === 'teen' || newLevel === 'pro')) {
-          console.log('[Realtime-Root] UI-Level update broadcast received:', newLevel);
-          setCampusStudentUiLevel(newLevel);
-          setUser((prev: any) => prev ? { ...prev, campus_ui_level: newLevel } : prev);
-          try {
-            localStorage.setItem(`campus_student_ui_level_${user.id}`, newLevel);
-            localStorage.setItem('campus_student_ui_level', newLevel);
-          } catch {}
-          window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: newLevel }));
-        }
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user?.id]);
-
-  const [isScreenLockedByInactivity, setIsScreenLockedByInactivity] = useState(false);
-
-  // 🔒 Dynamic Inactivity Idle Screen Lock (Enterprise Goldstandard):
-  // 45 minutes for Administration/Secretary (high risk), 60 minutes for Teachers (pedagogical continuity)
-  const effectiveInactivityTimeoutMs = useMemo(() => {
-    const activeRole = (user?.role || '').toLowerCase();
-    if (activeRole === 'admin' || activeRole === 'secretary') {
-      return 45 * 60 * 1000; // 45 Minuten für Verwaltung
-    }
-    if (activeRole === 'teacher') {
-      return 60 * 60 * 1000; // 60 Minuten für Lehrkräfte
-    }
-    return 45 * 60 * 1000; // Fallback 45 Minuten
-  }, [user?.role]);
-
-  useInactivityTimeout({
-    timeoutMs: effectiveInactivityTimeoutMs,
-    enabled: Boolean(currentView === 'dashboard' && !isScreenLockedByInactivity),
-    onTimeout: () => {
-      console.warn(`[Inactivity] Idle timeout reached (${effectiveInactivityTimeoutMs / 60000}m). Activating Privacy Screen Lock...`);
-      // Privilege Downgrade: If in admin mode, auto-downgrade to teacher if user has teacher role
-      try {
-        const storedUserStr = sessionStorage.getItem('groovelab_cached_user');
-        if (storedUserStr) {
-          const parsed = JSON.parse(storedUserStr);
-          if (parsed?.role === 'admin' && Array.isArray(parsed?.roles) && parsed.roles.includes('teacher')) {
-            console.log('[Inactivity] Downgrading active role from admin to teacher (Least Privilege)...');
-            sessionStorage.setItem('groovelab_active_workspace', 'teacher');
-          }
-        }
-      } catch (e) {}
-      setIsScreenLockedByInactivity(true);
-    }
+  // 🏛️ Campus Device, Kiosk, Dev Date Simulation & Parent Controls Hook
+  const {
+    kioskDetails,
+    setKioskDetails,
+    loadingKiosk,
+    setLoadingKiosk,
+    kioskRoomIdParam,
+    kioskSetupParam,
+    kioskBootstrapping,
+    setKioskBootstrapping,
+    stationIdFromStorage,
+    setStationIdFromStorage,
+    simulatedDate,
+    setSimulatedDate,
+    showDateSimulation,
+    setShowDateSimulation,
+    campusStudentUiLevel,
+    setCampusStudentUiLevel,
+    parentUnlocked,
+    setParentUnlocked,
+    parentPermissionsVersion,
+    setParentPermissionsVersion,
+    isCampusUnlocked,
+    setIsCampusUnlocked,
+    showCampusPinPrompt,
+    setShowCampusPinPrompt,
+    showPrivacy,
+    setShowPrivacy,
+    showAgb,
+    setShowAgb,
+    showImpressum,
+    setShowImpressum,
+    showCancellation,
+    setShowCancellation,
+    showAccessibility,
+    setShowAccessibility,
+    showTrialInfoModal,
+    setShowTrialInfoModal,
+    isGlobalHelpCenterOpen,
+    setIsGlobalHelpCenterOpen,
+    renderLegalModals,
+    isScreenLockedByInactivity,
+    setIsScreenLockedByInactivity,
+    effectiveInactivityTimeoutMs
+  } = useCampusDeviceAndParentControls({
+    searchParams,
+    currentView,
+    user,
+    setUser,
+    setLoggedInUserId
   });
 
   const { isShielded, dismissShield } = usePrivacyShield(false);
 
-  useEffect(() => {
-    if (loading) return; // wait until supabase auth/session loading is complete
 
-    const isGhostSessionActive = typeof window !== 'undefined' && (
-      new URLSearchParams(window.location.search).get('support_ghost') === 'true' ||
-      sessionStorage.getItem('groovelab_support_ghost') === 'true'
-    );
-    if (isGhostSessionActive) return; // Don't redirect during support ghost sessions
-    
-    const isPublicRoute = 
-      location.pathname === '/' || 
-      location.pathname === '/landingpage' || 
-      location.pathname === '/landingpage2' || 
-      location.pathname === '/startseite' || 
-      location.pathname === '/startseite2' || 
-      location.pathname === '/starseite2' || 
-      location.pathname === '/login' || 
-      location.pathname === '/signup' || 
-      location.pathname === '/master-admin' || 
-      location.pathname === '/admin' || 
-      location.pathname.startsWith('/qr/') ||
-      location.pathname.startsWith('/onboarding/') ||
-      location.pathname.startsWith('/device-onboarding/') ||
-      location.pathname.startsWith('/shared-biography/') ||
-      location.pathname.startsWith('/shared/');
-
-      
-    const isAuth = !!loggedInUserId;
-    if (isAuth) {
-      const isLandingOrAuthRoute = 
-        location.pathname === '/' || 
-        location.pathname === '/landingpage' || 
-        location.pathname === '/landingpage2' || 
-        location.pathname === '/startseite' || 
-        location.pathname === '/startseite2' || 
-        location.pathname === '/starseite2' ||
-        location.pathname === '/login' || 
-        location.pathname === '/signup';
-
-      if (isLandingOrAuthRoute) {
-        navigate('/dashboard', { replace: true });
-      }
-    } else {
-      // Redirect unauthenticated users trying to access dashboard/protected routes to /
-      if (!isPublicRoute) {
-        navigate('/', { replace: true });
-      }
-    }
-  }, [loggedInUserId, location.pathname, loading, navigate]);
-
-  // Auto-switch context when support_ghost is active in URL (Placed before any early returns)
-  useEffect(() => {
-    const ghostUrlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
-    const isGhostParam = ghostUrlParams.get('support_ghost') === 'true' || 
-                         ghostUrlParams.get('ghost_session') === 'true' || 
-                         sessionStorage.getItem('groovelab_support_ghost') === 'true';
-    const ghostSchoolId = ghostUrlParams.get('school_id') || 
-                          ghostUrlParams.get('ghost_school_id') || 
-                          sessionStorage.getItem('groovelab_ghost_school_id');
-    const ghostUserId = ghostUrlParams.get('ghost_user_id') || 
-                        sessionStorage.getItem('groovelab_ghost_impersonated_user_id');
-    const ghostTicketId = ghostUrlParams.get('ticket_id');
-    const ghostRole = ghostUrlParams.get('role') || 
-                      sessionStorage.getItem('groovelab_ghost_active_role') || 
-                      'admin';
-    const ghostLeaseToken = ghostUrlParams.get('ghost_lease_token');
-    if (ghostLeaseToken) {
-      sessionStorage.setItem('gl_active_session_lease_id', ghostLeaseToken);
-      localStorage.setItem('gl_active_session_lease_id', ghostLeaseToken);
-    }
-
-    const isMasterAuth = sessionStorage.getItem('groovelab_is_master_admin') === 'true' || 
-                         localStorage.getItem('groovelab_is_master_admin') === 'true';
-    const ghostAuthToken = localStorage.getItem('groovelab_ghost_auth_token');
-    const isMasterValid = isMasterAuth || Boolean(ghostAuthToken);
-
-    if (isGhostParam && (ghostSchoolId || ghostUserId)) {
-      if (!isMasterValid) {
-        console.warn('[Security] Unauthorized Ghost Mode attempt blocked.');
-        sessionStorage.removeItem('groovelab_support_ghost');
-        sessionStorage.removeItem('groovelab_ghost_school_id');
-        sessionStorage.removeItem('groovelab_ghost_impersonated_user_id');
-        sessionStorage.removeItem('groovelab_ghost_active_role');
-        const cleanUrl = window.location.pathname;
-        safeReplaceState({}, document.title, cleanUrl);
-        return;
-      }
-
-      // Consume one-time ghost token
-      if (ghostAuthToken) {
-        localStorage.removeItem('groovelab_ghost_auth_token');
-      }
-
-      // 🛡️ Ghost-Support 120-Minute Time-Box Enforcer (Hiscox CyberSafe / OWASP ASVS Level 3)
-      const MAX_GHOST_SESSION_MS = 120 * 60 * 1000;
-      const ghostStartedAtStr = sessionStorage.getItem('groovelab_ghost_started_at');
-      const now = Date.now();
-      if (!ghostStartedAtStr) {
-        sessionStorage.setItem('groovelab_ghost_started_at', String(now));
-      } else {
-        const startedAt = parseInt(ghostStartedAtStr, 10);
-        if (!isNaN(startedAt) && (now - startedAt > MAX_GHOST_SESSION_MS)) {
-          console.warn('[Security] Ghost-Support session TTL expired (>120min). Revoking access.');
-          sessionStorage.removeItem('groovelab_support_ghost');
-          sessionStorage.removeItem('groovelab_ghost_started_at');
-          sessionStorage.removeItem('groovelab_ghost_school_id');
-          sessionStorage.removeItem('groovelab_ghost_impersonated_user_id');
-          sessionStorage.removeItem('groovelab_ghost_active_role');
-          sessionStorage.removeItem('groovelab_ghost_lease_token');
-          window.location.href = '/master-admin';
-          return;
-        }
-      }
-
-      sessionStorage.setItem('groovelab_support_ghost', 'true');
-      if (ghostSchoolId) sessionStorage.setItem('groovelab_ghost_school_id', ghostSchoolId);
-      if (ghostUserId) sessionStorage.setItem('groovelab_ghost_impersonated_user_id', ghostUserId);
-      if (ghostRole) sessionStorage.setItem('groovelab_ghost_active_role', ghostRole);
-      const ghostLeaseToken = ghostUrlParams.get('ghost_lease_token');
-      if (ghostLeaseToken) sessionStorage.setItem('groovelab_ghost_lease_token', ghostLeaseToken);
-
-      // Enterprise Zero-Trace URL Sanitization: Purge sensitive credentials immediately from browser address bar & history
-      try {
-        safeReplaceState({}, document.title, window.location.pathname);
-      } catch (e) {}
-
-      const resolveGhostIdentity = async () => {
-        let realUser: any = null;
-        let schoolData: any = null;
-
-        // 1. If explicit user ID provided (e.g. from Ticket or Persona switcher)
-        if (ghostUserId) {
-          const { data: viewUser } = await supabase
-            .from('users')
-            .select('*, schools(*)')
-            .eq('id', ghostUserId)
-            .maybeSingle();
-          if (viewUser && (!ghostSchoolId || viewUser.school_id === ghostSchoolId)) {
-            realUser = viewUser;
-          }
-        }
-
-        // 2. If no user yet, but school ID present -> resolve primary admin or teacher from this school
-        if (!realUser && ghostSchoolId) {
-          const { data: viewUser } = await supabase
-            .from('users')
-            .select('*, schools(*)')
-            .eq('school_id', ghostSchoolId)
-            .eq('role', ghostRole === 'teacher' ? 'teacher' : 'admin')
-            .limit(1)
-            .maybeSingle();
-          if (viewUser) {
-            realUser = viewUser;
-          }
-        }
-
-        // 3. School metadata
-        if (realUser?.schools) {
-          schoolData = Array.isArray(realUser.schools) ? realUser.schools[0] : realUser.schools;
-        } else if (ghostSchoolId) {
-          const { data: sData } = await supabase.rpc('get_public_school_theme', { p_subdomain: ghostSchoolId });
-          schoolData = sData;
-        }
-
-        if (schoolData?.name) {
-          sessionStorage.setItem('groovelab_ghost_school_name', schoolData.name);
-        }
-
-        if (realUser) {
-          sessionStorage.setItem('groovelab_ghost_impersonated_user_id', realUser.id);
-          sessionStorage.setItem('groovelab_ghost_shadowed_teacher_id', realUser.id);
-          const targetRole = realUser.role || ghostRole;
-          sessionStorage.setItem('groovelab_ghost_active_role', targetRole);
-
-          const impersonatedUserObj = {
-            ...realUser,
-            is_ghost_mode: true,
-            ghost_ticket_id: ghostTicketId,
-            schools: schoolData || realUser.schools
-          };
-
-          setUserRaw(impersonatedUserObj);
-          setLoggedInUserId(realUser.id);
-
-          try {
-            const cacheImpersonated = targetRole === 'student' ? { ...impersonatedUserObj, last_name: null } : impersonatedUserObj;
-            sessionStorage.setItem('groovelab_cached_user', JSON.stringify(cacheImpersonated));
-          } catch (e) {}
-
-          const targetPlatform: 'campus' | 'groovelab' = (realUser.is_groovelab_active && !realUser.is_campus_active) ? 'groovelab' : 'campus';
-          const targetWorkspace = targetRole === 'admin' || targetRole === 'secretary' ? 'secretary' : (targetRole === 'teacher' ? 'teacher' : 'student');
-          const targetTab = targetRole === 'student' ? 'homework_book' : (targetRole === 'teacher' ? 'briefing' : 'briefing');
-
-          setActivePlatform(targetPlatform);
-          setActiveStudentTab(targetTab);
-          try {
-            sessionStorage.setItem('groovelab_active_workspace', targetWorkspace);
-            sessionStorage.setItem('groovelab_active_platform', targetPlatform);
-            localStorage.setItem('campus_active_tab', targetTab);
-          } catch (e) {}
-        } else if (schoolData) {
-          // Fallback if zero users in DB for school -> resolve from billing_contact_person
-          const contactPerson = (schoolData.billing_contact_person || '').trim();
-          let fName = `${schoolData.name} Support`;
-          let lName = '';
-          if (contactPerson) {
-            const parts = contactPerson.split(' ');
-            fName = parts[0] || `${schoolData.name} Support`;
-            lName = parts.slice(1).join(' ') || '';
-          }
-
-          const ghostUser = {
-            id: 'master-support-id',
-            school_id: schoolData.id,
-            role: ghostRole,
-            first_name: fName,
-            last_name: lName,
-            is_master_admin: false,
-            is_ghost_mode: true,
-            schools: schoolData
-          };
-          setUserRaw(ghostUser);
-          setLoggedInUserId('master-support-id');
-          setActivePlatform('campus');
-          setActiveStudentTab('briefing');
-        }
-      };
-
-      resolveGhostIdentity();
-    }
-  }, []);
-
-  // 🛡️ Ghost-Support 120-Minute Periodic Watchdog (Hiscox CyberSafe / OWASP ASVS Level 3)
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const isGhostActive = sessionStorage.getItem('groovelab_support_ghost') === 'true';
-    if (!isGhostActive) return;
-
-    const interval = setInterval(() => {
-      const ghostStartedAtStr = sessionStorage.getItem('groovelab_ghost_started_at');
-      if (ghostStartedAtStr) {
-        const startedAt = parseInt(ghostStartedAtStr, 10);
-        if (!isNaN(startedAt) && (Date.now() - startedAt > 120 * 60 * 1000)) {
-          console.warn('[Security] Ghost session exceeded 120 minutes TTL. Auto-terminating session.');
-          sessionStorage.removeItem('groovelab_support_ghost');
-          sessionStorage.removeItem('groovelab_ghost_started_at');
-          sessionStorage.removeItem('groovelab_ghost_school_id');
-          sessionStorage.removeItem('groovelab_ghost_impersonated_user_id');
-          sessionStorage.removeItem('groovelab_ghost_active_role');
-          sessionStorage.removeItem('groovelab_ghost_lease_token');
-          alert('Die maximale Dauer der Ghost-Support-Sitzung (120 Minuten) wurde erreicht. Die Sitzung wurde aus Sicherheitsgründen beendet.');
-          window.location.href = '/master-admin';
-        }
-      }
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const [session, setSessionRaw] = useState<any>(null);
-  const setSession = React.useCallback((val: any) => {
-    setSessionRaw((prev: any) => {
-      const nextVal = typeof val === 'function' ? val(prev) : val;
-      if (prev && nextVal && typeof prev === 'object' && typeof nextVal === 'object') {
-        try {
-          if (JSON.stringify(prev) === JSON.stringify(nextVal)) {
-            return prev;
-          }
-        } catch {}
-      }
-      return nextVal;
-    });
-  }, []);
-  const [totalPresenceMins, setTotalPresenceMins] = useState(0);
-  const [showEditProfile, setShowEditProfile] = useState(false);
-  const [editingProfile, setEditingProfile] = useState<any>(null);
-
-  const handleUpdateProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingProfile || !user) return;
-    
-    const updateData: any = {
-      first_name: editingProfile.first_name,
-      last_name: editingProfile.last_name,
-      photo_url: (user.role === 'admin' || user.role === 'secretary') ? '/campus_login_hero.png' : editingProfile.photo_url
-    };
-
-    if (user.role === 'student') {
-      updateData.age = editingProfile.age;
-    } else {
-      updateData.groovelab_instrument = editingProfile.groovelab_instrument;
-      updateData.bio = editingProfile.bio;
-      updateData.expertise = editingProfile.expertise;
-      updateData.bands = editingProfile.bands;
-    }
-
-    const { error } = await supabase.from('users').update(updateData).eq('id', user.id);
-    
-    if (error) alert('Fehler beim Aktualisieren: ' + error.message);
-    else {
-      const { data: updatedUser, error: userErr } = await supabase.from('users').select('*, schools(*)').eq('id', user.id).single();
-      if (userErr || !updatedUser) {
-        console.error('[Dashboard] User data fetch error:', userErr);
-        return;
-      }
-      console.log('[Dashboard] User data updated:', updatedUser.first_name, 'School:', updatedUser.school_id);
-      if (updatedUser) setUser(updatedUser);
-      setShowEditProfile(false);
-    }
-  };
   const [userSongs, setUserSongs] = useState<any[]>([]);
   const [userBands, setUserBands] = useState<any[]>([]);
   const [allBands, setAllBands] = useState<any[]>([]);
@@ -1812,133 +1193,63 @@ function App() {
   const [plannedSlots, setPlannedSlots] = useState<string[]>([]);
   const [globalPlannedSlots, setGlobalPlannedSlots] = useState<any[]>([]);
   const [showMobileInfo, setShowMobileInfo] = useState(false);
-  const [activePlatform, setActivePlatformRaw] = useState<'campus' | 'groovelab' | 'ensembles'>(() => {
-    if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search);
-      const platParam = urlParams.get('platform');
-      if (platParam === 'campus' || platParam === 'groovelab' || platParam === 'ensembles') {
-        return platParam as any;
-      }
-    }
-    const saved = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_platform') : null;
-    if (!showEnsemblesFeature && saved === 'ensembles') {
-      return 'campus';
-    }
-    return (saved as 'campus' | 'groovelab' | 'ensembles') || 'campus';
+  // 🏛️ Campus Platform, Workspace & Tab Navigation Hook
+  const {
+    activePlatform,
+    setActivePlatform,
+    setActivePlatformRaw,
+    activeWorkspace,
+    setActiveWorkspace,
+    activeStudentTab,
+    setActiveStudentTab,
+    setActiveStudentTabRaw,
+    isSidebarCollapsed,
+    setIsSidebarCollapsed,
+    sidebarNotificationsCount,
+    setSidebarNotificationsCount,
+    isMusicStandMode,
+    setIsMusicStandMode,
+    toggleMusicStandMode,
+    activeBandSubTab,
+    setActiveBandSubTab
+  } = useCampusNavigationAndWorkspaces({
+    user,
+    locationMode,
+    onResetRecipient: () => setSelectedCampusRecipient?.(null)
   });
-  const setActivePlatform = React.useCallback((val: any, forceUnlock = false) => {
-    const schoolObj = Array.isArray(user?.schools) ? user.schools[0] : user?.schools;
-    const schoolHasCampus = Boolean(
-      user?.is_campus_active || 
-      (schoolObj ? (schoolObj.has_campus_subscription || !schoolObj.is_billing_booked || schoolObj.subscription_bypass) : true)
-    );
-    const schoolHasGroove = Boolean(
-      user?.is_groovelab_active || 
-      (schoolObj ? (schoolObj.has_groovelab_subscription || !schoolObj.is_billing_booked || schoolObj.subscription_bypass) : true)
-    );
 
-    let targetVal = val;
-    if (targetVal === 'campus' && !schoolHasCampus) {
-      targetVal = 'groovelab';
-    } else if (targetVal === 'groovelab' && !schoolHasGroove) {
-      targetVal = 'campus';
-    }
-    // Instantly stop all active camera and microphone streams when switching modules
-    if (typeof (window as any).stopAllCameras === 'function') {
-      (window as any).stopAllCameras();
-    }
-
-    React.startTransition(() => {
-      setActivePlatformRaw(targetVal);
-      // Auto-switch the active tab to the saved tab of the target platform atomically within the same transition
-      if (targetVal === 'campus') {
-        const savedTab = (typeof window !== 'undefined' ? sessionStorage.getItem('campus_active_tab') : null) || 'briefing';
-        setActiveStudentTabRaw(savedTab === 'live' ? 'briefing' : savedTab);
-      } else if (targetVal === 'ensembles') {
-        const savedTab = (typeof window !== 'undefined' ? sessionStorage.getItem('ensembles_active_tab') : null) || 'overview';
-        setActiveStudentTabRaw(savedTab);
-      } else {
-        const savedTab = (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_tab') : null) || 'live';
-        setActiveStudentTabRaw(savedTab);
-      }
-    });
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('groovelab_active_platform', targetVal);
-    }
-  }, [locationMode, user?.role, user?.schools]);
-
-  const [activeWorkspace, setActiveWorkspaceRaw] = useState<string | null>(() => {
-    if (typeof window !== 'undefined') {
-      return sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace');
-    }
-    return null;
+  // 🏛️ Campus User Profile & Teacher Statistics Hook
+  const {
+    session,
+    setSession,
+    setSessionRaw,
+    totalPresenceMins,
+    setTotalPresenceMins,
+    showEditProfile,
+    setShowEditProfile,
+    editingProfile,
+    setEditingProfile,
+    handleUpdateProfile,
+    campusTeacherStats,
+    setCampusTeacherStats
+  } = useCampusUserProfile({
+    user,
+    setUser,
+    activeStudentTab,
+    activePlatform
   });
-  const setActiveWorkspace = React.useCallback((ws: string | null) => {
-    if (typeof window !== 'undefined') {
-      if (ws) {
-        sessionStorage.setItem('groovelab_active_workspace', ws);
-      } else {
-        sessionStorage.removeItem('groovelab_active_workspace');
-      }
-    }
-    setActiveWorkspaceRaw(ws);
-  }, []);
 
-  const [activeStudentTab, setActiveStudentTabRaw] = useState<string>(() => {
-    const platform = (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_platform') : null) || 'campus';
-    if (platform === 'campus') {
-      const tab = (typeof window !== 'undefined' ? sessionStorage.getItem('campus_active_tab') : null) || 'briefing';
-      return tab === 'live' ? 'briefing' : tab;
-    }
-    if (platform === 'ensembles') {
-      return (typeof window !== 'undefined' ? sessionStorage.getItem('ensembles_active_tab') : null) || 'overview';
-    }
-    return (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_tab') : null) || 'live';
+  // 🏛️ Campus Ghost Support & Authoritative Route Protection Hook
+  useCampusGhostAndRoutingSession({
+    loading,
+    loggedInUserId,
+    location,
+    navigate,
+    setUserRaw,
+    setLoggedInUserId,
+    setActivePlatform,
+    setActiveStudentTab
   });
-  const setActiveStudentTab = React.useCallback((val: any) => {
-    if (val === 'messages') {
-      setSelectedCampusRecipient(null);
-    }
-    if (val === 'homework_book') {
-      window.dispatchEvent(new CustomEvent('campus_reset_homework_board'));
-    }
-    setActiveStudentTabRaw(val);
-    const tabLabels: Record<string, string> = {
-      briefing: 'Briefing-Dashboard geöffnet',
-      homework_book: 'Hausaufgabenheft geöffnet',
-      practice_board: 'Übe-Pfad geöffnet',
-      practice: 'Übe-Studio geöffnet',
-      mediathek: 'Mediathek geöffnet',
-      events: 'Termine geöffnet',
-      campus_cup: 'Campus-Cup geöffnet',
-      messages: 'Nachrichten geöffnet',
-      settings: 'Einstellungen geöffnet',
-      overview: 'Übersicht geöffnet',
-      live: 'Live-Lab geöffnet',
-      library: 'Song-Bibliothek geöffnet',
-      repertoire: 'Repertoire geöffnet',
-      bands: 'Band-Zentrale geöffnet',
-      schedule: 'Stundenplan geöffnet',
-      students: 'Schüler-Übersicht geöffnet',
-      songs: 'Song-Verwaltung geöffnet',
-      rooms: 'Raumplaner geöffnet',
-      billing: 'Abrechnung geöffnet'
-    };
-    if (tabLabels[val]) {
-      announceA11y(tabLabels[val]);
-    }
-    // Persist the tab to the correct sessionStorage keys based on the current active platform
-    const platform = (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_platform') : null) || 'campus';
-    if (typeof window !== 'undefined') {
-      if (platform === 'campus') {
-        sessionStorage.setItem('campus_active_tab', val);
-      } else if (platform === 'ensembles') {
-        sessionStorage.setItem('ensembles_active_tab', val);
-      } else {
-        sessionStorage.setItem('groovelab_active_tab', val);
-      }
-    }
-  }, []);
 
   // Auto-refresh bands for staff profile and GrooveLab view
   useEffect(() => {
@@ -1972,94 +1283,7 @@ function App() {
     }
   }, [user?.id, activePlatform, activeStudentTab]);
 
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(true);
-  const [sidebarNotificationsCount, setSidebarNotificationsCount] = useState<number>(0);
-
-  // 🎼 Notenständer-Modus (Großschrift & Glanceability für 60–90 cm Distanz am Instrument)
-  const [isMusicStandMode, setIsMusicStandMode] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return localStorage.getItem('campus_music_stand_mode') === 'true';
-  });
-
-  useEffect(() => {
-    const handleSync = () => {
-      setIsMusicStandMode(localStorage.getItem('campus_music_stand_mode') === 'true');
-    };
-    window.addEventListener('campus_music_stand_mode_changed', handleSync);
-    window.addEventListener('storage', handleSync);
-    return () => {
-      window.removeEventListener('campus_music_stand_mode_changed', handleSync);
-      window.removeEventListener('storage', handleSync);
-    };
-  }, []);
-
-  const toggleMusicStandMode = () => {
-    setIsMusicStandMode(prev => {
-      const next = !prev;
-      localStorage.setItem('campus_music_stand_mode', String(next));
-      window.dispatchEvent(new Event('campus_music_stand_mode_changed'));
-      return next;
-    });
-  };
-
   const [selectedMatchingInsts, setSelectedMatchingInsts] = useState<Record<string, string>>({});
-  const [activeBandSubTab, setActiveBandSubTab] = useState<'meine' | 'alle'>(() => {
-    return (localStorage.getItem('groovelab_active_band_subtab') as 'meine' | 'alle') || 'meine';
-  });
-  
-  const [campusTeacherStats, setCampusTeacherStats] = useState<{ studentCount: number, totalMinutes: number, teachingDays: string[], primaryRoom: string, schedules: any[] } | null>(null);
-
-  useEffect(() => {
-    if (activeStudentTab === 'profile' && activePlatform === 'campus' && user && (user.role === 'teacher' || user.role === 'admin')) {
-      const fetchStats = async () => {
-        try {
-          const { data: scheds } = await supabase
-            .from('schedules')
-            .select('*, rooms(name)')
-            .eq('teacher_id', user.id);
-          
-          if (scheds) {
-            const uniqueStudents = new Set(scheds.filter(s => s.student_id).map(s => s.student_id));
-            const totalMins = scheds.filter(s => s.student_id).reduce((acc, curr) => acc + (curr.duration || 30), 0);
-            
-            const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-            const uniqueDays = Array.from(new Set(scheds.map(s => s.day_of_week)))
-              .sort((a, b) => a - b)
-              .map(d => DAYS_DE[d]);
-
-            // Primary room calculation
-            const roomCounts: Record<string, number> = {};
-            scheds.forEach(s => {
-              const rName = s.rooms?.name;
-              if (rName) {
-                roomCounts[rName] = (roomCounts[rName] || 0) + 1;
-              }
-            });
-            let primary = 'Kein Raum';
-            let maxCount = 0;
-            Object.entries(roomCounts).forEach(([rName, count]) => {
-              if (count > maxCount) {
-                maxCount = count;
-                primary = rName;
-              }
-            });
-
-            setCampusTeacherStats({
-              studentCount: uniqueStudents.size,
-              totalMinutes: totalMins,
-              teachingDays: uniqueDays,
-              primaryRoom: primary,
-              schedules: scheds
-            });
-          }
-        } catch (err) {
-          console.error('Error fetching teacher stats:', err);
-        }
-      };
-      fetchStats();
-    }
-  }, [activeStudentTab, activePlatform, user?.id]);
-
   const [selectedBandForProfile, setSelectedBandForProfileRaw] = useState<any>(null);
   const setSelectedBandForProfile = React.useCallback((val: any) => {
     React.startTransition(() => {

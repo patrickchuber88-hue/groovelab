@@ -1015,14 +1015,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [expandedTeacherAudioWeeks, setExpandedTeacherAudioWeeks] = useState<Record<string, boolean>>({});
   const [expandedStudentAudioWeeks, setExpandedStudentAudioWeeks] = useState<Record<string, boolean>>({});
 
-  const toggleTeacherAudioWeek = (weekKey: string, defaultOpen: boolean = true) => {
+  const toggleTeacherAudioWeek = (weekKey: string, defaultOpen: boolean = false) => {
     setExpandedTeacherAudioWeeks(prev => {
       const current = prev[weekKey] !== undefined ? prev[weekKey] : defaultOpen;
       return { ...prev, [weekKey]: !current };
     });
   };
 
-  const toggleStudentAudioWeek = (weekKey: string, defaultOpen: boolean = true) => {
+  const toggleStudentAudioWeek = (weekKey: string, defaultOpen: boolean = false) => {
     setExpandedStudentAudioWeeks(prev => {
       const current = prev[weekKey] !== undefined ? prev[weekKey] : defaultOpen;
       return { ...prev, [weekKey]: !current };
@@ -1899,7 +1899,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [showStudentFavoritesOnly, setShowStudentFavoritesOnly] = useState<boolean>(false);
   const [showTeacherHomeworkArchive, setShowTeacherHomeworkArchive] = useState<boolean>(false);
   const [openHomeworkWeekAccordions, setOpenHomeworkWeekAccordions] = useState<string[]>([]);
-  const [isTeacherHomeworkExpanded, setIsTeacherHomeworkExpanded] = useState<boolean>(readOnly ? true : false);
+  const [isTeacherHomeworkExpanded, setIsTeacherHomeworkExpanded] = useState<boolean>(false);
   const [isStudentWeekExpanded, setIsStudentWeekExpanded] = useState<boolean>(false);
   const [recordingSavedToast, setRecordingSavedToast] = useState<string | null>(null);
   const [mobileRecordingsTab, setMobileRecordingsTab] = useState<'teacher' | 'student'>('teacher');

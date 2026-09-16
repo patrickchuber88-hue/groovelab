@@ -1469,13 +1469,13 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
 
                         {weekKeys.map(wkKey => {
                           const wkAudios = monthData.weeks[wkKey] || [];
-                          const isExpanded = expandedTeacherAudioWeeks[wkKey] !== undefined ? expandedTeacherAudioWeeks[wkKey] : true;
+                          const isExpanded = expandedTeacherAudioWeeks[wkKey] !== undefined ? expandedTeacherAudioWeeks[wkKey] : false;
                           const wkNum = wkKey.split("-W")[1] || "";
 
                           return (
                             <div key={`teacher-month-week-${wkKey}`} style={{ display: "flex", flexDirection: "column" }}>
                               <div
-                                onClick={() => toggleTeacherAudioWeek(wkKey, true)}
+                                onClick={() => toggleTeacherAudioWeek(wkKey, false)}
                                 style={{
                                   display: "flex",
                                   alignItems: "center",
@@ -3292,13 +3292,13 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
 
                         {weekKeys.map(wkKey => {
                           const wkAudios = monthData.weeks[wkKey] || [];
-                          const isExpanded = expandedStudentAudioWeeks[wkKey] !== undefined ? expandedStudentAudioWeeks[wkKey] : true;
+                          const isExpanded = expandedStudentAudioWeeks[wkKey] !== undefined ? expandedStudentAudioWeeks[wkKey] : false;
                           const wkNum = wkKey.split("-W")[1] || "";
 
                           return (
                             <div key={`stud-month-week-${wkKey}`} style={{ display: "flex", flexDirection: "column" }}>
                               <div
-                                onClick={() => toggleStudentAudioWeek(wkKey, true)}
+                                onClick={() => toggleStudentAudioWeek(wkKey, false)}
                                 style={{
                                   display: "flex",
                                   alignItems: "center",
