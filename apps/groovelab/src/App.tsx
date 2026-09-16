@@ -4,14 +4,10 @@ import { useWindowSize } from 'react-use';
 import { useLocation, useNavigate, useSearchParams, Navigate } from 'react-router-dom';
 import { supabase, supabaseUrl, supabaseAnonKey } from './lib/supabase';
 import { dbCircuitBreaker } from './utils/circuitBreaker';
-import { subscribeUserToPush } from './utils/webPush';
 import { StudioAvatar, getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, renderBandAvatar, resolveStudentInstrumentAsync, getEffectiveInstrument, resolveCampusStudentAvatar } from './components/StudioAvatar';
 import { reportClientError, initGlobalErrorListeners } from './lib/errorTelemetry';
 import { isDevEnvironment } from './utils/tenantUrlHelper';
 import { CampusGroovelabText } from './components/CampusGroovelabBrand';
-import { scrubSharedDeviceCache } from './utils/sharedDeviceScrubber';
-import { SharedAudioEngine } from './utils/sharedAudioEngine';
-import { requestPersistentStorage } from './utils/storagePersistence';
 
 // Initialize global error interception
 initGlobalErrorListeners();
@@ -71,7 +67,6 @@ import { generateRandomBandName } from './utils/bandNameGenerator';
 import { APP_INSTRUMENT_ICONS, APP_INSTRUMENT_COLORS, brandColor } from './constants/instruments';
 import { normalizeInstrument, renderInstrumentIcon } from './utils/instruments';
 import { getDistanceFromLatLonInM } from './utils/geo';
-import { flushOfflineSyncQueue } from './services/offlineSyncService';
 import { MobileTopHeader } from './components/ui/MobileTopHeader';
 import { formatTeacherFullName } from './utils/nameHelper';
 import { CampusLevelSwitcher, CampusUiLevel } from './components/campus/CampusLevelSwitcher';
@@ -92,7 +87,6 @@ import { useCampusRealtimeSync } from './hooks/useCampusRealtimeSync';
 import { BAND_AVATARS, CAMPUS_AVATARS, STUDENT_AVATARS, TEACHER_AVATARS } from './constants/avatars';
 import { initGlobalErrorSanitizer } from './utils/errorSanitizer';
 import { initAntiTamperShield } from './utils/antiTamper';
-import { runStorageJanitor, runClientStorageJanitor } from './services/storageJanitorService';
 import { scrubSensitiveUrlParams, scrubSensitiveUrlPath } from './utils/urlSecurityScrubber';
 import { executeSessionZeroize } from './utils/sessionZeroize';
 import { initAuthBroadcastListener } from './utils/authBroadcastSync';
@@ -109,6 +103,9 @@ import { useCampusPracticeSearchAndPdfSuite } from './hooks/useCampusPracticeSea
 import { useCampusBandGatewayNavigation } from './hooks/useCampusBandGatewayNavigation';
 import { useCampusStaffBandSync } from './hooks/useCampusStaffBandSync';
 import { useCampusRepertoireAndSlotStates } from './hooks/useCampusRepertoireAndSlotStates';
+import { useCampusAuthUserStorage } from './hooks/useCampusAuthUserStorage';
+import { useCampusPwaAndSystemEvents } from './hooks/useCampusPwaAndSystemEvents';
+import { useCampusCoreSessionState } from './hooks/useCampusCoreSessionState';
 import { safeReplaceState } from './utils/historyUtils';
 import './App.css';
 
@@ -663,481 +660,62 @@ function App() {
     return cleanup;
   }, []);
 
-  const [showQuarterlyAccessReportModal, setShowQuarterlyAccessReportModal] = useState(false);
-
-
-  const qrPathMatch = location.pathname.match(/^\/qr\/([^/?#]+)/);
-
-  const isLocalhost = typeof window !== 'undefined' && (
-    window.location.hostname === 'localhost' || 
-    window.location.hostname === '127.0.0.1' ||
-    window.location.hostname.endsWith('.localhost') ||
-    window.location.hostname.endsWith('.local')
-  );
-
-  const [loggedInUserId, setLoggedInUserIdRaw] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null;
-    const isMasterAuth = sessionStorage.getItem('groovelab_is_master_admin') === 'true';
-    const ghostAuthToken = sessionStorage.getItem('groovelab_ghost_auth_token') || localStorage.getItem('groovelab_ghost_auth_token');
-    const isMasterValid = isMasterAuth || Boolean(ghostAuthToken);
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const isGhost = urlParams.get('support_ghost') === 'true' || 
-                    urlParams.get('ghost_session') === 'true' || 
-                    sessionStorage.getItem('groovelab_support_ghost') === 'true';
-    const ghostSchoolId = urlParams.get('school_id') || 
-                          urlParams.get('ghost_school_id') || 
-                          sessionStorage.getItem('groovelab_ghost_school_id');
-    if (isGhost && ghostSchoolId && isMasterValid) {
-      return 'master-support-id';
-    }
-    const storedId = sessionStorage.getItem('groovelab_user_id');
-    if (storedId) return storedId;
-    try {
-      const cached = sessionStorage.getItem('groovelab_cached_user');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (parsed?.id) return parsed.id;
-      }
-    } catch (e) {}
-
-    // 📱 PWA Standalone / Kaltstart-Immunisierung:
-    // AUSSCHLIESSLICH im installierten PWA-Standalone-Modus (Home-Screen-App ohne Browser-Tabs)
-    const isPwa = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
-    if (isPwa) {
-      const persistentId = localStorage.getItem('campus_active_student_id') ||
-                           localStorage.getItem('groovelab_current_student_id') ||
-                           localStorage.getItem('groovelab_user_id');
-      if (persistentId) return persistentId;
-    }
-    return null;
+  // 🏛️ Campus Core Identity, Session & Startup States Hook
+  const {
+    isLocalhost,
+    loggedInUserId,
+    setLoggedInUserId,
+    setLoggedInUserIdRaw,
+    locationMode,
+    setLocationMode,
+    setLocationModeRaw,
+    showDeletionPrompt,
+    setShowDeletionPrompt,
+    deletionPromptUserId,
+    setDeletionPromptUserId,
+    deletionPromptIsHome,
+    setDeletionPromptIsHome,
+    showAutoLockWarning,
+    setShowAutoLockWarning,
+    autoLockCountdown,
+    setAutoLockCountdown,
+    loading,
+    setLoading,
+    isOfflineMode,
+    setIsOfflineMode,
+    isSchoolPaused,
+    setIsSchoolPaused,
+    showSchoolOnboardingModal,
+    setShowSchoolOnboardingModal,
+    showAdminSecuritySuiteModal,
+    setShowAdminSecuritySuiteModal,
+    showQuarterlyAccessReportModal,
+    setShowQuarterlyAccessReportModal,
+    qrPathMatch
+  } = useCampusCoreSessionState({
+    locationSearch: location.search,
+    locationPathname: location.pathname
   });
 
-  const setLoggedInUserId = React.useCallback((val: string | null | ((prev: string | null) => string | null)) => {
-    setLoggedInUserIdRaw((prev) => {
-      const nextVal = typeof val === 'function' ? val(prev) : val;
-      if (typeof window !== 'undefined') {
-        const isPwa = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
-        if (nextVal) {
-          sessionStorage.setItem('groovelab_user_id', nextVal);
-          if (isPwa) {
-            localStorage.setItem('groovelab_user_id', nextVal);
-            localStorage.setItem('campus_active_student_id', nextVal);
-          }
-        } else {
-          sessionStorage.removeItem('groovelab_user_id');
-          if (isPwa) {
-            localStorage.removeItem('groovelab_user_id');
-            localStorage.removeItem('campus_active_student_id');
-            localStorage.removeItem('groovelab_current_student_id');
-          }
-        }
-      }
-      return nextVal;
-    });
-  }, []);
-
-  const [locationMode, setLocationModeRaw] = useState<'lab' | 'home'>(() => {
-    if (typeof window === 'undefined') return 'home';
-    return (sessionStorage.getItem('groovelab_location_mode') as 'lab' | 'home') || 'home';
+  // 🏛️ Campus PWA Lifecycle, Updates, Janitor & System Events Hook
+  const {
+    windowWidth,
+    setWindowWidth,
+    deferredPrompt,
+    setDeferredPrompt,
+    showInstallBanner,
+    setShowInstallBanner,
+    showInstallGuide,
+    setShowInstallGuide,
+    showPwaUpdateToast,
+    setShowPwaUpdateToast
+  } = useCampusPwaAndSystemEvents({
+    isLocalhost,
+    loggedInUserId
   });
 
-  const setLocationMode = React.useCallback((val: 'lab' | 'home' | ((prev: 'lab' | 'home') => 'lab' | 'home')) => {
-    setLocationModeRaw((prev) => {
-      const nextVal = typeof val === 'function' ? val(prev) : val;
-      if (prev === nextVal) return prev;
-      if (typeof window !== 'undefined') {
-        if (nextVal) {
-          sessionStorage.setItem('groovelab_location_mode', nextVal);
-        } else {
-          sessionStorage.removeItem('groovelab_location_mode');
-        }
-      }
-      return nextVal;
-    });
-  }, []);
-  const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1200);
-
-
-
-  const [showDeletionPrompt, setShowDeletionPrompt] = useState(false);
-  const [deletionPromptUserId, setDeletionPromptUserId] = useState<string | null>(null);
-  const [deletionPromptIsHome, setDeletionPromptIsHome] = useState<boolean | undefined>(undefined);
-
-  const [showAutoLockWarning, setShowAutoLockWarning] = useState(false);
-  const [autoLockCountdown, setAutoLockCountdown] = useState(30);
-
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [showInstallBanner, setShowInstallBanner] = useState(false);
-  const [showInstallGuide, setShowInstallGuide] = useState(false);
-  const [showPwaUpdateToast, setShowPwaUpdateToast] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    // Reset install banner dismiss state when scanning QR code or following QR links
-    const isQR = window.location.pathname.includes('/qr/') || 
-                 window.location.search.includes('qr') || 
-                 window.location.search.includes('auto_pair') || 
-                 window.location.search.includes('token');
-    if (isQR) {
-      localStorage.removeItem('groovelab_install_prompt_dismissed');
-    }
-
-    // In local development, unregister any stale service worker and purge CacheStorage to prevent freezing Vite HMR!
-    if (isLocalhost) {
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then((registrations) => {
-          for (const registration of registrations) {
-            registration.unregister();
-          }
-        }).catch(() => {});
-      }
-      if ('caches' in window) {
-        caches.keys().then((keys) => {
-          for (const key of keys) {
-            caches.delete(key);
-          }
-        }).catch(() => {});
-      }
-    } else if ('serviceWorker' in navigator) {
-      // Register service worker in production to ensure PWA installability and update checking
-      navigator.serviceWorker.register('/sw.js', { scope: '/' })
-        .then((reg) => {
-          console.log('Service Worker registered successfully on load:', reg.scope);
-
-          // 📱 Tier-1 Storage Persistence Guard (Protects IndexedDB & Offline Vault from iOS ITP 7-day auto-purge)
-          requestPersistentStorage().catch(() => {});
-
-          // If there is already a waiting worker, prompt user to update smoothly via floating toast
-          if (reg.waiting && navigator.serviceWorker.controller) {
-            console.log('[PWA] Waiting service worker found on load.');
-            setShowPwaUpdateToast(true);
-          }
-
-          // 🚀 Real-time PWA Service Worker update detection
-          const handleSwMessage = (e: MessageEvent) => {
-            if (e.data?.type === 'PWA_UPDATED') {
-              console.log('[PWA] Received PWA_UPDATED notification:', e.data.version);
-              setShowPwaUpdateToast(true);
-            }
-          };
-          navigator.serviceWorker.addEventListener('message', handleSwMessage);
-
-          const handleControllerChange = () => {
-            console.log('[PWA] Service Worker controller changed.');
-            setShowPwaUpdateToast(true);
-          };
-          navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
-
-          // Fast version checker via /version.json
-          const checkServerVersion = async () => {
-            try {
-              const res = await fetch('/version.json?t=' + Date.now(), { cache: 'no-store' });
-              if (res.ok) {
-                const data = await res.json();
-                const currentAppVer = sessionStorage.getItem('campus_app_loaded_version');
-                if (!currentAppVer) {
-                  sessionStorage.setItem('campus_app_loaded_version', data.version);
-                } else if (currentAppVer !== data.version) {
-                  console.log('[PWA] New server version detected via version.json:', data.version);
-                  setShowPwaUpdateToast(true);
-                }
-              }
-            } catch {}
-          };
-          checkServerVersion();
-          document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
-              checkServerVersion();
-              reg.update().catch(() => {});
-            }
-          });
-
-          // Register offline sync queue flusher on network restore
-          window.addEventListener('online', () => {
-            console.log('[OfflineSync] Network restored. Flushing offline queue...');
-            flushOfflineSyncQueue();
-          });
-
-          // Check for updates on the server periodically (every 5 minutes)
-          setInterval(() => {
-            if (navigator.onLine) {
-              reg.update().catch((err) => {
-                console.warn('[PWA] Service Worker update check failed:', err);
-              });
-              checkServerVersion();
-              console.log('[PWA] Checking for updates on the server...');
-            }
-          }, 1000 * 60 * 5);
-
-          // Handle updates
-          reg.onupdatefound = () => {
-            const installingWorker = reg.installing;
-            if (installingWorker) {
-              installingWorker.onstatechange = () => {
-                if (installingWorker.state === 'installed') {
-                  if (navigator.serviceWorker.controller) {
-                    console.log('[PWA] New content is available; prompt user via toast.');
-                    setShowPwaUpdateToast(true);
-                  } else {
-                    console.log('[PWA] Content is cached for offline use.');
-                  }
-                }
-              };
-            }
-          };
-        })
-        .catch((err) => console.error('Service Worker registration failed on load:', err));
-    }
-
-    // Intercept external links inside standalone PWA to prevent flickering and white screen in WebKit in-app browser
-    const handleAnchorClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      const anchor = target.closest('a');
-      if (anchor && anchor.href) {
-        try {
-          if (!anchor.href.startsWith('http://') && !anchor.href.startsWith('https://')) {
-            return; // Allow mailto:, tel:, etc. to bypass URL checking and use default OS handling
-          }
-          const url = new URL(anchor.href, window.location.origin);
-          const isExternal = url.origin !== window.location.origin;
-          const isStandalone = (window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches;
-
-          if (isStandalone && isExternal) {
-            e.preventDefault();
-            window.open(anchor.href, '_blank');
-          }
-        } catch (err) {
-          // Ignore malformed URLs
-        }
-      }
-    };
-    document.addEventListener('click', handleAnchorClick);
-
-    // Clear native PWA app badge when app is launched or becomes active
-    if ('clearAppBadge' in navigator) {
-      (navigator as any).clearAppBadge().catch(() => {});
-    }
-
-    // iOS Web AudioContext auto-unlock on first user interaction via SharedAudioEngine singleton
-    SharedAudioEngine.initAutoUnlock();
-
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      
-      const isStandalone = (window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches;
-      if (isStandalone) return;
-
-      const dismissedTime = localStorage.getItem('groovelab_install_prompt_dismissed');
-      const dismissedRecent = dismissedTime && (Date.now() - Number(dismissedTime) < 7 * 24 * 60 * 60 * 1000);
-      
-      if (!dismissedRecent) {
-        setShowInstallBanner(true);
-      }
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      document.removeEventListener('click', handleAnchorClick);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !loggedInUserId) return;
-    const isStandalone = (window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches;
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-    
-    if (isIOS && !isStandalone) {
-      const dismissedTime = localStorage.getItem('groovelab_install_prompt_dismissed');
-      const dismissedRecent = dismissedTime && (Date.now() - Number(dismissedTime) < 7 * 24 * 60 * 60 * 1000);
-      if (!dismissedRecent) {
-        setShowInstallBanner(true);
-      }
-    }
-
-    // Auto-subscribe or sync web push notifications in the background if permission is already granted
-    if ('Notification' in window && Notification.permission === 'granted') {
-      setTimeout(() => {
-        subscribeUserToPush(loggedInUserId)
-          .then((success) => console.log('PWA Push auto-subscribe sync outcome:', success))
-          .catch((err) => console.error('Failed to sync push subscription:', err));
-      }, 2000);
-    }
-  }, [loggedInUserId]);
-
-
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Automated Audio Storage Janitor & Client Cache Janitor Background Task
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    // Always prune stale local client caches on mount to prevent QuotaExceededError
-    runClientStorageJanitor().catch(() => {});
-
-    const lastRunStr = localStorage.getItem('groovelab_storage_janitor_last_run');
-    const lastRun = lastRunStr ? parseInt(lastRunStr, 10) : 0;
-    const twentyFourHoursMs = 24 * 60 * 60 * 1000;
-
-    if (Date.now() - lastRun > twentyFourHoursMs) {
-      console.log('[StorageJanitor] Triggering scheduled 24h background audio storage audit...');
-      runStorageJanitor('campus-assets').catch(err => {
-        console.warn('[StorageJanitor] Background storage audit error:', err);
-      });
-    }
-  }, []);
-
-  const [loading, setLoading] = useState(() => Boolean(
-    typeof window !== 'undefined' && 
-    sessionStorage.getItem('groovelab_user_id') && 
-    !sessionStorage.getItem('groovelab_cached_user')
-  ));
-  const [isOfflineMode, setIsOfflineMode] = useState(false);
-  const [isSchoolPaused, setIsSchoolPaused] = useState(false);
-  const [showSchoolOnboardingModal, setShowSchoolOnboardingModal] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    const params = new URLSearchParams(window.location.search);
-    return params.get('invite') === 'school_onboarding' || 
-           params.get('onboarding') === 'school' || 
-           params.has('school_onboarding') ||
-           window.location.search.includes('invite=school_onboarding');
-  });
-
-  const [showAdminSecuritySuiteModal, setShowAdminSecuritySuiteModal] = useState(false);
-
-  useEffect(() => {
-    const handleOpenSecuritySuite = () => setShowAdminSecuritySuiteModal(true);
-    window.addEventListener('open_admin_security_suite', handleOpenSecuritySuite);
-    return () => window.removeEventListener('open_admin_security_suite', handleOpenSecuritySuite);
-  }, []);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('invite') === 'school_onboarding' || params.get('onboarding') === 'school' || params.has('school_onboarding')) {
-        setShowSchoolOnboardingModal(true);
-      }
-    }
-  }, [location.search]);
-
-  const [user, setUserRaw] = useState<any>(() => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const isMasterAuth = sessionStorage.getItem('groovelab_is_master_admin') === 'true' || 
-                           localStorage.getItem('groovelab_is_master_admin') === 'true';
-      const ghostAuthToken = localStorage.getItem('groovelab_ghost_auth_token');
-      const isMasterValid = isMasterAuth || Boolean(ghostAuthToken);
-
-      const urlParams = new URLSearchParams(window.location.search);
-      const isGhost = urlParams.get('support_ghost') === 'true' || 
-                      urlParams.get('ghost_session') === 'true' || 
-                      sessionStorage.getItem('groovelab_support_ghost') === 'true';
-      const ghostSchoolId = urlParams.get('school_id') || 
-                            urlParams.get('ghost_school_id') || 
-                            sessionStorage.getItem('groovelab_ghost_school_id');
-      const ghostRole = urlParams.get('role') || 
-                        sessionStorage.getItem('groovelab_ghost_active_role') || 
-                        'admin';
-
-      if (isGhost && ghostSchoolId && isMasterValid) {
-        return {
-          id: 'master-support-id',
-          school_id: ghostSchoolId,
-          role: ghostRole,
-          first_name: 'Master',
-          last_name: 'Support',
-          is_master_admin: false,
-          is_ghost_mode: true,
-          schools: {
-            id: ghostSchoolId,
-            name: sessionStorage.getItem('groovelab_ghost_school_name') || 'Musikschule'
-          }
-        };
-      }
-
-      const cached = sessionStorage.getItem('groovelab_cached_user');
-      if (cached) return JSON.parse(cached);
-
-      // 📱 PWA Standalone Kaltstart-Fallback für initialen Benutzer-Cache (nur wenn Standalone PWA ohne Tabs)
-      const isPwa = typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true);
-      if (isPwa) {
-        const persistentId = localStorage.getItem('campus_active_student_id') ||
-                             localStorage.getItem('groovelab_current_student_id') ||
-                             localStorage.getItem('groovelab_user_id');
-        if (persistentId) {
-          const offlineCache = localStorage.getItem(`groovelab_offline_user_cache_${persistentId}`);
-          if (offlineCache) {
-            try {
-              const parsed = JSON.parse(offlineCache);
-              if (parsed?.data) return parsed.data;
-            } catch (e) {}
-          }
-        }
-      }
-      return null;
-    } catch (e) {
-      console.error('Failed to parse cached user:', e);
-      return null;
-    }
-  });
-  const setUser = React.useCallback((val: any) => {
-    setUserRaw((prev: any) => {
-      const nextVal = typeof val === 'function' ? val(prev) : val;
-
-      // Tier-1 Silent Background Sync: Deep Equality Guard
-      if (prev && nextVal && typeof prev === 'object' && typeof nextVal === 'object') {
-        try {
-          if (JSON.stringify(prev) === JSON.stringify(nextVal)) {
-            return prev; // Same object reference -> 0 React re-renders!
-          }
-        } catch {
-          // fallback
-        }
-      }
-
-      if (typeof window !== 'undefined') {
-        const isKiosk = Boolean(localStorage.getItem('groovelab_station_id') && localStorage.getItem('groovelab_station_id') !== 'skip');
-        const isPwa = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
-        if (nextVal) {
-          // 🛡️ Zero-Knowledge: Never persist student last_name on shared Kiosk tablets
-          const userToCache = (nextVal.role === 'student' && isKiosk) ? { ...nextVal, last_name: null } : nextVal;
-          sessionStorage.setItem('groovelab_cached_user', JSON.stringify(userToCache));
-          if (nextVal.id) {
-            sessionStorage.setItem('groovelab_user_id', nextVal.id);
-            if (isPwa && !isKiosk) {
-              localStorage.setItem('groovelab_user_id', nextVal.id);
-              localStorage.setItem('campus_active_student_id', nextVal.id);
-            }
-          }
-          if (nextVal.token_version !== undefined && nextVal.token_version !== null) {
-            sessionStorage.setItem('groovelab_token_version', String(nextVal.token_version));
-          }
-          if (!sessionStorage.getItem('groovelab_session_started_at')) {
-            sessionStorage.setItem('groovelab_session_started_at', String(Date.now()));
-          }
-        } else {
-          sessionStorage.removeItem('groovelab_cached_user');
-          sessionStorage.removeItem('groovelab_token_version');
-          sessionStorage.removeItem('groovelab_session_started_at');
-          if (isPwa) {
-            localStorage.removeItem('groovelab_user_id');
-            localStorage.removeItem('campus_active_student_id');
-          }
-        }
-      }
-      return nextVal;
-    });
-  }, []);
+  // 🏛️ Campus Authoritative User & Multi-Tier Session Storage Hook
+  const { user, setUser, setUserRaw } = useCampusAuthUserStorage();
 
   // 🏛️ Campus Device, Kiosk, Dev Date Simulation & Parent Controls Hook
   const {

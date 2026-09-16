@@ -1035,54 +1035,164 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
           </div>
 
           {/* Mini Waveform with Klick-zu-Position Scrubbing */}
-          <div 
-            onClick={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              const clickX = e.clientX - rect.left;
-              const newRatio = Math.max(0, Math.min(1, clickX / rect.width));
-              const newTime = newRatio * (duration || 0);
-              setCurrentTime(newTime);
-              if (audioRef.current) audioRef.current.currentTime = newTime;
-            }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '2px',
-              height: '16px',
-              cursor: 'pointer',
-              width: '100%',
-              maxWidth: isMobile ? '100%' : '160px'
-            }}
-            title="Tippen zum Spulen"
-          >
-            {ORGANIC_WAVEFORM.slice(0, 16).map((h, i) => {
-              const barRatio = i / 16;
-              const isFilled = barRatio <= progressRatio;
-              const barSec = duration > 0 ? barRatio * duration : 0;
-              const isOutsideLocator = Boolean(
-                isLooping &&
-                loopLocator &&
-                loopLocator.enabled &&
-                duration > 0 &&
-                (barSec < loopLocator.startSec || barSec > loopLocator.endSec)
-              );
+          {(() => {
+            const hasLocator = Boolean(loopLocator && loopLocator.endSec > loopLocator.startSec && duration > 0);
+            const startPct = hasLocator ? Math.max(0, Math.min(100, (loopLocator!.startSec / duration) * 100)) : 0;
+            const endPct = hasLocator ? Math.max(0, Math.min(100, (loopLocator!.endSec / duration) * 100)) : 100;
+            const spanPct = Math.max(0, endPct - startPct);
+            const isLoopActive = Boolean(isLooping && loopLocator?.enabled);
 
-              return (
-                <div
-                  key={i}
-                  style={{
-                    flex: 1,
-                    minWidth: '2.5px',
-                    height: `${Math.max(25, h)}%`,
-                    borderRadius: '1.5px',
-                    background: isFilled ? '#16a34a' : '#e2e8f0',
-                    opacity: isOutsideLocator ? 0.32 : 1,
-                    transition: 'all 0.15s ease'
-                  }}
-                />
-              );
-            })}
-          </div>
+            return (
+              <div 
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const clickX = e.clientX - rect.left;
+                  const newRatio = Math.max(0, Math.min(1, clickX / rect.width));
+                  let newTime = newRatio * (duration || 0);
+                  if (isLoopActive && hasLocator) {
+                    if (newTime < loopLocator!.startSec || newTime > loopLocator!.endSec) {
+                      newTime = loopLocator!.startSec;
+                    }
+                  }
+                  setCurrentTime(newTime);
+                  if (audioRef.current) audioRef.current.currentTime = newTime;
+                }}
+                style={{
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '2px',
+                  height: '18px',
+                  cursor: 'pointer',
+                  width: '100%',
+                  maxWidth: isMobile ? '100%' : '160px'
+                }}
+                title={hasLocator ? `A/B-Loop: ${formatTime(loopLocator!.startSec)} - ${formatTime(loopLocator!.endSec)} (Tippen zum Spulen)` : "Tippen zum Spulen"}
+              >
+                {/* 📍 A/B Loop Corridor & Pins */}
+                {hasLocator && (
+                  <>
+                    {/* Shaded Corridor between A and B */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        bottom: 0,
+                        left: `${startPct}%`,
+                        width: `${spanPct}%`,
+                        background: isLoopActive ? 'rgba(22, 163, 74, 0.15)' : 'rgba(148, 163, 184, 0.08)',
+                        borderRadius: '3px',
+                        pointerEvents: 'none',
+                        transition: 'all 0.15s ease'
+                      }}
+                    />
+
+                    {/* Marker A (Start) */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '-2px',
+                        bottom: '-2px',
+                        left: `${startPct}%`,
+                        width: '1.5px',
+                        background: isLoopActive ? '#16a34a' : '#94a3b8',
+                        borderRadius: '1px',
+                        pointerEvents: 'none',
+                        zIndex: 4,
+                        transition: 'all 0.15s ease'
+                      }}
+                      title={`Loop Start (A): ${formatTime(loopLocator!.startSec)}`}
+                    >
+                      <span
+                        style={{
+                          position: 'absolute',
+                          top: '-7px',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          fontSize: '0.45rem',
+                          fontWeight: 900,
+                          lineHeight: 1,
+                          color: '#ffffff',
+                          background: isLoopActive ? '#16a34a' : '#64748b',
+                          borderRadius: '2px',
+                          padding: '1px 2px',
+                          letterSpacing: '-0.02em',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.15)'
+                        }}
+                      >
+                        A
+                      </span>
+                    </div>
+
+                    {/* Marker B (Ende) */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '-2px',
+                        bottom: '-2px',
+                        left: `${endPct}%`,
+                        width: '1.5px',
+                        background: isLoopActive ? '#ef4444' : '#94a3b8',
+                        borderRadius: '1px',
+                        pointerEvents: 'none',
+                        zIndex: 4,
+                        transition: 'all 0.15s ease'
+                      }}
+                      title={`Loop Ende (B): ${formatTime(loopLocator!.endSec)}`}
+                    >
+                      <span
+                        style={{
+                          position: 'absolute',
+                          bottom: '-7px',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          fontSize: '0.45rem',
+                          fontWeight: 900,
+                          lineHeight: 1,
+                          color: '#ffffff',
+                          background: isLoopActive ? '#ef4444' : '#64748b',
+                          borderRadius: '2px',
+                          padding: '1px 2px',
+                          letterSpacing: '-0.02em',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.15)'
+                        }}
+                      >
+                        B
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                {ORGANIC_WAVEFORM.slice(0, 16).map((h, i) => {
+                  const barRatio = i / 16;
+                  const isFilled = barRatio <= progressRatio;
+                  const barSec = duration > 0 ? barRatio * duration : 0;
+                  const isOutsideLocator = Boolean(
+                    isLoopActive &&
+                    loopLocator &&
+                    loopLocator.enabled &&
+                    duration > 0 &&
+                    (barSec < loopLocator.startSec || barSec > loopLocator.endSec)
+                  );
+
+                  return (
+                    <div
+                      key={i}
+                      style={{
+                        flex: 1,
+                        minWidth: '2.5px',
+                        height: `${Math.max(25, h)}%`,
+                        borderRadius: '1.5px',
+                        background: isFilled ? '#16a34a' : '#e2e8f0',
+                        opacity: isOutsideLocator ? 0.32 : 1,
+                        transition: 'all 0.15s ease'
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Desktop-Only: Secondary Tools in Single Row */}
@@ -1118,6 +1228,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
             audioUrl={resolvedUrl || url}
             initialLabel={label || `Aufnahme #${trackIndex + 1}`}
             initialDuration={duration}
+            initialLocator={loopLocator}
             editorMode={!isTeacher || readOnly ? 'locator' : 'locator'}
             uiLevel={uiLevel}
             recordingId={url || resolvedUrl}
@@ -1126,6 +1237,16 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
             onSave={(res) => {
               if (res.loop_locator !== undefined) {
                 setLoopLocator(res.loop_locator);
+                if (res.loop_locator?.enabled) {
+                  setIsLooping(true); // ⚡ SOFORTIGE AKTIVIERUNG DES A/B LOOPS
+                  const startPos = res.loop_locator.startSec || 0;
+                  setCurrentTime(startPos);
+                  if (audioRef.current) {
+                    audioRef.current.currentTime = startPos;
+                  }
+                } else if (res.loop_locator === null) {
+                  setIsLooping(false);
+                }
               }
               if (onSaveEdited) {
                 onSaveEdited(res);
@@ -2044,6 +2165,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
             audioUrl={resolvedUrl}
             initialLabel={label || 'Aufnahme'}
             initialDuration={duration}
+            initialLocator={loopLocator}
             editorMode={!isTeacher || readOnly ? 'locator' : 'locator'}
             uiLevel={uiLevel}
             recordingId={url || resolvedUrl}
@@ -2052,6 +2174,16 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
             onSave={(res) => {
               if (res.loop_locator !== undefined) {
                 setLoopLocator(res.loop_locator);
+                if (res.loop_locator?.enabled) {
+                  setIsLooping(true); // ⚡ SOFORTIGE AKTIVIERUNG DES A/B LOOPS
+                  const startPos = res.loop_locator.startSec || 0;
+                  setCurrentTime(startPos);
+                  if (audioRef.current) {
+                    audioRef.current.currentTime = startPos;
+                  }
+                } else if (res.loop_locator === null) {
+                  setIsLooping(false);
+                }
               }
               setIsEditorOpen(false);
             }}

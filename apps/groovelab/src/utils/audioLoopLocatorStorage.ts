@@ -299,56 +299,100 @@ export function patchRecordingObjectWithLocator(
 
 /**
  * Ruft den gespeicherten A/B-Loop-Locator für eine Audio-Spur ab.
+ * Prüft autoritativ audioUrlOrKey sowie optional die recordingId und campus_junior_recordings_* Objekte.
  */
-export function getLoopLocator(audioUrlOrKey: string): AudioLoopLocator | null {
-  if (typeof window === 'undefined' || !audioUrlOrKey) return null;
+export function getLoopLocator(audioUrlOrKey: string, recordingId?: string): AudioLoopLocator | null {
+  if (typeof window === 'undefined' || (!audioUrlOrKey && !recordingId)) return null;
   try {
-    const key = getStorageKey(audioUrlOrKey);
-    const raw = localStorage.getItem(key);
-    if (!raw) {
-      // Fallback: Prüfen ob Aufnahme-Objekt selbst in campus_junior_recordings_* einen loop_locator besitzt
-      const canonicalKey = extractCanonicalAudioKey(audioUrlOrKey);
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && k.startsWith('campus_junior_recordings_')) {
-          const val = localStorage.getItem(k);
-          if (val && (val.includes(audioUrlOrKey) || val.includes(canonicalKey))) {
-            const parsed = JSON.parse(val);
-            if (Array.isArray(parsed)) {
-              const match = parsed.find((rec: any) => {
-                const recKey = rec.id || rec.blobKey || rec.url || '';
-                return rec.url === audioUrlOrKey || rec.id === audioUrlOrKey || extractCanonicalAudioKey(recKey) === canonicalKey;
-              });
-              if (match?.loop_locator && typeof match.loop_locator.startSec === 'number') {
-                // In den schnellen O(1)-Cache spiegeln
-                localStorage.setItem(key, JSON.stringify(match.loop_locator));
-                return match.loop_locator;
+    // 1. Primäre Suche über audioUrlOrKey
+    if (audioUrlOrKey) {
+      const key = getStorageKey(audioUrlOrKey);
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (
+          typeof parsed === 'object' &&
+          parsed !== null &&
+          typeof parsed.startSec === 'number' &&
+          typeof parsed.endSec === 'number' &&
+          parsed.endSec > parsed.startSec
+        ) {
+          return {
+            enabled: Boolean(parsed.enabled),
+            startSec: Math.max(0, parsed.startSec),
+            endSec: parsed.endSec,
+            updatedAt: parsed.updatedAt || new Date().toISOString(),
+            updatedBy: parsed.updatedBy,
+            schoolId: parsed.schoolId,
+            recordingId: parsed.recordingId || recordingId,
+            recordingTitle: parsed.recordingTitle,
+            totalDuration: parsed.totalDuration
+          };
+        }
+      }
+    }
+
+    // 2. Sekundäre Suche über recordingId
+    if (recordingId && recordingId !== audioUrlOrKey) {
+      const recKey = getStorageKey(recordingId);
+      const rawRec = localStorage.getItem(recKey);
+      if (rawRec) {
+        const parsed = JSON.parse(rawRec);
+        if (
+          typeof parsed === 'object' &&
+          parsed !== null &&
+          typeof parsed.startSec === 'number' &&
+          typeof parsed.endSec === 'number' &&
+          parsed.endSec > parsed.startSec
+        ) {
+          return {
+            enabled: Boolean(parsed.enabled),
+            startSec: Math.max(0, parsed.startSec),
+            endSec: parsed.endSec,
+            updatedAt: parsed.updatedAt || new Date().toISOString(),
+            updatedBy: parsed.updatedBy,
+            schoolId: parsed.schoolId,
+            recordingId: parsed.recordingId || recordingId,
+            recordingTitle: parsed.recordingTitle,
+            totalDuration: parsed.totalDuration
+          };
+        }
+      }
+    }
+
+    // 3. Fallback: Tiefenscan in campus_junior_recordings_* und campus_audio_biography_*
+    const canonicalKey = audioUrlOrKey ? extractCanonicalAudioKey(audioUrlOrKey) : '';
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith('campus_junior_recordings_') || k.startsWith('campus_audio_biography_'))) {
+        const val = localStorage.getItem(k);
+        if (
+          val &&
+          ((audioUrlOrKey && (val.includes(audioUrlOrKey) || val.includes(canonicalKey))) ||
+            (recordingId && val.includes(recordingId)))
+        ) {
+          const parsed = JSON.parse(val);
+          if (Array.isArray(parsed)) {
+            const match = parsed.find((rec: any) => {
+              const recKey = rec.id || rec.blobKey || rec.url || '';
+              return (
+                (recordingId && (rec.id === recordingId || rec.recordingId === recordingId)) ||
+                (audioUrlOrKey && (rec.url === audioUrlOrKey || rec.id === audioUrlOrKey || extractCanonicalAudioKey(recKey) === canonicalKey))
+              );
+            });
+            if (match?.loop_locator && typeof match.loop_locator.startSec === 'number') {
+              // In den schnellen O(1)-Cache spiegeln
+              if (audioUrlOrKey) {
+                localStorage.setItem(getStorageKey(audioUrlOrKey), JSON.stringify(match.loop_locator));
               }
+              if (recordingId) {
+                localStorage.setItem(getStorageKey(recordingId), JSON.stringify(match.loop_locator));
+              }
+              return match.loop_locator;
             }
           }
         }
       }
-      return null;
-    }
-    const parsed = JSON.parse(raw);
-    if (
-      typeof parsed === 'object' &&
-      parsed !== null &&
-      typeof parsed.startSec === 'number' &&
-      typeof parsed.endSec === 'number' &&
-      parsed.endSec > parsed.startSec
-    ) {
-      return {
-        enabled: Boolean(parsed.enabled),
-        startSec: Math.max(0, parsed.startSec),
-        endSec: parsed.endSec,
-        updatedAt: parsed.updatedAt || new Date().toISOString(),
-        updatedBy: parsed.updatedBy,
-        schoolId: parsed.schoolId,
-        recordingId: parsed.recordingId,
-        recordingTitle: parsed.recordingTitle,
-        totalDuration: parsed.totalDuration
-      };
     }
     return null;
   } catch {
@@ -364,7 +408,7 @@ export function saveLoopLocator(
   locator: { startSec: number; endSec: number; enabled?: boolean },
   meta?: AudioLoopLocatorMetadata
 ): AudioLoopLocator {
-  const prev = getLoopLocator(audioUrlOrKey);
+  const prev = getLoopLocator(audioUrlOrKey, meta?.recordingId);
   const startSec = Math.max(0, locator.startSec);
   const endSec = Math.max(startSec + 0.5, locator.endSec);
   const enabled = locator.enabled !== undefined ? locator.enabled : true;
@@ -380,15 +424,20 @@ export function saveLoopLocator(
     totalDuration: meta?.totalDuration
   };
 
-  if (typeof window !== 'undefined' && audioUrlOrKey) {
+  if (typeof window !== 'undefined' && (audioUrlOrKey || meta?.recordingId)) {
     try {
-      const key = getStorageKey(audioUrlOrKey);
-      localStorage.setItem(key, JSON.stringify(data));
+      const dataStr = JSON.stringify(data);
+      if (audioUrlOrKey) {
+        localStorage.setItem(getStorageKey(audioUrlOrKey), dataStr);
+      }
+      if (meta?.recordingId && meta.recordingId !== audioUrlOrKey) {
+        localStorage.setItem(getStorageKey(meta.recordingId), dataStr);
+      }
 
       // 1. Lokales Tab-Event
       window.dispatchEvent(
         new CustomEvent('campus-audio-loop-locator-changed', {
-          detail: { audioKey: audioUrlOrKey, locator: data }
+          detail: { audioKey: audioUrlOrKey, recordingId: meta?.recordingId, locator: data }
         })
       );
 
@@ -397,15 +446,19 @@ export function saveLoopLocator(
         locatorBroadcastChannel.postMessage({
           type: 'LOCATOR_UPDATED',
           audioKey: audioUrlOrKey,
+          recordingId: meta?.recordingId,
           locator: data
         });
       }
 
       // 3. Hybrid Dual-Store: Aufnahme-Objekt aktualisieren
       patchRecordingObjectWithLocator(audioUrlOrKey, data);
+      if (meta?.recordingId && meta.recordingId !== audioUrlOrKey) {
+        patchRecordingObjectWithLocator(meta.recordingId, data);
+      }
 
       // 4. Revisionssicheres Audit-Logging & Cross-Device Realtime
-      logLocatorAuditTrail('AUDIO_LOOP_LOCATOR_SAVED', audioUrlOrKey, data, {
+      logLocatorAuditTrail('AUDIO_LOOP_LOCATOR_SAVED', audioUrlOrKey || meta?.recordingId || 'unknown', data, {
         ...meta,
         previousLocator: prev
       }).catch(() => {});
@@ -425,7 +478,7 @@ export function toggleLoopLocator(
   audioUrlOrKey: string,
   meta?: AudioLoopLocatorMetadata
 ): boolean {
-  const current = getLoopLocator(audioUrlOrKey);
+  const current = getLoopLocator(audioUrlOrKey, meta?.recordingId);
   if (!current) return false;
   const nextEnabled = !current.enabled;
   saveLoopLocator(audioUrlOrKey, {
@@ -443,16 +496,20 @@ export function removeLoopLocator(
   audioUrlOrKey: string,
   meta?: AudioLoopLocatorMetadata
 ): void {
-  if (typeof window === 'undefined' || !audioUrlOrKey) return;
-  const prev = getLoopLocator(audioUrlOrKey);
+  if (typeof window === 'undefined' || (!audioUrlOrKey && !meta?.recordingId)) return;
+  const prev = getLoopLocator(audioUrlOrKey, meta?.recordingId);
   try {
-    const key = getStorageKey(audioUrlOrKey);
-    localStorage.removeItem(key);
+    if (audioUrlOrKey) {
+      localStorage.removeItem(getStorageKey(audioUrlOrKey));
+    }
+    if (meta?.recordingId && meta.recordingId !== audioUrlOrKey) {
+      localStorage.removeItem(getStorageKey(meta.recordingId));
+    }
 
     // 1. Lokales Tab-Event
     window.dispatchEvent(
       new CustomEvent('campus-audio-loop-locator-changed', {
-        detail: { audioKey: audioUrlOrKey, locator: null }
+        detail: { audioKey: audioUrlOrKey, recordingId: meta?.recordingId, locator: null }
       })
     );
 
@@ -461,15 +518,19 @@ export function removeLoopLocator(
       locatorBroadcastChannel.postMessage({
         type: 'LOCATOR_UPDATED',
         audioKey: audioUrlOrKey,
+        recordingId: meta?.recordingId,
         locator: null
       });
     }
 
     // 3. Hybrid Dual-Store: Aufnahme-Objekt aktualisieren
     patchRecordingObjectWithLocator(audioUrlOrKey, null);
+    if (meta?.recordingId && meta.recordingId !== audioUrlOrKey) {
+      patchRecordingObjectWithLocator(meta.recordingId, null);
+    }
 
     // 4. Revisionssicheres Audit-Logging & Cross-Device Realtime
-    logLocatorAuditTrail('AUDIO_LOOP_LOCATOR_REMOVED', audioUrlOrKey, null, {
+    logLocatorAuditTrail('AUDIO_LOOP_LOCATOR_REMOVED', audioUrlOrKey || meta?.recordingId || 'unknown', null, {
       ...meta,
       previousLocator: prev
     }).catch(() => {});

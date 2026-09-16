@@ -148,6 +148,32 @@ export function tryExtractTakeNumber(rawLabel?: string): number | null {
 }
 
 /**
+ * Detects whether a string is a generic fallback or timestamped lesson label
+ * (e.g. "Übung", "Unterricht", "Übung • 16. Sep. #5", "Aufnahme 1"), which must
+ * NEVER be treated as a real Song Album.
+ */
+export function isGenericSongTag(tag?: string | null): boolean {
+  if (!tag) return true;
+  const trimmed = tag.trim();
+  if (!trimmed) return true;
+  const lower = trimmed.toLowerCase();
+  if (GENERIC_LABELS.has(lower)) return true;
+
+  // Catch typical auto-generated lesson / exercise labels with dates or bullets
+  // e.g. "Übung • 16. Sep. #5", "Unterricht · 17. Aug.", "Duett: Übung • 16. Sep. #5"
+  if (/^(?:duett:\s*)?(?:übung|unterricht|aufnahme|take|audio|test|probe)\b/i.test(trimmed)) {
+    return true;
+  }
+  if (/[•·-]\s*\d{1,2}\.?\s*(?:jan|feb|mär|apr|mai|jun|jul|aug|sep|sept|okt|nov|dez)/i.test(trimmed)) {
+    return true;
+  }
+  if (/^eigene aufnahme/i.test(trimmed)) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * Parses artist and title from a string like "Linkin Park - Numb" or "Numb".
  */
 export function cleanSongOrBookTitle(raw?: string): string {

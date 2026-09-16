@@ -18,7 +18,7 @@ import { getBlob, storeBlob } from '../../utils/blobStorage';
 import { shiftAudioBufferPitch } from '../../utils/pitchShifter';
 import { safeDecodeAudioData, audioBufferToWavBlob } from '../../utils/audioMasteringEngine';
 import { getAudioNotes } from '../../utils/audioNotesStorage';
-import { getLoopLocator, saveLoopLocator, removeLoopLocator } from '../../utils/audioLoopLocatorStorage';
+import { getLoopLocator, saveLoopLocator, removeLoopLocator, AudioLoopLocator } from '../../utils/audioLoopLocatorStorage';
 
 export interface AudioEditorSaveResult {
   url: string;
@@ -51,6 +51,7 @@ export interface AudioEditorModalProps {
   schoolId?: string;
   userId?: string;
   recordingId?: string;
+  initialLocator?: AudioLoopLocator | null;
 }
 
 export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
@@ -69,7 +70,8 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
   uiLevel = 'junior',
   schoolId,
   userId,
-  recordingId
+  recordingId,
+  initialLocator
 }) => {
   const [activeUrl, setActiveUrl] = useState<string>(audioUrl);
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
@@ -77,7 +79,11 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoopingSelection, setIsLoopingSelection] = useState(false);
   
-  const existingLocator = useMemo(() => getLoopLocator(activeUrl || audioUrl), [activeUrl, audioUrl]);
+  const existingLocator = useMemo(() => {
+    if (initialLocator) return initialLocator;
+    return getLoopLocator(activeUrl || audioUrl, recordingId);
+  }, [initialLocator, activeUrl, audioUrl, recordingId]);
+
   const [duration, setDuration] = useState(initialDuration || 0);
   const [startTime, setStartTime] = useState(() => existingLocator?.startSec || 0);
   const [endTime, setEndTime] = useState(() => existingLocator?.endSec || initialDuration || 0);
@@ -177,9 +183,18 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
         setAudioBuffer(decoded);
         const dur = decoded.duration;
         setDuration(dur);
-        setStartTime(0);
-        setEndTime(dur);
-        setCurrentPlayTime(0);
+        const loc = initialLocator || existingLocator || getLoopLocator(activeUrl || audioUrl, recordingId);
+        if (loc && typeof loc.startSec === 'number' && typeof loc.endSec === 'number' && loc.endSec > loc.startSec) {
+          const clampedStart = Math.max(0, Math.min(dur, loc.startSec));
+          const clampedEnd = Math.max(clampedStart + 0.1, Math.min(dur, loc.endSec));
+          setStartTime(clampedStart);
+          setEndTime(clampedEnd);
+          setCurrentPlayTime(clampedStart);
+        } else {
+          setStartTime(0);
+          setEndTime(dur);
+          setCurrentPlayTime(0);
+        }
       } catch (err) {
         console.error('AudioEditor: Decode failed:', err);
       } finally {

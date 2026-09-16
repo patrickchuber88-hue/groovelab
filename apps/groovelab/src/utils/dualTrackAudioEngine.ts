@@ -187,16 +187,19 @@ export function playDualTrackSynchronous(params: {
   // Compute sub-track offsets
   const teacherOffset = Math.max(0, Math.min(teacherBuffer.duration, offsetSec));
   const latencySec = latencyOffsetMs / 1000;
-  // If student is shifted earlier or later:
-  const studentOffset = Math.max(0, Math.min(studentBuffer ? studentBuffer.duration : 0, offsetSec - latencySec));
-
+  
   teacherSource.start(startTick, teacherOffset);
 
   if (studentSource && studentBuffer) {
-    if (offsetSec - latencySec < 0) {
-      const delayedStartTick = startTick + Math.abs(offsetSec - latencySec);
+    // 🎯 1% Tier-1 Korrektur: Positiver Latenz-Offset schiebt die Schülerspur nach vorne (früher im Zeitstrahl)
+    const effectiveStudentPos = offsetSec + latencySec;
+    if (effectiveStudentPos < 0) {
+      // Wenn der Schüler zeitlich nach dem Start einsetzen soll (Verzögerter Start)
+      const delayedStartTick = startTick + Math.abs(effectiveStudentPos);
       studentSource.start(delayedStartTick, 0);
     } else {
+      // Normalfall: Schüler-Audio beginnt ab sofort, aber um den Latenzoffset vorgespult
+      const studentOffset = Math.min(studentBuffer.duration, effectiveStudentPos);
       studentSource.start(startTick, studentOffset);
     }
   }

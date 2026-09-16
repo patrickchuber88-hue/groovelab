@@ -11,6 +11,9 @@ import {
   Sliders, 
   Layers, 
   Sparkles,
+  Wand2,
+  Headphones,
+  ShieldCheck,
   Download
 } from 'lucide-react';
 import { getBlob, storeBlob } from '../../../utils/blobStorage';
@@ -25,6 +28,14 @@ import {
   DualTrackPlaybackSession 
 } from '../../../utils/dualTrackAudioEngine';
 import { UniversalLatencyEngine } from '../../../utils/universalLatencyEngine';
+import { calculateOptimalAlignmentOffsetMs, extractWaveformPeaks, applyMicroFadeIn } from '../../../utils/audioAutoAligner';
+import { 
+  uploadAudioWithIntegrityVerification, 
+  computeBlobSha256, 
+  buildCanonicalAudioStoragePath 
+} from '../../../utils/audioStorageHelper';
+import { isGenericSongTag } from '../../../utils/audioNamingHelper';
+import { supabase } from '../../../lib/supabase';
 
 export interface DuettDeckModalProps {
   isOpen: boolean;
@@ -34,6 +45,7 @@ export interface DuettDeckModalProps {
   teacherBpm?: number;
   songTag?: string;
   studentId: string;
+  schoolId?: string;
   studentFirstName?: string;
   onSaveStudentTake?: (take: {
     id: string;
@@ -41,13 +53,18 @@ export interface DuettDeckModalProps {
     title: string;
     label: string;
     duration: number;
+    date?: string;
     created_at: string;
     songTag?: string;
     isDuettTake?: boolean;
+    source?: string;
     latencyOffsetMs?: number;
     teacherAudioUrl?: string;
     teacherTitle?: string;
     teacherBpm?: number;
+    sha256Checksum?: string;
+    monitoringMode?: string;
+    isBlindTake?: boolean;
   }) => void;
 }
 
@@ -61,6 +78,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
   teacherBpm = 100,
   songTag,
   studentId,
+  schoolId,
   studentFirstName = 'Schüler',
   onSaveStudentTake
 }) => {
@@ -74,6 +92,17 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // 🎧 Pädagogisches 3-Stufen-Monitoring vor der Aufnahme
+  const [monitoringMode, setMonitoringMode] = useState<'full_teacher' | 'guide_teacher' | 'metronome_only'>('full_teacher');
+
+  // ✨ Auto-Aligning State & Feedback
+  const [isAutoAligning, setIsAutoAligning] = useState(false);
+  const [autoAlignNotice, setAutoAlignNotice] = useState<string | null>(null);
+
+  // 📊 Echte AudioBuffer RMS/Peak-Wellenformen
+  const [teacherPeaks, setTeacherPeaks] = useState<number[]>(() => Array.from({ length: 48 }, () => 30));
+  const [studentPeaks, setStudentPeaks] = useState<number[]>(() => Array.from({ length: 48 }, () => 30));
 
   // Master Playback State
   const [isPlaying, setIsPlaying] = useState(false);
@@ -159,6 +188,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
         if (active) {
           teacherBufferRef.current = decodedBuffer;
           setTeacherDuration(decodedBuffer.duration);
+          setTeacherPeaks(extractWaveformPeaks(decodedBuffer, 48));
           setIsLoadingTeacher(false);
         }
       } catch (err) {
@@ -420,15 +450,28 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
         // Decode Student Buffer into Web Audio Engine
         try {
           const decodedStudent = await decodeAudioSource(finalBlob, audioCtx);
+          
+          // 🪄 Zero-Touch: Klickfreies Cos² Micro-Fade-In (Anti-Plopp)
+          applyMicroFadeIn(decodedStudent, 15);
+
           studentBufferRef.current = decodedStudent;
           setStudentDuration(decodedStudent.duration);
+          setStudentPeaks(extractWaveformPeaks(decodedStudent, 48));
+
+          // 🌟 Tier-1 Enterprise+ Auto-Pre-Align: Berechne sofort das Phasen-Optimum
+          if (teacherBufferRef.current) {
+            const calculatedMs = calculateOptimalAlignmentOffsetMs(teacherBufferRef.current, decodedStudent);
+            setLatencyOffsetMs(calculatedMs);
+          } else {
+            setLatencyOffsetMs(UniversalLatencyEngine.getLatencyMs());
+          }
         } catch (decodeErr) {
           console.warn('[DuettDeckModal] Failed to decode student audio:', decodeErr);
+          setLatencyOffsetMs(UniversalLatencyEngine.getLatencyMs());
         }
 
         setStudentAudioBlob(finalBlob);
         setStudentAudioUrl(newUrl);
-        setLatencyOffsetMs(UniversalLatencyEngine.getLatencyMs());
         setIsRecording(false);
       };
 
@@ -447,26 +490,48 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
       // Calculate time until Beat 1
       const delayUntilBeat1 = Math.max(0, (songStartTime - audioCtx.currentTime) * 1000);
 
+      // 🪄 Zero-Touch Musikalische 16tel-Pre-Roll Berechnung:
+      // Dauer einer 16tel-Note in ms: (15 / effectiveBpm) * 1000 (schützt den Anschlag des ersten Tons)
+      const prerollMs = Math.round((15 / effectiveBpm) * 1000);
+      const delayUntilPrerollRecord = Math.max(0, delayUntilBeat1 - prerollMs);
+
+      // 1. Rekorder startet butterweich um prerollMs VOR Beat 1 (Zero-Amputation / Attack-Schutz):
+      window.setTimeout(() => {
+        try {
+          if (recorder.state === 'inactive') {
+            recorder.start(250); // Sanfte 250ms Chunks für minimalen Puffer-Jitter
+            setIsRecording(true);
+            recordStartTimeRef.current = Date.now();
+            setRecordDuration(0);
+
+            recordIntervalRef.current = window.setInterval(() => {
+              const elapsed = Math.floor((Date.now() - recordStartTimeRef.current) / 1000);
+              setRecordDuration(elapsed);
+            }, 1000);
+          }
+        } catch (recStartErr) {
+          console.warn('[DuettDeckModal] Pre-roll recorder start warning:', recStartErr);
+        }
+      }, delayUntilPrerollRecord);
+
+      // 2. Exakt auf Beat 1 startet die Lehrkraft-Spur synchron im Takt:
       window.setTimeout(() => {
         setCountInStep(null);
         countInCancelRef.current = null;
 
-        // 🎯 SYNCHRONOUS START: Beat 1 starts Track A and Student Recording AT THE IDENTICAL INSTANT!
-        recorder.start(500); // Efficient 500ms chunking
-        setIsRecording(true);
-        recordStartTimeRef.current = Date.now();
-        setRecordDuration(0);
-
-        recordIntervalRef.current = window.setInterval(() => {
-          const elapsed = Math.floor((Date.now() - recordStartTimeRef.current) / 1000);
-          setRecordDuration(elapsed);
-        }, 1000);
+        // 🎧 Pädagogisches Live-Monitoring je nach gewähltem Modus:
+        let liveMonitoringTeacherVol = 1.0;
+        if (monitoringMode === 'guide_teacher') {
+          liveMonitoringTeacherVol = 0.25; // Guide-Spur leise im Hintergrund
+        } else if (monitoringMode === 'metronome_only') {
+          liveMonitoringTeacherVol = 0.00; // 🎯 Studio-Challenge: Lehrkraft komplett stumm!
+        }
 
         // Start Track A playback through the Web Audio Engine
         playbackSessionRef.current = playDualTrackSynchronous({
           teacherBuffer: teacherBufferRef.current!,
           offsetSec: 0,
-          teacherVolume: teacherVolume,
+          teacherVolume: liveMonitoringTeacherVol,
           onEnded: () => {
             // 🎯 SYNCHRONOUS AUTO-STOP: When teacher track reaches its end, auto-stop student recording!
             handleStopRecording();
@@ -487,7 +552,45 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
     }
   };
 
-  // 6. Save Student Take with Rich Metadata to Junior Recordings
+  // 🌟 1-Klick Magischer Auto-Align Algorithmus (Kreuzkorrelation)
+  const handleAutoAlign = () => {
+    if (!teacherBufferRef.current || !studentBufferRef.current) return;
+    setIsAutoAligning(true);
+    try {
+      const calculatedOffset = calculateOptimalAlignmentOffsetMs(
+        teacherBufferRef.current,
+        studentBufferRef.current
+      );
+      setLatencyOffsetMs(calculatedOffset);
+      setAutoAlignNotice(`✨ Auto-Align optimiert: ${calculatedOffset > 0 ? `+${calculatedOffset}` : calculatedOffset} ms`);
+      setTimeout(() => setAutoAlignNotice(null), 3500);
+      updatePlayheadDOM(currentPlayheadTime);
+
+      if (isPlaying && playbackSessionRef.current) {
+        const currentT = playbackSessionRef.current.getCurrentPlaybackTime();
+        playbackSessionRef.current.stop();
+        playbackSessionRef.current = playDualTrackSynchronous({
+          teacherBuffer: teacherBufferRef.current!,
+          studentBuffer: studentBufferRef.current,
+          offsetSec: currentT,
+          latencyOffsetMs: calculatedOffset,
+          teacherVolume: teacherVolume,
+          studentVolume: studentVolume,
+          onEnded: () => {
+            setIsPlaying(false);
+            setCurrentPlayheadTime(0);
+            updatePlayheadDOM(0);
+          }
+        });
+      }
+    } catch (err) {
+      console.warn('[DuettDeckModal] Auto-align error:', err);
+    } finally {
+      setIsAutoAligning(false);
+    }
+  };
+
+  // 6. Save Student Take: 🛡️ Revisionssicherer Enterprise+ Standard (SHA-256, Cloud-Upload & Audit-Log)
   const handleSaveTake = async () => {
     if (!studentAudioBlob || isSaving) return;
     setIsSaving(true);
@@ -496,27 +599,91 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
       const takeId = `duett_take_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       const storageKey = `campus_blob_${takeId}`;
 
+      // 1. Dual-Storage Offline Cache (IndexedDB für verzögerungsfreie PWA-Wiedergabe)
       await storeBlob(storageKey, studentAudioBlob);
 
+      // 2. 🛡️ Kryptographische SHA-256 Integritätsprüfung gegen Bit-Rot & Manipulation
+      const sha256Checksum = await computeBlobSha256(studentAudioBlob);
+
+      // 3. 🛡️ Kanonischer Multi-Tenant Cloud Storage Upload
+      const effectiveSchool = schoolId || (typeof localStorage !== 'undefined' ? localStorage.getItem('campus_school_id') : null) || 'global';
+      const storagePath = buildCanonicalAudioStoragePath({
+        schoolId: effectiveSchool,
+        studentId: studentId,
+        category: 'duett_takes',
+        trackId: takeId,
+        extension: 'webm'
+      });
+
+      let finalUrl = storageKey;
+      try {
+        const uploadRes = await uploadAudioWithIntegrityVerification(
+          storagePath,
+          studentAudioBlob,
+          'campus-assets',
+          studentAudioBlob.type || 'audio/webm'
+        );
+        if (uploadRes.success && uploadRes.publicUrl) {
+          finalUrl = uploadRes.publicUrl;
+        }
+      } catch (uploadErr) {
+        console.warn('[DuettDeckModal] Cloud upload warning (local cache active):', uploadErr);
+      }
+
       const dur = studentDuration || recordDuration || 1;
-      const cleanTitle = `Duett: ${teacherTitle.replace(/^Aufnahme:\s*/i, '')}`;
+      const cleanTeacherTitle = (teacherTitle || 'Aufnahme').replace(/^(?:Aufnahme|Duett):\s*/i, '').trim();
+      const cleanTitle = cleanTeacherTitle || 'Übung';
       const nowIso = new Date().toISOString();
+
+      // 4. 🛡️ Revisionssicherer Audit-Trail Eintrag in public.audit_logs
+      try {
+        await supabase.from('audit_logs').insert({
+          action: 'DUETT_RECORDING_COMMITTED',
+          actor_id: studentId,
+          school_id: effectiveSchool,
+          target_id: takeId,
+          details: {
+            take_id: takeId,
+            title: cleanTitle,
+            sha256_checksum: sha256Checksum,
+            storage_path: storagePath,
+            latency_offset_ms: latencyOffsetMs,
+            monitoring_mode: monitoringMode,
+            is_blind_take: monitoringMode === 'metronome_only',
+            teacher_title: teacherTitle,
+            teacher_bpm: teacherBpm,
+            duration_seconds: dur
+          },
+          created_at: nowIso
+        });
+      } catch (auditErr) {
+        console.warn('[DuettDeckModal] Audit logging notice:', auditErr);
+      }
+
+      // 5. SongTag sanitization: Only genuine song/book titles become songTag (never generic lesson fallbacks)
+      const validSongTag = (songTag && !isGenericSongTag(songTag) && songTag !== teacherTitle) ? songTag.trim() : undefined;
 
       const newTake = {
         id: takeId,
-        url: storageKey,
+        url: finalUrl,
+        localUrl: storageKey,
         title: cleanTitle,
         label: cleanTitle,
         duration: dur,
+        date: nowIso,
         created_at: nowIso,
-        songTag: songTag || teacherTitle,
+        songTag: validSongTag,
         isDuettTake: true,
+        source: 'duet',
         latencyOffsetMs: latencyOffsetMs,
         teacherAudioUrl: teacherAudioUrl,
         teacherTitle: teacherTitle,
         teacherBpm: teacherBpm,
         metronomeBpm: teacherBpm,
-        bpm: teacherBpm
+        bpm: teacherBpm,
+        sha256Checksum: sha256Checksum,
+        monitoringMode: monitoringMode,
+        isBlindTake: monitoringMode === 'metronome_only'
       };
 
       const juniorKey = `campus_junior_recordings_${studentId}`;
@@ -578,9 +745,9 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Waveform visualization mockup bars (40 bars)
-  const teacherWaveform = [30, 45, 70, 50, 80, 95, 65, 40, 85, 90, 60, 45, 80, 100, 75, 55, 70, 85, 60, 40, 50, 75, 90, 65, 80, 95, 70, 45, 60, 85, 90, 65, 50, 70, 85, 60, 45, 35, 25, 20];
-  const studentWaveform = [25, 40, 60, 45, 75, 90, 70, 45, 80, 85, 65, 50, 85, 95, 70, 50, 65, 80, 65, 45, 55, 70, 85, 60, 75, 90, 65, 50, 65, 80, 85, 60, 45, 65, 80, 55, 40, 30, 20, 15];
+  // 📊 Echte RMS/Peak Wellenformen (48 Vektoren) aus decodierten AudioBuffers
+  const teacherWaveform = teacherPeaks && teacherPeaks.length > 0 ? teacherPeaks : [30, 45, 70, 50, 80, 95, 65, 40, 85, 90, 60, 45, 80, 100, 75, 55, 70, 85, 60, 40, 50, 75, 90, 65, 80, 95, 70, 45, 60, 85, 90, 65, 50, 70, 85, 60, 45, 35, 25, 20];
+  const studentWaveform = studentPeaks && studentPeaks.length > 0 ? studentPeaks : [25, 40, 60, 45, 75, 90, 70, 45, 80, 85, 65, 50, 85, 95, 70, 50, 65, 80, 65, 45, 55, 70, 85, 60, 75, 90, 65, 50, 65, 80, 85, 60, 45, 65, 80, 55, 40, 30, 20, 15];
 
   return (
     <div
@@ -911,11 +1078,57 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  padding: isMobile ? '18px 12px' : '24px 16px',
-                  gap: '12px',
+                  padding: isMobile ? '16px 12px' : '20px 16px',
+                  gap: '14px',
                   textAlign: 'center'
                 }}
               >
+                {/* 🎧 Pädagogisches 3-Stufen-Monitoring vor der Aufnahme */}
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Headphones size={13} color="#7c3aed" />
+                      Kopfhörer-Monitoring während der Aufnahme:
+                    </span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '6px' }}>
+                    {[
+                      { key: 'full_teacher', label: '🟢 Mitspiel-Duett', desc: 'Lehrer 100% + Klick' },
+                      { key: 'guide_teacher', label: '🟡 Guide-Spur', desc: 'Lehrer leise (25%)' },
+                      { key: 'metronome_only', label: '🟣 Studio-Challenge', desc: 'NUR Metronom (Blind)' }
+                    ].map(opt => {
+                      const isActive = monitoringMode === opt.key;
+                      return (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onClick={() => setMonitoringMode(opt.key as any)}
+                          style={{
+                            padding: '8px 10px',
+                            borderRadius: '12px',
+                            border: isActive ? '1.5px solid #7c3aed' : '1px solid #cbd5e1',
+                            background: isActive ? '#ede9fe' : '#ffffff',
+                            color: isActive ? '#5b21b6' : '#475569',
+                            textAlign: 'center',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '2px',
+                            minHeight: '44px',
+                            transition: 'all 0.15s ease',
+                            boxShadow: isActive ? '0 2px 8px rgba(124, 58, 237, 0.16)' : 'none'
+                          }}
+                          className="hover-scale-mini"
+                        >
+                          <span style={{ fontSize: '0.74rem', fontWeight: 900 }}>{opt.label}</span>
+                          <span style={{ fontSize: '0.64rem', color: isActive ? '#6d28d9' : '#64748b', fontWeight: 650 }}>{opt.desc}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <button
                   type="button"
                   onClick={handleStartRecording}
@@ -1083,18 +1296,30 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                     overflow: 'hidden'
                   }}
                 >
-                  {/* Background Gray Bars */}
-                  {studentWaveform.map((h, idx) => (
-                    <div
-                      key={`sw_bg_${idx}`}
-                      style={{
-                        flex: 1,
-                        height: `${h}%`,
-                        background: '#e2e8f0',
-                        borderRadius: '4px'
-                      }}
-                    />
-                  ))}
+                  {/* Background Gray Bars mit visuellem Latenz-Shift */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '3px',
+                      width: '100%',
+                      height: '100%',
+                      transform: `translateX(${Math.max(-28, Math.min(28, Math.round((latencyOffsetMs / 250) * 20)))}px)`,
+                      transition: 'transform 0.12s ease'
+                    }}
+                  >
+                    {studentWaveform.map((h, idx) => (
+                      <div
+                        key={`sw_bg_${idx}`}
+                        style={{
+                          flex: 1,
+                          height: `${h}%`,
+                          background: '#e2e8f0',
+                          borderRadius: '4px'
+                        }}
+                      />
+                    ))}
+                  </div>
 
                   {/* Foreground Purple Active Reveal Overlay */}
                   <div
@@ -1115,17 +1340,29 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                       boxShadow: '2px 0 8px rgba(124, 58, 237, 0.4)'
                     }}
                   >
-                    {studentWaveform.map((h, idx) => (
-                      <div
-                        key={`sw_fg_${idx}`}
-                        style={{
-                          flex: 1,
-                          height: `${h}%`,
-                          background: '#7c3aed',
-                          borderRadius: '4px'
-                        }}
-                      />
-                    ))}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        width: '100%',
+                        height: '100%',
+                        transform: `translateX(${Math.max(-28, Math.min(28, Math.round((latencyOffsetMs / 250) * 20)))}px)`,
+                        transition: 'transform 0.12s ease'
+                      }}
+                    >
+                      {studentWaveform.map((h, idx) => (
+                        <div
+                          key={`sw_fg_${idx}`}
+                          style={{
+                            flex: 1,
+                            height: `${h}%`,
+                            background: '#7c3aed',
+                            borderRadius: '4px'
+                          }}
+                        />
+                      ))}
+                    </div>
                   </div>
                 </div>
 
@@ -1173,17 +1410,46 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                 gap: '8px'
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Sliders size={15} color="#475569" />
                   <span style={{ fontSize: isMobile ? '0.72rem' : '0.76rem', fontWeight: 900, color: '#334155' }}>
                     Latenz-Kompensation (Timing-Feinschliff)
                   </span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  {/* ✨ 1-Klick Auto-Align Button (Kreuzkorrelation) */}
+                  <button
+                    type="button"
+                    onClick={handleAutoAlign}
+                    disabled={isAutoAligning || !studentBufferRef.current}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '4px 10px',
+                      minHeight: '30px',
+                      fontSize: '0.70rem',
+                      fontWeight: 900,
+                      cursor: isAutoAligning ? 'wait' : 'pointer',
+                      boxShadow: '0 2px 8px rgba(124, 58, 237, 0.28)',
+                      transition: 'all 0.15s ease'
+                    }}
+                    className="hover-scale-mini"
+                    title="Berechnet automatisch den optimalen Phasen- und Transient-Versatz via FFT-Kreuzkorrelation"
+                  >
+                    <Wand2 size={12} strokeWidth={2.4} />
+                    <span>{isAutoAligning ? 'Berechne...' : '✨ Auto-Align'}</span>
+                  </button>
+
                   <span
                     style={{
-                      fontSize: '0.76rem',
+                      fontSize: '0.74rem',
                       fontWeight: 900,
                       color: latencyOffsetMs === 0 ? '#64748b' : '#7c3aed',
                       background: latencyOffsetMs === 0 ? '#f1f5f9' : '#ede9fe',
@@ -1194,52 +1460,76 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                   >
                     {latencyOffsetMs > 0 ? `+${latencyOffsetMs} ms` : `${latencyOffsetMs} ms`}
                   </span>
+
                   <button
                     type="button"
                     onClick={() => {
-                      const smartMs = UniversalLatencyEngine.getLatencyMs();
-                      setLatencyOffsetMs(smartMs);
-                      UniversalLatencyEngine.saveLatencyMs(smartMs, studentId);
+                      const detected = UniversalLatencyEngine.getDeviceInfo().baselineLatencyMs || 65;
+                      setLatencyOffsetMs(detected);
                       updatePlayheadDOM(currentPlayheadTime);
                     }}
                     style={{
                       background: 'transparent',
                       border: 'none',
                       color: '#64748b',
-                      fontSize: '0.70rem',
+                      fontSize: '0.68rem',
                       fontWeight: 800,
                       cursor: 'pointer',
                       textDecoration: 'underline',
                       padding: '4px'
                     }}
+                    title="Setzt auf den hardware-erkannten Standard-Offset zurück"
                   >
-                    Auto-Smart ({UniversalLatencyEngine.getLatencyMs()} ms)
+                    Smart-Baseline ({UniversalLatencyEngine.getDeviceInfo().baselineLatencyMs || 65} ms)
                   </button>
+
                   <button
                     type="button"
                     onClick={() => {
                       setLatencyOffsetMs(0);
-                      UniversalLatencyEngine.saveLatencyMs(0, studentId);
                       updatePlayheadDOM(currentPlayheadTime);
                     }}
                     style={{
                       background: 'transparent',
                       border: 'none',
                       color: '#94a3b8',
-                      fontSize: '0.70rem',
+                      fontSize: '0.68rem',
                       fontWeight: 800,
                       cursor: 'pointer',
                       textDecoration: 'underline',
                       padding: '4px'
                     }}
+                    title="0 ms (Unkompensiert - Hardware-Puffer hörbar)"
                   >
                     0 ms
                   </button>
                 </div>
               </div>
 
+              {/* ✨ Auto-Align Erfolgs-Notice */}
+              {autoAlignNotice && (
+                <div
+                  style={{
+                    background: '#f5f3ff',
+                    border: '1px solid #ddd6fe',
+                    borderRadius: '8px',
+                    padding: '4px 10px',
+                    fontSize: '0.68rem',
+                    fontWeight: 800,
+                    color: '#6d28d9',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    animation: 'fadeIn 0.2s ease'
+                  }}
+                >
+                  <Sparkles size={13} color="#7c3aed" />
+                  <span>{autoAlignNotice}</span>
+                </div>
+              )}
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minHeight: '36px' }}>
-                <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700 }}>-300 ms</span>
+                <span style={{ fontSize: '0.66rem', color: '#94a3b8', fontWeight: 700 }}>-300 ms (Später)</span>
                 <input 
                   type="range" 
                   min="-300" 
@@ -1249,7 +1539,6 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                   onChange={(e) => {
                     const val = parseInt(e.target.value, 10);
                     setLatencyOffsetMs(val);
-                    UniversalLatencyEngine.saveLatencyMs(val, studentId);
                     updatePlayheadDOM(currentPlayheadTime);
 
                     if (isPlaying && playbackSessionRef.current) {
@@ -1272,9 +1561,9 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                     }
                   }}
                   style={{ flex: 1, height: '28px', accentColor: '#7c3aed', cursor: 'pointer' }}
-                  title="Schiebe nach links/rechts um Latenzen auszugleichen"
+                  title="Schiebe nach rechts um Latenzen der Schüleraufnahme auszugleichen"
                 />
-                <span style={{ fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700 }}>+300 ms</span>
+                <span style={{ fontSize: '0.66rem', color: '#94a3b8', fontWeight: 700 }}>+300 ms (Früher)</span>
               </div>
             </div>
           )}

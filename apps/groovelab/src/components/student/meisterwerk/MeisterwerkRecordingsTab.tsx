@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import {
   X, Check, BookOpen, Music, Plus, ChevronRight, ChevronDown, ChevronUp, Book, Star,
   Mic, Square, Play, Headphones, Calendar, Clock, ArrowLeft, Edit3, Search, Lock,
-  Share2, Sparkles, Filter, HelpCircle, SlidersHorizontal
+  Share2, Sparkles, Filter, HelpCircle, SlidersHorizontal, Users
 } from 'lucide-react';
-import { harmonizeAudioList } from '../../../utils/audioNamingHelper';
+import { harmonizeAudioList, isGenericSongTag } from '../../../utils/audioNamingHelper';
 import { checkIsAudioTresorActive } from '../../../domain/stickersAndTresor';
 import { shouldDefaultToInputPad } from '../../../utils/instruments';
 import { getSimulatedNow } from '../studentDateUtils';
@@ -231,6 +231,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
 
   const [localRecordingsRevision, setLocalRecordingsRevision] = useState(0);
   const [selectedPracticeCompanionAlbum, setSelectedPracticeCompanionAlbum] = useState<boolean>(false);
+  const [selectedDuettAlbum, setSelectedDuettAlbum] = useState<boolean>(false);
   const [selectedPracticeStyleFilter, setSelectedPracticeStyleFilter] = useState<string>('all');
 
   useEffect(() => {
@@ -1121,6 +1122,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                         duration={aud.duration}
                         waveformPeaks={aud.waveformPeaks}
                         date={aud.date}
+                        initialLoopLocator={aud.loop_locator}
                         isHero={isHero || (Boolean(justRecordedAudioUrl) && aud.url === justRecordedAudioUrl)}
                         contextBadge={aud.songTag}
                         onContextBadgeClick={aud.songTag ? () => { setSelectedTeacherMonth(null); setShowTeacherFavoritesOnly(false); setShowTeacherHomeworkArchive(false); setSelectedTeacherSongAlbum(aud.songTag); } : undefined}
@@ -2726,20 +2728,43 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                                 seenIds.add(recId);
                                 const rawSongTag = rec.songTag || rec.song || rec.songTitle || undefined;
                                 const songTag = (rec.url && audioSongTags[rec.url] !== undefined) ? (audioSongTags[rec.url] || undefined) : rawSongTag;
+                                const sanitizedSongTag = isGenericSongTag(songTag) ? undefined : songTag;
                                 const rawBpmCandidate = rec.metronomeBpm ?? rec.bpm ?? rec.teacherBpm;
                                 const parsedBpmNum = rawBpmCandidate !== undefined && rawBpmCandidate !== null ? parseInt(String(rawBpmCandidate), 10) : undefined;
                                 const validatedBpm = (parsedBpmNum && !isNaN(parsedBpmNum) && parsedBpmNum > 0) ? parsedBpmNum : undefined;
+
+                                const isDuett = Boolean(
+                                  rec.isDuettTake || 
+                                  rec.source === 'duet' || 
+                                  (typeof rec.title === 'string' && rec.title.startsWith('Duett:')) || 
+                                  (typeof rec.label === 'string' && rec.label.startsWith('Duett:'))
+                                );
+
+                                // 🛡️ Deterministischer Zeitstempel: Reale Aufnahmezeit verwenden, KEIN 'new Date().toISOString()' Fallback
+                                const rawDateCandidate = rec.date || rec.created_at || rec.recordedAt;
+                                let resolvedDate = rawDateCandidate;
+                                if (!resolvedDate && rec.id && typeof rec.id === 'string' && rec.id.includes('_')) {
+                                  const parts = rec.id.split('_');
+                                  const num = parseInt(parts[2] || parts[1] || '0', 10);
+                                  if (num > 1600000000000) {
+                                    resolvedDate = new Date(num).toISOString();
+                                  }
+                                }
+                                if (!resolvedDate) {
+                                  resolvedDate = new Date(0).toISOString();
+                                }
+
                                 studentAudios.push({
                                   id: recId,
                                   url: rec.url,
                                   blobKey: rec.blobKey,
                                   duration: parseInt(rec.duration || '0', 10),
-                                  date: rec.date || new Date().toISOString(),
+                                  date: resolvedDate,
                                   label: rec.title || rec.label || `Eigene Aufnahme #${studentAudios.length + 1}`,
                                   visibility: rec.visibility || 'private',
-                                  songTag,
+                                  songTag: sanitizedSongTag,
                                   originalIdx: -1,
-                                  source: rec.source || 'local_junior',
+                                  source: rec.source || (isDuett ? 'duet' : 'local_junior'),
                                   bpm: validatedBpm,
                                   style: rec.style,
                                   cloudSyncStatus: rec.cloudSyncStatus,
@@ -2749,7 +2774,14 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                                   metronomeBpm: validatedBpm,
                                   original_url: rec.original_url || rec.originalUrl,
                                   original_duration: rec.original_duration || rec.originalDuration,
-                                  waveformPeaks: rec.waveformPeaks
+                                  waveformPeaks: rec.waveformPeaks,
+                                  isDuettTake: isDuett,
+                                  teacherAudioUrl: rec.teacherAudioUrl,
+                                  teacherTitle: rec.teacherTitle,
+                                  teacherBpm: rec.teacherBpm,
+                                  latencyOffsetMs: rec.latencyOffsetMs,
+                                  monitoringMode: rec.monitoringMode,
+                                  isBlindTake: rec.isBlindTake
                                 });
                               }
                             });
@@ -2771,7 +2803,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                   studentAudios.sort((a, b) => {
                     const timeA = a.date ? new Date(a.date).getTime() : 0;
                     const timeB = b.date ? new Date(b.date).getTime() : 0;
-                    return timeB - timeA;
+                    return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
                   });
 
                   // If teacher is viewing, only show student recordings that are shared
@@ -2807,9 +2839,10 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                             duration={aud.duration}
                             waveformPeaks={aud.waveformPeaks}
                             date={aud.date}
+                            initialLoopLocator={aud.loop_locator}
                             isHero={idx === 0 || (Boolean(justRecordedAudioUrl) && (aud.url === justRecordedAudioUrl || aud.blobKey === justRecordedAudioUrl))}
                             contextBadge={aud.songTag}
-                            onContextBadgeClick={aud.songTag ? () => { setSelectedStudentMonth(null); setShowStudentFavoritesOnly(false); setSelectedPracticeCompanionAlbum(false); setSelectedStudentSongAlbum(aud.songTag); } : undefined}
+                            onContextBadgeClick={aud.songTag ? () => { setSelectedStudentMonth(null); setShowStudentFavoritesOnly(false); setSelectedPracticeCompanionAlbum(false); setSelectedDuettAlbum(false); setSelectedStudentSongAlbum(aud.songTag); } : undefined}
                             availableSongs={availableSongsForTagging}
                             onSelectSongTag={(newTag) => handleUpdateAudioSongTag(aud.url, newTag)}
                             themeColor="#16a34a"
@@ -2979,10 +3012,23 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                   );
                   practiceCompanionAudios.sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0));
 
-                  // Group Audios by Song if tagged
+                  // 👥 Duett Audios
+                  const duettAudios = studentAudios.filter(aud => 
+                    aud.isDuettTake || 
+                    aud.source === 'duet' || 
+                    (typeof aud.label === 'string' && aud.label.startsWith('Duett:')) ||
+                    (typeof aud.title === 'string' && aud.title.startsWith('Duett:'))
+                  );
+                  duettAudios.sort((a, b) => {
+                    const timeA = a.date ? new Date(a.date).getTime() : 0;
+                    const timeB = b.date ? new Date(b.date).getTime() : 0;
+                    return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+                  });
+
+                  // Group Audios by Song if tagged (Exclude generic tags / lesson titles)
                   const studentSongMap: { [songTitle: string]: any[] } = {};
                   studentAudios.forEach(aud => {
-                    if (aud.songTag) {
+                    if (aud.songTag && !isGenericSongTag(aud.songTag)) {
                       if (!studentSongMap[aud.songTag]) {
                         studentSongMap[aud.songTag] = [];
                       }
@@ -2990,7 +3036,11 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                     }
                   });
                   Object.values(studentSongMap).forEach(list => {
-                    list.sort((a, b) => (new Date(b.date).getTime() || 0) - (new Date(a.date).getTime() || 0));
+                    list.sort((a, b) => {
+                      const timeA = a.date ? new Date(a.date).getTime() : 0;
+                      const timeB = b.date ? new Date(b.date).getTime() : 0;
+                      return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+                    });
                   });
                   const studentSongAlbumsList = Object.keys(studentSongMap).sort().map(songTitle => ({
                     songTitle,
@@ -3043,20 +3093,21 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                         duration={aud.duration}
                         waveformPeaks={aud.waveformPeaks}
                         date={aud.date}
+                        initialLoopLocator={aud.loop_locator}
                         isHero={isHero || (Boolean(justRecordedAudioUrl) && (aud.url === justRecordedAudioUrl || aud.blobKey === justRecordedAudioUrl))}
                         contextBadge={aud.songTag}
-                        onContextBadgeClick={aud.songTag ? () => { setSelectedStudentMonth(null); setShowStudentFavoritesOnly(false); setSelectedPracticeCompanionAlbum(false); setSelectedStudentSongAlbum(aud.songTag); } : undefined}
+                        onContextBadgeClick={aud.songTag ? () => { setSelectedStudentMonth(null); setShowStudentFavoritesOnly(false); setSelectedPracticeCompanionAlbum(false); setSelectedDuettAlbum(false); setSelectedStudentSongAlbum(aud.songTag); } : undefined}
                         availableSongs={availableSongsForTagging}
                         onSelectSongTag={(newTag) => handleUpdateAudioSongTag(aud.url, newTag)}
                         isFavorite={favoriteAudioUrls.includes(aud.url)}
                         onToggleFavorite={() => toggleFavoriteAudio(aud.url)}
-                        themeColor={isPracticeTake ? "#d97706" : "#6d28d9"}
-                        themeBg={isPracticeTake ? "#fffbeb" : (aud.isDuettTake ? "#ecfdf5" : "#ede9fe")}
+                        themeColor={isPracticeTake ? "#d97706" : (aud.isDuettTake ? "#7c3aed" : "#6d28d9")}
+                        themeBg={isPracticeTake ? "#fffbeb" : (aud.isDuettTake ? "#faf5ff" : "#ede9fe")}
                         isSharedWithTeacher={isShared}
                         badge={aud.isDuettTake ? "👥 Duett" : (aud.cloudSyncStatus === 'synced' ? "☁️ Cloud" : (isShared ? "🚀 Für Lehrer" : "🔒 Privat"))}
                         badgeTitle={aud.isDuettTake ? "Synchrones Duett (Spur 1 & Spur 2) - Klicke auf Duett-Deck zum Abhören" : (aud.cloudSyncStatus === 'synced' ? "Revisionssicher im Audio-Tresor gesichert" : (isShared ? "Mit Lehrkraft geteilt (Klicken, um wieder privat zu machen)" : "Privat (Nur für dich sichtbar - Klicken zum Teilen mit Lehrkraft)"))}
-                        badgeBg={aud.isDuettTake ? "#dcfce7" : (aud.cloudSyncStatus === 'synced' ? "#fef3c7" : (isShared ? "#dcfce7" : "#f1f5f9"))}
-                        badgeColor={aud.isDuettTake ? "#15803d" : (aud.cloudSyncStatus === 'synced' ? "#b45309" : (isShared ? "#15803d" : "#475569"))}
+                        badgeBg={aud.isDuettTake ? "#f3e8ff" : (aud.cloudSyncStatus === 'synced' ? "#fef3c7" : (isShared ? "#dcfce7" : "#f1f5f9"))}
+                        badgeColor={aud.isDuettTake ? "#6b21a8" : (aud.cloudSyncStatus === 'synced' ? "#b45309" : (isShared ? "#15803d" : "#475569"))}
                         onRename={(newTitle) => handleRenameStudentAudio(aud.url, newTitle, aud.id)}
                         metronomeBpm={hasValidBpm ? effectiveBpm : undefined}
                         onOpenDuettDeck={hasValidBpm ? () => setDuettModalData({
@@ -3401,15 +3452,15 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                             width: "44px",
                             height: "44px",
                             borderRadius: "12px",
-                            background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                            background: "linear-gradient(135deg, #facc15 0%, #eab308 100%)",
                             color: "#ffffff",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            boxShadow: "0 4px 12px rgba(217, 119, 6, 0.30)",
+                            boxShadow: "0 4px 14px -2px rgba(234, 179, 8, 0.40)",
                             flexShrink: 0
                           }}>
-                            <Clock size={22} strokeWidth={2.4} />
+                            <Clock size={22} strokeWidth={2.4} style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.20))" }} />
                           </div>
                           <div style={{ minWidth: 0 }}>
                             <span style={{ fontSize: "0.68rem", fontWeight: 900, color: "#b45309", textTransform: "uppercase", letterSpacing: "0.06em" }}>
@@ -3477,6 +3528,102 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                         ) : (
                           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                             {filteredPracticeTakes.map((aud, idx) => renderStudentPlayer(aud, `stud-practice-${idx}`))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  // 👥 DUETT SYSTEM-ALBUM DRILLDOWN VIEW
+                  if (selectedDuettAlbum) {
+                    const totalDurationSec = duettAudios.reduce((acc, a) => acc + (a.duration || 0), 0);
+                    const totalMinutes = Math.max(1, Math.round(totalDurationSec / 60));
+
+                    return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedDuettAlbum(false)}
+                            style={{
+                              background: "#ffffff",
+                              border: "1px solid #cbd5e1",
+                              borderRadius: "100px",
+                              padding: "5px 14px",
+                              fontSize: "0.74rem",
+                              fontWeight: 800,
+                              color: "#475569",
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "6px"
+                            }}
+                            className="hover-scale"
+                          >
+                            <ArrowLeft size={13} /> Zurück zur Übersicht
+                          </button>
+                          <span style={{ fontSize: "0.74rem", fontWeight: 850, background: "#f3e8ff", color: "#6b21a8", padding: "3px 10px", borderRadius: "100px" }}>
+                            👥 {duettAudios.length} {duettAudios.length === 1 ? "Duett" : "Duette"} {totalDurationSec > 0 ? `• ${totalMinutes} min` : ''}
+                          </span>
+                        </div>
+
+                        {/* Duett Album Banner */}
+                        <div style={{
+                          background: "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 60%, #6d28d9 100%)",
+                          borderRadius: "16px",
+                          padding: "16px 18px",
+                          color: "#ffffff",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          boxShadow: "0 8px 24px -4px rgba(124, 58, 237, 0.35)",
+                          position: "relative",
+                          overflow: "hidden"
+                        }}>
+                          <div style={{
+                            position: "absolute",
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            height: "50%",
+                            background: "linear-gradient(180deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 100%)",
+                            pointerEvents: "none"
+                          }} />
+                          <div style={{ display: "flex", alignItems: "center", gap: "14px", position: "relative", zIndex: 1 }}>
+                            <div style={{
+                              width: "46px",
+                              height: "46px",
+                              borderRadius: "14px",
+                              background: "rgba(255,255,255,0.22)",
+                              backdropFilter: "blur(8px)",
+                              WebkitBackdropFilter: "blur(8px)",
+                              border: "1px solid rgba(255,255,255,0.6)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              boxShadow: "0 2px 8px rgba(0,0,0,0.15)"
+                            }}>
+                              <Users size={24} strokeWidth={2.4} color="#ffffff" />
+                            </div>
+                            <div>
+                              <div style={{ fontSize: "1.05rem", fontWeight: 900, letterSpacing: "-0.02em", lineHeight: 1.2 }}>
+                                Duett-Album
+                              </div>
+                              <div style={{ fontSize: "0.74rem", opacity: 0.9, marginTop: "2px", fontWeight: 600 }}>
+                                Alle synchronen Duett-Aufnahmen (Spur 1 & Spur 2) mit deiner Lehrkraft
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Takes List */}
+                        {duettAudios.length === 0 ? (
+                          <div style={{ textAlign: "center", padding: "30px 16px", color: "#94a3b8", fontSize: "0.80rem", fontWeight: 700, background: "#faf5ff", borderRadius: "12px", border: "1px dashed #d8b4fe" }}>
+                            Noch keine Duett-Aufnahmen vorhanden.
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                            {duettAudios.map((aud, idx) => renderStudentPlayer(aud, `stud-duett-${idx}`))}
                           </div>
                         )}
                       </div>
@@ -3670,6 +3817,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                                     setSelectedStudentMonth(null);
                                     setSelectedStudentSongAlbum(null);
                                     setSelectedPracticeCompanionAlbum(false);
+                                    setSelectedDuettAlbum(false);
                                     setShowStudentFavoritesOnly(true);
                                   }
                                 }}
@@ -3677,6 +3825,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                                   setSelectedStudentMonth(null);
                                   setSelectedStudentSongAlbum(null);
                                   setSelectedPracticeCompanionAlbum(false);
+                                  setSelectedDuettAlbum(false);
                                   setShowStudentFavoritesOnly(true);
                                 }}
                                 style={{
@@ -3767,7 +3916,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                             );
                           })()}
 
-                          {/* ⏱️ Übe-Begleiter & Rhythmen System Album Cover Card */}
+                          {/* ⏱️ Übe-Begleiter & Rhythmen System Album Cover Card (Modul-Gelb) */}
                           {(() => {
                             const isFilled = practiceCompanionAudios.length > 0;
                             return (
@@ -3781,6 +3930,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                                     setSelectedStudentMonth(null);
                                     setSelectedStudentSongAlbum(null);
                                     setShowStudentFavoritesOnly(false);
+                                    setSelectedDuettAlbum(false);
                                     setSelectedPracticeCompanionAlbum(true);
                                   }
                                 }}
@@ -3788,22 +3938,23 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                                   setSelectedStudentMonth(null);
                                   setSelectedStudentSongAlbum(null);
                                   setShowStudentFavoritesOnly(false);
+                                  setSelectedDuettAlbum(false);
                                   setSelectedPracticeCompanionAlbum(true);
                                 }}
                                 style={{
                                   aspectRatio: "1 / 1",
                                   background: isFilled 
-                                    ? "linear-gradient(135deg, #f59e0b 0%, #d97706 60%, #b45309 100%)" 
+                                    ? "linear-gradient(135deg, #facc15 0%, #eab308 100%)" 
                                     : "linear-gradient(145deg, #ffffff 0%, #fefce8 100%)",
                                   borderRadius: "16px",
-                                  border: isFilled ? "1px solid rgba(255, 255, 255, 0.4)" : "1.5px solid #fef08a",
+                                  border: isFilled ? "1.5px solid rgba(255, 255, 255, 0.65)" : "1.5px solid #fef08a",
                                   padding: "8px 4px",
                                   display: "flex",
                                   flexDirection: "column",
                                   alignItems: "center",
                                   justifyContent: "space-between",
                                   cursor: "pointer",
-                                  boxShadow: isFilled ? "0 6px 18px -2px rgba(217, 119, 6, 0.35), 0 2px 6px rgba(0,0,0,0.06)" : "0 2px 6px rgba(0,0,0,0.03)",
+                                  boxShadow: isFilled ? "0 6px 18px -2px rgba(234, 179, 8, 0.45), 0 2px 6px rgba(0,0,0,0.06)" : "0 2px 6px rgba(0,0,0,0.03)",
                                   position: "relative",
                                   overflow: "hidden",
                                   transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
@@ -3819,28 +3970,28 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                                     left: 0,
                                     right: 0,
                                     height: "50%",
-                                    background: "linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0) 100%)",
+                                    background: "linear-gradient(180deg, rgba(255,255,255,0.32) 0%, rgba(255,255,255,0) 100%)",
                                     pointerEvents: "none"
                                   }} />
                                 )}
 
-                                {/* Luminous Floating Capsule with Clock/Metronome Icon */}
+                                {/* Luminous Floating Capsule with Clock Icon (Duett-Style with Drop-Shadow) */}
                                 <div style={{
                                   width: "36px",
                                   height: "36px",
                                   borderRadius: "11px",
-                                  background: isFilled ? "rgba(255, 255, 255, 0.22)" : "#fef3c7",
+                                  background: isFilled ? "rgba(255, 255, 255, 0.28)" : "#fef3c7",
                                   backdropFilter: isFilled ? "blur(8px)" : "none",
                                   WebkitBackdropFilter: isFilled ? "blur(8px)" : "none",
-                                  border: isFilled ? "1px solid rgba(255, 255, 255, 0.65)" : "1px solid #fde68a",
+                                  border: isFilled ? "1px solid rgba(255, 255, 255, 0.75)" : "1px solid #fde68a",
                                   display: "flex",
                                   alignItems: "center",
                                   justifyContent: "center",
-                                  boxShadow: isFilled ? "0 2px 8px rgba(0, 0, 0, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.8)" : "none",
+                                  boxShadow: isFilled ? "0 2px 8px rgba(0, 0, 0, 0.12), inset 0 1px 1px rgba(255, 255, 255, 0.8)" : "none",
                                   marginTop: "2px",
                                   color: isFilled ? "#ffffff" : "#d97706"
                                 }}>
-                                  <Clock size={20} strokeWidth={2.4} color={isFilled ? "#ffffff" : "#d97706"} />
+                                  <Clock size={20} strokeWidth={2.4} color={isFilled ? "#ffffff" : "#d97706"} style={{ filter: isFilled ? "drop-shadow(0 1px 3px rgba(0,0,0,0.22))" : "none" }} />
                                 </div>
 
                                 {/* Typography */}
@@ -3848,30 +3999,137 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                                   <div style={{
                                     fontSize: "0.70rem",
                                     fontWeight: 900,
-                                    color: isFilled ? "#ffffff" : "#78350f",
+                                    color: "#78350f",
                                     letterSpacing: "-0.01em",
                                     lineHeight: 1.15,
                                     whiteSpace: "nowrap",
                                     overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    textShadow: isFilled ? "0 1px 3px rgba(0,0,0,0.25)" : "none"
+                                    textOverflow: "ellipsis"
                                   }}>
                                     Übe-Begleiter
                                   </div>
                                   <div style={{
                                     display: "inline-block",
-                                    background: isFilled ? "rgba(0, 0, 0, 0.18)" : "#fef3c7",
+                                    background: isFilled ? "rgba(255, 255, 255, 0.55)" : "#fef3c7",
                                     backdropFilter: isFilled ? "blur(4px)" : "none",
                                     WebkitBackdropFilter: isFilled ? "blur(4px)" : "none",
                                     padding: "1px 6px",
                                     borderRadius: "999px",
                                     fontSize: "0.55rem",
                                     fontWeight: 800,
-                                    color: isFilled ? "#fef3c7" : "#92400e",
+                                    color: isFilled ? "#78350f" : "#92400e",
                                     marginTop: "2px",
-                                    border: isFilled ? "1px solid rgba(255, 255, 255, 0.2)" : "1px solid #fde68a"
+                                    border: isFilled ? "1px solid rgba(255, 255, 255, 0.75)" : "1px solid #fde68a"
                                   }}>
                                     {practiceCompanionAudios.length} {practiceCompanionAudios.length === 1 ? "Take" : "Takes"}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          {/* 👥 Duett System Album Cover Card (nur sichtbar, sobald mind. 1 Duett existiert) */}
+                          {duettAudios.length > 0 && (() => {
+                            return (
+                              <div
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`Duett Album, ${duettAudios.length} Duette`}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    setSelectedStudentMonth(null);
+                                    setSelectedStudentSongAlbum(null);
+                                    setShowStudentFavoritesOnly(false);
+                                    setSelectedPracticeCompanionAlbum(false);
+                                    setSelectedDuettAlbum(true);
+                                  }
+                                }}
+                                onClick={() => {
+                                  setSelectedStudentMonth(null);
+                                  setSelectedStudentSongAlbum(null);
+                                  setShowStudentFavoritesOnly(false);
+                                  setSelectedPracticeCompanionAlbum(false);
+                                  setSelectedDuettAlbum(true);
+                                }}
+                                style={{
+                                  aspectRatio: "1 / 1",
+                                  background: "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 60%, #6d28d9 100%)",
+                                  borderRadius: "16px",
+                                  border: "1.5px solid rgba(255, 255, 255, 0.4)",
+                                  padding: "8px 4px",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  cursor: "pointer",
+                                  boxShadow: "0 6px 18px -2px rgba(124, 58, 237, 0.38), 0 2px 6px rgba(0,0,0,0.06)",
+                                  position: "relative",
+                                  overflow: "hidden",
+                                  transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
+                                  textAlign: "center"
+                                }}
+                                className="hover-scale"
+                              >
+                                {/* Specular Highlight Sheen */}
+                                <div style={{
+                                  position: "absolute",
+                                  top: 0,
+                                  left: 0,
+                                  right: 0,
+                                  height: "50%",
+                                  background: "linear-gradient(180deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0) 100%)",
+                                  pointerEvents: "none"
+                                }} />
+
+                                {/* Luminous Floating Capsule with Users Icon */}
+                                <div style={{
+                                  width: "36px",
+                                  height: "36px",
+                                  borderRadius: "11px",
+                                  background: "rgba(255, 255, 255, 0.24)",
+                                  backdropFilter: "blur(8px)",
+                                  WebkitBackdropFilter: "blur(8px)",
+                                  border: "1px solid rgba(255, 255, 255, 0.65)",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.8)",
+                                  marginTop: "2px",
+                                  color: "#ffffff"
+                                }}>
+                                  <Users size={20} strokeWidth={2.4} color="#ffffff" />
+                                </div>
+
+                                {/* Typography */}
+                                <div style={{ width: "100%", position: "relative", zIndex: 1, padding: "0 2px" }}>
+                                  <div style={{
+                                    fontSize: "0.70rem",
+                                    fontWeight: 900,
+                                    color: "#ffffff",
+                                    letterSpacing: "-0.01em",
+                                    lineHeight: 1.15,
+                                    whiteSpace: "nowrap",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    textShadow: "0 1px 3px rgba(0,0,0,0.25)"
+                                  }}>
+                                    Duett
+                                  </div>
+                                  <div style={{
+                                    display: "inline-block",
+                                    background: "rgba(0, 0, 0, 0.2)",
+                                    backdropFilter: "blur(4px)",
+                                    WebkitBackdropFilter: "blur(4px)",
+                                    padding: "1px 6px",
+                                    borderRadius: "999px",
+                                    fontSize: "0.55rem",
+                                    fontWeight: 800,
+                                    color: "#f3e8ff",
+                                    marginTop: "2px",
+                                    border: "1px solid rgba(255, 255, 255, 0.25)"
+                                  }}>
+                                    {duettAudios.length} {duettAudios.length === 1 ? "Duett" : "Duette"}
                                   </div>
                                 </div>
                               </div>
@@ -3888,6 +4146,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                                   setSelectedStudentMonth(null);
                                   setShowStudentFavoritesOnly(false);
                                   setSelectedPracticeCompanionAlbum(false);
+                                  setSelectedDuettAlbum(false);
                                   setSelectedStudentSongAlbum(songAlb.songTitle);
                                 }}
                                 style={{
@@ -4018,6 +4277,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                                   setSelectedStudentSongAlbum(null);
                                   setShowStudentFavoritesOnly(false);
                                   setSelectedPracticeCompanionAlbum(false);
+                                  setSelectedDuettAlbum(false);
                                   setSelectedStudentMonth({ key: m.monthKey, label: m.monthLabel });
                                 }}
                                 style={{
@@ -4403,6 +4663,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                     teacherBpm={duettModalData.teacherBpm}
                     songTag={duettModalData.songTag}
                     studentId={student.id}
+                    schoolId={student.school_id}
                     studentFirstName={studentFirstName}
                     onSaveStudentTake={() => {
                       setLocalJuniorRecordingsTrigger(prev => prev + 1);

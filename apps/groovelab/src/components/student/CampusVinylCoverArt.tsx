@@ -8,17 +8,18 @@ export interface CampusVinylCoverArtProps {
 export const CampusVinylCoverArt: React.FC<CampusVinylCoverArtProps> = ({ songColor, size = 'md' }) => {
   const isSm = size === 'sm';
   const isLg = size === 'lg';
-  const sleeveSize = isSm ? 54 : isLg ? 102 : 94;
-  const vinylSize = isSm ? 48 : isLg ? 92 : 84;
-  const borderRadius = isSm ? 14 : isLg ? 25 : 23;
-  const noteWidth = isSm ? 30 : isLg ? 52 : 46;
-  const noteHeight = isSm ? 30 : isLg ? 52 : 46;
-  const vinylRight = isSm ? -7 : isLg ? -13 : -11;
+  const sleeveSize = isSm ? 44 : isLg ? 88 : 52;
+  const vinylSize = isSm ? 40 : isLg ? 80 : 48;
+  const borderRadius = isSm ? 11 : isLg ? 20 : 13;
+  const noteWidth = isSm ? 24 : isLg ? 46 : 28;
+  const noteHeight = isSm ? 24 : isLg ? 46 : 28;
+  const vinylRight = isSm ? -6 : isLg ? -11 : -7;
 
-  const gradId = `studentFineGrad_${(songColor?.from || 'blue').replace(/[^a-zA-Z0-9]/g, '')}_${size}`;
-  const highId = `studentFineHigh_${(songColor?.from || 'blue').replace(/[^a-zA-Z0-9]/g, '')}_${size}`;
-  const headHigh1 = `studentHead1_${(songColor?.from || 'blue').replace(/[^a-zA-Z0-9]/g, '')}_${size}`;
-  const headHigh2 = `studentHead2_${(songColor?.from || 'blue').replace(/[^a-zA-Z0-9]/g, '')}_${size}`;
+  const instanceId = React.useId ? React.useId().replace(/[^a-zA-Z0-9]/g, '') : 'cva';
+  const gradId = `studentFineGrad_${instanceId}_${size}`;
+  const highId = `studentFineHigh_${instanceId}_${size}`;
+  const headHigh1 = `studentHead1_${instanceId}_${size}`;
+  const headHigh2 = `studentHead2_${instanceId}_${size}`;
 
   return (
     <div style={{

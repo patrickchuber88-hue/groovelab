@@ -138,8 +138,8 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
           ) : (
             <div style={{
               display: 'grid',
-              gridTemplateColumns: isMobile ? '1fr' : '1fr minmax(320px, 350px)',
-              gap: isMobile ? '16px' : '24px',
+              gridTemplateColumns: isMobile ? '1fr' : '1fr minmax(280px, 300px)',
+              gap: isMobile ? '16px' : '20px',
               alignItems: 'start',
               width: '100%',
               maxWidth: '100%',
@@ -151,15 +151,15 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                 style={{ 
                   flex: 1,
                   background: 'white', 
-                  borderRadius: isMusicStandMode ? '32px' : (isMobile ? '24px' : '28px'), 
+                  borderRadius: isMusicStandMode ? '28px' : (isMobile ? '20px' : '22px'), 
                   border: '1px solid rgba(0, 0, 0, 0.05)', 
-                  padding: isMusicStandMode ? '28px 32px' : (isMobile ? '16px 14px' : '24px 30px'), 
-                  boxShadow: '0 8px 30px -4px rgba(0, 0, 0, 0.04), 0 2px 8px -1px rgba(0, 0, 0, 0.02)',
+                  padding: isMusicStandMode ? '22px 24px' : (isMobile ? '16px 14px' : '20px 22px'), 
+                  boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.03), 0 2px 6px -1px rgba(0, 0, 0, 0.02)',
                   boxSizing: 'border-box',
                   maxWidth: '100%',
                   display: 'flex', 
                   flexDirection: 'column', 
-                  gap: isMusicStandMode ? '28px' : '24px' 
+                  gap: isMusicStandMode ? '20px' : '16px' 
                 }}
               >
                 {/* Header Area */}
@@ -168,20 +168,20 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                   return (
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
-                        <h2 style={{ fontSize: isMusicStandMode ? '2.15rem' : '1.85rem', color: '#18181b', display: 'flex', alignItems: 'center', gap: '12px', margin: 0, fontWeight: 950, letterSpacing: '-0.02em' }}>
+                        <h2 style={{ fontSize: isMusicStandMode ? '1.85rem' : '1.50rem', color: '#18181b', display: 'flex', alignItems: 'center', gap: '10px', margin: 0, fontWeight: 900, letterSpacing: '-0.02em' }}>
                           <div style={{ 
                             background: `${brandColor}15`, 
                             color: brandColor, 
-                            padding: isMusicStandMode ? '8px' : '6px', 
-                            borderRadius: isMusicStandMode ? '14px' : '10px', 
+                            padding: isMusicStandMode ? '7px' : '5px', 
+                            borderRadius: isMusicStandMode ? '12px' : '9px', 
                             display: 'flex', 
                             alignItems: 'center' 
                           }}>
-                            <Library size={isMusicStandMode ? 26 : 20} />
+                            <Library size={isMusicStandMode ? 22 : 18} />
                           </div>
                           <span>Mediathek</span>
                         </h2>
-                        <p style={{ color: '#64748b', fontSize: isMusicStandMode ? '0.96rem' : '0.82rem', margin: '4px 0 0 0', fontWeight: 600 }}>
+                        <p style={{ color: '#64748b', fontSize: isMusicStandMode ? '0.88rem' : '0.78rem', margin: '3px 0 0 0', fontWeight: 600 }}>
                           Deine Songs und Lehrwerke für den Unterricht.
                         </p>
                       </div>
@@ -243,17 +243,17 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                   const homeworkLehrwerke = uniqueAssignedLehrwerke.filter(lw => getLehrwerkHomeworkPages(lw.id, lw.title).length > 0);
                   const homeworkCount = homeworkSongs.length + homeworkLehrwerke.length;
 
-                  const chipHeight = isMusicStandMode ? '46px' : '38px';
-                  const chipPadding = isMusicStandMode ? '0 22px' : '0 18px';
-                  const chipFontSize = isMusicStandMode ? '0.94rem' : '0.82rem';
+                  const chipHeight = isMusicStandMode ? '38px' : '32px';
+                  const chipPadding = isMusicStandMode ? '0 16px' : '0 14px';
+                  const chipFontSize = isMusicStandMode ? '0.84rem' : '0.76rem';
 
                   return (
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: isMusicStandMode ? '12px' : '8px',
+                      gap: isMusicStandMode ? '10px' : '8px',
                       overflowX: 'auto',
-                      padding: '4px 2px',
+                      padding: '2px 0',
                       scrollbarWidth: 'none',
                       msOverflowStyle: 'none',
                       width: '100%'
@@ -268,7 +268,7 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                           border: juniorMediathekFilter === 'all' ? '1.5px solid #86efac' : '1px solid #e2e8f0',
                           background: juniorMediathekFilter === 'all' ? '#dcfce7' : '#ffffff',
                           color: juniorMediathekFilter === 'all' ? '#15803d' : '#64748b',
-                          fontWeight: 850,
+                          fontWeight: 750,
                           fontSize: chipFontSize,
                           cursor: 'pointer',
                           display: 'flex',
@@ -276,7 +276,7 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                           gap: '6px',
                           whiteSpace: 'nowrap',
                           transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                          boxShadow: juniorMediathekFilter === 'all' ? '0 4px 12px rgba(34, 197, 94, 0.18)' : '0 1px 3px rgba(0,0,0,0.02)'
+                          boxShadow: juniorMediathekFilter === 'all' ? '0 2px 8px rgba(34, 197, 94, 0.15)' : '0 1px 2px rgba(0,0,0,0.02)'
                         }}
                       >
                         <span>Alles ({uniqueAssignedSongs.length + uniqueAssignedLehrwerke.length})</span>
@@ -292,7 +292,7 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                           border: juniorMediathekFilter === 'songs' ? '1.5px solid #86efac' : '1px solid #e2e8f0',
                           background: juniorMediathekFilter === 'songs' ? '#dcfce7' : '#ffffff',
                           color: juniorMediathekFilter === 'songs' ? '#15803d' : '#64748b',
-                          fontWeight: 850,
+                          fontWeight: 750,
                           fontSize: chipFontSize,
                           cursor: 'pointer',
                           display: 'flex',
@@ -300,10 +300,10 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                           gap: '6px',
                           whiteSpace: 'nowrap',
                           transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                          boxShadow: juniorMediathekFilter === 'songs' ? '0 4px 12px rgba(34, 197, 94, 0.18)' : '0 1px 3px rgba(0,0,0,0.02)'
+                          boxShadow: juniorMediathekFilter === 'songs' ? '0 2px 8px rgba(34, 197, 94, 0.15)' : '0 1px 2px rgba(0,0,0,0.02)'
                         }}
                       >
-                        <Music size={isMusicStandMode ? 16 : 14} />
+                        <Music size={isMusicStandMode ? 15 : 13} />
                         <span>Songs ({uniqueAssignedSongs.length})</span>
                       </button>
 
@@ -317,7 +317,7 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                           border: juniorMediathekFilter === 'lehrwerke' ? '1.5px solid #86efac' : '1px solid #e2e8f0',
                           background: juniorMediathekFilter === 'lehrwerke' ? '#dcfce7' : '#ffffff',
                           color: juniorMediathekFilter === 'lehrwerke' ? '#15803d' : '#64748b',
-                          fontWeight: 850,
+                          fontWeight: 750,
                           fontSize: chipFontSize,
                           cursor: 'pointer',
                           display: 'flex',
@@ -325,10 +325,10 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                           gap: '6px',
                           whiteSpace: 'nowrap',
                           transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                          boxShadow: juniorMediathekFilter === 'lehrwerke' ? '0 4px 12px rgba(34, 197, 94, 0.18)' : '0 1px 3px rgba(0,0,0,0.02)'
+                          boxShadow: juniorMediathekFilter === 'lehrwerke' ? '0 2px 8px rgba(34, 197, 94, 0.15)' : '0 1px 2px rgba(0,0,0,0.02)'
                         }}
                       >
-                        <Library size={isMusicStandMode ? 16 : 14} />
+                        <Library size={isMusicStandMode ? 15 : 13} />
                         <span>Lehrwerke ({uniqueAssignedLehrwerke.length})</span>
                       </button>
 
@@ -343,7 +343,7 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                             border: juniorMediathekFilter === 'homework' ? '1.5px solid #0284c7' : '1px solid #e2e8f0',
                             background: juniorMediathekFilter === 'homework' ? '#e0f2fe' : '#ffffff',
                             color: juniorMediathekFilter === 'homework' ? '#0284c7' : '#64748b',
-                            fontWeight: 850,
+                            fontWeight: 750,
                             fontSize: chipFontSize,
                             cursor: 'pointer',
                             display: 'flex',
@@ -351,10 +351,10 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                             gap: '6px',
                             whiteSpace: 'nowrap',
                             transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                            boxShadow: juniorMediathekFilter === 'homework' ? '0 4px 12px rgba(2, 132, 199, 0.18)' : '0 1px 3px rgba(0,0,0,0.02)'
+                            boxShadow: juniorMediathekFilter === 'homework' ? '0 2px 8px rgba(2, 132, 199, 0.15)' : '0 1px 2px rgba(0,0,0,0.02)'
                           }}
                         >
-                          <Star size={isMusicStandMode ? 16 : 14} color="#0284c7" fill="#0284c7" />
+                          <Star size={isMusicStandMode ? 15 : 13} color="#0284c7" fill="#0284c7" />
                           <span>Hausaufgabe ({homeworkCount})</span>
                         </button>
                       )}
@@ -365,9 +365,9 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                 {/* Unified Smart Search Field */}
                 <div style={{ position: 'relative', width: '100%' }}>
                   <Search 
-                    size={isMusicStandMode ? 20 : 16} 
+                    size={isMusicStandMode ? 17 : 14} 
                     color="#94a3b8" 
-                    style={{ position: 'absolute', left: isMusicStandMode ? '18px' : '16px', top: '50%', transform: 'translateY(-50%)' }} 
+                    style={{ position: 'absolute', left: isMusicStandMode ? '16px' : '13px', top: '50%', transform: 'translateY(-50%)' }} 
                   />
                   <input 
                     placeholder="Songs oder Lehrwerke suchen…" 
@@ -375,12 +375,12 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                     onChange={e => setSongSearch(e.target.value)}
                     style={{ 
                       width: '100%', 
-                      padding: isMusicStandMode ? '16px 20px 16px 54px' : '12px 16px 12px 46px', 
-                      borderRadius: isMusicStandMode ? '20px' : '16px', 
+                      padding: isMusicStandMode ? '11px 16px 11px 44px' : '8px 14px 8px 36px', 
+                      borderRadius: isMusicStandMode ? '14px' : '11px', 
                       border: '1px solid #e2e8f0', 
                       background: '#f8fafc', 
-                      fontWeight: 650, 
-                      fontSize: isMusicStandMode ? '1.02rem' : '0.90rem', 
+                      fontWeight: 600, 
+                      fontSize: isMusicStandMode ? '0.94rem' : '0.82rem', 
                       outline: 'none', 
                       transition: 'all 0.2s', 
                       boxSizing: 'border-box',
@@ -477,23 +477,33 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                   const showLehrwerkeSection = juniorMediathekFilter === 'all' || juniorMediathekFilter === 'lehrwerke' || (juniorMediathekFilter === 'homework' && filteredLehrwerke.length > 0);
 
                   return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: isMusicStandMode ? '26px' : '20px', width: '100%' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: isMusicStandMode ? '20px' : '16px', width: '100%' }}>
                       
-                      {/* Apple HIG Luminous Hero Spotlight: "Deine heutige Mission" */}
+                      {/* 🏛️ 1% Goldstandard Slim Hero Spotlight: "Deine heutige Mission" */}
                       {activeMissionSong && (
                         <div 
+                          role="button"
+                          tabIndex={0}
                           onClick={() => setSelectedSongForDetail(activeMissionSong)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setSelectedSongForDetail(activeMissionSong);
+                            }
+                          }}
                           style={{
-                            background: 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 50%, #dcfce7 100%)',
-                            borderRadius: '32px',
-                            padding: isMusicStandMode ? '28px 32px' : '24px 26px',
+                            background: 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 65%, #dcfce7 100%)',
+                            borderRadius: isMusicStandMode ? '22px' : '18px',
+                            padding: isMusicStandMode ? '16px 20px' : (isMobile ? '14px 16px' : '12px 18px'),
                             color: '#0f172a',
                             position: 'relative',
                             overflow: 'hidden',
-                            boxShadow: '0 12px 32px -4px rgba(34, 197, 94, 0.12), 0 4px 16px -2px rgba(0, 0, 0, 0.03)',
+                            boxShadow: '0 8px 24px -4px rgba(34, 197, 94, 0.10), 0 2px 8px -2px rgba(0, 0, 0, 0.02)',
                             display: 'flex',
-                            flexDirection: 'column',
-                            gap: isMusicStandMode ? '20px' : '16px',
+                            flexDirection: isMobile ? 'column' : 'row',
+                            alignItems: isMobile ? 'stretch' : 'center',
+                            justifyContent: 'space-between',
+                            gap: isMobile ? '12px' : '16px',
                             cursor: 'pointer',
                             border: '1.5px solid #86efac',
                             transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
@@ -503,103 +513,112 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                           {/* Ambient soft glow accent */}
                           <div style={{
                             position: 'absolute',
-                            top: '-40px',
-                            right: '-40px',
-                            width: '240px',
-                            height: '240px',
-                            background: 'radial-gradient(circle, rgba(34, 197, 94, 0.18) 0%, transparent 70%)',
+                            top: '-30px',
+                            right: '-30px',
+                            width: '180px',
+                            height: '180px',
+                            background: 'radial-gradient(circle, rgba(34, 197, 94, 0.16) 0%, transparent 70%)',
                             pointerEvents: 'none'
                           }} />
 
-                          {/* Pill Tag */}
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 2 }}>
-                            <div style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              background: '#dcfce7',
-                              color: '#15803d',
-                              border: '1px solid #86efac',
-                              padding: isMusicStandMode ? '6px 14px' : '4px 12px',
-                              borderRadius: '100px',
-                              fontSize: isMusicStandMode ? '0.84rem' : '0.72rem',
-                              fontWeight: 850,
-                              letterSpacing: '0.03em',
-                              textTransform: 'uppercase',
-                              boxShadow: '0 2px 6px rgba(34, 197, 94, 0.1)'
-                            }}>
-                              <Sparkles size={isMusicStandMode ? 14 : 12} color="#15803d" />
-                              <span>Deine heutige Mission</span>
-                            </div>
-                            <span style={{ fontSize: isMusicStandMode ? '0.86rem' : '0.74rem', color: '#16a34a', fontWeight: 750 }}>Tippe für Details →</span>
-                          </div>
-
-                          {/* Hero Main Content */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: isMusicStandMode ? '22px' : '18px', zIndex: 2 }}>
-                            {renderSongVinylCover(getSongColor(activeMissionSong.title || ''), isMusicStandMode ? 'lg' : 'md')}
+                          {/* Hero Main Content (Cover + Titles + Tag) */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: isMusicStandMode ? '16px' : '14px', zIndex: 2, flex: 1, minWidth: 0 }}>
+                            {renderSongVinylCover(getSongColor(activeMissionSong.title || ''), isMusicStandMode ? 'md' : 'sm')}
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <h3 style={{ margin: '0 0 4px 0', fontSize: isMusicStandMode ? '1.60rem' : '1.38rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#dcfce7', color: '#15803d', border: '1px solid #86efac', padding: '2px 8px', borderRadius: '100px', fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.02em', marginBottom: '3px' }}>
+                                <Sparkles size={10} color="#15803d" />
+                                <span>Deine heutige Mission</span>
+                              </div>
+                              <h3 
+                                title={activeMissionSong.title}
+                                style={{ 
+                                  margin: 0, 
+                                  fontSize: isMusicStandMode ? '1.20rem' : '1.05rem', 
+                                  fontWeight: 850, 
+                                  color: '#0f172a', 
+                                  letterSpacing: '-0.01em', 
+                                  lineHeight: 1.25,
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
+                                }}
+                              >
                                 {activeMissionSong.title}
                               </h3>
-                              <p style={{ margin: 0, fontSize: isMusicStandMode ? '1.02rem' : '0.88rem', color: '#15803d', fontWeight: 750 }}>
+                              <p 
+                                title={normalizeArtistName(activeMissionSong.artist)}
+                                style={{ 
+                                  margin: '1px 0 0 0', 
+                                  fontSize: isMusicStandMode ? '0.84rem' : '0.76rem', 
+                                  color: '#15803d', 
+                                  fontWeight: 650,
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
+                                }}
+                              >
                                 von {normalizeArtistName(activeMissionSong.artist)}
                               </p>
                             </div>
                           </div>
 
-                          {/* Action Button inside Hero Card (aligned: transitions to practice tab) */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedTopic(activeMissionSong.title);
-                              handleTabChangeLocal('practice');
-                            }}
-                            style={{
-                              zIndex: 2,
-                              width: '100%',
-                              minHeight: isMusicStandMode ? '58px' : '50px',
-                              background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-                              color: '#ffffff',
-                              border: 'none',
-                              padding: isMusicStandMode ? '14px 22px' : '12px 18px',
-                              borderRadius: '20px',
-                              fontWeight: 950,
-                              fontSize: isMusicStandMode ? '1.12rem' : '0.92rem',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '10px',
-                              boxShadow: '0 8px 24px -2px rgba(34, 197, 94, 0.35)',
-                              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-                            }}
-                            className="hover-scale"
-                          >
-                            <Play size={isMusicStandMode ? 18 : 15} fill="white" color="white" />
-                            <span>Jetzt üben (Timer starten)</span>
-                          </button>
+                          {/* Action Button inside Hero Card */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', zIndex: 2, flexShrink: 0 }}>
+                            {!isMobile && (
+                              <span style={{ fontSize: '0.74rem', color: '#16a34a', fontWeight: 700 }}>Details →</span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedTopic(activeMissionSong.title);
+                                handleTabChangeLocal('practice');
+                              }}
+                              style={{
+                                height: isMusicStandMode ? '42px' : '36px',
+                                minWidth: isMobile ? '100%' : '140px',
+                                background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                                color: '#ffffff',
+                                border: 'none',
+                                padding: isMusicStandMode ? '0 18px' : '0 14px',
+                                borderRadius: '12px',
+                                fontWeight: 850,
+                                fontSize: isMusicStandMode ? '0.92rem' : '0.82rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                boxShadow: '0 4px 14px -2px rgba(34, 197, 94, 0.32)',
+                                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                              }}
+                              className="hover-scale"
+                            >
+                              <Play size={isMusicStandMode ? 14 : 12} fill="white" color="white" />
+                              <span>Jetzt üben</span>
+                            </button>
+                          </div>
                         </div>
                       )}
 
-                      {/* SECTION 1: SONGS (Balanced Auto-Fit Grid) */}
+                      {/* SECTION 1: SONGS (Resilient 2-Column Grid) */}
                       {showSongsSection && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: isMusicStandMode ? '14px' : '10px', width: '100%' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: isMusicStandMode ? '12px' : '8px', width: '100%' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ fontSize: isMusicStandMode ? '1.25rem' : '1.05rem', fontWeight: 850, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <Music size={isMusicStandMode ? 18 : 15} color={brandColor} /> Songs ({filteredSongs.length})
+                            <h3 style={{ fontSize: isMusicStandMode ? '1.15rem' : '0.98rem', fontWeight: 800, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <Music size={isMusicStandMode ? 16 : 14} color={brandColor} /> Songs ({filteredSongs.length})
                             </h3>
                           </div>
 
                           {filteredSongs.length === 0 ? (
-                            <div style={{ padding: isMusicStandMode ? '26px' : '20px', textAlign: 'center', color: '#94a3b8', fontSize: isMusicStandMode ? '0.94rem' : '0.82rem', fontStyle: 'italic', background: '#f8fafc', borderRadius: '18px', border: '1px solid #f1f5f9' }}>
+                            <div style={{ padding: isMusicStandMode ? '22px' : '16px', textAlign: 'center', color: '#94a3b8', fontSize: isMusicStandMode ? '0.88rem' : '0.78rem', fontStyle: 'italic', background: '#f8fafc', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
                               Keine Songs in dieser Auswahl gefunden.
                             </div>
                           ) : (
                             <div style={{
                               display: 'grid',
-                              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(300px, 1fr))',
-                              gap: isMusicStandMode ? '16px' : '12px',
+                              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(310px, 1fr))',
+                              gap: isMusicStandMode ? '12px' : '10px',
                               width: '100%'
                             }}>
                               {filteredSongs.map(song => {
@@ -618,20 +637,20 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                                 if (song.is_current_homework) {
                                   statusColor = '#0284c7';
                                   statusBg = '#e0f2fe';
-                                  statusText = 'Aktuelle Mission';
+                                  statusText = 'Hausaufgabe';
                                 } else if (progressItem) {
                                   if (progressItem.is_current_homework) {
                                     statusColor = '#0284c7';
                                     statusBg = '#e0f2fe';
-                                    statusText = 'Aktuelle Mission';
+                                    statusText = 'Hausaufgabe';
                                   } else if (progressItem.status === 'THEORY_DONE') {
                                     statusColor = '#7c3aed';
                                     statusBg = '#f3e8ff';
-                                    statusText = 'Theorie gelesen';
+                                    statusText = 'Theorie';
                                   } else if (progressItem.status === 'MASTERED') {
                                     statusColor = '#15803d';
                                     statusBg = '#dcfce7';
-                                    statusText = 'Meisterwerk!';
+                                    statusText = 'Meister!';
                                   } else {
                                     statusColor = '#15803d';
                                     statusBg = '#dcfce7';
@@ -642,21 +661,29 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                                 return (
                                   <div 
                                     key={song.id} 
+                                    role="button"
+                                    tabIndex={0}
                                     onClick={() => setSelectedSongForDetail(song)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        setSelectedSongForDetail(song);
+                                      }
+                                    }}
                                     className="hover-scale-subtle"
                                     style={{ 
-                                      padding: isMusicStandMode ? '16px 20px' : '14px 18px', 
+                                      padding: isMusicStandMode ? '12px 14px' : '10px 12px', 
                                       display: 'flex', 
-                                      gap: isMusicStandMode ? '16px' : '14px',
+                                      gap: isMusicStandMode ? '12px' : '10px',
                                       alignItems: 'center', 
                                       background: '#ffffff', 
-                                      borderRadius: '24px', 
+                                      borderRadius: '16px', 
                                       border: song.is_current_homework ? '1.5px solid #bae6fd' : '1px solid #e2e8f0', 
                                       boxShadow: song.is_current_homework 
-                                        ? '0 6px 20px -2px rgba(2, 132, 199, 0.08), 0 2px 6px rgba(0, 0, 0, 0.02)' 
-                                        : '0 4px 16px -2px rgba(0, 0, 0, 0.03), 0 1px 2px rgba(0, 0, 0, 0.02)', 
+                                        ? '0 4px 14px -2px rgba(2, 132, 199, 0.08), 0 1px 4px rgba(0, 0, 0, 0.02)' 
+                                        : '0 2px 8px -2px rgba(0, 0, 0, 0.03), 0 1px 2px rgba(0, 0, 0, 0.02)', 
                                       transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                                      minHeight: isMusicStandMode ? '96px' : '84px',
+                                      minHeight: isMusicStandMode ? '72px' : '62px',
                                       boxSizing: 'border-box',
                                       cursor: 'pointer'
                                     }}
@@ -664,17 +691,40 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                                     {/* Pastel Sleeve + Vinyl peeking out Cover */}
                                     {renderSongVinylCover(lwColor, isMusicStandMode ? 'md' : 'sm')}
 
-                                    {/* Title and Artist */}
+                                    {/* Title and Artist (Protected 1-Line Truncation) */}
                                     <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                      <div style={{ fontWeight: 850, color: '#0f172a', fontSize: isMusicStandMode ? '1.14rem' : '1.0rem', letterSpacing: '-0.01em', lineHeight: '1.25', wordBreak: 'break-word' }}>
+                                      <div 
+                                        title={song.title}
+                                        style={{ 
+                                          fontWeight: 800, 
+                                          color: '#0f172a', 
+                                          fontSize: isMusicStandMode ? '0.98rem' : '0.88rem', 
+                                          letterSpacing: '-0.01em', 
+                                          lineHeight: '1.25', 
+                                          whiteSpace: 'nowrap',
+                                          overflow: 'hidden',
+                                          textOverflow: 'ellipsis'
+                                        }}
+                                      >
                                         {song.title}
                                       </div>
-                                      <div style={{ fontSize: isMusicStandMode ? '0.90rem' : '0.80rem', fontWeight: 600, color: '#64748b', lineHeight: '1.2', wordBreak: 'break-word' }}>
+                                      <div 
+                                        title={normalizeArtistName(song.artist)}
+                                        style={{ 
+                                          fontSize: isMusicStandMode ? '0.78rem' : '0.72rem', 
+                                          fontWeight: 600, 
+                                          color: '#64748b', 
+                                          lineHeight: '1.2', 
+                                          whiteSpace: 'nowrap',
+                                          overflow: 'hidden',
+                                          textOverflow: 'ellipsis'
+                                        }}
+                                      >
                                         von {normalizeArtistName(song.artist)}
                                       </div>
                                     </div>
 
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                                       {progressItem?.status === 'MASTERED' && (
                                         <button
                                           type="button"
@@ -691,19 +741,19 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                                             color: '#92400e',
                                             border: '1px solid #fde68a',
                                             borderRadius: '8px',
-                                            padding: isMusicStandMode ? '6px 12px' : '4px 10px',
-                                            fontSize: isMusicStandMode ? '0.80rem' : '0.70rem',
+                                            padding: isMusicStandMode ? '4px 8px' : '3px 7px',
+                                            fontSize: isMusicStandMode ? '0.74rem' : '0.64rem',
                                             fontWeight: 800,
                                             cursor: 'pointer',
                                             display: 'inline-flex',
                                             alignItems: 'center',
-                                            gap: '4px',
-                                            boxShadow: '0 2px 6px rgba(202, 138, 4, 0.15)'
+                                            gap: '3px',
+                                            boxShadow: '0 2px 4px rgba(202, 138, 4, 0.12)'
                                           }}
                                           title="Offizielle Meisterwerk-Goldurkunde öffnen"
                                         >
-                                          <Award size={isMusicStandMode ? 15 : 13} />
-                                          <span>Gold-Urkunde</span>
+                                          <Award size={isMusicStandMode ? 13 : 11} />
+                                          <span>Urkunde</span>
                                         </button>
                                       )}
 
@@ -711,16 +761,16 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                                         <span style={{
                                           background: statusBg,
                                           color: statusColor,
-                                          padding: isMusicStandMode ? '6px 14px' : '4px 10px',
+                                          padding: isMusicStandMode ? '3px 9px' : '2px 7px',
                                           borderRadius: '100px',
-                                          fontSize: isMusicStandMode ? '0.80rem' : '0.70rem',
-                                          fontWeight: 850,
+                                          fontSize: isMusicStandMode ? '0.72rem' : '0.64rem',
+                                          fontWeight: 800,
                                           textTransform: 'uppercase',
                                           whiteSpace: 'nowrap',
                                           alignSelf: 'center',
                                           flexShrink: 0,
                                           border: statusColor === '#0284c7' ? '1px solid #bae6fd' : '1px solid rgba(0,0,0,0.05)',
-                                          boxShadow: statusColor === '#0284c7' ? '0 2px 8px rgba(2, 132, 199, 0.15)' : 'none'
+                                          boxShadow: statusColor === '#0284c7' ? '0 2px 6px rgba(2, 132, 199, 0.12)' : 'none'
                                         }}>
                                           {statusText}
                                         </span>
@@ -734,24 +784,24 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                         </div>
                       )}
 
-                      {/* SECTION 2: LEHRWERKE (Balanced Auto-Fit Grid) */}
+                      {/* SECTION 2: LEHRWERKE (Resilient 2-Column Grid) */}
                       {showLehrwerkeSection && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: isMusicStandMode ? '14px' : '10px', width: '100%', marginTop: showSongsSection ? '8px' : '0' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: isMusicStandMode ? '12px' : '8px', width: '100%', marginTop: showSongsSection ? '4px' : '0' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ fontSize: isMusicStandMode ? '1.25rem' : '1.05rem', fontWeight: 850, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <Library size={isMusicStandMode ? 18 : 15} color={brandColor} /> Lehrwerke ({filteredLehrwerke.length})
+                            <h3 style={{ fontSize: isMusicStandMode ? '1.15rem' : '0.98rem', fontWeight: 800, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <Library size={isMusicStandMode ? 16 : 14} color={brandColor} /> Lehrwerke ({filteredLehrwerke.length})
                             </h3>
                           </div>
 
                           {filteredLehrwerke.length === 0 ? (
-                            <div style={{ padding: isMusicStandMode ? '26px' : '20px', textAlign: 'center', color: '#94a3b8', fontSize: isMusicStandMode ? '0.94rem' : '0.82rem', fontStyle: 'italic', background: '#f8fafc', borderRadius: '18px', border: '1px solid #f1f5f9' }}>
+                            <div style={{ padding: isMusicStandMode ? '22px' : '16px', textAlign: 'center', color: '#94a3b8', fontSize: isMusicStandMode ? '0.88rem' : '0.78rem', fontStyle: 'italic', background: '#f8fafc', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
                               Keine Lehrwerke in dieser Auswahl gefunden.
                             </div>
                           ) : (
                             <div style={{
                               display: 'grid',
-                              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(300px, 1fr))',
-                              gap: isMusicStandMode ? '16px' : '12px',
+                              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(310px, 1fr))',
+                              gap: isMusicStandMode ? '12px' : '10px',
                               width: '100%'
                             }}>
                               {filteredLehrwerke.map(item => {
@@ -774,79 +824,111 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                                 return (
                                   <div 
                                     key={item.id} 
+                                    role="button"
+                                    tabIndex={0}
                                     onClick={() => setSelectedLehrwerkForDetail(item)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        setSelectedLehrwerkForDetail(item);
+                                      }
+                                    }}
                                     className="hover-scale-subtle" 
                                     style={{ 
-                                      padding: isMusicStandMode ? '16px 20px' : '14px 18px', 
+                                      padding: isMusicStandMode ? '12px 14px' : '10px 12px', 
                                       background: '#ffffff', 
                                       display: 'flex', 
-                                      gap: isMusicStandMode ? '16px' : '14px', 
+                                      gap: isMusicStandMode ? '12px' : '10px', 
                                       alignItems: 'center', 
-                                      borderRadius: '24px', 
+                                      borderRadius: '16px', 
                                       border: hasHomework ? '1.5px solid #bae6fd' : '1px solid #e2e8f0', 
                                       boxShadow: hasHomework
-                                        ? '0 6px 20px -2px rgba(2, 132, 199, 0.08), 0 2px 6px rgba(0, 0, 0, 0.02)'
-                                        : '0 4px 16px -2px rgba(0, 0, 0, 0.03), 0 1px 2px rgba(0, 0, 0, 0.02)',
+                                        ? '0 4px 14px -2px rgba(2, 132, 199, 0.08), 0 1px 4px rgba(0, 0, 0, 0.02)'
+                                        : '0 2px 8px -2px rgba(0, 0, 0, 0.03), 0 1px 2px rgba(0, 0, 0, 0.02)',
                                       position: 'relative',
                                       transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                                      minHeight: isMusicStandMode ? '96px' : '84px',
+                                      minHeight: isMusicStandMode ? '72px' : '62px',
                                       boxSizing: 'border-box',
                                       cursor: 'pointer'
                                     }}
                                   >
                                     <div style={{ 
-                                      width: isMusicStandMode ? '50px' : '42px', 
-                                      height: isMusicStandMode ? '64px' : '54px', 
+                                      width: isMusicStandMode ? '40px' : '36px', 
+                                      height: isMusicStandMode ? '48px' : '44px', 
                                       background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`, 
-                                      borderRadius: '10px', 
+                                      borderRadius: '8px', 
                                       display: 'flex', 
                                       alignItems: 'center', 
                                       justifyContent: 'center', 
                                       color: gradient.text, 
-                                      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                                      boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
                                       flexShrink: 0
                                     }}>
-                                      <BookOpen size={isMusicStandMode ? 22 : 18} color={gradient.text} />
+                                      <BookOpen size={isMusicStandMode ? 18 : 16} color={gradient.text} />
                                     </div>
                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                                        <h4 style={{ margin: '0 0 2px 0', fontSize: isMusicStandMode ? '1.14rem' : '0.96rem', fontWeight: 850, color: '#1e293b', lineHeight: '1.25', wordBreak: 'break-word' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                                        <h4 
+                                          title={item.title}
+                                          style={{ 
+                                            margin: 0, 
+                                            fontSize: isMusicStandMode ? '0.98rem' : '0.88rem', 
+                                            fontWeight: 800, 
+                                            color: '#1e293b', 
+                                            lineHeight: '1.25', 
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis'
+                                          }}
+                                        >
                                           {item.title}
                                         </h4>
                                         {hasHomework && (
                                           <span style={{
                                             background: '#e0f2fe',
                                             color: '#0284c7',
-                                            padding: isMusicStandMode ? '4px 12px' : '3px 8px',
+                                            padding: isMusicStandMode ? '2px 8px' : '2px 6px',
                                             borderRadius: '100px',
-                                            fontSize: isMusicStandMode ? '0.78rem' : '0.68rem',
-                                            fontWeight: 850,
+                                            fontSize: isMusicStandMode ? '0.70rem' : '0.62rem',
+                                            fontWeight: 800,
                                             display: 'inline-flex',
                                             alignItems: 'center',
-                                            gap: '4px',
+                                            gap: '3px',
                                             border: '1px solid #bae6fd',
                                             whiteSpace: 'nowrap',
                                             flexShrink: 0,
-                                            boxShadow: '0 2px 6px rgba(2, 132, 199, 0.12)'
+                                            boxShadow: '0 2px 4px rgba(2, 132, 199, 0.10)'
                                           }}>
-                                            <Star size={isMusicStandMode ? 12 : 10} color="#0284c7" fill="#0284c7" />
-                                            <span>Hausaufgabe: {hwPages.length === 1 && !isNaN(Number(hwPages[0])) ? `S. ${hwPages[0]}` : hwPages.join(', ')}</span>
+                                            <Star size={isMusicStandMode ? 10 : 9} color="#0284c7" fill="#0284c7" />
+                                            <span>{hwPages.length === 1 && !isNaN(Number(hwPages[0])) ? `S. ${hwPages[0]}` : 'Hausaufgabe'}</span>
                                           </span>
                                         )}
                                       </div>
                                       {item.author && (
-                                        <p style={{ margin: '0 0 2px 0', fontSize: isMusicStandMode ? '0.88rem' : '0.78rem', color: '#64748b', fontWeight: 600, lineHeight: '1.2', wordBreak: 'break-word' }}>
+                                        <p 
+                                          title={normalizeArtistName(item.author)}
+                                          style={{ 
+                                            margin: '1px 0 0 0', 
+                                            fontSize: isMusicStandMode ? '0.78rem' : '0.72rem', 
+                                            color: '#64748b', 
+                                            fontWeight: 600, 
+                                            lineHeight: '1.2', 
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis'
+                                          }}
+                                        >
                                           von {normalizeArtistName(item.author)}
                                         </p>
                                       )}
                                       
                                       {masteredCount > 0 && (
-                                        <div style={{ marginTop: '6px' }}>
-                                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: isMusicStandMode ? '0.78rem' : '0.64rem', color: '#64748b', fontWeight: 700, marginBottom: '3px' }}>
+                                        <div style={{ marginTop: '4px' }}>
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: isMusicStandMode ? '0.70rem' : '0.62rem', color: '#64748b', fontWeight: 700, marginBottom: '2px' }}>
                                             <span>{masteredCount} / {totalP} Seiten</span>
                                             <span>{Math.round(pct * 100)}%</span>
                                           </div>
-                                          <div style={{ width: '100%', height: isMusicStandMode ? '6px' : '4px', borderRadius: '3px', background: '#e2e8f0', overflow: 'hidden' }}>
+                                          <div style={{ width: '100%', height: isMusicStandMode ? '5px' : '3px', borderRadius: '3px', background: '#e2e8f0', overflow: 'hidden' }}>
                                             <div style={{ width: `${Math.min(100, pct * 100)}%`, height: '100%', background: gradient.from, borderRadius: '3px' }} />
                                           </div>
                                         </div>
@@ -868,39 +950,39 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
               <div style={{
                 background: 'linear-gradient(180deg, #ffffff 0%, #fbfdfc 100%)',
                 border: '1px solid #e2e8f0',
-                borderRadius: isMusicStandMode ? '32px' : '28px',
-                padding: isMusicStandMode ? '26px 24px' : (isMobile ? '16px 14px' : '22px'),
-                boxShadow: '0 8px 28px -4px rgba(15, 23, 42, 0.04)',
+                borderRadius: isMusicStandMode ? '26px' : '20px',
+                padding: isMusicStandMode ? '20px 18px' : (isMobile ? '16px 14px' : '18px'),
+                boxShadow: '0 8px 24px -4px rgba(15, 23, 42, 0.03)',
                 boxSizing: 'border-box',
                 maxWidth: '100%',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: isMusicStandMode ? '22px' : '18px'
+                gap: isMusicStandMode ? '16px' : '14px'
               }}>
                 <div>
-                  <h4 style={{ fontSize: isMusicStandMode ? '1.20rem' : '1.05rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '10px', margin: 0, fontWeight: 950 }}>
+                  <h4 style={{ fontSize: isMusicStandMode ? '1.15rem' : '1.0rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontWeight: 900 }}>
                     <div style={{ 
                       background: '#fef3c7', 
-                      padding: isMusicStandMode ? '8px' : '6px', 
-                      borderRadius: isMusicStandMode ? '14px' : '10px', 
+                      padding: isMusicStandMode ? '6px' : '5px', 
+                      borderRadius: isMusicStandMode ? '10px' : '8px', 
                       display: 'flex', 
                       alignItems: 'center', 
                       border: '1px solid #fde68a' 
                     }}>
-                      <Trophy size={isMusicStandMode ? 20 : 16} color="#d97706" fill="#d97706" />
+                      <Trophy size={isMusicStandMode ? 18 : 15} color="#d97706" fill="#d97706" />
                     </div>
                     <span>Meine Erfolge</span>
                   </h4>
-                  <p style={{ color: '#64748b', fontSize: isMusicStandMode ? '0.86rem' : '0.74rem', margin: '4px 0 0 0', fontWeight: 600 }}>
+                  <p style={{ color: '#64748b', fontSize: isMusicStandMode ? '0.82rem' : '0.72rem', margin: '3px 0 0 0', fontWeight: 600 }}>
                     Deine gesammelten Meilensteine
                   </p>
                 </div>
 
                 {/* List of Mastered Songs & Lehrwerke */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: isMusicStandMode ? '18px' : '14px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: isMusicStandMode ? '16px' : '12px' }}>
                   {/* Mastered Songs Section */}
                   <div>
-                    <h5 style={{ fontSize: isMusicStandMode ? '0.82rem' : '0.70rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <h5 style={{ fontSize: isMusicStandMode ? '0.78rem' : '0.68rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '5px' }}>
                       🏆 Gemeisterte Songs
                     </h5>
                     {(() => {
@@ -922,28 +1004,22 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                       });
 
                       // 2. From progressItems
-                      (progressItems || []).forEach(item => {
-                        const rawTopic = (item.topic_name || item.title || '').trim();
-                        if (!rawTopic || rawTopic.includes(' - Seite ') || rawTopic.startsWith('Hausaufgabe KW ') || rawTopic.toLowerCase() === 'test' || rawTopic.toLowerCase() === 'test - test' || rawTopic.toLowerCase() === 'test-test') return;
+                      (progressItems || []).forEach((item: any) => {
                         if (item.status === 'MASTERED' || item.progress_percent === 100) {
-                          const cleanT = rawTopic.replace(/\s*\([^)]*\)\s*$/, '').trim();
-                          const key = cleanT.toLowerCase();
-                          if (!masteredSongsMap.has(key)) {
-                            let artist = 'Unbekannt';
-                            let title = cleanT;
-                            if (cleanT.includes(' - ')) {
-                              const parts = cleanT.split(' - ');
-                              artist = parts[0].trim();
-                              title = parts.slice(1).join(' - ').trim();
+                          const raw = (item.topic_name || item.title || '').trim();
+                          if (raw && !raw.startsWith('Hausaufgabe KW ') && !raw.includes(' - Seite ')) {
+                            const clean = raw.replace(/\s*\([^)]*\)\s*$/, '').trim();
+                            const key = clean.toLowerCase();
+                            if (!masteredSongsMap.has(key)) {
+                              masteredSongsMap.set(key, {
+                                id: item.song_id || item.id || key,
+                                title: clean,
+                                artist: 'Unbekannt',
+                                status: 'MASTERED',
+                                progress_percent: 100,
+                                is_campus_active: true
+                              });
                             }
-                            masteredSongsMap.set(key, {
-                              id: item.song_id || item.id || key,
-                              title,
-                              artist: normalizeArtistName(artist),
-                              status: 'MASTERED',
-                              progress_percent: 100,
-                              is_campus_active: true
-                            });
                           }
                         }
                       });
@@ -973,49 +1049,80 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
 
                       if (masteredSongsList.length === 0) {
                         return (
-                          <div style={{ padding: isMusicStandMode ? '16px' : '12px', textAlign: 'center', color: '#94a3b8', fontSize: isMusicStandMode ? '0.84rem' : '0.72rem', fontStyle: 'italic', background: '#f8fafc', borderRadius: '14px', border: '1px solid #f1f5f9' }}>
+                          <div style={{ padding: isMusicStandMode ? '14px' : '10px', textAlign: 'center', color: '#94a3b8', fontSize: isMusicStandMode ? '0.80rem' : '0.70rem', fontStyle: 'italic', background: '#f8fafc', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
                             Noch keine Meisterwerke.
                           </div>
                         );
                       }
 
                       return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                           {masteredSongsList.map(song => {
                             const lwColor = getSongColor(song.title);
                             return (
                               <div 
                                 key={song.id || song.title} 
+                                role="button"
+                                tabIndex={0}
                                 onClick={() => setSelectedSongForDetail(song)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    setSelectedSongForDetail(song);
+                                  }
+                                }}
                                 className="hover-scale-subtle"
                                 style={{ 
                                   display: 'flex', 
                                   alignItems: 'center', 
-                                  gap: isMusicStandMode ? '12px' : '10px', 
+                                  gap: isMusicStandMode ? '10px' : '8px', 
                                   background: '#ffffff', 
-                                  padding: isMusicStandMode ? '10px 12px' : '8px 10px', 
-                                  borderRadius: isMusicStandMode ? '16px' : '14px', 
+                                  padding: isMusicStandMode ? '8px 10px' : '6px 8px', 
+                                  borderRadius: isMusicStandMode ? '14px' : '12px', 
                                   border: '1px solid #f1f5f9', 
-                                  boxShadow: '0 1px 4px rgba(0, 0, 0, 0.02)', 
+                                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)', 
                                   cursor: 'pointer'
                                 }}
                               >
                                 {renderSongVinylCover(lwColor, 'sm')}
                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontSize: isMusicStandMode ? '0.94rem' : '0.80rem', fontWeight: 850, color: '#0f172a', lineHeight: '1.25', wordBreak: 'break-word' }}>
+                                  <div 
+                                    title={song.title}
+                                    style={{ 
+                                      fontSize: isMusicStandMode ? '0.88rem' : '0.78rem', 
+                                      fontWeight: 800, 
+                                      color: '#0f172a', 
+                                      lineHeight: '1.25', 
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis'
+                                    }}
+                                  >
                                     {song.title}
                                   </div>
-                                  <div style={{ fontSize: isMusicStandMode ? '0.80rem' : '0.68rem', fontWeight: 600, color: '#64748b', lineHeight: '1.2', wordBreak: 'break-word', marginTop: '1px' }}>
+                                  <div 
+                                    title={song.artist}
+                                    style={{ 
+                                      fontSize: isMusicStandMode ? '0.74rem' : '0.66rem', 
+                                      fontWeight: 600, 
+                                      color: '#64748b', 
+                                      lineHeight: '1.2', 
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis', 
+                                      marginTop: '1px' 
+                                    }}
+                                  >
                                     von {song.artist}
                                   </div>
                                 </div>
                                 <div style={{
                                   background: '#dcfce7',
                                   color: '#15803d',
-                                  padding: isMusicStandMode ? '3px 8px' : '2px 6px',
+                                  padding: isMusicStandMode ? '2px 7px' : '2px 5px',
                                   borderRadius: '100px',
-                                  fontSize: isMusicStandMode ? '0.74rem' : '0.62rem',
-                                  fontWeight: 850,
+                                  fontSize: isMusicStandMode ? '0.70rem' : '0.60rem',
+                                  fontWeight: 800,
                                   display: 'flex',
                                   alignItems: 'center',
                                   gap: '3px',
@@ -1035,7 +1142,7 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
 
                   {/* Mastered / Completed Lehrwerke Section */}
                   <div>
-                    <h5 style={{ fontSize: isMusicStandMode ? '0.82rem' : '0.70rem', fontWeight: 850, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <h5 style={{ fontSize: isMusicStandMode ? '0.78rem' : '0.68rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '5px' }}>
                       📚 Gemeisterte Lehrwerke
                     </h5>
                     {(() => {
@@ -1087,17 +1194,25 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
 
                           return (
                             <div 
+                              role="button"
+                              tabIndex={0}
                               onClick={() => setSelectedLehrwerkForDetail(topBook.book)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  setSelectedLehrwerkForDetail(topBook.book);
+                                }
+                              }}
                               className="hover-scale-subtle"
                               style={{
                                 background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
-                                borderRadius: isMusicStandMode ? '20px' : '16px',
+                                borderRadius: isMusicStandMode ? '16px' : '14px',
                                 border: '1.5px solid #86efac',
-                                padding: isMusicStandMode ? '14px 16px' : '12px 14px',
-                                boxShadow: '0 4px 14px -2px rgba(34, 197, 94, 0.08)',
+                                padding: isMusicStandMode ? '12px 14px' : '10px 12px',
+                                boxShadow: '0 2px 8px -2px rgba(34, 197, 94, 0.08)',
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: '8px',
+                                gap: '6px',
                                 cursor: 'pointer'
                               }}
                             >
@@ -1105,44 +1220,55 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                                 <div style={{
                                   background: '#dcfce7',
                                   color: '#15803d',
-                                  fontSize: isMusicStandMode ? '0.74rem' : '0.64rem',
-                                  fontWeight: 900,
-                                  padding: '2px 8px',
+                                  fontSize: isMusicStandMode ? '0.70rem' : '0.62rem',
+                                  fontWeight: 800,
+                                  padding: '2px 7px',
                                   borderRadius: '100px',
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: '4px',
                                   textTransform: 'uppercase',
-                                  letterSpacing: '0.03em'
+                                  letterSpacing: '0.02em'
                                 }}>
-                                  <Target size={11} color="#15803d" />
+                                  <Target size={10} color="#15803d" />
                                   <span>Nächstes Ziel</span>
                                 </div>
-                                <span style={{ fontSize: isMusicStandMode ? '0.76rem' : '0.66rem', color: '#16a34a', fontWeight: 800 }}>
+                                <span style={{ fontSize: isMusicStandMode ? '0.72rem' : '0.64rem', color: '#16a34a', fontWeight: 800 }}>
                                   {Math.round(topBook.pct * 100)}%
                                 </span>
                               </div>
 
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <div style={{
-                                  width: '32px',
-                                  height: '40px',
+                                  width: '28px',
+                                  height: '34px',
                                   background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`,
-                                  borderRadius: '6px',
+                                  borderRadius: '5px',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   color: gradient.text,
                                   flexShrink: 0,
-                                  boxShadow: '0 2px 6px rgba(0,0,0,0.08)'
+                                  boxShadow: '0 1px 4px rgba(0,0,0,0.06)'
                                 }}>
-                                  <BookOpen size={14} />
+                                  <BookOpen size={12} />
                                 </div>
                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontSize: isMusicStandMode ? '0.94rem' : '0.82rem', fontWeight: 850, color: '#0f172a', lineHeight: 1.2, wordBreak: 'break-word' }}>
+                                  <div 
+                                    title={topBook.book.title}
+                                    style={{ 
+                                      fontSize: isMusicStandMode ? '0.88rem' : '0.78rem', 
+                                      fontWeight: 800, 
+                                      color: '#0f172a', 
+                                      lineHeight: 1.25, 
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis'
+                                    }}
+                                  >
                                     {topBook.book.title}
                                   </div>
-                                  <div style={{ fontSize: isMusicStandMode ? '0.78rem' : '0.68rem', fontWeight: 600, color: '#64748b', marginTop: '2px' }}>
+                                  <div style={{ fontSize: isMusicStandMode ? '0.74rem' : '0.66rem', fontWeight: 600, color: '#64748b', marginTop: '1px' }}>
                                     {topBook.masteredCount} von {topBook.total} Seiten
                                   </div>
                                 </div>
