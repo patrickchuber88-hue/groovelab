@@ -48,18 +48,16 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
   let clientInfo = rawHeaders['x-client-info'] || 'supabase-js/2.39.3';
   
   // Dynamically inject security session tokens into x-client-info to avoid CORS preflight (OPTIONS) blocks
+  // 🛡️ Strict Tab Session Isolation: Each browser tab uses its own tab-scoped session from sessionStorage
   const sessionToken = typeof window !== 'undefined' 
-    ? (sessionStorage.getItem('gl_active_session_lease_id') || localStorage.getItem('gl_active_session_lease_id') || localStorage.getItem('gl_global_device_key'))
+    ? (sessionStorage.getItem('gl_active_session_lease_id') || localStorage.getItem('gl_global_device_key'))
     : null;
   if (sessionToken) {
     clientInfo += `;session_token=${sessionToken}`;
   }
 
   const activeUserId = typeof window !== 'undefined' 
-    ? (sessionStorage.getItem('groovelab_user_id') || 
-       localStorage.getItem('campus_active_student_id') || 
-       localStorage.getItem('groovelab_current_student_id') || 
-       localStorage.getItem('groovelab_user_id')) 
+    ? sessionStorage.getItem('groovelab_user_id')
     : null;
   if (activeUserId) {
     clientInfo += `;user_id=${activeUserId}`;

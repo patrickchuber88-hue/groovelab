@@ -46,6 +46,8 @@ import { BandFoundingModalsHub } from './components/modals/BandFoundingModalsHub
 import { ProfileBandModalsHub } from './components/modals/ProfileBandModalsHub';
 import { MessagesTabContainer } from './components/messages/MessagesTabContainer';
 import { StudentPracticeRepertoireTabs } from './components/groovelab/StudentPracticeRepertoireTabs';
+import { StudentBandMatchingSuite } from './components/groovelab/StudentBandMatchingSuite';
+import { StudentLibraryTab } from './components/groovelab/StudentLibraryTab';
 const MaintenanceLockoutOverlay = lazy(() => import('./components/MaintenanceLockoutOverlay').then(m => ({ default: m.MaintenanceLockoutOverlay })));
 const GlobalBroadcastBanner = lazy(() => import('./components/GlobalBroadcastBanner').then(m => ({ default: m.GlobalBroadcastBanner })));
 const PwaUpdateToast = lazy(() => import('./components/ui/PwaUpdateToast').then(m => ({ default: m.PwaUpdateToast })));
@@ -718,9 +720,8 @@ function App() {
 
   const [loggedInUserId, setLoggedInUserIdRaw] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
-    const isMasterAuth = sessionStorage.getItem('groovelab_is_master_admin') === 'true' || 
-                         localStorage.getItem('groovelab_is_master_admin') === 'true';
-    const ghostAuthToken = localStorage.getItem('groovelab_ghost_auth_token');
+    const isMasterAuth = sessionStorage.getItem('groovelab_is_master_admin') === 'true';
+    const ghostAuthToken = sessionStorage.getItem('groovelab_ghost_auth_token') || localStorage.getItem('groovelab_ghost_auth_token');
     const isMasterValid = isMasterAuth || Boolean(ghostAuthToken);
 
     const urlParams = new URLSearchParams(window.location.search);
@@ -744,18 +745,14 @@ function App() {
     } catch (e) {}
 
     // 📱 PWA Standalone / Kaltstart-Immunisierung:
-    // Falls sessionStorage nach WebKit-Hintergrund-Suspendierung geleert wurde
-    const persistentId = localStorage.getItem('campus_active_student_id') ||
-                         localStorage.getItem('groovelab_current_student_id') ||
-                         localStorage.getItem('groovelab_user_id');
-    if (persistentId) return persistentId;
-
-    try {
-      const familyProfiles = JSON.parse(localStorage.getItem('campus_family_profiles') || '[]');
-      if (Array.isArray(familyProfiles) && familyProfiles[0]?.id) {
-        return familyProfiles[0].id;
-      }
-    } catch (e) {}
+    // AUSSCHLIESSLICH im installierten PWA-Standalone-Modus (Home-Screen-App ohne Browser-Tabs)
+    const isPwa = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+    if (isPwa) {
+      const persistentId = localStorage.getItem('campus_active_student_id') ||
+                           localStorage.getItem('groovelab_current_student_id') ||
+                           localStorage.getItem('groovelab_user_id');
+      if (persistentId) return persistentId;
+    }
     return null;
   });
 
@@ -763,18 +760,20 @@ function App() {
     setLoggedInUserIdRaw((prev) => {
       const nextVal = typeof val === 'function' ? val(prev) : val;
       if (typeof window !== 'undefined') {
-        const isKiosk = Boolean(localStorage.getItem('groovelab_station_id') && localStorage.getItem('groovelab_station_id') !== 'skip');
+        const isPwa = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
         if (nextVal) {
           sessionStorage.setItem('groovelab_user_id', nextVal);
-          if (!isKiosk) {
+          if (isPwa) {
             localStorage.setItem('groovelab_user_id', nextVal);
             localStorage.setItem('campus_active_student_id', nextVal);
           }
         } else {
           sessionStorage.removeItem('groovelab_user_id');
-          localStorage.removeItem('groovelab_user_id');
-          localStorage.removeItem('campus_active_student_id');
-          localStorage.removeItem('groovelab_current_student_id');
+          if (isPwa) {
+            localStorage.removeItem('groovelab_user_id');
+            localStorage.removeItem('campus_active_student_id');
+            localStorage.removeItem('groovelab_current_student_id');
+          }
         }
       }
       return nextVal;
@@ -1366,17 +1365,20 @@ function App() {
       const cached = sessionStorage.getItem('groovelab_cached_user');
       if (cached) return JSON.parse(cached);
 
-      // 📱 PWA Standalone Kaltstart-Fallback für initialen Benutzer-Cache
-      const persistentId = localStorage.getItem('campus_active_student_id') ||
-                           localStorage.getItem('groovelab_current_student_id') ||
-                           localStorage.getItem('groovelab_user_id');
-      if (persistentId) {
-        const offlineCache = localStorage.getItem(`groovelab_offline_user_cache_${persistentId}`);
-        if (offlineCache) {
-          try {
-            const parsed = JSON.parse(offlineCache);
-            if (parsed?.data) return parsed.data;
-          } catch (e) {}
+      // 📱 PWA Standalone Kaltstart-Fallback für initialen Benutzer-Cache (nur wenn Standalone PWA ohne Tabs)
+      const isPwa = typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true);
+      if (isPwa) {
+        const persistentId = localStorage.getItem('campus_active_student_id') ||
+                             localStorage.getItem('groovelab_current_student_id') ||
+                             localStorage.getItem('groovelab_user_id');
+        if (persistentId) {
+          const offlineCache = localStorage.getItem(`groovelab_offline_user_cache_${persistentId}`);
+          if (offlineCache) {
+            try {
+              const parsed = JSON.parse(offlineCache);
+              if (parsed?.data) return parsed.data;
+            } catch (e) {}
+          }
         }
       }
       return null;
@@ -1402,13 +1404,14 @@ function App() {
 
       if (typeof window !== 'undefined') {
         const isKiosk = Boolean(localStorage.getItem('groovelab_station_id') && localStorage.getItem('groovelab_station_id') !== 'skip');
+        const isPwa = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
         if (nextVal) {
           // 🛡️ Zero-Knowledge: Never persist student last_name on shared Kiosk tablets
           const userToCache = (nextVal.role === 'student' && isKiosk) ? { ...nextVal, last_name: null } : nextVal;
           sessionStorage.setItem('groovelab_cached_user', JSON.stringify(userToCache));
           if (nextVal.id) {
             sessionStorage.setItem('groovelab_user_id', nextVal.id);
-            if (!isKiosk) {
+            if (isPwa && !isKiosk) {
               localStorage.setItem('groovelab_user_id', nextVal.id);
               localStorage.setItem('campus_active_student_id', nextVal.id);
             }
@@ -1423,6 +1426,10 @@ function App() {
           sessionStorage.removeItem('groovelab_cached_user');
           sessionStorage.removeItem('groovelab_token_version');
           sessionStorage.removeItem('groovelab_session_started_at');
+          if (isPwa) {
+            localStorage.removeItem('groovelab_user_id');
+            localStorage.removeItem('campus_active_student_id');
+          }
         }
       }
       return nextVal;
@@ -1825,7 +1832,7 @@ function App() {
         return platParam as any;
       }
     }
-    const saved = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_platform') || localStorage.getItem('groovelab_active_platform')) : null;
+    const saved = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_platform') : null;
     if (!showEnsemblesFeature && saved === 'ensembles') {
       return 'campus';
     }
@@ -1857,32 +1864,31 @@ function App() {
       setActivePlatformRaw(targetVal);
       // Auto-switch the active tab to the saved tab of the target platform atomically within the same transition
       if (targetVal === 'campus') {
-        const savedTab = (typeof window !== 'undefined' ? (sessionStorage.getItem('campus_active_tab') || localStorage.getItem('campus_active_tab')) : null) || 'briefing';
+        const savedTab = (typeof window !== 'undefined' ? sessionStorage.getItem('campus_active_tab') : null) || 'briefing';
         setActiveStudentTabRaw(savedTab === 'live' ? 'briefing' : savedTab);
       } else if (targetVal === 'ensembles') {
-        const savedTab = (typeof window !== 'undefined' ? (sessionStorage.getItem('ensembles_active_tab') || localStorage.getItem('ensembles_active_tab')) : null) || 'overview';
+        const savedTab = (typeof window !== 'undefined' ? sessionStorage.getItem('ensembles_active_tab') : null) || 'overview';
         setActiveStudentTabRaw(savedTab);
       } else {
-        const savedTab = (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_tab') || localStorage.getItem('groovelab_active_tab')) : null) || 'live';
+        const savedTab = (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_tab') : null) || 'live';
         setActiveStudentTabRaw(savedTab);
       }
     });
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('groovelab_active_platform', targetVal);
-      localStorage.setItem('groovelab_active_platform', targetVal);
     }
   }, [locationMode, user?.role, user?.schools]);
 
   const [activeStudentTab, setActiveStudentTabRaw] = useState<string>(() => {
-    const platform = (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_platform') || localStorage.getItem('groovelab_active_platform')) : null) || 'campus';
+    const platform = (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_platform') : null) || 'campus';
     if (platform === 'campus') {
-      const tab = (typeof window !== 'undefined' ? (sessionStorage.getItem('campus_active_tab') || localStorage.getItem('campus_active_tab')) : null) || 'briefing';
+      const tab = (typeof window !== 'undefined' ? sessionStorage.getItem('campus_active_tab') : null) || 'briefing';
       return tab === 'live' ? 'briefing' : tab;
     }
     if (platform === 'ensembles') {
-      return (typeof window !== 'undefined' ? (sessionStorage.getItem('ensembles_active_tab') || localStorage.getItem('ensembles_active_tab')) : null) || 'overview';
+      return (typeof window !== 'undefined' ? sessionStorage.getItem('ensembles_active_tab') : null) || 'overview';
     }
-    return (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_tab') || localStorage.getItem('groovelab_active_tab')) : null) || 'live';
+    return (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_tab') : null) || 'live';
   });
   const setActiveStudentTab = React.useCallback((val: any) => {
     if (val === 'messages') {
@@ -1916,18 +1922,15 @@ function App() {
     if (tabLabels[val]) {
       announceA11y(tabLabels[val]);
     }
-    // Persist the tab to the correct sessionStorage and localStorage keys based on the current active platform
-    const platform = (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_platform') || localStorage.getItem('groovelab_active_platform')) : null) || 'campus';
+    // Persist the tab to the correct sessionStorage keys based on the current active platform
+    const platform = (typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_platform') : null) || 'campus';
     if (typeof window !== 'undefined') {
       if (platform === 'campus') {
         sessionStorage.setItem('campus_active_tab', val);
-        localStorage.setItem('campus_active_tab', val);
       } else if (platform === 'ensembles') {
         sessionStorage.setItem('ensembles_active_tab', val);
-        localStorage.setItem('ensembles_active_tab', val);
       } else {
         sessionStorage.setItem('groovelab_active_tab', val);
-        localStorage.setItem('groovelab_active_tab', val);
       }
     }
   }, []);
@@ -2105,9 +2108,6 @@ function App() {
   const [practiceSearchQuery, setPracticeSearchQuery] = useState('');
   const [practiceAlphaFilter, setPracticeAlphaFilter] = useState<string | null>(null);
   const [practiceSearchType, setPracticeSearchType] = useState<'title' | 'artist'>('title');
-  const [librarySearchQuery, setLibrarySearchQuery] = useState('');
-  const [libraryAlphaFilter, setLibraryAlphaFilter] = useState<string | null>(null);
-  const [librarySearchType, setLibrarySearchType] = useState<'title' | 'artist'>('title');
   const [activeStudentsCount, setActiveStudentsCount] = useState(0);
   const [personalRejections] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
@@ -3434,7 +3434,7 @@ function App() {
       }
 
       if (isInitial) {
-        const activeWs = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null;
+        const activeWs = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_workspace') : null;
         const isMasterSessionFlag = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_is_master_admin') === 'true') : false;
         const isMasterWorkspace = activeWs === 'master_admin';
         
@@ -3454,15 +3454,11 @@ function App() {
         if (isMasterAdmin) {
           sessionStorage.setItem('groovelab_is_master_admin', 'true');
           sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
-          localStorage.setItem('groovelab_is_master_admin', 'true');
-          localStorage.setItem('groovelab_active_workspace', 'master_admin');
           sessionStorage.setItem('groovelab_active_platform', 'campus');
           setActivePlatform('campus');
         } else if (isStudent) {
           sessionStorage.removeItem('groovelab_is_master_admin');
-          localStorage.removeItem('groovelab_is_master_admin');
           sessionStorage.setItem('groovelab_active_workspace', 'student');
-          localStorage.setItem('groovelab_active_workspace', 'student');
           const startPlat = allowedPlatform;
           setActivePlatform(startPlat);
           sessionStorage.setItem('groovelab_active_platform', startPlat);
@@ -3475,9 +3471,7 @@ function App() {
           sessionStorage.setItem(storageKey, startTab);
         } else if (isTeacher) {
           sessionStorage.removeItem('groovelab_is_master_admin');
-          localStorage.removeItem('groovelab_is_master_admin');
           sessionStorage.setItem('groovelab_active_workspace', 'teacher');
-          localStorage.setItem('groovelab_active_workspace', 'teacher');
           const startPlat = allowedPlatform;
           setActivePlatform(startPlat);
           sessionStorage.setItem('groovelab_active_platform', startPlat);
@@ -3490,12 +3484,10 @@ function App() {
           sessionStorage.setItem(storageKey, startTab);
         } else if (isSecretary) {
           sessionStorage.removeItem('groovelab_is_master_admin');
-          localStorage.removeItem('groovelab_is_master_admin');
           const startPlat = allowedPlatform;
           setActivePlatform(startPlat);
           sessionStorage.setItem('groovelab_active_platform', startPlat);
           sessionStorage.setItem('groovelab_active_workspace', 'secretary');
-          localStorage.setItem('groovelab_active_workspace', 'secretary');
           
           const storedSubtab = sessionStorage.getItem('groovelab_secretary_subtab');
           sessionStorage.setItem('groovelab_secretary_subtab', storedSubtab || 'briefing');
@@ -6767,7 +6759,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
 
     const { data: userToLogin } = await supabase.from('users').select('role, roles, contract_ends_at, contract_decision_made, is_external_vocalist, is_campus_active, is_groovelab_active, is_master_admin, schools(has_campus_subscription, has_groovelab_subscription, is_billing_booked, subscription_bypass)').eq('id', userId).single();
 
-    const existingWorkspace = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null;
+    const existingWorkspace = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_workspace') : null;
 
     let effectiveUser = userToLogin;
     if (!effectiveUser && isLocalhost) {
@@ -6818,22 +6810,16 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
 
     if (isMasterAdmin) {
       sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
-      localStorage.setItem('groovelab_active_workspace', 'master_admin');
       sessionStorage.setItem('groovelab_is_master_admin', 'true');
-      localStorage.setItem('groovelab_is_master_admin', 'true');
     } else {
       sessionStorage.removeItem('groovelab_is_master_admin');
-      localStorage.removeItem('groovelab_is_master_admin');
       if (currentRole === 'admin' || currentRole === 'secretary') {
         sessionStorage.setItem('groovelab_active_workspace', 'secretary');
-        localStorage.setItem('groovelab_active_workspace', 'secretary');
         sessionStorage.setItem('groovelab_secretary_subtab', 'briefing');
       } else if (currentRole === 'student') {
         sessionStorage.setItem('groovelab_active_workspace', 'student');
-        localStorage.setItem('groovelab_active_workspace', 'student');
       } else {
         sessionStorage.setItem('groovelab_active_workspace', 'teacher');
-        localStorage.setItem('groovelab_active_workspace', 'teacher');
       }
     }
 
@@ -6924,12 +6910,9 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     if (isMasterAdmin) {
       sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
       sessionStorage.setItem('groovelab_is_master_admin', 'true');
-      localStorage.setItem('groovelab_active_workspace', 'master_admin');
-      localStorage.setItem('groovelab_is_master_admin', 'true');
       sessionStorage.setItem('campus_active_tab', 'briefing');
     } else if (userToLogin?.role === 'student') {
       sessionStorage.setItem('groovelab_active_workspace', 'student');
-      localStorage.setItem('groovelab_active_workspace', 'student');
       if (selectedPlat === 'groovelab') {
         sessionStorage.setItem('groovelab_active_tab', 'live');
       } else {
@@ -6938,7 +6921,6 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
       }
     } else if (userToLogin?.role === 'teacher') {
       sessionStorage.setItem('groovelab_active_workspace', 'teacher');
-      localStorage.setItem('groovelab_active_workspace', 'teacher');
       if (selectedPlat === 'groovelab') {
         sessionStorage.setItem('groovelab_active_tab', 'live');
       } else {
@@ -6947,7 +6929,6 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
       }
     } else if (userToLogin?.role === 'secretary' || userToLogin?.role === 'admin') {
       sessionStorage.setItem('groovelab_active_workspace', 'secretary');
-      localStorage.setItem('groovelab_active_workspace', 'secretary');
       sessionStorage.setItem('groovelab_secretary_subtab', 'briefing');
       sessionStorage.setItem('campus_active_tab', 'briefing');
     } else {
@@ -7949,12 +7930,32 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
       // 2. Await authoritative database role update via RPC (Fail-Closed, no client table update)
       try {
         const activeLeaseId = typeof window !== 'undefined' 
-          ? (sessionStorage.getItem('gl_active_session_lease_id') || localStorage.getItem('gl_active_session_lease_id') || null) 
+          ? sessionStorage.getItem('gl_active_session_lease_id')
           : null;
-        const { error: rpcErr } = await supabase.rpc('switch_user_active_role', {
-          p_target_role: newRole,
-          ...(activeLeaseId ? { p_lease_id: activeLeaseId } : {})
-        });
+        
+        let rpcErr: any = null;
+
+        // Versuche primär den 2-Parameter-Aufruf mit Session-Lease-Scoping
+        if (activeLeaseId) {
+          const res = await supabase.rpc('switch_user_active_role', {
+            p_target_role: newRole,
+            p_lease_id: activeLeaseId
+          });
+          rpcErr = res.error;
+        }
+
+        // Graceful Degradation / Fallback: Wenn keine Lease-ID vorhanden ist oder das Backend
+        // die 2-Parameter-Signatur noch nicht im PostgREST-Schema-Cache geladen hat (PGRST202)
+        if (!activeLeaseId || (rpcErr && (rpcErr.message?.includes('schema cache') || rpcErr.code === 'PGRST202'))) {
+          if (rpcErr) {
+            console.warn('[Role Switch] 2-Parameter RPC nicht im Schema Cache, Fallback auf Basis-Signatur:', rpcErr.message);
+          }
+          const fallbackRes = await supabase.rpc('switch_user_active_role', {
+            p_target_role: newRole
+          });
+          rpcErr = fallbackRes.error;
+        }
+
         if (rpcErr) {
           console.error('[Role Switch] switch_user_active_role error:', rpcErr.message);
           alert('Rollenwechsel fehlgeschlagen: ' + rpcErr.message);
@@ -7988,21 +7989,17 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
 
         if (typeof window !== 'undefined') {
           sessionStorage.setItem('groovelab_active_workspace', 'teacher');
-          localStorage.setItem('groovelab_active_workspace', 'teacher');
           sessionStorage.removeItem('groovelab_is_master_admin');
-          localStorage.removeItem('groovelab_is_master_admin');
           sessionStorage.removeItem('groovelab_secretary_subtab');
           sessionStorage.removeItem('groovelab_dual_role_switched_notice');
           sessionStorage.setItem('groovelab_active_platform', targetPlatform);
-          localStorage.setItem('groovelab_active_platform', targetPlatform);
         }
-        const rawCampusTab = typeof window !== 'undefined' ? (sessionStorage.getItem('campus_active_tab') || localStorage.getItem('campus_active_tab')) : null;
+        const rawCampusTab = typeof window !== 'undefined' ? sessionStorage.getItem('campus_active_tab') : null;
         const startTab = targetPlatform === 'campus' 
           ? ((rawCampusTab && rawCampusTab !== 'live') ? rawCampusTab : 'briefing')
           : 'live';
         if (typeof window !== 'undefined') {
           sessionStorage.setItem(targetPlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab', startTab);
-          localStorage.setItem(targetPlatform === 'campus' ? 'campus_active_tab' : 'groovelab_active_tab', startTab);
         }
         React.startTransition(() => {
           setActivePlatform(targetPlatform);
@@ -8011,13 +8008,9 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
       } else if (newRole === 'admin' || newRole === 'secretary') {
         if (typeof window !== 'undefined') {
           sessionStorage.setItem('groovelab_active_workspace', 'secretary');
-          localStorage.setItem('groovelab_active_workspace', 'secretary');
           sessionStorage.removeItem('groovelab_is_master_admin');
-          localStorage.removeItem('groovelab_is_master_admin');
           sessionStorage.setItem('groovelab_active_platform', 'campus');
-          localStorage.setItem('groovelab_active_platform', 'campus');
           sessionStorage.setItem('campus_active_tab', 'briefing');
-          localStorage.setItem('campus_active_tab', 'briefing');
         }
         React.startTransition(() => {
           setActivePlatform('campus');
@@ -8030,7 +8023,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
   };
 
   // 2.5b SECRETARY DASHBOARD BYPASS
-  const activeWorkspace = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null;
+  const activeWorkspace = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_workspace') : null;
   if ((user.role?.toLowerCase() === 'secretary' || user.role?.toLowerCase() === 'admin') && activeWorkspace !== 'teacher') {
     return (
       <LegalConsentGate user={user}>
@@ -8241,19 +8234,6 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
 
   const groupedPracticeSongs = groupSongs(filteredPractice);
   const groupedRepertoireSongs = groupSongs(repertoireSongs);
-  const filteredLibrary = (globalSongs || []).filter((s: any) => {
-    const term = librarySearchQuery.toLowerCase();
-    const matchesSearch = librarySearchType === 'title' 
-      ? (s.title || '').toLowerCase().includes(term)
-      : (s.artist || '').toLowerCase().includes(term);
-      
-    const valForAlpha = librarySearchType === 'title' ? (s.title || '') : (s.artist || '');
-    const matchesAlpha = !libraryAlphaFilter 
-      ? true 
-      : valForAlpha.trim().toUpperCase().startsWith(libraryAlphaFilter);
-      
-    return matchesSearch && matchesAlpha;
-  }).sort((a: any, b: any) => (a.title || '').localeCompare(b.title || '', 'de-DE'));
 
   const getTeacherTheme = (name: string, userId: string) => {
     const nameLower = (name || '').toLowerCase();
@@ -9154,7 +9134,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                     (async () => {
                     try {
                       const activeLeaseToken = typeof window !== 'undefined'
-                        ? (sessionStorage.getItem('gl_parent_session_lease') || sessionStorage.getItem('gl_active_session_lease_id') || localStorage.getItem('gl_active_session_lease_id'))
+                        ? (sessionStorage.getItem('gl_parent_session_lease') || sessionStorage.getItem('gl_active_session_lease_id'))
                         : null;
                       const { error } = await supabase.rpc('save_parent_controls', {
                         p_student_id: user.id,
@@ -10655,7 +10635,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                     (async () => {
                       try {
                         const activeLeaseToken = typeof window !== 'undefined'
-                          ? (sessionStorage.getItem('gl_parent_session_lease') || sessionStorage.getItem('gl_active_session_lease_id') || localStorage.getItem('gl_active_session_lease_id'))
+                          ? (sessionStorage.getItem('gl_parent_session_lease') || sessionStorage.getItem('gl_active_session_lease_id'))
                           : null;
                         const { error } = await supabase.rpc('save_parent_controls', {
                           p_student_id: user.id,
@@ -12644,1177 +12624,57 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
         )}
 
 
-        {/* Band Matching Tab (The Wall) */}
-        {activeStudentTab === 'matching' && (
-          <ErrorBoundary>
-            <section className="exercises-section glass-panel animation-slide-up" style={{ margin: isMobile ? '12px' : '24px', padding: isMobile ? '16px' : '32px', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: isMobile ? '16px' : '32px', flexWrap: 'wrap', gap: isMobile ? '12px' : '20px' }}>
-                  <div>
-                    <h2 style={{ fontSize: isMobile ? '1.3rem' : '1.75rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
-                      <div style={{ color: '#f59e0b' }}><Users size={isMobile ? 22 : 32} /></div>
-                      Band Matching
-                    </h2>
-                    {!isMobile && <p style={{ color: '#64748b', fontSize: '1rem', margin: '8px 0 0 0' }}>Finde deine Mitmusiker für deine 100% Songs!</p>}
-                  </div>
-
-                  {/* Level Switch */}
-                  <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '16px', padding: '4px' }}>
-                    {[
-                      { id: 'all', label: 'Alle' },
-                      { id: 'starter', label: '🚀 Starter' },
-                      { id: 'pro', label: '⚡ Pro' }
-                    ].map(btn => (
-                      <button
-                        key={btn.id}
-                        onClick={() => setMatchingLevelFilter(btn.id as any)}
-                        style={{ 
-                          padding: isMobile ? '7px 12px' : '10px 20px', borderRadius: '12px', border: 'none', 
-                          background: matchingLevelFilter === btn.id ? 'white' : 'transparent', 
-                          color: matchingLevelFilter === btn.id ? '#1e293b' : '#64748b', 
-                          fontWeight: 800, cursor: 'pointer', fontSize: isMobile ? '0.78rem' : '0.85rem',
-                          boxShadow: matchingLevelFilter === btn.id ? '0 4px 12px rgba(0,0,0,0.05)' : 'none',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        {btn.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-              {(() => {
-                const filteredWall = (wallSongs || []).filter((ws: any) => {
-                  const hasFormations = ws?.formations && Array.isArray(ws.formations) && ws.formations.length > 0;
-                  if (!hasFormations) return false;
-                  if (matchingLevelFilter === 'all') return true;
-                  const level = ws.level?.toLowerCase() || 'pro'; // Default to pro if level is missing
-                  const isPro = level === 'original' || level === 'pro';
-                  const isStarter = level === 'starter';
-                  
-                  if (matchingLevelFilter === 'starter') return isStarter;
-                  if (matchingLevelFilter === 'pro') return isPro;
-                  return true;
-                });
-
-                if (filteredWall.length === 0) {
-                  return (
-                    <div style={{ textAlign: 'center', padding: '80px 40px', background: 'white', borderRadius: '32px', color: '#64748b', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
-                      <div style={{ fontSize: '3.5rem', marginBottom: '24px' }}>⏳</div>
-                      <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e293b', marginBottom: '12px' }}>Keine passenden Formationen</h3>
-                      <p style={{ fontSize: '1rem', lineHeight: 1.6, maxWidth: '400px', margin: '0 auto' }}>Ändere deinen Filter oder bringe neue Songs auf 100%!</p>
-                    </div>
-                  );
-                }
-
-
-                return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {filteredWall.map((song: any) => {
-                    const isExpanded = expandedMatchingSong === song.id;
-                    const totalRequired = Object.entries(song.instrumentation || {}).reduce((acc, [inst, count]) => {
-                      const low = inst.toLowerCase();
-                      if (low.includes('vocals') || low.includes('gesang')) return acc;
-                      return acc + (count as number);
-                    }, 0);
-
-                    const openSlots = Math.max(0, song.formations.reduce((acc: number, form: any) => {
-                      const instrumentalists = form.members?.filter((m: any) => m.instrument !== 'Vocals').length || 0;
-                      return acc + Math.max(0, totalRequired - instrumentalists);
-                    }, 0));
-
-                    return (
-                    <div key={song.id} style={{ display: 'flex', flexDirection: 'column' }}>
-                      <div className="glass-panel" 
-                        onClick={() => setExpandedMatchingSong(isExpanded ? null : song.id)}
-                        style={{ 
-                          background: 'white', 
-                          borderRadius: isExpanded ? '24px 24px 0 0' : '24px', 
-                          padding: isMobile ? '14px 16px' : '24px 32px', 
-                          border: '1px solid #f1f5f9',
-                          borderBottom: isExpanded ? 'none' : '1px solid #f1f5f9',
-                          boxShadow: isExpanded ? '0 10px 30px rgba(0,0,0,0.03)' : '0 4px 15px rgba(0,0,0,0.01)', 
-                          cursor: 'pointer', transition: 'all 0.2s', zIndex: 1
-                        }}>
-                        {isMobile ? (
-                          /* Mobile: vertical layout */
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <div style={{ 
-                                padding: '4px 10px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 900,
-                                background: song.level === 'starter' ? '#fffbeb' : '#eff6ff',
-                                color: song.level === 'starter' ? '#b45309' : '#2563eb',
-                                border: `1px solid ${song.level === 'starter' ? '#fef3c7' : '#dbeafe'}`,
-                                textTransform: 'uppercase', flexShrink: 0
-                              }}>
-                                {song.level === 'starter' ? '🚀 Starter' : '⚡ Pro'}
-                              </div>
-                              <div style={{ minWidth: 0, flex: 1 }}>
-                                <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{song.artist}</div>
-                                <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{song.title}</div>
-                              </div>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748b', background: '#f8fafc', padding: '6px 12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                                {openSlots} offene Slots
-                              </div>
-                              <div style={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', borderRadius: '50%', background: isExpanded ? '#f8fafc' : 'transparent' }}>
-                                {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          /* Desktop: horizontal layout */
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-                              <div style={{ 
-                                padding: '6px 14px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 900,
-                                background: song.level === 'starter' ? '#fffbeb' : '#eff6ff',
-                                color: song.level === 'starter' ? '#b45309' : '#2563eb',
-                                border: `1px solid ${song.level === 'starter' ? '#fef3c7' : '#dbeafe'}`,
-                                textTransform: 'uppercase'
-                              }}>
-                                {song.level === 'starter' ? '🚀 Starter' : '⚡ Pro'}
-                              </div>
-                              <div>
-                                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{song.artist}</div>
-                                <h3 style={{ fontSize: '1.4rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.2, margin: 0 }}>{song.title}</h3>
-                              </div>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-                              <div style={{ fontSize: '0.875rem', fontWeight: 800, color: '#64748b', background: '#f8fafc', padding: '8px 16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                                {openSlots} offene Slots
-                              </div>
-                              <div style={{ color: '#cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '50%', background: isExpanded ? '#f8fafc' : 'transparent' }}>
-                                {isExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {isExpanded && (
-                        <div style={{ 
-                          padding: isMobile ? '16px' : '32px', 
-                          background: '#f8fafc', 
-                          borderRadius: '0 0 24px 24px', 
-                          border: '1px solid #f1f5f9', 
-                          borderTop: 'none',
-                          boxShadow: 'inset 0 10px 10px -10px rgba(0,0,0,0.05)'
-                        }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '16px' : '24px' }}>
-                            {(() => {
-                              const activeBandForSong = (userBands || []).find((b: any) => {
-                                const hasActiveSong = (b.band_songs || []).some((bs: any) => 
-                                  bs.song_id === song.song_id && bs.status === 'active'
-                                );
-                                const isMember = (b.band_members || []).some((m: any) => m.user_id === user?.id);
-                                return hasActiveSong && isMember;
-                              });
-
-                              const myMember = activeBandForSong 
-                                ? (activeBandForSong.band_members || []).find((m: any) => m.user_id === user?.id) 
-                                : null;
-                              const myInstrument = myMember ? myMember.instrument : '';
-
-                              const finalFormations = [...song.formations].sort((a, b) => {
-                                const aMine = (a.members || []).some((m: any) => m.user_id === user?.id);
-                                const bMine = (b.members || []).some((m: any) => m.user_id === user?.id);
-                                if (aMine && !bMine) return -1;
-                                if (!aMine && bMine) return 1;
-                                return 0;
-                              });
-                              
-                              return (
-                                <>
-                                  {activeBandForSong && (
-                                    <div style={{
-                                      background: 'linear-gradient(135deg, #e6f4ea 0%, #e6f4ea 100%)',
-                                      border: '1px solid #e6f4ea',
-                                      padding: '20px 24px',
-                                      borderRadius: '24px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'space-between',
-                                      boxShadow: '0 4px 20px rgba(52, 168, 83, 0.08)',
-                                      gap: '16px',
-                                      marginBottom: '20px',
-                                      animation: 'slideUp 0.3s ease-out'
-                                    }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                        <div style={{ background: '#34a853', color: 'white', padding: '10px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(52, 168, 83, 0.2)' }}>
-                                          <CheckCircle size={24} />
-                                        </div>
-                                        <div>
-                                           <div style={{ fontSize: '1rem', fontWeight: 900, color: '#34a853', marginBottom: '2px' }}>
-                                             Du spielst bereits {myInstrument} in der Band "{activeBandForSong.name}" für diesen Song! 🚀
-                                           </div>
-                                           <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#34a853', opacity: 0.85 }}>
-                                             Dein Repertoire-Beitrag ist aktiv und verifiziert.
-                                           </div>
-                                         </div>
-                                      </div>
-                                      <span style={{ fontSize: '1.75rem', display: 'inline-flex', alignItems: 'center' }}>
-                                        {renderInstrumentIcon(myInstrument || 'Guitar', undefined, 24)}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {finalFormations.map((form: any, fIndex: number) => {
-                                    const mySlot = (form?.members || []).find((m: any) => m?.user_id === user?.id);
-                                    const isMySlot = !!mySlot;
-                                    
-                                    // Skip complete formation cards for the user if they are already in an active band for this song on the same instrument
-                                    if (activeBandForSong && isMySlot) {
-                                      const isSameInstrument = normalizeInstrument(mySlot.instrument) === normalizeInstrument(myInstrument);
-                                      if (isSameInstrument) return null;
-                                    }
-
-                                    // Skip complete formation cards if the current user is not a member of it (since it has no open slots for them to join)
-                                    if (form.isComplete && !isMySlot) return null;
-
-                                    const isGuestSearch = !!form.originBand;
-                                    const isProposal = form.status === 'proposal';
-                                    const mySkill = userSongs.find(us => us.song_id === song.song_id && (us.difficulty_level || 'original') === song.level);
-                                    const canJoin = mySkill && !isMySlot && !form.memberMap[mySkill.instrument] && !form.isComplete;
-
-                                return (
-                                  <div key={form.id} style={{ 
-                                    background: isProposal ? 'linear-gradient(135deg, #1e1b4b, #0f0728)' : (isGuestSearch ? '#0f172a' : (isMySlot ? 'linear-gradient(135deg, rgba(254, 252, 232, 0.95), rgba(255, 251, 235, 0.95))' : '#f8fafc')), 
-                                    border: isProposal ? '2px dashed #a855f7' : (isGuestSearch ? '1px solid rgba(255,255,255,0.1)' : (isMySlot ? '2px solid #eab308' : '1px solid #e2e8f0')),
-                                    borderRadius: '28px', padding: '24px',
-                                    boxShadow: isGuestSearch ? '0 10px 25px -5px rgba(0,0,0,0.3)' : (isMySlot ? '0 20px 40px rgba(234, 179, 8, 0.12)' : 'none'),
-                                    backdropFilter: isMySlot ? 'blur(10px)' : 'none',
-                                    WebkitBackdropFilter: isMySlot ? 'blur(10px)' : 'none'
-                                  }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                        <div style={{ 
-                                          fontSize: '0.75rem', 
-                                          fontWeight: 950, 
-                                          color: isProposal ? '#a855f7' : (isGuestSearch ? '#a855f7' : (isMySlot ? '#ca8a04' : (form.isInitial ? '#ca8a04' : '#64748b'))), 
-                                          textTransform: 'uppercase', 
-                                          letterSpacing: '0.05em',
-                                          display: 'flex',
-                                          flexDirection: 'column',
-                                          gap: '2px'
-                                        }}>
-                                          <span>
-                                            {isProposal 
-                                              ? `📢 BAND-PROJEKT (ABSTIMMUNG LÄUFT)` 
-                                              : (isGuestSearch 
-                                                  ? `🎸 GASTMUSIKER-SUCHE ${isMySlot ? '(DEINE BAND)' : ''}` 
-                                                  : (isMySlot ? '✨ Deine Formation' : (form.isInitial ? '📢 Offenes Recruiting' : `Band-Slot #${fIndex + 1}`)))
-                                            }
-                                          </span>
-                                        </div>
-                                      </div>
-                                {canJoin && (
-                                  <button 
-                                    onClick={async () => {
-                                      if (form.originBand) {
-                                        const choice = window.confirm(`BAND-PROJEKT: ${form.originBand.name}\n\nOption A (OK): Als GASTMUSIKER beitreten (Du unterstützt diese Band).\n\nOption B (Abbrechen): NEUE BAND gründen (Du startest ein eigenes Projekt für diesen Song).`);
-                                        if (choice) {
-                                          const { error } = await supabase.from('band_song_slots').insert({
-                                            band_song_id: form.bandSongId,
-                                            user_id: user.id,
-                                            instrument: mySkill.instrument,
-                                            status: 'joined'
-                                          });
-                                          if (error) alert('Fehler beim Beitreten: ' + error.message);
-                                          else {
-                                            alert(`Du bist nun Gastmusiker für "${form.originBand.name}"!`);
-                                            fetchDashboardData(user.id);
-                                          }
-                                        } else {
-                                          // Create a new formation instead
-                                          const newFormId = crypto.randomUUID();
-                                          await supabase.from('user_song_skills').update({ formation_group: newFormId }).eq('id', mySkill.id);
-                                          fetchDashboardData(user.id);
-                                        }
-                                      } else {
-                                        await supabase.from('user_song_skills').update({ formation_group: form.id }).eq('id', mySkill.id);
-                                        fetchDashboardData(user.id);
-                                      }
-                                    }}
-                                    style={{ background: form.originBand ? '#8b5cf6' : '#eab308', color: form.originBand ? 'white' : '#1e293b', border: 'none', padding: '6px 14px', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer' }}
-                                  >
-                                    BEITRETEN
-                                  </button>
-                                )}
-                              </div>
-
-                              <div style={{ display: 'flex', gap: '24px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                {isGuestSearch && (
-                                  <div 
-                                    onClick={() => {
-                                      setSelectedBandForProfile(form.originBand);
-                                      setShowBandProfile(true);
-                                    }}
-                                    style={{ 
-                                      display: 'flex', alignItems: 'center', gap: '16px', 
-                                      paddingRight: '24px', borderRight: '1px solid rgba(255,255,255,0.1)',
-                                      cursor: 'pointer', transition: 'all 0.2s ease',
-                                      flexShrink: 0
-                                    }}
-                                    
-                                    
-                                  >
-                                    {renderBandAvatar(form.originBand.name, form.originBand.photo_url, '64px', '18px')}
-                                    <div>
-                                      <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.4)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Band Projekt</div>
-                                      <div style={{ fontSize: '1rem', fontWeight: 950, color: 'white', lineHeight: 1.2 }}>{form.originBand.name}</div>
-                                      <div style={{ fontSize: '0.6rem', color: '#a855f7', fontWeight: 700, marginTop: '2px' }}>Profil ansehen →</div>
-                                    </div>
-                                  </div>
-                                )}
-
-                                <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap', flex: 1 }}>
-                                  {(() => {
-                                    const req = song.instrumentation || { 'E-Gitarre': 1, 'E-Bass': 1, 'E-Drums': 1 };
-                                    const requiredSlots: any[] = [];
-                                    Object.entries(req).forEach(([inst, count]) => {
-                                      if (inst.toLowerCase().includes('vocals') || inst.toLowerCase().includes('gesang')) return;
-                                      for (let i = 1; i <= (count as number); i++) {
-                                        requiredSlots.push({ inst, part: i });
-                                      }
-                                    });
-
-                                    // Sort slots: Guitar, Drums, Piano, Bass
-                                    requiredSlots.sort((a, b) => {
-                                      const orderMap: Record<string, number> = { 'e-gitarre': 1, 'e-drums': 2, 'e-piano': 3, 'e-bass': 4 };
-                                      const idxA = orderMap[a.inst.toLowerCase()] || 99;
-                                      const idxB = orderMap[b.inst.toLowerCase()] || 99;
-                                      if (idxA !== idxB) return idxA - idxB;
-                                      return a.part - b.part;
-                                    });
-
-                                    return requiredSlots.map(({ inst, part }) => {
-                                      const key = `${inst}_${part}`;
-                                      const member = form.memberMap[key] || form.memberMap[`${normalizeInstrument(inst)}_${part}`];
-                                      const isMe = member?.user_id === user?.id;
-                                      const instLabel = (req[inst] || 0) > 1 ? `${inst} ${part}` : inst;
-                                      
-                                      return (
-                                        <div key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '88px', position: 'relative' }}>
-                                          <div style={{ 
-                                            width: '72px', height: '72px', borderRadius: '50%', 
-                                            background: member ? (isGuestSearch ? 'rgba(255,255,255,0.05)' : 'white') : (isGuestSearch ? 'rgba(255,255,255,0.03)' : 'rgba(234, 179, 8, 0.03)'), 
-                                            border: (isMe || member?.isMastered) ? `3.5px solid #eab308` : (member ? (isGuestSearch ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0') : '2px dashed rgba(234, 179, 8, 0.25)'),
-                                            boxShadow: (isMe || member?.isMastered) ? '0 0 16px rgba(234, 179, 8, 0.4)' : 'none',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
-                                            opacity: member && !member.isMastered ? 0.75 : 1
-                                          }}>
-                                            {member ? (
-                                              <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-                                                <img 
-                                                  src={member.photo_url || '/avatar_ghost.jpg'} 
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setSelectedStudentForPreview(member);
-                                                  }}
-                                                  style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', cursor: 'pointer' }} 
-                                                  alt="" 
-                                                />
-                                                {member.isMastered && (
-                                                  <div style={{ position: 'absolute', bottom: '-2px', right: '-2px', background: '#34a853', color: 'white', borderRadius: '50%', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white', zIndex: 10 }}>
-                                                    <CheckCircle size={12} strokeWidth={4} />
-                                                  </div>
-                                                )}
-                                              </div>
-                                            ) : (
-                                              <div style={{ fontSize: '1.75rem', opacity: 0.35 }}>{APP_INSTRUMENT_ICONS[inst as keyof typeof APP_INSTRUMENT_ICONS] || '❓'}</div>
-                                            )}
-                                          </div>
-                                          <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px', width: '100%' }}>
-                                            <div style={{ fontSize: '0.68rem', fontWeight: 950, color: member ? (isGuestSearch ? 'white' : '#1e293b') : (isGuestSearch ? 'rgba(255,255,255,0.3)' : '#94a3b8'), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
-                                              {member ? member.first_name : instLabel}
-                                            </div>
-                                            {member && (
-                                              <div style={{ fontSize: '0.48rem', fontWeight: 800, color: isGuestSearch ? 'rgba(255,255,255,0.3)' : '#94a3b8', textTransform: 'uppercase' }}>
-                                                {instLabel}
-                                              </div>
-                                            )}
-                                          </div>
-                                        </div>
-                                      );
-                                    });
-                                  })()}
-                                </div>
-                              </div>
-
-                               {form.isComplete && isMySlot && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '24px' }}>
-                                  <div className="animation-pulse-subtle" style={{ 
-                                    width: '100%', padding: '18px', 
-                                    background: 'linear-gradient(135deg, #fef08a, #fde047)', 
-                                    color: '#854d0e', borderRadius: '20px', fontWeight: 900, textAlign: 'center',
-                                    border: '1px solid #eab308',
-                                    boxShadow: '0 8px 25px rgba(234,179,8,0.2)',
-                                    fontSize: '1rem',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px'
-                                  }}>
-                                    <span>✨</span> Formation vollständig! 🎸 <span>✨</span>
-                                  </div>
-                                  {!form.originBand && (
-                                    <button 
-                                      onClick={() => {
-                                        // Check for multi-band conflict first if the user already plays in another band
-                                        if (userBands.length > 0) {
-                                          const proceed = window.confirm('Deine Formation ist vollständig! 🎸\n\nDu spielst bereits in einer Band. Möchtest du wirklich eine zusätzliche Band gründen? Falls nicht, gibst du deinen Slot für andere frei.');
-                                          if (!proceed) {
-                                            (async () => {
-                                               await supabase.from('user_song_skills').update({ formation_group: null }).eq('id', mySlot.skill_id);
-                                               fetchDashboardData(user.id);
-                                            })();
-                                            return;
-                                          }
-                                        }
-
-                                        // Open naming modal - whoever clicks the button becomes the leader/founder
-                                        console.log('[DEBUG-Groovelab] setSuggestingSkill (Matching Board click) in App.tsx');
-                                        setSuggestingSkill({
-                                          ...mySlot,
-                                          isLeader: true,
-                                          leaderName: 'Du',
-                                          song_id: song.song_id,
-                                          songs: { id: song.song_id, title: song.title },
-                                          formation_group: form.id,
-                                          members: form.members
-                                        });
-                                        if (!foundingName) setFoundingName(generateRandomBandName(foundingLanguage));
-                                      }}
-                                      className="hero-cta-artistic"
-                                      style={{ 
-                                        padding: '20px', 
-                                        borderRadius: '20px', 
-                                        fontSize: '1.1rem', 
-                                        width: '100%', 
-                                        cursor: 'pointer',
-                                        background: 'linear-gradient(135deg, #ca8a04, #eab308)',
-                                        color: 'white',
-                                        border: 'none',
-                                        boxShadow: '0 12px 28px rgba(234, 179, 8, 0.35)'
-                                      }}
-                                    >
-                                      JETZT BAND GRÜNDEN
-                                    </button>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </>
-                    );
-                  })()}
-                        
-                        {!(song?.formations || []).some((f: any) => (f?.members || []).some((m: any) => m?.user_id === user?.id)) && (
-                          <button 
-                            onClick={async () => {
-                              const mySkill = userSongs.find(us => us.song_id === song.song_id);
-                              if (mySkill) {
-                                const newId = `form_${Math.random().toString(36).substr(2, 9)}`;
-                                await supabase.from('user_song_skills').update({ formation_group: newId }).eq('id', mySkill.id);
-                                fetchDashboardData(user.id);
-                              }
-                            }}
-                            style={{ padding: '16px', background: 'white', border: '2px dashed #cbd5e1', borderRadius: '24px', color: '#64748b', fontWeight: 800, cursor: 'pointer', width: '100%', marginTop: '20px' }}
-                          >
-                            + NEUE BAND-FORMATION STARTEN
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        );
-      })()}
-          </section>
-        </ErrorBoundary>
-      )}
-
-        {/* Bands Tab (Only for Students) */}
-        {activeStudentTab === 'bands' && user.role === 'student' && (
-          <ErrorBoundary>
-            <section className="exercises-section glass-panel animation-slide-up" style={{ margin: isMobile ? '12px' : '24px', padding: isMobile ? '16px' : '32px', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
-              <div style={{ marginBottom: isMobile ? '16px' : '32px' }}>
-                <h2 style={{ fontSize: isMobile ? '1.3rem' : '1.75rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
-                  <div style={{ color: '#3b82f6' }}><Box size={isMobile ? 22 : 32} /></div>
-                  Bands
-                </h2>
-              </div>
-
-              {/* Band-Finder Sidebar */}
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : (width < 1200 ? '1fr' : '1fr 380px'), gap: isMobile ? '24px' : '32px' }}>
-                  {/* Left Column: Band Management */}
-                  <div style={{ minWidth: 0 }}>
-                    {/* Tabs */}
-                    <div style={{ display: 'flex', gap: '8px', background: '#f8fafc', padding: '6px', borderRadius: '20px', width: 'fit-content', marginBottom: isMobile ? '16px' : '24px' }}>
-                      <button 
-                        onClick={() => setActiveBandSubTab('meine')}
-                        style={{ padding: isMobile ? '8px 16px' : '12px 24px', borderRadius: '16px', border: 'none', background: activeBandSubTab === 'meine' ? 'white' : 'transparent', color: activeBandSubTab === 'meine' ? '#1e293b' : '#64748b', fontWeight: 800, cursor: 'pointer', fontSize: isMobile ? '0.8rem' : '1rem', boxShadow: activeBandSubTab === 'meine' ? '0 4px 10px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s' }}
-                      >
-                        Meine Bands
-                      </button>
-                      <button 
-                        onClick={() => setActiveBandSubTab('alle')}
-                        style={{ padding: isMobile ? '8px 16px' : '12px 24px', borderRadius: '16px', border: 'none', background: activeBandSubTab === 'alle' ? 'white' : 'transparent', color: activeBandSubTab === 'alle' ? '#1e293b' : '#64748b', fontWeight: 800, cursor: 'pointer', fontSize: isMobile ? '0.8rem' : '1rem', boxShadow: activeBandSubTab === 'alle' ? '0 4px 10px rgba(0,0,0,0.05)' : 'none', transition: 'all 0.2s' }}
-                      >
-                        Alle Bands
-                      </button>
-                    </div>
-
-                    {activeBandSubTab === 'alle' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '10px' : '20px', marginBottom: isMobile ? '16px' : '32px' }}>
-                        <div style={{ position: 'relative' }}>
-                          <Search size={18} color="#94a3b8" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
-                          <input 
-                            type="text"
-                            placeholder="Nach Bands suchen..."
-                            value={bandSearchText}
-                            onChange={(e) => setBandSearchText(e.target.value)}
-                            style={{ width: '100%', padding: isMobile ? '12px 16px 12px 44px' : '16px 20px 16px 54px', borderRadius: '16px', border: '1px solid #e2e8f0', fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 600, background: 'white', boxSizing: 'border-box' }}
-                          />
-                        </div>
-                        <div 
-                          className="hide-scrollbar"
-                          style={{ display: 'flex', flexWrap: isMobile ? 'nowrap' : 'wrap', gap: '6px', overflowX: isMobile ? 'auto' : 'visible', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
-                          <button
-                            onClick={() => setBandSearchLetter(null)}
-                            style={{ padding: isMobile ? '6px 12px' : '8px 16px', borderRadius: '12px', border: 'none', background: !bandSearchLetter ? brandColor : '#f1f5f9', color: !bandSearchLetter ? 'white' : '#64748b', fontWeight: 800, cursor: 'pointer', fontSize: '0.8rem', flexShrink: 0 }}
-                          >
-                            Alle
-                          </button>
-                          {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(letter => (
-                            <button
-                              key={letter}
-                              onClick={() => setBandSearchLetter(letter)}
-                              style={{ padding: isMobile ? '6px 10px' : '8px 12px', borderRadius: '12px', border: 'none', background: bandSearchLetter === letter ? brandColor : '#f1f5f9', color: bandSearchLetter === letter ? 'white' : '#64748b', fontWeight: 800, cursor: 'pointer', fontSize: '0.8rem', flexShrink: 0 }}
-                            >
-                              {letter}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                      {(() => {
-                        const displayedBands = activeBandSubTab === 'meine' 
-                          ? userBands 
-                          : allBands.filter(band => {
-                              const matchText = band.name?.toLowerCase().includes(bandSearchText.toLowerCase());
-                              const matchLetter = bandSearchLetter ? band.name?.toUpperCase().startsWith(bandSearchLetter) : true;
-                              return matchText && matchLetter;
-                            });
-
-                        if (displayedBands.length === 0) {
-                          return (
-                            <div style={{ textAlign: 'center', padding: '80px', background: 'white', borderRadius: '32px', border: '2px dashed #e2e8f0' }}>
-                              <div style={{ fontSize: '3rem', marginBottom: '20px' }}>🎸</div>
-                              <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e293b' }}>
-                                {activeBandSubTab === 'meine' ? 'Noch kein Projekt aktiv' : 'Keine Bands gefunden'}
-                              </h3>
-                              <p style={{ color: '#64748b' }}>
-                                {activeBandSubTab === 'meine' ? 'Tritt einer Formation bei oder gründe eine neue Band!' : 'Versuche eine andere Suche.'}
-                              </p>
-                            </div>
-                          );
-                        }
-
-                        return displayedBands.map((band: any) => {
-                          const uniqueMembersList = (() => {
-                            const grouped: Record<string, any> = {};
-                            (band.band_members || []).forEach((m: any) => {
-                              const u = m.users ? (Array.isArray(m.users) ? m.users[0] : m.users) : null;
-                              const uid = u?.id || m.external_name || m.user_id || m.student_id;
-                              if (uid) {
-                                grouped[uid] = { ...m, user: u };
-                              }
-                            });
-                            return Object.values(grouped);
-                          })();
-
-                          return (
-                            <div 
-                              key={band.id} 
-                              onClick={() => { 
-                                setSelectedBandForProfile(band); 
-                                setShowBandProfile(true); 
-                              }}
-                              className="glass-panel hover-card" 
-                              style={{ 
-                                background: 'white', padding: isMobile ? '14px 16px' : '24px', borderRadius: isMobile ? '20px' : '32px', border: '1px solid #f1f5f9',
-                                display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer',
-                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-                              }}
-                            >
-                              <div style={{ display: 'flex', gap: isMobile ? '14px' : '24px', alignItems: 'center', minWidth: 0, flex: 1 }}>
-                                {renderBandAvatar(band.name, band.photo_url, isMobile ? '52px' : '80px', isMobile ? '16px' : '24px')}
-                                <div style={{ minWidth: 0 }}>
-                                    <h3 style={{ fontSize: isMobile ? '1.05rem' : '1.5rem', fontWeight: 900, color: '#1e293b', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{band.name}</h3>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
-                                      <span style={{ fontSize: isMobile ? '0.75rem' : '0.85rem', fontWeight: 800, color: brandColor }}>{band.genre || 'Bandprojekt'}</span>
-                                      <span style={{ color: '#cbd5e1' }}>•</span>
-                                      <span style={{ fontSize: isMobile ? '0.75rem' : '0.85rem', fontWeight: 700, color: '#94a3b8' }}>{uniqueMembersList.length} Mitglieder</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              <div style={{ display: 'flex', gap: '12px' }}>
-                                <div style={{ display: 'flex', WebkitMaskImage: 'linear-gradient(to right, transparent, black 40%)', WebkitMaskSize: '100% 100%' }}>
-                                    {uniqueMembersList.map((m: any, idx: number) => {
-                                      const u = m.user;
-                                      return (
-                                        <div key={idx} style={{ width: '32px', height: '32px', borderRadius: '50%', border: '2px solid white', marginLeft: idx === 0 ? 0 : '-12px', overflow: 'hidden', background: m.user_id ? '#f1f5f9' : '#000000', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title={`${u?.first_name || m.external_name || 'Mitglied'} (${m.instrument})`}>
-                                            {m.user_id ? (
-                                              <img src={u?.photo_url || '/avatar_ghost.jpg'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
-                                            ) : (
-                                              <span style={{ color: 'white', fontSize: '0.6rem', fontWeight: 900 }}>{m.external_name?.[0] || 'E'}</span>
-                                            )}
-                                        </div>
-                                      );
-                                    })}
-                                </div>
-                                <div style={{ width: '40px', height: '40px', borderRadius: '14px', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1' }}>
-                                    <ChevronRight size={24} />
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        });
-                      })()}
-                    </div>
-                  </div>
-
-                  {/* Right Column: Vocal Sidebar */}
-                  <div style={{ background: '#f8fafc', borderRadius: '32px', padding: '24px', alignSelf: 'start', position: 'sticky', top: '24px', border: '1px solid #f1f5f9' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
-                      <Mic size={20} />
-                    </div>
-                      <div>
-                        <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Vocal-Finder</h3>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8' }}>Sänger gesucht für diese Sessions</div>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                      {(() => {
-                        const vocalOpportunities: Array<{
-                          band: any;
-                          bandSong: any;
-                          song: any;
-                          vocalists: any[];
-                          isFull: boolean;
-                          isMeIn: boolean;
-                        }> = [];
-
-                        allBands.forEach(band => {
-                          const members = band.band_members || [];
-                          const bandSongs = band.band_songs || [];
-                          
-                          bandSongs.forEach((bs: any) => {
-                            if (bs.status !== 'active') return;
-                            
-                            const song = bs.songs ? (Array.isArray(bs.songs) ? bs.songs[0] : bs.songs) : null;
-                            if (!song) return;
-
-                            const vocalists = (bs.band_song_slots || []).filter((s: any) => {
-                              const inst = (s.instrument || '').toLowerCase();
-                              return (inst.includes('vocal') || inst.includes('gesang')) && s.status !== 'declined';
-                            });
-
-                            const isFull = vocalists.length >= 2;
-                            const isMeIn = vocalists.some((m: any) => m.user_id === user.id);
-
-                            if (vocalists.length < 2) {
-                              vocalOpportunities.push({
-                                band,
-                                bandSong: bs,
-                                song,
-                                vocalists,
-                                isFull,
-                                isMeIn
-                              });
-                            }
-                          });
-                        });
-
-                        const activeVocalOpportunities = vocalOpportunities;
-
-                        if (activeVocalOpportunities.length === 0) {
-                          return (
-                            <div style={{ textAlign: 'center', padding: '32px 16px', background: 'white', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
-                              <div style={{ fontSize: '2rem', marginBottom: '12px' }}>🔇</div>
-                              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#64748b' }}>Aktuell keine Gesangsslots frei</div>
-                            </div>
-                          );
-                        }
-
-                        return activeVocalOpportunities.map(opp => {
-                          const { band, bandSong, song, vocalists, isFull, isMeIn } = opp;
-
-                          return (
-                            <div key={bandSong.id} className="glass-panel" style={{ background: 'white', padding: '24px', borderRadius: '24px', border: '1px solid #f1f5f9' }}>
-                              <div style={{ marginBottom: '16px' }}>
-                                <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', lineHeight: 1.2 }}>
-                                  {(song.artist) || 'Unbekannter Interpret'}
-                                </div>
-                                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#64748b', marginBottom: '8px' }}>
-                                  {(song.title) || 'Kein Titel'}
-                                </div>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                  Band: <span style={{ color: '#1e293b' }}>{band.name}</span>
-                                </div>
-                              </div>
-
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                                <div style={{ display: 'flex', gap: '4px' }}>
-                                  {[0, 1].map(i => {
-                                    const v = vocalists[i];
-                                    return (
-                                      <div key={i} style={{ width: '28px', height: '28px', borderRadius: '50%', border: '2px solid #f8fafc', background: '#f1f5f9', overflow: 'hidden', willChange: 'transform' }}>
-                                        {v ? (() => {
-                                          const u = v.profiles || (Array.isArray(v.users) ? v.users[0] : v.users);
-                                          return <StudioAvatar src={u?.photo_url} user={u} />;
-                                        })() : (
-                                          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1' }}><Plus size={12} /></div>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>
-                                  {vocalists.length}/2 Vocal-Slots besetzt
-                                </span>
-                              </div>
-
-                              {isMeIn ? (
-                                <div style={{ textAlign: 'center', padding: '10px', background: '#e6f4ea', borderRadius: '12px', color: '#34a853', fontSize: '0.85rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                                  <CheckCircle size={16} /> Du bist dabei!
-                                </div>
-                              ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                  <button 
-                                    disabled={isFull || isJoiningVocal === bandSong.id}
-                                    onClick={async () => {
-                                      setIsJoiningVocal(bandSong.id);
-                                      try {
-                                        // 1. Join the band
-                                        const { error: memErr } = await supabase.from('band_members').insert({
-                                          band_id: band.id,
-                                          user_id: user.id,
-                                          instrument: 'Vocals'
-                                        });
-                                        if (memErr && !memErr.message.includes('duplicate key')) {
-                                          console.error('Error joining band as vocalist:', memErr);
-                                          setIsJoiningVocal(null);
-                                          return;
-                                        }
-
-                                        // 2. Also join the active song project slots if it exists
-                                        const hasSlot1 = vocalists.some((v: any) => v.part_number === 1);
-                                        const nextPartNumber = hasSlot1 ? 2 : 1;
-
-                                        await supabase.from('band_song_slots').insert({
-                                          band_song_id: bandSong.id,
-                                          user_id: user.id,
-                                          instrument: 'Vocals',
-                                          part_number: nextPartNumber,
-                                          status: 'accepted'
-                                        });
-                                        
-                                        await fetchDashboardData(user.id);
-                                      } finally {
-                                        setIsJoiningVocal(null);
-                                      }
-                                    }}
-                                    style={{ 
-                                      width: '100%', padding: '12px', borderRadius: '16px', border: 'none', 
-                                      background: isFull ? '#f1f5f9' : '#34a853', 
-                                      color: isFull ? '#94a3b8' : 'white', fontWeight: 900, cursor: (isFull || isJoiningVocal === bandSong.id) ? 'default' : 'pointer',
-                                      fontSize: '0.85rem', transition: 'all 0.2s',
-                                      opacity: isJoiningVocal === bandSong.id ? 0.7 : 1
-                                    }}
-                                  >
-                                    {isFull ? 'Vocal-Slots voll' : (isJoiningVocal === bandSong.id ? 'Beitritt läuft...' : 'Jetzt als Sänger beitreten')}
-                                  </button>
-
-                                  {/* Teacher Manual Add */}
-                                  {(user.role === 'teacher' || user.role === 'admin') && !isFull && (
-                                    <div style={{ position: 'relative' }}>
-                                      <button 
-                                        onClick={async () => {
-                                          if (showTeacherVocalPicker === bandSong.id) {
-                                            setShowTeacherVocalPicker(null);
-                                          } else {
-                                            const { data } = await supabase.from('users').select('id, first_name, last_name, avatar_url, photo_url').eq('is_external_vocalist', true).eq('school_id', user.school_id);
-                                            setExternalVocalists(data || []);
-                                            setShowTeacherVocalPicker(bandSong.id);
-                                          }
-                                        }}
-                                        style={{ width: '100%', padding: '10px', borderRadius: '14px', border: '1px dashed #cbd5e1', background: 'transparent', color: '#64748b', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                                      >
-                                        <Plus size={14} /> Externen Sänger hinzufügen
-                                      </button>
-
-                                      {showTeacherVocalPicker === bandSong.id && (
-                                        <div style={{ position: 'absolute', bottom: '100%', left: 0, right: 0, background: 'white', borderRadius: '16px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)', border: '1px solid #f1f5f9', padding: '12px', zIndex: 100, marginBottom: '8px', maxHeight: '200px', overflowY: 'auto' }}>
-                                          <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '8px', paddingLeft: '8px' }}>Verfügbare Externe</div>
-                                          {externalVocalists.length === 0 ? (
-                                            <div style={{ padding: '12px', textAlign: 'center', fontSize: '0.75rem', color: '#94a3b8' }}>Keine externen Sänger angelegt</div>
-                                          ) : (
-                                            externalVocalists.map(ev => (
-                                              <button 
-                                                key={ev.id}
-                                                onClick={async () => {
-                                                  const hasSlot1 = vocalists.some((v: any) => v.part_number === 1);
-                                                  const nextPartNumber = hasSlot1 ? 2 : 1;
-                                                  await supabase.from('band_members').insert({ band_id: band.id, user_id: ev.id, instrument: 'Vocals' });
-                                                  await supabase.from('band_song_slots').insert({ band_song_id: bandSong.id, user_id: ev.id, instrument: 'Vocals', part_number: nextPartNumber, status: 'accepted' });
-                                                  setShowTeacherVocalPicker(null);
-                                                  fetchDashboardData(user.id);
-                                                }}
-                                                style={{ width: '100%', padding: '8px', borderRadius: '8px', border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', textAlign: 'left' }}
-                                                className="hover-bg"
-                                              >
-                                                <div style={{ width: '24px', height: '24px', borderRadius: '50%', overflow: 'hidden' }}>
-                                                  <StudioAvatar src={ev.photo_url} />
-                                                </div>
-                                                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#1e293b' }}>{ev.first_name} {ev.last_name}</span>
-                                              </button>
-                                            ))
-                                          )}
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        });
-                      })()}
-                    </div>
-
-
-                  </div>
-                </div>
-            </section>
-          </ErrorBoundary>
+        {/* Band Matching & Bands Tabs (Students) */}
+        {['matching', 'bands'].includes(activeStudentTab) && user.role === 'student' && (
+          <StudentBandMatchingSuite
+            activeStudentTab={activeStudentTab as 'matching' | 'bands'}
+            user={user}
+            brandColor={brandColor}
+            wallSongs={wallSongs}
+            userSongs={userSongs}
+            userBands={userBands}
+            allBands={allBands}
+            matchingLevelFilter={matchingLevelFilter}
+            setMatchingLevelFilter={setMatchingLevelFilter}
+            activeBandSubTab={activeBandSubTab}
+            setActiveBandSubTab={setActiveBandSubTab}
+            bandSearchText={bandSearchText}
+            setBandSearchText={setBandSearchText}
+            bandSearchLetter={bandSearchLetter}
+            setBandSearchLetter={setBandSearchLetter}
+            onOpenBandProfile={(band) => {
+              setSelectedBandForProfile(band);
+              setShowBandProfile(true);
+            }}
+            onPreviewStudent={(student) => {
+              setSelectedStudentForPreview(student);
+            }}
+            onFoundBandFromSlot={(mySlot, song, form) => {
+              console.log('[DEBUG-Groovelab] setSuggestingSkill (Matching Board click) in App.tsx');
+              setSuggestingSkill({
+                ...mySlot,
+                isLeader: true,
+                leaderName: 'Du',
+                song_id: song.song_id,
+                songs: { id: song.song_id, title: song.title },
+                formation_group: form.id,
+                members: form.members
+              });
+              if (!foundingName) setFoundingName(generateRandomBandName(foundingLanguage));
+            }}
+            onRefreshDashboard={(userId) => fetchDashboardData(userId)}
+            isMobile={isMobile}
+            width={width}
+          />
         )}
         {activeStudentTab === 'library' && (
-          <ErrorBoundary>
-            <section className="exercises-section animation-slide-up" style={{ padding: isMobile ? '12px' : '24px' }}>
-              <div className="glass-panel" style={{ padding: isMobile ? '16px' : '32px', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
-                <div style={{ marginBottom: isMobile ? '16px' : '32px' }}>
-                  <h2 style={{ fontSize: isMobile ? '1.3rem' : '1.75rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '10px', margin: 0 }}>
-                    <Library size={isMobile ? 22 : 32} color={brandColor} />
-                    Songbibliothek
-                  </h2>
-                  {!isMobile && <p style={{ color: '#64748b', fontSize: '1rem', margin: '8px 0 0 0' }}>Entdecke neue Songs und füge sie deinem Üben-Board hinzu.</p>}
-                </div>
-
-              {/* Search and Alpha Filter Navigation */}
-              <div style={{ marginBottom: isMobile ? '16px' : '32px', display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '20px' }}>
-                <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '10px' : '20px', alignItems: isMobile ? 'stretch' : 'center' }}>
-                  {/* Text Search */}
-                  <div style={{ position: 'relative', flex: 1, minWidth: isMobile ? 'unset' : '300px' }}>
-                    <Search size={18} color="#94a3b8" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
-                    <input 
-                      type="text"
-                      placeholder={`Suche nach ${librarySearchType === 'title' ? 'Songtitel' : 'Interpret'}...`}
-                      value={librarySearchQuery}
-                      onChange={(e) => setLibrarySearchQuery(e.target.value)}
-                      style={{ width: '100%', padding: isMobile ? '13px 16px 13px 44px' : '16px 20px 16px 54px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: isMobile ? '0.95rem' : '1rem', fontWeight: 600, background: 'white', boxShadow: '0 4px 15px rgba(0,0,0,0.02)', boxSizing: 'border-box' }}
-                    />
-                  </div>
-
-                  {/* Toggle Search Type */}
-                  <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '14px', padding: '4px', alignSelf: isMobile ? 'flex-start' : 'center' }}>
-                    <button 
-                      onClick={() => setLibrarySearchType('title')}
-                      style={{ 
-                        padding: isMobile ? '8px 16px' : '10px 20px', borderRadius: '10px', border: 'none', 
-                        background: librarySearchType === 'title' ? 'white' : 'transparent', 
-                        color: librarySearchType === 'title' ? brandColor : '#64748b', 
-                        fontWeight: 800, cursor: 'pointer', fontSize: isMobile ? '0.8rem' : '0.85rem',
-                        boxShadow: librarySearchType === 'title' ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      Song
-                    </button>
-                    <button 
-                      onClick={() => setLibrarySearchType('artist')}
-                      style={{ 
-                        padding: isMobile ? '8px 16px' : '10px 20px', borderRadius: '10px', border: 'none', 
-                        background: librarySearchType === 'artist' ? 'white' : 'transparent', 
-                        color: librarySearchType === 'artist' ? brandColor : '#64748b', 
-                        fontWeight: 800, cursor: 'pointer', fontSize: isMobile ? '0.8rem' : '0.85rem',
-                        boxShadow: librarySearchType === 'artist' ? '0 2px 8px rgba(0,0,0,0.05)' : 'none',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      Interpret
-                    </button>
-                  </div>
-                </div>
-
-                {/* Alphabet Bar */}
-                <div 
-                  className="hide-scrollbar"
-                  style={{ 
-                    display: 'flex', 
-                    gap: '6px', 
-                    background: 'white', 
-                    padding: '10px', 
-                    borderRadius: '16px', 
-                    border: '1px solid #f1f5f9', 
-                    boxShadow: '0 4px 15px rgba(0,0,0,0.02)',
-                    overflowX: 'auto',
-                    scrollbarWidth: 'none',
-                    WebkitOverflowScrolling: 'touch',
-                    minWidth: 0
-                  }}
-                >
-                  <button
-                    onClick={() => setLibraryAlphaFilter(null)}
-                    style={{ padding: '8px 16px', borderRadius: '10px', border: 'none', background: !libraryAlphaFilter ? brandColor : '#f8fafc', color: !libraryAlphaFilter ? 'white' : '#64748b', fontWeight: 800, cursor: 'pointer', fontSize: '0.75rem', minWidth: '50px', flexShrink: 0 }}
-                  >
-                    ALLE
-                  </button>
-                  {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(letter => (
-                    <button 
-                      key={letter}
-                      onClick={() => setLibraryAlphaFilter(letter)}
-                      style={{ 
-                        width: '34px', height: '34px', borderRadius: '10px', border: 'none', 
-                        background: libraryAlphaFilter === letter ? brandColor : 'transparent', 
-                        color: libraryAlphaFilter === letter ? 'white' : '#94a3b8', 
-                        fontWeight: 800, cursor: 'pointer', fontSize: '0.75rem',
-                        transition: 'all 0.2s',
-                        flexShrink: 0
-                      }}
-                    >
-                      {letter}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {filteredLibrary.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '60px 20px', background: 'white', borderRadius: '32px', color: '#64748b', border: '2px dashed #f1f5f9' }}>
-                    <Search size={40} color="#cbd5e1" style={{ marginBottom: '16px' }} />
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b' }}>Keine Songs gefunden</h3>
-                    <p style={{ fontSize: '0.9rem' }}>Probiere einen anderen Suchbegriff oder Filter.</p>
-                  </div>
-                ) : (
-                  filteredLibrary.map((song: any) => {
-                    const LEVEL_COLORS: Record<string | number, string> = {
-                      '1': '#ef4444', // Red
-                      '2': '#3b82f6', // Blue
-                      '3': '#34a853', // Emerald
-                      '4': '#8b5cf6', // Violet
-                      '5': '#ec4899', // Pink
-                      'starter': '#ef4444',
-                      'pro': '#8b5cf6'
-                    };
-                    const levelColor = LEVEL_COLORS[String(song.level).toLowerCase()] || '#f59e0b';
-                    
-                    // Dynamic HSL coloring based on song title (A-Z)
-                    const firstLetter = (song.title || 'A').trim().toUpperCase().charAt(0);
-                    const code = firstLetter.charCodeAt(0);
-                    let pct = 0;
-                    if (code >= 65 && code <= 90) {
-                      pct = (code - 65) / (90 - 65);
-                    } else {
-                      pct = (code % 26) / 25;
-                    }
-                    const songHue = Math.floor(pct * 360);
-                    const iconBg = `hsl(${songHue}, 90%, 96%)`;
-                    const iconBorder = `hsl(${songHue}, 45%, 88%)`;
-                    const iconColor = `hsl(${songHue}, 65%, 45%)`;
-
-                    return (
-                      <div 
-                        key={song.id} 
-                        className="glass-panel" 
-                        style={{ 
-                          padding: isMobile ? '16px' : '24px', 
-                          background: 'white', 
-                          border: '1px solid #f1f5f9',
-                          borderLeft: `${isMobile ? '5px' : '8px'} solid ${levelColor}`, 
-                          borderRadius: '24px',
-                          display: 'flex', 
-                          flexDirection: isMobile ? 'column' : 'row',
-                          justifyContent: 'space-between', 
-                          alignItems: isMobile ? 'stretch' : 'center', 
-                          gap: isMobile ? '16px' : '24px',
-                          boxShadow: '0 10px 30px rgba(0,0,0,0.02)',
-                          transition: 'all 0.25s ease',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '12px' : '20px', flex: 1, width: '100%' }}>
-                          {/* Music Icon Rounded Box */}
-                          <div style={{ 
-                            width: isMobile ? '48px' : '64px', 
-                            height: isMobile ? '48px' : '64px', 
-                            borderRadius: isMobile ? '12px' : '18px', 
-                            background: iconBg, 
-                            border: `1px solid ${iconBorder}`, 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center',
-                            flexShrink: 0
-                          }}>
-                            <Music size={isMobile ? 22 : 28} color={iconColor} />
-                          </div>
-
-                          {/* Text Info */}
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ 
-                              fontSize: '0.75rem', 
-                              fontWeight: 900, 
-                              color: '#64748b', 
-                              textTransform: 'uppercase', 
-                              letterSpacing: '0.08em',
-                              lineHeight: 1.2
-                            }}>
-                              {song.artist}
-                            </div>
-                            <div style={{ 
-                              fontSize: isMobile ? '1.15rem' : '1.4rem', 
-                              fontWeight: 950, 
-                              color: '#0f172a', 
-                              marginTop: '4px',
-                              lineHeight: 1.2,
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis'
-                            }}>
-                              {song.title}
-                            </div>
-                            <div style={{ display: 'flex', gap: '6px', marginTop: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                              <span style={{ 
-                                background: '#fef3c7', 
-                                color: '#92400e', 
-                                padding: '4px 10px', 
-                                borderRadius: '8px', 
-                                fontSize: '0.75rem', 
-                                fontWeight: 800 
-                              }}>
-                                Level {song.level || '1'}
-                              </span>
-                              {song.bpm && (
-                                <span style={{
-                                  background: '#f1f5f9',
-                                  color: '#475569',
-                                  padding: '4px 8px',
-                                  borderRadius: '8px',
-                                  fontSize: '0.75rem',
-                                  fontWeight: 700
-                                }}>
-                                  {song.bpm} BPM
-                                </span>
-                              )}
-                              {song.instrumentation && typeof song.instrumentation === 'object' && !Array.isArray(song.instrumentation) && (
-                                Object.entries(song.instrumentation)
-                                  .filter(([_, count]) => Number(count) > 0)
-                                  .map(([inst]) => (
-                                    <span
-                                      key={inst}
-                                      style={{
-                                        background: '#f8fafc',
-                                        border: '1px solid #e2e8f0',
-                                        color: '#334155',
-                                        padding: '3px 8px',
-                                        borderRadius: '6px',
-                                        fontSize: '0.72rem',
-                                        fontWeight: 700
-                                      }}
-                                    >
-                                      {inst}
-                                    </span>
-                                  ))
-                              )}
-                              {song.media_link && (
-                                <a 
-                                  href={song.media_link} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer" 
-                                  style={{ 
-                                    color: '#2563eb', 
-                                    fontSize: '0.75rem', 
-                                    fontWeight: 700, 
-                                    textDecoration: 'none', 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    gap: '4px',
-                                    marginLeft: '4px' 
-                                  }}
-                                >
-                                  <ExternalLink size={12} /> Noten / Media
-                                </a>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Actions */}
-                        <div style={{ flexShrink: 0, width: isMobile ? '100%' : 'auto' }}>
-                          {userSongs.some(us => us.song_id === song.id) ? (
-                            <div style={{ 
-                              background: '#e6f4ea', 
-                              border: '1px solid #e6f4ea', 
-                              padding: '12px 24px', 
-                              borderRadius: '16px', 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              justifyContent: isMobile ? 'center' : 'flex-start',
-                              gap: '8px', 
-                              color: '#34a853', 
-                              fontWeight: 900, 
-                              fontSize: '0.85rem',
-                              width: isMobile ? '100%' : 'auto'
-                            }}>
-                              <Check size={18} strokeWidth={3} /> Hinzugefügt
-                            </div>
-                          ) : (
-                            <button 
-                              onClick={() => handleAddSongToRepertoire(song)}
-                              style={{ 
-                                background: '#ffffff', 
-                                border: '1px solid #e2e8f0', 
-                                padding: '12px 24px', 
-                                borderRadius: '16px', 
-                                cursor: 'pointer', 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: isMobile ? 'center' : 'flex-start',
-                                gap: '8px', 
-                                boxShadow: '0 4px 10px rgba(0,0,0,0.02)',
-                                transition: 'all 0.2s ease' 
-                              }}
-                              
-                              
-                            >
-                              <Plus size={18} color="#f59e0b" strokeWidth={3} />
-                              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>Üben</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-             )}
-            </div>
-            </div>
-            </section>
-          </ErrorBoundary>
+          <StudentLibraryTab
+            globalSongs={globalSongs}
+            userSongs={userSongs}
+            brandColor={brandColor}
+            onAddSongToRepertoire={handleAddSongToRepertoire}
+            isMobile={isMobile}
+          />
         )}
 
 

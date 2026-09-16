@@ -18,6 +18,7 @@ import { getBlob, storeBlob } from '../../utils/blobStorage';
 import { shiftAudioBufferPitch } from '../../utils/pitchShifter';
 import { safeDecodeAudioData, audioBufferToWavBlob } from '../../utils/audioMasteringEngine';
 import { getAudioNotes } from '../../utils/audioNotesStorage';
+import { getLoopLocator, saveLoopLocator, removeLoopLocator } from '../../utils/audioLoopLocatorStorage';
 
 export interface AudioEditorSaveResult {
   url: string;
@@ -42,8 +43,10 @@ export interface AudioEditorModalProps {
   initialOriginalDuration?: number;
   initialPitch?: number;
   hasAudioTresor?: boolean;
-  onSave: (result: AudioEditorSaveResult) => void;
+  onSave?: (result: AudioEditorSaveResult) => void;
   onRevertToOriginal?: () => void;
+  editorMode?: 'locator' | 'crop';
+  uiLevel?: 'junior' | 'teen' | 'pro';
 }
 
 export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
@@ -57,7 +60,9 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
   initialPitch = 0,
   hasAudioTresor = true,
   onSave,
-  onRevertToOriginal
+  onRevertToOriginal,
+  editorMode = 'locator',
+  uiLevel = 'junior'
 }) => {
   const [activeUrl, setActiveUrl] = useState<string>(audioUrl);
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
@@ -65,9 +70,10 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoopingSelection, setIsLoopingSelection] = useState(false);
   
+  const existingLocator = useMemo(() => getLoopLocator(activeUrl || audioUrl), [activeUrl, audioUrl]);
   const [duration, setDuration] = useState(initialDuration || 0);
-  const [startTime, setStartTime] = useState(0);
-  const [endTime, setEndTime] = useState(initialDuration || 0);
+  const [startTime, setStartTime] = useState(() => existingLocator?.startSec || 0);
+  const [endTime, setEndTime] = useState(() => existingLocator?.endSec || initialDuration || 0);
   const [currentPlayTime, setCurrentPlayTime] = useState(0);
   
   const [semitones, setSemitones] = useState(initialPitch || 0); // Pitch Shift: -12 to +12
@@ -498,18 +504,20 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
       const masterOrig = masterOriginalKey || audioUrl;
       const masterOrigDuration = initialOriginalDuration || duration;
 
-      onSave({
-        url: newKey,
-        original_url: masterOrig,
-        duration: newDurationSec,
-        original_duration: masterOrigDuration,
-        label: finalLabel,
-        mode,
-        is_edited: true,
-        pitch_semitones: semitones,
-        cut_start_time: startTime,
-        cut_end_time: endTime
-      });
+      if (onSave) {
+        onSave({
+          url: newKey,
+          original_url: masterOrig,
+          duration: newDurationSec,
+          original_duration: masterOrigDuration,
+          label: finalLabel,
+          mode,
+          is_edited: true,
+          pitch_semitones: semitones,
+          cut_start_time: startTime,
+          cut_end_time: endTime
+        });
+      }
       setIsSaving(false);
       onClose();
     } catch (err) {
@@ -570,7 +578,7 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
         border: '1px solid #e2e8f0'
       }}>
         
-        {/* ✂️ Header: Clean, Kid-Friendly, Focus on "Aufnahme kürzen" */}
+        {/* Header: Adaptable for A/B Loop Locator or Classic Crop */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{
@@ -584,11 +592,24 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
               justifyContent: 'center',
               color: '#15803d'
             }}>
-              <Scissors size={20} strokeWidth={2.3} />
+              {editorMode === 'locator' ? (
+                <Repeat size={20} strokeWidth={2.5} />
+              ) : (
+                <Scissors size={20} strokeWidth={2.3} />
+              )}
             </div>
-            <h3 id="audio-editor-title" style={{ margin: 0, fontSize: '1.20rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-              Aufnahme kürzen
-            </h3>
+            <div>
+              <h3 id="audio-editor-title" style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                {editorMode === 'locator' 
+                  ? (uiLevel === 'junior' ? '🔁 Übe-Schleife einstellen' : '🎛️ A/B Loop-Studio')
+                  : 'Aufnahme kürzen'}
+              </h3>
+              {editorMode === 'locator' && (
+                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                  Wähle Start- und Endpunkt für deinen Übe-Abschnitt
+                </span>
+              )}
+            </div>
           </div>
 
           <button
@@ -1255,33 +1276,113 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
           )}
         </button>
 
-        {/* 💾 Fertig Speichern Button */}
-        <button
-          type="button"
-          disabled={isSaving}
-          onClick={() => handleExportSave('overwrite')}
-          style={{
-            width: '100%',
-            background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-            border: 'none',
-            borderRadius: '16px',
-            padding: '13px 20px',
-            fontSize: '0.92rem',
-            fontWeight: 900,
-            color: '#ffffff',
-            cursor: isSaving ? 'wait' : 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            boxShadow: '0 4px 14px rgba(22, 163, 74, 0.3)',
-            transition: 'all 0.15s ease'
-          }}
-          className="hover-scale"
-        >
-          <Check size={18} strokeWidth={2.8} />
-          <span>{isSaving ? 'Wird gespeichert...' : 'Fertig (Zuschnitt speichern)'}</span>
-        </button>
+        {/* 💾 Fertig Speichern Button: Locator Mode (Non-Destructive) vs. Classic Crop */}
+        {editorMode === 'locator' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+            <button
+              type="button"
+              onClick={() => {
+                stopPlayback();
+                saveLoopLocator(activeUrl || audioUrl, { startSec: startTime, endSec: endTime, enabled: true });
+                if (onSave) {
+                  onSave({
+                    url: activeUrl || audioUrl,
+                    duration: duration,
+                    label: editLabel,
+                    mode: 'overwrite',
+                    is_edited: false,
+                    cut_start_time: startTime,
+                    cut_end_time: endTime
+                  });
+                }
+                onClose();
+              }}
+              style={{
+                width: '100%',
+                background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                border: 'none',
+                borderRadius: '16px',
+                padding: '14px 20px',
+                fontSize: '0.94rem',
+                fontWeight: 900,
+                color: '#ffffff',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 14px rgba(22, 163, 74, 0.3)',
+                transition: 'all 0.15s ease',
+                minHeight: '48px',
+                touchAction: 'manipulation'
+              }}
+              className="hover-scale"
+            >
+              <Check size={18} strokeWidth={2.8} />
+              <span>Als Übe-Schleife aktivieren (A ⇄ B)</span>
+            </button>
+
+            {existingLocator && (
+              <button
+                type="button"
+                onClick={() => {
+                  stopPlayback();
+                  removeLoopLocator(activeUrl || audioUrl);
+                  onClose();
+                }}
+                style={{
+                  width: '100%',
+                  background: '#f8fafc',
+                  border: '1.5px solid #e2e8f0',
+                  borderRadius: '14px',
+                  padding: '11px 16px',
+                  fontSize: '0.82rem',
+                  fontWeight: 800,
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  transition: 'all 0.15s ease',
+                  minHeight: '44px',
+                  touchAction: 'manipulation'
+                }}
+                className="hover-scale-mini"
+              >
+                <X size={15} strokeWidth={2.4} />
+                <span>Schleife aufheben (Ganzes Stück abspielen)</span>
+              </button>
+            )}
+          </div>
+        ) : (
+          <button
+            type="button"
+            disabled={isSaving}
+            onClick={() => handleExportSave('overwrite')}
+            style={{
+              width: '100%',
+              background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+              border: 'none',
+              borderRadius: '16px',
+              padding: '13px 20px',
+              fontSize: '0.92rem',
+              fontWeight: 900,
+              color: '#ffffff',
+              cursor: isSaving ? 'wait' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 14px rgba(22, 163, 74, 0.3)',
+              transition: 'all 0.15s ease'
+            }}
+            className="hover-scale"
+          >
+            <Check size={18} strokeWidth={2.8} />
+            <span>{isSaving ? 'Wird gespeichert...' : 'Fertig (Zuschnitt speichern)'}</span>
+          </button>
+        )}
 
         {/* ↩️ Dezent unten: Zurück zum Original */}
         {isDifferentFromMaster && (

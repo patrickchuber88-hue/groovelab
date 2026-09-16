@@ -8359,6 +8359,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         defaultExpanded={false}
                                         isCarriedOver={isAudioCarriedOver}
                                         hideCarriedOverBadge={true}
+                                        uiLevel={uiLevel}
                                       />
                                     </div>
                                   )}

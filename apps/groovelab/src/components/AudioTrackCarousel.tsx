@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import { Play, Pause, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Trash2, Mic, Repeat, Timer, Scissors, Pin, EyeOff, MessageSquareQuote } from 'lucide-react';
+import { Play, Pause, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Trash2, Mic, Repeat, Timer, Scissors, Pin, EyeOff, MessageSquareQuote, SlidersHorizontal } from 'lucide-react';
 import { getBlob, storeBlob } from '../utils/blobStorage';
 import { harmonizeAudioList, formatHarmonizedAudioTitle } from '../utils/audioNamingHelper';
 import { getAudioNotesCount, fetchAudioNotesFromServer } from '../utils/audioNotesStorage';
 import { getSecureAudioUrl } from '../utils/audioStorageHelper';
 import { SharedAudioEngine } from '../utils/sharedAudioEngine';
+import { getLoopLocator, saveLoopLocator, toggleLoopLocator, removeLoopLocator, AudioLoopLocator } from '../utils/audioLoopLocatorStorage';
 
 const isPlayableUrl = (u?: string): boolean => {
   if (!u) return false;
@@ -41,6 +42,7 @@ interface AudioTrackCarouselProps {
   defaultExpanded?: boolean;
   isCarriedOver?: boolean;
   hideCarriedOverBadge?: boolean;
+  uiLevel?: 'junior' | 'teen' | 'pro';
 }
 
 // Lightweight WebAudio beep helper for 4-beat count-in
@@ -86,13 +88,16 @@ export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
   isFutureWeek = false,
   defaultExpanded,
   isCarriedOver = false,
-  hideCarriedOverBadge = false
+  hideCarriedOverBadge = false,
+  uiLevel
 }) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isExpanded, setIsExpanded] = useState(defaultExpanded ?? (readOnly ? true : false));
   const touchStartXRef = useRef<number | null>(null);
   const touchEndXRef = useRef<number | null>(null);
+
+  const effectiveUiLevel: 'junior' | 'teen' | 'pro' = uiLevel || (typeof window !== 'undefined' ? ((localStorage.getItem('campus_student_ui_level') as any) || 'junior') : 'junior');
 
   const harmonizedTracks = React.useMemo(() => {
     return harmonizeAudioList(tracks || [], isTeacher, activeTopicContext);
@@ -212,6 +217,7 @@ export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
               isFutureWeek={isFutureWeek}
               isTeacher={isTeacher}
               readOnly={readOnly}
+              uiLevel={effectiveUiLevel}
             />
           );
         })}
@@ -348,6 +354,7 @@ export const AudioTrackCarousel: React.FC<AudioTrackCarouselProps> = ({
         hideCarriedOverBadge={hideCarriedOverBadge}
         isTeacher={isTeacher}
         readOnly={readOnly}
+        uiLevel={effectiveUiLevel}
       />
     </div>
   );
@@ -391,6 +398,7 @@ interface CompactAudioStripProps {
   isFutureWeek?: boolean;
   isTeacher?: boolean;
   readOnly?: boolean;
+  uiLevel?: 'junior' | 'teen' | 'pro';
 }
 
 const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
@@ -404,7 +412,8 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
   onSaveEdited,
   isFutureWeek = false,
   isTeacher = true,
-  readOnly = false
+  readOnly = false,
+  uiLevel = 'junior'
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState<number>(initialDuration || 0);
@@ -417,12 +426,23 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
   }, [initialDuration]);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isLooping, setIsLooping] = useState(false);
-  const [countInActive, setCountInActive] = useState(false);
+  const [countInActive, setCountInActive] = useState<boolean>(() => uiLevel === 'junior');
   const [countInStep, setCountInStep] = useState<number | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
   const [resolvedUrl, setResolvedUrl] = useState<string>(() => isPlayableUrl(url) ? url : '');
   const [notesCount, setNotesCount] = useState<number>(() => getAudioNotesCount(url || ''));
+
+  const [loopLocator, setLoopLocator] = useState<AudioLoopLocator | null>(() => getLoopLocator(url || resolvedUrl));
+  useEffect(() => {
+    const audioKey = url || resolvedUrl;
+    setLoopLocator(getLoopLocator(audioKey));
+    const handleLocatorChange = () => {
+      setLoopLocator(getLoopLocator(audioKey));
+    };
+    window.addEventListener('campus-audio-loop-locator-changed', handleLocatorChange);
+    return () => window.removeEventListener('campus-audio-loop-locator-changed', handleLocatorChange);
+  }, [url, resolvedUrl]);
 
   // 🔔 Reaktiv synchronisierte Notizen-Anzahl (SoundCloud-Style Marker)
   useEffect(() => {
@@ -528,13 +548,17 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
 
       const playNative = () => {
         if (!audioRef.current) return;
-        if (audioRef.current.ended || (duration > 0 && audioRef.current.currentTime >= duration)) {
+        if (isLooping && loopLocator && loopLocator.enabled) {
+          if (audioRef.current.currentTime < loopLocator.startSec || audioRef.current.currentTime >= loopLocator.endSec) {
+            audioRef.current.currentTime = loopLocator.startSec;
+          }
+        } else if (audioRef.current.ended || (duration > 0 && audioRef.current.currentTime >= duration)) {
           audioRef.current.currentTime = 0;
         }
         if (audioRef.current.readyState === 0) {
           audioRef.current.load();
         }
-        audioRef.current.loop = isLooping;
+        audioRef.current.loop = isLooping && (!loopLocator || !loopLocator.enabled);
         audioRef.current.play().then(() => setIsPlaying(true)).catch(err => {
           console.warn('[CompactAudioStrip] Play error:', err);
           setIsPlaying(false);
@@ -574,7 +598,15 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
       }
     };
     const handleTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
+      const cur = audio.currentTime;
+      setCurrentTime(cur);
+      if (isLooping && loopLocator && loopLocator.enabled) {
+        if (cur >= loopLocator.endSec) {
+          audio.currentTime = loopLocator.startSec;
+        } else if (cur < loopLocator.startSec) {
+          audio.currentTime = loopLocator.startSec;
+        }
+      }
     };
     const handleEnded = () => {
       if (!isLooping) {
@@ -587,7 +619,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
       setDuration(Math.round(audio.duration));
     }
 
-    audio.loop = isLooping;
+    audio.loop = isLooping && (!loopLocator || !loopLocator.enabled);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
@@ -596,12 +628,14 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [resolvedUrl, isLooping]);
+  }, [resolvedUrl, isLooping, loopLocator]);
 
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.playbackRate = playbackRate;
       (audioRef.current as any).preservesPitch = true;
+      (audioRef.current as any).webkitPreservesPitch = true;
+      (audioRef.current as any).mozPreservesPitch = true;
     }
   }, [playbackRate]);
 
@@ -615,6 +649,32 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
 
   const isMobile = useIsMobileAudio();
 
+  const handleCycleSpeed = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (uiLevel === 'junior') {
+      // 🐢 75% vs 🐰 100%
+      setPlaybackRate(prev => (prev === 1 ? 0.75 : 1));
+    } else if (uiLevel === 'teen') {
+      const rates = [1, 0.85, 0.75];
+      const nextRate = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
+      setPlaybackRate(nextRate);
+    } else {
+      // pro
+      const rates = [1, 0.85, 0.75, 0.6, 0.5];
+      const nextRate = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
+      setPlaybackRate(nextRate);
+    }
+  };
+
+  const getSpeedLabel = () => {
+    if (uiLevel === 'junior') {
+      return playbackRate < 1 ? '🐢 75%' : '🐰 100%';
+    }
+    return `${Math.round(playbackRate * 100)}%`;
+  };
+
+  const hasActiveLocator = Boolean(loopLocator && loopLocator.enabled);
+
   const renderSecondaryTools = () => (
     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
       {/* 🔁 Loop Toggle Button */}
@@ -626,25 +686,33 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
         }}
         aria-label={isLooping ? 'Endlos-Schleife aktiv' : 'Endlos-Schleife aktivieren'}
         style={{
-          border: isLooping ? '2px solid #16a34a' : '1px solid #cbd5e1',
-          background: isLooping ? '#bbf7d0' : '#ffffff',
-          color: isLooping ? '#15803d' : '#64748b',
-          height: isMobile ? '40px' : '34px',
-          minWidth: isMobile ? '40px' : '34px',
+          border: isLooping ? '2px solid #16a34a' : (hasActiveLocator ? '1.5px solid #86efac' : '1px solid #cbd5e1'),
+          background: isLooping ? '#bbf7d0' : (hasActiveLocator ? '#f0fdf4' : '#ffffff'),
+          color: isLooping ? '#15803d' : (hasActiveLocator ? '#166534' : '#64748b'),
+          height: isMobile ? '44px' : '36px',
+          minWidth: isMobile ? '44px' : '36px',
           padding: '0 8px',
           borderRadius: '10px',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          gap: '3px',
           boxShadow: isLooping ? '0 0 0 2px rgba(34, 197, 94, 0.3), 0 2px 6px rgba(22, 163, 74, 0.25)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
           transition: 'all 0.15s ease',
           touchAction: 'manipulation'
         }}
         className="hover-scale-mini"
-        title={isLooping ? 'Loop aktiv (Endlos-Schleife)' : 'Loop aktivieren (Endlos-Schleife für Play-Alongs)'}
+        title={
+          hasActiveLocator
+            ? `A/B Loop (${Math.round(loopLocator!.startSec)}s - ${Math.round(loopLocator!.endSec)}s) ${isLooping ? 'aktiv' : 'bereit'}`
+            : (isLooping ? 'Loop aktiv (Endlos-Schleife)' : 'Loop aktivieren (Endlos-Schleife für Play-Alongs)')
+        }
       >
         <Repeat size={16} strokeWidth={isLooping ? 2.8 : 2.2} />
+        {hasActiveLocator && (
+          <span style={{ fontSize: '0.66rem', fontWeight: 900, letterSpacing: '-0.02em' }}>A⇄B</span>
+        )}
       </button>
 
       {/* ⏱️ 4-Beat Count-In Vorzähler Toggle */}
@@ -661,8 +729,8 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
           color: countInActive ? '#15803d' : '#64748b',
           fontSize: '0.80rem',
           fontWeight: 850,
-          height: isMobile ? '40px' : '34px',
-          minWidth: isMobile ? '40px' : undefined,
+          height: isMobile ? '44px' : '36px',
+          minWidth: isMobile ? '44px' : '36px',
           padding: isMobile ? '0 10px' : '0 8px',
           borderRadius: '10px',
           cursor: 'pointer',
@@ -680,25 +748,20 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
         <span>4</span>
       </button>
 
-      {/* Speed Button (Percent-based & kid-friendly) */}
+      {/* Speed Button (Level-adaptive & pitch-preserved) */}
       <button
         type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          const rates = [1, 0.85, 0.75, 0.5];
-          const nextRate = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
-          setPlaybackRate(nextRate);
-        }}
-        aria-label={`Wiedergabegeschwindigkeit ${Math.round(playbackRate * 100)} Prozent`}
+        onClick={handleCycleSpeed}
+        aria-label={`Wiedergabegeschwindigkeit ${getSpeedLabel()}`}
         style={{
           border: playbackRate !== 1 ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
           background: playbackRate !== 1 ? '#dcfce7' : '#ffffff',
           color: playbackRate !== 1 ? '#15803d' : '#64748b',
           fontSize: '0.78rem',
           fontWeight: 850,
-          height: isMobile ? '40px' : '34px',
-          minWidth: isMobile ? '46px' : '40px',
-          padding: '0 6px',
+          height: isMobile ? '44px' : '36px',
+          minWidth: isMobile ? '48px' : '42px',
+          padding: '0 8px',
           borderRadius: '10px',
           cursor: 'pointer',
           display: 'flex',
@@ -712,14 +775,10 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
         title={
           playbackRate === 1
             ? 'Originaltempo (100%)'
-            : playbackRate === 0.85
-            ? 'Übetempo (85%)'
-            : playbackRate === 0.75
-            ? 'Übetempo (75%)'
-            : 'Halbes Tempo (50%)'
+            : `Übetempo (${Math.round(playbackRate * 100)}%) mit Tonhöhen-Stabilisierung`
         }
       >
-        {Math.round(playbackRate * 100)}%
+        {getSpeedLabel()}
       </button>
 
       {/* 💬 Timeline Notizen / Marker Button (SoundCloud-Style) */}
@@ -734,8 +793,8 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
           border: notesCount > 0 ? '1px solid #fed7aa' : '1px solid #cbd5e1',
           background: notesCount > 0 ? '#fff7ed' : '#ffffff',
           color: notesCount > 0 ? '#ea580c' : '#475569',
-          height: isMobile ? '40px' : '34px',
-          minWidth: isMobile ? '40px' : '34px',
+          height: isMobile ? '44px' : '36px',
+          minWidth: isMobile ? '44px' : '36px',
           padding: '0 8px',
           borderRadius: '10px',
           cursor: 'pointer',
@@ -756,34 +815,42 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
         {notesCount > 0 && <span>{notesCount}</span>}
       </button>
 
-      {/* ✂️ Studio Trimmer Button */}
+      {/* 🎛️ A/B Loop-Studio / Trimmer Button */}
       <button
         type="button"
         onClick={(e) => {
           e.stopPropagation();
           setIsEditorOpen(true);
         }}
-        aria-label="Studio Trimmer öffnen"
+        aria-label={hasActiveLocator ? 'A/B Loop-Schleife bearbeiten' : 'A/B Loop-Schleife einstellen'}
         style={{
-          border: '1px solid #cbd5e1',
-          background: '#ffffff',
-          color: '#6366f1',
-          height: isMobile ? '38px' : '34px',
-          minWidth: isMobile ? '38px' : '34px',
+          border: hasActiveLocator ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
+          background: hasActiveLocator ? '#f0fdf4' : '#ffffff',
+          color: hasActiveLocator ? '#16a34a' : '#6366f1',
+          height: isMobile ? '44px' : '36px',
+          minWidth: isMobile ? '44px' : '36px',
           padding: '0 8px',
           borderRadius: '10px',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+          gap: '4px',
+          boxShadow: hasActiveLocator ? '0 0 0 2px rgba(34, 197, 94, 0.2)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
           transition: 'all 0.15s ease',
           touchAction: 'manipulation'
         }}
         className="hover-scale-mini"
-        title="Zuschneiden & Pitch"
+        title={
+          hasActiveLocator
+            ? `A/B Loop aktiv: ${Math.round(loopLocator!.startSec)}s - ${Math.round(loopLocator!.endSec)}s (Tippen zum Ändern)`
+            : 'A/B Loop-Bereich festlegen (Schleife für schwere Takte)'
+        }
       >
-        <Scissors size={15} strokeWidth={2.2} />
+        <SlidersHorizontal size={15} strokeWidth={hasActiveLocator ? 2.5 : 2.2} />
+        {hasActiveLocator && (
+          <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#16a34a' }}>A/B</span>
+        )}
       </button>
     </div>
   );
@@ -950,6 +1017,15 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
             {ORGANIC_WAVEFORM.slice(0, 16).map((h, i) => {
               const barRatio = i / 16;
               const isFilled = barRatio <= progressRatio;
+              const barSec = duration > 0 ? barRatio * duration : 0;
+              const isOutsideLocator = Boolean(
+                isLooping &&
+                loopLocator &&
+                loopLocator.enabled &&
+                duration > 0 &&
+                (barSec < loopLocator.startSec || barSec > loopLocator.endSec)
+              );
+
               return (
                 <div
                   key={i}
@@ -959,7 +1035,8 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
                     height: `${Math.max(25, h)}%`,
                     borderRadius: '1.5px',
                     background: isFilled ? '#16a34a' : '#e2e8f0',
-                    transition: 'background 0.1s ease'
+                    opacity: isOutsideLocator ? 0.32 : 1,
+                    transition: 'all 0.15s ease'
                   }}
                 />
               );
@@ -1000,6 +1077,8 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
             audioUrl={resolvedUrl || url}
             initialLabel={label || `Aufnahme #${trackIndex + 1}`}
             initialDuration={duration}
+            editorMode={!isTeacher || readOnly ? 'locator' : 'locator'}
+            uiLevel={uiLevel}
             onSave={(res) => {
               if (onSaveEdited) {
                 onSaveEdited(res);
@@ -1045,6 +1124,7 @@ interface AppleSplitCapsulePlayerProps {
   hideCarriedOverBadge?: boolean;
   isTeacher?: boolean;
   readOnly?: boolean;
+  uiLevel?: 'junior' | 'teen' | 'pro';
 }
 
 const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
@@ -1062,19 +1142,31 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
   isCarriedOver = false,
   hideCarriedOverBadge = false,
   isTeacher = true,
-  readOnly = false
+  readOnly = false,
+  uiLevel = 'junior'
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState<number>(initialDuration || 0);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isLooping, setIsLooping] = useState(false);
-  const [countInActive, setCountInActive] = useState(false);
+  const [countInActive, setCountInActive] = useState<boolean>(() => uiLevel === 'junior');
   const [countInStep, setCountInStep] = useState<number | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
   const [resolvedUrl, setResolvedUrl] = useState<string>(() => isPlayableUrl(url) ? url : '');
   const [notesCount, setNotesCount] = useState<number>(() => getAudioNotesCount(url || ''));
+
+  const [loopLocator, setLoopLocator] = useState<AudioLoopLocator | null>(() => getLoopLocator(url || resolvedUrl));
+  useEffect(() => {
+    const audioKey = url || resolvedUrl;
+    setLoopLocator(getLoopLocator(audioKey));
+    const handleLocatorChange = () => {
+      setLoopLocator(getLoopLocator(audioKey));
+    };
+    window.addEventListener('campus-audio-loop-locator-changed', handleLocatorChange);
+    return () => window.removeEventListener('campus-audio-loop-locator-changed', handleLocatorChange);
+  }, [url, resolvedUrl]);
 
   // 🔔 Reaktiv synchronisierte Notizen-Anzahl (SoundCloud-Style Marker)
   useEffect(() => {
@@ -1181,13 +1273,17 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
 
       const playNative = () => {
         if (!audioRef.current) return;
-        if (audioRef.current.ended || (duration > 0 && audioRef.current.currentTime >= duration)) {
+        if (isLooping && loopLocator && loopLocator.enabled) {
+          if (audioRef.current.currentTime < loopLocator.startSec || audioRef.current.currentTime >= loopLocator.endSec) {
+            audioRef.current.currentTime = loopLocator.startSec;
+          }
+        } else if (audioRef.current.ended || (duration > 0 && audioRef.current.currentTime >= duration)) {
           audioRef.current.currentTime = 0;
         }
         if (audioRef.current.readyState === 0) {
           audioRef.current.load();
         }
-        audioRef.current.loop = isLooping;
+        audioRef.current.loop = isLooping && (!loopLocator || !loopLocator.enabled);
         audioRef.current.play().then(() => setIsPlaying(true)).catch(err => {
           console.warn('[Audio] Play error:', err);
           setIsPlaying(false);
@@ -1227,7 +1323,15 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
       }
     };
     const handleTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
+      const cur = audio.currentTime;
+      setCurrentTime(cur);
+      if (isLooping && loopLocator && loopLocator.enabled) {
+        if (cur >= loopLocator.endSec) {
+          audio.currentTime = loopLocator.startSec;
+        } else if (cur < loopLocator.startSec) {
+          audio.currentTime = loopLocator.startSec;
+        }
+      }
     };
     const handleEnded = () => {
       if (!isLooping) {
@@ -1240,7 +1344,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
       setDuration(Math.round(audio.duration));
     }
 
-    audio.loop = isLooping;
+    audio.loop = isLooping && (!loopLocator || !loopLocator.enabled);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
@@ -1249,12 +1353,14 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [resolvedUrl, isLooping]);
+  }, [resolvedUrl, isLooping, loopLocator]);
 
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.playbackRate = playbackRate;
       (audioRef.current as any).preservesPitch = true;
+      (audioRef.current as any).webkitPreservesPitch = true;
+      (audioRef.current as any).mozPreservesPitch = true;
     }
   }, [playbackRate]);
 
@@ -1268,6 +1374,32 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
 
   const isMobile = useIsMobileAudio();
 
+  const handleCycleSpeed = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (uiLevel === 'junior') {
+      // 🐢 75% vs 🐰 100%
+      setPlaybackRate(prev => (prev === 1 ? 0.75 : 1));
+    } else if (uiLevel === 'teen') {
+      const rates = [1, 0.85, 0.75];
+      const nextRate = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
+      setPlaybackRate(nextRate);
+    } else {
+      // pro
+      const rates = [1, 0.85, 0.75, 0.6, 0.5];
+      const nextRate = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
+      setPlaybackRate(nextRate);
+    }
+  };
+
+  const getSpeedLabel = () => {
+    if (uiLevel === 'junior') {
+      return playbackRate < 1 ? '🐢 75%' : '🐰 100%';
+    }
+    return `${Math.round(playbackRate * 100)}%`;
+  };
+
+  const hasActiveLocator = Boolean(loopLocator && loopLocator.enabled);
+
   const renderSecondaryTools = () => (
     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
       {/* 🔁 Loop Toggle Button */}
@@ -1277,26 +1409,35 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
           e.stopPropagation();
           setIsLooping(!isLooping);
         }}
+        aria-label={isLooping ? 'Endlos-Schleife aktiv' : 'Endlos-Schleife aktivieren'}
         style={{
-          border: isLooping ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
-          background: isLooping ? '#dcfce7' : '#ffffff',
-          color: isLooping ? '#15803d' : '#64748b',
-          height: isMobile ? '38px' : '34px',
-          minWidth: isMobile ? '38px' : '34px',
+          border: isLooping ? '2px solid #16a34a' : (hasActiveLocator ? '1.5px solid #86efac' : '1px solid #cbd5e1'),
+          background: isLooping ? '#bbf7d0' : (hasActiveLocator ? '#f0fdf4' : '#ffffff'),
+          color: isLooping ? '#15803d' : (hasActiveLocator ? '#166534' : '#64748b'),
+          height: isMobile ? '44px' : '34px',
+          minWidth: isMobile ? '44px' : '34px',
           padding: '0 8px',
           borderRadius: '10px',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: isLooping ? '0 1px 3px rgba(22, 163, 74, 0.15)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
+          gap: '3px',
+          boxShadow: isLooping ? '0 0 0 2px rgba(34, 197, 94, 0.3), 0 2px 6px rgba(22, 163, 74, 0.25)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
           transition: 'all 0.15s ease',
           touchAction: 'manipulation'
         }}
         className="hover-scale-mini"
-        title={isLooping ? 'Loop aktiv (Endlos-Schleife)' : 'Loop aktivieren (Endlos-Schleife für Play-Alongs)'}
+        title={
+          hasActiveLocator
+            ? `A/B Loop (${Math.round(loopLocator!.startSec)}s - ${Math.round(loopLocator!.endSec)}s) ${isLooping ? 'aktiv' : 'bereit'}`
+            : (isLooping ? 'Loop aktiv (Endlos-Schleife)' : 'Loop aktivieren (Endlos-Schleife für Play-Alongs)')
+        }
       >
-        <Repeat size={16} strokeWidth={isLooping ? 2.6 : 2.2} />
+        <Repeat size={16} strokeWidth={isLooping ? 2.8 : 2.2} />
+        {hasActiveLocator && (
+          <span style={{ fontSize: '0.66rem', fontWeight: 900, letterSpacing: '-0.02em' }}>A⇄B</span>
+        )}
       </button>
 
       {/* ⏱️ 4-Beat Count-In Vorzähler Toggle */}
@@ -1306,13 +1447,15 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
           e.stopPropagation();
           setCountInActive(!countInActive);
         }}
+        aria-label={countInActive ? '4-Beat Einzähler aktiv' : '4-Beat Einzähler aktivieren'}
         style={{
           border: countInActive ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
           background: countInActive ? '#dcfce7' : '#ffffff',
           color: countInActive ? '#15803d' : '#64748b',
           fontSize: '0.80rem',
           fontWeight: 850,
-          height: isMobile ? '38px' : '34px',
+          height: isMobile ? '44px' : '34px',
+          minWidth: isMobile ? '44px' : '34px',
           padding: isMobile ? '0 10px' : '0 8px',
           borderRadius: '10px',
           cursor: 'pointer',
@@ -1330,24 +1473,20 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
         <span>4</span>
       </button>
 
-      {/* Speed Button (Percent-based & kid-friendly) */}
+      {/* Speed Button (Level-adaptive & pitch-preserved) */}
       <button
         type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          const rates = [1, 0.85, 0.75, 0.5];
-          const nextRate = rates[(rates.indexOf(playbackRate) + 1) % rates.length];
-          setPlaybackRate(nextRate);
-        }}
+        onClick={handleCycleSpeed}
+        aria-label={`Wiedergabegeschwindigkeit ${getSpeedLabel()}`}
         style={{
           border: playbackRate !== 1 ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
           background: playbackRate !== 1 ? '#dcfce7' : '#ffffff',
           color: playbackRate !== 1 ? '#15803d' : '#64748b',
           fontSize: '0.78rem',
           fontWeight: 850,
-          height: isMobile ? '38px' : '34px',
-          minWidth: isMobile ? '44px' : '40px',
-          padding: '0 6px',
+          height: isMobile ? '44px' : '34px',
+          minWidth: isMobile ? '48px' : '40px',
+          padding: '0 8px',
           borderRadius: '10px',
           cursor: 'pointer',
           display: 'flex',
@@ -1361,14 +1500,10 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
         title={
           playbackRate === 1
             ? 'Originaltempo (100%)'
-            : playbackRate === 0.85
-            ? 'Übetempo (85%)'
-            : playbackRate === 0.75
-            ? 'Übetempo (75%)'
-            : 'Halbes Tempo (50%)'
+            : `Übetempo (${Math.round(playbackRate * 100)}%) mit Tonhöhen-Stabilisierung`
         }
       >
-        {Math.round(playbackRate * 100)}%
+        {getSpeedLabel()}
       </button>
 
       {/* 💬 Timeline Notizen / Marker Button (SoundCloud-Style) */}
@@ -1383,8 +1518,8 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
           border: notesCount > 0 ? '1px solid #fed7aa' : '1px solid #cbd5e1',
           background: notesCount > 0 ? '#fff7ed' : '#ffffff',
           color: notesCount > 0 ? '#ea580c' : '#475569',
-          height: isMobile ? '38px' : '34px',
-          minWidth: isMobile ? '38px' : '34px',
+          height: isMobile ? '44px' : '34px',
+          minWidth: isMobile ? '44px' : '34px',
           padding: '0 8px',
           borderRadius: '10px',
           cursor: 'pointer',
@@ -1405,34 +1540,42 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
         {notesCount > 0 && <span>{notesCount}</span>}
       </button>
 
-      {/* ✂️ Studio Trimmer Button */}
+      {/* 🎛️ A/B Loop-Studio / Trimmer Button */}
       <button
         type="button"
         onClick={(e) => {
           e.stopPropagation();
           setIsEditorOpen(true);
         }}
-        aria-label="Studio Trimmer öffnen"
+        aria-label={hasActiveLocator ? 'A/B Loop-Schleife bearbeiten' : 'A/B Loop-Schleife einstellen'}
         style={{
-          border: '1px solid #cbd5e1',
-          background: '#ffffff',
-          color: '#6366f1',
-          height: isMobile ? '38px' : '34px',
-          minWidth: isMobile ? '38px' : '34px',
+          border: hasActiveLocator ? '1.5px solid #16a34a' : '1px solid #cbd5e1',
+          background: hasActiveLocator ? '#f0fdf4' : '#ffffff',
+          color: hasActiveLocator ? '#16a34a' : '#6366f1',
+          height: isMobile ? '44px' : '34px',
+          minWidth: isMobile ? '44px' : '34px',
           padding: '0 8px',
           borderRadius: '10px',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)',
+          gap: '4px',
+          boxShadow: hasActiveLocator ? '0 0 0 2px rgba(34, 197, 94, 0.2)' : '0 1px 2px rgba(0, 0, 0, 0.02)',
           transition: 'all 0.15s ease',
           touchAction: 'manipulation'
         }}
         className="hover-scale-mini"
-        title="Zuschneiden & Pitch"
+        title={
+          hasActiveLocator
+            ? `A/B Loop aktiv: ${Math.round(loopLocator!.startSec)}s - ${Math.round(loopLocator!.endSec)}s (Tippen zum Ändern)`
+            : 'A/B Loop-Bereich festlegen (Schleife für schwere Takte)'
+        }
       >
-        <Scissors size={15} strokeWidth={2.2} />
+        <SlidersHorizontal size={15} strokeWidth={hasActiveLocator ? 2.5 : 2.2} />
+        {hasActiveLocator && (
+          <span style={{ fontSize: '0.65rem', fontWeight: 900, color: '#16a34a' }}>A/B</span>
+        )}
       </button>
     </div>
   );
@@ -1737,6 +1880,14 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
               const barRatio = i / ORGANIC_WAVEFORM.length;
               const isFilled = barRatio <= progressRatio;
               const isHead = Math.abs(barRatio - progressRatio) < (1 / ORGANIC_WAVEFORM.length);
+              const barSec = duration > 0 ? barRatio * duration : 0;
+              const isOutsideLocator = Boolean(
+                isLooping &&
+                loopLocator &&
+                loopLocator.enabled &&
+                duration > 0 &&
+                (barSec < loopLocator.startSec || barSec > loopLocator.endSec)
+              );
 
               return (
                 <div
@@ -1749,8 +1900,9 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
                     background: isFilled 
                       ? 'linear-gradient(180deg, #22c55e 0%, #16a34a 100%)' 
                       : '#e2e8f0',
+                    opacity: isOutsideLocator ? 0.32 : 1,
                     boxShadow: isHead && isPlaying ? '0 0 6px rgba(34, 197, 94, 0.8)' : 'none',
-                    transition: 'background 0.1s ease, height 0.15s ease'
+                    transition: 'background 0.1s ease, height 0.15s ease, opacity 0.15s ease'
                   }}
                 />
               );
@@ -1793,6 +1945,8 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
             audioUrl={resolvedUrl}
             initialLabel={label || 'Aufnahme'}
             initialDuration={duration}
+            editorMode={!isTeacher || readOnly ? 'locator' : 'locator'}
+            uiLevel={uiLevel}
             onSave={(_res) => {
               setIsEditorOpen(false);
             }}

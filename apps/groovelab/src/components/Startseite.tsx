@@ -44,9 +44,7 @@ export const Startseite: React.FC<StartseiteProps> = ({
     try {
       const lastId = localStorage.getItem('groovelab_last_school_id');
       if (lastId) setLastVisitedSchoolId(lastId);
-      const activeId = localStorage.getItem('groovelab_user_id') || 
-                       localStorage.getItem('campus_active_student_id') || 
-                       sessionStorage.getItem('groovelab_user_id');
+      const activeId = sessionStorage.getItem('groovelab_user_id');
       if (activeId) setHasActiveSession(true);
     } catch (e) {}
   }, []);

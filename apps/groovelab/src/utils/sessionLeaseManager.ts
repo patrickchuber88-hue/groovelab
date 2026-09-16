@@ -81,7 +81,6 @@ export async function registerClientSessionLease(user: { id: string; role?: stri
 
     if (data?.lease_id) {
       sessionStorage.setItem(ACTIVE_LEASE_STORAGE, data.lease_id);
-      localStorage.setItem(ACTIVE_LEASE_STORAGE, data.lease_id);
       return { success: true, leaseId: data.lease_id };
     }
 

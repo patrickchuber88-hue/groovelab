@@ -4,7 +4,11 @@
 -- Enforces: Non-repudiation on role switches and device-isolated session leases
 -- ==============================================================================
 
--- 1. SECURE ROLE SWITCH RPC WITH LEASE SCOPING AND REVISIONSSICHEREM AUDIT TRAIL
+-- 1. CLEANUP PREVIOUS OVERLOADS TO ELIMINATE POSTGREST AMBIGUITY
+DROP FUNCTION IF EXISTS public.switch_user_active_role(text);
+DROP FUNCTION IF EXISTS public.switch_user_active_role(text, uuid);
+
+-- 2. SECURE ROLE SWITCH RPC WITH LEASE SCOPING AND REVISIONSSICHEREM AUDIT TRAIL
 CREATE OR REPLACE FUNCTION public.switch_user_active_role(
     p_target_role text,
     p_lease_id uuid DEFAULT NULL
@@ -121,15 +125,4 @@ BEGIN
 END;
 $$;
 
--- 2. BACKWARDS-COMPATIBILITY WRAPPER (1 Parameter Signature)
-CREATE OR REPLACE FUNCTION public.switch_user_active_role(p_target_role text)
-RETURNS jsonb
-LANGUAGE sql
-SECURITY DEFINER
-SET search_path = public, private_auth, pg_temp, extensions
-AS $$
-    SELECT public.switch_user_active_role(p_target_role, NULL::uuid);
-$$;
-
 GRANT EXECUTE ON FUNCTION public.switch_user_active_role(text, uuid) TO anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.switch_user_active_role(text) TO anon, authenticated, service_role;

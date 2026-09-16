@@ -85,10 +85,11 @@ apply_migration "$MIGRATIONS_DIR/388_enterprise_forensic_master_seal.sql"
 apply_migration "$MIGRATIONS_DIR/389_enterprise_forensic_remediation.sql"
 apply_migration "$MIGRATIONS_DIR/390_enterprise_performance_covering_indexes.sql"
 apply_migration "$MIGRATIONS_DIR/391_enterprise_forensic_residual_seal.sql"
+apply_migration "$MIGRATIONS_DIR/438_enterprise_dual_role_audit_and_lease_scoping.sql"
 
 echo "🔄 Schema-Cache aktualisieren..."
 ssh "$SERVER" "docker exec -i $DB_CONTAINER psql -U postgres -d postgres -c \"NOTIFY pgrst, 'reload schema';\"" || true
 
-echo "✅ Alle Sicherheits- & Performancemigrationen (330-391) wurden erfolgreich auf dem Produktivserver angewendet!"
+echo "✅ Alle Sicherheits- & Performancemigrationen (330-438) wurden erfolgreich auf dem Produktivserver angewendet!"
 
 

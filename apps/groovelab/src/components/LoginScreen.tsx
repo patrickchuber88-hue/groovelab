@@ -2305,7 +2305,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             authenticatedUser = authResult.user;
             if (authResult.lease_token) {
               sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
-              localStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
             }
           }
         } catch (authErr) {
@@ -3212,7 +3211,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
       if (authResult.lease_token) {
         sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
-        localStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
       }
 
       // 4. Finalize login with verified server profile
@@ -3297,7 +3295,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           user = authResult.user;
           if (authResult.lease_token) {
             sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
-            localStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
           }
         } else if (authResult?.error) {
           userErr = new Error(authResult.error);
@@ -3552,7 +3549,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           user = authResult.user;
           if (authResult.lease_token) {
             sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
-            localStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
           }
         } else if (authResult?.error) {
           userErr = new Error(authResult.error);
@@ -7231,9 +7227,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 sessionStorage.setItem('groovelab_active_platform', 'campus');
                 sessionStorage.setItem('campus_active_tab', 'briefing');
                 sessionStorage.setItem('groovelab_user_id', targetId);
-                localStorage.setItem('groovelab_is_master_admin', 'true');
-                localStorage.setItem('groovelab_active_workspace', 'master_admin');
-                localStorage.setItem('groovelab_user_id', targetId);
                 sessionStorage.removeItem('groovelab_qr_token');
                 localStorage.removeItem('groovelab_last_qr_token');
                 localStorage.removeItem('groovelab_qr_token');
@@ -7286,7 +7279,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 localStorage.removeItem('groovelab_is_master_admin');
                 sessionStorage.removeItem('groovelab_support_ghost');
                 sessionStorage.setItem('groovelab_active_workspace', 'secretary');
-                localStorage.setItem('groovelab_active_workspace', 'secretary');
                 sessionStorage.setItem('groovelab_active_platform', 'campus');
                 sessionStorage.setItem('campus_active_tab', 'briefing');
                 sessionStorage.setItem('groovelab_secretary_subtab', 'briefing');
@@ -7338,7 +7330,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 localStorage.removeItem('groovelab_is_master_admin');
                 sessionStorage.removeItem('groovelab_support_ghost');
                 sessionStorage.setItem('groovelab_active_workspace', 'teacher');
-                localStorage.setItem('groovelab_active_workspace', 'teacher');
                 sessionStorage.setItem('groovelab_active_platform', 'campus');
                 sessionStorage.setItem('campus_active_tab', 'briefing');
                 sessionStorage.setItem('groovelab_user_id', targetUser.id);
@@ -7389,7 +7380,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 localStorage.removeItem('groovelab_is_master_admin');
                 sessionStorage.removeItem('groovelab_support_ghost');
                 sessionStorage.setItem('groovelab_active_workspace', 'student');
-                localStorage.setItem('groovelab_active_workspace', 'student');
                 sessionStorage.setItem('groovelab_active_platform', 'campus');
                 sessionStorage.setItem('campus_active_tab', 'briefing');
                 sessionStorage.setItem('groovelab_active_tab', 'briefing');

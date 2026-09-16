@@ -23,24 +23,26 @@ export function executeSessionZeroize(options: { preserveDeviceKey?: boolean; re
       broadcastLogoutToPeerTabs();
     }
 
-    // 1. Wipe sensitive localStorage items without flooding peer tabs with storage events
-    const keysToPreserve = new Set(
-      preserveDeviceKey ? ['gl_global_device_key', 'groovelab_kiosk_token', 'groovelab_station_id', 'groovelab_kiosk_room_id'] : []
-    );
-
-    const allKeys = Object.keys(localStorage);
-    allKeys.forEach((key) => {
-      if (!keysToPreserve.has(key)) {
-        try {
-          localStorage.removeItem(key);
-        } catch (_) {}
-      }
-    });
-
-    // 2. Wipe sessionStorage completely
+    // 1. Wipe tab-scoped sessionStorage completely
     try {
       sessionStorage.clear();
     } catch (_) {}
+
+    // 2. Clean up legacy or ephemeral session keys from localStorage without disrupting device/station config
+    const sessionKeysToScrub = [
+      'groovelab_user_id',
+      'campus_active_student_id',
+      'groovelab_current_student_id',
+      'groovelab_cached_user',
+      'gl_active_session_lease_id',
+      'groovelab_is_master_admin',
+      'groovelab_active_workspace'
+    ];
+    sessionKeysToScrub.forEach((k) => {
+      try {
+        localStorage.removeItem(k);
+      } catch (_) {}
+    });
 
     // 3. Purge Auth & Lease Cookies
     removeSecureCookie('cg_session_lease');

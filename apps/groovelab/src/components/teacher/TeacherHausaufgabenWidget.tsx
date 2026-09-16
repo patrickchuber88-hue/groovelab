@@ -70,6 +70,7 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
   const [quickHomeworkText, setQuickHomeworkText] = useState('');
   const [isSavingQuickHw, setIsSavingQuickHw] = useState(false);
   const [showQuickAudioRecorder, setShowQuickAudioRecorder] = useState(false);
+  const [audioTargetChip, setAudioTargetChip] = useState<string>('general');
 
   const handleSaveQuickHomework = async (currentPrep: any, customNote?: string) => {
     const textToSave = (customNote || quickHomeworkText).trim();
@@ -1195,7 +1196,59 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
                   </div>
 
                   {showQuickAudioRecorder && (
-                    <div style={{ padding: '8px', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ padding: '10px', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {/* Optional Target Chip Selector */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b' }}>Ziel:</span>
+                        <button
+                          type="button"
+                          onClick={() => setAudioTargetChip('general')}
+                          style={{
+                            padding: '3px 8px',
+                            borderRadius: '100px',
+                            fontSize: '0.72rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            border: audioTargetChip === 'general' ? '1.5px solid #16a34a' : '1px solid #e2e8f0',
+                            background: audioTargetChip === 'general' ? '#dcfce7' : '#f8fafc',
+                            color: audioTargetChip === 'general' ? '#15803d' : '#64748b',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          🌟 Ganze Woche
+                        </button>
+
+                        {formattedCurrentWeekItems && formattedCurrentWeekItems.map((item: any, i: number) => {
+                          const chipTitle = `${item.bookTitle || item.title || 'Aufgabe'}${item.formattedPages ? ` (${item.formattedPages})` : ''}`;
+                          const isSelected = audioTargetChip === chipTitle;
+                          return (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => setAudioTargetChip(chipTitle)}
+                              style={{
+                                padding: '3px 8px',
+                                borderRadius: '100px',
+                                fontSize: '0.72rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                border: isSelected ? '1.5px solid #16a34a' : '1px solid #e2e8f0',
+                                background: isSelected ? '#dcfce7' : '#f8fafc',
+                                color: isSelected ? '#15803d' : '#64748b',
+                                maxWidth: '200px',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                transition: 'all 0.15s ease'
+                              }}
+                              title={chipTitle}
+                            >
+                              📖 {chipTitle}
+                            </button>
+                          );
+                        })}
+                      </div>
+
                       <SimpleVoiceRecorder
                         studentId={prep.studentId}
                         colorTheme="#16a34a"
@@ -1203,8 +1256,16 @@ export const TeacherHausaufgabenWidget: React.FC<TeacherHausaufgabenWidgetProps>
                         topicName={`KW ${prep.currentWeekNum} Vorspiel-Memo`}
                         onAudioSaved={(url) => {
                           const todayStr = new Date().toISOString().split('T')[0];
-                          const audioTag = `AUDIO:${url}|30|${todayStr}|Vorspiel-Beispiel|teacher`;
+                          let memoLabel = 'Vorspiel-Beispiel';
+                          if (audioTargetChip !== 'general' && audioTargetChip) {
+                            memoLabel = audioTargetChip;
+                          } else if (quickHomeworkText.trim()) {
+                            memoLabel = quickHomeworkText.trim().substring(0, 36);
+                          }
+                          const audioTag = `AUDIO:${url}|30|${todayStr}|${memoLabel}|teacher`;
                           handleSaveQuickHomework(prep, audioTag);
+                          setShowQuickAudioRecorder(false);
+                          setAudioTargetChip('general');
                         }}
                       />
                     </div>

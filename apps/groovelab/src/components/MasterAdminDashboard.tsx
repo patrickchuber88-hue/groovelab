@@ -1179,7 +1179,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const activeMasterId = currentUser?.id || sessionStorage.getItem('groovelab_user_id') || localStorage.getItem('groovelab_user_id') || '11079eae-664a-49a4-8692-771d83a3193c';
+      const activeMasterId = currentUser?.id || sessionStorage.getItem('groovelab_user_id') || '11079eae-664a-49a4-8692-771d83a3193c';
       sessionStorage.setItem('groovelab_user_id', activeMasterId);
       sessionStorage.setItem('groovelab_is_master_admin', 'true');
       sessionStorage.setItem('groovelab_active_workspace', 'master_admin');

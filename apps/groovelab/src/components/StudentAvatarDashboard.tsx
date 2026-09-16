@@ -1185,7 +1185,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       if (effectiveId) {
         // 🛡️ Revisionssichere Persistenz via RPC (Fail-Closed: kein unsicherer Tabellen-Fallback)
         const activeLeaseToken = typeof window !== 'undefined'
-          ? (sessionStorage.getItem('gl_parent_session_lease') || sessionStorage.getItem('gl_active_session_lease_id') || localStorage.getItem('gl_active_session_lease_id'))
+          ? (sessionStorage.getItem('gl_parent_session_lease') || sessionStorage.getItem('gl_active_session_lease_id'))
           : null;
         const parentPin = inMemoryParentPinRef.current || undefined;
         const { error: rpcErr } = await supabase.rpc('save_parent_controls', {
@@ -1574,7 +1574,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     try {
       if (targetStudentId) {
         const activeLeaseToken = typeof window !== 'undefined'
-          ? (sessionStorage.getItem('gl_parent_session_lease') || sessionStorage.getItem('gl_active_session_lease_id') || localStorage.getItem('gl_active_session_lease_id'))
+          ? (sessionStorage.getItem('gl_parent_session_lease') || sessionStorage.getItem('gl_active_session_lease_id'))
           : null;
 
         const settingsPayload = {
@@ -1830,10 +1830,13 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   const [pendingSiblingUnlock, setPendingSiblingUnlock] = useState<any | null>(null);
 
   const executeSwitchFamilyStudent = (targetStudentId: string, keepParentUnlocked = false) => {
-    localStorage.setItem('groovelab_current_student_id', targetStudentId);
-    localStorage.setItem('campus_active_student_id', targetStudentId);
+    const isPwa = typeof window !== 'undefined' && (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true);
+    if (isPwa) {
+      localStorage.setItem('groovelab_current_student_id', targetStudentId);
+      localStorage.setItem('campus_active_student_id', targetStudentId);
+      localStorage.setItem('groovelab_user_id', targetStudentId);
+    }
     sessionStorage.setItem('groovelab_user_id', targetStudentId);
-    localStorage.setItem('groovelab_user_id', targetStudentId);
 
     // 📱 Reaktivitäts-Garantie: Cache und State für das Ziel-Profil sofort vorbereiten
     const targetSibling = familyProfiles.find(p => p.id === targetStudentId);

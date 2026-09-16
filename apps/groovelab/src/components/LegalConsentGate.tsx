@@ -21,9 +21,7 @@ function computeSessionProof(userId: string, role: string, leaseId: string, vers
 function getLeaseId(): string {
   if (typeof window === 'undefined') return '';
   try {
-    return sessionStorage.getItem('gl_active_session_lease_id') || 
-           localStorage.getItem('gl_active_session_lease_id') || 
-           '';
+    return sessionStorage.getItem('gl_active_session_lease_id') || '';
   } catch {
     return '';
   }

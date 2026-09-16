@@ -9,6 +9,7 @@ import {
 import { ALL_STICKERS } from '../../../domain/stickersAndTresor';
 import { UpdateAnnouncementHero } from '../../common/UpdateAnnouncementHero';
 import { AudioTrackCarousel, AudioTrackItem } from '../../AudioTrackCarousel';
+import { usePwaWakeLock } from '../../../hooks/usePwaWakeLock';
 import { DEFAULT_FOKUS_LEVELS } from '../../../utils/studentProgressEngine';
 import { buildContinuousHomeworkNarrative } from '../../../services/neuralTtsService';
 import { formatTeacherFullName } from '../../../utils/nameHelper';
@@ -267,6 +268,9 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
     pushEnabled,
     setShowPushSoftPrompt
   } = props;
+
+  // 📱 Prevent tablet display sleep during music practice on music stand
+  usePwaWakeLock(true);
 
   const activeWeeklyFocusKey = useMemo(() => {
     let focusKey: string | null = null;
@@ -3020,7 +3024,12 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                           <Headphones size={13} />
                                           <span>Unterrichtsaufnahmen ({audioTracks.length})</span>
                                         </div>
-                                        <AudioTrackCarousel tracks={audioTracks} isTeacher={false} readOnly={true} />
+                                        <AudioTrackCarousel
+                                          tracks={audioTracks}
+                                          isTeacher={false}
+                                          readOnly={true}
+                                          uiLevel={(studentUiLevel as any) || 'junior'}
+                                        />
                                       </div>
                                     )}
 
