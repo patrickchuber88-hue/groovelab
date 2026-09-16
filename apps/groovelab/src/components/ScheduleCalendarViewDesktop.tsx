@@ -35,7 +35,9 @@ import {
   BookOpen,
   MapPin,
   Scale,
-  Sliders
+  Sliders,
+  Star,
+  Plus
 } from 'lucide-react';
 import { 
   useRealNamesVisibility, 
@@ -525,6 +527,97 @@ export function ScheduleCalendarViewDesktop({
   const [isGroupModeActive, setIsGroupModeActive] = useState(false);
   const [selectedForGroup, setSelectedForGroup] = useState<string[]>([]);
   const [selectedRoomIdForXRay, setSelectedRoomIdForXRay] = useState<string | null>(null);
+  const [favoriteRoomIds, setFavoriteRoomIds] = useState<string[]>(() => {
+    try {
+      const savedArray = localStorage.getItem(`groovelab_favorite_room_ids_${userId}`);
+      if (savedArray) {
+        const parsed = JSON.parse(savedArray);
+        if (Array.isArray(parsed)) return parsed;
+      }
+      const singleFav = localStorage.getItem(`groovelab_favorite_room_id_${userId}`);
+      if (singleFav) return [singleFav];
+    } catch {}
+    return [];
+  });
+  const [isRoomPopoverOpen, setIsRoomPopoverOpen] = useState(false);
+  const [roomSearchQuery, setRoomSearchQuery] = useState('');
+  const roomPopoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isRoomPopoverOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (roomPopoverRef.current && !roomPopoverRef.current.contains(event.target as Node)) {
+        setIsRoomPopoverOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsRoomPopoverOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isRoomPopoverOpen]);
+
+  // Load user preferred_room_ids from DB profile
+  useEffect(() => {
+    if (!userId) return;
+    let isMounted = true;
+    const loadUserPreferences = async () => {
+      try {
+        const { data } = await supabase
+          .from('users')
+          .select('preferred_room_ids')
+          .eq('id', userId)
+          .maybeSingle();
+        if (isMounted && data && Array.isArray(data.preferred_room_ids) && data.preferred_room_ids.length > 0) {
+          setFavoriteRoomIds(prev => {
+            const merged = Array.from(new Set([...prev, ...data.preferred_room_ids]));
+            try {
+              localStorage.setItem(`groovelab_favorite_room_ids_${userId}`, JSON.stringify(merged));
+            } catch {}
+            return merged;
+          });
+        }
+      } catch (err) {
+        console.warn('[ScheduleCalendarViewDesktop] Error loading preferred_room_ids:', err);
+      }
+    };
+    loadUserPreferences();
+    return () => { isMounted = false; };
+  }, [userId]);
+
+  const toggleFavoriteRoom = (roomId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setFavoriteRoomIds(prev => {
+      const isFav = prev.includes(roomId);
+      const updated = isFav ? prev.filter(id => id !== roomId) : [...prev, roomId];
+      try {
+        localStorage.setItem(`groovelab_favorite_room_ids_${userId}`, JSON.stringify(updated));
+        if (updated.length > 0) {
+          localStorage.setItem(`groovelab_favorite_room_id_${userId}`, updated[0]);
+        } else {
+          localStorage.removeItem(`groovelab_favorite_room_id_${userId}`);
+        }
+      } catch {}
+      if (userId) {
+        supabase
+          .from('users')
+          .update({ preferred_room_ids: updated })
+          .eq('id', userId)
+          .then(({ error }) => {
+            if (error) {
+              console.warn('[ScheduleCalendarViewDesktop] Failed to sync preferred_room_ids:', error);
+            }
+          });
+      }
+      return updated;
+    });
+  };
   const [selectedStudentPrefs, setSelectedStudentPrefs] = useState<any[]>([]);
 
   const [localEndTime, setLocalEndTime] = useState<string>('');
@@ -2237,7 +2330,7 @@ export function ScheduleCalendarViewDesktop({
 
           // 4. Main Occurrences (single query with full fields and joins)
           supabase.from('schedule_occurrences')
-            .select('id, date, start_time, original_date, duration, status, notes, teacher_id, student_id, schedule_id, student:users!schedule_occurrences_student_id_fkey(id, school_id, teacher_id, first_name, last_name, instrument, is_campus_active, is_groovelab_active, group_id, campus_ui_level, parent_permissions)')
+            .select('id, date, start_time, original_date, duration, status, notes, teacher_id, student_id, schedule_id, student:users!schedule_occurrences_student_id_fkey(id, school_id, teacher_id, first_name, last_name, instrument, is_campus_active, is_groovelab_active, group_id, campus_ui_level, parent_permissions), schedules:schedules(room_id, room:rooms(name))')
             .eq('teacher_id', userId)
             .or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`)
             .order('date')
@@ -4836,23 +4929,41 @@ export function ScheduleCalendarViewDesktop({
     });
   };
 
-  const activeRooms = useMemo(() => {
+  const regularRoomIds = useMemo(() => {
     const ids = new Set<string>();
+    // 1. Scheduled occurrences of this teacher
     occurrences.forEach((occ: any) => {
-      const rid = occ.schedules?.room_id || occ.room_id;
-      if (rid) ids.add(rid);
+      const tId = occ.teacher_id || occ.student?.teacher_id;
+      if (!tId || tId === userId) {
+        const rid = occ.schedules?.room_id || occ.room_id;
+        if (rid) ids.add(rid);
+      }
     });
+    // 2. Regular master timetable schedules of this teacher
     cachedWeekSchedules.forEach((s: any) => {
       if (s.teacher_id === userId && s.room_id) {
         ids.add(s.room_id);
       }
     });
-    const activeIds = Array.from(ids);
-    if (activeIds.length > 0) {
-      return rooms.filter(r => activeIds.includes(r.id));
+    return Array.from(ids);
+  }, [occurrences, cachedWeekSchedules, userId]);
+
+  const displayedRooms = useMemo(() => {
+    const idsSet = new Set<string>([...regularRoomIds, ...favoriteRoomIds]);
+    // If a room is currently selected for Röntgen view, include it so it displays with a star option
+    if (selectedRoomIdForXRay) {
+      idsSet.add(selectedRoomIdForXRay);
     }
-    return rooms;
-  }, [occurrences, cachedWeekSchedules, userId, rooms]);
+    const targetIds = Array.from(idsSet);
+    return rooms.filter(r => targetIds.includes(r.id));
+  }, [regularRoomIds, favoriteRoomIds, selectedRoomIdForXRay, rooms]);
+
+  const remainingRooms = useMemo(() => {
+    return rooms.filter(r => !displayedRooms.some(dr => dr.id === r.id));
+  }, [rooms, displayedRooms]);
+
+  // Backward-compatible alias for any residual references
+  const activeRooms = displayedRooms;
 
   const getOtherRoomOccupancies = (dateStr: string, roomId: string) => {
     const dayDate = new Date(dateStr);
@@ -5345,66 +5456,246 @@ export function ScheduleCalendarViewDesktop({
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
                 {isTeacherScheduleUnlocked ? (
                   <>
-                    {activeRooms.map(room => {
+                    {displayedRooms.map(room => {
                       const isActive = selectedRoomIdForXRay === room.id;
+                      const isRegular = regularRoomIds.includes(room.id);
+                      const isFav = favoriteRoomIds.includes(room.id);
                       const isCampus = localStorage.getItem('groovelab_active_platform') === 'campus';
-                      const primaryColor = isCampus ? '#34a853' : '#ea4335';
+                      const isGroovelab = localStorage.getItem('groovelab_active_platform') === 'groovelab';
+                      const activeBg = isCampus ? '#34a853' : (isGroovelab ? '#facc15' : '#ea4335');
+                      const activeColor = isGroovelab ? '#0f172a' : '#ffffff';
+                      const activeBorder = isCampus ? '#2e7d32' : (isGroovelab ? '#eab308' : '#dc2626');
+
                       return (
-                        <button
+                        <div
                           key={room.id}
-                          type="button"
-                          onClick={() => setSelectedRoomIdForXRay(prev => prev === room.id ? null : room.id)}
-                          aria-label={`Röntgen-Ansicht für Raum ${room.name} filtern`}
-                          aria-pressed={isActive}
                           style={{
-                            background: isActive ? primaryColor : '#ffffff',
-                            color: isActive ? '#ffffff' : '#0f172a',
-                            border: `1px solid ${isActive ? primaryColor : '#cbd5e1'}`,
-                            borderRadius: '6px',
-                            padding: '5px 11px',
-                            fontSize: '0.78rem',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                            boxShadow: isActive ? '0 2px 4px rgba(0,0,0,0.1)' : '0 1px 2px rgba(0,0,0,0.02)',
                             display: 'inline-flex',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            minHeight: '28px'
+                            background: isActive ? activeBg : '#ffffff',
+                            color: isActive ? activeColor : '#0f172a',
+                            border: `1px solid ${isActive ? activeBorder : '#cbd5e1'}`,
+                            borderRadius: '6px',
+                            boxShadow: isActive ? '0 2px 4px rgba(0,0,0,0.1)' : '0 1px 2px rgba(0,0,0,0.02)',
+                            transition: 'all 0.15s ease'
                           }}
                         >
-                          {room.name}
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedRoomIdForXRay(prev => prev === room.id ? null : room.id)}
+                            aria-label={`Röntgen-Ansicht für Raum ${room.name} ${isActive ? 'deaktivieren' : 'filtern'}`}
+                            aria-pressed={isActive}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'inherit',
+                              padding: '5px 8px 5px 10px',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              minHeight: '28px',
+                              userSelect: 'none'
+                            }}
+                          >
+                            {room.name}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => toggleFavoriteRoom(room.id, e)}
+                            title={isFav ? "Aus Favoriten entfernen" : (isRegular ? "Regulärer Raum (als Favorit merken)" : "Als Favorit merken")}
+                            aria-label={isFav ? `Raum ${room.name} aus Favoriten entfernen` : `Raum ${room.name} als Favorit merken`}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              padding: '5px 8px 5px 2px',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: isFav 
+                                ? '#f59e0b' 
+                                : (isActive ? (isGroovelab ? '#475569' : 'rgba(255,255,255,0.7)') : '#94a3b8'),
+                              transition: 'transform 0.15s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              (e.currentTarget as HTMLElement).style.transform = 'scale(1.2)';
+                            }}
+                            onMouseLeave={(e) => {
+                              (e.currentTarget as HTMLElement).style.transform = 'scale(1)';
+                            }}
+                          >
+                            <Star 
+                              size={12} 
+                              strokeWidth={2.4} 
+                              fill={isFav ? '#f59e0b' : 'none'} 
+                            />
+                          </button>
+                        </div>
                       );
                     })}
-                    {rooms.length > activeRooms.length && (
-                      <select
-                        aria-label="Anderen Raum für Röntgen-Ansicht wählen"
-                        value={activeRooms.some(ar => ar.id === selectedRoomIdForXRay) ? '' : (selectedRoomIdForXRay || '')}
-                        onChange={(e) => setSelectedRoomIdForXRay(e.target.value || null)}
-                        style={{
-                          background: '#ffffff',
-                          border: '1px solid #cbd5e1',
-                          borderRadius: '6px',
-                          padding: '4px 8px',
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                          color: '#475569',
-                          outline: 'none',
-                          cursor: 'pointer',
-                          minHeight: '28px'
-                        }}
-                      >
-                        <option value="">+ Weiterer Raum...</option>
-                        {rooms.filter(r => !activeRooms.some(ar => ar.id === r.id)).map(r => (
-                          <option key={r.id} value={r.id}>{r.name}</option>
-                        ))}
-                      </select>
+
+                    {/* Popover for additional school rooms */}
+                    {remainingRooms.length > 0 && (
+                      <div style={{ position: 'relative' }} ref={roomPopoverRef}>
+                        <button
+                          type="button"
+                          onClick={() => setIsRoomPopoverOpen(prev => !prev)}
+                          aria-expanded={isRoomPopoverOpen}
+                          aria-haspopup="dialog"
+                          aria-label="Weiteren Raum für Röntgen-Ansicht wählen"
+                          style={{
+                            background: isRoomPopoverOpen ? '#f1f5f9' : '#ffffff',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '6px',
+                            padding: '4px 10px',
+                            fontSize: '0.74rem',
+                            fontWeight: 700,
+                            color: '#334155',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            cursor: 'pointer',
+                            minHeight: '28px',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <Plus size={12} strokeWidth={2.5} style={{ color: '#64748b' }} />
+                          <span>Weiterer Raum</span>
+                          <ChevronDown 
+                            size={12} 
+                            strokeWidth={2.5} 
+                            style={{ 
+                              color: '#64748b', 
+                              transform: isRoomPopoverOpen ? 'rotate(180deg)' : 'none', 
+                              transition: 'transform 0.15s ease' 
+                            }} 
+                          />
+                        </button>
+
+                        {isRoomPopoverOpen && (
+                          <div
+                            role="dialog"
+                            aria-label="Weiteren Raum auswählen"
+                            style={{
+                              position: 'absolute',
+                              top: 'calc(100% + 5px)',
+                              left: 0,
+                              zIndex: 1050,
+                              width: '240px',
+                              background: '#ffffff',
+                              borderRadius: '10px',
+                              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                              border: '1px solid #e2e8f0',
+                              padding: '6px'
+                            }}
+                          >
+                            {remainingRooms.length > 6 && (
+                              <div style={{ padding: '4px 4px 6px 4px', borderBottom: '1px solid #f1f5f9', marginBottom: '4px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f8fafc', padding: '4px 8px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                                  <Search size={11} strokeWidth={2.5} style={{ color: '#94a3b8' }} />
+                                  <input
+                                    type="text"
+                                    placeholder="Raum suchen..."
+                                    value={roomSearchQuery}
+                                    onChange={(e) => setRoomSearchQuery(e.target.value)}
+                                    autoFocus
+                                    style={{
+                                      border: 'none',
+                                      background: 'transparent',
+                                      outline: 'none',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 600,
+                                      color: '#0f172a',
+                                      width: '100%'
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            <div style={{ maxHeight: '220px', overflowY: 'auto' }}>
+                              {remainingRooms
+                                .filter(r => r.name.toLowerCase().includes(roomSearchQuery.trim().toLowerCase()))
+                                .map(r => {
+                                  const isFav = favoriteRoomIds.includes(r.id);
+                                  return (
+                                    <div
+                                      key={r.id}
+                                      style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        padding: '5px 8px',
+                                        borderRadius: '6px',
+                                        cursor: 'pointer',
+                                        transition: 'background 0.12s ease'
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        (e.currentTarget as HTMLElement).style.background = '#f8fafc';
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        (e.currentTarget as HTMLElement).style.background = 'transparent';
+                                      }}
+                                    >
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedRoomIdForXRay(r.id);
+                                          setIsRoomPopoverOpen(false);
+                                          setRoomSearchQuery('');
+                                        }}
+                                        style={{
+                                          background: 'transparent',
+                                          border: 'none',
+                                          textAlign: 'left',
+                                          flex: 1,
+                                          fontSize: '0.75rem',
+                                          fontWeight: 600,
+                                          color: '#1e293b',
+                                          cursor: 'pointer',
+                                          padding: 0
+                                        }}
+                                      >
+                                        {r.name}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => toggleFavoriteRoom(r.id, e)}
+                                        title={isFav ? "Aus Favoriten entfernen" : "Als Favorit anpinnen"}
+                                        aria-label={`Raum ${r.name} favorisieren`}
+                                        style={{
+                                          background: 'transparent',
+                                          border: 'none',
+                                          padding: '2px 4px',
+                                          cursor: 'pointer',
+                                          color: isFav ? '#f59e0b' : '#cbd5e1',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center'
+                                        }}
+                                      >
+                                        <Star size={12} strokeWidth={2.4} fill={isFav ? '#f59e0b' : 'none'} />
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              {remainingRooms.filter(r => r.name.toLowerCase().includes(roomSearchQuery.trim().toLowerCase())).length === 0 && (
+                                <div style={{ padding: '8px', fontSize: '0.72rem', color: '#94a3b8', textAlign: 'center' }}>
+                                  Kein Raum gefunden
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </>
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }} title="Die Raumbelegungs-Vorschau wird aktiv, sobald dein Stundenplan vom Schulsekretariat freigegeben wurde.">
-                    {activeRooms.map(room => (
+                    {displayedRooms.map(room => (
                       <span
                         key={room.id}
                         style={{
