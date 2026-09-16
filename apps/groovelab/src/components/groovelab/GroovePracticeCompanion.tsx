@@ -8,10 +8,12 @@ import {
   ensureCenteredStereoAudioBuffer, 
   audioBufferToWavBlob, 
   processPureRawAudioBuffer,
+  alignAudioBufferToGrid,
   TARGET_PURE_RAW_LUFS,
   TARGET_PEAK_DBTP,
   MAX_PURE_RAW_LIMITER_GR_DB
 } from '../../utils/audioMasteringEngine';
+import { UniversalLatencyEngine } from '../../utils/universalLatencyEngine';
 import { acquireAudioStream, stabilizeAudioStream, releaseAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
 import { supabase } from '../../lib/supabase';
 import { validateMediaBlob, stripAudioMetadata } from '../../utils/mediaSecurityValidator';
@@ -188,30 +190,10 @@ async function mixMicWithDirectBackingBeat(
 
     const sampleRate = 48000;
 
-    // 🌟 PDC (Plugin Delay Compensation):
-    // Compensate for Output Latency (~25ms) + Input Latency (~30ms) + MediaRecorder Start Offset (~20ms) = ~75ms
-    const LATENCY_COMPENSATION_SEC = 0.075;
-    const trimSamples = Math.min(
-      Math.floor(LATENCY_COMPENSATION_SEC * sampleRate),
-      Math.floor(rawMicBuffer.length * 0.25)
-    );
-
-    const micBuffer = (trimSamples > 0 && rawMicBuffer.length > trimSamples)
-      ? (() => {
-          const compensated = new (window.OfflineAudioContext || (window as any).webkitOfflineAudioContext)(
-            rawMicBuffer.numberOfChannels,
-            rawMicBuffer.length - trimSamples,
-            sampleRate
-          ).createBuffer(rawMicBuffer.numberOfChannels, rawMicBuffer.length - trimSamples, sampleRate);
-
-          for (let ch = 0; ch < rawMicBuffer.numberOfChannels; ch++) {
-            const src = rawMicBuffer.getChannelData(ch);
-            const dest = compensated.getChannelData(ch);
-            dest.set(src.subarray(trimSamples));
-          }
-          return compensated;
-        })()
-      : rawMicBuffer;
+    // 🌟 PDC (Plugin Delay Compensation) via UniversalLatencyEngine:
+    // Dynamically compensates for Output Latency + Input Latency + Bluetooth Codec Puffer
+    const latencyCompensationSec = UniversalLatencyEngine.getLatencySec(tempCtx);
+    const micBuffer = alignAudioBufferToGrid(rawMicBuffer, latencyCompensationSec, tempCtx);
 
     const duration = micBuffer.duration;
     const totalSamples = Math.max(1, Math.floor(duration * sampleRate));
@@ -1592,7 +1574,8 @@ export const GroovePracticeCompanion: React.FC<GroovePracticeCompanionProps> = (
             const pureRawRes = await processPureRawBlob(rawBlob, { 
               targetLufs: TARGET_PURE_RAW_LUFS, 
               targetPeakDb: TARGET_PEAK_DBTP,
-              maxLimiterGrDb: MAX_PURE_RAW_LIMITER_GR_DB
+              maxLimiterGrDb: MAX_PURE_RAW_LIMITER_GR_DB,
+              latencyCompensationSec: UniversalLatencyEngine.getLatencySec(audioCtxRef.current)
             });
             finalBlob = pureRawRes.processedBlob;
             blobUrl = pureRawRes.processedUrl;

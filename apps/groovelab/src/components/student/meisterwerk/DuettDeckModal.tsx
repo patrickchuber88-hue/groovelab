@@ -24,6 +24,7 @@ import {
   renderDuettMixdown,
   DualTrackPlaybackSession 
 } from '../../../utils/dualTrackAudioEngine';
+import { UniversalLatencyEngine } from '../../../utils/universalLatencyEngine';
 
 export interface DuettDeckModalProps {
   isOpen: boolean;
@@ -99,8 +100,15 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
   // Audio Controls & Mix
   const [teacherVolume, setTeacherVolume] = useState<number>(1.0);
   const [studentVolume, setStudentVolume] = useState<number>(1.0);
-  const [latencyOffsetMs, setLatencyOffsetMs] = useState<number>(DEFAULT_SMART_LATENCY_MS);
   const [activeMixPreset, setActiveMixPreset] = useState<'100_teacher' | '50_50' | '100_student' | 'custom'>('50_50');
+  const [latencyOffsetMs, setLatencyOffsetMs] = useState<number>(() => UniversalLatencyEngine.getLatencyMs());
+
+  // 🔄 Synchronize with global UniversalLatencyEngine across modules
+  useEffect(() => {
+    return UniversalLatencyEngine.subscribe((newMs) => {
+      setLatencyOffsetMs(newMs);
+    });
+  }, []);
 
   // Saving & Exporting State
   const [isSaving, setIsSaving] = useState(false);
@@ -420,7 +428,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
 
         setStudentAudioBlob(finalBlob);
         setStudentAudioUrl(newUrl);
-        setLatencyOffsetMs(DEFAULT_SMART_LATENCY_MS);
+        setLatencyOffsetMs(UniversalLatencyEngine.getLatencyMs());
         setIsRecording(false);
       };
 
@@ -1189,7 +1197,9 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      setLatencyOffsetMs(DEFAULT_SMART_LATENCY_MS);
+                      const smartMs = UniversalLatencyEngine.getLatencyMs();
+                      setLatencyOffsetMs(smartMs);
+                      UniversalLatencyEngine.saveLatencyMs(smartMs, studentId);
                       updatePlayheadDOM(currentPlayheadTime);
                     }}
                     style={{
@@ -1203,12 +1213,13 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                       padding: '4px'
                     }}
                   >
-                    Auto-Smart (+60 ms)
+                    Auto-Smart ({UniversalLatencyEngine.getLatencyMs()} ms)
                   </button>
                   <button
                     type="button"
                     onClick={() => {
                       setLatencyOffsetMs(0);
+                      UniversalLatencyEngine.saveLatencyMs(0, studentId);
                       updatePlayheadDOM(currentPlayheadTime);
                     }}
                     style={{
@@ -1238,6 +1249,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
                   onChange={(e) => {
                     const val = parseInt(e.target.value, 10);
                     setLatencyOffsetMs(val);
+                    UniversalLatencyEngine.saveLatencyMs(val, studentId);
                     updatePlayheadDOM(currentPlayheadTime);
 
                     if (isPlaying && playbackSessionRef.current) {

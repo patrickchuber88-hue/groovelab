@@ -100,6 +100,9 @@ import { useCampusDeviceAndParentControls } from './hooks/useCampusDeviceAndPare
 import { useCampusGhostAndRoutingSession } from './hooks/useCampusGhostAndRoutingSession';
 import { useCampusNavigationAndWorkspaces } from './hooks/useCampusNavigationAndWorkspaces';
 import { useCampusUserProfile } from './hooks/useCampusUserProfile';
+import { useCampusProfileInspector } from './hooks/useCampusProfileInspector';
+import { useBandFormationActions } from './hooks/useBandFormationActions';
+import { useCampusAnnouncementsAndMail } from './hooks/useCampusAnnouncementsAndMail';
 import { safeReplaceState } from './utils/historyUtils';
 import './App.css';
 
@@ -1369,162 +1372,109 @@ function App() {
     }
   }, [user?.id]);
 
-  const [selectedTeacher, setSelectedTeacher] = useState<any>(null);
-  const [selectedStudentProfile, setSelectedStudentProfile] = useState<any>(null);
+  // 🏛️ Campus Profile Inspector Hook (Teacher & Student inspection states & restore)
+  const {
+    selectedTeacher,
+    setSelectedTeacher,
+    selectedStudentProfile,
+    setSelectedStudentProfile,
+    openUserProfile
+  } = useCampusProfileInspector();
 
-  const openUserProfile = async (userIdOrUser: any) => {
-    if (!userIdOrUser) return;
-    
-    if (typeof userIdOrUser === 'object') {
-      if (userIdOrUser.role === 'teacher' || userIdOrUser.role === 'admin') {
-        setSelectedTeacher(userIdOrUser);
-      } else {
-        setSelectedStudentProfile(userIdOrUser);
-      }
-      return;
-    }
-    
-    if (typeof userIdOrUser === 'string') {
-      try {
-        const { data, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', userIdOrUser)
-          .single();
-          
-        if (error) {
-          console.error('Error fetching user profile:', error);
-          return;
-        }
-        
-        if (data) {
-          if (data.role === 'teacher' || data.role === 'admin') {
-            setSelectedTeacher(data);
-          } else {
-            setSelectedStudentProfile(data);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load user profile:', err);
-      }
-    }
-  };
+  const fetchDashboardDataRef = useRef<(userId: string, isInitial?: boolean) => Promise<void> | void>(() => {});
 
-  useEffect(() => {
-    if (selectedTeacher?.id) {
-      sessionStorage.setItem('groovelab_selected_teacher_id', selectedTeacher.id);
-    } else {
-      sessionStorage.removeItem('groovelab_selected_teacher_id');
-    }
-  }, [selectedTeacher]);
-
-  useEffect(() => {
-    if (selectedStudentProfile?.id) {
-      sessionStorage.setItem('groovelab_selected_student_id', selectedStudentProfile.id);
-    } else {
-      sessionStorage.removeItem('groovelab_selected_student_id');
-    }
-  }, [selectedStudentProfile]);
-
-  useEffect(() => {
-    const savedTeacherId = sessionStorage.getItem('groovelab_selected_teacher_id');
-    if (savedTeacherId && !selectedTeacher) {
-      openUserProfile(savedTeacherId);
-    }
-    const savedStudentId = sessionStorage.getItem('groovelab_selected_student_id');
-    if (savedStudentId && !selectedStudentProfile) {
-      openUserProfile(savedStudentId);
-    }
-  }, []);
-
-  useEffect(() => {
-    (window as any).openUserProfile = openUserProfile;
-    return () => {
-      delete (window as any).openUserProfile;
-    };
-  }, []);
-
-  const [studentActivity, setStudentActivity] = useState<any[]>([]);
-  const [showBandNaming, setShowBandNaming] = useState(false);
-  const [namingTarget, setNamingTarget] = useState<{song: any, form: any} | null>(null);
-  const [showBandConsent, setShowBandConsent] = useState(false);
-  const [consentTarget, setConsentTarget] = useState<{song: any, form: any} | null>(null);
-  const [showEditBand, setShowEditBand] = useState(false);
-  const [isJoiningVocal, setIsJoiningVocal] = useState<string | null>(null);
-  const [isJoiningGuest, setIsJoiningGuest] = useState<string | null>(null);
-  const [showTeacherVocalPicker, setShowTeacherVocalPicker] = useState<string | null>(null);
-  const [externalVocalists, setExternalVocalists] = useState<any[]>([]);
-  const [editingBand, setEditingBand] = useState<any>(null);
-  const [restoredBandId] = useState(() => localStorage.getItem('groovelab_selected_band_id'));
-
-  const [suggestingSkill, setSuggestingSkill] = useState<any>(null);
-  const [exclusiveProposal, setExclusiveProposal] = useState<boolean>(true);
-  const [matchingLevelFilter, setMatchingLevelFilter] = useState<'all' | 'starter' | 'pro'>('all');
-  const [pendingFounding, setPendingFounding] = useState<any | null>(null);
-  const [showFoundingModal, setShowFoundingModal] = useState(false);
-  const [foundingName, setFoundingName] = useState('');
-  const [foundingLanguage, setFoundingLanguage] = useState<'de' | 'en'>('de');
-  const [selectedCoachId, setSelectedCoachId] = useState<string>('');
-  const [lastAutoTriggeredFormId, setLastAutoTriggeredFormId] = useState<string | null>(sessionStorage.getItem('groovelab_last_form_id'));
+  // 🏛️ Campus Band Formation & Matching Actions Hook
+  const {
+    studentActivity,
+    setStudentActivity,
+    showBandNaming,
+    setShowBandNaming,
+    namingTarget,
+    setNamingTarget,
+    showBandConsent,
+    setShowBandConsent,
+    consentTarget,
+    setConsentTarget,
+    showEditBand,
+    setShowEditBand,
+    isJoiningVocal,
+    setIsJoiningVocal,
+    isJoiningGuest,
+    setIsJoiningGuest,
+    showTeacherVocalPicker,
+    setShowTeacherVocalPicker,
+    externalVocalists,
+    setExternalVocalists,
+    editingBand,
+    setEditingBand,
+    restoredBandId,
+    suggestingSkill,
+    setSuggestingSkill,
+    exclusiveProposal,
+    setExclusiveProposal,
+    matchingLevelFilter,
+    setMatchingLevelFilter,
+    pendingFounding,
+    setPendingFounding,
+    showFoundingModal,
+    setShowFoundingModal,
+    foundingName,
+    setFoundingName,
+    foundingLanguage,
+    setFoundingLanguage,
+    selectedCoachId,
+    setSelectedCoachId,
+    lastAutoTriggeredFormId,
+    setLastAutoTriggeredFormId,
+    updateAutoTriggerId,
+    ignoredFoundingIds,
+    gatewayJustClosed,
+    lastWriteTimeRef,
+    dismissSuggestion
+  } = useBandFormationActions({
+    user,
+    loading,
+    userBands,
+    userSongs,
+    wallSongs,
+    activeStudentTab,
+    selectedBandForGateway,
+    showBandProfile,
+    fetchDashboardData: (uid, init) => fetchDashboardDataRef.current(uid, init)
+  });
   
-  const updateAutoTriggerId = (id: string | null) => {
-    setLastAutoTriggeredFormId(id);
-    if (id) sessionStorage.setItem('groovelab_last_form_id', id);
-    else sessionStorage.removeItem('groovelab_last_form_id');
-  };
-  
-  useEffect(() => {
-    if (showFoundingModal && !foundingName) {
-      setFoundingName(generateRandomBandName(foundingLanguage));
-    } else if (!showFoundingModal) {
-      setFoundingName('');
-    }
-  }, [showFoundingModal, foundingLanguage]);
-
-  const ignoredFoundingIds = useRef<string[]>([]);
-  const gatewayJustClosed = useRef<boolean>(false);
-  const lastWriteTimeRef = useRef<number>(0);
-  
-  const [annBandId, setAnnBandId] = useState<string | null>(null);
-  const [announcements, setAnnouncements] = useState<any[]>([]);
-  const [announcementTitle, setAnnouncementTitle] = useState('');
-  const [announcementMessage, setAnnouncementMessage] = useState('');
-  const [announcementTarget, setAnnouncementTarget] = useState<'all' | 'students' | 'teachers' | 'specific'>('all');
-  const [selectedTargetUserIds, setSelectedTargetUserIds] = useState<string[]>([]);
-  const [recipientSearchText, setRecipientSearchText] = useState('');
-  const [activeAnnouncement, setActiveAnnouncement] = useState<any>(null);
-  const [schoolUsers, setSchoolUsers] = useState<any[]>([]);
-  const [selectedMailMessage, setSelectedMailMessage] = useState<any>(null);
-  const [isMailComposing, setIsMailComposing] = useState(false);
+  // 🏛️ Campus Announcements & Mail Hook
+  const {
+    annBandId,
+    setAnnBandId,
+    announcements,
+    setAnnouncements,
+    announcementTitle,
+    setAnnouncementTitle,
+    announcementMessage,
+    setAnnouncementMessage,
+    announcementTarget,
+    setAnnouncementTarget,
+    selectedTargetUserIds,
+    setSelectedTargetUserIds,
+    recipientSearchText,
+    setRecipientSearchText,
+    activeAnnouncement,
+    setActiveAnnouncement,
+    schoolUsers,
+    setSchoolUsers,
+    selectedMailMessage,
+    setSelectedMailMessage,
+    isMailComposing,
+    setIsMailComposing
+  } = useCampusAnnouncementsAndMail();
   
   // Removed redundant FAILSAFE effect to prevent loop conflicts.
   // The detection logic is now centralized in fetchDashboardData for better control.
 
   // (Auto-prompt logic now handled centrally in fetchDashboardData)
 
-  const dismissSuggestion = (songSkillId: string) => {
-    if (!user?.id) return;
-    const storageKey = `groovelab_prompted_${user.id}`;
-    const promptedIds = JSON.parse(localStorage.getItem(storageKey) || '[]');
-    if (!promptedIds.includes(songSkillId)) {
-      promptedIds.push(songSkillId);
-      localStorage.setItem(storageKey, JSON.stringify(promptedIds));
-    }
 
-    // Also mark the specific song as ignored for auto-founding trigger
-    if (suggestingSkill?.song_id) {
-       const inst = (suggestingSkill.instrument || '').toLowerCase();
-       localStorage.setItem(`groovelab_founding_ignored_${user.id}_${suggestingSkill.song_id}_${inst}`, 'true');
-    }
-    if (suggestingSkill?.songs?.id) {
-       const inst = (suggestingSkill.instrument || '').toLowerCase();
-       localStorage.setItem(`groovelab_founding_ignored_${user.id}_${suggestingSkill.songs.id}_${inst}`, 'true');
-    }
-
-    console.log('[DEBUG-Groovelab] setSuggestingSkill(null) in dismissSuggestion');
-    setSuggestingSkill(null);
-    setSelectedCoachId('');
-  };
 
   // Load student messages when they view the tab
   useEffect(() => {
@@ -1533,110 +1483,7 @@ function App() {
     }
   }, [activeStudentTab, userBands, user?.id]);
 
-  // Auto-trigger Band Founding Modal when formation is complete
-  useEffect(() => {
-    if (loading || !user || suggestingSkill || selectedBandForGateway || pendingFounding || showBandProfile || gatewayJustClosed.current) return;
 
-    // 1. Auto-trigger: If user is in a band and mastered a new skill, suggest it to their band first
-    if (userBands.length > 0) {
-      const stageReadySkills = userSongs.filter((s: any) => s.is_stage_ready && s.instrument !== 'Vocals');
-      
-      for (const skill of stageReadySkills) {
-        const inst = (skill.instrument || '').toLowerCase();
-        const isIgnored = localStorage.getItem(`groovelab_founding_ignored_${user.id}_${skill.song_id}_${inst}`);
-        if (isIgnored) continue;
-        
-        // Has it already been suggested/added to ANY of their bands?
-        const alreadyInBand = userBands.some((b: any) => 
-          b.song_id === skill.song_id || 
-          (b.band_songs || []).some((bs: any) => bs.song_id === skill.song_id || bs.songs?.id === skill.song_id)
-        );
-        
-        if (!alreadyInBand) {
-          console.log('[AutoTrigger] Suggesting skill to band:', skill.title);
-          console.log('[DEBUG-Groovelab] setSuggestingSkill (suggest to band) in auto-trigger', skill.title);
-          setSuggestingSkill({
-            ...skill,
-            songs: { id: skill.song_id, title: skill.title }
-          });
-          return;
-        }
-      }
-    }
-  }, [wallSongs, activeStudentTab, user, userBands, userSongs, suggestingSkill, selectedBandForGateway, pendingFounding, showBandProfile, loading]);
-
-  // Safety check: If suggestingSkill is set but userBands loads and indicates
-  // that the song is already suggested or active in their band, dismiss the popup immediately.
-  // ONLY run this for individual suggestions (!suggestingSkill.formation_group), NOT for band founding!
-  useEffect(() => {
-    if (suggestingSkill && !suggestingSkill.formation_group && user && userBands.length > 0) {
-      const targetSongId = suggestingSkill.song_id || suggestingSkill.songs?.id;
-      if (targetSongId) {
-        const alreadyInBand = userBands.some((b: any) => 
-          b.song_id === targetSongId || 
-          (b.band_songs || []).some((bs: any) => bs.song_id === targetSongId || bs.songs?.id === targetSongId)
-        );
-        if (alreadyInBand) {
-          console.log('[AutoTrigger] Automatically dismissing congratulations modal since song is already in band repertoire:', targetSongId);
-          console.log('[DEBUG-Groovelab] setSuggestingSkill(null) inside safety check effect!');
-          setSuggestingSkill(null);
-        }
-      }
-    }
-  }, [userBands, suggestingSkill, user]);
-
-  // Safety check for Band Founding: If suggestingSkill is set for band founding (with formation_group),
-  // query Supabase directly to check if a band already exists for this group or if the user is already in a band for this song.
-  // This handles the case where someone else already founded the band (e.g. manual widget click)
-  // before the background polling runs.
-  useEffect(() => {
-    if (suggestingSkill && suggestingSkill.formation_group && user) {
-      const targetSongId = suggestingSkill.song_id || suggestingSkill.songs?.id;
-      const targetGroup = suggestingSkill.formation_group;
-      
-      const checkDbForExistingBand = async () => {
-        try {
-          // 1. Check if a band already exists for this formation group in the database
-          const { data: existingBands } = await supabase
-            .from('bands')
-            .select('id, name, status')
-            .eq('formation_group', targetGroup)
-            .in('status', ['forming', 'active']);
-            
-          if (existingBands && existingBands.length > 0) {
-            console.log('[SafetyCheck] Band already exists in DB for group:', targetGroup);
-            setSuggestingSkill(null);
-            fetchDashboardData(user.id, false);
-            return;
-          }
-          
-          // 2. Check if this student is already in a band for this song
-          if (targetSongId) {
-            const { data: memberships } = await supabase
-              .from('band_members')
-              .select('id, bands(id, status, song_id)')
-              .eq('user_id', user.id);
-              
-            const alreadyInBand = (memberships || []).some((m: any) => 
-              m.bands && 
-              ['forming', 'active'].includes(m.bands.status) && 
-              m.bands.song_id === targetSongId
-            );
-            
-            if (alreadyInBand) {
-              console.log('[SafetyCheck] Student is already in a band for this song in DB:', targetSongId);
-              setSuggestingSkill(null);
-              fetchDashboardData(user.id, false);
-            }
-          }
-        } catch (err) {
-          console.error('[SafetyCheck] Error checking database for existing band:', err);
-        }
-      };
-      
-      checkDbForExistingBand();
-    }
-  }, [suggestingSkill, user]);
 
   const [selectedStudentForPreview, setSelectedStudentForPreview] = useState<any>(null);
 
@@ -1855,6 +1702,8 @@ function App() {
     fetchStudentMessagesBackground,
     fetchCampusMessages
   });
+  fetchDashboardDataRef.current = fetchDashboardData;
+
 
   const { liveSessionMins } = useCampusRealtimeSync({
     user,

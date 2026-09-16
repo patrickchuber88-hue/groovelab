@@ -38,6 +38,7 @@ import { checkIsAudioTresorActive } from '../../domain/stickersAndTresor';
 import { acquireAudioStream, stabilizeAudioStream, releaseAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
 import { SharedAudioEngine } from '../../utils/sharedAudioEngine';
 import { announceA11y } from '../common/A11yLiveAnnouncer';
+import { UniversalLatencyEngine } from '../../utils/universalLatencyEngine';
 import { useFocusInterruptionGuard } from '../../hooks/useFocusInterruptionGuard';
 import { FocusInterruptionBanner } from '../focus/FocusInterruptionBanner';
 import { FocusAbortedModal } from '../focus/FocusAbortedModal';
@@ -207,12 +208,18 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
   const [isAutoSequenceActive, setIsAutoSequenceActive] = useState(false);
   const [autoSequenceStatus, setAutoSequenceStatus] = useState<string>('');
   const [syncOffsetMs, setSyncOffsetMs] = useState<number>(() => {
-    const saved = localStorage.getItem('groovelab_sync_offset_ms');
-    return saved ? parseInt(saved, 10) : 0;
+    return UniversalLatencyEngine.getLatencyMs();
   });
   useEffect(() => {
-    localStorage.setItem('groovelab_sync_offset_ms', syncOffsetMs.toString());
+    UniversalLatencyEngine.saveLatencyMs(syncOffsetMs);
   }, [syncOffsetMs]);
+
+  // 🔄 Cross-Module Realtime Latency Sync
+  useEffect(() => {
+    return UniversalLatencyEngine.subscribe((newMs) => {
+      setSyncOffsetMs(newMs);
+    });
+  }, []);
 
   // 🛡️ Hardware & Sperrzeiten Safety: Stop audio when requested
   useEffect(() => {
@@ -256,11 +263,7 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
 
   const updateLatencyInDb = async (offsetVal: number) => {
     try {
-      localStorage.setItem('groovelab_sync_offset_ms', offsetVal.toString());
-      localStorage.setItem('groovelab_latency_calibrated', 'true');
-      if (activeDeviceHash) {
-        localStorage.setItem(`groovelab_latency_dev_${activeDeviceHash}`, offsetVal.toString());
-      }
+      await UniversalLatencyEngine.saveLatencyMs(offsetVal);
       setIsDeviceCalibrated(true);
     } catch (e) {}
 

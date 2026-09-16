@@ -1423,6 +1423,60 @@ export function processPureRawAudioBuffer(
 }
 
 // ==============================================================================
+// 🎯 GRID ALIGNMENT & HARDWARE LATENCY COMPENSATION
+// ==============================================================================
+/**
+ * 🎯 Phasenstarrer Latenz-Trimmer:
+ * Schneidet die exakte Hardware-Latenz am Anfang der Aufnahme ab.
+ * Versieht den Schnittpunkt mit einem 3ms Anti-Pop Cosine-Fade (weicher Nulldurchgang, zero click).
+ */
+export function alignAudioBufferToGrid(
+  buffer: AudioBuffer,
+  latencySec: number,
+  ctx?: BaseAudioContext
+): AudioBuffer {
+  if (latencySec <= 0 || !buffer || buffer.length <= 0) return buffer;
+
+  const sampleRate = buffer.sampleRate;
+  const trimSamples = Math.min(
+    Math.round(latencySec * sampleRate),
+    Math.floor(buffer.length * 0.45) // Sicherheits-Cap: maximal 45% der Spur schneiden
+  );
+
+  if (trimSamples <= 0 || trimSamples >= buffer.length) return buffer;
+
+  const remainingSamples = buffer.length - trimSamples;
+  const targetCtx = ctx || new (window.OfflineAudioContext || (window as any).webkitOfflineAudioContext)(
+    buffer.numberOfChannels,
+    remainingSamples,
+    sampleRate
+  );
+
+  const alignedBuffer = targetCtx.createBuffer(
+    buffer.numberOfChannels,
+    remainingSamples,
+    sampleRate
+  );
+
+  // 3ms Anti-Click Fade-In (ca. 132-144 Samples)
+  const fadeSamples = Math.min(Math.round(0.003 * sampleRate), remainingSamples);
+
+  for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+    const src = buffer.getChannelData(ch);
+    const dest = alignedBuffer.getChannelData(ch);
+
+    dest.set(src.subarray(trimSamples));
+
+    // Equal-power Cosine fade-in
+    for (let i = 0; i < fadeSamples; i++) {
+      dest[i] *= 0.5 * (1 - Math.cos((Math.PI * i) / fadeSamples));
+    }
+  }
+
+  return alignedBuffer;
+}
+
+// ==============================================================================
 // 🎙️ PURE RAW BLOB PROCESSOR (Platform-wide Pure RAW Source)
 // ==============================================================================
 export async function processPureRawBlob(
@@ -1437,6 +1491,7 @@ export async function processPureRawBlob(
     applyLookaheadLeveler?: boolean;
     padActive?: boolean;
     padDb?: number;
+    latencyCompensationSec?: number;
   }
 ): Promise<{
   processedBlob: Blob;
@@ -1453,6 +1508,9 @@ export async function processPureRawBlob(
   try {
     const rawDecoded = await safeDecodeAudioData(tempCtx, arrayBuffer);
     decodedBuffer = ensureCenteredStereoAudioBuffer(tempCtx, rawDecoded);
+    if (options?.latencyCompensationSec && options.latencyCompensationSec > 0) {
+      decodedBuffer = alignAudioBufferToGrid(decodedBuffer, options.latencyCompensationSec, tempCtx);
+    }
   } finally {
     try {
       tempCtx.close();
