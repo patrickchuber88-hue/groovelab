@@ -63,6 +63,18 @@
   - War bereits alles konform: Ein dezenter Vermerk (`🏛️ Monolith Goldstandard: Konform`) genügt.
 - **Verifikations-Abschluss**: Die formale Verifikation (`npm run gate`) erfolgt ausschließlich manuell durch den Entwickler im Host-Terminal oder per Git-Hook beim Commit. Keine automatische Ausführung durch den Agenten.
 
+## 🧠 Living Exocortex & Product Bible Governance (Zero-Knowledge-Drift Directive)
+- **Automatische Exocortex-Synchronisationspflicht**: Bei JEDER Implementierung eines neuen Features, einer neuen didaktischen Funktion, einer neuen Subkomponente oder eines neuen DB-RPCs MUSS der KI-Agent zwingend und ohne gesonderte Aufforderung die zentrale Product Bible [`docs/SYSTEM_FEATURE_MATRIX.md`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/docs/SYSTEM_FEATURE_MATRIX.md) aktualisieren.
+- **Katalogisierungs-Standards für `SYSTEM_FEATURE_MATRIX.md`**:
+  - Eindeutige Feature-ID nach Bounded-Context-Präfix (`CAM-xx` für Campus, `GRV-xx` für GrooveLab, `ADM-xx` für Admin/Billing, `SEC-xx` für Core Security).
+  - Feature-Name, Zielgruppe (Schüler, Lehrer, Schulleitung, Eltern).
+  - Konkreter UI-Einstiegspunkt / Screen / Modal.
+  - Autoritativer Backend-RPC / Tabelle (SSOT).
+  - Golden Invariants & Core Rules (Sicherheits- und Fachregeln).
+- **Billing- & Pricing-Synchronisation**: Berührt eine Code-Änderung Preise, Tarife, Rabatte, Währungen (EUR/CHF), Zahlungsströme oder Abrechnungsmodelle (Sammelzahler vs. Schüler-Direktabrechnung), MUSS [`docs/BILLING_CANONICAL_LOGIC.md`](file:///Users/patrickhuber/Documents/Antigravity%20Projects/Groovelab%20app/docs/BILLING_CANONICAL_LOGIC.md) zwingend im gleichen Schritt aktualisiert werden.
+- **ADR-Pflicht bei Grundsatzentscheidungen**: Wird eine neue fundamentale Architekturentscheidung getroffen (neues Modul, neues Authentifizierungsverfahren, radikale Datenflussänderung, neue regulatorische Anforderung), MUSS ein neues Architecture Decision Record unter `docs/adr/ADR-xxx_<NAME>.md` angelegt und in `docs/adr/README.md` indexiert werden.
+- **Micro-Ebenen-Schutz (Kein Dokumentations-Overhead für Triviales)**: Reine CSS-Korrekturen, Bugfixes in bestehender Logik, Schreibweisen-Korrekturen oder interne Refactorings ohne Änderung der Schnittstelle erfordern KEINE Matrix-Aktualisierung. Der Exocortex bleibt auf der Macro- und Meso-Ebene schlank und autoritativ.
+
 ## ♿ Barrierefreiheits-Wächter & BFSG 2025 / WCAG 2.2 AA Governance (Zero-Regression Directive)
 - **Automatischer Barrierefreiheits-Schutz (Wächter-Pflicht)**: Bei JEDER Modifikation an interaktiven UI-Komponenten, Buttons, Menüs, Karten, Formularen, Modals, Widgets oder Footern MUSS zwingend und ohne gesonderte Aufforderung geprüft werden, ob die digitale Barrierefreiheit nach dem Barrierefreiheitsstärkungsgesetz (BFSG 2025), BITV 2.0 und WCAG 2.2 Stufe AA gewahrt bleibt. Keine Code-Änderung darf die Barrierefreiheit einschränken oder herabsetzen.
 - **Tastatur-Vollbedienbarkeit (WCAG 2.1.1 & 2.4.7)**:

@@ -32,3 +32,5 @@ Jedes Dokument folgt dem bewährten MADR-Format (Markdown Architectural Decision
 - [ADR-003: Didaktische UI-Levels (Junior/Teen/Pro) mit DB-SSOT & Realtime Broadcast](./ADR-003_CAMPUS_ADAPTIVE_UI_REALTIME_SSOT.md)
 - [ADR-004: Musiker-Avatar-Beschränkung auf GrooveLab & Chalkboard-Hero für Schulleitung](./ADR-004_AVATAR_GOVERNANCE_MODULE_BOUNDARIES.md)
 - [ADR-005: Barrierefreiheit nach BFSG 2025 ohne Reduktion von Marken-Akzentfarben](./ADR-005_BFSG_2025_WCAG_AA_BRAND_PRESERVATION.md)
+- [ADR-006: Monolith-Entflechtung & Bounded-Context-Orchestrierung](./ADR-006_MONOLITH_DECOMPOSITION_BOUNDED_CONTEXTS.md)
+- [ADR-007: Zero-Secret-Leakage, Dynamic SQL Masking & Zero-PII Telemetry](./ADR-007_ZERO_SECRET_LEAKAGE_AND_DYNAMIC_SQL_MASKING.md)

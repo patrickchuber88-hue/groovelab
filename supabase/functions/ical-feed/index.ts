@@ -131,6 +131,14 @@ Deno.serve(async (req) => {
       )
     }
 
+    // 1% Tier-1 SaaS Query Parameters
+    const filterParam = url.searchParams.get('filter')
+    const allowedFilters = filterParam ? filterParam.split(',').map(s => s.trim().toLowerCase()) : ['lessons', 'campus_events']
+    const shouldIncludeLessons = allowedFilters.includes('lessons')
+    const shouldIncludeCampusEvents = allowedFilters.includes('campus_events')
+    const isWorkSafe = url.searchParams.get('worksafe') === '1' || url.searchParams.get('privacy') === '1'
+    const alarmSetting = url.searchParams.get('alarm') || '30m_morning'
+
     // 🛡️ TIER-1 DoS & Resource-Exhaustion Guard (Max 30 requests per 15m)
     const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown';
     const rateLimitKey = `${clientIp}:${token.substring(0, 16)}`;
@@ -617,111 +625,142 @@ Deno.serve(async (req) => {
     }
 
     // 7a. Write Unterrichtstermine (Lessons)
-    for (const occ of allMergedOccurrences) {
-      const dtStartStr = getLocalIcalDate(occ.date, occ.start_time)
-      const dtEndStr = getEndLocalIcalDate(occ.date, occ.start_time, occ.duration || 45)
+    if (shouldIncludeLessons) {
+      for (const occ of allMergedOccurrences) {
+        const dtStartStr = getLocalIcalDate(occ.date, occ.start_time)
+        const dtEndStr = getEndLocalIcalDate(occ.date, occ.start_time, occ.duration || 45)
 
-      const isCanceled = ['cancelled', 'teacher_sick', 'canceled_by_student', 'canceled_by_teacher_sick'].includes(occ.status)
-      const statusText = isCanceled ? 'CANCELLED' : 'CONFIRMED'
+        const isCanceled = ['cancelled', 'teacher_sick', 'canceled_by_student', 'canceled_by_teacher_sick'].includes(occ.status)
+        const statusText = isCanceled ? 'CANCELLED' : 'CONFIRMED'
 
-      const teacherName = occ.teacher ? `${occ.teacher.first_name} ${occ.teacher.last_name}` : 'Lehrkraft'
-      
-      // Privacy-safe student name: Vorname + Initiale des Nachnamens
-      const studentFirstName = occ.student?.first_name || 'Schüler'
-      const studentLastName = occ.student?.last_name || ''
-      const studentInitial = studentLastName ? ` ${studentLastName[0].toUpperCase()}.` : ''
-      const studentName = `${studentFirstName}${studentInitial}`
+        const teacherName = occ.teacher ? `${occ.teacher.first_name} ${occ.teacher.last_name}` : 'Lehrkraft'
+        
+        // Privacy-safe student name: Vorname + Initiale des Nachnamens
+        const studentFirstName = occ.student?.first_name || 'Schüler'
+        const studentLastName = occ.student?.last_name || ''
+        const studentInitial = studentLastName ? ` ${studentLastName[0].toUpperCase()}.` : ''
+        const studentName = `${studentFirstName}${studentInitial}`
 
-      const instrumentSuffix = (occ.student && occ.student.instrument) ? ` (${occ.student.instrument})` : ''
+        const instrumentSuffix = (occ.student && occ.student.instrument) ? ` (${occ.student.instrument})` : ''
 
-      // Build summary title according to status and role
-      const prefix = occ.status === 'pending_reschedule'
-        ? '🔄 ÄNDERUNG ANGEFRAGT: '
-        : occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick'
-        ? 'AUSFALL: '
-        : isCanceled
-        ? '❌ ABGESAGT: '
-        : '🎵 '
+        // Build summary title according to status and role
+        const prefix = occ.status === 'pending_reschedule'
+          ? '🔄 ÄNDERUNG ANGEFRAGT: '
+          : occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick'
+          ? 'AUSFALL: '
+          : isCanceled
+          ? '❌ ABGESAGT: '
+          : '🎵 '
 
-      let summary = ''
-      if (role === 'student') {
-        summary = `${prefix}${studentFirstName}: Musikunterricht bei ${teacherName}${instrumentSuffix}`
-      } else {
-        summary = `${prefix}Unterricht: ${studentName}${instrumentSuffix}`
+        let summary = ''
+        if (isWorkSafe) {
+          summary = isCanceled ? '❌ AUSFALL: Campus-Groovelab Termin' : '🎵 Campus-Groovelab Termin'
+        } else if (role === 'student') {
+          summary = `${prefix}${studentFirstName}: Musikunterricht bei ${teacherName}${instrumentSuffix}`
+        } else {
+          summary = `${prefix}Unterricht: ${studentName}${instrumentSuffix}`
+        }
+
+        // Build structured DESCRIPTION
+        let statusDesc = 'Bestätigt 📅'
+        if (occ.status === 'pending_reschedule') {
+          statusDesc = 'Verschiebung angefragt 🔄'
+        } else if (occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick') {
+          statusDesc = 'Ausfall (Terminabsage)'
+        } else if (isCanceled) {
+          statusDesc = 'Abgesagt ❌'
+        }
+
+        let descriptionLines = []
+        descriptionLines.push(`Status: ${statusDesc}`)
+        if (!isWorkSafe) {
+          descriptionLines.push(`Partner: ${role === 'student' ? teacherName : studentName}`)
+          if (role === 'student') {
+            descriptionLines.push(`Schüler: ${studentFirstName}`)
+          }
+          if (occ.student && occ.student.instrument) {
+            descriptionLines.push(`Instrument: ${occ.student.instrument}`)
+          }
+        }
+        descriptionLines.push(`Raum: ${occ.room_name}`)
+        if (occ.duration) {
+          descriptionLines.push(`Dauer: ${occ.duration} Minuten`)
+        }
+        descriptionLines.push('Hinweis: Externe Kalender synchronisieren zeitverzögert. Rechtlich verbindlich bei Ausfall oder Raumwechsel ist stets die Campus-Groovelab App.')
+        descriptionLines.push('Plattform: Campus-Groovelab')
+        descriptionLines.push('Direktlink: https://campus-groovelab.de/campus/homework')
+        
+        const description = descriptionLines.join('\n')
+
+        // Check color (Ensembles / Bands = Blue, regular Unterricht = Green)
+        const isBandOrEnsemble = 
+          studentName.toLowerCase().includes('band') || 
+          studentName.toLowerCase().includes('ensemble') || 
+          instrumentSuffix.toLowerCase().includes('band') || 
+          instrumentSuffix.toLowerCase().includes('ensemble') || 
+          occ.room_name.toLowerCase().includes('band') || 
+          occ.room_name.toLowerCase().includes('ensemble') || 
+          occ.room_name.toLowerCase().includes('groovelab');
+
+        const color = isBandOrEnsemble ? '#1a73e8' : '#137333';
+
+        icsContent.push('BEGIN:VEVENT')
+        icsContent.push(`UID:${occ.id}@campus-groovelab.de`)
+        icsContent.push(`DTSTAMP:${stampStr}Z`)
+        icsContent.push(`DTSTART;TZID=Europe/Berlin:${dtStartStr}`)
+        icsContent.push(`DTEND;TZID=Europe/Berlin:${dtEndStr}`)
+        icsContent.push(`SUMMARY:${escapeText(summary)}`)
+        icsContent.push(`DESCRIPTION:${escapeText(description)}`)
+        icsContent.push(`LOCATION:${escapeText(occ.room_name)}`)
+        icsContent.push(`STATUS:${statusText}`)
+        if (isCanceled) {
+          icsContent.push('SEQUENCE:1')
+        }
+        icsContent.push(`COLOR:${color}`)
+
+        if (!isCanceled && alarmSetting !== 'none') {
+          if (alarmSetting === '1d') {
+            icsContent.push('BEGIN:VALARM')
+            icsContent.push('ACTION:DISPLAY')
+            icsContent.push('TRIGGER:-P1D')
+            icsContent.push('DESCRIPTION:Erinnerung: Morgen ist dein Unterrichtstermin!')
+            icsContent.push('END:VALARM')
+          } else if (alarmSetting === '2h') {
+            icsContent.push('BEGIN:VALARM')
+            icsContent.push('ACTION:DISPLAY')
+            icsContent.push('TRIGGER:-PT2H')
+            icsContent.push('DESCRIPTION:Erinnerung: Dein Unterrichtstermin beginnt in 2 Stunden.')
+            icsContent.push('END:VALARM')
+          } else {
+            const valarmDateStr = occ.date.replace(/-/g, '')
+            icsContent.push('BEGIN:VALARM')
+            icsContent.push('ACTION:DISPLAY')
+            icsContent.push(`TRIGGER;VALUE=DATE-TIME;TZID=Europe/Berlin:${valarmDateStr}T080000`)
+            icsContent.push('DESCRIPTION:Erinnerung: Heute ist dein Unterrichtstermin!')
+            icsContent.push('END:VALARM')
+
+            icsContent.push('BEGIN:VALARM')
+            icsContent.push('ACTION:DISPLAY')
+            icsContent.push('TRIGGER:-PT30M')
+            icsContent.push('DESCRIPTION:Erinnerung: Dein Unterrichtstermin beginnt in 30 Minuten.')
+            icsContent.push('END:VALARM')
+          }
+        }
+
+        icsContent.push('END:VEVENT')
       }
-
-      // Build structured DESCRIPTION
-      let statusDesc = 'Bestätigt 📅'
-      if (occ.status === 'pending_reschedule') {
-        statusDesc = 'Verschiebung angefragt 🔄'
-      } else if (occ.status === 'teacher_sick' || occ.status === 'canceled_by_teacher_sick') {
-        statusDesc = 'Ausfall (Terminabsage)'
-      } else if (isCanceled) {
-        statusDesc = 'Abgesagt ❌'
-      }
-
-      let descriptionLines = []
-      descriptionLines.push(`Status: ${statusDesc}`)
-      descriptionLines.push(`Partner: ${role === 'student' ? teacherName : studentName}`)
-      if (role === 'student') {
-        descriptionLines.push(`Schüler: ${studentFirstName}`)
-      }
-      if (occ.student && occ.student.instrument) {
-        descriptionLines.push(`Instrument: ${occ.student.instrument}`)
-      }
-      descriptionLines.push(`Raum: ${occ.room_name}`)
-      if (occ.duration) {
-        descriptionLines.push(`Dauer: ${occ.duration} Minuten`)
-      }
-      descriptionLines.push('Hinweis: Externe Kalender synchronisieren zeitverzögert. Rechtlich verbindlich bei Ausfall oder Raumwechsel ist stets die Campus-Groovelab App.')
-      descriptionLines.push('Plattform: Campus-Groovelab')
-      descriptionLines.push('Direktlink: https://campus-groovelab.de/campus/homework')
-      
-      const description = descriptionLines.join('\n')
-
-      // Check color (Ensembles / Bands = Blue, regular Unterricht = Green)
-      const isBandOrEnsemble = 
-        studentName.toLowerCase().includes('band') || 
-        studentName.toLowerCase().includes('ensemble') || 
-        instrumentSuffix.toLowerCase().includes('band') || 
-        instrumentSuffix.toLowerCase().includes('ensemble') || 
-        occ.room_name.toLowerCase().includes('band') || 
-        occ.room_name.toLowerCase().includes('ensemble') || 
-        occ.room_name.toLowerCase().includes('groovelab');
-
-      const color = isBandOrEnsemble ? '#1a73e8' : '#137333';
-
-      icsContent.push('BEGIN:VEVENT')
-      icsContent.push(`UID:${occ.id}@campus-groovelab.de`)
-      icsContent.push(`DTSTAMP:${stampStr}Z`)
-      icsContent.push(`DTSTART;TZID=Europe/Berlin:${dtStartStr}`)
-      icsContent.push(`DTEND;TZID=Europe/Berlin:${dtEndStr}`)
-      icsContent.push(`SUMMARY:${escapeText(summary)}`)
-      icsContent.push(`DESCRIPTION:${escapeText(description)}`)
-      icsContent.push(`LOCATION:${escapeText(occ.room_name)}`)
-      icsContent.push(`STATUS:${statusText}`)
-      icsContent.push(`COLOR:${color}`)
-
-      if (!isCanceled) {
-        const valarmDateStr = occ.date.replace(/-/g, '')
-        icsContent.push('BEGIN:VALARM')
-        icsContent.push('ACTION:DISPLAY')
-        icsContent.push(`TRIGGER;VALUE=DATE-TIME;TZID=Europe/Berlin:${valarmDateStr}T080000`)
-        icsContent.push(`DESCRIPTION:Erinnerung: Heute ist dein Unterrichtstermin!`)
-        icsContent.push('END:VALARM')
-
-        icsContent.push('BEGIN:VALARM')
-        icsContent.push('ACTION:DISPLAY')
-        icsContent.push('TRIGGER:-PT30M')
-        icsContent.push(`DESCRIPTION:Erinnerung: Dein Unterrichtstermin beginnt in 30 Minuten.`)
-        icsContent.push('END:VALARM')
-      }
-
-      icsContent.push('END:VEVENT')
     }
 
     // 7b. Write Custom Campus-Termine (from database) - ALWAYS as all-day events
     for (const ev of campusEvents) {
+      const catLower = (ev.category || '').toLowerCase();
+      const isHoliday = catLower.includes('ferien') || catLower.includes('feiertag');
+      if (isHoliday && !shouldIncludeHolidays) {
+        continue;
+      }
+      if (!isHoliday && !shouldIncludeCampusEvents) {
+        continue;
+      }
       const locName = ev.room?.name || ev.location_extern || 'Musikschule';
 
       icsContent.push('BEGIN:VEVENT');
