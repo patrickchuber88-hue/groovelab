@@ -36,6 +36,7 @@ import { SecretaryHeader } from './secretary/SecretaryHeader';
 const SecretaryBillingModalsHub = lazy(() => import('./secretary/SecretaryBillingModalsHub').then(m => ({ default: m.SecretaryBillingModalsHub })));
 const SecretaryGeneralModalsHub = lazy(() => import('./secretary/SecretaryGeneralModalsHub').then(m => ({ default: m.SecretaryGeneralModalsHub })));
 const SecretaryOperationsModalsHub = lazy(() => import('./secretary/SecretaryOperationsModalsHub').then(m => ({ default: m.SecretaryOperationsModalsHub })));
+const SecretaryFacilityLogModal = lazy(() => import('./secretary/SecretaryFacilityLogModal').then(m => ({ default: m.SecretaryFacilityLogModal })));
 const SecretaryMobileNavigation = lazy(() => import('./secretary/SecretaryMobileNavigation').then(m => ({ default: m.SecretaryMobileNavigation })));
 const SecretaryGroovelabTab = lazy(() => import('./secretary/tabs/SecretaryGroovelabTab').then(m => ({ default: m.SecretaryGroovelabTab })));
 const SecretaryCampusTab = lazy(() => import('./secretary/tabs/SecretaryCampusTab').then(m => ({ default: m.SecretaryCampusTab })));
@@ -57,31 +58,9 @@ import {
 import { notesService, UserNote } from '../services/notesService';
 import { formatCleanNoteContent } from './notes/notesConstants';
 import { DEFAULT_FOKUS_LEVELS } from '../utils/studentProgressEngine';
-function generateStarterPin(role: string, isCampus: boolean, isGroovelab: boolean): string {
-  let prefix = 'C';
-  if (role === 'admin' || role === 'secretary') {
-    prefix = 'V';
-  } else if (isCampus && isGroovelab) {
-    prefix = 'CG';
-  } else if (isCampus) {
-    prefix = 'C';
-  } else if (isGroovelab) {
-    prefix = 'G';
-  } else {
-    prefix = 'C';
-  }
-  const randomNum = Math.floor(1000 + Math.random() * 9000).toString();
-  return `${prefix}-${randomNum}`;
-}
-
-function generateSecureQrToken(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let token = 't_';
-  for (let i = 0; i < 24; i++) {
-    token += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return token;
-}
+import { generateStarterPin, generateSecureQrToken } from './secretary/utils/secretaryAuthUtils';
+import { useSecretaryStaff } from './secretary/hooks/useSecretaryStaff';
+import { useSecretaryStudents } from './secretary/hooks/useSecretaryStudents';
 
 function checkTimeOverlap(t1Start: string, t1End: string, t2Start: string, t2End: string): boolean {
   if (!t1Start || !t1End || !t2Start || !t2End) return false;
@@ -1174,14 +1153,22 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     setTimeout(() => setBiometricsStatus('idle'), 3000);
   };
 
-  const [revealedPins, setRevealedPins] = useState<Record<string, boolean>>({});
-  const [selectedStudentForDetail, setSelectedStudentForDetail] = useState<any>(null);
-  const [deleteStudentModalData, setDeleteStudentModalData] = useState<StudentToDelete | null>(null);
   const [tickets, setTickets] = useState<any[]>([]);
   const [roomIssues, setRoomIssues] = useState<UserNote[]>([]);
   const [schoolEvents, setSchoolEvents] = useState<any[]>([]);
   const [showAddEventModal, setShowAddEventModal] = useState<boolean>(false);
   const [showLogbookModal, setShowLogbookModal] = useState<boolean>(false);
+  const [showFacilityLogModal, setShowFacilityLogModal] = useState<boolean>(false);
+
+  const handleResolveRoomIssue = async (issueId: string) => {
+    await notesService.resolveRoomIssue(issueId, 'secretary', schoolId);
+    setRoomIssues(prev => prev.map(n => n.id === issueId ? { ...n, is_completed: true, is_acknowledged: true, acknowledged_at: new Date().toISOString(), resolved_by: 'secretary' } : n));
+  };
+
+  const handleReopenRoomIssue = async (issueId: string) => {
+    await notesService.reopenRoomIssue(issueId, schoolId);
+    setRoomIssues(prev => prev.map(n => n.id === issueId ? { ...n, is_completed: false, is_acknowledged: false, acknowledged_at: null, resolved_by: null } : n));
+  };
   const [logbookBookings, setLogbookBookings] = useState<any[]>([]);
   const [editingLogbookBookingId, setEditingLogbookBookingId] = useState<string | null>(null);
   const [editBookingDate, setEditBookingDate] = useState<string>('');
@@ -1198,7 +1185,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [newEventExpiresAt, setNewEventExpiresAt] = useState<string>('');
   const [newEventAttachmentUrl, setNewEventAttachmentUrl] = useState<string>('');
   const [isUploadingAttachment, setIsUploadingAttachment] = useState<boolean>(false);
-  const [manageTeacher, setManageTeacher] = useState<any | null>(null);
   const [isAddingCustomEq, setIsAddingCustomEq] = useState<boolean>(false);
   const [customEqInput, setCustomEqInput] = useState<string>('');
   const [selectedCrisisTeacherId, setSelectedCrisisTeacherId] = useState<string | null>(null);
@@ -1206,7 +1192,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [selectedArchiveLog, setSelectedArchiveLog] = useState<any | null>(null);
   const [expandedLiveDayStr, setExpandedLiveDayStr] = useState<string | null>(null);
   const [activeContextMenu, setActiveContextMenu] = useState<{ student: any; top: number; right: number } | null>(null);
-  const [copiedStudentId, setCopiedStudentId] = useState<string | null>(null);
   const [copiedSchoolLink, setCopiedSchoolLink] = useState<boolean>(false);
   const [copiedKioskLink, setCopiedKioskLink] = useState<boolean>(false);
   const [showOwnQrModal, setShowOwnQrModal] = useState<boolean>(false);
@@ -1436,150 +1421,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     }
   };
 
-  const handleToggleTeacherModule = async (teacher: any, moduleType: 'campus' | 'groovelab') => {
-    try {
-      const isCampus = teacher.isCampusActive || teacher.is_campus_active;
-      const isGroove = teacher.isGroovelabActive || teacher.is_groovelab_active;
-      
-      const newCampusValue = moduleType === 'campus' ? !isCampus : isCampus;
-      const newGrooveValue = moduleType === 'groovelab' ? !isGroove : isGroove;
-
-      const moduleUpdates = {
-        is_campus_active: newCampusValue,
-        is_groovelab_active: newGrooveValue,
-      };
-
-      const { error: rawErr } = await supabase
-        .from('users')
-        .update(moduleUpdates)
-        .eq('id', teacher.id);
-
-      try {
-        await supabase.from('users').update(moduleUpdates).eq('id', teacher.id);
-      } catch (e) {}
-
-      if (rawErr) throw rawErr;
-      
-      if (manageTeacher && manageTeacher.id === teacher.id) {
-        setManageTeacher({
-          ...manageTeacher,
-          isCampusActive: newCampusValue,
-          is_campus_active: newCampusValue,
-          isGroovelabActive: newGrooveValue,
-          is_groovelab_active: newGrooveValue,
-        });
-      }
-      
-      fetchDashboardData();
-    } catch (err: any) {
-      alert('Fehler beim Umschalten: ' + err.message);
-    }
-  };
-
-  const handleToggleStudentModule = async (student: any, moduleType: 'campus' | 'groovelab') => {
-    const isCampus = !!(student.is_campus_active || student.isCampusActive);
-    const isGroove = !!(student.is_groovelab_active || student.isGroovelabActive);
-    
-    const newCampusValue = moduleType === 'campus' ? !isCampus : isCampus;
-    const newGrooveValue = moduleType === 'groovelab' ? !isGroove : isGroove;
-
-    // Annual billing grace period check: If deactivating campus/groovelab for pre-paid annual students
-    const isDeactivatingCampus = moduleType === 'campus' && isCampus;
-    const isDeactivatingGroove = moduleType === 'groovelab' && isGroove;
-    const hasAnnualBilling = studentBillingOption === 'option3_2' || studentBillingOption === 'option3_3';
-
-    if ((isDeactivatingCampus || isDeactivatingGroove) && hasAnnualBilling) {
-      alert("Da für diesen Schüler der Jahresbeitrag bereits vorab entrichtet wurde, bleiben das Profil und alle Funktionen des Schülers bis zum Ende des Schuljahres aktiv. Die Deaktivierung wird zum Schuljahreswechsel wirksam.");
-      return;
-    }
-
-    // Check school-level module availability
-    if (moduleType === 'campus' && isBillingBooked && !hasCampusSub) {
-      alert("Das Campus-Modul ist für deine Musikschule aktuell nicht gebucht.");
-      return;
-    }
-    if (moduleType === 'groovelab' && isBillingBooked && !hasGroovelabSub) {
-      alert("Das GrooveLab-Modul ist für deine Musikschule aktuell nicht gebucht.");
-      return;
-    }
-
-    // 1. Optimistic UI update for instant feedback
-    setStudents(prev => prev.map(s => {
-      if (s.id === student.id) {
-        return {
-          ...s,
-          is_campus_active: newCampusValue,
-          isCampusActive: newCampusValue,
-          is_groovelab_active: newGrooveValue,
-          isGroovelabActive: newGrooveValue,
-          ...(newGrooveValue ? {
-            is_active: true,
-            is_app_user: true,
-            status: 'aktiv',
-            isPendingOnboarding: false
-          } : {})
-        };
-      }
-      return s;
-    }));
-
-    try {
-      const moduleUpdates: any = {
-        is_campus_active: newCampusValue,
-        is_groovelab_active: newGrooveValue,
-      };
-      if (newGrooveValue) {
-        moduleUpdates.is_active = true;
-        moduleUpdates.is_app_user = true;
-        moduleUpdates.status = 'aktiv';
-      }
-
-      const { data: existingUser } = await supabase.from('users').select('id').eq('id', student.id).maybeSingle();
-      if (!existingUser) {
-        const { error: insertErr } = await supabase.from('users').insert({
-          id: student.id,
-          school_id: student.school_id || schoolId,
-          role: 'student',
-          first_name: student.first_name || 'Schüler',
-          last_name: student.last_name || '',
-          instrument: student.instrument || 'Musiker',
-          teacher_id: student.teacher_id || null,
-          lesson_duration: student.lesson_duration || 30,
-          is_campus_active: newCampusValue,
-          is_groovelab_active: newGrooveValue,
-          is_active: newGrooveValue ? true : false,
-          is_app_user: newGrooveValue ? true : false,
-          status: newGrooveValue ? 'aktiv' : 'offen'
-        });
-        if (insertErr) throw insertErr;
-      } else {
-        const { error: rawErr } = await supabase
-          .from('users')
-          .update(moduleUpdates)
-          .eq('id', student.id);
-        if (rawErr) throw rawErr;
-      }
-
-      // Background reconciliation without full page reload
-      fetchDashboardData();
-    } catch (err: any) {
-      // Revert optimistic update on failure
-      setStudents(prev => prev.map(s => {
-        if (s.id === student.id) {
-          return {
-            ...s,
-            is_campus_active: isCampus,
-            isCampusActive: isCampus,
-            is_groovelab_active: isGroove,
-            isGroovelabActive: isGroove
-          };
-        }
-        return s;
-      }));
-      alert('Fehler beim Umschalten: ' + err.message);
-    }
-  };
-
   const [holidayXpActive, setHolidayXpActive] = useState<boolean>(() => {
     return localStorage.getItem(`groovelab_holiday_xp_active_${schoolId}`) === 'true';
   });
@@ -1618,8 +1459,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     }
   };
 
-  // Students and Link States
-  const [students, setStudents] = useState<any[]>([]);
+  // Trial & Linking States
   const [bands, setBands] = useState<any[]>([]);
   const [showTrialLogModal, setShowTrialLogModal] = useState(false);
   const [trialLogs, setTrialLogs] = useState<any[]>([]);
@@ -1628,103 +1468,14 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [selectedGroovelabStudentId, setSelectedGroovelabStudentId] = useState<string>('');
   const [linkingInProgress, setLinkingInProgress] = useState<boolean>(false);
 
-  // Compact Schülerboard States
-  const [studentSearchQuery, setStudentSearchQuery] = useState<string>('');
-  const [studentFilterInstrument, setStudentFilterInstrument] = useState<string>('All');
-  const [studentFilterTeacher, setStudentFilterTeacher] = useState<string>('All');
-  const [studentFilterStatus, setStudentFilterStatus] = useState<'all' | 'campus' | 'groovelab' | 'inactive'>('all');
-  const [isStudentCsvExpanded, setIsStudentCsvExpanded] = useState<boolean>(false);
-  const [studentCsvText, setStudentCsvText] = useState<string>('');
-  const [bulkImportDuration, setBulkImportDuration] = useState<number>(30);
-  const [isAnonymizedImport, setIsAnonymizedImport] = useState<boolean>(true);
-  const [studentCurrentPage, setStudentCurrentPage] = useState<number>(1);
-  const [studentPageSize, setStudentPageSize] = useState<number>(12);
-  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
-  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState<boolean>(false);
-  const [bulkDeletePin, setBulkDeletePin] = useState<string>('');
-  const [bulkDeleteStep, setBulkDeleteStep] = useState<1 | 2>(1);
-  const [isBulkDeleting, setIsBulkDeleting] = useState<boolean>(false);
-
-  // ── 1.1: Memoized Student Filtering ──
-  const filteredStudents = useMemo(() => {
-    return students.filter((s: any) => {
-      const firstName = (s.first_name || '').toLowerCase();
-      const lastName = (s.last_name || '').toLowerCase();
-      const nickname = (s.nickname || '').toLowerCase();
-      const query = studentSearchQuery.toLowerCase().trim();
-      
-      const matchesSearch = !query || firstName.includes(query) || lastName.includes(query) || nickname.includes(query);
-      const matchesInstrument = studentFilterInstrument === 'All' || (s.instrument || 'Nicht festgelegt') === studentFilterInstrument;
-      const matchesTeacher = studentFilterTeacher === 'All' || 
-        (studentFilterTeacher === 'none' ? !s.teacher_id : s.teacher_id === studentFilterTeacher);
-      
-      let matchesStatus = true;
-      if (studentFilterStatus === 'campus') matchesStatus = s.is_campus_active;
-      else if (studentFilterStatus === 'groovelab') matchesStatus = s.is_groovelab_active;
-      else if (studentFilterStatus === 'inactive') matchesStatus = !s.is_campus_active && !s.is_groovelab_active;
-
-      return matchesSearch && matchesInstrument && matchesTeacher && matchesStatus;
-    }).sort((a: any, b: any) => {
-      const nameA = `${a.first_name || ''} ${a.last_name || ''}`.toLowerCase().trim();
-      const nameB = `${b.first_name || ''} ${b.last_name || ''}`.toLowerCase().trim();
-      return nameA.localeCompare(nameB, 'de');
-    });
-  }, [students, studentSearchQuery, studentFilterInstrument, studentFilterTeacher, studentFilterStatus]);
-
   // Overhauled Room Board States
   const [roomSearchQuery, setRoomSearchQuery] = useState<string>('');
   const [buildings, setBuildings] = useState<any[]>([]);
 
-
-  // Manual Student Creation Form States
-  const [showAddStudentModal, setShowAddStudentModal] = useState<boolean>(false);
-  const [showBulkImportModal, setShowBulkImportModal] = useState<boolean>(false);
+  // Guidance Modals
   const [showGuidanceModal, setShowGuidanceModal] = useState<boolean>(false);
   const [showParentInfoSheetModal, setShowParentInfoSheetModal] = useState<boolean>(false);
   const [guidanceInitialTab, setGuidanceInitialTab] = useState<'teacher' | 'parent'>('teacher');
-  const [newStudentFirstName, setNewStudentFirstName] = useState<string>('');
-  const [newStudentLastName, setNewStudentLastName] = useState<string>('');
-  const [newStudentBirthDate, setNewStudentBirthDate] = useState<string>('');
-  const [newStudentNickname, setNewStudentNickname] = useState<string>('');
-  const [newStudentInstrument, setNewStudentInstrument] = useState<string>('');
-  const [newStudentDuration, setNewStudentDuration] = useState<number>(30); // 30m by default
-  const [newStudentTeacherId, setNewStudentTeacherId] = useState<string>('');
-  const [newStudentIsAppUser, setNewStudentIsAppUser] = useState<boolean>(false);
-  const [newStudentIsCampusActive, setNewStudentIsCampusActive] = useState<boolean>(true);
-  const [newStudentIsGroovelabActive, setNewStudentIsGroovelabActive] = useState<boolean>(false);
-
-  // Administrative employees list
-  const [employees, setEmployees] = useState<any[]>([]);
-
-  // RBAC Master-Standard: Check if the logged-in user possesses an active teacher role (Dual Role)
-  const isCurrentUserTeacher = useMemo(() => {
-    const currentEmp = employees.find(e => e.id === userId);
-    const roles = Array.isArray(currentEmp?.roles) 
-      ? currentEmp.roles 
-      : Array.isArray(currentUserProfile?.roles) 
-        ? currentUserProfile.roles 
-        : Array.isArray(userRoles) 
-          ? userRoles 
-          : [];
-    return roles.includes('teacher') || currentEmp?.role === 'teacher' || currentUserProfile?.role === 'teacher';
-  }, [employees, userId, currentUserProfile, userRoles]);
-
-  // Employee Form States
-  const [employeeFirstName, setEmployeeFirstName] = useState<string>('');
-  const [employeeLastName, setEmployeeLastName] = useState<string>('');
-  const [employeeNickname, setEmployeeNickname] = useState<string>('');
-  const [employeeEmail, setEmployeeEmail] = useState<string>('');
-  const [employeeSearchQuery, setEmployeeSearchQuery] = useState<string>('');
-  const [employeeStatusTab, setEmployeeStatusTab] = useState<'all' | 'active' | 'inactive'>('all');
-  const [employeeFilterRole, setEmployeeFilterRole] = useState<string>('All');
-  const [isEmployeeCsvExpanded, setIsEmployeeCsvExpanded] = useState<boolean>(false);
-  const [employeeCsvText, setEmployeeCsvText] = useState<string>('');
-  const [employeeImportStatus, setEmployeeImportStatus] = useState<{ success: boolean; message: string } | null>(null);
-  const [showAddEmployeeModal, setShowAddEmployeeModal] = useState<boolean>(false);
-  const [dragHoveredEmployeeRole, setDragHoveredEmployeeRole] = useState<string | null>(null);
-  const [employeeFilterRoleFocused, setEmployeeFilterRoleFocused] = useState<boolean>(false);
-  const [employeeStatusTabFocused, setEmployeeStatusTabFocused] = useState<boolean>(false);
-  const [employeeSearchFocused, setEmployeeSearchFocused] = useState<boolean>(false);
 
   const [userQuota, setUserQuota] = useState<number>(150);
   const [activeUserQuota, setActiveUserQuota] = useState<number>(150);
@@ -1740,7 +1491,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [schoolYearStartMonth, setSchoolYearStartMonth] = useState<number>(9);
   const [schoolYearStartDay, setSchoolYearStartDay] = useState<number>(1);
   const [autoDeleteExpiredUsers, setAutoDeleteExpiredUsers] = useState<boolean>(false);
-  const [frozenStudents, setFrozenStudents] = useState<any[]>([]);
   const [schoolSubdomain, setSchoolSubdomain] = useState<string>('');
   const [openingHours, setOpeningHours] = useState<any>(null);
   const [schoolZipCode, setSchoolZipCode] = useState<string>('');
@@ -2644,6 +2394,222 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [campusTeachers, setCampusTeachers] = useState<any[]>([]);
   const [allTeachers, setAllTeachers] = useState<any[]>([]);
   const allTeachersRef = useRef<any[]>([]);
+
+  const INSTRUMENT_TAGS = ['Schlagzeug', 'Piano', 'Gitarre', 'Gesang', 'Geige', 'Querflöte', 'Saxophon', 'Bass', 'Keyboard', 'Trompete'];
+
+  // Subjects (Unterrichtsfächer) states
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const activeSubjectsList = useMemo(() => {
+    const placeholders = new Set([
+      'ohne zuweisung', 'ohnezuweisung', 'allgemein', 
+      'nicht festgelegt', 'nichtfestgelegt', 'nicht zugeordnet', 
+      'nichtzugeordnet', 'none', 'null', ''
+    ]);
+    const activeSubs = Array.from(new Set(
+      subjects
+        .filter((s: any) => s.is_active && s.name)
+        .map((s: any) => s.name.trim())
+    )).filter(name => !placeholders.has(name.toLowerCase()));
+    
+    return activeSubs.length > 0 ? activeSubs : INSTRUMENT_TAGS;
+  }, [subjects]);
+
+  const {
+    employees,
+    setEmployees,
+    revealedPins,
+    setRevealedPins,
+    isCurrentUserTeacher,
+    employeeFirstName,
+    setEmployeeFirstName,
+    employeeLastName,
+    setEmployeeLastName,
+    employeeNickname,
+    setEmployeeNickname,
+    employeeEmail,
+    setEmployeeEmail,
+    employeeSearchQuery,
+    setEmployeeSearchQuery,
+    employeeStatusTab,
+    setEmployeeStatusTab,
+    employeeFilterRole,
+    setEmployeeFilterRole,
+    isEmployeeCsvExpanded,
+    setIsEmployeeCsvExpanded,
+    employeeCsvText,
+    setEmployeeCsvText,
+    employeeImportStatus,
+    setEmployeeImportStatus,
+    showAddEmployeeModal,
+    setShowAddEmployeeModal,
+    dragHoveredEmployeeRole,
+    setDragHoveredEmployeeRole,
+    employeeFilterRoleFocused,
+    setEmployeeFilterRoleFocused,
+    employeeStatusTabFocused,
+    setEmployeeStatusTabFocused,
+    employeeSearchFocused,
+    setEmployeeSearchFocused,
+    handleCreateEmployee,
+    handleImportEmployees,
+    handleUpdateEmployeeRole,
+    handleToggleRole,
+    teacherSearchQuery,
+    setTeacherSearchQuery,
+    teacherFilterInstrument,
+    setTeacherFilterInstrument,
+    teacherStatusTab,
+    setTeacherStatusTab,
+    newTeacherFirstName,
+    setNewTeacherFirstName,
+    newTeacherLastName,
+    setNewTeacherLastName,
+    newTeacherEmail,
+    setNewTeacherEmail,
+    newTeacherInstrument,
+    setNewTeacherInstrument,
+    newTeacherLimit,
+    setNewTeacherLimit,
+    newTeacherContractEndsAt,
+    setNewTeacherContractEndsAt,
+    showAddTeacherModal,
+    setShowAddTeacherModal,
+    showAddCoachModal,
+    setShowAddCoachModal,
+    coachFirstName,
+    setCoachFirstName,
+    coachLastName,
+    setCoachLastName,
+    coachEmail,
+    setCoachEmail,
+    coachInstrument,
+    setCoachInstrument,
+    coachRole,
+    setCoachRole,
+    manageTeacher,
+    setManageTeacher,
+    isCsvExpanded,
+    setIsCsvExpanded,
+    csvText,
+    setCsvText,
+    importStatus,
+    setImportStatus,
+    handleCreateTeacher,
+    handleCreateCoachForGroovelab,
+    handleCreateCoach,
+    handleImportTeachers,
+    handleToggleTeacherModule,
+    handleUpdateTeacherInstrument,
+    handleGenerateInviteToken,
+    handleDeleteUser
+  } = useSecretaryStaff({
+    schoolId,
+    userId: userId || '',
+    schoolName,
+    currentSchoolProfile,
+    currentUserProfile,
+    setCurrentUserProfile,
+    userRoles,
+    isAvvSigned,
+    setShowAvvModal,
+    activeSubjectsList,
+    fetchDashboardData: () => fetchDashboardData(),
+    assertSecretaryWriteAccess
+  });
+
+  const {
+    students,
+    setStudents,
+    frozenStudents,
+    setFrozenStudents,
+    studentSearchQuery,
+    setStudentSearchQuery,
+    studentFilterInstrument,
+    setStudentFilterInstrument,
+    studentFilterTeacher,
+    setStudentFilterTeacher,
+    studentFilterStatus,
+    setStudentFilterStatus,
+    filteredStudents,
+    studentCurrentPage,
+    setStudentCurrentPage,
+    studentPageSize,
+    setStudentPageSize,
+    selectedStudentIds,
+    setSelectedStudentIds,
+    selectedStudentForDetail,
+    setSelectedStudentForDetail,
+    deleteStudentModalData,
+    setDeleteStudentModalData,
+    copiedStudentId,
+    setCopiedStudentId,
+    showAddStudentModal,
+    setShowAddStudentModal,
+    showAddGroovelabStudentModal,
+    setShowAddGroovelabStudentModal,
+    showBulkImportModal,
+    setShowBulkImportModal,
+    showBulkDeleteModal,
+    setShowBulkDeleteModal,
+    bulkDeletePin,
+    setBulkDeletePin,
+    bulkDeleteStep,
+    setBulkDeleteStep,
+    isBulkDeleting,
+    setIsBulkDeleting,
+    isStudentCsvExpanded,
+    setIsStudentCsvExpanded,
+    studentCsvText,
+    setStudentCsvText,
+    bulkImportDuration,
+    setBulkImportDuration,
+    isAnonymizedImport,
+    setIsAnonymizedImport,
+    isImportingStudentsBatch,
+    setIsImportingStudentsBatch,
+    newStudentFirstName,
+    setNewStudentFirstName,
+    newStudentLastName,
+    setNewStudentLastName,
+    newStudentBirthDate,
+    setNewStudentBirthDate,
+    newStudentNickname,
+    setNewStudentNickname,
+    newStudentInstrument,
+    setNewStudentInstrument,
+    newStudentDuration,
+    setNewStudentDuration,
+    newStudentTeacherId,
+    setNewStudentTeacherId,
+    newStudentIsAppUser,
+    setNewStudentIsAppUser,
+    newStudentIsCampusActive,
+    setNewStudentIsCampusActive,
+    newStudentIsGroovelabActive,
+    setNewStudentIsGroovelabActive,
+    handleCreateStudentCampus,
+    handleCreateStudentGroovelab,
+    handleDeleteStudentCampus,
+    handleBulkStudentImport,
+    handleBatchImportStudents,
+    handleToggleStudentModule,
+    handleUpdateStudentTeacher,
+    handleDeleteExpiredStudents
+  } = useSecretaryStudents({
+    schoolId,
+    allTeachers,
+    campusTeachers,
+    bypassTeachers,
+    coaches,
+    hasCampusSub,
+    hasGroovelabSub,
+    isBillingBooked,
+    studentBillingOption,
+    billingPayer,
+    fetchDashboardData: () => fetchDashboardData(),
+    assertSecretaryWriteAccess
+  });
+
   const studentsRef = useRef<any[]>([]);
 
   useEffect(() => {
@@ -2814,8 +2780,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     fetchDashboardData: () => fetchDashboardData()
   });
 
-  const INSTRUMENT_TAGS = ['Schlagzeug', 'Piano', 'Gitarre', 'Gesang', 'Geige', 'Querflöte', 'Saxophon', 'Bass', 'Keyboard', 'Trompete'];
-
   // Equipment State
   const [schoolEquipment, setSchoolEquipment] = useState<any[]>([]);
   const [equipmentFormName, setEquipmentFormName] = useState('');
@@ -2842,25 +2806,11 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   // Helpers
   const [userMap, setUserMap] = useState<Record<string, string>>({});
   const [roomMap, setRoomMap] = useState<Record<string, string>>({});
-  
-  // Form States
-  const [csvText, setCsvText] = useState<string>('');
-  const [coachFirstName, setCoachFirstName] = useState<string>('');
-  const [coachLastName, setCoachLastName] = useState<string>('');
-  const [coachEmail, setCoachEmail] = useState<string>('');
-  const [coachInstrument, setCoachInstrument] = useState<string>('');
-  const [coachRole, setCoachRole] = useState<'teacher' | 'admin'>('teacher');
-
   // Copy States
   const [copyingKiosk, setCopyingKiosk] = useState(false);
   const [copyingCampus, setCopyingCampus] = useState(false);
   const [copiedTeacherId, setCopiedTeacherId] = useState<string | null>(null);
   const [regeneratingTokens, setRegeneratingTokens] = useState(false);
-  const [importStatus, setImportStatus] = useState<{ success: boolean; message: string } | null>(null);
-  // Redesigned Teacher Onboarding & Search states
-  const [teacherSearchQuery, setTeacherSearchQuery] = useState<string>('');
-  const [teacherStatusTab, setTeacherStatusTab] = useState<'all' | 'active' | 'inactive'>('all');
-  const [teacherFilterInstrument, setTeacherFilterInstrument] = useState<string>('All');
   
   const [coachSearchQuery, setCoachSearchQuery] = useState<string>('');
   const [coachFilterInstrument, setCoachFilterInstrument] = useState<string>('All');
@@ -2868,41 +2818,14 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [groovelabStudentSearchQuery, setGroovelabStudentSearchQuery] = useState<string>('');
   const [groovelabStudentFilterInstrument, setGroovelabStudentFilterInstrument] = useState<string>('All');
   
-  // Manual Teacher Creation Form States
-  const [showAddCoachModal, setShowAddCoachModal] = useState<boolean>(false);
+  // Manual Modal Sub-states
   const [coachModalSearchQuery, setCoachModalSearchQuery] = useState<string>('');
   const [showManualCreateCoach, setShowManualCreateCoach] = useState<boolean>(false);
-  const [showAddGroovelabStudentModal, setShowAddGroovelabStudentModal] = useState<boolean>(false);
   const [groovelabStudentModalSearchQuery, setGroovelabStudentModalSearchQuery] = useState<string>('');
   const [showManualCreateGroovelabStudent, setShowManualCreateGroovelabStudent] = useState<boolean>(false);
-  const [showAddTeacherModal, setShowAddTeacherModal] = useState<boolean>(false);
-  const [newTeacherFirstName, setNewTeacherFirstName] = useState<string>('');
-  const [newTeacherLastName, setNewTeacherLastName] = useState<string>('');
-  const [newTeacherEmail, setNewTeacherEmail] = useState<string>('');
-  const [newTeacherInstrument, setNewTeacherInstrument] = useState<string>('');
-  const [newTeacherLimit, setNewTeacherLimit] = useState<number>(10);
-  const [newTeacherContractEndsAt, setNewTeacherContractEndsAt] = useState<string>('');
   const [showCsvImportModal, setShowCsvImportModal] = useState<boolean>(false);
-  const [isCsvExpanded, setIsCsvExpanded] = useState<boolean>(false);
-  const [isImportingStudentsBatch, setIsImportingStudentsBatch] = useState<boolean>(false);
   const [isHandoutsDropdownOpen, setIsHandoutsDropdownOpen] = useState<boolean>(false);
 
-  // Subjects (Unterrichtsfächer) states
-  const [subjects, setSubjects] = useState<any[]>([]);
-  const activeSubjectsList = useMemo(() => {
-    const placeholders = new Set([
-      'ohne zuweisung', 'ohnezuweisung', 'allgemein', 
-      'nicht festgelegt', 'nichtfestgelegt', 'nicht zugeordnet', 
-      'nichtzugeordnet', 'none', 'null', ''
-    ]);
-    const activeSubs = Array.from(new Set(
-      subjects
-        .filter((s: any) => s.is_active && s.name)
-        .map((s: any) => s.name.trim())
-    )).filter(name => !placeholders.has(name.toLowerCase()));
-    
-    return activeSubs.length > 0 ? activeSubs : INSTRUMENT_TAGS;
-  }, [subjects]);
   // Cleanup any legacy rental instruments local storage keys
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -6071,1019 +5994,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     }
   };
 
-  const handleDeleteExpiredStudents = async (silent = false, customStudentsList?: any[]) => {
-    const listToFilter = customStudentsList || students;
-    const expired = listToFilter.filter((s: any) => s.contractEndsAt && new Date(s.contractEndsAt).getTime() < Date.now());
-    if (expired.length === 0) {
-      if (!silent) {
-        alert("Keine abgelaufenen Schülerkonten zum Löschen vorhanden.");
-      }
-      return;
-    }
-
-    if (!silent) {
-      const confirmMsg = `Möchtest du wirklich ${expired.length} Schülerkonto/Schülerkonten mit abgelaufenen Verträgen unwiderruflich löschen? Alle zugehörigen Fortschritte und Audio-Dateien im Cloud-Speicher (Supabase Storage) werden physisch und datenschutzkonform entfernt.`;
-      if (!window.confirm(confirmMsg)) return;
-    }
-
-    try {
-      let deletedAudioCount = 0;
-      let deletedDbCount = 0;
-
-      for (const student of expired) {
-        try {
-          const { data: files, error: listError } = await supabase.storage
-            .from('campus-assets')
-            .list('avatars');
-          
-          if (!listError && files) {
-            const filesToDelete = files
-              .filter(f => f.name.includes(`${student.id}_loopmix_`))
-              .map(f => `avatars/${f.name}`);
-            
-            if (filesToDelete.length > 0) {
-              const { error: removeError } = await supabase.storage
-                .from('campus-assets')
-                .remove(filesToDelete);
-              if (!removeError) {
-                deletedAudioCount += filesToDelete.length;
-              }
-            }
-          }
-        } catch (storageErr) {
-          console.error(`[GDPR Cleanup] Error clearing storage for ${student.id}:`, storageErr);
-        }
-
-        const { error: dbError } = await supabase
-          .from('users')
-          .delete()
-          .eq('id', student.id);
-        
-        if (!dbError) {
-          deletedDbCount++;
-        } else {
-          console.error(`[GDPR Cleanup] Error deleting student ${student.id} from DB:`, dbError);
-        }
-      }
-
-      if (!silent) {
-        alert(`Datenschutzkonforme Löschung erfolgreich durchgeführt!\n- ${deletedDbCount} Schülerprofile gelöscht\n- ${deletedAudioCount} Audio-Dateien physisch aus dem Cloud-Speicher entfernt`);
-      } else {
-        console.log(`[GDPR Auto-Cleanup] Auto-deleted ${deletedDbCount} expired students and cleared ${deletedAudioCount} storage files.`);
-      }
-      fetchDashboardData();
-    } catch (err: any) {
-      if (!silent) {
-        alert("Fehler bei der datenschutzkonformen Löschung: " + err.message);
-      } else {
-        console.error("[GDPR Auto-Cleanup] Deletion failed:", err);
-      }
-    }
-  };
-
-  const handleGenerateInviteToken = async (studentId: string, studentName: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('student_onboarding_tokens')
-        .insert({ student_id: studentId })
-        .select('token')
-        .single();
-
-      if (error) throw error;
-      
-      const inviteUrl = getParentOnboardingUrl(
-        schoolName || currentSchoolProfile?.name || 'Stadtmusikschule',
-        currentSchoolProfile?.subdomain,
-        data.token
-      );
-      await navigator.clipboard.writeText(inviteUrl);
-      alert(`Personalisierter Onboarding-Link für ${studentName} wurde in die Zwischenablage kopiert!\n\nLink: ${inviteUrl}`);
-    } catch (err: any) {
-      console.error('Error generating invite token:', err);
-      alert('Der Einladungs-Link konnte nicht generiert werden: ' + err.message);
-    }
-  };
-
-  const handleImportTeachers = async () => {
-    if (!csvText.trim()) return;
-    try {
-      setImportStatus(null);
-      const lines = csvText.split('\n');
-      let successCount = 0;
-      let skippedCount = 0;
-
-      for (let line of lines) {
-        line = line.trim();
-        if (!line || line.toLowerCase().includes('vorname')) continue;
-
-        const parts = line.split(/[;,]/);
-        if (parts.length < 2) {
-          skippedCount++;
-          continue;
-        }
-
-        const firstName = parts[0]?.trim();
-        const lastName = parts[1]?.trim();
-        const instrument = parts[2]?.trim() || (teacherFilterInstrument !== 'All' ? teacherFilterInstrument : 'ohne Zuweisung');
-        const maxStudents = parseInt(parts[3]?.trim()) || 10;
-        const pin = generateStarterPin('teacher', false, false);
-        const qrToken = generateSecureQrToken();
-
-        const { error } = await supabase
-          .from('users')
-          .insert({
-            school_id: schoolId,
-            role: 'teacher',
-            first_name: firstName,
-            last_name: lastName,
-            email: null,
-            instrument: instrument,
-            max_students: maxStudents,
-            ausweis_nummer: pin,
-            teacher_qr_token: qrToken,
-            is_active: false,
-            is_app_user: false,
-            is_campus_active: false,
-            is_groovelab_active: false
-          });
-
-        if (error) {
-          console.error("Error inserting user during import:", error);
-          skippedCount++;
-        } else {
-          successCount++;
-        }
-      }
-
-      setImportStatus({
-        success: true,
-        message: `Import abgeschlossen: ${successCount} Lehrerprofile angelegt (inaktiv). PINs bereit zur Verteilung.`
-      });
-      setCsvText('');
-      fetchDashboardData();
-    } catch (err: any) {
-      alert('Fehler: ' + err.message);
-    }
-  };
-
-  const handleBatchImportStudents = async () => {
-    if (!studentCsvText.trim()) return;
-    setIsImportingStudentsBatch(true);
-    try {
-      const lines = studentCsvText.split('\n');
-      let successCount = 0;
-      let skippedCount = 0;
-
-      const assignedTeacherId = (studentFilterTeacher && studentFilterTeacher !== 'All' && studentFilterTeacher !== 'none')
-        ? studentFilterTeacher
-        : null;
-
-      for (let line of lines) {
-        line = line.trim();
-        if (!line || line.toLowerCase().startsWith('vorname') || line.toLowerCase().startsWith('name')) continue;
-
-        let firstName = '';
-        let lastName = '';
-        let instrument = 'Nicht festgelegt';
-        let duration = 30;
-        let birthDate: string | null = null;
-
-        const parts = line.split(/[;,\t]/).map(p => p.trim());
-
-        if (parts.length >= 2) {
-          firstName = parts[0];
-          lastName = parts[1];
-          if (parts[2]) {
-            if (/^\d+$/.test(parts[2])) {
-              duration = parseInt(parts[2], 10);
-            } else {
-              instrument = parts[2];
-            }
-          }
-          if (parts[3]) {
-            if (/^\d+$/.test(parts[3])) {
-              duration = parseInt(parts[3], 10);
-            } else if (parts[3].includes('.') || parts[3].includes('-')) {
-              birthDate = parts[3];
-            }
-          }
-        } else if (parts.length === 1 && parts[0].includes(' ')) {
-          const words = parts[0].split(/\s+/);
-          firstName = words[0];
-          lastName = words[1];
-          if (words.length > 2) {
-            instrument = words.slice(2).join(' ');
-          }
-        } else if (parts.length === 1 && parts[0]) {
-          firstName = parts[0];
-          lastName = '';
-        }
-
-        if (!firstName) {
-          skippedCount++;
-          continue;
-        }
-
-        const finalLastName = hasCampusSub ? lastName : (lastName?.trim() ? lastName.trim().charAt(0).toUpperCase() + '.' : '');
-        const finalBirthDate = hasCampusSub && birthDate ? sanitizeBirthDateToDayOnly(birthDate) : null;
-
-        try {
-          const { error: insertError } = await supabase.rpc('import_student', {
-            first_name: firstName,
-            last_name: finalLastName,
-            birth_date: finalBirthDate,
-            instrument: instrument || 'Nicht festgelegt',
-            school_id: schoolId,
-            teacher_id: assignedTeacherId,
-            lesson_duration: duration || 30
-          });
-
-          if (insertError) {
-            console.error('[StudentBatchImport] RPC error for line:', line, insertError);
-            skippedCount++;
-          } else {
-            successCount++;
-          }
-        } catch (rpcErr) {
-          console.error('[StudentBatchImport] Failed to import student:', rpcErr);
-          skippedCount++;
-        }
-      }
-
-      setStudentCsvText('');
-      setIsStudentCsvExpanded(false);
-      window.dispatchEvent(new CustomEvent('students_updated'));
-      window.dispatchEvent(new CustomEvent('campus_students_updated'));
-      window.dispatchEvent(new CustomEvent('groovelab_students_updated'));
-      await fetchDashboardData();
-      alert(`Sammel-Onboarding abgeschlossen: ${successCount} Schüler erfolgreich angelegt! ${skippedCount > 0 ? `(${skippedCount} Zeilen übersprungen)` : ''}`);
-    } catch (err: any) {
-      alert('Fehler beim Sammel-Import: ' + err.message);
-    } finally {
-      setIsImportingStudentsBatch(false);
-    }
-  };
-
-  const handleCreateTeacher = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!assertSecretaryWriteAccess('Lehrkraft anlegen')) return;
-    if (!newTeacherFirstName.trim() || !newTeacherLastName.trim()) return;
-
-    if (!isAvvSigned) {
-      alert('DSGVO-Compliance: Vor dem Anlegen von Lehrkräften muss der gesetzliche Auftragsverarbeitungsvertrag (AVV gem. Art. 28 DSGVO) einmalig durch die Schulleitung digital gezeichnet werden.');
-      setShowAvvModal(true);
-      return;
-    }
-
-    try {
-      const pin = generateStarterPin('teacher', false, false);
-      const qrToken = generateSecureQrToken();
-
-      const { error } = await supabase
-        .from('users')
-        .insert({
-          school_id: schoolId,
-          role: 'teacher',
-          roles: ['teacher'],
-          first_name: newTeacherFirstName.trim(),
-          last_name: newTeacherLastName.trim(),
-          email: newTeacherEmail.trim() || null,
-          instrument: newTeacherInstrument.trim() || activeSubjectsList[0] || 'Nicht festgelegt',
-          max_students: newTeacherLimit,
-          ausweis_nummer: pin,
-          teacher_qr_token: qrToken,
-          is_active: true,
-          is_app_user: true,
-          is_campus_active: true,
-          is_groovelab_active: true,
-          contract_ends_at: newTeacherContractEndsAt || null
-        });
-
-      if (error) throw error;
-
-      setNewTeacherFirstName('');
-      setNewTeacherLastName('');
-      setNewTeacherEmail('');
-      setNewTeacherInstrument('');
-      setNewTeacherLimit(10);
-      setNewTeacherContractEndsAt('');
-      setShowAddTeacherModal(false);
-      fetchDashboardData();
-    } catch (err: any) {
-      alert('Fehler beim Anlegen der Lehrkraft: ' + err.message);
-    }
-  };
-
-  const handleCreateCoachForGroovelab = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTeacherFirstName.trim() || !newTeacherLastName.trim()) return;
-
-    if (!isAvvSigned) {
-      alert('DSGVO-Compliance: Vor dem Anlegen von Lehrkräften muss der gesetzliche Auftragsverarbeitungsvertrag (AVV gem. Art. 28 DSGVO) einmalig durch die Schulleitung digital gezeichnet werden.');
-      setShowAvvModal(true);
-      return;
-    }
-
-    try {
-      const pin = generateStarterPin('teacher', false, false);
-      const qrToken = generateSecureQrToken();
-
-      const { error } = await supabase
-        .from('users')
-        .insert({
-          school_id: schoolId,
-          role: 'teacher',
-          roles: ['teacher'],
-          first_name: newTeacherFirstName.trim(),
-          last_name: newTeacherLastName.trim(),
-          email: newTeacherEmail.trim() || null,
-          instrument: newTeacherInstrument.trim() || activeSubjectsList[0] || 'Nicht festgelegt',
-          max_students: newTeacherLimit,
-          ausweis_nummer: pin,
-          teacher_qr_token: qrToken,
-          is_active: true,
-          is_app_user: true,
-          is_campus_active: false,
-          is_groovelab_active: true,
-          contract_ends_at: newTeacherContractEndsAt || null
-        });
-
-      if (error) throw error;
-
-      setNewTeacherFirstName('');
-      setNewTeacherLastName('');
-      setNewTeacherEmail('');
-      setNewTeacherInstrument('');
-      setNewTeacherLimit(10);
-      setNewTeacherContractEndsAt('');
-      setShowAddCoachModal(false);
-      fetchDashboardData();
-    } catch (err: any) {
-      alert('Fehler beim Anlegen der Lehrkraft: ' + err.message);
-    }
-  };
-
-  const handleCreateCoach = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!coachFirstName || !coachLastName || !coachEmail) return;
-
-    if (!isAvvSigned) {
-      alert('DSGVO-Compliance: Vor dem Anlegen von Lehrkräften muss der gesetzliche Auftragsverarbeitungsvertrag (AVV gem. Art. 28 DSGVO) einmalig durch die Schulleitung digital gezeichnet werden.');
-      setShowAvvModal(true);
-      return;
-    }
-
-    try {
-      const pin = generateStarterPin(coachRole, false, true);
-      const qrToken = generateSecureQrToken();
-
-      const { error } = await supabase
-        .from('users')
-        .insert({
-          school_id: schoolId,
-          role: coachRole,
-          roles: [coachRole],
-          first_name: coachFirstName,
-          last_name: coachLastName,
-          email: coachEmail,
-          instrument: coachInstrument || 'Nicht festgelegt',
-          is_active: true,
-          is_app_user: true,
-          ausweis_nummer: pin,
-          teacher_qr_token: qrToken,
-          is_campus_active: false,
-          is_groovelab_active: true
-        });
-
-      if (error) throw error;
-
-      alert(`Coach ${coachFirstName} ${coachLastName} wurde erfolgreich angelegt.`);
-      setCoachFirstName('');
-      setCoachLastName('');
-      setCoachEmail('');
-      setCoachInstrument('');
-      fetchDashboardData();
-    } catch (err: any) {
-      alert('Fehler: ' + err.message);
-    }
-  };
-
-  const handleCreateEmployee = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!employeeFirstName || !employeeLastName) return;
-
-    try {
-      const selectedRole = (e.currentTarget as any).elements.employeeRoleSelect?.value || 'admin';
-      const pin = generateStarterPin(selectedRole, false, false);
-      const qrToken = generateSecureQrToken();
-
-      const { error } = await supabase
-        .from('users')
-        .insert({
-          school_id: schoolId,
-          role: selectedRole,
-          roles: [selectedRole],
-          first_name: employeeFirstName,
-          last_name: employeeLastName,
-          nickname: null,
-          email: null,
-          photo_url: '/campus_login_hero.png',
-          is_active: true,
-          is_app_user: true,
-          ausweis_nummer: pin,
-          teacher_qr_token: qrToken,
-          is_campus_active: false,
-          is_groovelab_active: false
-        });
-
-      if (error) throw error;
-
-      alert(`Mitarbeiter ${employeeFirstName} ${employeeLastName} wurde erfolgreich angelegt.`);
-      setEmployeeFirstName('');
-      setEmployeeLastName('');
-      setEmployeeNickname('');
-      setEmployeeEmail('');
-      setShowAddEmployeeModal(false);
-      fetchDashboardData();
-    } catch (err: any) {
-      alert('Fehler: ' + err.message);
-    }
-  };
-
-  const handleImportEmployees = async () => {
-    if (!employeeCsvText.trim()) return;
-    try {
-      setEmployeeImportStatus(null);
-      const lines = employeeCsvText.split('\n');
-      let successCount = 0;
-      let skippedCount = 0;
-
-      for (let line of lines) {
-        line = line.trim();
-        if (!line || line.toLowerCase().includes('vorname')) continue;
-
-        const parts = line.split(/[;,]/);
-        if (parts.length < 3) {
-          skippedCount++;
-          continue;
-        }
-
-        const firstName = parts[0]?.trim();
-        const lastName = parts[1]?.trim();
-        const email = parts[2]?.trim();
-        const nickname = parts[3]?.trim() || null;
-        const role = parts[4]?.trim()?.toLowerCase() === 'admin' ? 'admin' : 'secretary';
-        const pin = generateStarterPin(role, false, false);
-        const qrToken = generateSecureQrToken();
-
-        const { error } = await supabase
-          .from('users')
-          .insert({
-            school_id: schoolId,
-            role: role,
-            roles: [role],
-            first_name: firstName,
-            last_name: lastName,
-            email: email,
-            nickname: nickname,
-            photo_url: '/campus_login_hero.png',
-            ausweis_nummer: pin,
-            teacher_qr_token: qrToken,
-            is_active: true,
-            is_app_user: true,
-            is_campus_active: false,
-            is_groovelab_active: false
-          });
-
-        if (error) {
-          console.error("Error inserting employee during import:", error);
-          skippedCount++;
-        } else {
-          successCount++;
-        }
-      }
-
-      setEmployeeImportStatus({
-        success: true,
-        message: `Import abgeschlossen: ${successCount} Mitarbeiterprofile angelegt. PINs bereit zur Verteilung.`
-      });
-      setEmployeeCsvText('');
-      fetchDashboardData();
-    } catch (err: any) {
-      alert('Fehler: ' + err.message);
-    }
-  };
-
-  const handleUpdateEmployeeRole = async (employeeId: string, newRole: string) => {
-    try {
-      const emp = employees.find(e => e.id === employeeId);
-      const currentRoles: string[] = Array.isArray(emp?.roles) && emp.roles.length > 0 
-        ? [...emp.roles] 
-        : (emp?.role ? [emp.role] : ['secretary']);
-      
-      if (!currentRoles.includes(newRole)) {
-        currentRoles.push(newRole);
-      }
-      
-      let primaryRole = emp?.role || newRole;
-      if (!currentRoles.includes(primaryRole)) {
-        primaryRole = currentRoles[0] || newRole;
-      }
-
-      const updateFields: any = {};
-      if (currentRoles.includes('teacher')) {
-        updateFields.is_campus_active = true;
-        updateFields.is_groovelab_active = true;
-      }
-
-      // Optimistically update local state immediately
-      setEmployees((prev) =>
-        prev.map((e) =>
-          e.id === employeeId ? { ...e, roles: currentRoles, role: primaryRole, ...updateFields } : e
-        )
-      );
-      if (employeeId === userId) {
-        setCurrentUserProfile((prev: any) =>
-          prev ? { ...prev, roles: currentRoles, role: primaryRole, ...updateFields } : prev
-        );
-      }
-
-      // 1. Authoritative RPC call (Fail-Closed, Security Definer)
-      const { data: rpcData, error: rpcErr } = await supabase.rpc('update_employee_roles', {
-        p_target_user_id: employeeId,
-        p_roles: currentRoles,
-        p_primary_role: primaryRole
-      });
-      if (rpcErr) throw rpcErr;
-      if (!rpcData?.success) throw new Error(rpcData?.error || 'Rollen-Update fehlgeschlagen');
-
-      // 2. Optional non-role module flags update
-      if (Object.keys(updateFields).length > 0) {
-        await supabase.from('users').update(updateFields).eq('id', employeeId);
-      }
-
-      alert(`Mitarbeiter-Rolle erfolgreich aktualisiert.`);
-      await fetchDashboardData();
-    } catch (err: any) {
-      alert('Fehler beim Aktualisieren der Rolle: ' + err.message);
-    }
-  };
-
-  const handleToggleRole = async (emp: any, roleToToggle: 'admin' | 'secretary' | 'teacher') => {
-    try {
-      const currentRoles: string[] = Array.isArray(emp.roles) && emp.roles.length > 0 
-        ? [...emp.roles] 
-        : (emp.role ? [emp.role] : ['secretary']);
-      
-      const hasRole = currentRoles.includes(roleToToggle);
-      let newRoles: string[] = [];
-
-      if (hasRole) {
-        // Attempting to remove role
-        newRoles = currentRoles.filter(r => r !== roleToToggle);
-        if (newRoles.length === 0) {
-          alert('Ein Mitarbeiter muss mindestens eine aktive Rolle besitzen (Admin, Verwaltung oder Lehrer).');
-          return;
-        }
-      } else {
-        // Adding role
-        newRoles = [...currentRoles, roleToToggle];
-      }
-
-      // Determine primary role
-      let primaryRole = emp.role;
-      if (!newRoles.includes(primaryRole)) {
-        if (newRoles.includes('admin')) primaryRole = 'admin';
-        else if (newRoles.includes('secretary')) primaryRole = 'secretary';
-        else primaryRole = 'teacher';
-      }
-
-      const updateFields: any = {};
-      if (newRoles.includes('teacher')) {
-        updateFields.is_campus_active = true;
-        updateFields.is_groovelab_active = true;
-      }
-
-      // Optimistically update local state immediately
-      setEmployees((prev) =>
-        prev.map((e) =>
-          e.id === emp.id ? { ...e, roles: newRoles, role: primaryRole, ...updateFields } : e
-        )
-      );
-      if (emp.id === userId) {
-        setCurrentUserProfile((prev: any) =>
-          prev ? { ...prev, roles: newRoles, role: primaryRole, ...updateFields } : prev
-        );
-      }
-
-      // 1. Authoritative RPC call (Fail-Closed, Security Definer)
-      const { data: rpcData, error: rpcErr } = await supabase.rpc('update_employee_roles', {
-        p_target_user_id: emp.id,
-        p_roles: newRoles,
-        p_primary_role: primaryRole
-      });
-      if (rpcErr) throw rpcErr;
-      if (!rpcData?.success) throw new Error(rpcData?.error || 'Rollen-Update fehlgeschlagen');
-
-      // 2. Optional non-role module flags update
-      if (Object.keys(updateFields).length > 0) {
-        await supabase.from('users').update(updateFields).eq('id', emp.id);
-      }
-
-      await fetchDashboardData();
-    } catch (err: any) {
-      alert('Fehler beim Aktualisieren der Rolle: ' + err.message);
-    }
-  };
-
-  const handleCreateStudentCampus = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!assertSecretaryWriteAccess('Schüler anlegen')) return;
-    if (!newStudentFirstName || !newStudentLastName) {
-      alert('Bitte Vorname und Nachname ausfüllen.');
-      return;
-    }
-
-    try {
-      const teacherId = newStudentTeacherId || null;
-      const finalLastName = hasCampusSub ? newStudentLastName : (newStudentLastName?.trim() ? newStudentLastName.trim().charAt(0).toUpperCase() + '.' : '');
-      const finalBirthDate = null;
-
-      // 1. Call import_student RPC (5-Tabellen anonymisiertes Onboarding)
-      const { data: newStudentId, error: insertError } = await supabase.rpc('import_student', {
-        first_name: newStudentFirstName,
-        last_name: finalLastName,
-        birth_date: finalBirthDate,
-        instrument: newStudentInstrument || 'Nicht festgelegt',
-        school_id: schoolId,
-        teacher_id: teacherId,
-        lesson_duration: newStudentDuration || 30
-      });
-
-      if (insertError) throw insertError;
-
-      alert(`Schüler ${newStudentFirstName} ${newStudentLastName} wurde erfolgreich angelegt (Onboarding ausstehend).`);
-      
-      // Reset form
-      setNewStudentFirstName('');
-      setNewStudentLastName('');
-      setNewStudentBirthDate('');
-      setNewStudentNickname('');
-      setNewStudentInstrument('');
-      setNewStudentDuration(30);
-      setNewStudentTeacherId('');
-      setShowAddStudentModal(false);
-      window.dispatchEvent(new CustomEvent('students_updated'));
-      window.dispatchEvent(new CustomEvent('campus_students_updated'));
-      window.dispatchEvent(new CustomEvent('groovelab_students_updated'));
-      fetchDashboardData();
-    } catch (err: any) {
-      alert('Fehler beim Erstellen des Schülers: ' + err.message);
-    }
-  };
-
-  const handleCreateStudentGroovelab = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!assertSecretaryWriteAccess('Schüler anlegen')) return;
-    if (!newStudentFirstName || !newStudentLastName) {
-      alert('Bitte Vorname und Nachname ausfüllen.');
-      return;
-    }
-
-    try {
-      const teacherId = newStudentTeacherId || null;
-      const finalLastName = hasCampusSub ? newStudentLastName : (newStudentLastName?.trim() ? newStudentLastName.trim().charAt(0).toUpperCase() + '.' : '');
-      const finalBirthDate = null;
-
-      // 1. Call import_student RPC
-      const { data: newStudentId, error: insertError } = await supabase.rpc('import_student', {
-        first_name: newStudentFirstName,
-        last_name: finalLastName,
-        birth_date: finalBirthDate,
-        instrument: newStudentInstrument || 'Nicht festgelegt',
-        school_id: schoolId,
-        teacher_id: teacherId,
-        lesson_duration: newStudentDuration || 30
-      });
-
-      if (insertError) throw insertError;
-
-      // 2. Set is_groovelab_active = true for the newly created student profile
-      // Note: is_groovelab_active / is_campus_active are on users_raw (via users view), not on students
-      if (newStudentId) {
-        await supabase
-          .from('users')
-          .update({ is_groovelab_active: true, is_campus_active: false })
-          .eq('id', newStudentId);
-      }
-
-      alert(`Schüler ${newStudentFirstName} ${newStudentLastName} wurde erfolgreich für GrooveLab angelegt.`);
-      
-      // Reset form
-      setNewStudentFirstName('');
-      setNewStudentLastName('');
-      setNewStudentBirthDate('');
-      setNewStudentNickname('');
-      setNewStudentInstrument('');
-      setNewStudentDuration(30);
-      setNewStudentTeacherId('');
-      setShowAddGroovelabStudentModal(false);
-      window.dispatchEvent(new CustomEvent('students_updated'));
-      window.dispatchEvent(new CustomEvent('campus_students_updated'));
-      window.dispatchEvent(new CustomEvent('groovelab_students_updated'));
-      fetchDashboardData();
-    } catch (err: any) {
-      alert('Fehler beim Erstellen des Schülers: ' + err.message);
-    }
-  };
-
-  const handleDeleteStudentCampus = (
-    studentId: string, 
-    name: string, 
-    instrument?: string, 
-    teacherId?: string, 
-    isCampusActive?: boolean, 
-    isGroovelabActive?: boolean
-  ) => {
-    const teacher = allTeachers.find((t: any) => t.id === teacherId);
-    const teacherName = teacher ? formatTeacherFullName(teacher) : undefined;
-    setDeleteStudentModalData({
-      id: studentId,
-      name,
-      instrument,
-      teacherName,
-      isCampusActive,
-      isGroovelabActive
-    });
-  };
-
-  const handleBulkStudentImport = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!studentCsvText.trim()) {
-      alert('Bitte geben Sie Schülerdaten ein.');
-      return;
-    }
-
-    const lines = studentCsvText.split('\n');
-    let successCount = 0;
-    let failCount = 0;
-
-    // Load unique teachers list for naming check
-    const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
-      if (!acc.some(existing => existing.id === t.id)) {
-        acc.push(t);
-      }
-      return acc;
-    }, []);
-
-    const errors: string[] = [];
-
-    if (isAnonymizedImport) {
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-        
-        let parts = trimmed.split(';');
-        if (parts.length < 2) {
-          parts = trimmed.split(',');
-        }
-
-        let firstName = '';
-        let lastName = '';
-        let birthDate: string | null = null;
-        let instrument = 'Nicht festgelegt';
-        let teacherNamePart = '';
-
-        const isSmartActive = studentFilterTeacher && studentFilterTeacher !== 'All';
-
-        if (parts.length === 1) {
-          // e.g. "Max Mustermann" or "Max"
-          const nameParts = trimmed.split(/\s+/);
-          firstName = nameParts[0] || '';
-          lastName = nameParts.slice(1).join(' ') || '';
-        } else if (parts.length === 2 && isSmartActive) {
-          // Could be "Max; Mustermann" or "Max Mustermann; 15.08.2012"
-          const p1 = parts[1]?.trim() || '';
-          if (p1.includes('.')) {
-            const nameParts = parts[0].trim().split(/\s+/);
-            firstName = nameParts[0] || '';
-            lastName = nameParts.slice(1).join(' ') || '';
-            birthDate = p1;
-          } else {
-            firstName = parts[0]?.trim();
-            lastName = parts[1]?.trim();
-          }
-        } else {
-          // Regular parsing
-          firstName = parts[0]?.trim();
-          lastName = parts[1]?.trim();
-          
-          // Check if parts[2] looks like a birth date (has dot) or instrument
-          const p2 = parts[2]?.trim() || '';
-          if (p2.includes('.')) {
-            birthDate = p2;
-            instrument = parts[3]?.trim() || 'Nicht festgelegt';
-            teacherNamePart = parts[4]?.trim()?.toLowerCase() || '';
-          } else {
-            // No birth date provided, parts[2] is instrument
-            instrument = p2 || 'Nicht festgelegt';
-            teacherNamePart = parts[3]?.trim()?.toLowerCase() || '';
-          }
-        }
-
-        if (!firstName) {
-          failCount++;
-          errors.push(`Zeile "${line}": Vorname fehlt.`);
-          continue;
-        }
-
-        // Match teacher
-        let teacherId: string | null = null;
-        if (studentFilterTeacher && studentFilterTeacher !== 'All') {
-          const foundSelected = allUniqueTeachers.find(t => t.id === studentFilterTeacher);
-          if (foundSelected) {
-            teacherId = foundSelected.id;
-            instrument = foundSelected.instrument || 'Nicht festgelegt';
-          }
-        }
-
-        if (!teacherId && teacherNamePart) {
-          const found = allUniqueTeachers.find(t => {
-            const fName = (t.firstName || t.first_name || '').toLowerCase();
-            const lName = (t.lastName || t.last_name || '').toLowerCase();
-            return `${fName} ${lName}`.includes(teacherNamePart) || lName.includes(teacherNamePart);
-          });
-          if (found) {
-            teacherId = found.id;
-          }
-        }
-
-        try {
-          const finalLastName = hasCampusSub ? lastName : (lastName?.trim() ? lastName.trim().charAt(0).toUpperCase() + '.' : '');
-          const finalBirthDate = hasCampusSub ? sanitizeBirthDateToDayOnly(birthDate) : null;
-
-          const { data, error: rpcError } = await supabase.rpc('import_student', {
-            first_name: firstName,
-            last_name: finalLastName,
-            birth_date: finalBirthDate,
-            instrument: instrument,
-            school_id: schoolId,
-            teacher_id: teacherId || null,
-            lesson_duration: bulkImportDuration || 30
-          });
-
-          if (rpcError) throw rpcError;
-          successCount++;
-        } catch (err: any) {
-          console.error('Import error for line:', line, err);
-          errors.push(`Zeile "${line}": ${err.message || err}`);
-          failCount++;
-        }
-      }
-
-      if (errors.length > 0) {
-        alert(`Anonymisierter Bulk-Import abgeschlossen: ${successCount} Schüler erfolgreich angelegt, ${failCount} Fehler.\n\nFehlerdetails:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? '\n...weitere Fehler in der Browser-Konsole.' : ''}`);
-      } else {
-        alert(`Anonymisierter Bulk-Import abgeschlossen: ${successCount} Schüler erfolgreich angelegt.`);
-      }
-
-      setStudentCsvText('');
-      setIsStudentCsvExpanded(false);
-      setIsAnonymizedImport(true);
-      window.dispatchEvent(new CustomEvent('students_updated'));
-      window.dispatchEvent(new CustomEvent('campus_students_updated'));
-      window.dispatchEvent(new CustomEvent('groovelab_students_updated'));
-      fetchDashboardData();
-      return;
-    }
-
-
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-
-      // Robust Delimiter Parsing
-      let parts = trimmed.split(';');
-      if (parts.length < 2) {
-        parts = trimmed.split(',');
-      }
-
-      let namePart = '';
-      let instrument = 'ohne Zuweisung';
-      let email = '';
-      let teacherNamePart = '';
-
-      if (parts.length >= 2) {
-        namePart = parts[0].trim();
-        instrument = parts[1].trim() || 'Nicht festgelegt';
-        email = parts[2]?.trim() || '';
-        teacherNamePart = parts[3]?.trim()?.toLowerCase() || '';
-      } else {
-        namePart = trimmed;
-      }
-
-      const nameParts = namePart.split(/\s+/);
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
-
-      if (!firstName) {
-        failCount++;
-        errors.push(`Zeile "${line}": Kein Vorname gefunden.`);
-        continue;
-      }
-
-      // Try matching associated teacher name
-      let teacherId: string | null = null;
-      let finalInstrument = instrument;
-
-      // If a specific teacher is selected on the sidebar, auto-fill teacher and instrument
-      if (studentFilterTeacher && studentFilterTeacher !== 'All') {
-        const foundSelected = allUniqueTeachers.find(t => t.id === studentFilterTeacher);
-        if (foundSelected) {
-          teacherId = foundSelected.id;
-          // Auto-inject instrument if not explicitly typed or is default/placeholder
-          if (!parts[1]?.trim()) {
-            finalInstrument = foundSelected.instrument || 'Nicht festgelegt';
-          }
-        }
-      }
-
-      if (!teacherId && teacherNamePart) {
-        const found = allUniqueTeachers.find(t => {
-          const fName = (t.firstName || t.first_name || '').toLowerCase();
-          const lName = (t.lastName || t.last_name || '').toLowerCase();
-          return `${fName} ${lName}`.includes(teacherNamePart) || lName.includes(teacherNamePart);
-        });
-        if (found) {
-          teacherId = found.id;
-        }
-      }
-
-      try {
-        const pin = 'GL-' + Math.floor(1000 + Math.random() * 9000);
-        const studentId = crypto.randomUUID();
-        const qrToken = crypto.randomUUID();
-        const defaultAvatarUrl = '/avatars/student_eguitar_1.png';
-        const finalEmail = `student.${studentId}@campus-groovelab.local`;
-
-        const finalLastName = hasCampusSub ? lastName : (lastName?.trim() ? lastName.trim().charAt(0).toUpperCase() + '.' : '');
-
-        const { data: insertedStudent, error: insertError } = await supabase
-          .from('users')
-          .insert({
-            id: studentId,
-            school_id: schoolId,
-            teacher_id: teacherId,
-            role: 'student',
-            first_name: firstName,
-            last_name: finalLastName,
-            email: finalEmail,
-            instrument: finalInstrument || 'Nicht festgelegt',
-            avatar_url: defaultAvatarUrl,
-            is_active: true,
-            is_campus_active: !(billingPayer === 'student' || studentBillingOption === 'student_full' || studentBillingOption === 'student_partial' || studentBillingOption === 'option1'),
-            is_groovelab_active: false,
-            status: (billingPayer === 'student' || studentBillingOption === 'student_full' || studentBillingOption === 'student_partial' || studentBillingOption === 'option1') ? 'passive' : 'active',
-            ausweis_nummer: pin,
-            qr_token: qrToken,
-            lesson_duration: bulkImportDuration || 30
-          })
-          .select('id')
-          .single();
-
-        if (insertError) throw insertError;
-        if (!insertedStudent) throw new Error("Keine ID vom Server zurückgegeben.");
-
-        await supabase.from('avatars').insert({
-          user_id: insertedStudent.id,
-          avatar_style: 'Standard_Silhouette',
-          instrument_type: instrument || 'Nicht festgelegt',
-          evolution_level: 1
-        });
-
-        successCount++;
-      } catch (err: any) {
-        console.error('Import error for line:', line, err);
-        errors.push(`Zeile "${line}": ${err.message || err}`);
-        failCount++;
-      }
-    }
-
-    if (errors.length > 0) {
-      alert(`Bulk-Import abgeschlossen: ${successCount} Schüler erfolgreich angelegt, ${failCount} Fehler.\n\nFehlerdetails:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? '\n...weitere Fehler in der Browser-Konsole.' : ''}`);
-    } else {
-      alert(`Bulk-Import abgeschlossen: ${successCount} Schüler erfolgreich angelegt.`);
-    }
-
-    setStudentCsvText('');
-    setIsStudentCsvExpanded(false);
-    window.dispatchEvent(new CustomEvent('students_updated'));
-    window.dispatchEvent(new CustomEvent('campus_students_updated'));
-    window.dispatchEvent(new CustomEvent('groovelab_students_updated'));
-    fetchDashboardData();
-  };
-
   const getRemainingMonthsAndPrice = () => {
     const now = new Date();
     const startMonth = Number(schoolYearStartMonth || 9);
@@ -7286,170 +6196,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       alert('Fehler bei der Verknüpfung: ' + err.message);
     } finally {
       setLinkingInProgress(false);
-    }
-  };
-
-  const handleDeleteUser = async (id: string) => {
-    if (!confirm('Diesen Account wirklich entfernen?')) return;
-    try {
-      // Physically purge assets from Supabase Storage
-      await deleteUserStorageAssets([id]);
-
-      try {
-        await supabase.rpc('delete_user_fully', {
-          p_user_id: id,
-          p_school_id: schoolId || null
-        });
-      } catch (e) {}
-
-      try { await supabase.from('user_email_prefixes').delete().eq('user_id', id); } catch (e) {}
-      try { await supabase.from('user_email_suffixes').delete().eq('user_id', id); } catch (e) {}
-      try { await supabase.from('activation_days').delete().eq('student_id', id); } catch (e) {}
-      try { await supabase.from('student_first_names').delete().eq('student_id', id); } catch (e) {}
-      try { await supabase.from('student_last_names').delete().eq('student_id', id); } catch (e) {}
-      try { await supabase.from('schedules').delete().or(`teacher_id.eq.${id},student_id.eq.${id}`); } catch (e) {}
-      try { await supabase.from('schedule_occurrences').delete().or(`teacher_id.eq.${id},student_id.eq.${id}`); } catch (e) {}
-      try { await supabase.from('bands').update({ coach_id: null }).eq('coach_id', id); } catch (e) {}
-      try { await supabase.from('band_members').delete().eq('user_id', id); } catch (e) {}
-      try { await supabase.from('chat_messages').delete().or(`sender_id.eq.${id},recipient_id.eq.${id}`); } catch (e) {}
-      try { await supabase.from('direct_messages').delete().or(`sender_id.eq.${id},recipient_id.eq.${id}`); } catch (e) {}
-      try { await supabase.from('campus_feedback_responses').delete().eq('teacher_id', id); } catch (e) {}
-      try { await supabase.from('pending_students').delete().eq('id', id); } catch (e) {}
-
-      const { error: rawErr } = await supabase.from('users').delete().eq('id', id);
-      try { await supabase.from('students').delete().eq('id', id); } catch (e) {}
-      try { await supabase.from('users').delete().eq('id', id); } catch (e) {}
-
-      if (rawErr && rawErr.code !== 'PGRST116') {
-        console.warn('Users raw delete notice:', rawErr);
-      }
-      fetchDashboardData();
-    } catch (err: any) {
-      alert('Fehler beim Löschen: ' + err.message);
-    }
-  };
-
-  // Drag and Drop Helpers
-  const handleUpdateTeacherInstrument = async (teacherId: string, newInstrument: string) => {
-    try {
-      const { error: rawErr } = await supabase
-        .from('users')
-        .update({ instrument: newInstrument })
-        .eq('id', teacherId);
-      try {
-        await supabase.from('users').update({ instrument: newInstrument }).eq('id', teacherId);
-      } catch (e) {}
-      if (rawErr) throw rawErr;
-      fetchDashboardData();
-    } catch (err: any) {
-      alert("Fehler beim Zuweisen des Unterrichtsfachs: " + err.message);
-    }
-  };
-
-  const handleUpdateStudentTeacher = async (studentId: string, teacherId: string | null) => {
-    try {
-      let teacherInstrument: string | null = null;
-      if (teacherId) {
-        const { data: teacherUser } = await supabase
-          .from('users')
-          .select('instrument')
-          .eq('id', teacherId)
-          .maybeSingle();
-        if (teacherUser?.instrument) {
-          teacherInstrument = teacherUser.instrument;
-        }
-      }
-
-      const updatePayload: any = { 
-        teacher_id: teacherId, 
-        instrument: teacherId ? (teacherInstrument || 'Musiker') : 'Musiker' 
-      };
-
-      // Resolve student first_name & last_name for cross-table matching
-      let sFirstName = '';
-      let sLastName = '';
-      const { data: uStudent } = await supabase
-        .from('users')
-        .select('first_name, last_name')
-        .eq('id', studentId)
-        .maybeSingle();
-
-      if (uStudent) {
-        sFirstName = uStudent.first_name || '';
-        sLastName = uStudent.last_name || '';
-      } else {
-        const { data: pStudent } = await supabase
-          .from('pending_students_decrypted')
-          .select('first_name, last_name')
-          .eq('id', studentId)
-          .maybeSingle();
-        if (pStudent) {
-          sFirstName = pStudent.first_name || '';
-          sLastName = pStudent.last_name || '';
-        }
-      }
-
-      // Optimistic local state update for instant UI feedback
-      setStudents((prevStudents: any[]) =>
-        prevStudents.map((s: any) => {
-          const isTarget = s.id === studentId || (sFirstName && sLastName && s.first_name === sFirstName && s.last_name === sLastName);
-          if (isTarget) {
-            return {
-              ...s,
-              teacher_id: teacherId,
-              instrument: teacherId ? (teacherInstrument || s.instrument || 'Musiker') : 'Musiker'
-            };
-          }
-          return s;
-        })
-      );
-
-      // If the teacher filter was set to 'none' or a specific teacher, switch to 'All' so student stays visible
-      if (studentFilterTeacher !== 'All') {
-        setStudentFilterTeacher('All');
-      }
-
-      // 1. Update or create in users_raw
-      try {
-        const { data: existingUser } = await supabase.from('users').select('id').eq('id', studentId).maybeSingle();
-        if (!existingUser) {
-          const stObj = students.find((s: any) => s.id === studentId);
-          await supabase.from('users').insert({
-            id: studentId,
-            school_id: stObj?.school_id || schoolId,
-            role: 'student',
-            first_name: sFirstName || stObj?.first_name || 'Schüler',
-            last_name: sLastName || stObj?.last_name || '',
-            instrument: updatePayload.instrument,
-            teacher_id: teacherId,
-            lesson_duration: stObj?.lesson_duration || 30,
-            is_campus_active: !!stObj?.is_campus_active,
-            is_groovelab_active: !!stObj?.is_groovelab_active,
-            is_active: false
-          });
-        } else {
-          await supabase.from('users').update(updatePayload).eq('id', studentId);
-          try {
-            await supabase.from('users').update(updatePayload).eq('id', studentId);
-          } catch (e) {}
-        }
-      } catch (e) {
-        console.warn('users_raw teacher update warning:', e);
-      }
-
-      // 2. Update students table (only valid columns: teacher_id and instrument)
-      try {
-        await supabase.from('students').update({
-          teacher_id: teacherId,
-          instrument: updatePayload.instrument
-        }).eq('id', studentId);
-      } catch (e) {
-        console.warn('students teacher update warning:', e);
-      }
-
-      await fetchDashboardData();
-    } catch (err: any) {
-      alert("Fehler beim Zuweisen der Lehrkraft: " + err.message);
     }
   };
 
@@ -8376,6 +7122,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               setSchedulesRoomsViewMode={setSchedulesRoomsViewMode}
               roomIssues={roomIssues}
               setRoomIssues={setRoomIssues}
+              onOpenFacilityLogModal={() => setShowFacilityLogModal(true)}
               pendingBookings={pendingBookings}
               setPendingBookings={setPendingBookings}
               pendingSchedules={pendingSchedules}
@@ -9157,6 +7904,17 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           activeTab={activeTab}
           fetchDashboardData={fetchDashboardData}
         />
+        {showFacilityLogModal && (
+          <SecretaryFacilityLogModal
+            isOpen={showFacilityLogModal}
+            onClose={() => setShowFacilityLogModal(false)}
+            roomIssues={roomIssues}
+            rooms={rooms}
+            schoolId={schoolId}
+            onResolveIssue={handleResolveRoomIssue}
+            onReopenIssue={handleReopenRoomIssue}
+          />
+        )}
       </Suspense>
       {/* 👤 Bounded Context: User Detail, Management & Context Menu Modals Hub */}
       <Suspense fallback={null}>

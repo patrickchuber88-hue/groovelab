@@ -99,6 +99,7 @@ export interface SecretaryVerwaltungTabProps {
   getAlphabeticalUniColor: (name: string) => any;
   checkTimeOverlap?: (start1: string, end1: string, start2: string, end2: string) => boolean;
   getPlanDisplayName?: (plan: any) => string;
+  onOpenFacilityLogModal?: () => void;
 
   // Teachers & Staff
   campusTeachers: any[];
@@ -532,6 +533,7 @@ export function SecretaryVerwaltungTab(props: SecretaryVerwaltungTabProps) {
     getAlphabeticalUniColor,
     checkTimeOverlap,
     getPlanDisplayName,
+    onOpenFacilityLogModal,
 
     // Staff
     campusTeachers,
@@ -992,6 +994,7 @@ export function SecretaryVerwaltungTab(props: SecretaryVerwaltungTabProps) {
             setShowAvvModal={setShowAvvModal}
             showLogbookModal={showLogbookModal}
             setShowLogbookModal={setShowLogbookModal}
+            onOpenFacilityLogModal={onOpenFacilityLogModal}
             showStorageManagerModal={showStorageManagerModal}
             setShowStorageManagerModal={setShowStorageManagerModal}
             dismissedInvoiceAlert={dismissedInvoiceAlert}
@@ -1269,6 +1272,7 @@ export function SecretaryVerwaltungTab(props: SecretaryVerwaltungTabProps) {
             pendingBookings={pendingBookings}
             handleConfirmBooking={handleConfirmBooking}
             handleRejectBooking={handleRejectBooking}
+            onOpenFacilityLogModal={onOpenFacilityLogModal}
           />
         </Suspense>
       )}
