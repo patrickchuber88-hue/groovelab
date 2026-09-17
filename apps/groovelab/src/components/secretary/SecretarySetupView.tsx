@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   AlertCircle, Check, CheckCircle, Clock, Copy, Database, Download,
   Eye, FileCheck, FileText, Fingerprint, KeyRound, Lightbulb, Printer, QrCode, School, ShieldAlert,
@@ -7,6 +7,7 @@ import {
 import { generateMessengerSafetyCertificatePDF } from '../../utils/messengerSafetyCertificateGenerator';
 import { copyMessengerClauseToClipboard } from '../../utils/messengerClauseTemplate';
 import { getCanonicalQrLandingUrl } from '../../utils/tenantUrlHelper';
+import { AvvCertificateModal } from '../modals/AvvCertificateModal';
 
 export interface SecretarySetupViewProps {
   schoolId: string;
@@ -188,6 +189,7 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
   } = props;
 
   const [copiedClause, setCopiedClause] = React.useState(false);
+  const [showCertModal, setShowCertModal] = useState<boolean>(false);
 
   return (
           <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -1480,25 +1482,46 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                                     {isAvvSigned ? 'Gezeichnet' : 'Ausstehend'}
                                   </span>
                                   {isAvvSigned ? (
-                                    <button
-                                      onClick={() => setShowAvvModal(true)}
-                                      style={{
-                                        fontSize: '0.62rem', 
-                                        fontWeight: 800, 
-                                        background: '#ffffff', 
-                                        border: '1px solid #a7f3d0', 
-                                        color: '#065f46', 
-                                        padding: '3.5px 10px', 
-                                        borderRadius: '100px', 
-                                        cursor: 'pointer',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
-                                      }}
-                                    >
-                                      <FileText size={11} /> AVV ansehen / drucken
-                                    </button>
+                                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                      <button
+                                        onClick={() => setShowAvvModal(true)}
+                                        style={{
+                                          fontSize: '0.62rem', 
+                                          fontWeight: 800, 
+                                          background: '#ffffff', 
+                                          border: '1px solid #a7f3d0', 
+                                          color: '#065f46', 
+                                          padding: '3.5px 10px', 
+                                          borderRadius: '100px', 
+                                          cursor: 'pointer',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+                                        }}
+                                      >
+                                        <FileText size={11} /> AVV Text
+                                      </button>
+                                      <button
+                                        onClick={() => setShowCertModal(true)}
+                                        style={{
+                                          fontSize: '0.62rem', 
+                                          fontWeight: 850, 
+                                          background: '#16a34a', 
+                                          border: 'none', 
+                                          color: '#ffffff', 
+                                          padding: '3.5px 10px', 
+                                          borderRadius: '100px', 
+                                          cursor: 'pointer',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          boxShadow: '0 2px 4px rgba(22, 163, 74, 0.2)'
+                                        }}
+                                      >
+                                        <ShieldCheck size={11} /> AVV-Siegeldokument (PDF)
+                                      </button>
+                                    </div>
                                   ) : (
                                     <button
                                       onClick={() => setShowAvvModal(true)}
@@ -2065,6 +2088,13 @@ export function SecretarySetupView(props: SecretarySetupViewProps) {
                 </div>
               </div>
             )}
+
+            <AvvCertificateModal
+              isOpen={showCertModal}
+              onClose={() => setShowCertModal(false)}
+              schoolName={props.schoolName || 'Musikschule'}
+              adminName={props.currentUserProfile?.full_name || 'Schulleitung'}
+            />
 
           </div>
   );

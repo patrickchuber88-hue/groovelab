@@ -61,6 +61,10 @@ import { DEFAULT_FOKUS_LEVELS } from '../utils/studentProgressEngine';
 import { generateStarterPin, generateSecureQrToken } from './secretary/utils/secretaryAuthUtils';
 import { useSecretaryStaff } from './secretary/hooks/useSecretaryStaff';
 import { useSecretaryStudents } from './secretary/hooks/useSecretaryStudents';
+import { useSecretaryCrisis } from './secretary/hooks/useSecretaryCrisis';
+import { useSecretaryAnnouncements } from './secretary/hooks/useSecretaryAnnouncements';
+import { useSecretaryEquipment } from './secretary/hooks/useSecretaryEquipment';
+import { useSecretaryAudit } from './secretary/hooks/useSecretaryAudit';
 
 function checkTimeOverlap(t1Start: string, t1End: string, t2Start: string, t2End: string): boolean {
   if (!t1Start || !t1End || !t2Start || !t2End) return false;
@@ -871,43 +875,12 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       refreshStorageQuota();
     }
   }, [currentSchoolProfile?.id]);
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
-  const [auditLoading, setAuditLoading] = useState<boolean>(false);
-  const [auditSearchQuery, setAuditSearchQuery] = useState<string>('');
-  const [auditActionFilter, setAuditActionFilter] = useState<string>('All');
   const [campusSubTab, setCampusSubTab] = useState<'briefing' | 'subjects' | 'onboarding' | 'students' | 'events' | 'schedules' | 'status' | 'rooms'>(() => {
     const saved = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_campus_subtab') || localStorage.getItem('groovelab_campus_subtab')) : null;
     const valid = ['briefing', 'subjects', 'onboarding', 'students', 'events', 'schedules', 'status', 'rooms'];
     if (saved && valid.includes(saved)) return saved as any;
     return 'briefing';
   });
-  // Administrative Mitteilungen & Informationen
-  const [announcementsList, setAnnouncementsList] = useState<any[]>([]);
-  const [announcementsLoading, setAnnouncementsLoading] = useState<boolean>(false);
-  const [newAnnouncementTitle, setNewAnnouncementTitle] = useState('');
-  const [newAnnouncementDescription, setNewAnnouncementDescription] = useState('');
-  const [newAnnouncementType, setNewAnnouncementType] = useState<'todo' | 'questionnaire'>('todo');
-  const [newAnnouncementQuestions, setNewAnnouncementQuestions] = useState<any[]>([]);
-  const [newAnnouncementQuestionType, setNewAnnouncementQuestionType] = useState<'text' | 'choice' | 'boolean'>('text');
-  const [newAnnouncementQuestionOptions, setNewAnnouncementQuestionOptions] = useState<string>('Ja, Nein, Vielleicht');
-  const [newAnnouncementPriority, setNewAnnouncementPriority] = useState<'standard' | 'critical'>('standard');
-  const [newAnnouncementIsAnonymous, setNewAnnouncementIsAnonymous] = useState<boolean>(false);
-  const [newAnnouncementTargetType, setNewAnnouncementTargetType] = useState<'all' | 'group' | 'individual'>('all');
-  const [newAnnouncementTargetGroup, setNewAnnouncementTargetGroup] = useState('guitar');
-  const [newAnnouncementTargetTeacherId, setNewAnnouncementTargetTeacherId] = useState('');
-  const [newAnnouncementDueDate, setNewAnnouncementDueDate] = useState('');
-  const [newAnnouncementRecurrence, setNewAnnouncementRecurrence] = useState<'none' | 'monthly' | 'half_yearly'>('none');
-  const [newAnnouncementAttachmentUrl, setNewAnnouncementAttachmentUrl] = useState('');
-  const [isUploadingAnnouncementAttachment, setIsUploadingAnnouncementAttachment] = useState(false);
-  const [selectedAnnouncementForStats, setSelectedAnnouncementForStats] = useState<any>(null);
-  const [statsSearchQuery, setStatsSearchQuery] = useState('');
-  const [statsStatusFilter, setStatsStatusFilter] = useState<'all' | 'completed' | 'pending'>('all');
-  const [statsModalTab, setStatsModalTab] = useState<'status' | 'qa'>('status');
-  const [announcementResponsesList, setAnnouncementResponsesList] = useState<any[]>([]);
-  const [newAnnouncementQuestionInput, setNewAnnouncementQuestionInput] = useState('');
-  const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
-  const [expandedResponseIds, setExpandedResponseIds] = useState<Record<string, boolean>>({});
-
   const [enabledCampusSubjects, setEnabledCampusSubjects] = useState<boolean>(true);
   const [enabledCampusRooms, setEnabledCampusRooms] = useState<boolean>(true);
   const [enabledCampusEvents, setEnabledCampusEvents] = useState<boolean>(true);
@@ -1187,10 +1160,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [isUploadingAttachment, setIsUploadingAttachment] = useState<boolean>(false);
   const [isAddingCustomEq, setIsAddingCustomEq] = useState<boolean>(false);
   const [customEqInput, setCustomEqInput] = useState<string>('');
-  const [selectedCrisisTeacherId, setSelectedCrisisTeacherId] = useState<string | null>(null);
-  const [crisisTabMode, setCrisisTabMode] = useState<'live' | 'history'>('live');
-  const [selectedArchiveLog, setSelectedArchiveLog] = useState<any | null>(null);
-  const [expandedLiveDayStr, setExpandedLiveDayStr] = useState<string | null>(null);
   const [activeContextMenu, setActiveContextMenu] = useState<{ student: any; top: number; right: number } | null>(null);
   const [copiedSchoolLink, setCopiedSchoolLink] = useState<boolean>(false);
   const [copiedKioskLink, setCopiedKioskLink] = useState<boolean>(false);
@@ -1727,7 +1696,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [activeStudentsModalList, setActiveStudentsModalList] = useState<{ list: any[], month: string, amount?: number, campusCount?: number, groovelabCount?: number, passiveCount?: number } | null>(null);
   const [activationSearchQuery, setActivationSearchQuery] = useState<string>('');
   const [modalStudentSearchQuery, setModalStudentSearchQuery] = useState<string>('');
-  const [auditLimit, setAuditLimit] = useState<number>(200);
 
   // Dynamic School Year End Calculation (German/Austrian Standard: Sept 1 to Aug 31)
   const getSchoolYearEndInfo = (simDate?: string | Date | null, existingEndIso?: string | null) => {
@@ -2780,32 +2748,85 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     fetchDashboardData: () => fetchDashboardData()
   });
 
-  // Equipment State
-  const [schoolEquipment, setSchoolEquipment] = useState<any[]>([]);
-  const [equipmentFormName, setEquipmentFormName] = useState('');
-  const [equipmentFormQty, setEquipmentFormQty] = useState<number>(1);
-  const [editingEquipment, setEditingEquipment] = useState<any | null>(null);
-  const [equipmentSaving, setEquipmentSaving] = useState(false);
-  const [selectedEquipmentRoomId, setSelectedEquipmentRoomId] = useState<string>('All');
-  const [dragOverRoomId, setDragOverRoomId] = useState<string | null>(null);
-  const [equipmentSearchQuery, setEquipmentSearchQuery] = useState<string>('');
-  const [equipmentSortFreeFirst, setEquipmentSortFreeFirst] = useState<boolean>(false);
-  const equipmentNameInputRef = useRef<HTMLInputElement>(null);
-  const equipmentQtyInputRef = useRef<HTMLInputElement>(null);
-  const [editingRoomInstrument, setEditingRoomInstrument] = useState<{ roomId: string, index: number, name: string, model: string } | null>(null);
-  const [editRoomInstFormName, setEditRoomInstFormName] = useState<string>('');
-  const [editRoomInstFormModel, setEditRoomInstFormModel] = useState<string>('');
-  const [editingEquipmentGroup, setEditingEquipmentGroup] = useState<any | null>(null);
-  const [editGroupName, setEditGroupName] = useState<string>('');
-  const [editGroupModel, setEditGroupModel] = useState<string>('');
-  const [editGroupLink, setEditGroupLink] = useState<string>('');
-  const [editGroupCoupled, setEditGroupCoupled] = useState<boolean>(true);
-  const [editGroupQty, setEditGroupQty] = useState<number>(1);
-  const [editGroupInstancesData, setEditGroupInstancesData] = useState<any[]>([]);
-  const [hoveredCloseId, setHoveredCloseId] = useState<string | null>(null);
+  const {
+    schoolEquipment,
+    setSchoolEquipment,
+    equipmentFormName,
+    setEquipmentFormName,
+    equipmentFormQty,
+    setEquipmentFormQty,
+    editingEquipment,
+    setEditingEquipment,
+    equipmentSaving,
+    setEquipmentSaving,
+    selectedEquipmentRoomId,
+    setSelectedEquipmentRoomId,
+    dragOverRoomId,
+    setDragOverRoomId,
+    equipmentSearchQuery,
+    setEquipmentSearchQuery,
+    equipmentSortFreeFirst,
+    setEquipmentSortFreeFirst,
+    equipmentNameInputRef,
+    equipmentQtyInputRef,
+    editingRoomInstrument,
+    setEditingRoomInstrument,
+    editRoomInstFormName,
+    setEditRoomInstFormName,
+    editRoomInstFormModel,
+    setEditRoomInstFormModel,
+    editingEquipmentGroup,
+    setEditingEquipmentGroup,
+    editGroupName,
+    setEditGroupName,
+    editGroupModel,
+    setEditGroupModel,
+    editGroupLink,
+    setEditGroupLink,
+    editGroupCoupled,
+    setEditGroupCoupled,
+    editGroupQty,
+    setEditGroupQty,
+    editGroupInstancesData,
+    setEditGroupInstancesData,
+    fetchSchoolEquipment,
+    handleSaveEquipment,
+    handleQtyChange,
+    handleSaveEquipmentGroup,
+    handleDeleteEquipment,
+    openEquipmentEditor,
+    handleDropInstrumentOnRoom,
+    handleRemoveRoomInstrument,
+    handleSaveRoomInstrumentEdit
+  } = useSecretaryEquipment({
+    schoolId,
+    rooms,
+    setRooms
+  });
+
   // Helpers
   const [userMap, setUserMap] = useState<Record<string, string>>({});
   const [roomMap, setRoomMap] = useState<Record<string, string>>({});
+
+  // 🛡️ Step 3.15: Modular Audit Log Governance Hook
+  const {
+    auditLogs,
+    auditLoading,
+    auditSearchQuery,
+    setAuditSearchQuery,
+    auditActionFilter,
+    setAuditActionFilter,
+    auditLimit,
+    setAuditLimit,
+    exportAuditLogsToCsv,
+    translateKey,
+    translateValue
+  } = useSecretaryAudit({
+    schoolId,
+    activeTab,
+    secretarySubTab,
+    userMap
+  });
   // Copy States
   const [copyingKiosk, setCopyingKiosk] = useState(false);
   const [copyingCampus, setCopyingCampus] = useState(false);
@@ -2846,13 +2867,101 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [updatingAlertId, setUpdatingAlertId] = useState<string | null>(null);
   const [updatingTeacherId, setUpdatingTeacherId] = useState<string | null>(null);
   const [briefingData, setBriefingData] = useState<SecretaryBriefingData | null>(null);
-  const [crisisNotifications, setCrisisNotifications] = useState<any[]>([]);
+  const {
+    crisisNotifications,
+    setCrisisNotifications,
+    crisisTabMode,
+    setCrisisTabMode,
+    selectedCrisisTeacherId,
+    setSelectedCrisisTeacherId,
+    selectedArchiveLog,
+    setSelectedArchiveLog,
+    expandedLiveDayStr,
+    setExpandedLiveDayStr,
+    fetchCrisisNotifications,
+    handleMarkAsNotified,
+    handleArchiveCrisisTicket,
+    handleArchiveAllResolvedTickets,
+    handleClaimTicket,
+    handleEndAbsenceOnBehalf
+  } = useSecretaryCrisis({
+    schoolId,
+    onRefreshDashboard: () => fetchDashboardData()
+  });
 
-  // Realtime subscription for crisis updates, system alerts, and user profiles with 500ms settling debounce
+  const {
+    announcementsList,
+    setAnnouncementsList,
+    announcementsLoading,
+    setAnnouncementsLoading,
+    newAnnouncementTitle,
+    setNewAnnouncementTitle,
+    newAnnouncementDescription,
+    setNewAnnouncementDescription,
+    newAnnouncementType,
+    setNewAnnouncementType,
+    newAnnouncementQuestions,
+    setNewAnnouncementQuestions,
+    newAnnouncementQuestionType,
+    setNewAnnouncementQuestionType,
+    newAnnouncementQuestionOptions,
+    setNewAnnouncementQuestionOptions,
+    newAnnouncementPriority,
+    setNewAnnouncementPriority,
+    newAnnouncementIsAnonymous,
+    setNewAnnouncementIsAnonymous,
+    newAnnouncementTargetType,
+    setNewAnnouncementTargetType,
+    newAnnouncementTargetGroup,
+    setNewAnnouncementTargetGroup,
+    newAnnouncementTargetTeacherId,
+    setNewAnnouncementTargetTeacherId,
+    newAnnouncementDueDate,
+    setNewAnnouncementDueDate,
+    newAnnouncementRecurrence,
+    setNewAnnouncementRecurrence,
+    newAnnouncementAttachmentUrl,
+    setNewAnnouncementAttachmentUrl,
+    isUploadingAnnouncementAttachment,
+    setIsUploadingAnnouncementAttachment,
+    selectedAnnouncementForStats,
+    setSelectedAnnouncementForStats,
+    statsSearchQuery,
+    setStatsSearchQuery,
+    statsStatusFilter,
+    setStatsStatusFilter,
+    statsModalTab,
+    setStatsModalTab,
+    announcementResponsesList,
+    setAnnouncementResponsesList,
+    newAnnouncementQuestionInput,
+    setNewAnnouncementQuestionInput,
+    editingAnnouncementId,
+    setEditingAnnouncementId,
+    expandedResponseIds,
+    setExpandedResponseIds,
+    fetchAnnouncements,
+    handleUploadAnnouncementAttachment,
+    handleMoveQuestion,
+    handleCreateAnnouncement,
+    handleDeleteAnnouncement,
+    fetchAnnouncementStats,
+    getAnnouncementTargetedTeachers,
+    handleSendReminder,
+    handleExportCSV
+  } = useSecretaryAnnouncements({
+    schoolId,
+    currentUserProfile,
+    campusTeachers,
+    bypassTeachers,
+    coaches,
+    setApprovalToast
+  });
+
+  // Realtime subscription for system alerts, bookings, and user profiles with 500ms settling debounce
   useEffect(() => {
     if (!schoolId) return;
     
-    fetchCrisisNotifications();
     fetchPendingBookings();
 
     const handleRefresh = () => {
@@ -2860,15 +2969,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     };
     window.addEventListener('refresh-bookings', handleRefresh);
 
-    let crisisTimeout: any = null;
     let dashboardTimeout: any = null;
-
-    const debouncedFetchCrisisNotifications = () => {
-      if (crisisTimeout) clearTimeout(crisisTimeout);
-      crisisTimeout = setTimeout(() => {
-        fetchCrisisNotifications();
-      }, 500);
-    };
 
     const debouncedFetchDashboardData = () => {
       if (dashboardTimeout) clearTimeout(dashboardTimeout);
@@ -2878,27 +2979,12 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     };
 
     const channel = supabase
-      .channel(`realtime_secretary_crisis_${schoolId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'crisis_notifications', filter: `school_id=eq.${schoolId}` }, (payload) => {
-        const updatedRow = payload.new as any;
-        if (updatedRow) {
-          setCrisisNotifications(prev =>
-            prev.map(n => n.id === updatedRow.id ? { ...n, status: updatedRow.status, notified_at: updatedRow.notified_at } : n)
-          );
-        }
-      })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'crisis_notifications', filter: `school_id=eq.${schoolId}` }, () => {
-        debouncedFetchCrisisNotifications();
-      })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'crisis_notifications', filter: `school_id=eq.${schoolId}` }, () => {
-        debouncedFetchCrisisNotifications();
-      })
+      .channel(`realtime_secretary_dashboard_${schoolId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'system_alerts' }, () => {
         debouncedFetchDashboardData();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'users', filter: `school_id=eq.${schoolId}` }, () => {
         debouncedFetchDashboardData();
-        debouncedFetchCrisisNotifications();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'room_bookings' }, (payload: any) => {
         fetchPendingBookings();
@@ -2921,43 +3007,11 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       .subscribe();
 
     return () => {
-      if (crisisTimeout) clearTimeout(crisisTimeout);
       if (dashboardTimeout) clearTimeout(dashboardTimeout);
       supabase.removeChannel(channel);
       window.removeEventListener('refresh-bookings', handleRefresh);
     };
   }, [schoolId]);
-
-  const fetchCrisisNotifications = async () => {
-    try {
-      let query = supabase
-        .from('crisis_notifications')
-        .select(`
-          id,
-          teacher_id,
-          student_id,
-          slot_start_datetime,
-          status,
-          notified_at,
-          handling_owner,
-          student:users!crisis_notifications_student_id_fkey (first_name, last_name, instrument),
-          teacher:users!crisis_notifications_teacher_id_fkey (id, first_name, last_name, ausfall_until)
-        `)
-        .order('slot_start_datetime', { ascending: true });
-
-      if (schoolId) {
-        query = query.eq('school_id', schoolId);
-      }
-
-      const { data, error } = await query;
-
-      if (data) {
-        setCrisisNotifications(data);
-      }
-    } catch (err) {
-      console.error('Error fetching crisis notifications:', err);
-    }
-  };
 
   useEffect(() => {
     fetchDashboardData();
@@ -2983,44 +3037,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     };
   }, [schoolId]);
 
-  const fetchAuditLogs = async (limitVal: number = 200) => {
-    setAuditLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('audit_logs')
-        .select(`
-          id,
-          changed_by,
-          table_name,
-          action,
-          record_id,
-          old_data,
-          new_data,
-          created_at,
-          users (
-            first_name,
-            last_name
-          )
-        `)
-        .eq('school_id', schoolId)
-        .order('created_at', { ascending: false })
-        .limit(limitVal);
-
-      if (error) throw error;
-      setAuditLogs(data || []);
-    } catch (err: any) {
-      console.error('Error fetching audit logs:', err);
-    } finally {
-      setAuditLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (activeTab === 'secretary' && secretarySubTab === 'audit') {
-      fetchAuditLogs(auditLimit);
-    }
-  }, [activeTab, secretarySubTab, auditLimit]);
-
   useEffect(() => {
     if (schoolId && matrixAllocations.length > 0) {
       const draftMap: Record<string, string | null> = {};
@@ -3041,284 +3057,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       document.removeEventListener('click', handleDocumentClick);
     };
   }, []);
-
-  const exportAuditLogsToCsv = () => {
-    if (auditLogs.length === 0) return;
-    const headers = ['Zeitpunkt', 'Aktion', 'Kategorie', 'Betroffener Datensatz', 'Record-ID', 'Geändert von', 'Protokollierte Details'];
-    const ignoredKeys = [
-      'id', 'created_at', 'school_id', 'password', 'password_hash', 
-      'personal_pin', 'parent_pin', 'teacher_qr_token', 'campus_login_token', 
-      'groovelab_kiosk_token', 'secret_token', 'joker_used_at', 'weekly_jokers_used',
-      'lesson_duration', 'preferred_room_ids', 'planned_boards', 'ausfall_until',
-      'age', 'bio', 'gear', 'listening', 'projects', 'bands', 'expertise', 'phone', 'group_id', 'nickname'
-    ];
-
-    const rows = auditLogs.map(log => {
-      const changer = log.users ? `${log.users.first_name} ${log.users.last_name}` : 'System (Automatik)';
-      let targetName = log.table_name === 'users' ? (userMap[log.record_id] || '') : log.table_name;
-      if (!targetName && log.new_data) {
-        const fn = log.new_data.first_name || '';
-        const ln = log.new_data.last_name || '';
-        if (fn || ln) targetName = `${fn} ${ln}`.trim();
-      }
-      if (!targetName) targetName = 'Datensatz';
-
-      let details = '';
-      if (log.action === 'UPDATE') {
-        details = Object.entries(log.new_data || {})
-          .filter(([k]) => !ignoredKeys.includes(k))
-          .map(([k, v]) => {
-            const oldV = translateValue(k, log.old_data?.[k]);
-            const newV = translateValue(k, v);
-            if (oldV === newV) return null;
-            return `${translateKey(k)}: ${oldV || '(leer)'} -> ${newV || '(gelöscht)'}`;
-          })
-          .filter(Boolean)
-          .join(' | ');
-      } else if (log.action === 'INSERT') {
-        details = Object.entries(log.new_data || {})
-          .filter(([k]) => !ignoredKeys.includes(k))
-          .map(([k, v]) => {
-            const valStr = translateValue(k, v);
-            if (!valStr) return null;
-            return `${translateKey(k)}: ${valStr}`;
-          })
-          .filter(Boolean)
-          .join(' | ');
-      } else {
-        details = Object.entries(log.old_data || {})
-          .filter(([k]) => !ignoredKeys.includes(k))
-          .map(([k, v]) => {
-            const valStr = translateValue(k, v);
-            if (!valStr) return null;
-            return `${translateKey(k)}: ${valStr}`;
-          })
-          .filter(Boolean)
-          .join(' | ');
-      }
-
-      return [
-        new Date(log.created_at).toLocaleString('de-DE'),
-        log.action === 'INSERT' ? 'Neuanlage' : log.action === 'UPDATE' ? 'Aktualisierung' : 'Löschung',
-        log.table_name === 'users' ? 'Benutzer' : log.table_name === 'schools' ? 'Musikschule' : log.table_name,
-        targetName,
-        log.record_id,
-        changer,
-        details || 'Keine relevanten Feldänderungen'
-      ];
-    });
-    const sanitizeCsvCell = (val: any) => {
-      let s = String(val ?? '');
-      if (/^[=+\-@\t\r]/.test(s)) {
-        s = "'" + s;
-      }
-      return `"${s.replace(/"/g, '""')}"`;
-    };
-    const csvContent = "\uFEFF" + [headers.map(sanitizeCsvCell).join(';'), ...rows.map(e => e.map(sanitizeCsvCell).join(';'))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `Aenderungsprotokoll_Campus_Groovelab_${new Date().toISOString().slice(0,10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const translateKey = (key: string): string => {
-    const keyMap: Record<string, string> = {
-      role: 'Hauptrolle',
-      roles: 'Rollen',
-      first_name: 'Vorname',
-      last_name: 'Nachname',
-      email: 'E-Mail',
-      is_active: 'Konto-Status',
-      is_campus_active: 'Campus Modul',
-      is_groovelab_active: 'GrooveLab Modul',
-      is_trial: 'Probezeit-Status',
-      trial_ends_at: 'Probezeit-Ende',
-      activated_at: 'Aktivierungsdatum',
-      ausweis_nummer: 'Mitarbeiter-PIN',
-      ausweis_id: 'Ausweis-ID',
-      is_app_user: 'App-Nutzung',
-      is_premium_user: 'Premium-Status',
-      contract_start_date: 'Vertragsstart',
-      status: 'Status',
-      storage_addon_gb: 'Zusatzspeicher',
-      has_campus_subscription: 'Abo Campus',
-      has_groovelab_subscription: 'Abo GrooveLab',
-      student_billing_option: 'Abrechnungsmodell'
-    };
-    return keyMap[key] || key;
-  };
-
-  const translateValue = (key: string, val: any): string => {
-    if (val === null || val === undefined || val === '') return '';
-    if (typeof val === 'object' && !Array.isArray(val)) {
-      return JSON.stringify(val);
-    }
-    if (typeof val === 'boolean') {
-      if (key.startsWith('is_') && key.endsWith('_active')) {
-        return val ? 'Freigeschaltet' : 'Gesperrt';
-      }
-      if (key === 'is_campus_active' || key === 'is_groovelab_active') {
-        return val ? 'Aktiv' : 'Basis';
-      }
-      if (key === 'has_campus_subscription' || key === 'has_groovelab_subscription') {
-        return val ? 'Aktiv' : 'Inaktiv';
-      }
-      return val ? 'Aktiv' : 'Inaktiv';
-    }
-    if (Array.isArray(val)) {
-      if (val.length === 0) return '';
-      return val.map(v => translateValue(key, v)).filter(Boolean).join(', ');
-    }
-    const valueMap: Record<string, string> = {
-      admin: 'Schulleitung (Admin)',
-      secretary: 'Schulsekretariat',
-      teacher: 'Lehrkraft',
-      student: 'Schüler',
-      active: 'Aktiv',
-      trial: 'Testphase'
-    };
-    if (typeof val === 'string' && valueMap[val]) {
-      return valueMap[val];
-    }
-    if (typeof val === 'string' && (key === 'photo_url' || key === 'avatar_url')) {
-      if (val.includes('campus_login_hero')) return 'Schul-Tafel (Standard)';
-      return 'Profilbild hinterlegt';
-    }
-    if (typeof val === 'string' && key === 'qr_token') {
-      return `Generiert (${val.substring(0, 6)}...${val.substring(val.length - 4)})`;
-    }
-    if (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}/)) {
-      try {
-        const d = new Date(val);
-        if (!isNaN(d.getTime())) {
-          return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-        }
-      } catch (e) {}
-    }
-    return String(val);
-  };
-
-  const renderDiffContent = (log: any) => {
-    try {
-      const ignoredKeys = [
-        'id', 'created_at', 'school_id', 'password', 'password_hash', 
-        'personal_pin', 'parent_pin', 'teacher_qr_token', 'campus_login_token', 
-        'groovelab_kiosk_token', 'secret_token', 'joker_used_at', 'weekly_jokers_used',
-        'lesson_duration', 'preferred_room_ids', 'planned_boards', 'ausfall_until',
-        'age', 'bio', 'gear', 'listening', 'projects', 'bands', 'expertise', 'phone', 'group_id', 'nickname'
-      ];
-      
-      if (log.action === 'INSERT') {
-        if (!log.new_data) return <span style={{ color: '#94a3b8', fontSize: '0.72rem' }}>Neuanlage initialisiert</span>;
-        
-        const validEntries = Object.entries(log.new_data)
-          .filter(([key]) => !ignoredKeys.includes(key))
-          .map(([key, val]) => ({ key, label: translateKey(key), valStr: translateValue(key, val) }))
-          .filter(entry => entry.valStr && entry.valStr.trim() !== '' && entry.valStr !== 'nicht gesetzt' && entry.valStr !== 'keine');
-
-        if (validEntries.length === 0) {
-          return <span style={{ color: '#64748b', fontSize: '0.72rem' }}>Datensatz mit Standardwerten initialisiert</span>;
-        }
-
-        return (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
-            {validEntries.map(({ key, label, valStr }) => (
-              <div 
-                key={key} 
-                style={{ 
-                  fontSize: '0.72rem', 
-                  color: '#1e293b', 
-                  background: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  padding: '3px 8px', 
-                  borderRadius: '6px', 
-                  display: 'inline-flex', 
-                  alignItems: 'center', 
-                  gap: '4px' 
-                }}
-              >
-                <span style={{ fontWeight: 700, color: '#64748b' }}>{label}:</span>
-                <span style={{ color: '#166534', background: '#dcfce7', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
-                  {valStr}
-                </span>
-              </div>
-            ))}
-          </div>
-        );
-      }
-
-      if (log.action === 'DELETE') {
-        if (!log.old_data) return <span style={{ color: '#ef4444', fontSize: '0.72rem' }}>Datensatz gelöscht</span>;
-        const validEntries = Object.entries(log.old_data)
-          .filter(([key]) => !ignoredKeys.includes(key))
-          .map(([key, val]) => ({ key, label: translateKey(key), valStr: translateValue(key, val) }))
-          .filter(entry => entry.valStr && entry.valStr.trim() !== '' && entry.valStr !== 'nicht gesetzt' && entry.valStr !== 'keine');
-
-        return (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
-            <span style={{ color: '#dc2626', background: '#fee2e2', padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 700 }}>
-              Gelöschte Stammdaten:
-            </span>
-            {validEntries.map(({ key, label, valStr }) => (
-              <div key={key} style={{ fontSize: '0.72rem', color: '#64748b', background: '#fef2f2', border: '1px solid #fecaca', padding: '2px 6px', borderRadius: '6px', display: 'inline-flex', gap: '4px' }}>
-                <span>{label}:</span>
-                <span style={{ textDecoration: 'line-through' }}>{valStr}</span>
-              </div>
-            ))}
-          </div>
-        );
-      }
-
-      if (log.action === 'UPDATE') {
-        if (!log.new_data || !log.old_data) return <span style={{ color: '#94a3b8', fontSize: '0.72rem' }}>Keine Änderungen</span>;
-        
-        const diffEntries = Object.entries(log.new_data)
-          .filter(([key]) => !ignoredKeys.includes(key))
-          .map(([key, newVal]: [string, any]) => {
-            const oldVal = log.old_data[key];
-            const oldValStr = translateValue(key, oldVal);
-            const newValStr = translateValue(key, newVal);
-            if (oldValStr === newValStr) return null;
-            return {
-              key,
-              label: translateKey(key),
-              oldValStr: oldValStr || '(leer)',
-              newValStr: newValStr || '(gelöscht)'
-            };
-          })
-          .filter(Boolean) as Array<{ key: string; label: string; oldValStr: string; newValStr: string }>;
-
-        if (diffEntries.length === 0) {
-          return <span style={{ color: '#94a3b8', fontSize: '0.72rem', fontStyle: 'italic' }}>System-Aktualisierung (keine sichtbaren Feldänderungen)</span>;
-        }
-
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
-            {diffEntries.map(({ key, label, oldValStr, newValStr }) => (
-              <div key={key} style={{ fontSize: '0.72rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: 700, color: '#475569', minWidth: '110px' }}>{label}:</span>
-                <span style={{ textDecoration: 'line-through', color: '#dc2626', background: '#fee2e2', padding: '1px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>
-                  {oldValStr}
-                </span>
-                <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>➔</span>
-                <span style={{ color: '#166534', background: '#dcfce7', padding: '1px 6px', borderRadius: '4px', fontWeight: 700, fontSize: '0.7rem' }}>
-                  {newValStr}
-                </span>
-              </div>
-            ))}
-          </div>
-        );
-      }
-      return '-';
-    } catch (err) {
-      console.error('Error rendering diff content:', err);
-      return <span style={{ color: '#ea4335', fontSize: '0.7rem', fontWeight: 700 }}>Fehler beim Laden der Details</span>;
-    }
-  };
 
   const fetchLiveStatusData = async () => {
     try {
@@ -4945,330 +4683,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     }
   };
 
-  const fetchAnnouncements = async () => {
-    try {
-      setAnnouncementsLoading(true);
-      const { data, error } = await supabase
-        .from('campus_feedback_requests')
-        .select('*')
-        .eq('school_id', schoolId)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      setAnnouncementsList(data || []);
-    } catch (err: any) {
-      console.error('Error fetching announcements:', err);
-    } finally {
-      setAnnouncementsLoading(false);
-    }
-  };
-
-  const handleUploadAnnouncementAttachment = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      setIsUploadingAnnouncementAttachment(true);
-
-      // 🛡️ Enterprise Media Security & Anti-Malware Ingestion Validation
-      const validation = await validateMediaBlob(file, 'any');
-      if (!validation.isValid) {
-        alert(validation.reason || 'Sicherheitswarnung: Das Dateiformat ist unzulässig oder enthält bedenkliche Binärstrukturen.');
-        setIsUploadingAnnouncementAttachment(false);
-        return;
-      }
-
-      const fileExt = file.name.split('.').pop();
-      const fileName = `announcement_${Date.now()}.${fileExt}`;
-      const filePath = `feed-attachments/${fileName}`;
-      const { error: uploadErr } = await supabase.storage
-        .from('campus-assets')
-        .upload(filePath, file);
-      if (uploadErr) throw uploadErr;
-      
-      const { data: urlData } = supabase.storage
-        .from('campus-assets')
-        .getPublicUrl(filePath);
-      setNewAnnouncementAttachmentUrl(urlData.publicUrl);
-    } catch (err: any) {
-      alert('Upload fehlgeschlagen: ' + err.message);
-    } finally {
-      setIsUploadingAnnouncementAttachment(false);
-    }
-  };
-
-  const handleMoveQuestion = (idx: number, direction: 'up' | 'down') => {
-    const nextQuestions = [...newAnnouncementQuestions];
-    if (direction === 'up' && idx > 0) {
-      const temp = nextQuestions[idx - 1];
-      nextQuestions[idx - 1] = nextQuestions[idx];
-      nextQuestions[idx] = temp;
-    } else if (direction === 'down' && idx < nextQuestions.length - 1) {
-      const temp = nextQuestions[idx + 1];
-      nextQuestions[idx + 1] = nextQuestions[idx];
-      nextQuestions[idx] = temp;
-    }
-    setNewAnnouncementQuestions(nextQuestions);
-  };
-
-  const handleCreateAnnouncement = async () => {
-    if (!newAnnouncementTitle.trim()) {
-      setApprovalToast({ message: '⚠️ Bitte einen Titel für die Mitteilung eingeben.', type: 'error' });
-      setTimeout(() => setApprovalToast(null), 3500);
-      return;
-    }
-    try {
-      const currentUserName = currentUserProfile ? `${currentUserProfile.first_name} ${currentUserProfile.last_name}` : 'Verwaltung';
-      const currentUserRole = currentUserProfile?.role === 'admin' ? 'Administration' : 'Sekretariat';
-
-      const payload: any = {
-        title: newAnnouncementTitle.trim(),
-        description: newAnnouncementDescription.trim(),
-        questions: newAnnouncementType === 'questionnaire' ? newAnnouncementQuestions : null,
-        due_date: newAnnouncementDueDate ? newAnnouncementDueDate + (newAnnouncementDueDate.includes('T') ? '' : 'T23:59:59Z') : null,
-        priority: newAnnouncementPriority,
-        target_type: newAnnouncementTargetType,
-        target_group: newAnnouncementTargetType === 'group' ? newAnnouncementTargetGroup : null,
-        target_teacher_id: newAnnouncementTargetType === 'individual' ? newAnnouncementTargetTeacherId : null,
-        recurrence: newAnnouncementRecurrence,
-        attachment_url: newAnnouncementAttachmentUrl || null,
-        is_anonymous: newAnnouncementType === 'questionnaire' ? newAnnouncementIsAnonymous : false
-      };
-
-      if (editingAnnouncementId) {
-        let { error } = await supabase
-          .from('campus_feedback_requests')
-          .update(payload)
-          .eq('id', editingAnnouncementId);
-
-        if (error && error.message?.includes('is_anonymous')) {
-          delete payload.is_anonymous;
-          const retry = await supabase
-            .from('campus_feedback_requests')
-            .update(payload)
-            .eq('id', editingAnnouncementId);
-          error = retry.error;
-        }
-
-        if (error) throw error;
-        setApprovalToast({ message: '✅ Mitteilung erfolgreich aktualisiert!', type: 'success' });
-        setTimeout(() => setApprovalToast(null), 4000);
-        setEditingAnnouncementId(null);
-      } else {
-        payload.school_id = schoolId;
-        payload.created_by_name = currentUserName;
-        payload.created_by_role = currentUserRole;
-
-        let { error } = await supabase
-          .from('campus_feedback_requests')
-          .insert(payload);
-
-        if (error && error.message?.includes('is_anonymous')) {
-          delete payload.is_anonymous;
-          const retry = await supabase
-            .from('campus_feedback_requests')
-            .insert(payload);
-          error = retry.error;
-        }
-
-        if (error) throw error;
-        setApprovalToast({ message: '✅ Mitteilung erfolgreich am Infobrett veröffentlicht!', type: 'success' });
-        setTimeout(() => setApprovalToast(null), 4000);
-      }
-
-      setNewAnnouncementTitle('');
-      setNewAnnouncementDescription('');
-      setNewAnnouncementType('todo');
-      setNewAnnouncementQuestions([]);
-      setNewAnnouncementPriority('standard');
-      setNewAnnouncementIsAnonymous(false);
-      setNewAnnouncementTargetType('all');
-      setNewAnnouncementDueDate('');
-      setNewAnnouncementRecurrence('none');
-      setNewAnnouncementAttachmentUrl('');
-      
-      fetchAnnouncements();
-    } catch (err: any) {
-      setApprovalToast({ message: '❌ Speichern fehlgeschlagen: ' + err.message, type: 'error' });
-      setTimeout(() => setApprovalToast(null), 5000);
-    }
-  };
-
-  const handleDeleteAnnouncement = async (id: string) => {
-    if (!confirm('Möchtest du diese Mitteilung wirklich entfernen? Alle Rückmeldungen von Lehrkräften werden ebenfalls gelöscht.')) return;
-    try {
-      const { error } = await supabase
-        .from('campus_feedback_requests')
-        .delete()
-        .eq('id', id);
-      if (error) throw error;
-      setApprovalToast({ message: 'Mitteilung gelöscht.', type: 'success' });
-      setTimeout(() => setApprovalToast(null), 3000);
-      fetchAnnouncements();
-    } catch (err: any) {
-      alert('Löschen fehlgeschlagen: ' + err.message);
-    }
-  };
-
-  const fetchAnnouncementStats = async (announcement: any) => {
-    try {
-      setSelectedAnnouncementForStats(announcement);
-      setStatsSearchQuery('');
-      setStatsStatusFilter('all');
-      setStatsModalTab('status');
-      const { data, error } = await supabase
-        .from('campus_feedback_responses')
-        .select('*')
-        .eq('request_id', announcement.id);
-      if (error) throw error;
-      setAnnouncementResponsesList(data || []);
-    } catch (err: any) {
-      console.error('Error fetching announcement stats:', err);
-    }
-  };
-
-  const getAnnouncementTargetedTeachers = (announcement: any) => {
-    const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
-      if (!acc.some(existing => existing.id === t.id)) {
-        acc.push(t);
-      }
-      return acc;
-    }, []);
-
-    if (announcement.target_type === 'all') return allUniqueTeachers;
-    if (announcement.target_type === 'individual') {
-      const found = allUniqueTeachers.find(t => t.id === announcement.target_teacher_id);
-      return found ? [found] : [];
-    }
-    if (announcement.target_type === 'group') {
-      return allUniqueTeachers.filter(t => {
-        const inst = (t.instrument || '').toLowerCase();
-        const targetGrp = (announcement.target_group || '').toLowerCase();
-        if (targetGrp === 'guitar') return inst.includes('gitarre') || inst.includes('guitar') || inst.includes('bass');
-        if (targetGrp === 'piano') return inst.includes('klavier') || inst.includes('piano') || inst.includes('keyboard') || inst.includes('keys');
-        if (targetGrp === 'vocals') return inst.includes('gesang') || inst.includes('vocal') || inst.includes('sing');
-        if (targetGrp === 'drums') return inst.includes('schlagzeug') || inst.includes('drum');
-        return inst.includes(targetGrp);
-      });
-    }
-    return [];
-  };
-
-  const handleSendReminder = async (announcement: any) => {
-    if (!announcement) return;
-    const targeted = getAnnouncementTargetedTeachers(announcement);
-    const pendingTeachers = targeted.filter((t: any) => !announcementResponsesList.some((res: any) => res.teacher_id === t.id));
-    
-    if (pendingTeachers.length === 0) {
-      alert('Alle Lehrkräfte haben diese Mitteilung bereits zur Kenntnis genommen bzw. beantwortet!');
-      return;
-    }
-    
-    const confirmSend = confirm(`Möchtest du eine Erinnerung an ${pendingTeachers.length} ausstehende Lehrkräfte senden?`);
-    if (!confirmSend) return;
-    
-    let successCount = 0;
-    for (const teacher of pendingTeachers) {
-      try {
-        const title = 'Mitteilung der Musikschulleitung 📋';
-        const message = `Bitte beachten bzw. Rückmeldung geben: "${announcement.title}"`;
-        const metadata = { type: 'announcement_reminder', request_id: announcement.id };
-
-        const { data: notification, error: notifErr } = await supabase
-          .from('notifications')
-          .insert({
-            user_id: teacher.id,
-            title,
-            message,
-            metadata
-          })
-          .select('id')
-          .single();
-
-        if (!notifErr && notification) {
-          await supabase.functions.invoke('send-push', {
-            body: {
-              userId: teacher.id,
-              title,
-              body: message,
-              url: '/',
-              notificationId: notification.id
-            }
-          });
-        }
-        successCount++;
-      } catch (err) {
-        console.error('Failed to send reminder to', teacher.id, err);
-      }
-    }
-    
-    alert(`Erinnerungen erfolgreich an ${successCount} Lehrkräfte gesendet!`);
-  };
-
-  const handleExportCSV = (announcement: any) => {
-    if (!announcement) return;
-    const targeted = getAnnouncementTargetedTeachers(announcement);
-    
-    let csvContent = '\uFEFF'; // Add BOM for excel support
-    const isAnonymous = !!announcement.is_anonymous;
-    
-    if (announcement.questions && announcement.questions.length > 0) {
-      const headers = ['Lehrkraft', 'Status', 'Abgabe-Datum', ...announcement.questions.map((q: any) => typeof q === 'string' ? q : q.text)];
-      csvContent += headers.map(h => `"${h.replace(/"/g, '""')}"`).join(',') + '\n';
-      
-      targeted.forEach((t: any, idx: number) => {
-        const response = announcementResponsesList.find(res => res.teacher_id === t.id);
-        const hasCompleted = !!response;
-        
-        let answersObj: Record<string, string> = {};
-        if (hasCompleted && response.response_text) {
-          try {
-            if (response.response_text.startsWith('{')) {
-              answersObj = JSON.parse(response.response_text);
-            }
-          } catch (e) {}
-        }
-        
-        const row = [
-          isAnonymous ? `Anonyme Lehrkraft #${idx + 1}` : formatTeacherFullName(t),
-          hasCompleted ? 'Bestätigt' : 'Ausstehend',
-          hasCompleted ? new Date(response.created_at).toLocaleDateString('de-DE') : '-',
-          ...announcement.questions.map((q: any) => {
-            const qKey = typeof q === 'string' ? q : q.text;
-            if (!hasCompleted) return '-';
-            const ans = answersObj[qKey] !== undefined ? answersObj[qKey] : (response.response_text || '');
-            return ans;
-          })
-        ];
-        
-        csvContent += row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',') + '\n';
-      });
-    } else {
-      const headers = ['Lehrkraft', 'Status', 'Abgabe-Datum', 'Antwort'];
-      csvContent += headers.map(h => `"${h.replace(/"/g, '""')}"`).join(',') + '\n';
-      
-      targeted.forEach((t: any, idx: number) => {
-        const response = announcementResponsesList.find(res => res.teacher_id === t.id);
-        const hasCompleted = !!response;
-        
-        const row = [
-          isAnonymous ? `Anonyme Lehrkraft #${idx + 1}` : formatTeacherFullName(t),
-          hasCompleted ? 'Bestätigt' : 'Ausstehend',
-          hasCompleted ? new Date(response.created_at).toLocaleDateString('de-DE') : '-',
-          hasCompleted ? (response.response_text || 'Bestätigt') : '-'
-        ];
-        
-        csvContent += row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',') + '\n';
-      });
-    }
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `Mitteilung_${announcement.title.replace(/[^a-zA-Z0-9]/g, '_')}_Auswertung.csv`);
-    document.body.appendChild(link);
-    link.click();
-  };
-
   const handleResolveTicket = async (ticketId: string) => {
     try {
       const response = await fetch('/api/groovelab/tickets/resolve', {
@@ -5286,202 +4700,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       fetchDashboardData();
     } catch (err: any) {
       alert('Fehler beim Beheben des Schadens: ' + err.message);
-    }
-  };
-
-  const handleMarkAsNotified = async (notificationId: string) => {
-    // Optimistic UI update
-    setCrisisNotifications(prev =>
-      prev.map(n => n.id === notificationId ? { ...n, status: 'READ', notified_at: new Date().toISOString() } : n)
-    );
-    try {
-      await supabase
-        .from('crisis_notifications')
-        .update({ status: 'READ' })
-        .eq('id', notificationId);
-    } catch (err: any) {
-      console.error('Error marking notification as notified:', err);
-    }
-  };
-
-  const handleArchiveCrisisTicket = async (notificationId: string) => {
-    // Optimistic UI update
-    setCrisisNotifications(prev =>
-      prev.map(n => n.id === notificationId ? { ...n, status: 'ARCHIVED' } : n)
-    );
-    try {
-      await supabase
-        .from('crisis_notifications')
-        .update({ status: 'ARCHIVED' })
-        .eq('id', notificationId);
-    } catch (err: any) {
-      console.error('Error archiving crisis ticket:', err);
-    }
-  };
-
-  const handleArchiveAllResolvedTickets = async (ticketIds: string[]) => {
-    // Optimistic UI update
-    setCrisisNotifications(prev =>
-      prev.map(n => ticketIds.includes(n.id) ? { ...n, status: 'ARCHIVED' } : n)
-    );
-    try {
-      await supabase
-        .from('crisis_notifications')
-        .update({ status: 'ARCHIVED' })
-        .in('id', ticketIds);
-    } catch (err: any) {
-      console.error('Error archiving crisis tickets:', err);
-    }
-  };
-
-  const handleClaimTicket = async (ticketId: string) => {
-    // Optimistic UI update
-    setCrisisNotifications(prev =>
-      prev.map(n => n.id === ticketId ? { ...n, handling_owner: 'secretariat' } : n)
-    );
-    try {
-      const { error } = await supabase.rpc('claim_crisis_ticket_by_secretariat', {
-        p_ticket_id: ticketId
-      });
-      if (error) {
-        // Fallback falls RPC nicht deployt
-        await supabase
-          .from('crisis_notifications')
-          .update({ handling_owner: 'secretariat' })
-          .eq('id', ticketId);
-      }
-    } catch (err: any) {
-      console.error('Error claiming crisis ticket:', err);
-    }
-  };
-
-
-  const handleEndAbsenceOnBehalf = async (teacherId: string, teacherName: string) => {
-    try {
-      const confirmOk = window.confirm(`Möchten Sie ${teacherName} wirklich als wieder im Dienst verfügbar melden? Alle betroffenen zukünftigen Stunden werden reaktiviert.`);
-      if (!confirmOk) return;
-
-      const { data: profile, error: profileErr } = await supabase
-        .from('users')
-        .select('school_id')
-        .eq('id', teacherId)
-        .single();
-
-      if (profileErr || !profile) {
-        throw new Error('Lehrerprofil nicht gefunden.');
-      }
-
-      // 1. Clear user absence columns (Neutral: Ausfall)
-      const { error: userErr } = await supabase
-        .from('users')
-        .update({ 
-          ausfall_until: null,
-          ausfall_start: null
-        })
-        .eq('id', teacherId);
-
-      if (userErr) throw userErr;
-
-      // 2. Fetch weekly schedules
-      const { data: schedules, error: schedError } = await supabase
-        .from('schedules')
-        .select('*')
-        .eq('school_id', schoolId)
-        .eq('teacher_id', teacherId);
-
-      if (schedError) throw schedError;
-
-      // 3. Fetch occurrences
-      const { data: occurrences } = await supabase
-        .from('schedule_occurrences')
-        .select('*')
-        .eq('school_id', schoolId)
-        .eq('teacher_id', teacherId);
-
-      const now = new Date();
-      const todayStart = new Date(now);
-      todayStart.setHours(0, 0, 0, 0);
-
-      const maxDate = new Date(now);
-      maxDate.setDate(maxDate.getDate() + 30); // 30 days window
-
-      const currentDate = new Date(todayStart);
-      const scheduleIdsToRestore = new Set<string>();
-      const datesToDeleteNotifs: string[] = [];
-
-      while (currentDate <= maxDate) {
-        const rawDay = currentDate.getDay();
-        const currentDayOfWeek = rawDay === 0 ? 7 : rawDay;
-        const daySchedules = (schedules || []).filter(s => s.day_of_week === currentDayOfWeek);
-
-        daySchedules.forEach(sched => {
-          const [hours, minutes] = (sched.time_slot || '00:00').split(':').map(Number);
-          const startDateTime = new Date(currentDate);
-          startDateTime.setHours(hours, minutes, 0, 0);
-
-          if (startDateTime >= now) {
-            scheduleIdsToRestore.add(sched.id);
-            datesToDeleteNotifs.push(startDateTime.toISOString());
-          }
-        });
-
-        currentDate.setDate(currentDate.getDate() + 1);
-      }
-
-      const occurrenceIdsToRestore = new Set<string>();
-      (occurrences || []).forEach(occ => {
-        const startDateTime = new Date(`${occ.date}T${occ.start_time}`);
-        if (startDateTime >= now) {
-          occurrenceIdsToRestore.add(occ.id);
-          datesToDeleteNotifs.push(startDateTime.toISOString());
-        }
-      });
-
-      // Restore schedules
-      if (scheduleIdsToRestore.size > 0) {
-        await supabase
-          .from('schedules')
-          .update({ status: 'approved' })
-          .in('id', Array.from(scheduleIdsToRestore))
-          .in('status', ['canceled_by_teacher_ausfall', 'teacher_ausfall']);
-      }
-
-      // Restore occurrences
-      if (occurrenceIdsToRestore.size > 0) {
-        await supabase
-          .from('schedule_occurrences')
-          .update({ status: 'rescheduled_confirmed' })
-          .in('id', Array.from(occurrenceIdsToRestore))
-          .eq('status', 'cancelled');
-      }
-
-      // Re-enable and mark future notifications as reinstated for students instead of deleting them (nur wenn nicht bereits als stattfindend quittiert)
-      if (datesToDeleteNotifs.length > 0) {
-        await supabase
-          .from('crisis_notifications')
-          .update({ is_reinstated: true, status: 'UNREAD' })
-          .eq('teacher_id', teacherId)
-          .in('slot_start_datetime', datesToDeleteNotifs)
-          .or('is_reinstated.eq.false,status.neq.READ');
-      }
-
-      // Add healthy alert
-      const alertMessage = `🟢 WIEDER IM DIENST: Lehrkraft ${teacherName} wurde durch die Disposition wieder als verfügbar gemeldet.`;
-      await supabase
-        .from('system_alerts')
-        .insert({
-          school_id: profile.school_id,
-          teacher_id: teacherId,
-          type: 'Teacher Return Alert',
-          message: alertMessage,
-          resolved: false
-        });
-
-      alert('Erfolgreich als verfügbar gemeldet! Zukünftige Stundenplandaten wurden wieder aktiviert.');
-      fetchDashboardData();
-    } catch (err: any) {
-      console.error(err);
-      alert('Fehler bei der Statusaktualisierung: ' + err.message);
     }
   };
 
@@ -6227,397 +5445,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     } catch (err: any) {
       alert('Fehler: ' + err.message);
     }
-  };
-
-
-  // ── Equipment State & Handlers ──
-  const handleSaveEquipment = async () => {
-    if (!equipmentFormName.trim() || !schoolId) return;
-    setEquipmentSaving(true);
-    try {
-      if (editingEquipment) {
-        const { error } = await supabase.from('school_equipment').update({
-          name: equipmentFormName.trim()
-        }).eq('id', editingEquipment.id);
-        if (error) throw error;
-        setSchoolEquipment(prev => prev.map(e => e.id === editingEquipment.id ? { ...e, name: equipmentFormName.trim() } : e));
-      } else {
-        const qty = Math.max(1, Math.min(50, equipmentFormQty));
-        const inserts = [];
-        if (qty === 1) {
-          inserts.push({ school_id: schoolId, name: equipmentFormName.trim() });
-        } else {
-          for (let i = 1; i <= qty; i++) {
-            inserts.push({ school_id: schoolId, name: `${equipmentFormName.trim()} #${i}` });
-          }
-        }
-
-        const { data, error } = await supabase.from('school_equipment').insert(inserts).select();
-        if (error) throw error;
-        if (data) setSchoolEquipment(prev => [...prev, ...data]);
-      }
-      setEditingEquipment(null);
-      setEquipmentFormName('');
-      setEquipmentFormQty(1);
-      setTimeout(() => equipmentNameInputRef.current?.focus(), 50);
-    } catch (e: any) {
-      console.error('Equipment save error:', e);
-      alert('Fehler beim Speichern der Ausstattung: ' + e.message);
-    } finally {
-      setEquipmentSaving(false);
-    }
-  };
-
-  const handleQtyChange = (newQty: number) => {
-    if (newQty < 1) return;
-    setEditGroupQty(newQty);
-    
-    // Adjust editGroupInstancesData
-    setEditGroupInstancesData(prev => {
-      if (newQty > prev.length) {
-        const added = [];
-        const base = editGroupName.trim() || 'Instrument';
-        const model = editGroupModel.trim() || 'Standard';
-        for (let i = prev.length; i < newQty; i++) {
-          added.push({
-            id: `temp_${Date.now()}_${i}`,
-            fullName: `${base} #${i + 1}`,
-            baseName: base,
-            model,
-            linkUrl: editGroupLink.trim(),
-            roomId: null,
-            roomName: null,
-            roomInstIdx: -1
-          });
-        }
-        return [...prev, ...added];
-      } else if (newQty < prev.length) {
-        return prev.slice(0, newQty);
-      }
-      return prev;
-    });
-  };
-
-  const handleSaveEquipmentGroup = async () => {
-    if (!schoolId) return;
-    setEquipmentSaving(true);
-    try {
-      // Load global model mapping
-      let localModelMap: Record<string, string> = {};
-      let localLinkMap: Record<string, string> = {};
-      try {
-        localModelMap = JSON.parse(localStorage.getItem(`groovelab_instrument_models_${schoolId}`) || '{}');
-      } catch {}
-      try {
-        localLinkMap = JSON.parse(localStorage.getItem(`groovelab_instrument_links_${schoolId}`) || '{}');
-      } catch {}
-
-      // 1. Determine deletions
-      const originalIds = editingEquipmentGroup.instances.map((i: any) => i.id);
-      let idsToDelete: string[] = [];
-      if (editGroupCoupled) {
-        idsToDelete = originalIds.slice(editGroupQty);
-      } else {
-        const idsToKeep = editGroupInstancesData.filter(i => !i.id.startsWith('temp_')).map(i => i.id);
-        idsToDelete = originalIds.filter((id: string) => !idsToKeep.includes(id));
-      }
-
-      // Perform Deletions from DB & State/Rooms
-      if (idsToDelete.length > 0) {
-        await supabase.from('school_equipment').delete().in('id', idsToDelete);
-        for (const delId of idsToDelete) {
-          const inst = editingEquipmentGroup.instances.find((i: any) => i.id === delId);
-          if (inst && inst.roomId) {
-            const targetRoom = rooms.find(r => r.id === inst.roomId);
-            if (targetRoom && Array.isArray(targetRoom.room_instruments)) {
-              const updatedRoomInsts = targetRoom.room_instruments.filter((_: any, idx: number) => idx !== inst.roomInstIdx);
-              setRooms(prev => prev.map(r => r.id === inst.roomId ? { ...r, room_instruments: updatedRoomInsts } : r));
-              await supabase.from('rooms').update({ room_instruments: updatedRoomInsts }).eq('id', inst.roomId);
-            }
-          }
-        }
-      }
-
-      if (editGroupCoupled) {
-        // SCENARIO A: Coupled (all exemplars have the same name and model)
-        const newBaseName = editGroupName.trim();
-        const newModel = editGroupModel.trim();
-        const newLink = editGroupLink.trim();
-
-        for (let idx = 0; idx < editGroupQty; idx++) {
-          const newName = editGroupQty > 1 ? `${newBaseName} #${idx + 1}` : newBaseName;
-
-          if (idx < originalIds.length) {
-            // Update existing row
-            const originalId = originalIds[idx];
-            await supabase.from('school_equipment').update({ name: newName }).eq('id', originalId);
-            localModelMap[newName] = newModel;
-            if (newLink) {
-              localLinkMap[newName] = newLink;
-            } else {
-              delete localLinkMap[newName];
-            }
-
-            // Sync with assigned room
-            const inst = editingEquipmentGroup.instances.find((i: any) => i.id === originalId);
-            if (inst && inst.roomId) {
-              const targetRoom = rooms.find(r => r.id === inst.roomId);
-              if (targetRoom && Array.isArray(targetRoom.room_instruments)) {
-                const updatedRoomInsts = [...targetRoom.room_instruments];
-                if (updatedRoomInsts[inst.roomInstIdx]) {
-                  updatedRoomInsts[inst.roomInstIdx] = {
-                    name: newName,
-                    model: newModel
-                  };
-                }
-                setRooms(prev => prev.map(r => r.id === inst.roomId ? { ...r, room_instruments: updatedRoomInsts } : r));
-                await supabase.from('rooms').update({ room_instruments: updatedRoomInsts }).eq('id', inst.roomId);
-              }
-            }
-          } else {
-            // Insert new row
-            await supabase.from('school_equipment').insert({
-              school_id: schoolId,
-              name: newName
-            });
-            localModelMap[newName] = newModel;
-            if (newLink) {
-              localLinkMap[newName] = newLink;
-            } else {
-              delete localLinkMap[newName];
-            }
-          }
-        }
-      } else {
-        // SCENARIO B: Decoupled (each exemplar can have a custom name and model)
-        for (let idx = 0; idx < editGroupInstancesData.length; idx++) {
-          const inst = editGroupInstancesData[idx];
-          const name = inst.fullName.trim();
-          const model = inst.model.trim();
-          const link = inst.linkUrl?.trim() || '';
-
-          if (inst.id.startsWith('temp_')) {
-            // Insert new row
-            await supabase.from('school_equipment').insert({
-              school_id: schoolId,
-              name: name
-            });
-            localModelMap[name] = model;
-            if (link) {
-              localLinkMap[name] = link;
-            } else {
-              delete localLinkMap[name];
-            }
-          } else {
-            // Update existing row
-            await supabase.from('school_equipment').update({ name: name }).eq('id', inst.id);
-            localModelMap[name] = model;
-            if (link) {
-              localLinkMap[name] = link;
-            } else {
-              delete localLinkMap[name];
-            }
-
-            // Sync with assigned room
-            const originalInst = editingEquipmentGroup.instances.find((i: any) => i.id === inst.id);
-            if (originalInst && originalInst.roomId) {
-              const targetRoom = rooms.find(r => r.id === originalInst.roomId);
-              if (targetRoom && Array.isArray(targetRoom.room_instruments)) {
-                const updatedRoomInsts = [...targetRoom.room_instruments];
-                if (updatedRoomInsts[originalInst.roomInstIdx]) {
-                  updatedRoomInsts[originalInst.roomInstIdx] = {
-                    name: name,
-                    model: model
-                  };
-                }
-                setRooms(prev => prev.map(r => r.id === originalInst.roomId ? { ...r, room_instruments: updatedRoomInsts } : r));
-                await supabase.from('rooms').update({ room_instruments: updatedRoomInsts }).eq('id', originalInst.roomId);
-              }
-            }
-          }
-        }
-      }
-
-      // Save model mapping and links to localStorage
-      localStorage.setItem(`groovelab_instrument_models_${schoolId}`, JSON.stringify(localModelMap));
-      localStorage.setItem(`groovelab_instrument_links_${schoolId}`, JSON.stringify(localLinkMap));
-
-      // Reload list from Supabase
-      const { data: eqData } = await supabase.from('school_equipment').select('*').eq('school_id', schoolId);
-      if (eqData) {
-        setSchoolEquipment(eqData);
-      }
-
-      setEditingEquipmentGroup(null);
-    } catch (e: any) {
-      console.error('Equipment group save error:', e);
-      alert('Fehler beim Speichern der Ausstattung: ' + e.message);
-    } finally {
-      setEquipmentSaving(false);
-    }
-  };
-
-  const handleDeleteEquipment = async (id: string) => {
-    if (!window.confirm('Ausstattung wirklich löschen? Dieser Eintrag wird auch aus Räumen entfernt, in denen er verwendet wird.')) return;
-    try {
-      const { error } = await supabase.from('school_equipment').delete().eq('id', id);
-      if (error) throw error;
-      setSchoolEquipment(prev => prev.filter(e => e.id !== id));
-      const { data: roomsData } = await supabase.from('rooms').select('*').eq('school_id', schoolId);
-      const localMap = (() => {
-        try { return JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}'); }
-        catch { return {}; }
-      })();
-      setRooms((roomsData || []).map(r => ({ 
-        ...r, 
-        equipment: r.allowed_instruments || [],
-        room_instruments: r.room_instruments || localMap[r.id] || []
-      })));
-    } catch (err: any) {
-      console.error('Error deleting equipment:', err);
-      alert('Fehler beim Löschen: ' + err.message);
-    }
-  };
-
-  const openEquipmentEditor = (eq?: any) => {
-    if (eq) {
-      setEditingEquipment(eq);
-      setEquipmentFormName(eq.name);
-    } else {
-      setEditingEquipment(null);
-      setEquipmentFormName('');
-    }
-  };
-
-  const handleDropInstrumentOnRoom = async (instrumentName: string, roomId: string) => {
-    const targetRoom = rooms.find(r => r.id === roomId);
-    if (!targetRoom) return;
-
-    const currentInsts = Array.isArray(targetRoom.room_instruments) 
-      ? targetRoom.room_instruments 
-      : (() => {
-          try {
-            const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
-            return map[roomId] || [];
-          } catch { return []; }
-        })();
-
-    const updatedInsts = [...currentInsts, { name: instrumentName, model: 'Standard' }];
-
-    // Update LocalStorage first
-    try {
-      const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
-      map[roomId] = updatedInsts;
-      localStorage.setItem(`groovelab_room_instruments_mappings_${schoolId}`, JSON.stringify(map));
-    } catch (err) {
-      console.error(err);
-    }
-
-    // Update state
-    setRooms(prev => prev.map(r => r.id === roomId ? { ...r, room_instruments: updatedInsts } : r));
-
-    // Update Supabase
-    try {
-      const { error } = await supabase.from('rooms').update({
-        room_instruments: updatedInsts
-      }).eq('id', roomId);
-
-      if (error && error.message.includes("room_instruments")) {
-        console.warn("Supabase room_instruments column missing, using local storage fallback.");
-      } else if (error) {
-        throw error;
-      }
-    } catch (err: any) {
-      console.error("Error saving room instruments:", err);
-    }
-  };
-
-  const handleRemoveRoomInstrument = async (roomId: string, idxToRemove: number) => {
-    const targetRoom = rooms.find(r => r.id === roomId);
-    if (!targetRoom) return;
-
-    const currentInsts = Array.isArray(targetRoom.room_instruments) 
-      ? targetRoom.room_instruments 
-      : (() => {
-          try {
-            const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
-            return map[roomId] || [];
-          } catch { return []; }
-        })();
-
-    const updatedInsts = currentInsts.filter((_: any, idx: number) => idx !== idxToRemove);
-
-    // Update LocalStorage first
-    try {
-      const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
-      map[roomId] = updatedInsts;
-      localStorage.setItem(`groovelab_room_instruments_mappings_${schoolId}`, JSON.stringify(map));
-    } catch (err) {
-      console.error(err);
-    }
-
-    // Update state
-    setRooms(prev => prev.map(r => r.id === roomId ? { ...r, room_instruments: updatedInsts } : r));
-
-    // Update Supabase
-    try {
-      const { error } = await supabase.from('rooms').update({
-        room_instruments: updatedInsts
-      }).eq('id', roomId);
-
-      if (error && error.message.includes("room_instruments")) {
-        console.warn("Supabase room_instruments column missing, using local storage fallback.");
-      } else if (error) {
-        throw error;
-      }
-    } catch (err: any) {
-      console.error("Error removing room instrument:", err);
-    }
-  };
-
-  const handleSaveRoomInstrumentEdit = async (name: string, model: string) => {
-    if (!editingRoomInstrument) return;
-    const { roomId, index } = editingRoomInstrument;
-
-    const targetRoom = rooms.find(r => r.id === roomId);
-    if (!targetRoom) return;
-
-    const currentInsts = Array.isArray(targetRoom.room_instruments) 
-      ? [...targetRoom.room_instruments]
-      : [];
-
-    if (currentInsts[index]) {
-      currentInsts[index] = { name: name.trim(), model: model.trim() };
-    }
-
-    // Update LocalStorage first
-    try {
-      const map = JSON.parse(localStorage.getItem(`groovelab_room_instruments_mappings_${schoolId}`) || '{}');
-      map[roomId] = currentInsts;
-      localStorage.setItem(`groovelab_room_instruments_mappings_${schoolId}`, JSON.stringify(map));
-    } catch (err) {
-      console.error(err);
-    }
-
-    // Update state
-    setRooms(prev => prev.map(r => r.id === roomId ? { ...r, room_instruments: currentInsts } : r));
-
-    // Update Supabase
-    try {
-      const { error } = await supabase.from('rooms').update({
-        room_instruments: currentInsts
-      }).eq('id', roomId);
-
-      if (error && error.message.includes("room_instruments")) {
-        console.warn("Supabase room_instruments column missing, using local storage fallback.");
-      } else if (error) {
-        throw error;
-      }
-    } catch (err: any) {
-      console.error("Error saving room instrument edit:", err);
-    }
-
-    setEditingRoomInstrument(null);
   };
 
   const getTabTitle = () => {

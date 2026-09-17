@@ -51,7 +51,33 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
   const leaseId = getLeaseId();
   const proofKey = user?.id ? `gl_legal_proof_${user.id}_min_${MINIMUM_ENFORCED_VERSION}` : '';
   const currentProof = user?.id ? computeSessionProof(user.id, role, leaseId, MINIMUM_ENFORCED_VERSION) : '';
-  const isProofValid = typeof window !== 'undefined' && Boolean(user?.id) && Boolean(currentProof) && sessionStorage.getItem(proofKey) === currentProof;
+
+  const getStoredProof = (): string | null => {
+    if (typeof window === 'undefined' || !proofKey) return null;
+    try {
+      return sessionStorage.getItem(proofKey) || localStorage.getItem(proofKey);
+    } catch {
+      return null;
+    }
+  };
+
+  const saveProof = (proof: string) => {
+    if (typeof window === 'undefined' || !proofKey) return;
+    try {
+      sessionStorage.setItem(proofKey, proof);
+      localStorage.setItem(proofKey, proof);
+    } catch {}
+  };
+
+  const clearProof = () => {
+    if (typeof window === 'undefined' || !proofKey) return;
+    try {
+      sessionStorage.removeItem(proofKey);
+      localStorage.removeItem(proofKey);
+    } catch {}
+  };
+
+  const isProofValid = typeof window !== 'undefined' && Boolean(user?.id) && Boolean(currentProof) && getStoredProof() === currentProof;
 
   // Initialize compliant state optimistically if valid cryptographic session proof is present
   const [isCompliant, setIsCompliant] = useState<boolean>(() => {
@@ -93,10 +119,8 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
         setIsCompliant(true);
         setIsChecking(false);
         setIsNetworkBlocked(false);
-        if (proofKey && currentProof) {
-          try {
-            sessionStorage.setItem(proofKey, currentProof);
-          } catch {}
+        if (currentProof) {
+          saveProof(currentProof);
         }
       }
     };
@@ -105,7 +129,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
     };
   }, [user?.id, proofKey, currentProof]);
 
-  // 2. Authoritative check with 4-second short-circuit timeout (Stale-While-Revalidate if cached proof is present)
+  // 2. Authoritative check with adaptive timeout & resilient schema fallback
   useEffect(() => {
     let isMounted = true;
 
@@ -128,26 +152,48 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
       setIsNetworkBlocked(false);
 
       try {
-        const rpcPromise = supabase.rpc('check_user_legal_status', {
-          p_user_id: user.id,
-          p_role: role,
-          p_required_version: ACTIVE_LEGAL_VERSION,
-          p_minimum_enforced_version: MINIMUM_ENFORCED_VERSION
-        });
+        const queryTimeoutMs = isDev ? 12000 : 8000;
 
-        // 4.0-second short-circuit timeout to eliminate the 25-75s cascade in supabase.ts
+        const executeCheckRpc = async () => {
+          // Primary: 4-parameter call (Migration 441 - Decoupled active & minimum enforced)
+          let rpcRes = await supabase.rpc('check_user_legal_status', {
+            p_user_id: user.id,
+            p_role: role,
+            p_required_version: ACTIVE_LEGAL_VERSION,
+            p_minimum_enforced_version: MINIMUM_ENFORCED_VERSION
+          });
+
+          // 🛡️ Resilient Schema-Cache Fallback: If remote DB has not yet applied Migration 441,
+          // PostgREST returns PGRST202 (function signature with 4 parameters not found).
+          // Fall back gracefully to the canonical 3-parameter call from Migration 375!
+          if (rpcRes.error && (rpcRes.error.code === 'PGRST202' || rpcRes.error.message?.includes('schema cache'))) {
+            console.info('[LegalConsentGate] 4-parameter check_user_legal_status not in remote schema cache. Falling back to 3-parameter signature...');
+            rpcRes = await supabase.rpc('check_user_legal_status', {
+              p_user_id: user.id,
+              p_role: role,
+              p_required_version: MINIMUM_ENFORCED_VERSION
+            });
+          }
+
+          return rpcRes;
+        };
+
         const timeoutPromise = new Promise<{ data: any; error: any }>((_, reject) => {
-          setTimeout(() => reject(new Error('RPC_TIMEOUT')), 4000);
+          setTimeout(() => reject(new Error('RPC_TIMEOUT')), queryTimeoutMs);
         });
 
-        const res = await Promise.race([rpcPromise, timeoutPromise]) as any;
+        const res = await Promise.race([executeCheckRpc(), timeoutPromise]) as any;
         const { data, error } = res || {};
 
         if (error) {
           console.warn('[LegalConsentGate] Check RPC error:', error.message);
           if (isMounted) {
-            // Fail-Closed: If there is a server/network error and no valid session proof, do NOT silently bypass!
-            if (!isProofValid) {
+            // Localhost / Dev Immunity: Never lock out developers on local machine due to remote transients
+            if (isDev) {
+              console.info('[LegalConsentGate] Dev environment: auto-passing on transient RPC error.');
+              setIsCompliant(true);
+              setIsNetworkBlocked(false);
+            } else if (!isProofValid) {
               setIsCompliant(false);
               setIsNetworkBlocked(true);
             }
@@ -160,10 +206,8 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
           if (data && data.is_compliant === true) {
             setIsCompliant(true);
             setIsNetworkBlocked(false);
-            if (proofKey && currentProof && typeof window !== 'undefined') {
-              try {
-                sessionStorage.setItem(proofKey, currentProof);
-              } catch {}
+            if (currentProof) {
+              saveProof(currentProof);
             }
           } else {
             setIsCompliant(false);
@@ -174,19 +218,19 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
             } else {
               setIsMajorUpdateFlow(false);
             }
-            if (proofKey && typeof window !== 'undefined') {
-              try {
-                sessionStorage.removeItem(proofKey);
-              } catch {}
-            }
+            clearProof();
           }
           setIsChecking(false);
         }
       } catch (err: any) {
         console.warn('[LegalConsentGate] Check status timed out or network failed:', err);
         if (isMounted) {
-          // Fail-Closed: Show clean retry dialog rather than silent unverified bypass
-          if (!isProofValid) {
+          // Localhost / Dev Immunity: Auto-pass on timeout in Vite DEV mode
+          if (isDev) {
+            console.info('[LegalConsentGate] Dev environment: auto-passing on network timeout.');
+            setIsCompliant(true);
+            setIsNetworkBlocked(false);
+          } else if (!isProofValid) {
             setIsCompliant(false);
             setIsNetworkBlocked(true);
           }
@@ -245,10 +289,8 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
         return;
       }
 
-      if (proofKey && currentProof && typeof window !== 'undefined') {
-        try {
-          sessionStorage.setItem(proofKey, currentProof);
-        } catch {}
+      if (currentProof) {
+        saveProof(currentProof);
       }
 
       // Realtime Cross-Tab Broadcast notification
@@ -299,6 +341,52 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
           fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif"
         }}
       >
+        {/* 🛠️ Localhost / Dev-Sandbox Immunity Pill */}
+        {isDev && (
+          <div style={{
+            position: 'fixed',
+            top: '16px',
+            left: '16px',
+            zIndex: 100000,
+            background: '#1e293b',
+            color: '#38bdf8',
+            padding: '6px 12px',
+            borderRadius: '12px',
+            fontSize: '0.74rem',
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.3)',
+            border: '1px solid #334155'
+          }}>
+            <Terminal size={14} color="#38bdf8" />
+            <span>Localhost Dev-Sandbox</span>
+            <button
+              type="button"
+              onClick={() => {
+                if (currentProof) {
+                  saveProof(currentProof);
+                }
+                setIsCompliant(true);
+                setIsNetworkBlocked(false);
+              }}
+              style={{
+                background: '#0284c7',
+                color: '#ffffff',
+                border: 'none',
+                padding: '4px 10px',
+                borderRadius: '8px',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              Überspringen
+            </button>
+          </div>
+        )}
+
         <div style={{
           background: '#ffffff',
           width: '100%',
@@ -397,6 +485,38 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
               <span>Erneut prüfen</span>
             </button>
           </div>
+
+          {isDev && (
+            <button
+              type="button"
+              onClick={() => {
+                if (currentProof) {
+                  saveProof(currentProof);
+                }
+                setIsCompliant(true);
+                setIsNetworkBlocked(false);
+              }}
+              style={{
+                width: '100%',
+                marginTop: '14px',
+                padding: '10px 16px',
+                borderRadius: '14px',
+                border: '1px dashed #38bdf8',
+                background: '#0f172a',
+                color: '#38bdf8',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+            >
+              <Terminal size={14} color="#38bdf8" />
+              <span>Entwickler-Bypass (Localhost Dev-Sandbox)</span>
+            </button>
+          )}
         </div>
       </div>
     );

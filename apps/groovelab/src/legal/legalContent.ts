@@ -25,6 +25,9 @@ export const LEGAL_RELEASE_CONFIG: LegalReleaseConfig = {
       title: 'Präzisierung Didaktik & Urheberschutz',
       date: '13.09.2026',
       highlights: [
+        'Präzisierung des didaktischen Audio-Tresors für Instrumental-, Gesangs- und Sprachaufnahmen bis Schuljahresende',
+        'Transparente Subdienstleister-Information gem. Art. 28 Abs. 2 DSGVO und 48h-Vorfallsmeldung',
+        'Ausschluss von Gesundheitsdaten & Verankerung der radikalen Datenminimierung für Schüler',
         'Ausdrücklicher Urheberschutz an eigenen Audio-Loops und Notizen (§ 3 Abs. 2 Didaktik-Kodex)',
         'Stärkung der pädagogischen Autonomie & des didaktischen Assistenz-Prinzips (§ 1)',
         'Klarstellung des Botenstatus in der Terminkommunikation (§ 4)'
@@ -113,11 +116,11 @@ export const LEGAL_DOCUMENTS: Record<string, LegalDocumentDefinition> = {
       '0,00 € Software-Lizenzkaufgebühren (Bereitstellung & Miete reiner Cloud-Infrastruktur)',
       'Schule ist die datenschutzrechtlich „Verantwortliche“ (Art. 4 Nr. 7 DSGVO)',
       'Campus-Groovelab fungiert als geprüfter, weisungsgebundener Auftragsverarbeiter (Art. 28 DSGVO)',
-      'ISO 27001 Rechenzentren in Deutschland (Hetzner Falkenstein & Nürnberg) • 14 Tage Widerspruchsfrist bei Subdienstleistern',
-      '48-Stunden-Meldepflicht bei Datenschutzverletzungen (Art. 33 DSGVO)',
-      'Reine Didaktik & Kommunikation: Keine Übernahme behördlicher Dokumentation (iMikel) oder physischer Aufsicht',
-      'Raumanfragen & Terminabsagen als Voranfrage unter Vorbehalt / Botenmodell ohne ERP-Automatik',
-      'BGH-konformes Aufrechnungsverbot, 2 Mio. € IT-Haftpflichtdeckung & Salvatorische Klausel (§ 306 Abs. 2 BGB)'
+      'ISO 27001 Rechenzentren in Deutschland (Hetzner Falkenstein & Nürnberg) • Transparente Vorab-Information bei Subdienstleister-Wechsel gem. Art. 28 Abs. 2 DSGVO',
+      'Vorfallsmeldung des Betreibers binnen 48 Stunden an die Schulleitung (Schule behält 24-Stunden-Puffer für die 72h-Behördenmeldung nach Art. 33 DSGVO)',
+      'Fokus auf Musikdidaktik, Proben & Stundenorganisation: Keine Übernahme kommunaler Finanzbuchhaltung (ERP) oder physischer Aufsicht',
+      'Raumanfragen & Terminabsagen rein unter Vorbehalt (Botenmodell) • Datensouveränität & DIN 66398 Löschroutine bei Vertragsende',
+      'Haftungsprivilegierung nach Stand der Technik (Art. 32 DSGVO) • BGH-konformes Aufrechnungsverbot & Erhaltungsklausel (§ 306 Abs. 2 BGB)'
     ],
     checkboxLabel: 'Ich bestätige als vertretungsberechtigte Person der Musikschule den B2B-Infrastrukturvertrag sowie den Auftragsverarbeitungsvertrag (Art. 28 DSGVO) inklusive der Technisch-Organisatorischen Maßnahmen (TOMs).',
     fullTextMarkdown: `
@@ -131,8 +134,9 @@ export const LEGAL_DOCUMENTS: Record<string, LegalDocumentDefinition> = {
 (2) Campus-Groovelab verarbeitet personenbezogene Daten ausschließlich im Auftrag und auf dokumentierte Weisung der Musikschule.
 (3) Sämtliche Datenverarbeitungen erfolgen ausnahmslos auf ISO-27001-zertifizierten Servern innerhalb der Bundesrepublik Deutschland (Standort Hetzner Online GmbH, Falkenstein/Vogtland & Nürnberg, Deutschland).
 (4) Die Einhaltung strenger Technisch-Organisatorischer Maßnahmen (TOMs gem. Art. 32 DSGVO) – einschließlich AES-256-Verschlüsselung, Pseudonymisierung von Minderjährigendaten und automatischer Kündigungs-Purge-Routinen nach DIN 66398 – wird garantiert.
-(5) Unterauftragsverarbeiter & Widerspruchsfrist: Der Betreiber setzt Hetzner Online GmbH als Hosting-Provider ein. Bei beabsichtigten Änderungen an Unterauftragnehmern wird die Schule mindestens 14 Tage vorab informiert; der Schule steht ein Widerspruchsrecht aus wichtigem datenschutzrechtlichem Grund zu.
+(5) Unterauftragsverarbeiter & Information: Der Betreiber setzt Hetzner Online GmbH als Hosting-Provider auf ISO-27001-zertifizierten Rechenzentren in Deutschland ein. Bei beabsichtigten Änderungen an Unterauftragnehmern wird die Schule mindestens 14 Tage vorab transparent informiert; der Schule steht ein Widerspruchsrecht aus wichtigem, nachgewiesenem datenschutzrechtlichem Grund zu. Bei unaufschiebbaren Notfall-Migrationen zur Abwehr akuter Betriebs- oder Sicherheitsstörungen informiert der Betreiber die Schulleitung unverzüglich nach Durchführung.
 (6) Vorfallsmeldung binnen 48 Stunden: Der Betreiber meldet Verletzungen des Schutzes personenbezogener Daten (Art. 33 Abs. 2 DSGVO) unverzüglich, spätestens binnen 48 Stunden nach Bekanntwerden, an die Schule.
+(7) Zero-AI- & Zero-Model-Training-Garantie: Sämtliche im Auftrag verarbeiteten Daten (insbesondere Schüler-, Lehrkräfte-, Stundenplan-, Text- und didaktische Audioaufnahmen) werden zu 0 % für das Training von Machine-Learning-Algorithmen, Large Language Models (LLMs) oder generativer künstlicher Intelligenz verwendet. Eine Weitergabe an externe KI-Modellanbieter ist ausgeschlossen.
 
 ### 3. Pflichten der Musikschule, Haftungsbegrenzung & Aufrechnung
 (1) Die Musikschule versichert, dass die Erhebung und Übermittlung der Schülerdaten an die Plattform auf einer rechtmäßigen Grundlage beruht, und stellt den Betreiber von Ansprüchen Dritter bei unbefugter Datenübermittlung frei.
@@ -141,7 +145,7 @@ export const LEGAL_DOCUMENTS: Record<string, LegalDocumentDefinition> = {
 (4) Versicherungsschutz: Der Betreiber unterhält eine IT- und Cyber-Haftpflichtversicherung mit mindestens 2.000.000,00 € Deckungssumme je Versicherungsfall.
 
 ### 4. Zweckbestimmung & Abgrenzung zu behördlichen Schul-ERPs (iMikel)
-(1) Campus-Groovelab ist ein didaktisches Begleit-, Motivations- und Kommunikationswerkzeug zur Unterstützung des zeitgemäßen Musikunterrichts.
+(1) Campus-Groovelab ist ein didaktisches Begleit-, Motivations- und Kommunikationswerkzeug zur Unterstützung des modernen Instrumental-, Gesangs- und Ensembleunterrichts an Musikschulen.
 (2) Die Plattform ersetzt nicht die primären Verwaltungs-, Buchhaltungs- und Dokumentationssysteme der Musikschule (wie z. B. iMikel, Win-Musikschule o. ä.). Amtliche Dokumentations- und Nachweispflichten obliegen weiterhin vollumfänglich den herkömmlichen Systemen der Schule.
 (3) Die physische Aufsichtspflicht (§ 832 BGB i.V.m. § 1631 BGB) verbleibt personell und räumlich ausnahmslos beim Personal der Musikschule vor Ort.
 (4) Raumbuchungsanfragen und Terminabstimmungen stellen unverbindliche Voranfragen („unter Vorbehalt“) dar.
@@ -199,35 +203,41 @@ Die Lehrkraft verpflichtet sich, alle Schüler- und Kollegendaten vertraulich zu
     version: ACTIVE_LEGAL_VERSION,
     summaryPoints: [
       'Kostenfreie Nutzung der didaktischen Lern-App für Musikschüler',
-      'Hausaufgabenheft, digitaler Übe-Timer und persönlicher Stundenplan-Sync',
+      'Zivilrechtliche Vertragspartnerschaft: Bis zum 18. Lebensjahr (Volljährigkeit gem. § 2 BGB) handeln die Erziehungsberechtigten',
+      'Datenschutzrechtliche Mündigkeit (Art. 8 DSGVO): Eigenständige Audio-Einwilligung ab 16 Jahren möglich',
       'DSGVO-Datenminimierung: Keine Speicherung von Bank-, Vertrags- oder E-Mail-Daten im Schülerprofil',
+      'Zero-AI-Garantie: Keine Nutzung von Audios oder Daten für das Training künstlicher Intelligenz',
       'Didaktische Terminübersicht & Botenmodell: Unterrichtsverträge & Aufsicht verbleiben bei der Schule',
-      'Vollständiges geistiges Eigentum an eigenen Audioaufnahmen und Notizen',
-      'Ausschluss von Art. 9 DSGVO Gesundheitsdaten: Angabe „verhindert“ genügt vollkommen',
-      'Verbraucherschlichtungshinweis (§ 36 VSBG) & Jederzeitige Kündbarkeit'
+      'Vollständiges geistiges Eigentum an eigenen Audioaufnahmen und Notizen'
     ],
-    checkboxLabel: 'Ich akzeptiere die kostenfreien Plattform-Nutzungsbedingungen für Campus-Groovelab (bei Minderjährigen durch die Erziehungsberechtigten).',
+    checkboxLabel: 'Ich akzeptiere die Plattform-Nutzungsbedingungen für Campus-Groovelab (bei Minderjährigen unter 18 Jahren durch die Erziehungsberechtigten bzw. mit deren ausdrücklicher Einwilligung).',
     fullTextMarkdown: `
-### 1. Leistungsbeschreibung & Kostenfreiheit
+### 1. Leistungsbeschreibung, Kostenfreiheit & Zivilrechtliche Vertragspartnerschaft (§ 2 & § 106 BGB)
 (1) Campus-Groovelab bietet Schülerinnen und Schülern sowie deren Eltern eine geschützte digitale Begleitung für den Musikunterricht.
-(2) Für Schülerinnen und Schüler entstehen durch die reine Nutzung der Plattform keine gesonderten Lizenzkaufgebühren.
-(3) Die Plattform umfasst das digitale Hausaufgabenheft, die Meisterwerk-Dokumentation, den Übe-Timer und die Terminübersicht.
+(2) **Zivilrechtliche Vertragspartnerschaft bis zum 18. Lebensjahr (§ 2 & §§ 106 ff. BGB):** Bei minderjährigen Schülerinnen und Schülern bis zur Vollendung des 18. Lebensjahres (gesetzliche Volljährigkeit gem. § 2 BGB) sind und bleiben ausnahmslos die Erziehungsberechtigten Vertragspartner für die Plattformnutzung sowie für etwaige kostenpflichtige Zusatzmodule (wie Schüler-Jahresbeiträge bei Direktabrechnung). Minderjährige können ohne ausdrückliche Einwilligung ihrer gesetzlichen Vertreter keine vertraglichen Zahlungsverpflichtungen oder Dauerschuldverhältnisse begründen.
+(3) **Gemeinsames Sorgerecht & Vertretungsvermutung (§ 1629 Abs. 1 Satz 2 BGB):** Meldet ein Elternteil ein minderjähriges Kind an oder nimmt Freigaben im Elternbereich vor, versichert dieser Elternteil an Eides statt, zur gesetzlichen Vertretung des Kindes allein berechtigt zu sein oder im ausdrücklichen Einvernehmen und mit Vollmacht des weiteren sorgeberechtigten Elternteils zu handeln (§ 1629 Abs. 1 Satz 2 BGB). Der anmeldende Elternteil stellt den Plattformbetreiber sowie die Musikschule im Innenverhältnis von jeglichen Ansprüchen, Einwendungen oder Schadensersatzforderungen des anderen Elternteils (insbesondere hinsichtlich Profilerstellung, Audioaufnahmen oder Kostenübernahme) vollumfänglich frei.
+(4) Für Schülerinnen und Schüler entstehen durch die reine Basisnutzung der Plattform keine gesonderten Lizenzkaufgebühren (0,00 € inklusive).
+(5) Die Plattform umfasst das digitale Hausaufgabenheft, die Meisterwerk-Dokumentation, den didaktischen Übe-Timer und die Terminübersicht.
 
-### 2. Kinder- und Jugendschutz (DSGVO & Datenminimierung)
-(1) Der Schutz von Minderjährigen hat höchste Priorität. Im Schülerprofil werden aus Datenschutzgründen keine Bankdaten, keine E-Mail-Adressen und keine sensiblen Vertragsdaten gespeichert.
-(2) Schülernamen werden im Lehrerbereich datensparsam pseudonymisiert dargestellt.
-(3) Die Plattform ist zu 100 % werbefrei. Es findet keinerlei Tracking für kommerzielle Zwecke statt.
-(4) Verdachtsmeldungen & Kinderschutz: Bei Hinweisen auf Grenzverletzungen steht die Clearing-Adresse kinderschutz@campus-groovelab.de zur Verfügung.
+### 2. Kinder- und Jugendschutz, Datenschutz-Mündigkeit (Art. 8 DSGVO) & Zero-AI-Garantie
+(1) **Datenschutzrechtliche Einwilligungs- und Mitwirkungsmündigkeit (Art. 8 DSGVO):** 
+- Bis zum vollendeten 16. Lebensjahr bedürfen datenschutzrechtliche Einwilligungen (insbesondere in didaktische Audioaufnahmen im Übe-Studio gem. Art. 8 Abs. 1 DSGVO und § 22 KUG) der zwingenden Autorisierung durch die Erziehungsberechtigten (über die PIN-geschützte Elternfreigabe).
+- Jugendliche zwischen dem vollendeten 16. und dem 18. Lebensjahr besitzen die gesetzliche Mündigkeit, ihre datenschutzrechtliche Einwilligung in didaktische Audioaufnahmen selbstständig zu erteilen oder zu widerrufen. Die zivilrechtliche Vertragspartnerschaft für das Nutzerkonto verbleibt hiervon unberührt bis zum 18. Lebensjahr bei den Erziehungsberechtigten.
+(2) **Radikale Datenminimierung (Art. 5 Abs. 1 lit. c DSGVO):** Im Schülerprofil werden aus Datenschutzgründen keine Bankdaten, keine E-Mail-Adressen, keine Schüler-Telefonnummern und keine sensiblen Vertragsdaten gespeichert. Zur Wahrung des Prinzips der Datenminimierung wird bei Schülern ausschließlich der Tag des Geburtstags (Tag 1..31) für didaktische Kalenderfunktionen erhoben; die Speicherung von Geburtsmonat oder Geburtsjahr ist ausgeschlossen. Reale Gesichtsfotos sind im Schüler- und Lehrerbereich strengstens untersagt; es kommen ausschließlich stilisierte Musiker-Avatare zum Einsatz.
+(3) Schülernamen werden im Lehrerbereich datensparsam pseudonymisiert dargestellt („Vorname + N.“).
+(4) **Zero-AI- & Zero-Commercial-Garantie:** Die Plattform ist zu 100 % werbefrei. Es findet keinerlei Tracking für kommerzielle Zwecke statt. Didaktische Audioaufnahmen, Sprachnachrichten, Notizen und Nutzungsmetriken werden zu 0 % für das Training von Machine-Learning-Systemen, generativer künstlicher Intelligenz (LLMs) oder Foundation-Modellen verwendet oder an Dritte weitergeleitet.
+(5) Verdachtsmeldungen & Kinderschutz: Bei Hinweisen auf Grenzverletzungen steht die Clearing-Adresse kinderschutz@campus-groovelab.de zur Verfügung.
 
-### 3. Geistiges Eigentum an eigenen Beiträgen
-Schülerinnen, Schüler und Eltern behalten das uneingeschränkte Urheberrecht an allen selbst eingespielten Audio-Aufnahmen, Loopstation-Spuren und Notizen.
+### 3. Geistiges Eigentum & Freistellung bei Fremdurheberrechten
+(1) Schülerinnen, Schüler und Eltern behalten das uneingeschränkte Urheberrecht an allen selbst eingespielten Audio-Aufnahmen, Loopstation-Spuren und Notizen.
+(2) Nutzer versichern, dass durch von ihnen eingespielte Aufnahmen oder Notizen keine Urheber-, Persönlichkeits- oder Leistungsschutzrechte Dritter verletzt werden. Das Hochladen von geschützten Original-Tonaufnahmen (Master-Tracks) oder unlizenzierten Noten-PDFs ist untersagt.
 
 ### 4. Didaktischer Charakter der Stunden- und Terminübersichten
 (1) Die in Campus-Groovelab dargestellten Termine, Stundenpläne und Hausaufgaben dienen der pädagogischen Orientierung und der didaktischen Kommunikation zwischen Lehrkraft und Schüler.
 (2) Verbindliche Unterrichtsverträge, offizielle Schulbescheinigungen sowie rechtlich bindende Unterrichtsvereinbarungen richten sich nach den Bestimmungen des Vertrags mit der Musikschule.
 (3) Die Aufsichtspflicht der Musikschule und ihrer Lehrkräfte vor Ort beginnt und endet ausschließlich mit dem tatsächlichen Antritt und Verlassen des Präsenzunterrichts gemäß der Haus- und Schulordnung der Musikschule, nicht durch die digitale Zeitanzeige in der App.
 (4) Botenstatus & Ausschluss von Hauptvertragskündigungen: Mitteilungen über Absagen oder Terminabstimmungen in der termingekoppelten Shoutbox fungieren technisch rein als elektronischer Bote. Formelle Kündigungen des Unterrichtsvertrags mit der Musikschule können über die App nicht erklärt werden.
-(5) Ausschluss von Gesundheitsdaten (Art. 9 DSGVO): Bei Verhinderung genügt die neutrale Angabe „verhindert“; die Angabe von Diagnosen oder Attestdetails ist unzulässig.
+(5) Organisatorische Abwesenheitsmeldungen & Ausschluss von Gesundheitsdaten (Art. 9 DSGVO): Mitteilungen über Unterrichtsausfälle dienen ausschließlich der organisatorischen Terminkoordination. Es ist strengstens untersagt, Diagnosen, Symptome, Atteste oder sonstige Gesundheitsdaten (Art. 9 DSGVO) über die Plattform zu übermitteln. Die Angabe „verhindert“ oder „kann nicht teilnehmen“ ist allein maßgeblich.
 
 ### 5. Verbraucherstreitbeilegung (§ 36 VSBG) & Salvatorische Klausel
 (1) Wir sind weder verpflichtet noch bereit, an einem Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen. Die OS-Plattform der EU ist erreichbar unter: https://ec.europa.eu/consumers/odr.
@@ -243,25 +253,27 @@ Schülerinnen, Schüler und Eltern behalten das uneingeschränkte Urheberrecht a
     isMandatory: false,
     version: ACTIVE_LEGAL_VERSION,
     summaryPoints: [
-      'Freiwillige Freigabe für das Aufnehmen eigener Übe-Audios (Loopstation, Übe-Studio)',
-      'Audio-Feedback der Lehrkraft direkt im Hausaufgabenheft anhören',
-      'Keine Weitergabe an die Öffentlichkeit – strikt geschützter Klassenraum-Tresor',
-      'Freiwillig: Das Hausaufgabenheft funktioniert auch ohne Audioaufnahmen',
-      'Jederzeit mit Wirkung für die Zukunft widerruflich'
+      'Freiwillige Freigabe für instrumentale und stimmliche Übe-Audios (Instrument, Gesang, Loopstation, Übe-Studio)',
+      'Audio-Feedback der Lehrkraft (Play-Alongs, Vorspielen, Einsprechen) direkt im Hausaufgabenheft anhören',
+      'Geschützter Audio-Tresor: Gespeichert im privaten, isolierten Speicher mit 60-Sekunden-Zugriffstoken (keine öffentliche Abrufbarkeit)',
+      'Meisterwerke & Bildungsbiografie: Aufnahmen bleiben für die Dauer des Schuljahres (bis 31. August) bzw. während der aktiven Unterrichtszeit erhalten',
+      '100 % freiwillig & jederzeit im Profil widerrufbar (ohne Nachteile für den regulären Unterricht)'
     ],
-    checkboxLabel: 'Ich willige freiwillig ein, dass im Rahmen des Musikunterrichts didaktische Audioaufnahmen (Übe-Audios, Loopstation-Spuren) zwischen Schüler und Lehrkraft über den geschützten Audio-Tresor ausgetauscht werden dürfen (Widerruf jederzeit möglich).',
+    checkboxLabel: 'Ich willige freiwillig ein, dass im Rahmen des Musikunterrichts didaktische Audioaufnahmen (Instrumental-, Gesangs-, Stimm- und Übe-Aufnahmen sowie Loopstation-Spuren) zwischen Schüler und Lehrkraft über den geschützten Audio-Tresor ausgetauscht werden dürfen (Widerruf jederzeit mit Wirkung für die Zukunft möglich).',
     fullTextMarkdown: `
 ### 1. Zweck der didaktischen Audioverarbeitung
-(1) Im Rahmen des Musikunterrichts können Schüler und Lehrkräfte kurze Audioaufnahmen anfertigen (z. B. Play-Along-Aufnahmen der Lehrkraft, Einspielen eigener Übe-Loops durch den Schüler).
-(2) Diese Aufnahmen dienen ausschließlich der pädagogischen Unterstützung des Übens zu Hause und der didaktischen Erfolgskontrolle.
+(1) Im Rahmen des Musikunterrichts (Instrumental-, Gesangs- und Ensembleunterricht) können Schülerinnen, Schüler und Lehrkräfte didaktische Audioaufnahmen anfertigen (z. B. Play-Alongs der Lehrkraft, Einspielen eigener Instrumental- und Gesangsspuren, Loopstation-Spuren sowie didaktisches Feedback).
+(2) Diese Aufnahmen dienen ausschließlich der pädagogischen Unterstützung des Übens zu Hause, der musikalischen Gehörbildung und der didaktischen Erfolgskontrolle.
 
-### 2. Geschützter Audio-Tresor & Keine Veröffentlichung
-(1) Alle Audios werden in einem isolierten, verschlüsselten Cloud-Speicher gehalten und sind ausschließlich für die zugeordnete Lehrkraft und den Schüler hörbar.
-(2) Es erfolgt keinerlei öffentliche Bereitstellung oder Weitergabe an Dritte.
+### 2. Geschützter Audio-Tresor, Zugriffstoken & Speicherdauer
+(1) Alle Audios werden in einem isolierten, privaten Cloud-Speicher (Audio-Tresor) verschlüsselt gehalten. Der Zugriff erfolgt ausschließlich über ephemere, kryptografisch signierte HMAC-Sicherheits-Tokens mit einer Gültigkeitsdauer von maximal 60 Sekunden.
+(2) Aufnahmen sind ausschließlich für die zugeordnete Lehrkraft sowie die Schülerin bzw. den Schüler und deren Erziehungsberechtigte abrufbar. Es erfolgt keinerlei öffentliche Bereitstellung, kein Suchmaschinen-Indexing und keine Weitergabe an Dritte.
+(3) Meisterwerke & Schuljahres-Aufbewahrung: Didaktische Audioaufnahmen dokumentieren die musikalische Lernbiografie. Sie verbleiben für die Dauer des jeweiligen Schuljahres (bis zum 31. August) bzw. während der aktiven Unterrichtszeit im Tresor und werden zum Schuljahresende im Rahmen der standardisierten Jahresabschluss-Wartung gelöscht, sofern sie nicht zuvor manuell durch den Nutzer entfernt wurden.
+(4) Zweckbindung: Der Audio-Tresor dient ausschließlich musikalisch-didaktischen Zwecken. Reine Privataufnahmen außerhalb des Musikunterrichts sind unzulässig.
 
 ### 3. Freiwilligkeit & Widerrufsrecht (Art. 7 Abs. 3 DSGVO)
-(1) Die Erteilung dieser Einwilligung ist vollkommen freiwillig. Aus einer Nichteinwilligung entstehen keine Nachteile für die reguläre Unterrichtsteilnahme.
-(2) Diese Einwilligung kann jederzeit mit Wirkung für die Zukunft im Schüler- bzw. Elternprofil widerrufen werden. Im Falle des Widerrufs werden vorhandene Schüleraufnahmen gelöscht.
+(1) Die Erteilung dieser Einwilligung ist vollkommen freiwillig. Aus einer Nichteinwilligung entstehen keinerlei Nachteile für die reguläre Unterrichtsteilnahme; das digitale Hausaufgabenheft bleibt uneingeschränkt nutzbar.
+(2) Diese Einwilligung kann jederzeit mit Wirkung für die Zukunft im Schüler- bzw. Elternprofil widerrufen werden. Im Falle des Widerrufs werden vorhandene Audioaufnahmen unverzüglich und unwiederbringlich aus dem Tresor gelöscht.
     `.trim()
   }
 };
