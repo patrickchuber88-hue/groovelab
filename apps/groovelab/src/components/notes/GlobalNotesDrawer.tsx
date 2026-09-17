@@ -11,6 +11,8 @@ interface GlobalNotesDrawerProps {
   allStudents?: any[];
   todayStudents?: any[];
   rooms?: any[];
+  currentRoom?: string;
+  teacherTodayRooms?: string[];
   onOpenHomeworkModal?: (student: any) => void;
 }
 
@@ -23,6 +25,8 @@ export const GlobalNotesDrawer: React.FC<GlobalNotesDrawerProps> = ({
   allStudents = [],
   todayStudents = [],
   rooms = [],
+  currentRoom,
+  teacherTodayRooms = [],
   onOpenHomeworkModal
 }) => {
   const drawerRef = useRef<HTMLDivElement | null>(null);
@@ -119,6 +123,8 @@ export const GlobalNotesDrawer: React.FC<GlobalNotesDrawerProps> = ({
             allStudents={allStudents}
             todayStudents={todayStudents}
             rooms={rooms}
+            currentRoom={currentRoom}
+            teacherTodayRooms={teacherTodayRooms}
             onOpenHomeworkModal={onOpenHomeworkModal}
           />
         </div>

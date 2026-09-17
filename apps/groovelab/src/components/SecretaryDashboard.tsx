@@ -16,7 +16,7 @@ import {
   Disc3, Menu, ScrollText
 } from 'lucide-react';
 import { isWebAuthnSupported, registerUserBiometrics, authenticateUserBiometrics, getStoredBiometricProfiles, removeBiometricProfile, BiometricVaultProfile } from '../utils/webauthn';
-import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
+import { usePremiumOnboardingTour, TourStep } from './PremiumOnboardingTour';
 import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from './CampusGroovelabBrand';
 import QRCode from 'react-qr-code';
 import { getInstrumentAvatarUrl } from './StudioAvatar';
@@ -30,30 +30,19 @@ import { isUUID } from '../utils/uuidValidator';
 import { getAlphabeticalHue, getAlphabeticalUniColor } from '../utils/adminColorHelpers';
 import { formatCurrency, formatGermanDate } from '../utils/formatters';
 
-// Lazy load heavy auxiliary modals and views on demand
-const SecretaryAnnouncementsView = lazy(() => import('./secretary/SecretaryAnnouncementsView').then(m => ({ default: m.SecretaryAnnouncementsView })));
-const SecretaryCrisisView = lazy(() => import('./secretary/SecretaryCrisisView').then(m => ({ default: m.SecretaryCrisisView })));
-const SecretaryEquipmentView = lazy(() => import('./secretary/SecretaryEquipmentView').then(m => ({ default: m.SecretaryEquipmentView })));
-const SecretaryAuditView = lazy(() => import('./secretary/SecretaryAuditView').then(m => ({ default: m.SecretaryAuditView })));
-const SecretaryRoomsView = lazy(() => import('./secretary/SecretaryRoomsView').then(m => ({ default: m.SecretaryRoomsView })));
-const SecretaryLicensesView = lazy(() => import('./secretary/SecretaryLicensesView').then(m => ({ default: m.SecretaryLicensesView })));
-const SecretarySetupView = lazy(() => import('./secretary/SecretarySetupView').then(m => ({ default: m.SecretarySetupView })));
-const SecretaryStudentsView = lazy(() => import('./secretary/SecretaryStudentsView').then(m => ({ default: m.SecretaryStudentsView })));
-const SecretaryEmployeesView = lazy(() => import('./secretary/SecretaryEmployeesView').then(m => ({ default: m.SecretaryEmployeesView })));
-const SecretaryBriefingView = lazy(() => import('./secretary/SecretaryBriefingView').then(m => ({ default: m.SecretaryBriefingView })));
-const SecretarySubjectsView = lazy(() => import('./secretary/SecretarySubjectsView').then(m => ({ default: m.SecretarySubjectsView })));
+// Modular Bounded Context components, navigation hubs and tabs
+import { SecretarySidebar } from './secretary/SecretarySidebar';
+import { SecretaryHeader } from './secretary/SecretaryHeader';
 const SecretaryBillingModalsHub = lazy(() => import('./secretary/SecretaryBillingModalsHub').then(m => ({ default: m.SecretaryBillingModalsHub })));
 const SecretaryGeneralModalsHub = lazy(() => import('./secretary/SecretaryGeneralModalsHub').then(m => ({ default: m.SecretaryGeneralModalsHub })));
+const SecretaryOperationsModalsHub = lazy(() => import('./secretary/SecretaryOperationsModalsHub').then(m => ({ default: m.SecretaryOperationsModalsHub })));
 const SecretaryMobileNavigation = lazy(() => import('./secretary/SecretaryMobileNavigation').then(m => ({ default: m.SecretaryMobileNavigation })));
 const SecretaryGroovelabTab = lazy(() => import('./secretary/tabs/SecretaryGroovelabTab').then(m => ({ default: m.SecretaryGroovelabTab })));
 const SecretaryCampusTab = lazy(() => import('./secretary/tabs/SecretaryCampusTab').then(m => ({ default: m.SecretaryCampusTab })));
+const SecretaryVerwaltungTab = lazy(() => import('./secretary/tabs/SecretaryVerwaltungTab').then(m => ({ default: m.SecretaryVerwaltungTab })));
 import { AppleStyleTokenField } from './common/AppleStyleTokenField';
-const AdminDashboard = lazy(() => import('./AdminDashboard').then(m => ({ default: m.AdminDashboard })));
-const CampusEventsBoard = lazy(() => import('./CampusEventsBoard').then(m => ({ default: m.CampusEventsBoard })));
-const StudentDetailModal = lazy(() => import('./StudentDetailModal').then(m => ({ default: m.StudentDetailModal })));
-const TeacherDetailModal = lazy(() => import('./TeacherDetailModal').then(m => ({ default: m.TeacherDetailModal })));
-import { TeacherManagementModal } from './verwaltung/TeacherManagementModal';
-const ConfirmDeleteStudentModal = lazy(() => import('./ConfirmDeleteStudentModal').then(m => ({ default: m.ConfirmDeleteStudentModal })));
+const SecretaryUserDetailModalsHub = lazy(() => import('./secretary/SecretaryUserDetailModalsHub').then(m => ({ default: m.SecretaryUserDetailModalsHub })));
+import { useSecretarySchedules } from './secretary/hooks/useSecretarySchedules';
 import { calculateSchoolYearDirectBilling, calculateTransitionEffectiveDate } from '../utils/epcGiroCode';
 import { generateTariffReceiptPDF } from '../utils/tariffReceiptPdfGenerator';
 import { computeSchoolDunningStatus, SchoolDunningStatus, getDunningVisualConfig } from '../domain/schoolDunningEngine';
@@ -1224,18 +1213,25 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [qrModalUser, setQrModalUser] = useState<any | null>(null);
   const [copiedQrLink, setCopiedQrLink] = useState<boolean>(false);
 
-  // Live Real-Time Sync for Room Issues & Facility Defects across tabs
+  // Live Real-Time Sync for Room Issues & Facility Defects across tabs and devices
   useEffect(() => {
     if (!schoolId) return;
-    const unsubscribe = notesService.onSync(async () => {
+    const handleSync = async () => {
       try {
         const fetchedIssues = await notesService.fetchSchoolRoomIssues(schoolId);
         setRoomIssues(fetchedIssues);
       } catch (err) {
         console.warn('Real-time room issues sync notice:', err);
       }
-    });
-    return () => unsubscribe();
+    };
+
+    const unsubscribe = notesService.onSync(handleSync);
+    const unsubscribeRealtime = notesService.subscribeSchoolRealtime(schoolId, handleSync);
+
+    return () => {
+      unsubscribe();
+      unsubscribeRealtime();
+    };
   }, [schoolId]);
 
 
@@ -2754,150 +2750,69 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     schoolYearStartMonth, schoolYearStartDay, autoDeleteExpiredUsers
   ]);
 
-  const [pendingSchedules, setPendingSchedules] = useState<PendingSchedule[]>([]);
-  
-  // Room Planner Matrix states
-  const [matrixAllocations, setMatrixAllocations] = useState<any[]>([]);
-  const [unsubmittedTeachers, setUnsubmittedTeachers] = useState<Record<string, boolean>>({});
-  const [selectedDayPlan, setSelectedDayPlan] = useState<any | null>(null);
-  const [draggedPlanId, setDraggedPlanId] = useState<string | null>(null);
-  const [draggedPlanDay, setDraggedPlanDay] = useState<number | null>(null);
-  const [dragOverCell, setDragOverCell] = useState<{ roomId: string | null; day: number | null }>({ roomId: null, day: null });
-  const [isSavingApproval, setIsSavingApproval] = useState<boolean>(false);
-  const [approvalToast, setApprovalToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [showUnassignedWarning, setShowUnassignedWarning] = useState<boolean>(false);
-  const approvalDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [isApprovingAllSchedules, setIsApprovingAllSchedules] = useState<boolean>(false);
-  const [showOnlyPendingReviews, setShowOnlyPendingReviews] = useState<boolean>(false);
-
-  const handleApproveAllPendingSchedules = async () => {
-    if (pendingSchedules.length === 0) return;
-    setIsApprovingAllSchedules(true);
-    try {
-      const pendingIds = pendingSchedules.map(s => s.id);
-      
-      // Targeted notifications to affected students
-      const dayNamesMap: Record<number, string> = { 1: 'Montag', 2: 'Dienstag', 3: 'Mittwoch', 4: 'Donnerstag', 5: 'Freitag', 6: 'Samstag', 7: 'Sonntag' };
-      pendingSchedules.forEach(item => {
-        if (item.student_id && item.student_id !== 'vacant') {
-          const studentName = item.student_name || 'Schüler';
-          const timeSlot = item.time_slot ? item.time_slot.substring(0, 5) : '';
-          const dayName = dayNamesMap[item.day_of_week] || 'Unterrichtstag';
-          
-          const studentTitle = '✅ Neuer Unterrichtstermin zugeteilt';
-          const studentMsg = `Hallo ${studentName.split(' ')[0]}, dein neuer Unterrichtstermin wurde offiziell freigegeben: ${dayName} um ${timeSlot} Uhr.`;
-          
-          supabase.from('notifications')
-            .insert({ user_id: item.student_id, title: studentTitle, message: studentMsg, metadata: { type: 'schedule_approved', day_of_week: item.day_of_week } })
-            .select('id').single()
-            .then(async ({ data: notif }: any) => {
-              if (notif?.id) {
-                try {
-                  await supabase.functions.invoke('send-push', { body: { userId: item.student_id, title: studentTitle, body: studentMsg, url: '/', notificationId: notif.id } });
-                } catch {
-                  // Silence push errors
-                }
-              }
-            });
-        }
-      });
-
-      const { error } = await supabase
-        .from('schedules')
-        .update({ status: 'approved' })
-        .in('id', pendingIds);
-
-      if (error) throw error;
-
-      setPendingSchedules([]);
-      setShowOnlyPendingReviews(false);
-      setApprovalToast({
-        message: `Erfolgreich: Alle ${pendingIds.length} Stundenpläne wurden freigegeben und betroffene Nutzer benachrichtigt!`,
-        type: 'success'
-      });
-      setTimeout(() => setApprovalToast(null), 4000);
-    } catch (err) {
-      console.error('Error approving all pending schedules:', err);
-      setApprovalToast({
-        message: 'Fehler beim Freigeben der Stundenpläne.',
-        type: 'error'
-      });
-      setTimeout(() => setApprovalToast(null), 4000);
-    } finally {
-      setIsApprovingAllSchedules(false);
-    }
-  };
-
-
-  // Dynamic centering auto-scroll when dragging schedule blocks (high performance requestAnimationFrame)
-  useEffect(() => {
-    if (!draggedPlanId) return;
-
-    let currentSpeed = 0;
-    let animationFrameId: number | null = null;
-    const scrollContainer = document.getElementById('secretary-main-scroll-container');
-
-    const updateScroll = () => {
-      if (currentSpeed !== 0) {
-        if (scrollContainer) {
-          scrollContainer.scrollBy(0, currentSpeed);
-        } else {
-          window.scrollBy(0, currentSpeed);
-        }
-      }
-      animationFrameId = requestAnimationFrame(updateScroll);
-    };
-
-    // Start the scroll loop
-    animationFrameId = requestAnimationFrame(updateScroll);
-
-    const handleGlobalDragOver = (e: DragEvent) => {
-      e.preventDefault();
-      
-      const clientY = e.clientY;
-      const viewHeight = window.innerHeight;
-      const centerY = viewHeight / 2;
-      const deltaY = clientY - centerY;
-      const absDelta = Math.abs(deltaY);
-      
-      // Calmer speed: dead zone of 80px, capped at 7px per frame (very smooth and readable)
-      if (absDelta > 80) {
-        const direction = Math.sign(deltaY);
-        const maxScrollContainerDist = viewHeight / 2 - 80;
-        const ratio = Math.min(1, (absDelta - 80) / Math.max(1, maxScrollContainerDist));
-        currentSpeed = direction * ratio * 7; 
-      } else {
-        currentSpeed = 0;
-      }
-    };
-
-    const handleGlobalDragEnd = () => {
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-      }
-      setDraggedPlanId(null);
-      setDraggedPlanDay(null);
-      setDragOverCell({ roomId: null, day: null });
-    };
-
-    window.addEventListener('dragover', handleGlobalDragOver);
-    window.addEventListener('dragend', handleGlobalDragEnd);
-    
-    return () => {
-      window.removeEventListener('dragover', handleGlobalDragOver);
-      window.removeEventListener('dragend', handleGlobalDragEnd);
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-      }
-    };
-  }, [draggedPlanId]);
-
-  const [hoveredUnassignedDayNum, setHoveredUnassignedDayNum] = useState<number | null>(null);
-  const [clickedUnassignedDayNum, setClickedUnassignedDayNum] = useState<number | null>(null);
-  const [schedulesSidebarTab, setSchedulesSidebarTab] = useState<'submissions' | 'stats'>('submissions');
-  const [sidebarTeacherSearch, setSidebarTeacherSearch] = useState<string>('');
-  const [expandedSidebarTeacherId, setExpandedSidebarTeacherId] = useState<string | null>(null);
-  const [selectedFilterTeacherId, setSelectedFilterTeacherId] = useState<string | null>(null);
+  const {
+    pendingSchedules,
+    setPendingSchedules,
+    matrixAllocations,
+    setMatrixAllocations,
+    unsubmittedTeachers,
+    setUnsubmittedTeachers,
+    selectedDayPlan,
+    setSelectedDayPlan,
+    draggedPlanId,
+    setDraggedPlanId,
+    draggedPlanDay,
+    setDraggedPlanDay,
+    dragOverCell,
+    setDragOverCell,
+    isSavingApproval,
+    setIsSavingApproval,
+    approvalToast,
+    setApprovalToast,
+    showUnassignedWarning,
+    setShowUnassignedWarning,
+    approvalDebounceRef,
+    isApprovingAllSchedules,
+    setIsApprovingAllSchedules,
+    showOnlyPendingReviews,
+    setShowOnlyPendingReviews,
+    hoveredUnassignedDayNum,
+    setHoveredUnassignedDayNum,
+    clickedUnassignedDayNum,
+    setClickedUnassignedDayNum,
+    schedulesSidebarTab,
+    setSchedulesSidebarTab,
+    sidebarTeacherSearch,
+    setSidebarTeacherSearch,
+    expandedSidebarTeacherId,
+    setExpandedSidebarTeacherId,
+    selectedFilterTeacherId,
+    setSelectedFilterTeacherId,
+    handleApproveAllPendingSchedules,
+    isGroovelabPlan,
+    isGroovelabRoom,
+    runAutoRoomAllocation,
+    handleSaveAndApproveAll,
+    handleRejectTeacherDayPlan,
+    getSplitPoints,
+    handleSplitPlan,
+    handleMergePlans,
+    getPlanDisplayName,
+    handleApproveSingleSchedule,
+    handleRejectSingleSchedule,
+    handleDragStartMatrix,
+    handleDropOnMatrix,
+    handleDownloadTeacherSchedule
+  } = useSecretarySchedules({
+    schoolId,
+    rooms,
+    setRooms,
+    openingHours,
+    campusTeachers,
+    bypassTeachers,
+    coaches,
+    fetchDashboardData: () => fetchDashboardData()
+  });
 
   const INSTRUMENT_TAGS = ['Schlagzeug', 'Piano', 'Gitarre', 'Gesang', 'Geige', 'Querflöte', 'Saxophon', 'Bass', 'Keyboard', 'Trompete'];
 
@@ -7279,97 +7194,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       alert("Fehler beim Umstellen auf Basis: " + err.message);
     }
   };
+  // [EXTRACTED to SecretaryVerwaltungTab: renderAnnouncementsBoard]
 
-  const renderAnnouncementsBoard = () => {
-    const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
-      if (!acc.some(existing => existing.id === t.id)) {
-        acc.push(t);
-      }
-      return acc;
-    }, []);
-
-    return (
-      <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Mitteilungen & Informationen...</div>}>
-        <SecretaryAnnouncementsView
-          announcements={announcementsList}
-          announcementsLoading={announcementsLoading}
-          allUniqueTeachers={allUniqueTeachers}
-          editingAnnouncementId={editingAnnouncementId}
-          setEditingAnnouncementId={setEditingAnnouncementId}
-          newAnnouncementTitle={newAnnouncementTitle}
-          setNewAnnouncementTitle={setNewAnnouncementTitle}
-          newAnnouncementDescription={newAnnouncementDescription}
-          setNewAnnouncementDescription={setNewAnnouncementDescription}
-          newAnnouncementType={newAnnouncementType}
-          setNewAnnouncementType={setNewAnnouncementType}
-          newAnnouncementPriority={newAnnouncementPriority}
-          setNewAnnouncementPriority={setNewAnnouncementPriority}
-          newAnnouncementIsAnonymous={newAnnouncementIsAnonymous}
-          setNewAnnouncementIsAnonymous={setNewAnnouncementIsAnonymous}
-          newAnnouncementTargetType={newAnnouncementTargetType}
-          setNewAnnouncementTargetType={setNewAnnouncementTargetType}
-          newAnnouncementTargetGroup={newAnnouncementTargetGroup}
-          setNewAnnouncementTargetGroup={setNewAnnouncementTargetGroup}
-          newAnnouncementTargetTeacherId={newAnnouncementTargetTeacherId}
-          setNewAnnouncementTargetTeacherId={setNewAnnouncementTargetTeacherId}
-          newAnnouncementDueDate={newAnnouncementDueDate}
-          setNewAnnouncementDueDate={setNewAnnouncementDueDate}
-          newAnnouncementRecurrence={newAnnouncementRecurrence}
-          setNewAnnouncementRecurrence={setNewAnnouncementRecurrence}
-          newAnnouncementAttachmentUrl={newAnnouncementAttachmentUrl}
-          setNewAnnouncementAttachmentUrl={setNewAnnouncementAttachmentUrl}
-          newAnnouncementQuestions={newAnnouncementQuestions}
-          setNewAnnouncementQuestions={setNewAnnouncementQuestions}
-          uploadingAnnouncementAttachment={isUploadingAnnouncementAttachment}
-          handleUploadAnnouncementAttachment={handleUploadAnnouncementAttachment}
-          handleSaveAnnouncement={handleCreateAnnouncement}
-          handleDeleteAnnouncement={handleDeleteAnnouncement}
-          handleEditAnnouncement={(announcement) => {
-            setEditingAnnouncementId(announcement.id);
-            setNewAnnouncementTitle(announcement.title);
-            setNewAnnouncementDescription(announcement.description || '');
-            setNewAnnouncementType(announcement.duty_type as any);
-            setNewAnnouncementQuestions(announcement.questions || []);
-            setNewAnnouncementPriority((announcement.priority as any) || 'standard');
-            setNewAnnouncementIsAnonymous(announcement.is_anonymous || false);
-            setNewAnnouncementTargetType(announcement.target_type as any);
-            setNewAnnouncementTargetGroup(announcement.target_group || 'all');
-            setNewAnnouncementTargetTeacherId(announcement.target_teacher_id || '');
-            setNewAnnouncementDueDate(announcement.due_date ? announcement.due_date.split('T')[0] : '');
-            setNewAnnouncementRecurrence((announcement.recurrence as any) || 'none');
-            setNewAnnouncementAttachmentUrl(announcement.attachment_url || '');
-          }}
-          handleResetAnnouncementForm={() => {
-            setEditingAnnouncementId(null);
-            setNewAnnouncementTitle('');
-            setNewAnnouncementDescription('');
-            setNewAnnouncementType('todo');
-            setNewAnnouncementQuestions([]);
-            setNewAnnouncementPriority('standard');
-            setNewAnnouncementIsAnonymous(false);
-            setNewAnnouncementTargetType('all');
-            setNewAnnouncementDueDate('');
-            setNewAnnouncementRecurrence('none');
-            setNewAnnouncementAttachmentUrl('');
-          }}
-          selectedAnnouncementForStats={selectedAnnouncementForStats}
-          setSelectedAnnouncementForStats={setSelectedAnnouncementForStats}
-          announcementResponses={announcementResponsesList}
-          fetchAnnouncementStats={fetchAnnouncementStats}
-          statsModalTab={statsModalTab}
-          setStatsModalTab={setStatsModalTab}
-          statsStatusFilter={statsStatusFilter}
-          setStatsStatusFilter={setStatsStatusFilter}
-          statsSearchQuery={statsSearchQuery}
-          setStatsSearchQuery={setStatsSearchQuery}
-          expandedResponseIds={expandedResponseIds}
-          setExpandedResponseIds={setExpandedResponseIds}
-          handleExportAnnouncementPdf={() => window.print()}
-          handleExportAnnouncementCsv={() => handleExportCSV(selectedAnnouncementForStats)}
-        />
-      </Suspense>
-    );
-  };
 
 // [EXTRACTED to SecretaryStudentsView]
 
@@ -7657,1002 +7483,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     }
   };
 
-  // Helper to identify GrooveLab plans & GrooveLab rooms
-  const isGroovelabPlan = (plan: any) => {
-    if (!plan) return false;
-    const tId = plan.teacherId || '';
-    const tName = (plan.teacherName || '').toLowerCase();
-    const instr = (plan.instrument || '').toLowerCase();
-    return tId === 'groovelab' || tName.includes('groove lab') || tName.includes('groovelab') || instr.includes('plattform');
-  };
-
-  const isGroovelabRoom = (room: any) => {
-    if (!room) return false;
-    if (room.is_groovelab_active === true) return true;
-    const name = (room.name || '').toLowerCase();
-    return name.includes('groovelab') || name.includes('groove lab') || name.includes('band');
-  };
-
-  // Multi-Iteration Smart Solver for Room Allocation
-  const runAutoRoomAllocation = () => {
-    const activeRooms = rooms.filter(r => r.is_campus_active !== false);
-    if (activeRooms.length === 0) {
-      alert('Keine aktiven Räume für die Autozuweisung vorhanden!');
-      return;
-    }
-
-    const isOverlap = (p1: any, p2: any) => {
-      return p1.startTime < p2.endTime && p2.startTime < p1.endTime;
-    };
-
-    const isRoomUnsuitable = (r: any, instrumentName: string) => {
-      if (!r || !instrumentName) return false;
-      const unsuitable = r.unsuitable_instruments || (() => {
-        try {
-          const map = JSON.parse(localStorage.getItem(`groovelab_room_unsuitable_mappings_${schoolId}`) || '{}');
-          return map[r.id] || [];
-        } catch { return []; }
-      })();
-      return unsuitable.some((inst: string) => inst.toLowerCase() === instrumentName.toLowerCase());
-    };
-
-    const allTeachersList = [...campusTeachers, ...bypassTeachers, ...coaches];
-    const teacherProfileMap = new Map<string, any>();
-    allTeachersList.forEach(t => teacherProfileMap.set(t.id, t));
-
-    // 1. Detect plans with time conflicts or unassigned rooms
-    const conflictingPlanIds = new Set<string>();
-    matrixAllocations.forEach(p1 => {
-      if (!p1.roomId) return;
-      matrixAllocations.forEach(p2 => {
-        if (p1.id !== p2.id && p1.roomId === p2.roomId && p1.dayOfWeek === p2.dayOfWeek && isOverlap(p1, p2)) {
-          conflictingPlanIds.add(p1.id);
-          conflictingPlanIds.add(p2.id);
-        }
-      });
-    });
-
-    const initialAssigned: Record<string, string> = {};
-    matrixAllocations.forEach(p => {
-      if (p.roomId && !conflictingPlanIds.has(p.id)) {
-        initialAssigned[p.id] = p.roomId;
-      }
-    });
-
-    const unassignedPlans = matrixAllocations.filter(p => !p.roomId || conflictingPlanIds.has(p.id));
-    if (unassignedPlans.length === 0) {
-      alert('Alle Einheiten haben bereits einen zugewiesenen Raum ohne Konflikte!');
-      return;
-    }
-
-    // Separate rooms into GrooveLab rooms and Standard rooms
-    const activeGroovelabRooms = activeRooms.filter(r => isGroovelabRoom(r));
-    const activeStandardRooms = activeRooms.filter(r => !isGroovelabRoom(r));
-
-    // Helper to get favorite room IDs for a teacher (from DB profile + Räume Board star selections in localStorage)
-    const getTeacherFavoriteRoomIds = (tId: string) => {
-      const teacherProfile = teacherProfileMap.get(tId);
-      const dbFavs: string[] = teacherProfile?.preferred_room_ids || [];
-      const localFav = localStorage.getItem(`groovelab_favorite_room_id_${tId}`);
-      const combined = new Set<string>([
-        ...dbFavs,
-        ...(localFav ? [localFav] : [])
-      ]);
-      return Array.from(combined);
-    };
-
-    // Pre-calculate candidate room pools per plan:
-    // GrooveLab sessions MUST be assigned to GrooveLab rooms first.
-    // Regular teachers prefer Favorite & Standard rooms first, but unbooked hours in GrooveLab rooms are also available.
-    const candidateRoomsPerPlan = new Map<string, any[]>();
-    unassignedPlans.forEach(plan => {
-      if (isGroovelabPlan(plan)) {
-        const targetGLRooms = activeGroovelabRooms.length > 0 ? activeGroovelabRooms : activeRooms;
-        candidateRoomsPerPlan.set(plan.id, targetGLRooms);
-      } else {
-        const instr = plan.instrument?.toLowerCase() || '';
-        let candidates = activeStandardRooms.length > 0 ? [...activeStandardRooms] : [...activeRooms];
-
-        if (instr.includes('schlagzeug') || instr.includes('drums')) {
-          const drumRooms = candidates.filter(r => {
-            const eq = r.equipment;
-            const hasEquip = Array.isArray(eq) && (eq.includes('drums') || eq.includes('schlagzeug') || eq.includes('drum'));
-            return hasEquip || r.name.toLowerCase().includes('schlagzeug') || r.name.toLowerCase().includes('drums') || r.name.toLowerCase().includes('band') || r.name.toLowerCase().includes('drum');
-          });
-          if (drumRooms.length > 0) candidates = drumRooms;
-        } else if (instr.includes('klavier') || instr.includes('piano')) {
-          const pianoRooms = candidates.filter(r => {
-            const eq = r.equipment;
-            const hasEquip = Array.isArray(eq) && (eq.includes('piano') || eq.includes('klavier') || eq.includes('keys'));
-            return hasEquip || r.name.toLowerCase().includes('klavier') || r.name.toLowerCase().includes('piano') || r.name.toLowerCase().includes('flügel');
-          });
-          if (pianoRooms.length > 0) candidates = pianoRooms;
-        }
-
-        // Suitable standard candidate rooms
-        let suitableCandidates = candidates.filter(r => !isRoomUnsuitable(r, plan.instrument));
-
-        // Unbooked times in GrooveLab rooms are available for regular teachers after GrooveLab sessions are placed
-        if (activeGroovelabRooms.length > 0) {
-          const suitableGLRooms = activeGroovelabRooms.filter(r => !isRoomUnsuitable(r, plan.instrument));
-          suitableCandidates = [...suitableCandidates, ...suitableGLRooms];
-        }
-
-        // Prioritize teacher's favorite rooms at the top of candidate list
-        const favRoomIds = getTeacherFavoriteRoomIds(plan.teacherId);
-        if (favRoomIds.length > 0) {
-          const favCandidates = suitableCandidates.filter(r => favRoomIds.includes(r.id));
-          const nonFavCandidates = suitableCandidates.filter(r => !favRoomIds.includes(r.id));
-          suitableCandidates = [...favCandidates, ...nonFavCandidates];
-        }
-
-        candidateRoomsPerPlan.set(plan.id, suitableCandidates.length > 0 ? suitableCandidates : activeRooms.filter(r => !isRoomUnsuitable(r, plan.instrument)));
-      }
-    });
-
-    // 2. MONTE-CARLO SOLVER (100 Iterations)
-    const RUN_ITERATIONS = 100;
-    let bestGlobalScore = -Infinity;
-    let bestAssigned: Record<string, string> = { ...initialAssigned };
-
-    for (let iter = 0; iter < RUN_ITERATIONS; iter++) {
-      const currentAssigned: Record<string, string> = { ...initialAssigned };
-
-      // Sort plans: GrooveLab sessions MUST always be placed FIRST (Phase 1), followed by drums/schlagzeug, then others
-      const iterPlans = [...unassignedPlans].sort((a, b) => {
-        const aIsGL = isGroovelabPlan(a);
-        const bIsGL = isGroovelabPlan(b);
-        if (aIsGL && !bIsGL) return -1;
-        if (!aIsGL && bIsGL) return 1;
-
-        const aIsDrums = a.instrument?.toLowerCase().includes('schlagzeug') || a.instrument?.toLowerCase().includes('drums');
-        const bIsDrums = b.instrument?.toLowerCase().includes('schlagzeug') || b.instrument?.toLowerCase().includes('drums');
-        if (aIsDrums && !bIsDrums) return -1;
-        if (!aIsDrums && bIsDrums) return 1;
-
-        if (iter > 0) {
-          return (Math.random() - 0.5);
-        }
-        return 0;
-      });
-
-      for (const plan of iterPlans) {
-        const candidateRooms = candidateRoomsPerPlan.get(plan.id) || activeRooms;
-        let bestRoomIdForPlan: string | null = null;
-        let highestRoomScore = -Infinity;
-
-        // Evaluate candidate rooms
-        for (const room of candidateRooms) {
-          // Check hard conflict with already assigned rooms (manual + solver assigned so far in this iter)
-          const hasConflict = matrixAllocations.some(otherPlan => {
-            if (otherPlan.id === plan.id) return false;
-            const allocatedRoom = currentAssigned[otherPlan.id];
-            return allocatedRoom === room.id && otherPlan.dayOfWeek === plan.dayOfWeek && isOverlap(otherPlan, plan);
-          });
-
-          if (hasConflict) continue;
-
-          // Tiered Scoring Matrix
-          let roomScore = 0;
-
-          // GrooveLab Priority Score
-          if (isGroovelabPlan(plan) && isGroovelabRoom(room)) {
-            roomScore += 50000;
-          }
-
-          // Tier 2 (30.000 pts): Favorite Room Hit (Räume-Board Starred + DB Profile Favorite Rooms)
-          const favRoomIds = getTeacherFavoriteRoomIds(plan.teacherId);
-          if (favRoomIds.includes(room.id)) {
-            roomScore += 30000;
-          }
-
-          // Tier 2b (20.000 pts): Day Continuity - Teacher already has an assigned slot in this exact room on this day!
-          const teacherSameDaySlots = matrixAllocations.filter(p => p.teacherId === plan.teacherId && p.dayOfWeek === plan.dayOfWeek && p.id !== plan.id);
-          const sameDayRoomUsageCount = teacherSameDaySlots.filter(p => currentAssigned[p.id] === room.id).length;
-          if (sameDayRoomUsageCount > 0) {
-            roomScore += 20000 * sameDayRoomUsageCount;
-          }
-
-          // Tier 3 (8.000 pts): Teacher Anchor - Room matches a manually assigned room for this teacher on this day
-          const anchorRoom = teacherSameDaySlots.find(p => initialAssigned[p.id])?.roomId;
-          if (anchorRoom && anchorRoom === room.id) {
-            roomScore += 8000;
-          }
-
-          // Tier 4 (4.000 pts): Preferred Room Hit
-          const teacherProfile = teacherProfileMap.get(plan.teacherId);
-          const prefRooms: string[] = teacherProfile?.preferred_room_ids || [];
-          if (prefRooms.includes(room.id)) {
-            roomScore += 4000;
-          }
-
-          // Tier 5 (1.000 pts): Room Compaction / Docking Bonus (docking directly adjacent to another class in this room)
-          const isAdjacent = matrixAllocations.some(otherPlan => {
-            if (otherPlan.id === plan.id) return false;
-            const allocatedRoom = currentAssigned[otherPlan.id];
-            if (allocatedRoom !== room.id || otherPlan.dayOfWeek !== plan.dayOfWeek) return false;
-            return (otherPlan.endTime === plan.startTime || otherPlan.startTime === plan.endTime);
-          });
-          if (isAdjacent) {
-            roomScore += 1000;
-          }
-
-          // Base points
-          roomScore += 100;
-
-          if (roomScore > highestRoomScore) {
-            highestRoomScore = roomScore;
-            bestRoomIdForPlan = room.id;
-          }
-        }
-
-        if (bestRoomIdForPlan) {
-          currentAssigned[plan.id] = bestRoomIdForPlan;
-        }
-      }
-
-      // Calculate global score of iteration
-      let iterationGlobalScore = 0;
-      let totalAssignedInIter = 0;
-      let preferredHitsInIter = 0;
-
-      unassignedPlans.forEach(plan => {
-        const assignedRoomId = currentAssigned[plan.id];
-        if (assignedRoomId) {
-          totalAssignedInIter++;
-          iterationGlobalScore += 100000; // Tier 1: Assignment priority
-
-          // Preferred room hit bonus
-          const teacherProfile = teacherProfileMap.get(plan.teacherId);
-          if (teacherProfile?.preferred_room_ids?.includes(assignedRoomId)) {
-            preferredHitsInIter++;
-            iterationGlobalScore += 4000;
-          }
-        }
-      });
-
-      // Continuity score bonus across all teachers per day
-      const teacherDays = new Set<string>();
-      matrixAllocations.forEach(p => teacherDays.add(`${p.teacherId}_${p.dayOfWeek}`));
-
-      let zeroSwitchTeacherDays = 0;
-      teacherDays.forEach(tdKey => {
-        const [tId, dayStr] = tdKey.split('_');
-        const dayNum = Number(dayStr);
-        const slotsForTeacherDay = matrixAllocations.filter(p => p.teacherId === tId && p.dayOfWeek === dayNum);
-        const assignedRooms = new Set(slotsForTeacherDay.map(p => currentAssigned[p.id]).filter(Boolean));
-        if (assignedRooms.size === 1) {
-          zeroSwitchTeacherDays++;
-          iterationGlobalScore += 20000;
-        }
-      });
-
-      if (iterationGlobalScore > bestGlobalScore) {
-        bestGlobalScore = iterationGlobalScore;
-        bestAssigned = { ...currentAssigned };
-      }
-    }
-
-    // Apply best solver result to state
-    setMatrixAllocations(prev => prev.map(p => ({
-      ...p,
-      roomId: bestAssigned[p.id] || p.roomId
-    })));
-
-    // Calculate quality metrics for notification feedback
-    const newlyAssignedCount = unassignedPlans.filter(p => bestAssigned[p.id]).length;
-    const unassignedRemainingCount = unassignedPlans.length - newlyAssignedCount;
-
-    // Zero room switch metrics
-    const teacherDays = new Set<string>();
-    matrixAllocations.forEach(p => teacherDays.add(`${p.teacherId}_${p.dayOfWeek}`));
-    let zeroSwitchCount = 0;
-    let totalTeacherDaysCount = 0;
-
-    teacherDays.forEach(tdKey => {
-      const [tId, dayStr] = tdKey.split('_');
-      const dayNum = Number(dayStr);
-      const slots = matrixAllocations.filter(p => p.teacherId === tId && p.dayOfWeek === dayNum);
-      const roomsUsed = new Set(slots.map(p => bestAssigned[p.id] || p.roomId).filter(Boolean));
-      if (roomsUsed.size === 1 && slots.length > 1) {
-        zeroSwitchCount++;
-      }
-      if (slots.length > 1) {
-        totalTeacherDaysCount++;
-      }
-    });
-
-    const continuityPercentage = totalTeacherDaysCount > 0 ? Math.round((zeroSwitchCount / totalTeacherDaysCount) * 100) : 100;
-
-    alert(
-      `⚡ Smart Auto-Zuweisung abgeschlossen!\n\n` +
-      `• Erreichter Gesamt-Score: ${bestGlobalScore.toLocaleString()}\n` +
-      `• Zugewiesene Einheiten: ${newlyAssignedCount} von ${unassignedPlans.length}\n` +
-      `• Raumtreue (0 Raumwechsel am Tag): ${continuityPercentage}% der Lehrkräfte\n` +
-      (unassignedRemainingCount > 0 ? `⚠️ ${unassignedRemainingCount} Einheiten konnten wegen Raumkonflikten nicht platziert werden.` : `✅ Alle Einheiten optimal verteilt.`)
-    );
-  };
-
-  // Bulk save and approve to database
-  const handleSaveAndApproveAll = async (skipUnassignedWarning = false) => {
-    // Check for unassigned plans and show warning modal if needed
-    const unassignedPlans = matrixAllocations.filter(p => !p.roomId);
-    if (!skipUnassignedWarning && unassignedPlans.length > 0) {
-      setShowUnassignedWarning(true);
-      return;
-    }
-
-    setIsSavingApproval(true);
-    try {
-      const dayNames = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
-
-      // Only process plans that have a room assigned
-      const assignedPlans = matrixAllocations.filter(p => p.roomId);
-
-      // Map to store assigned roomId for each teacher_day key (includes all for localStorage)
-      const approvedDraftMap: Record<string, string | null> = {};
-      matrixAllocations.forEach(p => {
-        if (p) approvedDraftMap[`${p.teacherId}_${p.dayOfWeek}`] = p.roomId || null;
-      });
-
-      // ─── Prepare all DB writes ─────────────────────────────────────────────
-
-      const scheduleUpdatePromises: any[] = [];
-      const slotsToInsert: any[] = [];
-      const teacherRoomMap: Record<string, Record<number, string | null>> = {};
-
-      for (const plan of assignedPlans) {
-        if (!plan) continue;
-        const targetRoomId = plan.roomId;
-
-        if (plan.teacherId && plan.teacherId !== 'groovelab') {
-          // Batch: purge stale schedules for this teacher & day of week to prevent duplicate/ghost accumulation
-          scheduleUpdatePromises.push(
-            supabase
-              .from('schedules')
-              .delete()
-              .eq('school_id', schoolId)
-              .eq('teacher_id', plan.teacherId)
-              .eq('day_of_week', plan.dayOfWeek)
-          );
-
-          // Collect clean active slots from approved plan
-          if (plan.slots && plan.slots.length > 0) {
-            for (const slot of plan.slots) {
-              if (!slot.isBreak) {
-                if (slot.isGroup && slot.groupStudents && slot.groupStudents.length > 0) {
-                  slot.groupStudents.forEach((gs: any) => {
-                    slotsToInsert.push({
-                      school_id: schoolId,
-                      teacher_id: plan.teacherId,
-                      student_id: gs.id,
-                      day_of_week: plan.dayOfWeek,
-                      time_slot: slot.time_slot || slot.startTime || '14:00',
-                      room_id: targetRoomId,
-                      duration: slot.duration || 30,
-                      status: 'approved',
-                      instrument: gs.instrument || slot.instrument || plan.instrument || 'Musiker'
-                    });
-                  });
-                } else if (slot.student_id) {
-                  slotsToInsert.push({
-                    school_id: schoolId,
-                    teacher_id: plan.teacherId,
-                    student_id: slot.student_id,
-                    day_of_week: plan.dayOfWeek,
-                    time_slot: slot.time_slot || slot.startTime || '14:00',
-                    room_id: targetRoomId,
-                    duration: slot.duration || 30,
-                    status: 'approved',
-                    instrument: slot.instrument || plan.instrument || 'Musiker'
-                  });
-                }
-              }
-            }
-          }
-
-          // Build teacherRoomMap for user.planned_boards update
-          if (!teacherRoomMap[plan.teacherId]) teacherRoomMap[plan.teacherId] = {};
-          teacherRoomMap[plan.teacherId][plan.dayOfWeek] = plan.roomId || null;
-        }
-      }
-
-      const groovelabRoomsMap: Record<number, string | null> = {};
-      assignedPlans.forEach((p: any) => {
-        if (p.teacherId === 'groovelab') groovelabRoomsMap[p.dayOfWeek] = p.roomId || null;
-      });
-
-      const updatedOpHours = { ...openingHours };
-      const dayKeys = ['', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-      let opHoursChanged = false;
-      for (let d = 1; d <= 7; d++) {
-        const dayKey = dayKeys[d];
-        if (updatedOpHours[dayKey] && groovelabRoomsMap[d] !== undefined) {
-          updatedOpHours[dayKey] = { ...updatedOpHours[dayKey], roomId: groovelabRoomsMap[d] };
-          opHoursChanged = true;
-        }
-      }
-
-      // ─── WAVE 1: Core DB writes ───────────────────────────────────────────
-      // 1. Purge stale schedules first so delete and insert do not race
-      if (scheduleUpdatePromises.length > 0) {
-        await Promise.all(scheduleUpdatePromises);
-      }
-
-      // 2. Insert clean approved slots, fetch teacher users, and update opening hours
-      const [, teacherUsersResult] = await Promise.all([
-        slotsToInsert.length > 0
-          ? supabase.from('schedules').insert(slotsToInsert).then(({ error }) => {
-              if (error) console.error('[SecretaryDashboard] Error inserting clean schedules:', error);
-            })
-          : Promise.resolve(),
-        supabase.from('users').select('*').eq('school_id', schoolId),
-        opHoursChanged
-          ? supabase.from('schools').update({ opening_hours: updatedOpHours }).eq('id', schoolId)
-          : Promise.resolve()
-      ]);
-
-      const teacherUsers = (teacherUsersResult as any)?.data || [];
-
-      // ─── WAVE 2: User planned_boards updates + fetch approved schedules (parallel) ─
-
-      // Build user update promises (all at once, no sequential loop)
-      const userUpdatePromises: any[] = [];
-      for (const tu of teacherUsers) {
-        const roomMap = teacherRoomMap[tu.id];
-        if (!roomMap) continue;
-        const rawPlanned = tu.planned_boards || (tu as any).campus_räume || (tu as any).groovelab_räume;
-        if (rawPlanned && typeof rawPlanned === 'object') {
-          const updatedPlanned = { ...rawPlanned, status: 'approved' };
-          if (Array.isArray((rawPlanned as any).drafts)) {
-            updatedPlanned.drafts = (rawPlanned as any).drafts.map((d: any) => ({
-              ...d,
-              status: 'approved',
-              boards: (d.boards || []).map((b: any) => ({
-                ...b,
-                roomId: roomMap[b.dayOfWeek] !== undefined ? roomMap[b.dayOfWeek] : (b.roomId || null)
-              }))
-            }));
-          } else if (Array.isArray((rawPlanned as any).boards)) {
-            updatedPlanned.boards = (rawPlanned as any).boards.map((b: any) => ({
-              ...b,
-              roomId: roomMap[b.dayOfWeek] !== undefined ? roomMap[b.dayOfWeek] : (b.roomId || null)
-            }));
-          }
-          userUpdatePromises.push(
-            supabase.from('users').update({
-              planned_boards: updatedPlanned,
-              campus_räume: updatedPlanned,
-              groovelab_räume: updatedPlanned
-            }).eq('id', tu.id)
-          );
-        }
-      }
-
-      const [, allApprovedSchedulesResult] = await Promise.all([
-        // All user.planned_boards updates in parallel
-        Promise.all(userUpdatePromises),
-        // Fetch all approved schedules for occurrence sync
-        supabase.from('schedules').select('*').eq('school_id', schoolId).eq('status', 'approved')
-      ]);
-
-      const allApprovedSchedules = (allApprovedSchedulesResult as any)?.data || [];
-
-      // ─── WAVE 3: schedule_occurrences sync ─────────────────────────────────
-
-      if (allApprovedSchedules.length > 0) {
-        const today = new Date();
-        const y = today.getFullYear();
-        const m = String(today.getMonth() + 1).padStart(2, '0');
-        const d = String(today.getDate()).padStart(2, '0');
-        const todayStr = `${y}-${m}-${d}`;
-
-        const schoolStartYear = today.getMonth() >= 8 ? today.getFullYear() : today.getFullYear() - 1;
-        const schoolYearEnd = new Date(`${schoolStartYear + 1}-08-31T23:59:59`);
-
-        const occurrences: any[] = [];
-        allApprovedSchedules.forEach((sch: any) => {
-          const { id: scheduleId, student_id, teacher_id, day_of_week, time_slot, duration, school_id: schSchoolId } = sch;
-          if (!student_id || !day_of_week || !time_slot) return;
-          const dayNum = typeof day_of_week === 'number' ? day_of_week : (parseInt(day_of_week, 10) || 1);
-
-          const current = new Date(today);
-          current.setHours(0, 0, 0, 0);
-          const currentDay = current.getDay() || 7;
-          const diff = dayNum - currentDay;
-          const targetDate = new Date(current);
-          targetDate.setDate(current.getDate() + diff);
-
-          const todayZero = new Date(today);
-          todayZero.setHours(0, 0, 0, 0);
-          if (targetDate < todayZero) {
-            targetDate.setDate(targetDate.getDate() + 7);
-          }
-
-          while (targetDate <= schoolYearEnd) {
-            const ty = targetDate.getFullYear();
-            const tm = String(targetDate.getMonth() + 1).padStart(2, '0');
-            const td = String(targetDate.getDate()).padStart(2, '0');
-            const dateStr = `${ty}-${tm}-${td}`;
-            const startTime = time_slot.includes(':') && time_slot.split(':').length === 2 ? time_slot + ':00' : time_slot;
-            occurrences.push({ 
-              school_id: schSchoolId || schoolId,
-              schedule_id: scheduleId, 
-              student_id, 
-              teacher_id, 
-              date: dateStr, 
-              start_time: startTime, 
-              duration: duration || 45, 
-              status: 'scheduled' 
-            });
-            targetDate.setDate(targetDate.getDate() + 7);
-          }
-        });
-
-        const teacherIds = Array.from(new Set(allApprovedSchedules.map((s: any) => s.teacher_id).filter(Boolean))) as string[];
-
-        await Promise.all([
-          // Single DELETE with .in() instead of sequential loop per teacher
-          teacherIds.length > 0
-            ? supabase.from('schedule_occurrences').delete().in('teacher_id', teacherIds).gte('date', todayStr)
-            : Promise.resolve()
-        ]);
-
-        if (occurrences.length > 0) {
-          await supabase.from('schedule_occurrences').insert(occurrences);
-        }
-      }
-
-      // ─── LocalStorage + UI feedback (sync, instant) ────────────────────────
-      localStorage.setItem(`groovelab_matrix_allocations_draft_${schoolId}`, JSON.stringify(approvedDraftMap));
-      setApprovalToast({ message: `✅ Raumplan freigegeben! ${assignedPlans.length} Einheiten wurden gespeichert.`, type: 'success' });
-      setTimeout(() => setApprovalToast(null), 4000);
-
-      // Refresh dashboard data immediately — don't wait for notifications
-      fetchDashboardData();
-
-      // ─── Notifications: fire-and-forget (don't block UI) ───────────────────
-      const teacherUsersData = teacherUsers;
-      const notificationPromises: any[] = [];
-      for (const plan of assignedPlans) {
-        if (!plan || plan.teacherId === 'groovelab' || !plan.teacherId) continue;
-        const rName = (rooms.find((r: any) => r.id === plan.roomId)?.name) || plan.roomId || 'dem zugewiesenen Raum';
-        const dayName = dayNames[plan.dayOfWeek] || '';
-
-        const teacherTitle = '✅ Stundenplan freigegeben';
-        const teacherMsg = `Dein Stundenplan für ${dayName} wurde freigegeben! Ab sofort unterrichtest du in ${rName}.`;
-        notificationPromises.push(
-          Promise.resolve(
-            supabase.from('notifications').insert({ user_id: plan.teacherId, title: teacherTitle, message: teacherMsg, metadata: { type: 'schedule_approved', day_of_week: plan.dayOfWeek, room_id: plan.roomId } }).select('id').single()
-          ).then(async ({ data: notif }: any) => {
-            if (notif?.id) await supabase.functions.invoke('send-push', { body: { userId: plan.teacherId, title: teacherTitle, body: teacherMsg, url: '/', notificationId: notif.id } });
-          }).catch(() => {})
-        );
-
-        if (plan.slots) {
-          const teacherUser = teacherUsersData.find((u: any) => u.id === plan.teacherId);
-          const tName = teacherUser ? `${teacherUser.first_name || ''} ${(teacherUser.last_name || '')[0] || ''}.`.trim() : 'deiner Lehrkraft';
-          for (const slot of plan.slots) {
-            const studentId = slot.student_id;
-            if (!studentId || slot.isBreak) continue;
-            const slotTime = (slot.time_slot || '').substring(0, 5);
-            const studentTitle = '✅ Unterricht bestätigt';
-            const studentMsg = `Dein Unterricht am ${dayName} um ${slotTime} Uhr in ${rName} bei ${tName} wurde bestätigt!`;
-            notificationPromises.push(
-              Promise.resolve(
-                supabase.from('notifications').insert({ user_id: studentId, title: studentTitle, message: studentMsg, metadata: { type: 'schedule_approved', day_of_week: plan.dayOfWeek, room_id: plan.roomId } }).select('id').single()
-              ).then(async ({ data: notif }: any) => {
-                if (notif?.id) await supabase.functions.invoke('send-push', { body: { userId: studentId, title: studentTitle, body: studentMsg, url: '/', notificationId: notif.id } });
-              }).catch(() => {})
-            );
-          }
-        }
-      }
-      // Fire notifications without awaiting — they don't affect the user-visible result
-      Promise.allSettled(notificationPromises);
-
-    } catch (err: any) {
-      console.error('Error saving allocations:', err);
-      setApprovalToast({ message: `❌ Fehler: ${err.message}`, type: 'error' });
-      setTimeout(() => setApprovalToast(null), 5000);
-    } finally {
-      setIsSavingApproval(false);
-    }
-  };
-
-
-  // Reject an entire teacher's day plan back to draft
-  const handleRejectTeacherDayPlan = async (plan: any) => {
-    if (!window.confirm(`Möchtest du den Stundenplan von ${plan.teacherName} für diesen Tag wirklich zur Überarbeitung zurückweisen?`)) return;
-    try {
-      const slotIds = plan.slots.map((s: any) => s.id);
-      if (slotIds.length === 0) return;
-
-      const { error } = await supabase
-        .from('schedules')
-        .update({ status: 'draft' })
-        .in('id', slotIds);
-
-      if (error) throw error;
-      setSelectedDayPlan(null);
-      alert('Stundenplan erfolgreich zur Überarbeitung zurückgewiesen.');
-      fetchDashboardData();
-    } catch (err: any) {
-      console.error('Error rejecting plan:', err);
-      alert('Fehler: ' + err.message);
-    }
-  };
-
-  // Split points search: scan for pause slots >= 15 mins
-  const getSplitPoints = (plan: any) => {
-    if (!plan || !plan.slots || plan.slots.length <= 1) return [];
-    const points: Array<{ index: number; time: string; duration: number }> = [];
-    plan.slots.forEach((slot: any, idx: number) => {
-      if (idx > 0 && idx < plan.slots.length - 1) {
-        const isBreak = !slot.student_id && !plan.id.startsWith('adhoc_');
-        if (isBreak && (slot.duration || 0) >= 15) {
-          points.push({ index: idx, time: slot.time_slot, duration: slot.duration });
-        }
-      }
-    });
-    return points;
-  };
-
-  const handleSplitPlan = (plan: any, splitIdx: number) => {
-    const slotsBefore = plan.slots.slice(0, splitIdx);
-    const slotsAfter = plan.slots.slice(splitIdx);
-
-    if (slotsBefore.length === 0 || slotsAfter.length === 0) return;
-
-    const addMins = (t: string, m: number) => {
-      const [hStr, mStr] = t.split(':');
-      let h = parseInt(hStr) || 0;
-      let mVal = parseInt(mStr) || 0;
-      mVal += m;
-      h += Math.floor(mVal / 60);
-      mVal = mVal % 60;
-      h = h % 24;
-      return `${String(h).padStart(2, '0')}:${String(mVal).padStart(2, '0')}`;
-    };
-
-    const lastSlot1 = slotsBefore[slotsBefore.length - 1];
-    const endTime1 = lastSlot1 ? addMins(lastSlot1.time_slot, lastSlot1.duration || 45) : plan.endTime;
-    const firstSlot2 = slotsAfter[0];
-    const startTime2 = firstSlot2 ? firstSlot2.time_slot : plan.startTime;
-
-    const plan1 = {
-      ...plan,
-      id: `${plan.id}_split1`,
-      endTime: endTime1,
-      slots: slotsBefore
-    };
-
-    const plan2 = {
-      ...plan,
-      id: `${plan.id}_split2`,
-      startTime: startTime2,
-      slots: slotsAfter
-    };
-
-    setMatrixAllocations(prev => {
-      const next = [];
-      for (const p of prev) {
-        if (p.id === plan.id) {
-          next.push(plan1, plan2);
-        } else {
-          next.push(p);
-        }
-      }
-      return next;
-    });
-
-    setSelectedDayPlan(null);
-    alert(`Unterrichtsblock erfolgreich in 2 Teile aufgeteilt!`);
-  };
-
-  const handleMergePlans = (splitPlan: any) => {
-    const baseId = splitPlan.id.split('_split')[0];
-    const relatedSplits = matrixAllocations.filter(p => p.id.startsWith(baseId + '_split') || p.id === baseId);
-    if (relatedSplits.length <= 1) return;
-
-    const sortedSplits = [...relatedSplits].sort((a, b) => a.startTime.localeCompare(b.startTime));
-
-    const mergedSlots: any[] = [];
-    const slotIdsSeen = new Set();
-    for (const p of sortedSplits) {
-      for (const s of p.slots) {
-        if (!slotIdsSeen.has(s.id)) {
-          slotIdsSeen.add(s.id);
-          mergedSlots.push(s);
-        }
-      }
-    }
-    mergedSlots.sort((a, b) => (a.time_slot || '').localeCompare(b.time_slot || ''));
-
-    const addMins = (t: string, m: number) => {
-      const [hStr, mStr] = t.split(':');
-      let h = parseInt(hStr) || 0;
-      let mVal = parseInt(mStr) || 0;
-      mVal += m;
-      h += Math.floor(mVal / 60);
-      mVal = mVal % 60;
-      h = h % 24;
-      return `${String(h).padStart(2, '0')}:${String(mVal).padStart(2, '0')}`;
-    };
-
-    const startTime = mergedSlots[0]?.time_slot || splitPlan.startTime;
-    const lastSlot = mergedSlots[mergedSlots.length - 1];
-    const endTime = lastSlot ? addMins(lastSlot.time_slot, lastSlot.duration || 45) : splitPlan.endTime;
-
-    const mergedPlan = {
-      ...sortedSplits[0],
-      id: baseId,
-      startTime,
-      endTime,
-      slots: mergedSlots,
-      roomId: sortedSplits[0].roomId || null
-    };
-
-    setMatrixAllocations(prev => {
-      const next = [];
-      let inserted = false;
-      for (const p of prev) {
-        if (p.id.startsWith(baseId + '_split') || p.id === baseId) {
-          if (!inserted) {
-            next.push(mergedPlan);
-            inserted = true;
-          }
-        } else {
-          next.push(p);
-        }
-      }
-      return next;
-    });
-
-    setSelectedDayPlan(null);
-    alert(`Unterrichtsblöcke wieder erfolgreich zusammengefügt!`);
-  };
-
-  const getPlanDisplayName = (plan: any) => {
-    if (!plan) return '';
-    if (plan.id.includes('_split1')) {
-      return `${plan.teacherName} (Teil 1)`;
-    }
-    if (plan.id.includes('_split2')) {
-      return `${plan.teacherName} (Teil 2)`;
-    }
-    return plan.teacherName;
-  };
-
-  const handleApproveSingleSchedule = async (scheduleId: string) => {
-    try {
-      const { error } = await supabase
-        .from('schedules')
-        .update({ status: 'approved' })
-        .eq('id', scheduleId);
-
-      if (error) throw error;
-      alert('Stundenplan-Eintrag erfolgreich genehmigt.');
-      fetchDashboardData();
-    } catch (err: any) {
-      console.error('Error approving schedule slot:', err);
-      alert('Fehler: ' + err.message);
-    }
-  };
-
-  const handleRejectSingleSchedule = async (scheduleId: string) => {
-    if (!window.confirm('Möchtest du diesen Stundenplan-Eintrag zur Überarbeitung zurückweisen?')) return;
-    try {
-      const { error } = await supabase
-        .from('schedules')
-        .update({ status: 'draft' })
-        .eq('id', scheduleId);
-
-      if (error) throw error;
-      alert('Stundenplan-Eintrag zur Überarbeitung zurückgewiesen.');
-      fetchDashboardData();
-    } catch (err: any) {
-      console.error('Error rejecting schedule slot:', err);
-      alert('Fehler: ' + err.message);
-    }
-  };
-
-  // Drag and drop matrix logic
-  const handleDragStartMatrix = (e: React.DragEvent, planId: string) => {
-    try {
-      e.dataTransfer.setData("text/plain", planId);
-      e.dataTransfer.effectAllowed = "move";
-    } catch (err) {
-      console.warn("dataTransfer error", err);
-    }
-    setTimeout(() => {
-      setDraggedPlanId(planId);
-      const plan = matrixAllocations.find(p => p.id === planId);
-      setDraggedPlanDay(plan?.dayOfWeek ?? null);
-    }, 0);
-  };
-
-  const handleDropOnMatrix = (e: React.DragEvent | null, targetRoomId: string | null, targetDay: number) => {
-    let activePlanId = draggedPlanId;
-    if (e && e.dataTransfer) {
-      try {
-        const dataId = e.dataTransfer.getData("text/plain");
-        if (dataId) activePlanId = dataId;
-      } catch (err) {
-        console.warn("dataTransfer error on drop", err);
-      }
-    }
-    const plan = activePlanId ? matrixAllocations.find(p => p.id === activePlanId) : null;
-    const activePlanDay = plan?.dayOfWeek ?? draggedPlanDay;
-
-    console.log("handleDropOnMatrix start:", { activePlanId, activePlanDay, targetRoomId, targetDay });
-    if (!activePlanId || activePlanDay === null) {
-      console.log("handleDropOnMatrix exit 1: no activePlanId or activePlanDay");
-      return;
-    }
-    // ── Day-lock: only allow drops within the same weekday column ──
-    if (targetDay !== activePlanDay) {
-      console.log("handleDropOnMatrix exit 2: targetDay !== activePlanDay", { targetDay, activePlanDay });
-      setDraggedPlanId(null);
-      setDraggedPlanDay(null);
-      return;
-    }
-    const dayKeys = ['', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-    const dayHours = openingHours?.[dayKeys[targetDay]];
-    console.log("handleDropOnMatrix resolved plan & hours:", { plan, dayHours });
-    const isGroovelabPlan = plan && plan.teacherId === 'groovelab';
-    
-    if (isGroovelabPlan && dayHours) {
-      if (dayHours.active === false) {
-        if (!confirm('Das Groovelab ist an diesem Tag geschlossen. Möchtest du die Zuweisung trotzdem durchführen?')) {
-          setDraggedPlanId(null);
-          setDraggedPlanDay(null);
-          return;
-        }
-      } else {
-        if (plan && dayHours.start && dayHours.end && (plan.startTime < dayHours.start || plan.endTime > dayHours.end)) {
-          if (!confirm(`Die Unterrichtszeit (${plan.startTime}–${plan.endTime}) liegt außerhalb der Öffnungszeiten des Groovelabs (${dayHours.start}–${dayHours.end}). Zuweisung trotzdem durchführen?`)) {
-            setDraggedPlanId(null);
-            setDraggedPlanDay(null);
-            return;
-          }
-        }
-      }
-    }
-
-    if (targetRoomId) {
-      const room = rooms.find(r => r.id === targetRoomId);
-      if (room && plan) {
-        const unsuitable = room.unsuitable_instruments || (() => {
-          try {
-            const map = JSON.parse(localStorage.getItem(`groovelab_room_unsuitable_mappings_${schoolId}`) || '{}');
-            return map[room.id] || [];
-          } catch { return []; }
-        })();
-        if (unsuitable.some((inst: string) => inst.toLowerCase() === plan.instrument?.toLowerCase())) {
-          alert(`Zuteilung verweigert: Raum "${room.name}" ist akustisch ungeeignet für das Instrument "${plan.instrument}".`);
-          setDraggedPlanId(null);
-          setDraggedPlanDay(null);
-          return;
-        }
-      }
-    }
-
-    setMatrixAllocations(prev => {
-      const updated = prev.map(p => {
-        if (p.id === activePlanId) {
-          return { ...p, roomId: targetRoomId };
-        }
-        return p;
-      });
-
-      // Immediately persist draftMap in localStorage
-      if (schoolId) {
-        const draftMap: Record<string, string | null> = {};
-        updated.forEach(p => {
-          draftMap[p.id] = p.roomId;
-          if (p.teacherId && p.dayOfWeek) {
-            draftMap[`${p.teacherId}_${p.dayOfWeek}`] = p.roomId;
-          }
-        });
-        localStorage.setItem(`groovelab_matrix_allocations_draft_${schoolId}`, JSON.stringify(draftMap));
-      }
-
-      return updated;
-    });
-
-    // Auto-sync room assignment to database schedules so teacher dashboard receives realtime update
-    if (plan && plan.teacherId && plan.teacherId !== 'groovelab' && schoolId) {
-      supabase
-        .from('schedules')
-        .update({ room_id: targetRoomId })
-        .eq('school_id', schoolId)
-        .eq('teacher_id', plan.teacherId)
-        .eq('day_of_week', targetDay)
-        .then(({ error }) => {
-          if (error) console.error('Error auto-syncing room_id to schedules:', error);
-        });
-    }
-
-    setDraggedPlanId(null);
-    setDraggedPlanDay(null);
-  };
-
-  // ── Download Teacher Schedule Report ──────────────────────────────────
-  const handleDownloadTeacherSchedule = (tId: string, teacherName: string, instrument: string) => {
-    const cleanTId = tId ? tId.replace(/^teacher-/i, '') : '';
-    const teacherAllocations = matrixAllocations.filter(p => {
-      const cleanPId = p.teacherId ? p.teacherId.replace(/^teacher-/i, '') : '';
-      return p.teacherId === tId || (cleanPId && cleanPId === cleanTId);
-    });
-
-    const daysMap: Record<number, string> = {
-      1: 'Montag',
-      2: 'Dienstag',
-      3: 'Mittwoch',
-      4: 'Donnerstag',
-      5: 'Freitag',
-      6: 'Samstag',
-      7: 'Sonntag'
-    };
-
-    let content = `=======================================================\n`;
-    content += `CAMPUS-GROOVELAB UNTERRICHTSZEITEN & WOCHENPLAN\n`;
-    content += `=======================================================\n`;
-    content += `Lehrkraft:   ${teacherName}\n`;
-    content += `Instrument:  ${instrument || 'Allgemein'}\n`;
-    content += `Erstellt am: ${new Date().toLocaleDateString('de-DE')} um ${new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}\n`;
-    content += `=======================================================\n\n`;
-
-    let totalSlotsCount = 0;
-
-    for (let d = 1; d <= 7; d++) {
-      const dayName = daysMap[d];
-      const dayAllocations = teacherAllocations
-        .filter(p => p.dayOfWeek === d)
-        .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
-
-      content += `--- ${dayName.toUpperCase()} ---\n`;
-      if (dayAllocations.length === 0) {
-        content += `  Kein Unterricht eingetragen\n\n`;
-      } else {
-        dayAllocations.forEach(plan => {
-          totalSlotsCount++;
-          const roomName = plan.roomId 
-            ? (rooms.find(r => r.id === plan.roomId)?.name || 'Raum ' + plan.roomId) 
-            : '⚠️ Noch kein Raum zugewiesen';
-          content += `  ⏱ ${plan.startTime} - ${plan.endTime} Uhr\n`;
-          content += `     Raum:       ${roomName}\n`;
-          content += `     Instrument: ${plan.instrument || instrument || 'Unterricht'}\n`;
-
-          if (plan.slots && Array.isArray(plan.slots) && plan.slots.length > 0) {
-            content += `     Schüler/Einheiten (${plan.slots.length}):\n`;
-            plan.slots.forEach((s: any, idx: number) => {
-              const studentName = s.student_name || s.name || `Schüler ${idx + 1}`;
-              const timeInfo = s.time_slot ? ` (${s.time_slot}${s.duration ? `, ${s.duration} Min.` : ''})` : '';
-              content += `       • ${studentName}${timeInfo}\n`;
-            });
-          }
-          content += `\n`;
-        });
-      }
-    }
-
-    content += `=======================================================\n`;
-    content += `GESAMTÜBERSICHT: ${totalSlotsCount} Unterrichtsblock/Blöcke in der Woche\n`;
-    content += `=======================================================\n`;
-
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    const safeName = teacherName.replace(/[^a-zA-Z0-9_-]/g, '_');
-    link.download = `Unterrichtszeiten_${safeName}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
 
   // ── Equipment State & Handlers ──
   const handleSaveEquipment = async () => {
@@ -9076,41 +7906,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     }
   };
 
-  const downloadQRCode = () => {
-    const svg = document.getElementById('qr-code-svg');
-    if (!svg || !manageTeacher) return;
-    
-    // Ensure XMLNS attribute is present for proper standalone SVG rendering in Safari
-    if (!svg.getAttribute('xmlns')) {
-      svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-    }
-    
-    try {
-      const svgData = new XMLSerializer().serializeToString(svg);
-      const base64Data = btoa(unescape(encodeURIComponent(svgData)));
-      const dataUrl = `data:image/svg+xml;charset=utf-8;base64,${base64Data}`;
-      
-      const downloadLink = document.createElement('a');
-      downloadLink.href = dataUrl;
-      downloadLink.download = `QR_Code_${manageTeacher.firstName || 'User'}_${manageTeacher.lastName || ''}.svg`;
-      downloadLink.target = '_blank'; // Fallback for Safari blocking direct programmatic downloads
-      
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      document.body.removeChild(downloadLink);
-    } catch (e) {
-      console.error('Fallback download using Blob due to Base64 failure:', e);
-      const svgData = new XMLSerializer().serializeToString(svg);
-      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-      const svgUrl = URL.createObjectURL(svgBlob);
-      const downloadLink = document.createElement('a');
-      downloadLink.href = svgUrl;
-      downloadLink.download = `QR_Code_${manageTeacher.firstName || 'User'}_${manageTeacher.lastName || ''}.svg`;
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      document.body.removeChild(downloadLink);
-    }
-  };
+
 
   const getTrialDaysRemaining = () => {
     if (!isSchoolTrial || !schoolTrialEndsAt) return 0;
@@ -9433,769 +8229,30 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         </div>
       )}
 
-      {/* ROOM BOOKINGS LOGBOOK MODAL */}
-      {showLogbookModal && (
-        <div 
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="logbook-modal-title"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowLogbookModal(false);
-              setEditingLogbookBookingId(null);
-            }
-          }}
-          style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 9999,
-          background: 'rgba(15, 23, 42, 0.3)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '24px'
-        }}>
-          <div style={{
-            background: '#ffffff',
-            borderRadius: '24px',
-            width: '100%',
-            maxWidth: '960px',
-            maxHeight: '85vh',
-            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.12)',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            border: '1px solid rgba(0, 0, 0, 0.05)'
-          }}>
-            {/* Modal Header */}
-            <div style={{
-              padding: '24px 32px',
-              borderBottom: '1px solid #e2e8f0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              background: '#f8fafc'
-            }}>
-              <div>
-                <h2 id="logbook-modal-title" style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                  📖 Raumbuchungen Logbuch
-                </h2>
-                <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
-                  Verwalte und bearbeite alle Raumbuchungen deiner Schule nachträglich.
-                </p>
-              </div>
-              <button
-                type="button"
-                aria-label="Logbuch schließen"
-                onClick={() => {
-                  setShowLogbookModal(false);
-                  setEditingLogbookBookingId(null);
-                }}
-                style={{
-                  background: '#f1f5f9',
-                  border: 'none',
-                  color: '#475569',
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '1rem',
-                  transition: 'all 0.15s'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.background = '#e2e8f0'}
-                onMouseLeave={(e) => e.currentTarget.style.background = '#f1f5f9'}
-              >
-                ✕
-              </button>
-            </div>
 
-            {/* Modal Content */}
-            <div style={{
-              flex: 1,
-              padding: '32px',
-              overflowY: 'auto',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '24px'
-            }}>
-              {logbookBookings.length === 0 ? (
-                <div style={{
-                  textAlign: 'center',
-                  padding: '48px 24px',
-                  color: '#64748b'
-                }}>
-                  <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700 }}>Keine Buchungen vorhanden</p>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', opacity: 0.8 }}>Es wurden noch keine Raumbuchungen vorgenommen.</p>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {logbookBookings.map((b) => {
-                    const isEditing = editingLogbookBookingId === b.id;
-                    const teacherName = b.profiles 
-                      ? `${b.profiles.first_name || ''} ${b.profiles.last_name || ''}`.trim()
-                      : 'Unbekannt';
-                    const roomName = b.rooms?.name || 'Unbekannt';
-                    const dateFormatted = new Date(b.date).toLocaleDateString('de-DE', {
-                      weekday: 'short',
-                      year: 'numeric',
-                      month: '2-digit',
-                      day: '2-digit'
-                    });
-
-                    return (
-                      <div 
-                        key={b.id}
-                        style={{
-                          background: isEditing ? '#f8fafc' : '#ffffff',
-                          border: isEditing ? '1.5px solid #3b82f6' : '1px solid #e2e8f0',
-                          borderRadius: '16px',
-                          padding: '20px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '16px',
-                          boxShadow: isEditing ? '0 4px 12px rgba(59, 130, 246, 0.04)' : 'none',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        {isEditing ? (
-                          /* EDITING FORM */
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
-                              <div>
-                                <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '6px' }}>Titel / Zweck</label>
-                                <input
-                                  type="text"
-                                  value={editBookingTitle}
-                                  onChange={(e) => setEditBookingTitle(e.target.value)}
-                                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontFamily: 'inherit', boxSizing: 'border-box' }}
-                                />
-                              </div>
-                              <div>
-                                <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '6px' }}>Raum</label>
-                                <select
-                                  value={editBookingRoomId}
-                                  onChange={(e) => setEditBookingRoomId(e.target.value)}
-                                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontFamily: 'inherit', boxSizing: 'border-box', background: '#ffffff' }}
-                                >
-                                  {rooms.map((r: any) => (
-                                    <option key={r.id} value={r.id}>{r.name}</option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div>
-                                <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '6px' }}>Datum</label>
-                                <input
-                                  type="date"
-                                  value={editBookingDate}
-                                  onChange={(e) => setEditBookingDate(e.target.value)}
-                                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontFamily: 'inherit', boxSizing: 'border-box' }}
-                                />
-                              </div>
-                              <div>
-                                <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '6px' }}>Startzeit</label>
-                                <input
-                                  type="time"
-                                  value={editBookingStartTime}
-                                  onChange={(e) => setEditBookingStartTime(e.target.value)}
-                                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontFamily: 'inherit', boxSizing: 'border-box' }}
-                                />
-                              </div>
-                              <div>
-                                <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '6px' }}>Endzeit</label>
-                                <input
-                                  type="time"
-                                  value={editBookingEndTime}
-                                  onChange={(e) => setEditBookingEndTime(e.target.value)}
-                                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.82rem', fontFamily: 'inherit', boxSizing: 'border-box' }}
-                                />
-                              </div>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '4px' }}>
-                              <button
-                                onClick={() => setEditingLogbookBookingId(null)}
-                                style={{
-                                  background: '#e2e8f0',
-                                  border: 'none',
-                                  color: '#334155',
-                                  padding: '8px 16px',
-                                  borderRadius: '10px',
-                                  fontSize: '0.78rem',
-                                  fontWeight: 800,
-                                  cursor: 'pointer',
-                                  transition: 'background 0.15s'
-                                }}
-                              >
-                                Abbrechen
-                              </button>
-                              <button
-                                onClick={() => handleUpdateLogbookBooking(b.id)}
-                                style={{
-                                  background: '#3b82f6',
-                                  border: 'none',
-                                  color: '#ffffff',
-                                  padding: '8px 16px',
-                                  borderRadius: '10px',
-                                  fontSize: '0.78rem',
-                                  fontWeight: 800,
-                                  cursor: 'pointer',
-                                  transition: 'background 0.15s'
-                                }}
-                              >
-                                Speichern
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          /* VIEWING MODE */
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '240px', flex: 1 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b' }}>{b.title || 'Eigennutzung'}</span>
-                                <span style={{
-                                  background: b.status === 'pending' ? '#fff7ed' : '#e6f4ea',
-                                  color: b.status === 'pending' ? '#c2410c' : '#34a853',
-                                  border: b.status === 'pending' ? '1px solid #fed7aa' : '1px solid #e6f4ea',
-                                  padding: '2px 8px',
-                                  borderRadius: '9999px',
-                                  fontSize: '0.64rem',
-                                  fontWeight: 800,
-                                  textTransform: 'uppercase'
-                                }}>
-                                  {b.status === 'pending' ? '⏳ Vorläufig' : '✓ Bestätigt'}
-                                </span>
-                              </div>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
-                                <span style={{ marginRight: '12px' }}>📍 Raum: <strong>{roomName}</strong></span>
-                                <span style={{ marginRight: '12px' }}>👤 Gebucht von: <strong>{teacherName}</strong></span>
-                                <span>📅 {dateFormatted} ({b.start_time.substring(0, 5)} - {b.end_time.substring(0, 5)})</span>
-                              </div>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              {b.status === 'pending' && (
-                                <button
-                                  onClick={() => handleConfirmLogbookBooking(b.id)}
-                                  style={{
-                                    background: '#34a853',
-                                    border: 'none',
-                                    color: '#ffffff',
-                                    padding: '8px 14px',
-                                    borderRadius: '10px',
-                                    fontSize: '0.74rem',
-                                    fontWeight: 800,
-                                    cursor: 'pointer',
-                                    transition: 'all 0.15s'
-                                  }}
-                                  onMouseEnter={(e) => e.currentTarget.style.background = '#34a853'}
-                                  onMouseLeave={(e) => e.currentTarget.style.background = '#34a853'}
-                                >
-                                  Bestätigen
-                                </button>
-                              )}
-                              <button
-                                onClick={() => {
-                                  setEditingLogbookBookingId(b.id);
-                                  setEditBookingTitle(b.title || '');
-                                  setEditBookingRoomId(b.room_id || '');
-                                  setEditBookingDate(b.date || '');
-                                  setEditBookingStartTime(b.start_time.substring(0, 5));
-                                  setEditBookingEndTime(b.end_time.substring(0, 5));
-                                }}
-                                style={{
-                                  background: '#f1f5f9',
-                                  border: 'none',
-                                  color: '#475569',
-                                  padding: '8px 14px',
-                                  borderRadius: '10px',
-                                  fontSize: '0.74rem',
-                                  fontWeight: 800,
-                                  cursor: 'pointer',
-                                  transition: 'all 0.15s'
-                                }}
-                                onMouseEnter={(e) => e.currentTarget.style.background = '#e2e8f0'}
-                                onMouseLeave={(e) => e.currentTarget.style.background = '#f1f5f9'}
-                              >
-                                Bearbeiten
-                              </button>
-                              <button
-                                onClick={() => handleDeleteLogbookBooking(b.id)}
-                                style={{
-                                  background: 'rgba(239, 68, 68, 0.08)',
-                                  border: 'none',
-                                  color: '#ef4444',
-                                  padding: '8px 14px',
-                                  borderRadius: '10px',
-                                  fontSize: '0.74rem',
-                                  fontWeight: 800,
-                                  cursor: 'pointer',
-                                  transition: 'all 0.15s'
-                                }}
-                                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
-                                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
-                              >
-                                Löschen
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TRIAL LOGBOOK MODAL */}
-      {showTrialLogModal && (
-        <div 
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="trial-log-modal-title"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowTrialLogModal(false);
-          }}
-          style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 9999,
-          background: 'rgba(15, 23, 42, 0.3)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '24px'
-        }}>
-          <div style={{
-            background: '#ffffff',
-            borderRadius: '24px',
-            width: '100%',
-            maxWidth: '640px',
-            maxHeight: '80vh',
-            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.12)',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            border: '1.5px solid #cbd5e1'
-          }}>
-            {/* Modal Header */}
-            <div style={{ padding: '24px', borderBottom: '1.5px solid #cbd5e1', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <ClipboardList size={22} color="#34a853" />
-                <h3 id="trial-log-modal-title" style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>Probezeit- & Freischaltungs-Logbuch</h3>
-              </div>
-              <button
-                type="button"
-                aria-label="Logbuch schließen"
-                onClick={() => setShowTrialLogModal(false)}
-                style={{
-                  background: '#f1f5f9',
-                  border: 'none',
-                  color: '#64748b',
-                  fontSize: '1rem',
-                  fontWeight: 900,
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div style={{ padding: '24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {trialLogsLoading ? (
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 0' }}>
-                  <div className="google-spinner" />
-                </div>
-              ) : trialLogs.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b', fontSize: '0.88rem', fontWeight: 600 }}>
-                  Keine Logbucheinträge vorhanden.
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {trialLogs.map((log: any) => {
-                    const studentName = userMap[log.record_id] || `Schüler (ID: ${log.record_id.substring(0, 8)})`;
-                    const dateStr = new Date(log.created_at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-                    
-                    // Parse log changes to render a descriptive message
-                    let detailMsg = '';
-                    let actionIcon = '📝';
-                    let actionColor = '#f8fafc';
-                    let actionBorder = '#e2e8f0';
-
-                    if (log.action === 'INSERT') {
-                      detailMsg = 'Nutzerprofil wurde neu angelegt.';
-                      actionIcon = '👤';
-                      actionColor = '#eff6ff';
-                      actionBorder = '#bfdbfe';
-                    } else if (log.action === 'UPDATE' && log.new_data) {
-                      const oldT = log.old_data?.is_trial;
-                      const newT = log.new_data?.is_trial;
-                      const oldC = log.old_data?.is_campus_active;
-                      const newC = log.new_data?.is_campus_active;
-
-                      if (newT === true && oldT !== true) {
-                        detailMsg = `Probezeit (30 Tage) wurde gestartet (gültig bis ${log.new_data.trial_ends_at ? new Date(log.new_data.trial_ends_at).toLocaleDateString('de-DE') : ''}).`;
-                        actionIcon = '⏳';
-                        actionColor = '#fffbeb';
-                        actionBorder = '#fde68a';
-                      } else if (oldT === true && newT === false && newC !== false) {
-                        detailMsg = 'Probezeit beendet und Account dauerhaft freigeschaltet.';
-                        actionIcon = '✅';
-                        actionColor = '#e6f4ea';
-                        actionBorder = '#e6f4ea';
-                      } else if (newC === false && oldC === true) {
-                        detailMsg = 'Campus-Zugang wurde deaktiviert.';
-                        actionIcon = '🚫';
-                        actionColor = '#fef2f2';
-                        actionBorder = '#fca5a5';
-                      } else if (newC === true && oldC !== true) {
-                        detailMsg = 'Campus-Zugang wurde aktiviert.';
-                        actionIcon = '⚡';
-                        actionColor = '#e6f4ea';
-                        actionBorder = '#e6f4ea';
-                      } else {
-                        detailMsg = 'Profil-Informationen wurden aktualisiert.';
-                      }
-                    }
-
-                    // Who performed the action?
-                    const changerName = log.changed_by ? (userMap[log.changed_by] || `Mitarbeiter (${log.changed_by.substring(0, 8)})`) : 'Schüler (Selbst-Aktivierung)';
-
-                    return (
-                      <div key={log.id} style={{ display: 'flex', gap: '14px', padding: '16px', borderRadius: '16px', background: actionColor, border: `1px solid ${actionBorder}` }}>
-                        <span style={{ fontSize: '1.4rem', marginTop: '2px' }}>{actionIcon}</span>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#1f2937' }}>
-                            {studentName}
-                          </span>
-                          <span style={{ fontSize: '0.82rem', color: '#4b5563', fontWeight: 600 }}>
-                            {detailMsg}
-                          </span>
-                          <span style={{ fontSize: '0.74rem', color: '#6b7280', fontWeight: 600, marginTop: '2px' }}>
-                            📅 {dateStr} • Durchgeführt von: <strong>{changerName}</strong>
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-            
-            {/* Modal Footer */}
-            <div style={{ padding: '18px 24px', borderTop: '1.5px solid #cbd5e1', display: 'flex', justifyContent: 'flex-end', background: '#f8fafc' }}>
-              <button
-                type="button"
-                onClick={() => setShowTrialLogModal(false)}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: '12px',
-                  background: '#64748b',
-                  color: 'white',
-                  border: 'none',
-                  fontWeight: 800,
-                  fontSize: '0.85rem',
-                  cursor: 'pointer'
-                }}
-              >
-                Schließen
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* LEFT SIDEBAR PANEL - GLASS WITH BLUR */}
-      <div 
-        className="glass-sidebar"
-        style={{
-          width: '280px',
-          padding: '36px 20px 24px 24px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '32px',
-          height: '100vh',
-          boxSizing: 'border-box',
-          overflowY: 'auto',
-          flexShrink: 0,
-          background: '#ffffff',
-          borderRight: '1px solid #e2e8f0'
-        }}
-      >
-        {/* Brand header / Logo */}
-        <div style={{ paddingBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ 
-            width: '42px', 
-            height: '42px', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            transition: 'all 0.3s ease'
-          }}>
-            {activeTab === 'secretary' ? (
-              <Shield size={28} color="#ea4335" strokeWidth={3} />
-            ) : activeTab === 'campus' ? (
-              <GraduationCap size={28} color="#34a853" strokeWidth={3} />
-            ) : (
-              <Music size={28} color="#eab308" strokeWidth={3} />
-            )}
-          </div>
-          <div style={{ 
-            fontSize: '1.5rem', 
-            fontWeight: 900, 
-            color: activeTab === 'secretary' ? '#ea4335' : activeTab === 'campus' ? '#34a853' : '#eab308',
-            letterSpacing: '-0.02em',
-            fontFamily: "'Plus Jakarta Sans', sans-serif"
-          }}>
-            {activeTab === 'secretary' ? 'Verwaltung' : activeTab === 'campus' ? 'Campus' : 'GrooveLab'}
-          </div>
-            </div>
-            {activeTab === 'secretary' && secretarySubTab === 'briefing' && (
-              <TourStartButton 
-                onClick={startTour}
-                platformTheme="admin"
-              />
-            )}
-        </div>
-
-        {/* Dynamic Sidebar Nav Items based on active workspace */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
-          
-          {/* If activeTab is Secretary */}
-          {activeTab === 'secretary' && [
-            { id: 'briefing', label: 'Briefing', icon: LayoutDashboard },
-            hasCampusSub && { 
-              id: 'crisis', 
-              label: 'Ausfall-Cockpit', 
-              icon: ShieldAlert, 
-              count: (() => {
-                const todayStart = new Date();
-                todayStart.setHours(0,0,0,0);
-                return crisisNotifications.filter(n => {
-                  if (n.status !== 'UNREAD') return false;
-                  const untilVal = n.teacher?.ausfall_until ?? n.teacher?.ausfallUntil;
-                  if (!n.teacher || !untilVal) return false;
-                  const absenceUntilTime = new Date(untilVal).getTime();
-                  if (absenceUntilTime < todayStart.getTime()) return false;
-                  const isPast = new Date(n.slot_start_datetime).getTime() < todayStart.getTime();
-                  return !isPast;
-                }).length;
-              })()
-            },
-            hasCampusSub && { id: 'announcements', label: 'Mitteilungen & Informationen', icon: FileText },
-            { id: 'rooms', label: 'Räume', icon: DoorOpen },
-            hasCampusSub && { id: 'equipment', label: 'Instrumente & Ausstattung', icon: Settings },
-            { id: 'employees', label: 'Mitarbeiter', icon: Users },
-            { id: 'licenses', label: 'Abrechnung & Infrastruktur', icon: Award },
-            { id: 'audit', label: 'Änderungsverlauf', icon: Clock },
-            { id: 'setup', label: 'Einstellungen', icon: Settings }
-          ].filter((item): item is any => !!item).map((item) => {
-            const Icon = item.icon;
-            const isSelected = secretarySubTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  React.startTransition(() => {
-                    setSecretarySubTab(item.id as any);
-                  });
-                }}
-                className={`google-sidebar-item briefing ${isSelected ? 'active briefing' : ''}`}
-              >
-                <div className="sidebar-icon-circle briefing">
-                  <Icon size={16} />
-                </div>
-                <span style={{ flex: 1 }}>{item.label}</span>
-                {item.count !== undefined && item.count > 0 && (
-                  <span style={{
-                    background: isSelected ? '#ea4335' : '#fce8e6',
-                    color: isSelected ? '#ffffff' : '#c5221f',
-                    fontSize: '0.68rem',
-                    fontWeight: 900,
-                    padding: '2px 8px',
-                    borderRadius: '100px'
-                  }}>
-                    {item.count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-
-          {/* If activeTab is Campus */}
-          {activeTab === 'campus' && [
-            { id: 'briefing', label: 'Startseite', icon: LayoutDashboard },
-            enabledCampusSubjects && { id: 'subjects', label: 'Unterrichtsfächer', icon: BookOpen },
-            { id: 'onboarding', label: 'Lehrer', icon: UserPlus },
-            { id: 'students', label: 'Schüler', icon: Users },
-            enabledCampusRooms && { id: 'rooms', label: 'Räume', icon: DoorOpen },
-            enabledCampusEvents && { id: 'events', label: 'Termine', icon: Calendar },
-            enabledCampusSchedules && { id: 'schedules', label: `Stundenpläne`, count: pendingSchedules.length, icon: Calendar },
-            { id: 'status', label: 'Einstellungen', icon: Sliders }
-          ].filter((item): item is { id: string; label: string; icon: any; count?: number } => !!item).map((item) => {
-            const Icon = item.icon;
-            const isSelected = campusSubTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setCampusSubTab(item.id as any)}
-                className={`google-sidebar-item campus ${isSelected ? 'active campus' : ''}`}
-              >
-                <div className="sidebar-icon-circle campus">
-                  <Icon size={16} />
-                </div>
-                <span style={{ flex: 1 }}>{item.label}</span>
-                {item.count !== undefined && item.count > 0 && (
-                  <span style={{
-                    background: isSelected ? '#34a853' : '#e6f4ea',
-                    color: isSelected ? '#ffffff' : '#34a853',
-                    fontSize: '0.68rem',
-                    fontWeight: 900,
-                    padding: '2px 8px',
-                    borderRadius: '100px'
-                  }}>
-                    {item.count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-
-          {activeTab === 'groovelab' && [
-            { id: 'live', label: 'Live Lab', icon: Monitor },
-            { id: 'coaches', label: 'Lehrer', icon: GraduationCap },
-            { id: 'students', label: 'Schüler', icon: Users },
-            { id: 'settings', label: 'Einstellungen', icon: Settings }
-          ].map((item) => {
-            const Icon = item.icon;
-            const isSelected = groovelabSubTab === item.id;
-            const itemClass = 'google-sidebar-item groovelab-dark';
-            return (
-              <button
-                key={item.id}
-                onClick={() => setGroovelabSubTab(item.id as any)}
-                className={`${itemClass} ${isSelected ? 'active' : ''}`}
-              >
-                <div className="sidebar-icon-circle groovelab">
-                  <Icon size={16} />
-                </div>
-                <span style={{ flex: 1 }}>{item.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Profile Info at bottom of sidebar */}
-        <div style={{ borderTop: activeTab === 'campus' ? '1px solid #e6f4ea' : (activeTab === 'secretary' ? '1px solid #fee2e2' : '1px solid #fef3c7'), paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div 
-            onClick={() => setShowOwnQrModal(true)}
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '12px',
-              padding: '10px 12px',
-              borderRadius: '16px',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              backgroundColor: secretarySubTab === 'briefing' ? (activeTab === 'campus' ? '#e6f4ea' : (activeTab === 'secretary' ? '#fff1f2' : '#fffbeb')) : '#f8fafc',
-              border: '1px solid #f1f5f9'
-            }}
-          >
-            <div style={{ position: 'relative' }}>
-              <div style={{ width: '40px', height: '40px', borderRadius: '12px', overflow: 'hidden', border: '2px solid white', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                <img 
-                  src="/campus_login_hero.png"
-                  alt="" 
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top center' }} 
-                  loading="lazy" 
-                />
-              </div>
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {currentUserProfile?.nickname || currentUserProfile?.first_name || 'Verwaltung'}
-              </div>
-              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                Schulsekretariat
-              </div>
-            </div>
-          </div>
-
-          {/* Ausweis Button - Always Red for Verwaltung/Sekretariat */}
-          <button 
-            type="button"
-            onClick={() => setShowOwnQrModal(true)}
-            style={{ 
-              width: '100%', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              gap: '8px', 
-              padding: '10px 12px', 
-              borderRadius: '12px', 
-              border: '1.5px solid rgba(234, 67, 53, 0.25)', 
-              background: 'rgba(234, 67, 53, 0.08)', 
-              color: '#ea4335', 
-              fontWeight: 800, 
-              fontSize: '0.82rem',
-              cursor: 'pointer',
-              boxShadow: '0 2px 8px rgba(234, 67, 53, 0.05)',
-              transition: 'all 0.2s ease'
-            }}
-            className="hover-scale"
-          >
-            <QrCode size={16} color="#ea4335" /> Ausweis zeigen
-          </button>
-          
-          {onLogout && (
-            <button 
-              type="button"
-              onClick={handleSecretaryLogout}
-              style={{ 
-                width: '100%', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                gap: '8px', 
-                padding: '10px 12px', 
-                borderRadius: '12px', 
-                border: 'none', 
-                background: '#fff1f2', 
-                color: '#ef4444', 
-                fontWeight: 800, 
-                fontSize: '0.82rem',
-                cursor: 'pointer',
-                transition: 'background-color 0.2s ease'
-              }}
-              className="hover-scale"
-            >
-              <LogOut size={16} color="#ef4444" /> Abmelden
-            </button>
-          )}
-        </div>
-      </div>
+      <SecretarySidebar
+        activeTab={activeTab}
+        secretarySubTab={secretarySubTab}
+        setSecretarySubTab={setSecretarySubTab}
+        campusSubTab={campusSubTab}
+        setCampusSubTab={setCampusSubTab}
+        groovelabSubTab={groovelabSubTab}
+        setGroovelabSubTab={setGroovelabSubTab}
+        hasCampusSub={hasCampusSub}
+        enabledCampusSubjects={enabledCampusSubjects}
+        enabledCampusRooms={enabledCampusRooms}
+        enabledCampusEvents={enabledCampusEvents}
+        enabledCampusSchedules={enabledCampusSchedules}
+        crisisNotifications={crisisNotifications}
+        pendingSchedules={pendingSchedules}
+        startTour={startTour}
+        currentUserProfile={currentUserProfile}
+        setShowOwnQrModal={setShowOwnQrModal}
+        onLogout={onLogout}
+        handleSecretaryLogout={handleSecretaryLogout}
+      />
 
       {/* RIGHT CONTENT PANE */}
       <div style={{
@@ -10211,602 +8268,34 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         paddingBottom: windowWidth < 1024 ? '90px' : '0px'
       }}>
         
-        {/* Top Header with App Suite Switcher Tabs (Karteireiter) */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: windowWidth < 768 ? '0 12px' : '0 40px',
-          height: windowWidth < 768 ? '62px' : '80px',
-          borderBottom: '1px solid rgba(0,0,0,0.05)',
-          background: 'rgba(255, 255, 255, 0.88)',
-          backdropFilter: 'var(--glass-blur)',
-          WebkitBackdropFilter: 'var(--glass-blur)',
-          position: 'sticky',
-          top: 0,
-          zIndex: 10
-        }}>
-          {/* App Switcher Tabs */}
-          <div 
-            role="tablist"
-            aria-label="Modulauswahl Verwaltung, Campus und GrooveLab"
-            style={{ 
-            display: 'flex', 
-            alignItems: 'flex-end', 
-            gap: '6px', 
-            height: '100%',
-            paddingTop: '20px',
-            boxSizing: 'border-box'
-          }}>
-            {/* Sekretariat Tab Button */}
-            <div 
-              role="tab"
-              aria-selected={activeTab === 'secretary'}
-              tabIndex={0}
-              id="tab-secretary"
-              aria-controls="panel-secretary"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  setActiveTab('secretary');
-                  sessionStorage.setItem('groovelab_active_workspace', 'secretary');
-                }
-              }}
-              onClick={() => {
-                setActiveTab('secretary');
-                sessionStorage.setItem('groovelab_active_workspace', 'secretary');
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '12px 22px 10px',
-                borderRadius: '12px 12px 0 0',
-                background: activeTab === 'secretary' ? '#ea4335' : 'rgba(234, 67, 53, 0.05)',
-                color: activeTab === 'secretary' ? '#ffffff' : '#ea4335',
-                border: activeTab === 'secretary' ? '1px solid #ea4335' : '1px solid rgba(234, 67, 53, 0.18)',
-                borderBottom: 'none',
-                fontWeight: 750,
-                fontSize: '0.82rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                cursor: 'pointer',
-                zIndex: activeTab === 'secretary' ? 2 : 1,
-                transform: activeTab === 'secretary' ? 'translateY(1px)' : 'translateY(0)',
-                boxShadow: activeTab === 'secretary' ? '0 -4px 16px rgba(234, 67, 53, 0.18)' : 'none',
-                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                height: '44px',
-                boxSizing: 'border-box',
-                fontFamily: "'Plus Jakarta Sans', sans-serif"
-              }}
-            >
-              <Shield size={15} color={activeTab === 'secretary' ? '#ffffff' : '#ea4335'} />
-              <span>Verwaltung</span>
-            </div>
-
-            {(!isBillingBooked || hasCampusSub) && (
-              /* Campus Tab Button */
-              <div 
-                role="tab"
-                aria-selected={activeTab === 'campus'}
-                tabIndex={0}
-                id="tab-campus"
-                aria-controls="panel-campus"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    setActiveTab('campus');
-                    sessionStorage.setItem('groovelab_active_workspace', 'campus');
-                  }
-                }}
-                onClick={() => {
-                  setActiveTab('campus');
-                  sessionStorage.setItem('groovelab_active_workspace', 'campus');
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '12px 22px 10px',
-                  borderRadius: '12px 12px 0 0',
-                  background: activeTab === 'campus' ? '#34a853' : 'rgba(52, 168, 83, 0.05)',
-                  color: activeTab === 'campus' ? '#ffffff' : '#34a853',
-                  border: activeTab === 'campus' ? '1px solid #34a853' : '1px solid rgba(52, 168, 83, 0.18)',
-                  borderBottom: 'none',
-                  fontWeight: 750,
-                  fontSize: '0.82rem',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  cursor: 'pointer',
-                  zIndex: activeTab === 'campus' ? 2 : 1,
-                  transform: activeTab === 'campus' ? 'translateY(1px)' : 'translateY(0)',
-                  boxShadow: activeTab === 'campus' ? '0 -4px 16px rgba(52, 168, 83, 0.18)' : 'none',
-                  transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                  height: '44px',
-                  boxSizing: 'border-box',
-                  fontFamily: "'Plus Jakarta Sans', sans-serif"
-                }}
-              >
-                <GraduationCap size={15} color={activeTab === 'campus' ? '#ffffff' : '#34a853'} />
-                <span>Campus</span>
-              </div>
-            )}
-
-            {(!isBillingBooked || hasGroovelabSub) && (
-              /* GrooveLab Tab Button */
-              <div 
-                role="tab"
-                aria-selected={activeTab === 'groovelab'}
-                tabIndex={0}
-                id="tab-groovelab"
-                aria-controls="panel-groovelab"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    setActiveTab('groovelab');
-                    sessionStorage.setItem('groovelab_active_workspace', 'groovelab');
-                  }
-                }}
-                onClick={() => {
-                  setActiveTab('groovelab');
-                  sessionStorage.setItem('groovelab_active_workspace', 'groovelab');
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '12px 22px 10px',
-                  borderRadius: '12px 12px 0 0',
-                  background: activeTab === 'groovelab' ? '#fbbc05' : 'rgba(251, 188, 5, 0.05)',
-                  color: activeTab === 'groovelab' ? '#09090b' : '#b45309',
-                  border: activeTab === 'groovelab' ? '1px solid #fbbc05' : '1px solid rgba(251, 188, 5, 0.18)',
-                  borderBottom: 'none',
-                  fontWeight: 750,
-                  fontSize: '0.82rem',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  cursor: 'pointer',
-                  zIndex: activeTab === 'groovelab' ? 2 : 1,
-                  transform: activeTab === 'groovelab' ? 'translateY(1px)' : 'translateY(0)',
-                  boxShadow: activeTab === 'groovelab' ? '0 -4px 16px rgba(251, 188, 5, 0.18)' : 'none',
-                  transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                  height: '44px',
-                  boxSizing: 'border-box',
-                  fontFamily: "'Plus Jakarta Sans', sans-serif"
-                }}
-              >
-                <Music size={15} color={activeTab === 'groovelab' ? '#09090b' : '#b45309'} />
-                <span>GrooveLab</span>
-              </div>
-            )}
-          </div>
-
-          {/* Action & Profile */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {/* Unified School & User Pill */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: 'rgba(59, 130, 246, 0.04)',
-              height: '40px',
-              padding: '0 16px',
-              borderRadius: '12px',
-              border: '1px solid rgba(59, 130, 246, 0.12)',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-              whiteSpace: 'nowrap',
-              flexShrink: 0
-            }}>
-              <span style={{
-                fontWeight: 750,
-                fontSize: '0.76rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.03em',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}>
-                <span style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  <School size={14} color="#ef4444" />
-                  <span>{schoolName || 'Meine Musikschule'}</span>
-                </span>
-                <span style={{ color: '#94a3b8', margin: '0 2px' }}>•</span>
-                <span style={{ color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <User size={14} color="#3b82f6" />
-                  <span>
-                    {currentUserProfile 
-                      ? `${currentUserProfile.first_name || ''} ${currentUserProfile.last_name || ''}`.trim() 
-                      : (schoolName ? `${schoolName} Schulleitung` : 'Verwaltung')}
-                  </span>
-                  <span style={{
-                    marginLeft: '2px',
-                    background: '#fee2e2',
-                    color: '#b91c1c',
-                    border: '1px solid rgba(239, 68, 68, 0.25)',
-                    fontSize: '0.62rem',
-                    fontWeight: 900,
-                    padding: '2px 6px',
-                    borderRadius: '6px',
-                    letterSpacing: '0.04em',
-                    lineHeight: 1
-                  }}>
-                    VERWALTUNG
-                  </span>
-                </span>
-              </span>
-            </div>
-
-            {/* Elegant Refresh / Reload Button */}
-            <button 
-              onClick={() => window.location.reload()}
-              style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
-                width: '40px', 
-                height: '40px', 
-                borderRadius: '12px', 
-                background: '#f8fafc', 
-                border: '1px solid #e2e8f0', 
-                color: '#64748b', 
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                flexShrink: 0
-              }}
-              className="hover-scale"
-              title="Seite neu laden"
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#f1f5f9';
-                e.currentTarget.style.color = '#334155';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = '#f8fafc';
-                e.currentTarget.style.color = '#64748b';
-              }}
-            >
-              <RefreshCw size={16} />
-            </button>
-
-            {/* Datum Simulation Control (Dev Mode Only - Toggled via Shift+T) */}
-            {isDevEnvironment() && showDateSimulation && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                background: simulatedToday ? '#fefce8' : '#f8fafc',
-                border: simulatedToday ? '1.5px solid #eab308' : '1.5px solid #cbd5e1',
-                height: '40px',
-                padding: '0 10px',
-                borderRadius: '12px',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                color: '#334155',
-                boxShadow: simulatedToday ? '0 2px 8px rgba(234, 179, 8, 0.2)' : 'none',
-                transition: 'all 0.2s',
-                flexShrink: 0
-              }} title="Datum-Simulation für alle Dashboards">
-                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: simulatedToday ? '#854d0e' : '#64748b', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                  📅 Simu:
-                </span>
-                <input 
-                  type="date"
-                  value={simulatedToday || ''}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setSimulatedToday(val);
-                    if (val) {
-                      localStorage.setItem('groovelab_simulated_date', val);
-                      localStorage.setItem('groovelab_simulated_start_timestamp', String(Date.now()));
-                      if (schoolId) {
-                        localStorage.setItem(`simulatedToday_${schoolId}`, val);
-                      }
-                    } else {
-                      localStorage.removeItem('groovelab_simulated_date');
-                      localStorage.removeItem('groovelab_simulated_start_timestamp');
-                      if (schoolId) {
-                        localStorage.removeItem(`simulatedToday_${schoolId}`);
-                      }
-                    }
-                    window.dispatchEvent(new Event('storage'));
-                    window.dispatchEvent(new CustomEvent('groovelab_simulated_date_changed'));
-                  }}
-                  style={{
-                    border: 'none',
-                    background: 'transparent',
-                    fontWeight: 800,
-                    fontSize: '0.78rem',
-                    color: simulatedToday ? '#ca8a04' : '#0f172a',
-                    outline: 'none',
-                    cursor: 'pointer'
-                  }}
-                />
-                {simulatedToday && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSimulatedToday('');
-                      localStorage.removeItem('groovelab_simulated_date');
-                      localStorage.removeItem('groovelab_simulated_start_timestamp');
-                      if (schoolId) {
-                        localStorage.removeItem(`simulatedToday_${schoolId}`);
-                      }
-                      window.dispatchEvent(new Event('storage'));
-                      window.dispatchEvent(new CustomEvent('groovelab_simulated_date_changed'));
-                    }}
-                    style={{
-                      border: 'none',
-                      background: '#fef08a',
-                      color: '#854d0e',
-                      fontSize: '0.68rem',
-                      fontWeight: 900,
-                      padding: '2px 8px',
-                      borderRadius: '6px',
-                      cursor: 'pointer'
-                    }}
-                    title="Auf heutiges Datum zurücksetzen"
-                  >
-                    Heute
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Elegant Switch to Teacher Dashboard Button (Only rendered if current user possesses active teacher role) */}
-            {isCurrentUserTeacher && (
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  if (onRoleSwitched) {
-                    onRoleSwitched('teacher');
-                  }
-                }}
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  gap: '6px', 
-                  background: '#e6f4ea', 
-                  border: '1.5px solid #34a853', 
-                  height: '40px', 
-                  padding: '0 14px', 
-                  borderRadius: '12px', 
-                  color: '#34a853', 
-                  fontWeight: 800, 
-                  fontSize: '0.8rem', 
-                  cursor: 'pointer', 
-                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', 
-                  boxShadow: '0 4px 12px rgba(52, 168, 83, 0.12)', 
-                  flexShrink: 0 
-                }}
-                className="hover-scale"
-                title="Zum Lehrer-Dashboard wechseln"
-                aria-label="Aktive Ansicht: Schulsekretariat. Klicken, um zum Lehrer-Dashboard zu wechseln."
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#d1fae5';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = '#e6f4ea';
-                }}
-              >
-                <ArrowLeftRight size={13} color="#34a853" />
-                <GraduationCap size={15} color="#34a853" />
-                <span>Zum Lehrerpult</span>
-              </button>
-            )}
-          </div>
-        </div>
-        
-        {/* Thin accent line matching the active tab label color */}
-        <div style={{
-          height: '3px',
-          background: activeTab === 'secretary' ? '#ea4335' : activeTab === 'campus' ? '#34a853' : '#fbbc05',
-          width: '100%',
-          flexShrink: 0
-        }} />
-
-        {showDualRoleNotice && (
-          <div style={{
-            background: '#ecfdf5',
-            borderBottom: '1px solid #a7f3d0',
-            padding: '10px 40px',
-            fontSize: '0.82rem',
-            color: '#065f46',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            fontWeight: 600,
-            fontFamily: 'Inter, sans-serif',
-            flexShrink: 0
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>🎓</span>
-              <span><strong>Doppelrolle aktiv:</strong> Sie sind als Schulsekretariat angemeldet. Über die Schaltfläche <strong>„⇄ Zum Lehrerpult“</strong> oben rechts können Sie jederzeit zu Ihrer persönlichen Unterrichtsansicht wechseln.</span>
-            </div>
-            <button
-              onClick={() => {
-                setShowDualRoleNotice(false);
-                try {
-                  sessionStorage.removeItem('groovelab_dual_role_switched_notice');
-                } catch (e) {}
-              }}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#047857',
-                fontWeight: 800,
-                cursor: 'pointer',
-                fontSize: '0.85rem',
-                padding: '2px 8px'
-              }}
-              aria-label="Hinweis schließen"
-            >
-              ✕
-            </button>
-          </div>
-        )}
-
-        {!isBillingBooked && !isSchoolTrial && !hasCampusSub && !hasGroovelabSub && (
-          <div style={{
-            background: '#e8f0fe',
-            borderBottom: '1px solid #d2e3fc',
-            padding: '10px 40px',
-            fontSize: '0.82rem',
-            color: '#1967d2',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontWeight: 500,
-            fontFamily: 'Inter, sans-serif',
-            flexShrink: 0
-          }}>
-            <span>🛠️</span>
-            <span><strong>Setup-Modus aktiv:</strong> Die {schoolName || 'Musikschule'} befindet sich in der Konfigurationsphase. Aktuell entstehen für Ihre Schule keine Infrastruktur- oder Nutzungsgebühren.</span>
-          </div>
-        )}
-
-        {subscriptionBypass && (
-          <div style={{
-            background: '#f3e8ff',
-            borderBottom: '1px solid #e9d5ff',
-            padding: '10px 40px',
-            fontSize: '0.82rem',
-            color: '#6b21a8',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            fontWeight: 700,
-            fontFamily: 'Inter, sans-serif',
-            flexShrink: 0
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>✦</span>
-              <span><strong>Freistellung aktiv (Abo-Bypass):</strong> Ihre Musikschule nutzt Campus-Groovelab im Rahmen einer kostenfreien Freistellung. Es fallen keine Server-Hosting- oder Nutzungsgebühren an.</span>
-            </div>
-          </div>
-        )}
-
-        {!isBillingBooked && isSchoolTrial && !subscriptionBypass && (
-          <div style={{
-            background: (isSchoolTrial && schoolTrialEndsAt && new Date(schoolTrialEndsAt).getTime() < Date.now()) || (schoolStatus === 'expired')
-              ? '#fef2f2'
-              : (trialDaysRemaining <= 7 ? '#fff7ed' : '#e6f4ea'),
-            borderBottom: (isSchoolTrial && schoolTrialEndsAt && new Date(schoolTrialEndsAt).getTime() < Date.now()) || (schoolStatus === 'expired')
-              ? '1px solid #fee2e2'
-              : (trialDaysRemaining <= 7 ? '1px solid #ffedd5' : '1px solid #e6f4ea'),
-            padding: '10px 40px',
-            fontSize: '0.82rem',
-            color: (isSchoolTrial && schoolTrialEndsAt && new Date(schoolTrialEndsAt).getTime() < Date.now()) || (schoolStatus === 'expired')
-              ? '#b91c1c'
-              : (trialDaysRemaining <= 7 ? '#c2410c' : '#34a853'),
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            fontWeight: 700,
-            fontFamily: 'Inter, sans-serif',
-            flexShrink: 0
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>✨</span>
-              <span>
-                {(isSchoolTrial && schoolTrialEndsAt && new Date(schoolTrialEndsAt).getTime() < Date.now()) || (schoolStatus === 'expired') ? (
-                  <><strong>Testphase abgelaufen:</strong> Bitte schließe den Bestellprozess ab, um Campus-Groovelab weiter zu nutzen.</>
-                ) : (
-                  <><strong>Testphase aktiv:</strong> Deine Musikschule hat noch <strong>{trialDaysRemaining} Tage</strong> Zeit, um Campus-Groovelab einzurichten und zu testen.</>
-                )}
-              </span>
-            </div>
-            {!(activeTab === 'secretary' && secretarySubTab === 'licenses') && (
-              <button
-                onClick={() => {
-                  setActiveTab('secretary');
-                  setSecretarySubTab('licenses');
-                }}
-                style={{
-                  background: (isSchoolTrial && schoolTrialEndsAt && new Date(schoolTrialEndsAt).getTime() < Date.now()) || (schoolStatus === 'expired')
-                    ? '#dc2626'
-                    : (trialDaysRemaining <= 7 ? '#ea580c' : '#34a853'),
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '100px',
-                  padding: '6px 16px',
-                  fontSize: '0.74rem',
-                  fontWeight: 900,
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 10px rgba(0,0,0,0.05)'
-                }}
-              >
-                Bestellprozess abschließen
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* ─── ENTERPRISE B2B DELINQUENCY & GRACE PERIOD ESCALATION BANNER ─── */}
-        {!subscriptionBypass && dunningStatus.isDelinquent && (
-          <div style={{
-            background: dunningStatus.isSecretaryReadOnly
-              ? '#fef2f2'
-              : (dunningStatus.level === 'level_2_warning' ? '#fffbeb' : '#eff6ff'),
-            borderBottom: dunningStatus.isSecretaryReadOnly
-              ? '1px solid #fee2e2'
-              : (dunningStatus.level === 'level_2_warning' ? '1px solid #fef3c7' : '1px solid #dbeafe'),
-            padding: '12px 40px',
-            fontSize: '0.84rem',
-            color: dunningStatus.isSecretaryReadOnly
-              ? '#991b1b'
-              : (dunningStatus.level === 'level_2_warning' ? '#92400e' : '#1e40af'),
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            fontWeight: 700,
-            fontFamily: "'Plus Jakarta Sans', sans-serif",
-            flexShrink: 0,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ fontSize: '1.2rem' }}>
-                {dunningStatus.isSecretaryReadOnly ? '🚨' : (dunningStatus.level === 'level_2_warning' ? '⚠️' : 'ℹ️')}
-              </span>
-              <span>
-                {dunningStatus.isSecretaryReadOnly ? (
-                  <>
-                    <strong>Administrativer Schreibschutz aktiv:</strong> Offene B2B-Infrastrukturrechnung in Höhe von <strong>{dunningStatus.totalOverdueAmount.toFixed(2)} €</strong> (überfällig seit {dunningStatus.overdueDays} Tagen). Neuanlagen sind pausiert. Schüler &amp; Unterrichtsbetrieb bleiben uneingeschränkt geschützt.
-                  </>
-                ) : dunningStatus.level === 'level_2_warning' ? (
-                  <>
-                    <strong>Dringende Mahnung:</strong> Offene B2B-Infrastrukturrechnung in Höhe von <strong>{dunningStatus.totalOverdueAmount.toFixed(2)} €</strong>. Noch <strong>{dunningStatus.adminCountdownDays} {dunningStatus.adminCountdownDays === 1 ? 'Tag' : 'Tage'}</strong> bis zum administrativen Schreibschutz &amp; Audio-Tresor-Uploadstopp.
-                  </>
-                ) : (
-                  <>
-                    <strong>Zahlungserinnerung:</strong> Für die Musikschule liegt eine offene B2B-Infrastrukturrechnung über <strong>{dunningStatus.totalOverdueAmount.toFixed(2)} €</strong> vor (Fällig seit {dunningStatus.overdueDays} Tagen).
-                  </>
-                )}
-              </span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <button
-                onClick={() => setShowDunningPayModal(true)}
-                style={{
-                  background: dunningStatus.isSecretaryReadOnly ? '#dc2626' : (dunningStatus.level === 'level_2_warning' ? '#d97706' : '#2563eb'),
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '100px',
-                  padding: '7px 18px',
-                  fontSize: '0.76rem',
-                  fontWeight: 900,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                }}
-              >
-                <span>⚡ Sofort ausgleichen (EPC-QR)</span>
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Top Header & Banners */}
+        <SecretaryHeader
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          isBillingBooked={isBillingBooked}
+          hasCampusSub={hasCampusSub}
+          hasGroovelabSub={hasGroovelabSub}
+          schoolName={schoolName}
+          schoolId={schoolId}
+          currentUserProfile={currentUserProfile}
+          windowWidth={windowWidth}
+          showDateSimulation={showDateSimulation}
+          simulatedToday={simulatedToday}
+          setSimulatedToday={setSimulatedToday}
+          isCurrentUserTeacher={isCurrentUserTeacher}
+          onRoleSwitched={onRoleSwitched}
+          showDualRoleNotice={showDualRoleNotice}
+          setShowDualRoleNotice={setShowDualRoleNotice}
+          isSchoolTrial={isSchoolTrial}
+          schoolTrialEndsAt={schoolTrialEndsAt}
+          schoolStatus={schoolStatus}
+          trialDaysRemaining={trialDaysRemaining}
+          subscriptionBypass={subscriptionBypass}
+          dunningStatus={dunningStatus}
+          setShowDunningPayModal={setShowDunningPayModal}
+          secretarySubTab={secretarySubTab}
+          setSecretarySubTab={setSecretarySubTab}
+        />
 
         {/* Main scrollable body content */}
         <div id="secretary-main-scroll-container" style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: '20px', flex: 1, overflowY: 'scroll', scrollbarGutter: 'stable' }}>
@@ -10833,108 +8322,78 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
             </div>
           </div>
 
-          {/* TAB 1: SECRETARY - BRIEFING */}
-          {/* TAB 1: SECRETARY - BRIEFING */}
-          {activeTab === 'secretary' && secretarySubTab === 'briefing' && (
-          <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Briefing wird geladen...</div>}>
-            <SecretaryBriefingView
+        {/* TAB 1: SECRETARY - VERWALTUNG & GOVERNANCE (EXTRACTED TO SecretaryVerwaltungTab) */}
+        {activeTab === 'secretary' && (
+          <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Verwaltung...</div>}>
+            <SecretaryVerwaltungTab
+              secretarySubTab={secretarySubTab}
+              setSecretarySubTab={setSecretarySubTab}
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              campusSubTab={campusSubTab}
+              setCampusSubTab={setCampusSubTab}
+              schoolId={schoolId}
+              schoolNumericId={schoolNumericId}
+              schoolName={schoolName}
+              schoolStreet={schoolStreet}
+              setSchoolStreet={setSchoolStreet}
+              schoolHouseNumber={schoolHouseNumber}
+              setSchoolHouseNumber={setSchoolHouseNumber}
+              schoolZipCode={schoolZipCode}
+              setSchoolZipCode={setSchoolZipCode}
+              schoolCity={schoolCity}
+              setSchoolCity={setSchoolCity}
+              schoolSubdomain={schoolSubdomain}
+              setSchoolSubdomain={setSchoolSubdomain}
+              schoolPhoneNumber={schoolPhoneNumber}
+              setSchoolPhoneNumber={setSchoolPhoneNumber}
+              schoolEmail={schoolEmail}
+              setSchoolEmail={setSchoolEmail}
+              absenceEmail={absenceEmail}
+              setAbsenceEmail={setAbsenceEmail}
+              logoUrl={logoUrl}
+              setLogoUrl={setLogoUrl}
+              setSchoolName={setSchoolName}
               currentSchoolProfile={currentSchoolProfile}
               setCurrentSchoolProfile={setCurrentSchoolProfile}
               currentUserProfile={currentUserProfile}
               userId={userId}
-              schoolId={schoolId}
-              schoolNumericId={schoolNumericId}
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-              secretarySubTab={secretarySubTab}
-              setSecretarySubTab={setSecretarySubTab}
-              campusSubTab={campusSubTab}
-              setCampusSubTab={setCampusSubTab}
-              schedulesRoomsViewMode={schedulesRoomsViewMode}
-              setSchedulesRoomsViewMode={setSchedulesRoomsViewMode}
-              roomsSubView={roomsSubView}
-              setRoomsSubView={setRoomsSubView}
+              supabase={supabase}
+              windowWidth={windowWidth}
+              fetchDashboardData={fetchDashboardData}
+              rooms={rooms}
+              setRooms={setRooms}
+              buildings={buildings}
+              setBuildings={setBuildings}
+              matrixAllocations={matrixAllocations}
               roomSearchQuery={roomSearchQuery}
               setRoomSearchQuery={setRoomSearchQuery}
-              expandedSidebarTeacherId={expandedSidebarTeacherId}
-              setExpandedSidebarTeacherId={setExpandedSidebarTeacherId}
-              selectedFilterTeacherId={selectedFilterTeacherId}
-              setSelectedFilterTeacherId={setSelectedFilterTeacherId}
-              pendingBookings={pendingBookings}
-              setPendingBookings={setPendingBookings}
+              selectedDayPlan={selectedDayPlan}
+              setSelectedDayPlan={setSelectedDayPlan}
+              roomsSubView={roomsSubView}
+              setRoomsSubView={setRoomsSubView}
+              schedulesRoomsViewMode={schedulesRoomsViewMode}
+              setSchedulesRoomsViewMode={setSchedulesRoomsViewMode}
               roomIssues={roomIssues}
               setRoomIssues={setRoomIssues}
-              rooms={rooms}
-              students={students}
+              pendingBookings={pendingBookings}
+              setPendingBookings={setPendingBookings}
+              pendingSchedules={pendingSchedules}
+              handleConfirmBooking={handleConfirmBooking}
+              handleRejectBooking={handleRejectBooking}
+              parseRoomName={parseRoomName}
+              getFloorColor={getFloorColor}
+              getAlphabeticalColor={getAlphabeticalColor}
+              formatInstrumentName={formatInstrumentName}
+              getAlphabeticalUniColor={getAlphabeticalUniColor}
+              checkTimeOverlap={checkTimeOverlap}
+              getPlanDisplayName={getPlanDisplayName}
               campusTeachers={campusTeachers}
               bypassTeachers={bypassTeachers}
               coaches={coaches}
-              matrixAllocations={matrixAllocations}
-              pendingSchedules={pendingSchedules}
-              userMap={userMap}
-              roomMap={roomMap}
-              isAvvSigned={isAvvSigned}
-              setShowAvvModal={setShowAvvModal}
-              showLogbookModal={showLogbookModal}
-              setShowLogbookModal={setShowLogbookModal}
-              showStorageManagerModal={showStorageManagerModal}
-              setShowStorageManagerModal={setShowStorageManagerModal}
-              dismissedInvoiceAlert={dismissedInvoiceAlert}
-              setDismissedInvoiceAlert={setDismissedInvoiceAlert}
-              studentBillingOption={studentBillingOption}
-              isBillingBooked={isBillingBooked}
-              bookedExtraUsers={bookedExtraUsers}
-              extraBillingOption={extraBillingOption}
-              selectedStorageAddonGb={selectedStorageAddonGb}
-              setSelectedStorageAddonGb={setSelectedStorageAddonGb}
-              selectedInvoice={selectedInvoice}
-              setSelectedInvoice={setSelectedInvoice}
-              contractStartDate={contractStartDate}
-              simulatedToday={simulatedToday}
-              studentLevyMonthly_global={studentLevyMonthly_global}
-              extraLevyMonthly_global={extraLevyMonthly_global}
-              studentSharePreview_global={studentSharePreview_global}
-              schoolShareBookedExtra_global={schoolShareBookedExtra_global}
-              currentTotalB2B_global={currentTotalB2B_global}
-              mixedTotal_global={mixedTotal_global}
-              fetchLogbookBookings={fetchLogbookBookings}
-              handleConfirmBooking={handleConfirmBooking}
-              handleRejectBooking={handleRejectBooking}
-              getEffectiveStorageUsedBytes={getEffectiveStorageUsedBytes}
-            />
-          </Suspense>
-        )}
-
-        {/* TAB 1.1: SECRETARY - CRISIS */}
-        {activeTab === 'secretary' && secretarySubTab === 'crisis' && (
-          <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Vertretungs- &amp; Krisenmanagement...</div>}>
-            <SecretaryCrisisView
-              crisisNotifications={crisisNotifications}
-              crisisTabMode={crisisTabMode}
-              setCrisisTabMode={setCrisisTabMode}
-              selectedCrisisTeacherId={selectedCrisisTeacherId}
-              setSelectedCrisisTeacherId={setSelectedCrisisTeacherId}
-              handleMarkAsNotified={handleMarkAsNotified}
-              handleClaimTicket={handleClaimTicket}
-              handleArchiveCrisisTicket={handleArchiveCrisisTicket}
-              handleArchiveAllResolvedTickets={handleArchiveAllResolvedTickets}
-              handleEndAbsenceOnBehalf={handleEndAbsenceOnBehalf}
-              expandedLiveDayStr={expandedLiveDayStr}
-              setExpandedLiveDayStr={setExpandedLiveDayStr}
-              selectedArchiveLog={selectedArchiveLog}
-              setSelectedArchiveLog={setSelectedArchiveLog}
-            />
-          </Suspense>
-        )}
-
-        {/* TAB 1.5: SECRETARY - EMPLOYEES */}
-        {activeTab === 'secretary' && secretarySubTab === 'employees' && (
-          <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Mitarbeiter-Verwaltung wird geladen...</div>}>
-            <SecretaryEmployeesView
+              allTeachers={allTeachers}
               employees={employees}
               setEmployees={setEmployees}
-              currentUserProfile={currentUserProfile}
-              userId={userId}
               revealedPins={revealedPins}
               setRevealedPins={setRevealedPins}
               employeeFirstName={employeeFirstName}
@@ -10961,15 +8420,326 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
               setEmployeeStatusTabFocused={setEmployeeStatusTabFocused}
               employeeSearchFocused={employeeSearchFocused}
               setEmployeeSearchFocused={setEmployeeSearchFocused}
-              getAlphabeticalColor={getAlphabeticalColor}
               handleCreateEmployee={handleCreateEmployee}
               handleDeleteUser={handleDeleteUser}
               handleImportEmployees={handleImportEmployees}
               handleToggleRole={handleToggleRole}
               handleUpdateEmployeeRole={handleUpdateEmployeeRole}
+              expandedSidebarTeacherId={expandedSidebarTeacherId}
+              setExpandedSidebarTeacherId={setExpandedSidebarTeacherId}
+              selectedFilterTeacherId={selectedFilterTeacherId}
+              setSelectedFilterTeacherId={setSelectedFilterTeacherId}
+              students={students}
+              userMap={userMap}
+              roomMap={roomMap}
+              isAvvSigned={isAvvSigned}
+              setShowAvvModal={setShowAvvModal}
+              showLogbookModal={showLogbookModal}
+              setShowLogbookModal={setShowLogbookModal}
+              showStorageManagerModal={showStorageManagerModal}
+              setShowStorageManagerModal={setShowStorageManagerModal}
+              dismissedInvoiceAlert={dismissedInvoiceAlert}
+              setDismissedInvoiceAlert={setDismissedInvoiceAlert}
+              selectedInvoice={selectedInvoice}
+              setSelectedInvoice={setSelectedInvoice}
+              contractStartDate={contractStartDate}
+              simulatedToday={simulatedToday}
+              studentLevyMonthly_global={studentLevyMonthly_global}
+              extraLevyMonthly_global={extraLevyMonthly_global}
+              studentSharePreview_global={studentSharePreview_global}
+              schoolShareBookedExtra_global={schoolShareBookedExtra_global}
+              currentTotalB2B_global={currentTotalB2B_global}
+              mixedTotal_global={mixedTotal_global}
+              fetchLogbookBookings={fetchLogbookBookings}
+              getEffectiveStorageUsedBytes={getEffectiveStorageUsedBytes}
+              crisisNotifications={crisisNotifications}
+              crisisTabMode={crisisTabMode}
+              setCrisisTabMode={setCrisisTabMode}
+              selectedCrisisTeacherId={selectedCrisisTeacherId}
+              setSelectedCrisisTeacherId={setSelectedCrisisTeacherId}
+              handleMarkAsNotified={handleMarkAsNotified}
+              handleClaimTicket={handleClaimTicket}
+              handleArchiveCrisisTicket={handleArchiveCrisisTicket}
+              handleArchiveAllResolvedTickets={handleArchiveAllResolvedTickets}
+              handleEndAbsenceOnBehalf={handleEndAbsenceOnBehalf}
+              expandedLiveDayStr={expandedLiveDayStr}
+              setExpandedLiveDayStr={setExpandedLiveDayStr}
+              selectedArchiveLog={selectedArchiveLog}
+              setSelectedArchiveLog={setSelectedArchiveLog}
+              activeStudentsCount_global={activeStudentsCount_global}
+              activeGroovelabStudentsCount_global={activeGroovelabStudentsCount_global}
+              passiveStudentsCount_global={passiveStudentsCount_global}
+              billableTeachersCount={billableTeachersCount}
+              teacherServiceFeeTotal_global={teacherServiceFeeTotal_global}
+              moduleCost_global={moduleCost_global}
+              storageAddonFee_global={storageAddonFee_global}
+              baseB2B_global={baseB2B_global}
+              masterRates={masterRates}
+              effectiveSchoolRates={effectiveSchoolRates}
+              masterPricing={masterPricing}
+              isSammelzahler={isSammelzahler}
+              fetchTariffBookings={fetchTariffBookings}
+              hasCampusSub={hasCampusSub}
+              setHasCampusSub={setHasCampusSub}
+              hasGroovelabSub={hasGroovelabSub}
+              setHasGroovelabSub={setHasGroovelabSub}
+              campusActivatedThisMonth={campusActivatedThisMonth}
+              setCampusActivatedThisMonth={setCampusActivatedThisMonth}
+              groovelabActivatedThisMonth={groovelabActivatedThisMonth}
+              setGroovelabActivatedThisMonth={setGroovelabActivatedThisMonth}
+              handleToggleCampusSub={handleToggleCampusSub}
+              handleToggleGroovelabSub={handleToggleGroovelabSub}
+              studentBillingOption={studentBillingOption}
+              setStudentBillingOption={setStudentBillingOption}
+              isBillingBooked={isBillingBooked}
+              setIsBillingBooked={setIsBillingBooked}
+              bookedExtraUsers={bookedExtraUsers}
+              setBookedExtraUsers={setBookedExtraUsers}
+              extraUsersSliderVal={extraUsersSliderVal}
+              setExtraUsersSliderVal={setExtraUsersSliderVal}
+              extraBillingOption={extraBillingOption}
+              setExtraBillingOption={setExtraBillingOption}
+              nextBillingOption={nextBillingOption}
+              setNextBillingOption={setNextBillingOption}
+              nextBillingOptionEffectiveAt={nextBillingOptionEffectiveAt}
+              setNextBillingOptionEffectiveAt={setNextBillingOptionEffectiveAt}
+              showChangeTariffModal={showChangeTariffModal}
+              setShowChangeTariffModal={setShowChangeTariffModal}
+              showCheckoutModal={showCheckoutModal}
+              setShowCheckoutModal={setShowCheckoutModal}
+              checkoutStep={checkoutStep}
+              setCheckoutStep={setCheckoutStep}
+              billingPayer={billingPayer}
+              setBillingPayer={setBillingPayer}
+              showSuccessModal={showSuccessModal}
+              setShowSuccessModal={setShowSuccessModal}
+              customUmlageAmount={customUmlageAmount}
+              setCustomUmlageAmount={setCustomUmlageAmount}
+              agreedToTerms={agreedToTerms}
+              setAgreedToTerms={setAgreedToTerms}
+              couponCode={couponCode}
+              setCouponCode={setCouponCode}
+              isCouponApplied={isCouponApplied}
+              setIsCouponApplied={setIsCouponApplied}
+              couponDiscount={couponDiscount}
+              setCouponDiscount={setCouponDiscount}
+              showCouponInput={showCouponInput}
+              setShowCouponInput={setShowCouponInput}
+              hasCustomBillingAddress={hasCustomBillingAddress}
+              setHasCustomBillingAddress={setHasCustomBillingAddress}
+              customBillingName={customBillingName}
+              setCustomBillingName={setCustomBillingName}
+              customBillingStreet={customBillingStreet}
+              setCustomBillingStreet={setCustomBillingStreet}
+              customBillingZip={customBillingZip}
+              setCustomBillingZip={setCustomBillingZip}
+              customBillingCity={customBillingCity}
+              setCustomBillingCity={setCustomBillingCity}
+              customBillingEmail={customBillingEmail}
+              setCustomBillingEmail={setCustomBillingEmail}
+              customBillingLeitwegId={customBillingLeitwegId}
+              setCustomBillingLeitwegId={setCustomBillingLeitwegId}
+              hasCustomActivationBillingAddress={hasCustomActivationBillingAddress}
+              setHasCustomActivationBillingAddress={setHasCustomActivationBillingAddress}
+              customActivationBillingName={customActivationBillingName}
+              setCustomActivationBillingName={setCustomActivationBillingName}
+              customActivationBillingStreet={customActivationBillingStreet}
+              setCustomActivationBillingStreet={setCustomActivationBillingStreet}
+              customActivationBillingZip={customActivationBillingZip}
+              setCustomActivationBillingZip={setCustomActivationBillingZip}
+              customActivationBillingCity={customActivationBillingCity}
+              setCustomActivationBillingCity={setCustomActivationBillingCity}
+              customActivationBillingEmail={customActivationBillingEmail}
+              setCustomActivationBillingEmail={setCustomActivationBillingEmail}
+              selectedStorageAddonGb={selectedStorageAddonGb}
+              setSelectedStorageAddonGb={setSelectedStorageAddonGb}
+              selectedStorageAddonFee={selectedStorageAddonFee}
+              setSelectedStorageAddonFee={setSelectedStorageAddonFee}
+              showSwitchBillingModelModal={showSwitchBillingModelModal}
+              setShowSwitchBillingModelModal={setShowSwitchBillingModelModal}
+              selectedSwitchTargetPayer={selectedSwitchTargetPayer}
+              setSelectedSwitchTargetPayer={setSelectedSwitchTargetPayer}
+              showStorageTerminationModal={showStorageTerminationModal}
+              setShowStorageTerminationModal={setShowStorageTerminationModal}
+              agreedToSepa={agreedToSepa}
+              setAgreedToSepa={setAgreedToSepa}
+              showConfirmExtra={showConfirmExtra}
+              setShowConfirmExtra={setShowConfirmExtra}
+              isSchoolTrial={isSchoolTrial}
+              setIsSchoolTrial={setIsSchoolTrial}
+              schoolTrialEndsAt={schoolTrialEndsAt}
+              setSchoolTrialEndsAt={setSchoolTrialEndsAt}
+              schoolStatus={schoolStatus}
+              setSchoolStatus={setSchoolStatus}
+              subscriptionBypass={subscriptionBypass}
+              setContractStartDate={setContractStartDate}
+              setSimulatedToday={setSimulatedToday}
+              expandedYears={expandedYears}
+              setExpandedYears={setExpandedYears}
+              isCancelled={isCancelled}
+              setIsCancelled={setIsCancelled}
+              schoolContractEndsAt={schoolContractEndsAt}
+              setSchoolContractEndsAt={setSchoolContractEndsAt}
+              showModuleUpgradeModal={showModuleUpgradeModal}
+              setShowModuleUpgradeModal={setShowModuleUpgradeModal}
+              setUpgradeTargetModule={setUpgradeTargetModule}
+              setShowCancelModal={setShowCancelModal}
+              tariffBookings={tariffBookings}
+              loadingTariffBookings={loadingTariffBookings}
+              activeStudentsModalList={activeStudentsModalList}
+              setActiveStudentsModalList={setActiveStudentsModalList}
+              dunningStatus={dunningStatus}
+              setShowDunningPayModal={setShowDunningPayModal}
+              schoolEquipment={schoolEquipment}
+              selectedEquipmentRoomId={selectedEquipmentRoomId}
+              setSelectedEquipmentRoomId={setSelectedEquipmentRoomId}
+              equipmentFormName={equipmentFormName}
+              setEquipmentFormName={setEquipmentFormName}
+              equipmentFormQty={equipmentFormQty}
+              setEquipmentFormQty={setEquipmentFormQty}
+              equipmentSaving={equipmentSaving}
+              handleSaveEquipment={handleSaveEquipment}
+              equipmentSearchQuery={equipmentSearchQuery}
+              setEquipmentSearchQuery={setEquipmentSearchQuery}
+              equipmentSortFreeFirst={equipmentSortFreeFirst}
+              setEquipmentSortFreeFirst={setEquipmentSortFreeFirst}
+              dragOverRoomId={dragOverRoomId}
+              setDragOverRoomId={setDragOverRoomId}
+              handleDropInstrumentOnRoom={handleDropInstrumentOnRoom}
+              editingEquipmentGroup={editingEquipmentGroup}
+              setEditingEquipmentGroup={setEditingEquipmentGroup}
+              editGroupName={editGroupName}
+              setEditGroupName={setEditGroupName}
+              editGroupModel={editGroupModel}
+              setEditGroupModel={setEditGroupModel}
+              editGroupLink={editGroupLink}
+              setEditGroupLink={setEditGroupLink}
+              editGroupCoupled={editGroupCoupled}
+              setEditGroupCoupled={setEditGroupCoupled}
+              editGroupQty={editGroupQty}
+              setEditGroupQty={setEditGroupQty}
+              editGroupInstancesData={editGroupInstancesData}
+              setEditGroupInstancesData={setEditGroupInstancesData}
+              handleSaveEquipmentGroup={handleSaveEquipmentGroup}
+              handleDeleteEquipment={handleDeleteEquipment}
+              equipmentNameInputRef={equipmentNameInputRef}
+              equipmentQtyInputRef={equipmentQtyInputRef}
+              kioskPinLength={kioskPinLength}
+              setKioskPinLength={setKioskPinLength}
+              bypassPin={bypassPin}
+              setBypassPin={setBypassPin}
+              logRetention={logRetention}
+              setLogRetention={setLogRetention}
+              syncInterval={syncInterval}
+              setSyncInterval={setSyncInterval}
+              calendarUrls={calendarUrls}
+              newCalendarUrlInput={newCalendarUrlInput}
+              setNewCalendarUrlInput={setNewCalendarUrlInput}
+              lastBackupDate={lastBackupDate}
+              schoolYearStartDay={schoolYearStartDay}
+              schoolYearStartMonth={schoolYearStartMonth}
+              autoDeleteExpiredUsers={autoDeleteExpiredUsers}
+              isCurrentDevicePasskeyActive={isCurrentDevicePasskeyActive}
+              isSavingSettings={isSavingSettings}
+              isSettingsDirty={isSettingsDirty}
+              activeSecretarySettingsModal={activeSecretarySettingsModal}
+              setActiveSecretarySettingsModal={setActiveSecretarySettingsModal}
+              settingsTab={settingsTab}
+              setSettingsTab={setSettingsTab}
+              showResetModal={showResetModal}
+              setShowResetModal={setShowResetModal}
+              resetConfirmText={resetConfirmText}
+              setResetConfirmText={setResetConfirmText}
+              showOwnQrModal={showOwnQrModal}
+              setShowOwnQrModal={setShowOwnQrModal}
+              copiedSettingsLink={copiedSettingsLink}
+              setCopiedSettingsLink={setCopiedSettingsLink}
+              copiedSettingsPin={copiedSettingsPin}
+              setCopiedSettingsPin={setCopiedSettingsPin}
+              copiedKioskLink={copiedKioskLink}
+              setCopiedKioskLink={setCopiedKioskLink}
+              copiedSchoolLink={copiedSchoolLink}
+              setCopiedSchoolLink={setCopiedSchoolLink}
+              setIsFeedbackModalOpen={setIsFeedbackModalOpen}
+              setShowDpoIdCardModal={setShowDpoIdCardModal}
+              setShowDpoPortalModal={setShowDpoPortalModal}
+              setQrModalUser={setQrModalUser}
+              handleSaveAllSettings={handleSaveAllSettings}
+              handleAddCalendarUrl={handleAddCalendarUrl}
+              handleRemoveCalendarUrl={handleRemoveCalendarUrl}
+              handleExportBackup={handleExportBackup}
+              handleRestoreBackup={handleRestoreBackup}
+              handleEnrollBiometrics={handleEnrollBiometrics}
+              handleRemoveBiometrics={handleRemoveBiometrics}
+              handleTestBiometrics={handleTestBiometrics}
+              handleDeleteExpiredStudents={handleDeleteExpiredStudents}
+              handleToggleAutoClean={handleToggleAutoClean}
+              handleUpdateSchoolYear={handleUpdateSchoolYear}
+              biometricsStatus={biometricsStatus}
+              biometricsMessage={biometricsMessage}
+              kioskToken={kioskToken}
+              isExporting={isExporting}
+              isRestoring={isRestoring}
+              announcementsList={announcementsList}
+              announcementsLoading={announcementsLoading}
+              editingAnnouncementId={editingAnnouncementId}
+              setEditingAnnouncementId={setEditingAnnouncementId}
+              newAnnouncementTitle={newAnnouncementTitle}
+              setNewAnnouncementTitle={setNewAnnouncementTitle}
+              newAnnouncementDescription={newAnnouncementDescription}
+              setNewAnnouncementDescription={setNewAnnouncementDescription}
+              newAnnouncementType={newAnnouncementType}
+              setNewAnnouncementType={setNewAnnouncementType}
+              newAnnouncementPriority={newAnnouncementPriority}
+              setNewAnnouncementPriority={setNewAnnouncementPriority}
+              newAnnouncementIsAnonymous={newAnnouncementIsAnonymous}
+              setNewAnnouncementIsAnonymous={setNewAnnouncementIsAnonymous}
+              newAnnouncementTargetType={newAnnouncementTargetType}
+              setNewAnnouncementTargetType={setNewAnnouncementTargetType}
+              newAnnouncementTargetGroup={newAnnouncementTargetGroup}
+              setNewAnnouncementTargetGroup={setNewAnnouncementTargetGroup}
+              newAnnouncementTargetTeacherId={newAnnouncementTargetTeacherId}
+              setNewAnnouncementTargetTeacherId={setNewAnnouncementTargetTeacherId}
+              newAnnouncementDueDate={newAnnouncementDueDate}
+              setNewAnnouncementDueDate={setNewAnnouncementDueDate}
+              newAnnouncementRecurrence={newAnnouncementRecurrence}
+              setNewAnnouncementRecurrence={setNewAnnouncementRecurrence}
+              newAnnouncementAttachmentUrl={newAnnouncementAttachmentUrl}
+              setNewAnnouncementAttachmentUrl={setNewAnnouncementAttachmentUrl}
+              newAnnouncementQuestions={newAnnouncementQuestions}
+              setNewAnnouncementQuestions={setNewAnnouncementQuestions}
+              isUploadingAnnouncementAttachment={isUploadingAnnouncementAttachment}
+              handleUploadAnnouncementAttachment={handleUploadAnnouncementAttachment}
+              handleSaveAnnouncement={handleCreateAnnouncement}
+              handleDeleteAnnouncement={handleDeleteAnnouncement}
+              selectedAnnouncementForStats={selectedAnnouncementForStats}
+              setSelectedAnnouncementForStats={setSelectedAnnouncementForStats}
+              announcementResponsesList={announcementResponsesList}
+              fetchAnnouncementStats={fetchAnnouncementStats}
+              statsModalTab={statsModalTab}
+              setStatsModalTab={setStatsModalTab}
+              statsStatusFilter={statsStatusFilter}
+              setStatsStatusFilter={setStatsStatusFilter}
+              statsSearchQuery={statsSearchQuery}
+              setStatsSearchQuery={setStatsSearchQuery}
+              expandedResponseIds={expandedResponseIds}
+              setExpandedResponseIds={setExpandedResponseIds}
+              handleExportCSV={handleExportCSV}
+              auditLogs={auditLogs}
+              auditLoading={auditLoading}
+              auditSearchQuery={auditSearchQuery}
+              setAuditSearchQuery={setAuditSearchQuery}
+              auditActionFilter={auditActionFilter}
+              setAuditActionFilter={setAuditActionFilter}
+              auditLimit={auditLimit}
+              setAuditLimit={setAuditLimit}
+              exportAuditLogsToCsv={exportAuditLogsToCsv}
+              translateKey={translateKey}
+              translateValue={translateValue}
             />
           </Suspense>
         )}
+
 
 
 
@@ -11337,753 +9107,92 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           </Suspense>
         )}
 
-        {/* TAB 1.7: SECRETARY - LICENSES */}
-        {activeTab === 'secretary' && secretarySubTab === 'licenses' && (
-          <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Abrechnung &amp; Infrastruktur...</div>}>
-            <SecretaryLicensesView
-              schoolId={schoolId}
-              schoolNumericId={schoolNumericId}
-              schoolName={schoolName}
-              schoolStreet={schoolStreet}
-              schoolHouseNumber={schoolHouseNumber}
-              schoolZipCode={schoolZipCode}
-              schoolCity={schoolCity}
-              currentSchoolProfile={currentSchoolProfile}
-              setCurrentSchoolProfile={setCurrentSchoolProfile}
-              supabase={supabase}
-              allTeachers={allTeachers}
-              employees={employees}
-              students={students}
-              activeStudentsCount_global={activeStudentsCount_global}
-              activeGroovelabStudentsCount_global={activeGroovelabStudentsCount_global}
-              passiveStudentsCount_global={passiveStudentsCount_global}
-              billableTeachersCount={billableTeachersCount}
-              teacherServiceFeeTotal_global={teacherServiceFeeTotal_global}
-              moduleCost_global={moduleCost_global}
-              storageAddonFee_global={storageAddonFee_global}
-              baseB2B_global={baseB2B_global}
-              masterRates={masterRates}
-              effectiveSchoolRates={effectiveSchoolRates}
-              masterPricing={masterPricing}
-              isSammelzahler={isSammelzahler}
-              fetchDashboardData={fetchDashboardData}
-              fetchTariffBookings={fetchTariffBookings}
-              hasCampusSub={hasCampusSub}
-              setHasCampusSub={setHasCampusSub}
-              hasGroovelabSub={hasGroovelabSub}
-              setHasGroovelabSub={setHasGroovelabSub}
-              campusActivatedThisMonth={campusActivatedThisMonth}
-              setCampusActivatedThisMonth={setCampusActivatedThisMonth}
-              groovelabActivatedThisMonth={groovelabActivatedThisMonth}
-              setGroovelabActivatedThisMonth={setGroovelabActivatedThisMonth}
-              handleToggleCampusSub={handleToggleCampusSub}
-              handleToggleGroovelabSub={handleToggleGroovelabSub}
-              studentBillingOption={studentBillingOption}
-              setStudentBillingOption={setStudentBillingOption}
-              isBillingBooked={isBillingBooked}
-              setIsBillingBooked={setIsBillingBooked}
-              bookedExtraUsers={bookedExtraUsers}
-              setBookedExtraUsers={setBookedExtraUsers}
-              extraUsersSliderVal={extraUsersSliderVal}
-              setExtraUsersSliderVal={setExtraUsersSliderVal}
-              extraBillingOption={extraBillingOption}
-              setExtraBillingOption={setExtraBillingOption}
-              nextBillingOption={nextBillingOption}
-              setNextBillingOption={setNextBillingOption}
-              nextBillingOptionEffectiveAt={nextBillingOptionEffectiveAt}
-              setNextBillingOptionEffectiveAt={setNextBillingOptionEffectiveAt}
-              showChangeTariffModal={showChangeTariffModal}
-              setShowChangeTariffModal={setShowChangeTariffModal}
-              showCheckoutModal={showCheckoutModal}
-              setShowCheckoutModal={setShowCheckoutModal}
-              checkoutStep={checkoutStep}
-              setCheckoutStep={setCheckoutStep}
-              billingPayer={billingPayer}
-              setBillingPayer={setBillingPayer}
-              showSuccessModal={showSuccessModal}
-              setShowSuccessModal={setShowSuccessModal}
-              customUmlageAmount={customUmlageAmount}
-              setCustomUmlageAmount={setCustomUmlageAmount}
-              agreedToTerms={agreedToTerms}
-              setAgreedToTerms={setAgreedToTerms}
-              couponCode={couponCode}
-              setCouponCode={setCouponCode}
-              isCouponApplied={isCouponApplied}
-              setIsCouponApplied={setIsCouponApplied}
-              couponDiscount={couponDiscount}
-              setCouponDiscount={setCouponDiscount}
-              showCouponInput={showCouponInput}
-              setShowCouponInput={setShowCouponInput}
-              hasCustomBillingAddress={hasCustomBillingAddress}
-              setHasCustomBillingAddress={setHasCustomBillingAddress}
-              customBillingName={customBillingName}
-              setCustomBillingName={setCustomBillingName}
-              customBillingStreet={customBillingStreet}
-              setCustomBillingStreet={setCustomBillingStreet}
-              customBillingZip={customBillingZip}
-              setCustomBillingZip={setCustomBillingZip}
-              customBillingCity={customBillingCity}
-              setCustomBillingCity={setCustomBillingCity}
-              customBillingEmail={customBillingEmail}
-              setCustomBillingEmail={setCustomBillingEmail}
-              customBillingLeitwegId={customBillingLeitwegId}
-              setCustomBillingLeitwegId={setCustomBillingLeitwegId}
-              setShowAvvModal={setShowAvvModal}
-              hasCustomActivationBillingAddress={hasCustomActivationBillingAddress}
-              setHasCustomActivationBillingAddress={setHasCustomActivationBillingAddress}
-              customActivationBillingName={customActivationBillingName}
-              setCustomActivationBillingName={setCustomActivationBillingName}
-              customActivationBillingStreet={customActivationBillingStreet}
-              setCustomActivationBillingStreet={setCustomActivationBillingStreet}
-              customActivationBillingZip={customActivationBillingZip}
-              setCustomActivationBillingZip={setCustomActivationBillingZip}
-              customActivationBillingCity={customActivationBillingCity}
-              setCustomActivationBillingCity={setCustomActivationBillingCity}
-              customActivationBillingEmail={customActivationBillingEmail}
-              setCustomActivationBillingEmail={setCustomActivationBillingEmail}
-              selectedStorageAddonGb={selectedStorageAddonGb}
-              setSelectedStorageAddonGb={setSelectedStorageAddonGb}
-              selectedStorageAddonFee={selectedStorageAddonFee}
-              setSelectedStorageAddonFee={setSelectedStorageAddonFee}
-              showStorageManagerModal={showStorageManagerModal}
-              setShowStorageManagerModal={setShowStorageManagerModal}
-              showSwitchBillingModelModal={showSwitchBillingModelModal}
-              setShowSwitchBillingModelModal={setShowSwitchBillingModelModal}
-              selectedSwitchTargetPayer={selectedSwitchTargetPayer}
-              setSelectedSwitchTargetPayer={setSelectedSwitchTargetPayer}
-              showStorageTerminationModal={showStorageTerminationModal}
-              setShowStorageTerminationModal={setShowStorageTerminationModal}
-              agreedToSepa={agreedToSepa}
-              setAgreedToSepa={setAgreedToSepa}
-              selectedInvoice={selectedInvoice}
-              setSelectedInvoice={setSelectedInvoice}
-              showConfirmExtra={showConfirmExtra}
-              setShowConfirmExtra={setShowConfirmExtra}
-              isSchoolTrial={isSchoolTrial}
-              setIsSchoolTrial={setIsSchoolTrial}
-              schoolTrialEndsAt={schoolTrialEndsAt}
-              setSchoolTrialEndsAt={setSchoolTrialEndsAt}
-              schoolStatus={schoolStatus}
-              setSchoolStatus={setSchoolStatus}
-              subscriptionBypass={subscriptionBypass}
-              contractStartDate={contractStartDate}
-              setContractStartDate={setContractStartDate}
-              simulatedToday={simulatedToday}
-              setSimulatedToday={setSimulatedToday}
-              expandedYears={expandedYears}
-              setExpandedYears={setExpandedYears}
-              isCancelled={isCancelled}
-              setIsCancelled={setIsCancelled}
-              schoolContractEndsAt={schoolContractEndsAt}
-              setSchoolContractEndsAt={setSchoolContractEndsAt}
-              showModuleUpgradeModal={showModuleUpgradeModal}
-              setShowModuleUpgradeModal={setShowModuleUpgradeModal}
-              setUpgradeTargetModule={setUpgradeTargetModule}
-              setShowCancelModal={setShowCancelModal}
-              tariffBookings={tariffBookings}
-              loadingTariffBookings={loadingTariffBookings}
-              activeStudentsModalList={activeStudentsModalList}
-              setActiveStudentsModalList={setActiveStudentsModalList}
-              getEffectiveStorageUsedBytes={getEffectiveStorageUsedBytes}
-              isSecretaryReadOnly={dunningStatus.isSecretaryReadOnly}
-              onOpenDunningPayModal={() => setShowDunningPayModal(true)}
-            />
-          </Suspense>
-        )}
 
-        {/* TAB: SECRETARY - RÄUME */}
-        {activeTab === 'secretary' && secretarySubTab === 'rooms' && (
-          <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Raumverwaltung...</div>}>
-            <SecretaryRoomsView
-              schoolId={schoolId}
-              rooms={rooms}
-              setRooms={setRooms}
-              buildings={buildings}
-              setBuildings={setBuildings}
-              matrixAllocations={matrixAllocations}
-              roomSearchQuery={roomSearchQuery}
-              setRoomSearchQuery={setRoomSearchQuery}
-              selectedDayPlan={selectedDayPlan}
-              setSelectedDayPlan={setSelectedDayPlan}
-              supabase={supabase}
-              fetchDashboardData={fetchDashboardData}
-              parseRoomName={parseRoomName}
-              getFloorColor={getFloorColor}
-              getAlphabeticalColor={getAlphabeticalColor}
-              formatInstrumentName={formatInstrumentName}
-              roomIssues={roomIssues}
-              getAlphabeticalUniColor={getAlphabeticalUniColor}
-              checkTimeOverlap={checkTimeOverlap}
-              getPlanDisplayName={getPlanDisplayName}
-              roomsSubView={roomsSubView}
-              setRoomsSubView={setRoomsSubView}
-              pendingBookings={pendingBookings}
-              handleConfirmBooking={handleConfirmBooking}
-              handleRejectBooking={handleRejectBooking}
-            />
-          </Suspense>
-        )}
-
-        {/* TAB 1.7.5: SECRETARY - EQUIPMENT */}
-        {activeTab === 'secretary' && secretarySubTab === 'equipment' && (
-          <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Inventar &amp; Instrumente...</div>}>
-            <SecretaryEquipmentView
-              schoolId={schoolId}
-              schoolEquipment={schoolEquipment}
-              rooms={rooms}
-              selectedEquipmentRoomId={selectedEquipmentRoomId === 'All' ? null : selectedEquipmentRoomId}
-              setSelectedEquipmentRoomId={(id: string | null) => setSelectedEquipmentRoomId(id || 'All')}
-              equipmentFormName={equipmentFormName}
-              setEquipmentFormName={setEquipmentFormName}
-              equipmentFormQty={equipmentFormQty}
-              setEquipmentFormQty={setEquipmentFormQty}
-              equipmentSaving={equipmentSaving}
-              handleSaveEquipment={handleSaveEquipment}
-              equipmentSearchQuery={equipmentSearchQuery}
-              setEquipmentSearchQuery={setEquipmentSearchQuery}
-              equipmentSortFreeFirst={equipmentSortFreeFirst}
-              setEquipmentSortFreeFirst={setEquipmentSortFreeFirst}
-              dragOverRoomId={dragOverRoomId}
-              setDragOverRoomId={setDragOverRoomId}
-              handleDropInstrumentOnRoom={handleDropInstrumentOnRoom}
-              editingEquipmentGroup={editingEquipmentGroup}
-              setEditingEquipmentGroup={setEditingEquipmentGroup}
-              editGroupName={editGroupName}
-              setEditGroupName={setEditGroupName}
-              editGroupModel={editGroupModel}
-              setEditGroupModel={setEditGroupModel}
-              editGroupLink={editGroupLink}
-              setEditGroupLink={setEditGroupLink}
-              editGroupCoupled={editGroupCoupled}
-              setEditGroupCoupled={setEditGroupCoupled}
-              editGroupQty={editGroupQty}
-              setEditGroupQty={setEditGroupQty}
-              editGroupInstancesData={editGroupInstancesData}
-              setEditGroupInstancesData={setEditGroupInstancesData}
-              handleSaveGroupEdit={handleSaveEquipmentGroup}
-              handleDeleteEquipmentGroup={async () => {
-                if (!editingEquipmentGroup) return;
-                for (const inst of editingEquipmentGroup.instances) {
-                  await handleDeleteEquipment(inst.id);
-                }
-                setEditingEquipmentGroup(null);
-              }}
-              equipmentNameInputRef={equipmentNameInputRef}
-              equipmentQtyInputRef={equipmentQtyInputRef}
-              parseRoomName={parseRoomName}
-            />
-          </Suspense>
-        )}
-
-        {/* TAB 1.8: SECRETARY - SETUP */}
-        {activeTab === 'secretary' && secretarySubTab === 'setup' && (
-          <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Einstellungen...</div>}>
-            <SecretarySetupView
-              schoolId={schoolId}
-              schoolName={schoolName}
-              setSchoolName={setSchoolName}
-              schoolSubdomain={schoolSubdomain}
-              setSchoolSubdomain={setSchoolSubdomain}
-              schoolStreet={schoolStreet}
-              setSchoolStreet={setSchoolStreet}
-              schoolHouseNumber={schoolHouseNumber}
-              setSchoolHouseNumber={setSchoolHouseNumber}
-              schoolZipCode={schoolZipCode}
-              setSchoolZipCode={setSchoolZipCode}
-              schoolCity={schoolCity}
-              setSchoolCity={setSchoolCity}
-              schoolPhoneNumber={schoolPhoneNumber}
-              setSchoolPhoneNumber={setSchoolPhoneNumber}
-              schoolEmail={schoolEmail}
-              setSchoolEmail={setSchoolEmail}
-              absenceEmail={absenceEmail}
-              setAbsenceEmail={setAbsenceEmail}
-              logoUrl={logoUrl}
-              setLogoUrl={setLogoUrl}
-              kioskPinLength={kioskPinLength}
-              setKioskPinLength={setKioskPinLength}
-              bypassPin={bypassPin}
-              setBypassPin={setBypassPin}
-              logRetention={logRetention}
-              setLogRetention={setLogRetention}
-              syncInterval={syncInterval}
-              setSyncInterval={setSyncInterval}
-              calendarUrls={calendarUrls}
-              newCalendarUrlInput={newCalendarUrlInput}
-              setNewCalendarUrlInput={setNewCalendarUrlInput}
-              isAvvSigned={isAvvSigned}
-              lastBackupDate={lastBackupDate}
-              schoolYearStartDay={schoolYearStartDay}
-              schoolYearStartMonth={schoolYearStartMonth}
-              autoDeleteExpiredUsers={autoDeleteExpiredUsers}
-              isCurrentDevicePasskeyActive={isCurrentDevicePasskeyActive}
-              isSavingSettings={isSavingSettings}
-              isSettingsDirty={isSettingsDirty}
-              windowWidth={windowWidth}
-              activeSecretarySettingsModal={activeSecretarySettingsModal}
-              setActiveSecretarySettingsModal={setActiveSecretarySettingsModal}
-              settingsTab={settingsTab}
-              setSettingsTab={setSettingsTab}
-              showResetModal={showResetModal}
-              setShowResetModal={setShowResetModal}
-              resetConfirmText={resetConfirmText}
-              setResetConfirmText={setResetConfirmText}
-              showOwnQrModal={showOwnQrModal}
-              setShowOwnQrModal={setShowOwnQrModal}
-              copiedSettingsLink={copiedSettingsLink}
-              setCopiedSettingsLink={setCopiedSettingsLink}
-              copiedSettingsPin={copiedSettingsPin}
-              setCopiedSettingsPin={setCopiedSettingsPin}
-              copiedKioskLink={copiedKioskLink}
-              setCopiedKioskLink={setCopiedKioskLink}
-              copiedSchoolLink={copiedSchoolLink}
-              setCopiedSchoolLink={setCopiedSchoolLink}
-              setIsFeedbackModalOpen={setIsFeedbackModalOpen}
-              setShowAvvModal={setShowAvvModal}
-              setShowDpoIdCardModal={setShowDpoIdCardModal}
-              setShowDpoPortalModal={setShowDpoPortalModal}
-              setQrModalUser={setQrModalUser}
-              handleSaveAllSettings={handleSaveAllSettings}
-              handleAddCalendarUrl={handleAddCalendarUrl}
-              handleRemoveCalendarUrl={handleRemoveCalendarUrl}
-              handleExportBackup={handleExportBackup}
-              handleRestoreBackup={handleRestoreBackup}
-              handleEnrollBiometrics={handleEnrollBiometrics}
-              handleRemoveBiometrics={handleRemoveBiometrics}
-              handleTestBiometrics={handleTestBiometrics}
-              handleDeleteExpiredStudents={handleDeleteExpiredStudents}
-              handleToggleAutoClean={handleToggleAutoClean}
-              handleUpdateSchoolYear={handleUpdateSchoolYear}
-              students={students}
-              contractEndsAt={schoolContractEndsAt}
-              currentUserProfile={currentUserProfile}
-              biometricsStatus={biometricsStatus}
-              biometricsMessage={biometricsMessage}
-              kioskToken={kioskToken}
-              hasCampusSub={hasCampusSub}
-              hasGroovelabSub={hasGroovelabSub}
-              studentBillingOption={studentBillingOption}
-              isExporting={isExporting}
-              isRestoring={isRestoring}
-            />
-          </Suspense>
-        )}
-        {activeTab === 'secretary' && (secretarySubTab === 'announcements' || secretarySubTab === 'duties') && renderAnnouncementsBoard()}
-        {activeTab === 'secretary' && secretarySubTab === 'audit' && (
-          <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Audit-Logbuch...</div>}>
-            <SecretaryAuditView
-              auditLogs={auditLogs}
-              auditLoading={auditLoading}
-              auditSearchQuery={auditSearchQuery}
-              setAuditSearchQuery={setAuditSearchQuery}
-              auditActionFilter={auditActionFilter}
-              setAuditActionFilter={setAuditActionFilter}
-              auditLimit={auditLimit}
-              setAuditLimit={setAuditLimit}
-              userMap={userMap}
-              exportAuditLogsToCsv={exportAuditLogsToCsv}
-              translateKey={translateKey}
-              translateValue={translateValue}
-            />
-          </Suspense>
-        )}
 
       </div>
-      {showResetModal && (
-        <div 
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="school-reset-title"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowResetModal(false);
-              setResetConfirmText('');
-            }
-          }}
-          style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(15,23,42,0.3)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
-        >
-          <div style={{ background: '#ffffff', borderRadius: '24px', maxWidth: '540px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            {/* Header */}
-            <div style={{ padding: '24px', borderBottom: '1px solid #fee2e2', background: '#fff5f5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 id="school-reset-title" style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: '#c53030', fontFamily: 'Urbanist', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <ShieldAlert size={20} /> Werkseinstellungen zurücksetzen
-              </h3>
-              <button 
-                type="button"
-                aria-label="Dialog schließen"
-                onClick={() => {
-                  setShowResetModal(false);
-                  setResetConfirmText('');
-                }}
-                style={{ border: 'none', background: 'transparent', fontSize: '1.2rem', cursor: 'pointer', color: '#742a2a', fontWeight: 'bold' }}
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Body */}
-            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div style={{ background: '#fff5f5', border: '1.5px solid #feb2b2', borderRadius: '12px', padding: '16px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                <ShieldAlert size={24} style={{ color: '#e53e3e', flexShrink: 0, marginTop: '2px' }} />
-                <div style={{ fontSize: '0.8rem', color: '#742a2a', lineHeight: '1.45' }}>
-                  <strong style={{ display: 'block', marginBottom: '4px', fontSize: '0.84rem' }}>Achtung: Dies ist eine destruktive Aktion!</strong>
-                  Durch diesen Vorgang werden alle Schülerprofile, Lehrerprofile, Ausweise, Wochenpläne, Stunden, Bands, Chathistorien und zugehörigen Übungsdaten <strong>unwiderruflich gelöscht</strong>. Nur Ihr Administrator-Konto bleibt aktiv.
-                </div>
-              </div>
-
-              <div style={{
-                background: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                borderRadius: '12px',
-                padding: '12px 16px',
-                fontSize: '0.76rem',
-                color: '#475569',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                lineHeight: '1.45'
-              }}>
-                <CheckCircle size={18} color="#34a853" style={{ flexShrink: 0 }} />
-                <span>
-                  <strong style={{ color: '#1e293b' }}>Abonnement-Schutz:</strong> Ihr gebuchter Vertrag und das Cloud-Hosting bleiben unverändert aktiv. Variable Schülergebühren stoppen automatisch, bis Sie neue Schülerprofile anlegen.
-                </span>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <span style={{ fontSize: '0.78rem', color: '#475569', lineHeight: '1.4' }}>
-                  Bitte bestätigen Sie diesen Vorgang, indem Sie den genauen Namen Ihrer Musikschule eingeben:
-                </span>
-                <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center', userSelect: 'none' }}>
-                  {schoolName}
-                </div>
-                <input
-                  type="text"
-                  placeholder="Namen der Musikschule hier eingeben..."
-                  value={resetConfirmText}
-                  onChange={(e) => setResetConfirmText(e.target.value)}
-                  style={{ 
-                    padding: '12px 14px', 
-                    borderRadius: '10px', 
-                    border: '1.5px solid',
-                    borderColor: resetConfirmText === schoolName ? '#34a853' : '#cbd5e1', 
-                    fontSize: '0.84rem', 
-                    outline: 'none', 
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    textAlign: 'center',
-                    fontWeight: 'bold',
-                    transition: 'all 0.15s'
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Footer / Action Buttons */}
-            <div style={{ padding: '16px 24px', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowResetModal(false);
-                  setResetConfirmText('');
-                }}
-                style={{ 
-                  padding: '10px 18px', 
-                  fontSize: '0.78rem', 
-                  fontWeight: 700, 
-                  borderRadius: '10px', 
-                  border: '1px solid #cbd5e1', 
-                  background: '#ffffff', 
-                  color: '#475569', 
-                  cursor: 'pointer' 
-                }}
-              >
-                Abbrechen
-              </button>
-              <button
-                type="button"
-                onClick={handleResetSchool}
-                disabled={resetConfirmText !== schoolName || isResetting}
-                style={{ 
-                  padding: '10px 20px', 
-                  fontSize: '0.78rem', 
-                  fontWeight: 800, 
-                  borderRadius: '10px', 
-                  border: 'none', 
-                  background: resetConfirmText === schoolName ? '#e53e3e' : '#cbd5e1', 
-                  color: '#ffffff', 
-                  cursor: resetConfirmText === schoolName ? 'pointer' : 'not-allowed',
-                  opacity: resetConfirmText === schoolName ? 1 : 0.6,
-                  transition: 'all 0.15s'
-                }}
-              >
-                {isResetting ? 'Wird zurückgesetzt...' : 'Ja, alle Daten unwiderruflich löschen'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {selectedStudentForDetail && (
-        <Suspense fallback={null}>
-          <StudentDetailModal 
-            student={selectedStudentForDetail} 
-            onClose={() => {
-              setSelectedStudentForDetail(null);
-              fetchDashboardData();
-            }} 
-            callerDashboard="secretary"
-            activePlatform={activeTab}
-            onSwitchPlatform={(newPlatform) => {
-              setActiveTab(newPlatform);
-              if (newPlatform === 'campus') {
-                setCampusSubTab('briefing');
-              } else if (newPlatform === 'groovelab') {
-                setGroovelabSubTab('live');
-              }
-            }}
-          />
-        </Suspense>
-      )}
-      {deleteStudentModalData && (
-        <Suspense fallback={null}>
-          <ConfirmDeleteStudentModal
-            isOpen={!!deleteStudentModalData}
-            student={deleteStudentModalData}
-            activePlatform={activeTab === 'campus' ? 'campus' : activeTab === 'groovelab' ? 'groovelab' : 'all'}
-            onClose={() => setDeleteStudentModalData(null)}
-            onConfirm={async (studentId) => {
-              const sName = deleteStudentModalData?.name;
-              const res = await deleteStudentFully(studentId, {
-                activePlatform: activeTab === 'campus' ? 'campus' : activeTab === 'groovelab' ? 'groovelab' : 'all',
-                isCampusActive: deleteStudentModalData?.isCampusActive,
-                isGroovelabActive: deleteStudentModalData?.isGroovelabActive,
-                studentName: sName
-              });
-              if (!res.success) {
-                throw new Error(res.error);
-              }
-              const fName = sName ? sName.trim().split(/\s+/)[0].toLowerCase() : '';
-              setStudents((prev: any[]) => prev.filter((s: any) => {
-                if (s.id === studentId) return false;
-                if (fName && s.first_name && s.first_name.toLowerCase().trim() === fName) return false;
-                return true;
-              }));
-              await fetchDashboardData();
-            }}
-          />
-        </Suspense>
-      )}
-      {showBulkDeleteModal && (
-        <div 
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="bulk-delete-title"
-          style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(8px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '16px'
-        }}>
-          <div style={{
-            background: '#ffffff', borderRadius: '24px', width: '100%', maxWidth: '520px',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', overflow: 'hidden', border: '1px solid #e2e8f0'
-          }}>
-            {/* Header */}
-            <div style={{
-              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: 'white',
-              padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '10px', borderRadius: '12px' }}>
-                  <Trash2 size={22} color="white" />
-                </div>
-                <div>
-                  <h3 id="bulk-delete-title" style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, fontFamily: 'Urbanist' }}>
-                    Mehrere Schüler löschen ({selectedStudentIds.length})
-                  </h3>
-                  <span style={{ fontSize: '0.78rem', opacity: 0.9 }}>Sicherheitsabfrage für Sammellöschung</span>
-                </div>
-              </div>
-              <button
-                type="button"
-                aria-label="Dialog schließen"
-                onClick={() => {
-                  setShowBulkDeleteModal(false);
-                  setBulkDeleteStep(1);
-                  setBulkDeletePin('');
-                }}
-                style={{ background: 'rgba(255, 255, 255, 0.2)', border: 'none', color: 'white', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {bulkDeleteStep === 1 ? (
-                <>
-                  <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '16px', padding: '16px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                    <AlertCircle size={20} color="#dc2626" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    <div style={{ fontSize: '0.84rem', color: '#991b1b', lineHeight: 1.5 }}>
-                      Du bist dabei, <strong>{selectedStudentIds.length} Schüler</strong> gleichzeitig zu entfernen.
-                      <br /><br />
-                      - Schüler, die <strong>nur auf dem aktuellen Modul</strong> aktiv sind, werden <strong>unwiderruflich gelöscht</strong>.
-                      <br />
-                      - Schüler, die auch auf dem <strong>anderen Modul</strong> aktiv sind, bleiben dort erhalten und werden hier nur deaktiviert.
-                    </div>
-                  </div>
-
-                  <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '10px 14px', background: '#f8fafc' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Ausgewählte Schüler ({selectedStudentIds.length}):
-                    </span>
-                    <ul style={{ margin: '8px 0 0 0', paddingLeft: '18px', fontSize: '0.84rem', color: '#1e293b', lineHeight: 1.6 }}>
-                      {students.filter((s: any) => selectedStudentIds.includes(s.id)).map((s: any) => (
-                        <li key={s.id}>
-                          <strong>{s.first_name} {maskLastName(s.last_name, showRealNames)}</strong> {s.instrument ? `(${s.instrument})` : ''}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setShowBulkDeleteModal(false)}
-                      style={{ padding: '10px 18px', borderRadius: '12px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#475569', fontWeight: 700, cursor: 'pointer' }}
-                    >
-                      Abbrechen
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setBulkDeleteStep(2)}
-                      style={{ padding: '10px 20px', borderRadius: '12px', border: 'none', background: '#dc2626', color: '#ffffff', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
-                    >
-                      Weiter zur Sicherheits-PIN <ChevronRight size={16} />
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
-                    <div style={{ fontWeight: 900, color: '#991b1b', fontSize: '0.95rem', marginBottom: '6px' }}>
-                      Zweite Sicherheitsstufe: PIN-Bestätigung
-                    </div>
-                    <p style={{ margin: 0, fontSize: '0.82rem', color: '#7f1d1d' }}>
-                      Gib den 3-stelligen Sicherheitscode <strong>489</strong> ein, um das Löschen der {selectedStudentIds.length} Schüler zu bestätigen.
-                    </p>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                    <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Sicherheits-PIN (489)
-                    </label>
-                    <input
-                      type="text"
-                      maxLength={3}
-                      placeholder="489"
-                      value={bulkDeletePin}
-                      onChange={(e) => setBulkDeletePin(e.target.value)}
-                      style={{
-                        width: '120px', textAlign: 'center', fontSize: '1.8rem', fontWeight: 900,
-                        letterSpacing: '0.2em', padding: '8px', borderRadius: '12px', border: '2px solid #ef4444', outline: 'none'
-                      }}
-                    />
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setBulkDeleteStep(1)}
-                      style={{ padding: '10px 18px', borderRadius: '12px', border: '1px solid #cbd5e1', background: '#ffffff', color: '#475569', fontWeight: 700, cursor: 'pointer' }}
-                    >
-                      Zurück
-                    </button>
-                    <button
-                      type="button"
-                      disabled={bulkDeletePin !== '489' || isBulkDeleting}
-                      onClick={async () => {
-                        setIsBulkDeleting(true);
-                        try {
-                          const currentPlatform = activeTab === 'campus' ? 'campus' : activeTab === 'groovelab' ? 'groovelab' : 'all';
-                          for (const studentId of selectedStudentIds) {
-                            const studentObj = students.find((s: any) => s.id === studentId);
-                            await deleteStudentFully(studentId, {
-                              activePlatform: currentPlatform,
-                              isCampusActive: studentObj?.is_campus_active,
-                              isGroovelabActive: studentObj?.is_groovelab_active
-                            });
-                          }
-                          const deletedIds = [...selectedStudentIds];
-                          setSelectedStudentIds([]);
-                          setShowBulkDeleteModal(false);
-                          setBulkDeleteStep(1);
-                          setBulkDeletePin('');
-                          setStudents((prev: any[]) => prev.filter((s: any) => !deletedIds.includes(s.id)));
-                          fetchDashboardData();
-                        } catch (err: any) {
-                          alert('Fehler beim Löschen: ' + err.message);
-                        } finally {
-                          setIsBulkDeleting(false);
-                        }
-                      }}
-                      style={{
-                        padding: '10px 20px', borderRadius: '12px', border: 'none',
-                        background: bulkDeletePin === '489' && !isBulkDeleting ? '#dc2626' : '#cbd5e1',
-                        color: '#ffffff', fontWeight: 900, cursor: bulkDeletePin === '489' && !isBulkDeleting ? 'pointer' : 'not-allowed',
-                        display: 'flex', alignItems: 'center', gap: '8px'
-                      }}
-                    >
-                      {isBulkDeleting ? 'Lösche...' : `Unwiderruflich ${selectedStudentIds.length} Schüler löschen`}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-      {selectedCoachProfile && (
-        <Suspense fallback={null}>
-          <TeacherDetailModal
-            teacher={selectedCoachProfile}
-            onClose={() => setSelectedCoachProfile(null)}
-          />
-        </Suspense>
-      )}
-      {manageTeacher && (
-        <TeacherManagementModal
-          teacher={manageTeacher}
+      <Suspense fallback={null}>
+        <SecretaryOperationsModalsHub
+          showLogbookModal={showLogbookModal}
+          setShowLogbookModal={setShowLogbookModal}
+          logbookBookings={logbookBookings}
+          editingLogbookBookingId={editingLogbookBookingId}
+          setEditingLogbookBookingId={setEditingLogbookBookingId}
+          editBookingTitle={editBookingTitle}
+          setEditBookingTitle={setEditBookingTitle}
+          editBookingRoomId={editBookingRoomId}
+          setEditBookingRoomId={setEditBookingRoomId}
+          editBookingDate={editBookingDate}
+          setEditBookingDate={setEditBookingDate}
+          editBookingStartTime={editBookingStartTime}
+          setEditBookingStartTime={setEditBookingStartTime}
+          editBookingEndTime={editBookingEndTime}
+          setEditBookingEndTime={setEditBookingEndTime}
+          rooms={rooms}
+          handleConfirmLogbookBooking={handleConfirmLogbookBooking}
+          handleUpdateLogbookBooking={handleUpdateLogbookBooking}
+          handleDeleteLogbookBooking={handleDeleteLogbookBooking}
+          showTrialLogModal={showTrialLogModal}
+          setShowTrialLogModal={setShowTrialLogModal}
+          trialLogsLoading={trialLogsLoading}
+          trialLogs={trialLogs}
+          userMap={userMap}
+          showResetModal={showResetModal}
+          setShowResetModal={setShowResetModal}
+          resetConfirmText={resetConfirmText}
+          setResetConfirmText={setResetConfirmText}
+          schoolName={schoolName}
+          handleResetSchool={handleResetSchool}
+          isResetting={isResetting}
+          showBulkDeleteModal={showBulkDeleteModal}
+          setShowBulkDeleteModal={setShowBulkDeleteModal}
+          bulkDeleteStep={bulkDeleteStep}
+          setBulkDeleteStep={setBulkDeleteStep}
+          bulkDeletePin={bulkDeletePin}
+          setBulkDeletePin={setBulkDeletePin}
+          selectedStudentIds={selectedStudentIds}
+          setSelectedStudentIds={setSelectedStudentIds}
+          students={students}
+          setStudents={setStudents}
+          showRealNames={showRealNames}
+          activeTab={activeTab}
+          fetchDashboardData={fetchDashboardData}
+        />
+      </Suspense>
+      {/* 👤 Bounded Context: User Detail, Management & Context Menu Modals Hub */}
+      <Suspense fallback={null}>
+        <SecretaryUserDetailModalsHub
+          selectedStudentForDetail={selectedStudentForDetail}
+          setSelectedStudentForDetail={setSelectedStudentForDetail}
+          deleteStudentModalData={deleteStudentModalData}
+          setDeleteStudentModalData={setDeleteStudentModalData}
+          setStudents={setStudents}
+          selectedCoachProfile={selectedCoachProfile}
+          setSelectedCoachProfile={setSelectedCoachProfile}
+          manageTeacher={manageTeacher}
+          setManageTeacher={setManageTeacher}
           schoolName={schoolName}
           schoolId={schoolId}
           activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          setCampusSubTab={setCampusSubTab}
+          setGroovelabSubTab={setGroovelabSubTab}
           students={students}
           bands={bands}
           activeSubjectsList={activeSubjectsList}
-          onClose={() => setManageTeacher(null)}
-          onSave={async (updatedData) => {
-            await handleUpdateTeacher(updatedData);
-          }}
-          onDelete={async (teacherId) => {
-            await handleDeleteUser(teacherId);
-          }}
-          onRevokeSessions={async (teacherId) => {
-            await supabase.rpc("revoke_user_sessions", { p_user_id: teacherId });
-          }}
-          onOpenQrModal={(user) => {
-            setQrModalUser({
-              ...user,
-              first_name: user.firstName || user.first_name,
-              last_name: user.lastName || user.last_name,
-              role: user.role || "teacher",
-              qr_token: user.teacherQrToken || user.ausweisNummer || user.id,
-              teacher_qr_token: user.teacherQrToken || user.ausweisNummer || user.id,
-              ausweis_nummer: user.ausweisNummer || user.ausweis_nummer,
-              is_campus_active: user.isCampusActive,
-              is_groovelab_active: user.isGroovelabActive
-            });
-          }}
-          downloadQRCode={downloadQRCode}
+          handleUpdateTeacher={handleUpdateTeacher}
+          handleDeleteUser={handleDeleteUser}
+          setQrModalUser={setQrModalUser}
           generateStarterPin={generateStarterPin}
+          showUnassignedWarning={showUnassignedWarning}
+          setShowUnassignedWarning={setShowUnassignedWarning}
+          matrixAllocations={matrixAllocations}
+          handleSaveAndApproveAll={handleSaveAndApproveAll}
+          activeContextMenu={activeContextMenu}
+          setActiveContextMenu={setActiveContextMenu}
+          handleDeleteStudentCampus={handleDeleteStudentCampus}
+          fetchDashboardData={fetchDashboardData}
         />
-      )}
+      </Suspense>
 
       {/* 💳 Bounded Context: Billing, Licenses & Infrastructure Modals Hub */}
       <Suspense fallback={null}>
@@ -12283,248 +9392,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         </button>
       )}
 
-      {/* ─── Unassigned-Warning Modal ─── */}
-      {showUnassignedWarning && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
-          <div 
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="unassigned-warning-title"
-            style={{ background: 'white', borderRadius: '20px', padding: '28px 28px 22px', maxWidth: 380, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', textAlign: 'center' }}>
-            <div style={{ fontSize: '2.4rem', marginBottom: 10 }} aria-hidden="true">⚠️</div>
-            <h3 id="unassigned-warning-title" style={{ margin: '0 0 8px', fontSize: '1.05rem', fontWeight: 800, color: '#1e293b' }}>Nicht alle Räume zugewiesen</h3>
-            <p style={{ margin: '0 0 20px', fontSize: '0.88rem', color: '#64748b', lineHeight: 1.5 }}>
-              Es gibt noch {matrixAllocations.filter(p => !p.roomId).length} Lehrkraft-Tag-Kombination(en) ohne Raumzuweisung. Diese werden <strong>nicht freigegeben</strong>.
-            </p>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-              <button
-                onClick={() => setShowUnassignedWarning(false)}
-                style={{ flex: 1, padding: '10px 16px', borderRadius: '12px', border: '1.5px solid #e2e8f0', background: 'white', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', color: '#64748b' }}
-              >
-                Abbrechen
-              </button>
-              <button
-                onClick={() => { setShowUnassignedWarning(false); handleSaveAndApproveAll(true); }}
-                style={{ flex: 1.2, padding: '10px 16px', borderRadius: '12px', border: 'none', background: 'linear-gradient(135deg, #34a853, #22c55e)', color: 'white', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', boxShadow: '0 2px 8px rgba(52,168,83,0.3)' }}
-              >
-                Trotzdem freigeben
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Floating Active Context Menu (3-Dots Menu) */}
-      {activeContextMenu && activeContextMenu.student && (
-        <>
-          <div 
-            role="presentation"
-            aria-hidden="true"
-            onClick={() => setActiveContextMenu(null)}
-            style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'transparent' }}
-          />
-          <div 
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              position: 'fixed',
-              top: `${activeContextMenu.top}px`,
-              right: `${activeContextMenu.right}px`,
-              width: '220px',
-              background: '#ffffff',
-              borderRadius: '12px',
-              boxShadow: '0 10px 30px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-              border: '1px solid #e2e8f0',
-              padding: '6px',
-              zIndex: 9999,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '2px'
-            }}
-          >
-            {/* PIN Display if available */}
-            {activeContextMenu.student.is_app_user && (
-              <div style={{ 
-                padding: '6px 10px', 
-                fontSize: '0.74rem', 
-                color: '#64748b', 
-                background: '#f8fafc', 
-                borderRadius: '8px',
-                fontFamily: 'monospace',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '4px'
-              }}>
-                <span>Login-PIN:</span>
-                <strong style={{ color: '#0f172a', fontSize: '0.84rem' }}>{activeContextMenu.student.ausweis_nummer || 'Keine'}</strong>
-              </div>
-            )}
-
-            {/* PIN Reset */}
-            <button
-              type="button"
-              onClick={async () => {
-                const s = activeContextMenu.student;
-                setActiveContextMenu(null);
-                const sName = `${s.first_name || ''} ${s.last_name || ''}`.trim() || 'diesem Schüler';
-                if (!window.confirm(`PIN von ${sName} zurücksetzen?\n\nDer Schüler wird beim nächsten App-Aufruf dazu aufgefordert, seinen Geburtstagstag zu bestätigen und eine neue 4-stellige PIN zu vergeben.`)) {
-                  return;
-                }
-                try {
-                  await supabase.from('activation_days').delete().eq('student_id', s.id);
-                  const userResetPayload: any = { 
-                    onboarding_pin: null, 
-                    personal_pin: null,
-                    parent_pin: null,
-                    is_pin_activated: false,
-                    status: 'offen' 
-                  };
-                  try {
-                    await supabase.from('users').update(userResetPayload).eq('id', s.id);
-                  } catch (e) {}
-                  const { error: userResetErr } = await supabase.from('users').update(userResetPayload).eq('id', s.id);
-                  if (userResetErr && userResetErr.message?.includes('onboarding_pin')) {
-                    delete userResetPayload.onboarding_pin;
-                    await supabase.from('users').update(userResetPayload).eq('id', s.id);
-                  }
-                  await supabase.from('students').update({ onboarding_pin: null, is_pin_activated: false, status: 'offen' }).eq('id', s.id);
-                  await supabase.from('pending_students').update({ is_pin_activated: false, status: 'offen' }).eq('id', s.id);
-                  fetchDashboardData();
-                  alert(`PIN von ${sName} wurde zurückgesetzt.`);
-                } catch (err: any) {
-                  alert("Fehler beim Zurücksetzen der PIN: " + err.message);
-                }
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 10px',
-                borderRadius: '8px',
-                border: 'none',
-                background: 'transparent',
-                color: '#334155',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                width: '100%',
-                textAlign: 'left'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-            >
-              <Key size={14} color="#b45309" />
-              <span>PIN zurücksetzen</span>
-            </button>
-
-            {/* Geburtstagstag Selector */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '6px 10px',
-              borderRadius: '8px',
-              background: '#f8fafc'
-            }}>
-              <span style={{ fontSize: '0.76rem', fontWeight: 600, color: '#475569' }}>Geburtstagstag:</span>
-              <select
-                value={activeContextMenu.student.day_of_birth || 1}
-                onChange={async (e) => {
-                  const newDay = parseInt(e.target.value, 10);
-                  const s = activeContextMenu.student;
-                  try {
-                    const { data: existing } = await supabase
-                      .from('activation_days')
-                      .select('student_id')
-                      .eq('student_id', s.id)
-                      .maybeSingle();
-
-                    if (existing) {
-                      const { error: err } = await supabase
-                        .from('activation_days')
-                        .update({ day_of_birth: newDay })
-                        .eq('student_id', s.id);
-                      if (err) throw err;
-                    } else {
-                      const { error: err } = await supabase
-                        .from('activation_days')
-                        .insert({ student_id: s.id, day_of_birth: newDay });
-                      if (err) throw err;
-                    }
-
-                    if (s.isPendingOnboarding) {
-                      await supabase
-                        .from('pending_students')
-                        .update({ day_of_birth: newDay })
-                        .eq('id', s.id);
-                    }
-
-                    fetchDashboardData();
-                  } catch (err: any) {
-                    console.error("Fehler beim Ändern des Geburtstagstags:", err);
-                    alert("Fehler beim Ändern des Geburtstagstags: " + err.message);
-                  }
-                }}
-                style={{
-                  fontSize: '0.76rem',
-                  fontWeight: 700,
-                  color: '#0f172a',
-                  background: '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '6px',
-                  padding: '2px 6px',
-                  cursor: 'pointer'
-                }}
-              >
-                {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
-                  <option key={d} value={d}>
-                    Tag {d}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ height: '1px', background: '#f1f5f9', margin: '4px 0' }} />
-
-            {/* Delete Student */}
-            <button
-              type="button"
-              onClick={() => {
-                const s = activeContextMenu.student;
-                setActiveContextMenu(null);
-                handleDeleteStudentCampus(
-                  s.id, 
-                  `${s.first_name || ''} ${s.last_name || ''}`.trim(),
-                  s.instrument,
-                  s.teacher_id,
-                  s.is_campus_active,
-                  s.is_groovelab_active
-                );
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '8px 10px',
-                borderRadius: '8px',
-                border: 'none',
-                background: '#fef2f2',
-                color: '#dc2626',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                width: '100%',
-                textAlign: 'left'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = '#fee2e2'}
-              onMouseLeave={(e) => e.currentTarget.style.background = '#fef2f2'}
-            >
-              <Trash2 size={14} color="#dc2626" />
-              <span>Schüler löschen</span>
-            </button>
-          </div>
-        </>
-      )}
 
       {/* ─── Apple Glass Mobile Bottom Navigation for Administration & Secretariat ─── */}
       <Suspense fallback={null}>

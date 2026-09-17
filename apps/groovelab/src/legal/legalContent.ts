@@ -3,7 +3,66 @@
 // Standards: OWASP ASVS Level 3 / Art. 7, 8, 28 DSGVO / § 307 BGB / § 1631 BGB
 // ==============================================================================
 
-export const ACTIVE_LEGAL_VERSION = '2026.2';
+export interface LegalChangelog {
+  version: string;
+  title: string;
+  date: string;
+  highlights: string[];
+}
+
+export interface LegalReleaseConfig {
+  activeVersion: string;
+  minimumEnforcedVersion: string;
+  changelogs: Record<string, LegalChangelog>;
+}
+
+export const LEGAL_RELEASE_CONFIG: LegalReleaseConfig = {
+  activeVersion: '2026.2',
+  minimumEnforcedVersion: '2026.1', // 🛡️ 2026.1 remains legally valid and compliant; no forced lockout for existing teachers
+  changelogs: {
+    '2026.2': {
+      version: '2026.2',
+      title: 'Präzisierung Didaktik & Urheberschutz',
+      date: '13.09.2026',
+      highlights: [
+        'Ausdrücklicher Urheberschutz an eigenen Audio-Loops und Notizen (§ 3 Abs. 2 Didaktik-Kodex)',
+        'Stärkung der pädagogischen Autonomie & des didaktischen Assistenz-Prinzips (§ 1)',
+        'Klarstellung des Botenstatus in der Terminkommunikation (§ 4)'
+      ]
+    },
+    '2026.1': {
+      version: '2026.1',
+      title: 'Initiales Enterprise Legal Framework',
+      date: '07.09.2026',
+      highlights: [
+        'B2B Auftragsverarbeitungsvertrag gem. Art. 28 DSGVO (ISO 27001 RZ Hetzner Falkenstein/Nürnberg)',
+        'Dienstliche Nutzungsvereinbarung & Didaktik-Kodex für Lehrkräfte gem. § 1631 BGB',
+        'DSGVO-Minderjährigenschutz und Botenmodell im Schülerbereich'
+      ]
+    }
+  }
+};
+
+export const ACTIVE_LEGAL_VERSION = LEGAL_RELEASE_CONFIG.activeVersion;
+export const MINIMUM_ENFORCED_VERSION = LEGAL_RELEASE_CONFIG.minimumEnforcedVersion;
+
+/**
+ * Compares two version strings (e.g. '2026.2' vs '2026.1').
+ * Returns true if vCandidate is at least vTarget (>=).
+ */
+export function isVersionAtLeast(vCandidate: string, vTarget: string): boolean {
+  if (!vCandidate || !vTarget) return false;
+  if (vCandidate === vTarget) return true;
+  const parse = (v: string) => v.split('.').map(n => parseInt(n, 10) || 0);
+  const [cMaj, cMin = 0] = parse(vCandidate);
+  const [tMaj, tMin = 0] = parse(vTarget);
+  if (cMaj !== tMaj) return cMaj > tMaj;
+  return cMin >= tMin;
+}
+
+export function getLegalChangelog(version: string): LegalChangelog | null {
+  return LEGAL_RELEASE_CONFIG.changelogs[version] || null;
+}
 
 export interface LegalDocumentDefinition {
   type: 'terms_b2b_avv' | 'terms_teacher_conduct' | 'terms_student_platform' | 'consent_media_audio';

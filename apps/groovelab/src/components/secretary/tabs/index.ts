@@ -22,3 +22,4 @@ export * from '../SecretaryGeneralModalsHub';
 export * from '../SecretaryMobileNavigation';
 export * from './SecretaryGroovelabTab';
 export * from './SecretaryCampusTab';
+export * from './SecretaryVerwaltungTab';

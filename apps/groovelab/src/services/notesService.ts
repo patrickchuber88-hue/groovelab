@@ -44,6 +44,18 @@ const DB_VERSION = 1;
 const STORE_NAME = 'user_notes';
 const BROADCAST_CHANNEL_NAME = 'campus_notes_sync_channel';
 
+export interface NotesSyncEvent {
+  type: string;
+  noteId?: string;
+  timestamp: number;
+  schoolId?: number | string;
+  roomId?: string | null;
+  note?: Partial<UserNote>;
+}
+
+// 🏛️ Same-Window 0ms In-Memory Event Bus
+const inMemoryListeners = new Set<(event: NotesSyncEvent) => void>();
+
 // Multi-Tab Sync Broadcast Channel
 let broadcastChannel: BroadcastChannel | null = null;
 if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
@@ -350,21 +362,86 @@ export const syncNotePageToProtocolMatrix = async (params: {
 };
 
 export const notesService = {
-  // Subscribe to multi-tab note updates
-  onSync(callback: (event: { type: string; noteId?: string; timestamp: number }) => void) {
-    if (!broadcastChannel) return () => {};
-    const handler = (event: MessageEvent) => {
-      if (event.data) callback(event.data);
+  // Subscribe to multi-tab and same-window note updates
+  onSync(callback: (event: NotesSyncEvent) => void) {
+    inMemoryListeners.add(callback);
+    let handler: ((event: MessageEvent) => void) | null = null;
+    if (broadcastChannel) {
+      handler = (event: MessageEvent) => {
+        if (event.data) callback(event.data);
+      };
+      broadcastChannel.addEventListener('message', handler);
+    }
+    return () => {
+      inMemoryListeners.delete(callback);
+      if (broadcastChannel && handler) {
+        broadcastChannel.removeEventListener('message', handler);
+      }
     };
-    broadcastChannel.addEventListener('message', handler);
-    return () => broadcastChannel?.removeEventListener('message', handler);
   },
 
-  // Notify other tabs
-  notifySync(type: string, noteId?: string) {
+  // Schulweiter Supabase Realtime Broadcast Listener
+  subscribeSchoolRealtime(schoolId: number | string, onEvent?: (event: NotesSyncEvent) => void) {
+    if (!schoolId) return () => {};
+    const channelName = `realtime_notes_${schoolId}`;
+    const channel = supabase.channel(channelName);
+    
+    channel.on('broadcast', { event: 'NOTE_SYNC' }, ({ payload }: { payload: NotesSyncEvent }) => {
+      if (payload) {
+        if (onEvent) {
+          try { onEvent(payload); } catch (e) {}
+        }
+        inMemoryListeners.forEach(listener => {
+          try { listener(payload); } catch (e) {}
+        });
+      }
+    }).subscribe();
+
+    return () => {
+      try {
+        supabase.removeChannel(channel);
+      } catch (e) {}
+    };
+  },
+
+  // Notify other tabs, same-window listeners, and school realtime
+  notifySync(type: string, noteId?: string, extra?: { schoolId?: number | string; roomId?: string | null; note?: Partial<UserNote> }) {
+    const payload: NotesSyncEvent = {
+      type,
+      noteId,
+      timestamp: Date.now(),
+      schoolId: extra?.schoolId,
+      roomId: extra?.roomId,
+      note: extra?.note
+    };
+
+    // 1. Same-Window 0ms Instant Dispatch
+    inMemoryListeners.forEach(listener => {
+      try {
+        listener(payload);
+      } catch (err) {
+        console.warn('[notesService] Error in local sync listener:', err);
+      }
+    });
+
+    // 2. Cross-Tab Local BroadcastChannel
     try {
-      broadcastChannel?.postMessage({ type, noteId, timestamp: Date.now() });
+      broadcastChannel?.postMessage(payload);
     } catch (e) {}
+
+    // 3. Cross-Device / Multi-User Supabase Realtime Broadcast
+    const effectiveSchoolId = extra?.schoolId;
+    if (effectiveSchoolId) {
+      try {
+        const channelName = `realtime_notes_${effectiveSchoolId}`;
+        const channel = supabase.channel(channelName);
+        channel.send({
+          type: 'broadcast',
+          event: 'NOTE_SYNC',
+          payload
+        }).catch(() => {});
+      } catch (e) {}
+    }
   },
 
   // Get notes from IndexedDB (0ms Fast Cache)
@@ -419,7 +496,7 @@ export const notesService = {
       }
       localStorage.setItem(getLocalNotesKey(note.user_id), JSON.stringify(notes));
     }
-    this.notifySync('NOTE_UPSERTED', note.id);
+    this.notifySync('NOTE_UPSERTED', note.id, { schoolId: note.school_id, roomId: note.room_id, note });
   },
 
   // Delete locally
@@ -682,7 +759,7 @@ export const notesService = {
   },
 
   // Resolve / Mark room issue as completed permanently across Supabase, IndexedDB & LocalStorage
-  async resolveRoomIssue(noteId: string, resolvedBy: 'teacher' | 'secretary' | 'admin' = 'secretary'): Promise<void> {
+  async resolveRoomIssue(noteId: string, resolvedBy: 'teacher' | 'secretary' | 'admin' = 'secretary', schoolId?: number | string): Promise<void> {
     const nowIso = new Date().toISOString();
     const patch = {
       is_completed: true,
@@ -749,7 +826,142 @@ export const notesService = {
       }
     } catch (e) {}
 
-    this.notifySync('NOTE_UPSERTED', noteId);
+    this.notifySync('NOTE_UPSERTED', noteId, { schoolId });
+  },
+
+  // 🏛️ 1% Goldstandard: Mangel wiedereröffnen (Reopen)
+  async reopenRoomIssue(noteId: string, schoolId?: number | string): Promise<void> {
+    const nowIso = new Date().toISOString();
+    const patch = {
+      is_completed: false,
+      is_acknowledged: false,
+      acknowledged_at: null,
+      resolved_by: null,
+      updated_at: nowIso
+    };
+
+    // 1. Remove from LocalStorage persistent resolved registry
+    try {
+      const raw = localStorage.getItem('campus_resolved_room_issues');
+      if (raw) {
+        const resolved: string[] = JSON.parse(raw);
+        const filtered = resolved.filter(id => id !== noteId);
+        localStorage.setItem('campus_resolved_room_issues', JSON.stringify(filtered));
+      }
+    } catch (e) {}
+
+    // 2. Update Supabase Database
+    try {
+      await supabase
+        .from('user_notes')
+        .update(patch)
+        .eq('id', noteId);
+    } catch (e) {
+      console.warn('Supabase reopen update notice:', e);
+    }
+
+    // 3. Update IndexedDB
+    try {
+      const db = await openNotesDB();
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.get(noteId);
+      req.onsuccess = () => {
+        if (req.result) {
+          store.put({ ...req.result, ...patch });
+        }
+      };
+    } catch (e) {}
+
+    // 4. Update all local note caches in LocalStorage
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('campus_groovelab_notes_')) {
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            const notes: UserNote[] = JSON.parse(raw);
+            let changed = false;
+            const updated = notes.map(n => {
+              if (n.id === noteId) {
+                changed = true;
+                return { ...n, ...patch };
+              }
+              return n;
+            });
+            if (changed) {
+              localStorage.setItem(key, JSON.stringify(updated));
+            }
+          }
+        }
+      }
+    } catch (e) {}
+
+    this.notifySync('NOTE_UPSERTED', noteId, { schoolId });
+  },
+
+  // 🏛️ 1% Goldstandard: Nachträgliche Raumkorrektur für einen gemeldeten Mangel
+  async updateNoteRoom(noteId: string, newRoomId: string, schoolId?: number | string): Promise<void> {
+    const cleanRoom = newRoomId.trim();
+    if (!cleanRoom) return;
+    const nowIso = new Date().toISOString();
+    const patch: Partial<UserNote> = {
+      room_id: cleanRoom,
+      updated_at: nowIso
+    };
+
+    // 1. Update in IndexedDB
+    try {
+      const db = await openNotesDB();
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.get(noteId);
+      req.onsuccess = () => {
+        if (req.result) {
+          const existing = req.result as UserNote;
+          const oldTags = (existing.tags || []).filter(t => !/^(#|!)raum/i.test(t));
+          const newTags = [...oldTags, `#${cleanRoom}`];
+          store.put({ ...existing, ...patch, tags: newTags });
+        }
+      };
+    } catch (e) {}
+
+    // 2. Update LocalStorage caches
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('campus_groovelab_notes_')) {
+            const raw = localStorage.getItem(key);
+            if (raw) {
+              const notes: UserNote[] = JSON.parse(raw);
+              let changed = false;
+              const updated = notes.map(n => {
+                if (n.id === noteId) {
+                  changed = true;
+                  const oldTags = (n.tags || []).filter(t => !/^(#|!)raum/i.test(t));
+                  return { ...n, ...patch, tags: [...oldTags, `#${cleanRoom}`] };
+                }
+                return n;
+              });
+              if (changed) {
+                localStorage.setItem(key, JSON.stringify(updated));
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {}
+
+    // 3. Update Supabase
+    try {
+      await supabase
+        .from('user_notes')
+        .update(patch)
+        .eq('id', noteId);
+    } catch (e) {}
+
+    this.notifySync('NOTE_UPSERTED', noteId, { schoolId, roomId: cleanRoom });
   },
 
   // Dismiss room issue ONLY from teacher's personal focus list without closing the ticket in secretariat

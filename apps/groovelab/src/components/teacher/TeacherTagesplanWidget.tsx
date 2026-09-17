@@ -1,7 +1,7 @@
 import { formatCleanNoteContent } from '../notes/notesConstants';
 import React, { useState, useRef } from 'react';
 import {
-  CalendarX, Check, Clock, Coffee, DoorOpen, Eye, EyeOff,
+  CalendarX, Check, ChevronDown, Clock, Coffee, DoorOpen, Eye, EyeOff,
   HelpCircle, MessageSquare, Mic, Sparkles, Users
 } from 'lucide-react';
 import { maskLastName, formatSingleStudentAnonymized } from '../../utils/nameHelper';
@@ -363,6 +363,8 @@ export interface TeacherTagesplanRoomIssuesBannerProps {
   getIssueRoomLabel: (issue: any, fallback?: any) => string;
   teacher?: any;
   userId?: string;
+  rooms?: any[];
+  handleUpdateIssueRoom?: (issueId: string, newRoom: string) => Promise<void> | void;
 }
 
 export const TeacherTagesplanRoomIssuesBanner: React.FC<TeacherTagesplanRoomIssuesBannerProps> = ({
@@ -373,7 +375,32 @@ export const TeacherTagesplanRoomIssuesBanner: React.FC<TeacherTagesplanRoomIssu
   getIssueRoomLabel,
   teacher,
   userId,
+  rooms = [],
+  handleUpdateIssueRoom,
 }) => {
+    const [changeRoomIssueId, setChangeRoomIssueId] = useState<string | null>(null);
+
+    // List of all selectable rooms for post-submit correction
+    const allRoomsList = React.useMemo(() => {
+      const set = new Set<string>();
+      if (teacherTodayRooms && teacherTodayRooms.length > 0) {
+        teacherTodayRooms.forEach(r => { if (r && typeof r === 'string' && r.trim()) set.add(r.trim()); });
+      }
+      if (rooms && rooms.length > 0) {
+        rooms.forEach((r: any) => {
+          const raw = r.name || r.id;
+          if (raw) {
+            const cleaned = String(raw).replace(/^#\d+\s*[-:]*\s*/, '').trim();
+            if (cleaned && cleaned !== 'Unbenannter Raum') set.add(cleaned);
+          }
+        });
+      }
+      if (set.size === 0) {
+        ['Raum 1', 'Raum 2', 'Raum 3', 'Raum 4', 'Raum 5', 'Saal', 'Studio'].forEach(r => set.add(r));
+      }
+      return Array.from(set);
+    }, [teacherTodayRooms, rooms]);
+
     if (relevantRoomIssuesToday.length === 0) return null;
 
     return (
@@ -381,18 +408,26 @@ export const TeacherTagesplanRoomIssuesBanner: React.FC<TeacherTagesplanRoomIssu
         style={{
           width: '100%',
           padding: isDesktop ? '10px 16px' : '10px 14px',
-          background: 'rgba(254, 242, 242, 0.85)',
+          background: 'rgba(254, 242, 242, 0.88)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid rgba(239, 68, 68, 0.2)',
+          border: '1px solid rgba(239, 68, 68, 0.22)',
           borderRadius: '18px',
-          boxShadow: '0 4px 20px -4px rgba(220, 38, 38, 0.08), 0 1px 3px rgba(0, 0, 0, 0.02)',
+          boxShadow: '0 4px 20px -4px rgba(220, 38, 38, 0.12), 0 1px 3px rgba(0, 0, 0, 0.02)',
           display: 'flex',
           flexDirection: 'column',
           gap: '8px',
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
+          animation: 'campusIssuePulse 1.2s ease-out'
         }}
       >
+        <style>{`
+          @keyframes campusIssuePulse {
+            0% { transform: scale(0.985); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.45); }
+            70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+            100% { transform: scale(1); box-shadow: 0 4px 20px -4px rgba(220, 38, 38, 0.12); }
+          }
+        `}</style>
         {relevantRoomIssuesToday.map(issue => {
           const isMyReport = issue.user_id === (teacher?.id || userId);
           const authorDisplay = isMyReport 
@@ -430,16 +465,90 @@ export const TeacherTagesplanRoomIssuesBanner: React.FC<TeacherTagesplanRoomIssu
                   <DoorOpen size={13} color="#dc2626" />
                 </div>
 
-                {/* Room Pill */}
-                <span style={{
-                  fontSize: '0.74rem',
-                  fontWeight: 800,
-                  color: '#991b1b',
-                  letterSpacing: '-0.01em',
-                  flexShrink: 0
-                }}>
-                  {roomLabel}
-                </span>
+                {/* 📍 1% Goldstandard: Klickbare Room Pill zur nachträglichen Raumkorrektur */}
+                <div style={{ position: 'relative' }}>
+                  <button
+                    type="button"
+                    onClick={() => setChangeRoomIssueId(prev => prev === issue.id ? null : issue.id)}
+                    title={`Raum ${roomLabel} (Klicken zum Ändern)`}
+                    aria-label={`Raum ${roomLabel}. Klicken, um Mangel einem anderen Raum zuzuweisen`}
+                    style={{
+                      background: 'rgba(239, 68, 68, 0.12)',
+                      border: '1px solid rgba(239, 68, 68, 0.25)',
+                      borderRadius: '6px',
+                      padding: '2px 7px',
+                      fontSize: '0.74rem',
+                      fontWeight: 800,
+                      color: '#991b1b',
+                      letterSpacing: '-0.01em',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      flexShrink: 0,
+                      transition: 'all 0.12s ease'
+                    }}
+                    className="hover-scale-mini"
+                  >
+                    <span>{roomLabel}</span>
+                    <ChevronDown size={10} color="#dc2626" />
+                  </button>
+
+                  {changeRoomIssueId === issue.id && (
+                    <div 
+                      style={{
+                        position: 'absolute',
+                        top: '26px',
+                        left: 0,
+                        background: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '12px',
+                        boxShadow: '0 12px 30px rgba(0,0,0,0.18)',
+                        padding: '6px',
+                        zIndex: 10000,
+                        minWidth: '190px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '3px',
+                        maxHeight: '220px',
+                        overflowY: 'auto'
+                      }}
+                    >
+                      <div style={{ fontSize: '0.64rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', padding: '3px 6px' }}>
+                        Mangel verschieben nach:
+                      </div>
+                      {allRoomsList.map(rName => (
+                        <button
+                          key={`change-room-${rName}`}
+                          type="button"
+                          onClick={() => {
+                            if (handleUpdateIssueRoom) {
+                              handleUpdateIssueRoom(issue.id, rName);
+                            }
+                            setChangeRoomIssueId(null);
+                          }}
+                          style={{
+                            textAlign: 'left',
+                            background: rName === roomLabel ? '#fee2e2' : '#f8fafc',
+                            border: rName === roomLabel ? '1px solid #fca5a5' : '1px solid #e2e8f0',
+                            borderRadius: '6px',
+                            padding: '5px 8px',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            color: rName === roomLabel ? '#991b1b' : '#1e293b',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between'
+                          }}
+                        >
+                          <span>📍 {rName}</span>
+                          {rName === roomLabel && <Check size={12} color="#dc2626" />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 <span style={{ color: '#fca5a5', fontSize: '0.74rem', flexShrink: 0 }}>•</span>
 

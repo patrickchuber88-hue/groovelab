@@ -90,6 +90,8 @@ interface BriefingNotesCardProps {
   allStudents?: any[];
   todayStudents?: any[];
   rooms?: any[];
+  currentRoom?: string;
+  teacherTodayRooms?: string[];
   onOpenDrawer?: () => void;
   onOpenHomeworkModal?: (student: any) => void;
 }
@@ -101,6 +103,8 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
   allStudents = [],
   todayStudents = [],
   rooms = [],
+  currentRoom,
+  teacherTodayRooms = [],
   onOpenDrawer,
   onOpenHomeworkModal
 }) => {
@@ -125,6 +129,58 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
   } = useNotes({ user, schoolId, activeStudent });
 
   const [selectedRoomIssueNote, setSelectedRoomIssueNote] = useState<UserNote | null>(null);
+
+  // 📍 1% Goldstandard: Intelligente Raum-Vorbelegung (Kontext: Aktiver Slot / Heute belegt)
+  const initialRoom = useMemo(() => {
+    if (currentRoom && currentRoom !== 'Unbenannter Raum') return currentRoom;
+    if (teacherTodayRooms && teacherTodayRooms.length > 0 && teacherTodayRooms[0]) return teacherTodayRooms[0];
+    return 'Raum 4';
+  }, [currentRoom, teacherTodayRooms]);
+
+  const [selectedRoom, setSelectedRoom] = useState<string>(initialRoom);
+  const [showRoomPopover, setShowRoomPopover] = useState<boolean>(false);
+  const roomPopoverRef = useRef<HTMLDivElement>(null);
+
+  // Synchronisation bei Slot-Wechsel im Tagesplan
+  useEffect(() => {
+    if (currentRoom && currentRoom !== 'Unbenannter Raum') {
+      setSelectedRoom(currentRoom);
+    }
+  }, [currentRoom]);
+
+  // Klick außerhalb schließt Raum-Popover
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (roomPopoverRef.current && !roomPopoverRef.current.contains(e.target as Node)) {
+        setShowRoomPopover(false);
+      }
+    };
+    if (showRoomPopover) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showRoomPopover]);
+
+  // Liste aller verfügbaren Musikschul-Räume
+  const allAvailableRoomNames = useMemo(() => {
+    const set = new Set<string>();
+    if (teacherTodayRooms && teacherTodayRooms.length > 0) {
+      teacherTodayRooms.forEach(r => { if (r && typeof r === 'string' && r.trim()) set.add(r.trim()); });
+    }
+    if (rooms && rooms.length > 0) {
+      rooms.forEach((r: any) => {
+        const raw = r.name || r.id;
+        if (raw) {
+          const cleaned = String(raw).replace(/^#\d+\s*[-:]*\s*/, '').trim();
+          if (cleaned && cleaned !== 'Unbenannter Raum') set.add(cleaned);
+        }
+      });
+    }
+    if (set.size === 0) {
+      ['Raum 1', 'Raum 2', 'Raum 3', 'Raum 4', 'Raum 5', 'Saal', 'Studio'].forEach(r => set.add(r));
+    }
+    return Array.from(set);
+  }, [teacherTodayRooms, rooms]);
 
   const [internalRooms, setInternalRooms] = useState<any[]>([]);
   const [internalEquipment, setInternalEquipment] = useState<any[]>([]);
@@ -1200,8 +1256,8 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
       const isRoomReport = isEquipmentReport || parsedIntent?.isRoomIssue || !!parsedIntent?.detectedRoomName;
       const authorFullName = `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || 'Lehrkraft';
 
-      const finalRoom = parsedIntent?.detectedRoomName || (parsedIntent?.isRoomIssue ? 'Raum' : null);
-      const roomTag = parsedIntent?.detectedRoomName ? [`#${parsedIntent.detectedRoomName}`] : [];
+      const finalRoom = parsedIntent?.detectedRoomName || selectedRoom || (isRoomReport ? 'Raum 4' : null);
+      const roomTag = finalRoom ? [`#${finalRoom}`] : [];
 
       await createNote(textToSave || 'Audio-Memo', {
         studentId: studentToLink?.id || null,
@@ -1247,8 +1303,8 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
       }
       
       const targetLabel = parsedIntent?.detectedEquipmentName 
-        ? `${parsedIntent.detectedEquipmentName}${parsedIntent.detectedRoomName ? ` (${parsedIntent.detectedRoomName})` : ''}`
-        : parsedIntent?.detectedRoomName || 'Raum';
+        ? `${parsedIntent.detectedEquipmentName}${finalRoom ? ` (${finalRoom})` : ''}`
+        : finalRoom || 'Raum';
 
       showToast(
         isRoomReport
@@ -2051,7 +2107,7 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                 <button
                   type="button"
-                  onClick={() => handleInsertSyntax('!Raum 4: Mangel melden: ', 'room', '!Raum 4: Mangel melden: ')}
+                  onClick={() => handleInsertSyntax(`!${selectedRoom || 'Raum 4'}: Mangel melden: `, 'room', `!${selectedRoom || 'Raum 4'}: Mangel melden: `)}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -2401,6 +2457,137 @@ export const BriefingNotesCard: React.FC<BriefingNotesCardProps> = ({
               >
                 {isAutoStudentActive ? '⚡ Auto-Modus deaktivieren' : '⚡ Auto-Modus aktivieren'}
               </button>
+            </div>
+          )}
+        </div>
+
+        {/* 📍 1% Goldstandard: Apple Squircle Raum-Chip mit 1-Tap Schnellauswahl */}
+        <div ref={roomPopoverRef} style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={() => setShowRoomPopover(prev => !prev)}
+            title={`Raum für Mängel & Notizen: ${selectedRoom} (Klicken zum Wechseln)`}
+            aria-label={`Aktueller Raum ${selectedRoom}. Klicken zum Wechseln`}
+            style={{
+              height: '32px',
+              padding: '0 9px',
+              borderRadius: '8px',
+              border: parsedIntent?.isRoomIssue || parsedIntent?.isEquipmentIssue ? '1px solid #dc2626' : '1px solid #cbd5e1',
+              background: parsedIntent?.isRoomIssue || parsedIntent?.isEquipmentIssue ? '#fef2f2' : '#ffffff',
+              color: parsedIntent?.isRoomIssue || parsedIntent?.isEquipmentIssue ? '#b91c1c' : '#334155',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              fontSize: '0.76rem',
+              fontWeight: 750,
+              cursor: 'pointer',
+              flexShrink: 0,
+              transition: 'all 0.15s ease'
+            }}
+            className="hover-scale-mini"
+          >
+            <DoorOpen size={13} color={parsedIntent?.isRoomIssue || parsedIntent?.isEquipmentIssue ? '#dc2626' : '#64748b'} />
+            <span>{selectedRoom}</span>
+            <ChevronDown size={11} color={parsedIntent?.isRoomIssue || parsedIntent?.isEquipmentIssue ? '#dc2626' : '#94a3b8'} />
+          </button>
+
+          {/* Apple HIG Popover zur Raumauswahl */}
+          {showRoomPopover && (
+            <div style={{
+              position: 'absolute',
+              bottom: '38px',
+              left: 0,
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              borderRadius: '12px',
+              boxShadow: '0 12px 30px rgba(0,0,0,0.18)',
+              padding: '8px',
+              zIndex: 10000,
+              minWidth: '220px',
+              maxWidth: '300px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px',
+              maxHeight: '260px',
+              overflowY: 'auto'
+            }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', padding: '4px 6px' }}>
+                Raum für diesen Eintrag wählen
+              </div>
+              {/* Heute belegte Räume der Lehrkraft */}
+              {teacherTodayRooms && teacherTodayRooms.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '0.64rem', color: '#16a34a', fontWeight: 700, paddingLeft: '6px' }}>
+                    Heute in deinem Stundenplan:
+                  </span>
+                  {teacherTodayRooms.map(r => (
+                    <button
+                      key={`today-${r}`}
+                      type="button"
+                      onClick={() => {
+                        setSelectedRoom(r);
+                        setShowRoomPopover(false);
+                        if (inputContent.startsWith('!')) {
+                          setInputContent(prev => prev.replace(/^![^:]+:/, `!${r}:`));
+                        }
+                      }}
+                      style={{
+                        textAlign: 'left',
+                        background: selectedRoom === r ? '#f0fdf4' : '#f8fafc',
+                        border: selectedRoom === r ? '1px solid #86efac' : '1px solid #e2e8f0',
+                        borderRadius: '6px',
+                        padding: '6px 8px',
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        color: selectedRoom === r ? '#15803d' : '#0f172a',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                      }}
+                    >
+                      <span>📍 {r}</span>
+                      {selectedRoom === r && <Check size={12} color="#16a34a" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {/* Alle weiteren Schulräume */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ fontSize: '0.64rem', color: '#64748b', fontWeight: 700, paddingLeft: '6px' }}>
+                  Alle Musikschul-Räume:
+                </span>
+                {allAvailableRoomNames.map(rName => (
+                  <button
+                    key={`all-${rName}`}
+                    type="button"
+                    onClick={() => {
+                      setSelectedRoom(rName);
+                      setShowRoomPopover(false);
+                      if (inputContent.startsWith('!')) {
+                        setInputContent(prev => prev.replace(/^![^:]+:/, `!${rName}:`));
+                      }
+                    }}
+                    style={{
+                      textAlign: 'left',
+                      background: selectedRoom === rName ? '#eff6ff' : '#ffffff',
+                      border: selectedRoom === rName ? '1px solid #93c5fd' : '1px solid #f1f5f9',
+                      borderRadius: '6px',
+                      padding: '5px 8px',
+                      fontSize: '0.74rem',
+                      fontWeight: selectedRoom === rName ? 750 : 600,
+                      cursor: 'pointer',
+                      color: selectedRoom === rName ? '#1d4ed8' : '#334155',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}
+                  >
+                    <span>{rName}</span>
+                    {selectedRoom === rName && <Check size={12} color="#2563eb" />}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>

@@ -3108,8 +3108,13 @@ export function TeacherDashboard({
   useEffect(() => {
     loadSchoolIssues();
 
-    // Multi-Tab & Realtime Sync Subscription
+    // Multi-Tab & Same-Window Sync Subscription
     const unsubscribe = notesService.onSync(() => {
+      loadSchoolIssues();
+    });
+
+    const effectiveSchoolId = teacher?.school_id || (session?.users?.school_id) || 1;
+    const unsubscribeRealtime = notesService.subscribeSchoolRealtime(effectiveSchoolId, () => {
       loadSchoolIssues();
     });
 
@@ -3119,10 +3124,11 @@ export function TeacherDashboard({
 
     return () => {
       unsubscribe();
+      unsubscribeRealtime();
       window.removeEventListener('focus', handleSync);
       window.removeEventListener('storage', handleSync);
     };
-  }, [loadSchoolIssues]);
+  }, [loadSchoolIssues, teacher?.school_id, session?.users?.school_id]);
 
   // 📍 Heute vom Lehrer belegte Unterrichtsräume (aus briefingData.timeline)
   const teacherTodayRooms = useMemo<string[]>(() => {
@@ -3236,13 +3242,26 @@ export function TeacherDashboard({
   // Handler: Mangel direkt aus dem Tagesplan als behoben melden
   const handleResolveRoomIssueInTagesplan = useCallback(async (issueId: string) => {
     try {
-      await notesService.resolveRoomIssue(issueId, 'teacher');
+      const effectiveSchoolId = teacher?.school_id || (session?.users?.school_id) || 1;
+      await notesService.resolveRoomIssue(issueId, 'teacher', effectiveSchoolId);
       setSchoolRoomIssues(prev => prev.filter(i => i.id !== issueId));
       setToastMessage('✅ Raummangel als behoben gemeldet');
     } catch (err) {
       console.error('[TeacherDashboard] Error resolving room issue:', err);
     }
-  }, []);
+  }, [teacher?.school_id, session?.users?.school_id]);
+
+  // Handler: Mangel nachträglich einem anderen Raum zuweisen (1% Goldstandard)
+  const handleUpdateIssueRoomInTagesplan = useCallback(async (issueId: string, newRoom: string) => {
+    try {
+      const effectiveSchoolId = teacher?.school_id || (session?.users?.school_id) || 1;
+      await notesService.updateNoteRoom(issueId, newRoom, effectiveSchoolId);
+      await loadSchoolIssues();
+      setToastMessage(`📍 Mangel erfolgreich ${newRoom} zugeordnet`);
+    } catch (err) {
+      console.error('[TeacherDashboard] Error updating room issue room:', err);
+    }
+  }, [loadSchoolIssues, teacher?.school_id, session?.users?.school_id]);
 
 
   // New Right Sidebar Absence & Administrative feedback states
@@ -8092,6 +8111,8 @@ useEffect(() => {
         getIssueRoomLabel={getIssueRoomLabel}
         teacher={teacher}
         userId={userId}
+        rooms={rooms}
+        handleUpdateIssueRoom={handleUpdateIssueRoomInTagesplan}
       />
     </Suspense>
   );
@@ -10241,6 +10262,8 @@ useEffect(() => {
                             allStudents={allStudents}
                             todayStudents={todayTagesplanStudents}
                             rooms={rooms}
+                            currentRoom={activeTimelineSlot?.room || activeTimelineSlot?.rooms?.name || teacherTodayRooms[0] || 'Raum 4'}
+                            teacherTodayRooms={teacherTodayRooms}
                             onOpenDrawer={() => setShowNotesDrawer(true)}
                             onOpenHomeworkModal={(stud) => {
                               const sId = stud.id || stud.user_id;
@@ -12179,6 +12202,8 @@ useEffect(() => {
         allStudents={allStudents}
         todayStudents={todayTagesplanStudents}
         rooms={rooms}
+        currentRoom={activeTimelineSlot?.room || activeTimelineSlot?.rooms?.name || teacherTodayRooms[0] || 'Raum 4'}
+        teacherTodayRooms={teacherTodayRooms}
         onOpenHomeworkModal={(stud) => {
           const sId = stud.id || stud.user_id;
           const matched = allStudents.find((s: any) => String(s.id) === String(sId));

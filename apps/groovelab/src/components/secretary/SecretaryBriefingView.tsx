@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  BookOpen, Calendar, CalendarX, Check, CheckCircle, ChevronRight,
-  ClipboardList, Clock, DoorOpen, HardDrive, Music, ShieldAlert,
-  UserCheck, Wrench
+  ArrowUpRight, BookOpen, Calendar, CalendarX, Check, CheckCircle, ChevronDown,
+  ChevronRight, ChevronUp, ClipboardList, Clock, DoorOpen, HardDrive, Music,
+  RotateCcw, ShieldAlert, Sparkles, UserCheck, Users, Wrench
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { UpdateAnnouncementHero } from '../common/UpdateAnnouncementHero';
@@ -75,6 +75,7 @@ export interface SecretaryBriefingViewProps {
   setRoomsSubView?: (view: 'overview' | 'plan' | 'settings') => void;
   roomSearchQuery?: string;
   setRoomSearchQuery?: React.Dispatch<React.SetStateAction<string>>;
+  onOpenFacilityLogModal?: () => void;
 }
 
 export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
@@ -141,7 +142,10 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
   setRoomsSubView,
   roomSearchQuery,
   setRoomSearchQuery,
+  onOpenFacilityLogModal,
 }) => {
+            const [showIntegrityDetails, setShowIntegrityDetails] = useState<boolean>(false);
+            const [roomIssuesTab, setRoomIssuesTab] = useState<'open' | 'resolved' | 'all'>('open');
             const todayDayNum = new Date().getDay() === 0 ? 7 : new Date().getDay();
             const todayDateStr = new Date().toISOString().split('T')[0];
 
@@ -149,6 +153,8 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
             const todayAllocations = matrixAllocations.filter(p => p.dayOfWeek === todayDayNum && p.roomId);
             const totalSlotsCount = rooms.length * 8; // standard 8 slots per room per day
             const roomOccupancyRate = totalSlotsCount > 0 ? Math.round((todayAllocations.length / totalSlotsCount) * 100) : 0;
+            const todayTeacherIds = Array.from(new Set(todayAllocations.map((p: any) => p.teacherId).filter(Boolean)));
+            const todayTeachersCount = todayTeacherIds.length;
 
             // 2. Heutige Abwesenheiten
             const activeAusfallTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].filter(t => {
@@ -313,6 +319,13 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
               
               return list;
             })();
+
+            const allIssues = (roomIssues || []);
+            const openIssues = allIssues.filter((i: any) => !i.is_completed && !i.is_acknowledged);
+            const resolvedIssues = allIssues.filter((i: any) => i.is_completed || i.is_acknowledged);
+            const displayedIssues = roomIssuesTab === 'open' ? openIssues : (roomIssuesTab === 'resolved' ? resolvedIssues : allIssues);
+            const totalPendingActionCount = (pendingBookings?.length || 0) + openIssues.length + scheduleConflicts.length + (pendingSchedules?.length || 0);
+            const hasAnyActionRequired = totalPendingActionCount > 0;
 
             return (
               <div 
@@ -870,7 +883,276 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
 
                   </div>
 
+                  {/* 📅 LIVE CAMPUS RADAR & HEUTE IM HAUS (Operatives Tages-Cockpit) */}
+                  <div style={{
+                    background: '#ffffff',
+                    borderRadius: '24px',
+                    padding: '24px',
+                    boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
+                    border: '1px solid rgba(0, 0, 0, 0.05)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', gap: '10px', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ background: '#f0fdf4', color: '#16a34a', width: '38px', height: '38px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #dcfce7' }}>
+                          <Calendar size={18} />
+                        </div>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                              Tages-Radar • Musikschulbetrieb heute
+                            </h3>
+                            <span style={{
+                              background: '#f1f5f9',
+                              color: '#334155',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              fontSize: '0.68rem',
+                              fontWeight: 700,
+                              letterSpacing: '0.02em'
+                            }}>
+                              {['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'][todayDayNum === 7 ? 0 : todayDayNum]}
+                            </span>
+                          </div>
+                          <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 500, marginTop: '2px', display: 'block' }}>
+                            {todayAllocations.length} Unterrichtsstunden geplant &bull; {todayTeachersCount} Lehrkräfte im Haus &bull; {rooms.length} Räume aktiv
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <button
+                          type="button"
+                          aria-label="Direkt zum Räume-Board wechseln"
+                          onClick={() => {
+                            if (setRoomsSubView) setRoomsSubView('plan');
+                            if (setRoomSearchQuery) setRoomSearchQuery('');
+                            setActiveTab('secretary');
+                            setSecretarySubTab('rooms');
+                          }}
+                          style={{
+                            background: '#ea4335',
+                            border: 'none',
+                            color: '#ffffff',
+                            padding: '6px 14px',
+                            borderRadius: '9999px',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                            letterSpacing: '-0.01em',
+                            fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
+                            boxShadow: '0 2px 6px rgba(234, 67, 53, 0.2)'
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = '#d93025'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = '#ea4335'; }}
+                        >
+                          <DoorOpen size={13} style={{ color: '#ffffff' }} />
+                          <span>Räume-Board</span>
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Logbuch der Raumbuchungen öffnen"
+                          onClick={() => {
+                            fetchLogbookBookings();
+                            setShowLogbookModal(true);
+                          }}
+                          style={{
+                            background: '#f2f2f7',
+                            border: 'none',
+                            color: '#1c1c1e',
+                            padding: '6px 14px',
+                            borderRadius: '9999px',
+                            fontSize: '0.78rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                            letterSpacing: '-0.01em',
+                            fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif'
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = '#e5e5ea'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = '#f2f2f7'; }}
+                        >
+                          <BookOpen size={13} style={{ color: '#1c1c1e' }} />
+                          <span>Logbuch öffnen</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Room Grid Preview */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px' }}>
+                      {rooms.length === 0 ? (
+                        <div style={{ padding: '16px', color: '#64748b', fontSize: '0.82rem' }}>Keine Räume hinterlegt.</div>
+                      ) : (
+                        rooms.slice(0, 8).map((room: any) => {
+                          const roomAllocs = todayAllocations.filter((a: any) => a.roomId === room.id);
+                          const isOccupied = roomAllocs.length > 0;
+                          const roomTeachers = Array.from(new Set(roomAllocs.map((a: any) => a.teacherName || (a.teacherId ? (userMap[a.teacherId] || '') : '')).filter(Boolean)));
+                          
+                          return (
+                            <div
+                              key={room.id}
+                              role="button"
+                              tabIndex={0}
+                              aria-label={`Raum ${room.name}: ${isOccupied ? `${roomAllocs.length} Termine heute` : 'Heute frei'}`}
+                              onClick={() => {
+                                if (setRoomSearchQuery) setRoomSearchQuery(room.name);
+                                if (setRoomsSubView) setRoomsSubView('plan');
+                                setActiveTab('secretary');
+                                setSecretarySubTab('rooms');
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  if (setRoomSearchQuery) setRoomSearchQuery(room.name);
+                                  if (setRoomsSubView) setRoomsSubView('plan');
+                                  setActiveTab('secretary');
+                                  setSecretarySubTab('rooms');
+                                }
+                              }}
+                              style={{
+                                background: isOccupied ? '#ffffff' : '#f8fafc',
+                                border: isOccupied ? '1px solid #e2e8f0' : '1px dashed #cbd5e1',
+                                borderRadius: '14px',
+                                padding: '12px 14px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'space-between',
+                                minHeight: '74px',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease'
+                              }}
+                              className="hover-scale"
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                                <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>
+                                  {room.name}
+                                </span>
+                                <span style={{
+                                  background: isOccupied ? '#eff6ff' : '#f0fdf4',
+                                  color: isOccupied ? '#1d4ed8' : '#15803d',
+                                  padding: '2px 7px',
+                                  borderRadius: '6px',
+                                  fontSize: '0.66rem',
+                                  fontWeight: 750,
+                                  border: isOccupied ? '1px solid #dbeafe' : '1px solid #dcfce7'
+                                }}>
+                                  {isOccupied ? `${roomAllocs.length} Slots` : 'Frei'}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '0.70rem', color: '#64748b', marginTop: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {isOccupied ? (roomTeachers.length > 0 ? roomTeachers.join(', ') : 'Unterricht belegt') : 'Frei für Spontan-Üben'}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 🛡️ KONDENSIERTE SYSTEM-INTEGRITÄTSLEISTE (Wenn keine offenen Aktionen) */}
+                  {!hasAnyActionRequired && !showIntegrityDetails && (
+                    <div style={{
+                      background: '#ffffff',
+                      borderRadius: '20px',
+                      padding: '18px 24px',
+                      boxShadow: '0 4px 20px rgba(15, 23, 42, 0.03)',
+                      border: '1px solid rgba(0, 0, 0, 0.05)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '16px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: '280px' }}>
+                        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <CheckCircle size={20} color="#16a34a" />
+                        </div>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <strong style={{ fontSize: '0.90rem', fontWeight: 800, color: '#0f172a' }}>
+                              System-Integrität: 100% stabil & überschneidungsfrei
+                            </strong>
+                            <span style={{ background: '#ecfdf5', color: '#059669', fontSize: '0.66rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', border: '1px solid #a7f3d0' }}>
+                              Optimal
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '4px', flexWrap: 'wrap', fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                            <span>✓ 0 Terminkonflikte</span>
+                            <span>&bull;</span>
+                            <span>✓ Alle Räume & Ausstattung intakt</span>
+                            <span>&bull;</span>
+                            <span>✓ Keine ausstehenden Raumbuchungen</span>
+                            <span>&bull;</span>
+                            <span>✓ Stundenpläne synchron</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        aria-label="Detaillierte System-Prüfberichte anzeigen"
+                        onClick={() => setShowIntegrityDetails(true)}
+                        style={{
+                          background: '#f8fafc',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '10px',
+                          color: '#334155',
+                          padding: '7px 14px',
+                          fontSize: '0.74rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          transition: 'all 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
+                      >
+                        <span>Prüfberichte anzeigen</span>
+                        <ChevronDown size={14} color="#64748b" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Toggle Button zum Schließen der Details */}
+                  {showIntegrityDetails && !hasAnyActionRequired && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '10px 16px' }}>
+                      <span style={{ fontSize: '0.76rem', color: '#475569', fontWeight: 600 }}>
+                        📋 Detaillierte System-Prüfberichte geöffnet (0 Anomalien gefunden)
+                      </span>
+                      <button
+                        type="button"
+                        aria-label="Prüfberichte wieder einklappen"
+                        onClick={() => setShowIntegrityDetails(false)}
+                        style={{
+                          background: '#ffffff',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '8px',
+                          color: '#334155',
+                          padding: '5px 12px',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <span>Prüfberichte einklappen</span>
+                        <ChevronUp size={13} color="#64748b" />
+                      </button>
+                    </div>
+                  )}
+
                   {/* WIDGET: Vorläufige Raumbuchungen */}
+                  {(pendingBookings.length > 0 || showIntegrityDetails) && (
                   <div id="tour-secretary-bookings" style={{
                     background: '#ffffff',
                     borderRadius: '24px',
@@ -1104,11 +1386,10 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                       </div>
                     )}
                   </div>
+                  )}
 
-                  {/* WIDGET: Offene Raum-Meldungen & Mängel */}
-                  {(() => {
-                    const openIssues = roomIssues.filter(i => !i.is_completed && !i.is_acknowledged);
-                    return (
+                  {/* WIDGET: Raum-Meldungen & Mängel */}
+                  {(allIssues.length > 0 || showIntegrityDetails) && (
                       <div id="tour-secretary-room-issues" style={{
                         background: '#ffffff',
                         borderRadius: '24px',
@@ -1116,51 +1397,164 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                         boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
                         border: '1px solid rgba(0, 0, 0, 0.05)'
                       }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', gap: '12px', flexWrap: 'wrap' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div style={{ background: '#fef2f2', color: '#dc2626', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div style={{ background: openIssues.length > 0 ? '#fef2f2' : '#f0fdf4', color: openIssues.length > 0 ? '#dc2626' : '#16a34a', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                               <Wrench size={16} />
                             </div>
                             <div>
                               <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                Offene Raum-Meldungen & Mängel
+                                Raum-Meldungen & Mängel
                               </h3>
-                              <span style={{ fontSize: '0.65rem', fontWeight: 750, color: openIssues.length > 0 ? '#dc2626' : '#94a3b8', textTransform: 'uppercase' }}>
-                                {openIssues.length > 0 ? `${openIssues.length} ${openIssues.length === 1 ? 'Mangel gemeldet' : 'Mängel gemeldet'}` : 'Keine offenen Meldungen'}
+                              <span style={{ fontSize: '0.65rem', fontWeight: 750, color: openIssues.length > 0 ? '#dc2626' : '#16a34a', textTransform: 'uppercase' }}>
+                                {openIssues.length > 0 ? `${openIssues.length} ${openIssues.length === 1 ? 'Mangel gemeldet' : 'Mängel gemeldet'}` : 'Alle Räume intakt'}
                               </span>
                             </div>
                           </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            {/* Segmented status filter */}
+                            <div 
+                              role="tablist"
+                              aria-label="Mängelfilter"
+                              style={{
+                                display: 'inline-flex',
+                                background: '#f1f5f9',
+                                borderRadius: '10px',
+                                padding: '3px'
+                              }}
+                            >
+                              <button
+                                type="button"
+                                role="tab"
+                                aria-selected={roomIssuesTab === 'open'}
+                                onClick={() => setRoomIssuesTab('open')}
+                                style={{
+                                  padding: '5px 10px',
+                                  borderRadius: '8px',
+                                  border: 'none',
+                                  background: roomIssuesTab === 'open' ? '#ffffff' : 'transparent',
+                                  color: roomIssuesTab === 'open' ? '#dc2626' : '#64748b',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 750,
+                                  cursor: 'pointer',
+                                  boxShadow: roomIssuesTab === 'open' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                                  transition: 'all 0.15s ease'
+                                }}
+                              >
+                                Offen ({openIssues.length})
+                              </button>
+                              <button
+                                type="button"
+                                role="tab"
+                                aria-selected={roomIssuesTab === 'resolved'}
+                                onClick={() => setRoomIssuesTab('resolved')}
+                                style={{
+                                  padding: '5px 10px',
+                                  borderRadius: '8px',
+                                  border: 'none',
+                                  background: roomIssuesTab === 'resolved' ? '#ffffff' : 'transparent',
+                                  color: roomIssuesTab === 'resolved' ? '#15803d' : '#64748b',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 750,
+                                  cursor: 'pointer',
+                                  boxShadow: roomIssuesTab === 'resolved' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                                  transition: 'all 0.15s ease'
+                                }}
+                              >
+                                Behoben ({resolvedIssues.length})
+                              </button>
+                              <button
+                                type="button"
+                                role="tab"
+                                aria-selected={roomIssuesTab === 'all'}
+                                onClick={() => setRoomIssuesTab('all')}
+                                style={{
+                                  padding: '5px 10px',
+                                  borderRadius: '8px',
+                                  border: 'none',
+                                  background: roomIssuesTab === 'all' ? '#ffffff' : 'transparent',
+                                  color: roomIssuesTab === 'all' ? '#0f172a' : '#64748b',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 750,
+                                  cursor: 'pointer',
+                                  boxShadow: roomIssuesTab === 'all' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                                  transition: 'all 0.15s ease'
+                                }}
+                              >
+                                Alle ({allIssues.length})
+                              </button>
+                            </div>
+
+                            {/* Open Logbook Button */}
+                            {onOpenFacilityLogModal && (
+                              <button
+                                type="button"
+                                onClick={onOpenFacilityLogModal}
+                                aria-label="Mängel-Logbuch öffnen"
+                                style={{
+                                  background: '#ffffff',
+                                  border: '1px solid #cbd5e1',
+                                  borderRadius: '10px',
+                                  padding: '6px 12px',
+                                  fontSize: '0.76rem',
+                                  fontWeight: 750,
+                                  color: '#334155',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  transition: 'all 0.15s ease'
+                                }}
+                              >
+                                <BookOpen size={13} />
+                                <span>Mängel-Logbuch</span>
+                              </button>
+                            )}
+                          </div>
                         </div>
 
-                        {openIssues.length === 0 ? (
+                        {displayedIssues.length === 0 ? (
                           <div style={{
-                            background: 'rgba(52, 168, 83, 0.04)',
-                            border: '1px solid rgba(52, 168, 83, 0.1)',
-                            color: '#34a853',
+                            background: roomIssuesTab === 'open' ? 'rgba(52, 168, 83, 0.04)' : '#f8fafc',
+                            border: roomIssuesTab === 'open' ? '1px solid rgba(52, 168, 83, 0.1)' : '1px solid #e2e8f0',
+                            color: roomIssuesTab === 'open' ? '#34a853' : '#64748b',
                             borderRadius: '16px',
                             padding: '16px 20px',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '12px'
                           }}>
-                            <CheckCircle size={20} color="#34a853" />
+                            <CheckCircle size={20} color={roomIssuesTab === 'open' ? '#34a853' : '#64748b'} />
                             <div>
-                              <strong style={{ display: 'block', fontSize: '0.85rem', fontWeight: 800 }}>Alle Räume & Ausstattung intakt</strong>
-                              <span style={{ fontSize: '0.74rem', opacity: 0.9 }}>Aktuell liegen keine offenen Mängel- oder Reparaturbedarfe von Lehrkräften vor.</span>
+                              <strong style={{ display: 'block', fontSize: '0.85rem', fontWeight: 800 }}>
+                                {roomIssuesTab === 'open' 
+                                  ? 'Alle Räume & Ausstattung intakt' 
+                                  : (roomIssuesTab === 'resolved' ? 'Keine behobenen Mängel vorhanden' : 'Keine Meldungen vorhanden')}
+                              </strong>
+                              <span style={{ fontSize: '0.74rem', opacity: 0.9 }}>
+                                {roomIssuesTab === 'open'
+                                  ? 'Aktuell liegen keine offenen Mängel- oder Reparaturbedarfe von Lehrkräften vor.'
+                                  : (roomIssuesTab === 'resolved' ? 'Sobald ein Mangel behoben wird, bleibt er hier dauerhaft dokumentiert.' : 'Es liegen noch keine Mängelmeldungen vor.')}
+                              </span>
                             </div>
                           </div>
                         ) : (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {openIssues.map((issue) => {
+                            {displayedIssues.map((issue) => {
+                              const isResolved = Boolean(issue.is_completed || issue.is_acknowledged);
                               const createdDate = new Date(issue.created_at);
                               const dateFormatted = createdDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
                               const cleanContent = formatCleanNoteContent(issue.content, issue.student_name);
                               const authorDisplay = issue.author_name || 'Lehrkraft';
+                              const resolvedDateFormatted = issue.acknowledged_at 
+                                ? new Date(issue.acknowledged_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+                                : null;
 
                               return (
                                 <div key={issue.id} style={{
-                                  background: '#fffbfb',
-                                  border: '1px solid #fee2e2',
+                                  background: isResolved ? '#f8fafc' : '#fffbfb',
+                                  border: isResolved ? '1px solid #e2e8f0' : '1px solid #fee2e2',
                                   borderRadius: '16px',
                                   padding: '16px',
                                   display: 'flex',
@@ -1182,8 +1576,8 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                                       issue.content.toLowerCase().includes('netzteil');
                                       return (
                                         <div style={{
-                                          background: '#fee2e2',
-                                          color: '#dc2626',
+                                          background: isResolved ? '#f1f5f9' : '#fee2e2',
+                                          color: isResolved ? '#475569' : '#dc2626',
                                           borderRadius: '10px',
                                           padding: '6px 10px',
                                           fontWeight: 800,
@@ -1199,42 +1593,91 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                                       );
                                     })()}
                                     <div>
-                                      <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>
-                                        {cleanContent || issue.content}
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                                        {isResolved && (
+                                          <span style={{
+                                            background: '#dcfce7',
+                                            color: '#15803d',
+                                            border: '1px solid #86efac',
+                                            borderRadius: '5px',
+                                            padding: '1px 6px',
+                                            fontSize: '0.66rem',
+                                            fontWeight: 800
+                                          }}>
+                                            ✓ Behoben
+                                          </span>
+                                        )}
+                                        <div style={{ fontSize: '0.88rem', fontWeight: 700, color: isResolved ? '#334155' : '#0f172a' }}>
+                                          {cleanContent || issue.content}
+                                        </div>
                                       </div>
-                                      <div style={{ fontSize: '0.72rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <div style={{ fontSize: '0.72rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                         <span>Gemeldet von <strong>{authorDisplay}</strong></span>
                                         <span>•</span>
                                         <span>{dateFormatted} Uhr</span>
+                                        {isResolved && resolvedDateFormatted && (
+                                          <>
+                                            <span>•</span>
+                                            <span style={{ color: '#15803d', fontWeight: 650 }}>
+                                              Behoben am {resolvedDateFormatted} Uhr ({issue.resolved_by === 'teacher' ? 'Lehrkraft' : 'Sekretariat'})
+                                            </span>
+                                          </>
+                                        )}
                                       </div>
                                     </div>
                                   </div>
 
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <button
-                                      type="button"
-                                      onClick={async () => {
-                                        await notesService.resolveRoomIssue(issue.id, 'secretary');
-                                        setRoomIssues(prev => prev.map(n => n.id === issue.id ? { ...n, is_completed: true, is_acknowledged: true, acknowledged_at: new Date().toISOString() } : n));
-                                      }}
-                                      style={{
-                                        background: '#16a34a',
-                                        color: '#ffffff',
-                                        border: 'none',
-                                        borderRadius: '10px',
-                                        padding: '8px 14px',
-                                        fontSize: '0.76rem',
-                                        fontWeight: 750,
-                                        cursor: 'pointer',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '6px',
-                                        boxShadow: '0 2px 8px rgba(22, 163, 74, 0.2)'
-                                      }}
-                                    >
-                                      <Check size={13} />
-                                      <span>Als behoben markieren</span>
-                                    </button>
+                                    {!isResolved ? (
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          await notesService.resolveRoomIssue(issue.id, 'secretary', schoolId);
+                                          setRoomIssues(prev => prev.map(n => n.id === issue.id ? { ...n, is_completed: true, is_acknowledged: true, acknowledged_at: new Date().toISOString(), resolved_by: 'secretary' } : n));
+                                        }}
+                                        style={{
+                                          background: '#16a34a',
+                                          color: '#ffffff',
+                                          border: 'none',
+                                          borderRadius: '10px',
+                                          padding: '8px 14px',
+                                          fontSize: '0.76rem',
+                                          fontWeight: 750,
+                                          cursor: 'pointer',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '6px',
+                                          boxShadow: '0 2px 8px rgba(22, 163, 74, 0.2)'
+                                        }}
+                                      >
+                                        <Check size={13} />
+                                        <span>Als behoben markieren</span>
+                                      </button>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          await notesService.reopenRoomIssue(issue.id, schoolId);
+                                          setRoomIssues(prev => prev.map(n => n.id === issue.id ? { ...n, is_completed: false, is_acknowledged: false, acknowledged_at: null, resolved_by: null } : n));
+                                        }}
+                                        style={{
+                                          background: '#ffffff',
+                                          color: '#475569',
+                                          border: '1.5px solid #cbd5e1',
+                                          borderRadius: '10px',
+                                          padding: '7px 12px',
+                                          fontSize: '0.74rem',
+                                          fontWeight: 700,
+                                          cursor: 'pointer',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '5px'
+                                        }}
+                                      >
+                                        <RotateCcw size={12} />
+                                        <span>Wiedereröffnen</span>
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
                               );
@@ -1242,10 +1685,10 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                           </div>
                         )}
                       </div>
-                    );
-                  })()}
+                  )}
 
                   {/* WIDGET: Systemische Terminkonflikte (Apple / Enterprise SaaS Level) */}
+                  {(scheduleConflicts.length > 0 || showIntegrityDetails) && (
                   <div style={{
                     background: '#ffffff',
                     borderRadius: '24px',
@@ -1528,8 +1971,10 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                       </div>
                     )}
                   </div>
+                  )}
 
                   {/* WIDGET: Stundenplaneinreichungen */}
+                  {(pendingSchedules.length > 0 || showIntegrityDetails) && (
                   <div style={{
                     background: '#ffffff',
                     borderRadius: '24px',
@@ -1674,6 +2119,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                       )}
                     </div>
                   </div>
+                  )}
 
                 </div>
 
@@ -1681,43 +2127,28 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                   
                   {/* WIDGET: Unterrichtsausfälle heute (Ausfall- & Raumfreigabe-Monitor) */}
-                  <div style={{
-                    background: '#ffffff',
-                    borderRadius: '24px',
-                    padding: '24px',
-                    boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
-                    border: '1px solid rgba(0, 0, 0, 0.05)'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-                      <div style={{ background: activeAusfallTeachers.length > 0 ? '#fee2e2' : '#e6f4ea', color: activeAusfallTeachers.length > 0 ? '#b91c1c' : '#34a853', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
-                        {activeAusfallTeachers.length > 0 ? <CalendarX size={16} color="#ef4444" /> : <CheckCircle size={16} color="#34a853" />}
-                      </div>
-                      <div>
-                        <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                          Unterrichtsausfälle heute
-                        </h3>
-                        <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                          Ausfall- &amp; Raumfreigabe-Monitor
-                        </span>
-                      </div>
-                    </div>
-
-                    {activeAusfallTeachers.length === 0 ? (
-                      <div style={{
-                        background: 'rgba(52, 168, 83, 0.04)',
-                        border: '1px solid rgba(52, 168, 83, 0.1)',
-                        color: '#34a853',
-                        borderRadius: '16px',
-                        padding: '16px',
-                        textAlign: 'center'
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px' }}>
-                          <CheckCircle size={22} color="#34a853" />
+                  {activeAusfallTeachers.length > 0 ? (
+                    <div style={{
+                      background: '#ffffff',
+                      borderRadius: '24px',
+                      padding: '24px',
+                      boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
+                      border: '1px solid rgba(239, 68, 68, 0.15)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                        <div style={{ background: '#fee2e2', color: '#b91c1c', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
+                          <CalendarX size={16} color="#ef4444" />
                         </div>
-                        <strong style={{ display: 'block', fontSize: '0.82rem', fontWeight: 800 }}>Kein Ausfallbedarf</strong>
-                        <span style={{ fontSize: '0.72rem', opacity: 0.9 }}>Alle geplanten Unterrichtsstunden finden regulär statt. Keine offenen Schüler-Benachrichtigungen.</span>
+                        <div>
+                          <h3 style={{ margin: 0, fontSize: '0.96rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                            Unterrichtsausfälle heute
+                          </h3>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#ef4444', textTransform: 'uppercase' }}>
+                            {activeAusfallTeachers.length} {activeAusfallTeachers.length === 1 ? 'Ausfall gemeldet' : 'Ausfälle gemeldet'}
+                          </span>
+                        </div>
                       </div>
-                    ) : (
+
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {activeAusfallTeachers.map(teacher => {
                           const untilDateVal = teacher.ausfall_until;
@@ -1756,9 +2187,191 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                           );
                         })}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Calm Status Pill (Zero-Inbox Parity) */}
+                      <div style={{
+                        background: '#ffffff',
+                        borderRadius: '20px',
+                        padding: '16px 20px',
+                        boxShadow: '0 4px 20px rgba(15, 23, 42, 0.03)',
+                        border: '1px solid rgba(52, 168, 83, 0.2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px'
+                      }}>
+                        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <CheckCircle size={18} color="#16a34a" />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#14532d' }}>
+                            Heutiger Unterricht vollzählig
+                          </div>
+                          <span style={{ fontSize: '0.72rem', color: '#166534', opacity: 0.9 }}>
+                            0 Ausfälle gemeldet &bull; Alle Lehrkräfte planmäßig
+                          </span>
+                        </div>
+                      </div>
 
+                      {/* WIDGET: Schnellzugriff & Werkzeuge */}
+                      <div style={{
+                        background: '#ffffff',
+                        borderRadius: '24px',
+                        padding: '22px 20px',
+                        boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04)',
+                        border: '1px solid rgba(0, 0, 0, 0.05)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '14px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ background: '#fef2f2', color: '#ea4335', width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Sparkles size={16} />
+                          </div>
+                          <div>
+                            <h3 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#1e293b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                              Schnellzugriff Sekretariat
+                            </h3>
+                            <span style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                              Häufige Verwaltungsaktionen
+                            </span>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <button
+                            type="button"
+                            aria-label="Zur Schülerübersicht und Stammdaten wechseln"
+                            onClick={() => {
+                              setActiveTab('campus');
+                              setCampusSubTab('students');
+                            }}
+                            style={{
+                              background: '#f8fafc',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '12px',
+                              padding: '10px 14px',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              color: '#1e293b',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              minHeight: '44px',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
+                          >
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <Users size={15} color="#3b82f6" />
+                              <span>Schülerübersicht &amp; Stammdaten</span>
+                            </span>
+                            <ChevronRight size={14} color="#94a3b8" />
+                          </button>
+
+                          <button
+                            type="button"
+                            aria-label="Zum Räume- und Belegungsplan wechseln"
+                            onClick={() => {
+                              if (setRoomsSubView) setRoomsSubView('plan');
+                              setActiveTab('secretary');
+                              setSecretarySubTab('rooms');
+                            }}
+                            style={{
+                              background: '#f8fafc',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '12px',
+                              padding: '10px 14px',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              color: '#1e293b',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              minHeight: '44px',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
+                          >
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <DoorOpen size={15} color="#ea580c" />
+                              <span>Räume- &amp; Belegungsplan</span>
+                            </span>
+                            <ChevronRight size={14} color="#94a3b8" />
+                          </button>
+
+                          <button
+                            type="button"
+                            aria-label="Zu Abrechnung und Lizenzen wechseln"
+                            onClick={() => {
+                              setActiveTab('secretary');
+                              setSecretarySubTab('licenses');
+                            }}
+                            style={{
+                              background: '#f8fafc',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '12px',
+                              padding: '10px 14px',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              color: '#1e293b',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              minHeight: '44px',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
+                          >
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <ClipboardList size={15} color="#16a34a" />
+                              <span>Abrechnung &amp; Lizenzen</span>
+                            </span>
+                            <ChevronRight size={14} color="#94a3b8" />
+                          </button>
+
+                          <button
+                            type="button"
+                            aria-label="Zu Mitteilungen und Informationen wechseln"
+                            onClick={() => {
+                              setActiveTab('secretary');
+                              setSecretarySubTab('announcements');
+                            }}
+                            style={{
+                              background: '#f8fafc',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '12px',
+                              padding: '10px 14px',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              color: '#1e293b',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              minHeight: '44px',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = '#f8fafc'; }}
+                          >
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <BookOpen size={15} color="#8b5cf6" />
+                              <span>Mitteilungen &amp; Aushänge</span>
+                            </span>
+                            <ChevronRight size={14} color="#94a3b8" />
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
 
               </div>

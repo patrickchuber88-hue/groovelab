@@ -32,6 +32,7 @@ export interface SecretaryRoomsViewProps {
   pendingBookings?: any[];
   handleConfirmBooking?: (id: string) => Promise<void> | void;
   handleRejectBooking?: (id: string) => Promise<void> | void;
+  onOpenFacilityLogModal?: () => void;
 }
 
 export function SecretaryRoomsView({
@@ -59,7 +60,8 @@ export function SecretaryRoomsView({
   setRoomsSubView: controlledSetRoomsSubView,
   pendingBookings = [],
   handleConfirmBooking,
-  handleRejectBooking
+  handleRejectBooking,
+  onOpenFacilityLogModal
 }: SecretaryRoomsViewProps) {
   // Room state
   const [roomFilterFloor, setRoomFilterFloor] = useState<string>('All');
@@ -1656,6 +1658,31 @@ export function SecretaryRoomsView({
                             <option value="inactive">inaktiv</option>
                           </select>
                         </div>
+
+                        {onOpenFacilityLogModal && (
+                          <button
+                            type="button"
+                            onClick={onOpenFacilityLogModal}
+                            aria-label="Mängel-Logbuch öffnen"
+                            style={{
+                              background: '#ffffff',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '8px',
+                              padding: '8px 12px',
+                              fontSize: '0.78rem',
+                              fontWeight: 750,
+                              color: '#334155',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              flexShrink: 0
+                            }}
+                          >
+                            <Wrench size={13} style={{ color: '#dc2626' }} />
+                            <span>Mängel-Logbuch</span>
+                          </button>
+                        )}
                       </div>
 
                       {/* Rooms List Board */}
@@ -1783,18 +1810,25 @@ export function SecretaryRoomsView({
                                           const roomOpenIssues = roomIssues.filter((i: any) => (!i.is_completed && !i.is_acknowledged) && (i.room_id === room.id || i.room_id === room.name || (room.name && i.room_id && room.name.toLowerCase().includes(i.room_id.toLowerCase()))));
                                           if (roomOpenIssues.length === 0) return null;
                                           return (
-                                            <span style={{ 
-                                              fontSize: '0.62rem', 
-                                              color: '#dc2626', 
-                                              background: '#fee2e2', 
-                                              border: '1px solid #fca5a5', 
-                                              borderRadius: '6px', 
-                                              padding: '1px 6px', 
-                                              fontWeight: 800, 
-                                              display: 'inline-flex', 
-                                              alignItems: 'center', 
-                                              gap: '3px' 
-                                            }}>
+                                            <span 
+                                              role={onOpenFacilityLogModal ? 'button' : undefined}
+                                              tabIndex={onOpenFacilityLogModal ? 0 : undefined}
+                                              onClick={onOpenFacilityLogModal ? (e) => { e.stopPropagation(); onOpenFacilityLogModal(); } : undefined}
+                                              onKeyDown={onOpenFacilityLogModal ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onOpenFacilityLogModal(); } } : undefined}
+                                              title={onOpenFacilityLogModal ? "Klicken, um Mängel im Logbuch zu öffnen" : undefined}
+                                              style={{ 
+                                                fontSize: '0.62rem', 
+                                                color: '#dc2626', 
+                                                background: '#fee2e2', 
+                                                border: '1px solid #fca5a5', 
+                                                borderRadius: '6px', 
+                                                padding: '1px 6px', 
+                                                fontWeight: 800, 
+                                                display: 'inline-flex', 
+                                                alignItems: 'center', 
+                                                gap: '3px',
+                                                cursor: onOpenFacilityLogModal ? 'pointer' : 'default'
+                                              }}>
                                               <Wrench size={9} />
                                               {roomOpenIssues.length === 1 ? '1 Mangel' : `${roomOpenIssues.length} Mängel`}
                                             </span>

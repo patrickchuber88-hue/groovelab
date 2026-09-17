@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { ShieldCheck, Scale, FileText, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Lock, Check, RefreshCw, WifiOff } from 'lucide-react';
-import { ACTIVE_LEGAL_VERSION, LEGAL_DOCUMENTS, computeSha256 } from '../legal/legalContent';
+import { ShieldCheck, Scale, FileText, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Lock, Check, RefreshCw, WifiOff, Terminal } from 'lucide-react';
+import { ACTIVE_LEGAL_VERSION, MINIMUM_ENFORCED_VERSION, LEGAL_DOCUMENTS, LEGAL_RELEASE_CONFIG, computeSha256, getLegalChangelog } from '../legal/legalContent';
 import { isUUID } from '../utils/uuidValidator';
+import { isDevEnvironment } from '../utils/tenantUrlHelper';
 
 /**
  * Computes a deterministic session proof bound to user, active role, session lease ID and legal version.
  * Prevents trivial boolean client-side tampering while enabling instantaneous (0ms) render times.
  */
-function computeSessionProof(userId: string, role: string, leaseId: string, version: string): string {
-  const seed = `${userId}:${role}:${leaseId || 'no_lease'}:${version}`;
+function computeSessionProof(userId: string, role: string, leaseId: string, minVersion: string): string {
+  const seed = `${userId}:${role}:${leaseId || 'no_lease'}:${minVersion}`;
   let hash = 0;
   for (let i = 0; i < seed.length; i++) {
     hash = ((hash << 5) - hash) + seed.charCodeAt(i);
@@ -45,10 +46,11 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
   const isAdmin = role === 'admin' || role === 'secretary';
   const isTeacher = role === 'teacher';
   const isStudent = role === 'student';
+  const isDev = typeof window !== 'undefined' && isDevEnvironment();
 
   const leaseId = getLeaseId();
-  const proofKey = user?.id ? `gl_legal_proof_${user.id}_${ACTIVE_LEGAL_VERSION}` : '';
-  const currentProof = user?.id ? computeSessionProof(user.id, role, leaseId, ACTIVE_LEGAL_VERSION) : '';
+  const proofKey = user?.id ? `gl_legal_proof_${user.id}_min_${MINIMUM_ENFORCED_VERSION}` : '';
+  const currentProof = user?.id ? computeSessionProof(user.id, role, leaseId, MINIMUM_ENFORCED_VERSION) : '';
   const isProofValid = typeof window !== 'undefined' && Boolean(user?.id) && Boolean(currentProof) && sessionStorage.getItem(proofKey) === currentProof;
 
   // Initialize compliant state optimistically if valid cryptographic session proof is present
@@ -67,6 +69,8 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [showFullText, setShowFullText] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [latestAcceptedVersion, setLatestAcceptedVersion] = useState<string | null>(null);
+  const [isMajorUpdateFlow, setIsMajorUpdateFlow] = useState<boolean>(false);
 
   // Determine active primary document
   const primaryDocKey = isAdmin 
@@ -80,7 +84,28 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
   const themeBgLight = isAdmin ? '#fef2f2' : (isTeacher ? '#f0fdf4' : '#ecfdf5');
   const themeBorder = isAdmin ? 'rgba(239, 68, 68, 0.25)' : (isTeacher ? 'rgba(52, 168, 83, 0.25)' : 'rgba(16, 185, 129, 0.25)');
 
-  // 1. Authoritative check with 4-second short-circuit timeout (Stale-While-Revalidate if cached proof is present)
+  // 1. Cross-Tab Realtime Broadcast Synchronization
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return;
+    const channel = new BroadcastChannel('gl_legal_consent_sync');
+    channel.onmessage = (event) => {
+      if (event.data?.type === 'CONSENT_GRANTED' && event.data?.userId === user?.id) {
+        setIsCompliant(true);
+        setIsChecking(false);
+        setIsNetworkBlocked(false);
+        if (proofKey && currentProof) {
+          try {
+            sessionStorage.setItem(proofKey, currentProof);
+          } catch {}
+        }
+      }
+    };
+    return () => {
+      channel.close();
+    };
+  }, [user?.id, proofKey, currentProof]);
+
+  // 2. Authoritative check with 4-second short-circuit timeout (Stale-While-Revalidate if cached proof is present)
   useEffect(() => {
     let isMounted = true;
 
@@ -106,7 +131,8 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
         const rpcPromise = supabase.rpc('check_user_legal_status', {
           p_user_id: user.id,
           p_role: role,
-          p_required_version: ACTIVE_LEGAL_VERSION
+          p_required_version: ACTIVE_LEGAL_VERSION,
+          p_minimum_enforced_version: MINIMUM_ENFORCED_VERSION
         });
 
         // 4.0-second short-circuit timeout to eliminate the 25-75s cascade in supabase.ts
@@ -142,6 +168,12 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
           } else {
             setIsCompliant(false);
             setIsNetworkBlocked(false);
+            if (data?.latest_accepted_version) {
+              setLatestAcceptedVersion(data.latest_accepted_version);
+              setIsMajorUpdateFlow(true);
+            } else {
+              setIsMajorUpdateFlow(false);
+            }
             if (proofKey && typeof window !== 'undefined') {
               try {
                 sessionStorage.removeItem(proofKey);
@@ -170,7 +202,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
     };
   }, [user?.id, role, user?.is_ghost_mode, retryCount]);
 
-  // 2. Record consent
+  // 3. Record consent
   const handleConfirmConsents = async () => {
     if (!checkedMandatory || isSaving || !user?.id) return;
 
@@ -201,7 +233,9 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
         p_ip_hash: null,
         p_metadata: {
           client_timestamp: new Date().toISOString(),
-          is_student_minor_flow: isStudent
+          is_student_minor_flow: isStudent,
+          is_major_reconsent: isMajorUpdateFlow,
+          previous_version: latestAcceptedVersion || null
         }
       });
 
@@ -216,6 +250,16 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
           sessionStorage.setItem(proofKey, currentProof);
         } catch {}
       }
+
+      // Realtime Cross-Tab Broadcast notification
+      try {
+        if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+          const channel = new BroadcastChannel('gl_legal_consent_sync');
+          channel.postMessage({ type: 'CONSENT_GRANTED', userId: user.id, version: ACTIVE_LEGAL_VERSION });
+          channel.close();
+        }
+      } catch {}
+
       setIsCompliant(true);
       setIsNetworkBlocked(false);
       if (onConsentRecorded) {
@@ -435,6 +479,8 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
   }
 
   // 3. Render Legal Consent Gate (Hard Barrier Modal)
+  const activeChangelog = getLegalChangelog(ACTIVE_LEGAL_VERSION);
+
   return (
     <div style={{
       position: 'fixed',
@@ -449,20 +495,72 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
       padding: '20px',
       fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif"
     }}>
-      <div style={{
-        background: '#ffffff',
-        width: '100%',
-        maxWidth: '680px',
-        maxHeight: '90vh',
-        borderRadius: '28px',
-        boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.35)',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        border: `1px solid ${themeBorder}`,
-        animation: 'fadeInUp 0.25s ease-out'
-      }}>
-        {/* Header Bar */}
+      {/* 🛠️ Localhost / Dev-Sandbox Immunity Pill */}
+      {isDev && (
+        <div style={{
+          position: 'fixed',
+          top: '16px',
+          left: '16px',
+          zIndex: 100000,
+          background: '#1e293b',
+          color: '#38bdf8',
+          padding: '6px 12px',
+          borderRadius: '12px',
+          fontSize: '0.74rem',
+          fontWeight: 700,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          boxShadow: '0 4px 14px rgba(0,0,0,0.3)',
+          border: '1px solid #334155'
+        }}>
+          <Terminal size={14} color="#38bdf8" />
+          <span>Localhost Dev-Sandbox</span>
+          <button
+            type="button"
+            onClick={() => {
+              if (proofKey && currentProof) {
+                try {
+                  sessionStorage.setItem(proofKey, currentProof);
+                } catch {}
+              }
+              setIsCompliant(true);
+            }}
+            style={{
+              background: '#0284c7',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '3px 8px',
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              cursor: 'pointer'
+            }}
+          >
+            Dev Bypass (1-Klick)
+          </button>
+        </div>
+      )}
+
+      <div 
+        role="dialog"
+        aria-modal="true"
+        aria-label={isMajorUpdateFlow ? `Vertrags-Aktualisierung Version ${ACTIVE_LEGAL_VERSION}` : primaryDoc.title}
+        style={{
+          background: '#ffffff',
+          width: '100%',
+          maxWidth: '680px',
+          maxHeight: '90vh',
+          borderRadius: '28px',
+          boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.35)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          border: `1px solid ${themeBorder}`,
+          animation: 'fadeInUp 0.25s ease-out'
+        }}
+      >
+        {/* Header Bar - ZONE 1: RECHTLICHER KONTEXT & DIFFERENZ-STATUS */}
         <div style={{
           padding: '24px 28px 20px 28px',
           borderBottom: '1px solid #f1f5f9',
@@ -484,14 +582,14 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
                 padding: '2px 8px',
                 borderRadius: '6px'
               }}>
-                {primaryDoc.badge}
+                {isMajorUpdateFlow ? 'Vertrags-Aktualisierung' : primaryDoc.badge}
               </span>
               <span style={{
                 fontSize: '0.72rem',
                 fontWeight: 700,
                 color: '#64748b'
               }}>
-                Version {primaryDoc.version} • Revisionssicher
+                Version {ACTIVE_LEGAL_VERSION} • Revisionssicher
               </span>
             </div>
             <h2 style={{
@@ -502,7 +600,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
               letterSpacing: '-0.02em',
               lineHeight: 1.3
             }}>
-              {primaryDoc.title}
+              {isMajorUpdateFlow ? `Aktualisierung: ${primaryDoc.title}` : primaryDoc.title}
             </h2>
             <p style={{
               margin: '4px 0 0 0',
@@ -510,7 +608,9 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
               color: '#475569',
               fontWeight: 500
             }}>
-              {primaryDoc.subtitle}
+              {isMajorUpdateFlow 
+                ? `Wesentliche didaktische Anpassung (Bisherige Bestätigung: Version ${latestAcceptedVersion || '2026.1'})` 
+                : primaryDoc.subtitle}
             </p>
           </div>
           <div style={{
@@ -529,7 +629,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
           </div>
         </div>
 
-        {/* Body Content */}
+        {/* Body Content - ZONE 2: CHANGELOG-LENS & TRANSPARENZGEBOT */}
         <div style={{
           padding: '24px 28px',
           overflowY: 'auto',
@@ -556,27 +656,60 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
             </div>
           )}
 
-          {/* Key Summary Capsules */}
-          <div style={{
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            borderRadius: '18px',
-            padding: '16px 18px'
-          }}>
-            <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
-              Wichtigste Kernpunkte im Überblick (Transparenzgebot Art. 12 DSGVO):
+          {/* 🔍 Major-Update Changelog-Lens (Delta-Fokus gem. BGH XI ZR 26/20) */}
+          {isMajorUpdateFlow && activeChangelog ? (
+            <div style={{
+              background: themeBgLight,
+              border: `1.5px solid ${themeBorder}`,
+              borderRadius: '18px',
+              padding: '16px 18px'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '0.76rem',
+                fontWeight: 800,
+                color: themeColor,
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                marginBottom: '10px'
+              }}>
+                <Scale size={16} />
+                <span>Was ist neu in Version {ACTIVE_LEGAL_VERSION}? (Art. 12 DSGVO / § 307 BGB):</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {activeChangelog.highlights.map((pt, idx) => (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.82rem', color: '#0f172a', lineHeight: 1.4 }}>
+                    <CheckCircle2 size={16} color={themeColor} style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <span style={{ fontWeight: 600 }}>{pt}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {primaryDoc.summaryPoints.map((pt, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.82rem', color: '#334155', lineHeight: 1.4 }}>
-                  <CheckCircle2 size={16} color={themeColor} style={{ flexShrink: 0, marginTop: '2px' }} />
-                  <span>{pt}</span>
-                </div>
-              ))}
+          ) : (
+            /* Kaltstart-Kernpunkte für Erstnutzer */
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '18px',
+              padding: '16px 18px'
+            }}>
+              <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
+                Wichtigste Kernpunkte im Überblick (Transparenzgebot Art. 12 DSGVO):
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {primaryDoc.summaryPoints.map((pt, idx) => (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.82rem', color: '#334155', lineHeight: 1.4 }}>
+                    <CheckCircle2 size={16} color={themeColor} style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <span>{pt}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Optional Toggle Full Text */}
+          {/* Optional Toggle Full Text Accordion (§ 305 Abs. 2 BGB) */}
           <div>
             <button
               type="button"
@@ -594,7 +727,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
                 padding: 0
               }}
             >
-              <span>{showFullText ? 'Vollständigen Vertragstext ausblenden' : 'Vollständigen Vertragstext anzeigen & prüfen'}</span>
+              <span>{showFullText ? 'Vollständigen Vertragstext ausblenden' : 'Vollständigen konsolidierten Vertragstext anzeigen & prüfen'}</span>
               {showFullText ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </button>
 
@@ -617,8 +750,17 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
             )}
           </div>
 
-          {/* Mandatory Checkbox Card */}
+          {/* ZONE 3: RECHTSSICHERES OPT-IN (EuGH Planet49 & BFSG 2025 Konform) */}
           <div 
+            role="button"
+            tabIndex={0}
+            aria-checked={checkedMandatory}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setCheckedMandatory(!checkedMandatory);
+              }
+            }}
             onClick={() => setCheckedMandatory(!checkedMandatory)}
             style={{
               border: checkedMandatory ? `2px solid ${themeColor}` : '1.5px solid #cbd5e1',
@@ -649,13 +791,26 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
             </div>
             <div style={{ flex: 1, fontSize: '0.82rem', fontWeight: 650, color: '#0f172a', lineHeight: 1.4 }}>
               <span style={{ color: themeColor, fontWeight: 800 }}>[Pflicht] </span>
-              {primaryDoc.checkboxLabel}
+              {isMajorUpdateFlow ? (
+                `Ich erkenne die aktualisierten Vertragsbedingungen (Version ${ACTIVE_LEGAL_VERSION}) sowie den Didaktik-Kodex an und nehme ausdrücklich zur Kenntnis, dass die gesetzliche Aufsichtspflicht (§ 1631 BGB) personell bei der Lehrkraft verbleibt.`
+              ) : (
+                primaryDoc.checkboxLabel
+              )}
             </div>
           </div>
 
-          {/* Optional Audio Consent Checkbox for Students (Kopplungsverbot-Schutz) */}
+          {/* Optional Audio Consent Checkbox for Students (Kopplungsverbot-Schutz gem. Art. 7 Abs. 4 DSGVO) */}
           {isStudent && (
             <div 
+              role="button"
+              tabIndex={0}
+              aria-checked={checkedAudio}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setCheckedAudio(!checkedAudio);
+                }
+              }}
               onClick={() => setCheckedAudio(!checkedAudio)}
               style={{
                 border: checkedAudio ? '2px solid #10b981' : '1.5px solid #e2e8f0',
@@ -751,7 +906,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
             ) : (
               <>
                 <Scale size={16} />
-                <span>Rechtssicher bestätigen & Weiter</span>
+                <span>{isMajorUpdateFlow ? 'Änderungen verbindlich bestätigen' : 'Rechtssicher bestätigen & Weiter'}</span>
               </>
             )}
           </button>
