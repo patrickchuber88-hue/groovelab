@@ -83,7 +83,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
     isCampusActive: boolean;
   }
 
-  const [agreeWithdrawalWaiver, setAgreeWithdrawalWaiver] = useState(true);
+  const [agreeWithdrawalWaiver, setAgreeWithdrawalWaiver] = useState(false);
   const [legalModalTab, setLegalModalTab] = useState<'terms' | 'privacy' | 'impressum' | 'cancellation' | null>(null);
   const [linkedSiblings, setLinkedSiblings] = useState<LinkedSibling[]>(() => {
     if (typeof window === 'undefined') return [];
@@ -1305,11 +1305,51 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               </div>
             </div>
 
+            {/* 🛡️ Gesetzliche Vertragszusammenfassung unmittelbar vor der Bestellung (§ 312j Abs. 2 BGB / Art. 246a § 1 EGBGB) */}
+            <div style={{
+              background: '#ffffff',
+              border: '1px solid #cbd5e1',
+              borderRadius: '12px',
+              padding: '10px 14px',
+              fontSize: '0.74rem',
+              lineHeight: 1.5,
+              color: '#334155',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '3px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '4px' }}>
+                <span style={{ fontWeight: 800, color: '#0f172a' }}>📋 Vertragsübersicht (§ 312j Abs. 2 BGB)</span>
+                <span style={{ fontWeight: 700, color: '#059669' }}>
+                  {isThirdOrMoreChild 
+                    ? '0,00 € (3. Kind Befreiung)' 
+                    : `${isChf ? `CHF ${totalAmountStr}` : `${totalAmountStr} €`} / Schuljahr`}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                <span>Leistung:</span>
+                <span style={{ fontWeight: 600, color: '#0f172a' }}>Campus-Groovelab (Modul Campus)</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                <span>Vertragslaufzeit:</span>
+                <span style={{ fontWeight: 600, color: '#0f172a' }}>Bis zum Schuljahresende (Endet automatisch, kein Abo)</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b' }}>
+                <span>Schnupperphase:</span>
+                <span style={{ fontWeight: 600, color: '#059669' }}>1. Monat 100 % kostenfrei zum Kennenlernen</span>
+              </div>
+            </div>
+
             {/* Primary confirmation CTA with strict § 312j BGB Compliance */}
             <button
               type="button"
               disabled={!agreeWithdrawalWaiver}
               onClick={handleProceedToWizard}
+              aria-label={isThirdOrMoreChild 
+                ? 'Kostenlos freischalten' 
+                : schoolYearCalc.isCurrentTrialPeriod 
+                  ? `Kostenfreien Schnuppermonat jetzt starten (${freeMonthDisplay})` 
+                  : 'Zahlungspflichtig bestellen'}
               style={{
                 background: !agreeWithdrawalWaiver 
                   ? '#94a3b8' 

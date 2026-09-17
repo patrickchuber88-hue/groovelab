@@ -56,6 +56,7 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
   const [biometricsStatus, setBiometricsStatus] = useState<'idle' | 'registering' | 'success' | 'error'>('idle');
   const [biometricsErrorMessage, setBiometricsErrorMessage] = useState('');
   const [isB2BConfirmed, setIsB2BConfirmed] = useState(false);
+  const [isAgbAvvConfirmed, setIsAgbAvvConfirmed] = useState(false);
 
   // Clean Zip Code Helper
   const cleanZip = zipCode.trim().replace(/^(DE|D|AT|A|CH)-?/i, '').trim();
@@ -73,7 +74,8 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
     street.trim().length >= 2 &&
     isZipValid &&
     city.trim().length >= 2 &&
-    isB2BConfirmed;
+    isB2BConfirmed &&
+    isAgbAvvConfirmed;
 
   const handleRegisterSchool = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -219,9 +221,10 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
         targetId: String(schoolRecord.id),
         metadata: {
           b2b_confirmed: true,
+          agb_avv_confirmed: true,
           country: country,
           subdomain: slug,
-          contract_terms: 'AGB Teil A (B2B) v2026.1',
+          contract_terms: 'AGB Teil A (B2B) & AVV v2026.3',
           audit_checksum: auditChecksum,
           signed_at: new Date().toISOString()
         }
@@ -701,6 +704,89 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
                 </span>
               </label>
 
+              {/* 🛡️ Zwingende aktive Opt-In Checkbox für B2B-AGB, Datenschutz & AVV (BGH & DSGVO Goldstandard) */}
+              <label style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '8px',
+                fontSize: '0.72rem',
+                lineHeight: 1.45,
+                color: '#334155',
+                background: '#f8fafc',
+                padding: '10px 12px',
+                borderRadius: '12px',
+                border: isAgbAvvConfirmed ? '1px solid #86efac' : '1px solid #cbd5e1',
+                marginTop: '2px',
+                textAlign: 'left'
+              }}>
+                <input
+                  type="checkbox"
+                  checked={isAgbAvvConfirmed}
+                  onChange={(e) => setIsAgbAvvConfirmed(e.target.checked)}
+                  style={{ marginTop: '2px', cursor: 'pointer', accentColor: '#15803d', flexShrink: 0 }}
+                />
+                <span>
+                  Ich habe die{' '}
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setLegalModalTab('terms');
+                      setShowLegalModal(true);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setLegalModalTab('terms');
+                        setShowLegalModal(true);
+                      }
+                    }}
+                    style={{ color: '#15803d', textDecoration: 'underline', cursor: 'pointer', fontWeight: 750, outline: 'none' }}
+                  >
+                    AGB für Bildungseinrichtungen (Teil A: B2B)
+                  </span>, die{' '}
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setLegalModalTab('privacy');
+                      setShowLegalModal(true);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setLegalModalTab('privacy');
+                        setShowLegalModal(true);
+                      }
+                    }}
+                    style={{ color: '#15803d', textDecoration: 'underline', cursor: 'pointer', fontWeight: 750, outline: 'none' }}
+                  >
+                    Datenschutzerklärung
+                  </span>{' '}
+                  sowie die{' '}
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setShowAvvModal(true);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setShowAvvModal(true);
+                      }
+                    }}
+                    style={{ color: '#15803d', textDecoration: 'underline', cursor: 'pointer', fontWeight: 750, outline: 'none' }}
+                  >
+                    Vereinbarung zur Auftragsverarbeitung (AVV nach Art. 28 DSGVO / Art. 9 nDSG)
+                  </span>{' '}
+                  vollständig zur Kenntnis genommen und akzeptiere diese verbindlich für die Bildungseinrichtung.
+                </span>
+              </label>
+
               {/* Submit CTA */}
               <button
                 type="submit"
@@ -708,7 +794,7 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
                 className="lean-btn-primary"
                 style={{
                   width: '100%',
-                  marginTop: '4px',
+                  marginTop: '6px',
                   opacity: (!isFormValid || loading) ? 0.6 : 1,
                   cursor: (!isFormValid || loading) ? 'not-allowed' : 'pointer'
                 }}
@@ -721,62 +807,9 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
                 )}
               </button>
 
-              {/* Rechtlicher Hinweis (B2B SaaS / AGB, Datenschutz & AVV) */}
-              <div style={{ fontSize: '0.68rem', color: '#94a3b8', textAlign: 'center', lineHeight: 1.45, padding: '0 6px' }}>
-                Mit Klick auf „Kostenfrei freischalten“ akzeptieren Sie unsere{' '}
-                <span
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => {
-                    setLegalModalTab('terms');
-                    setShowLegalModal(true);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      setLegalModalTab('terms');
-                      setShowLegalModal(true);
-                    }
-                  }}
-                  style={{ color: '#15803d', textDecoration: 'underline', cursor: 'pointer', fontWeight: 750, outline: 'none' }}
-                >
-                  AGB für Bildungseinrichtungen
-                </span>, die{' '}
-                <span
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => {
-                    setLegalModalTab('privacy');
-                    setShowLegalModal(true);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      setLegalModalTab('privacy');
-                      setShowLegalModal(true);
-                    }
-                  }}
-                  style={{ color: '#15803d', textDecoration: 'underline', cursor: 'pointer', fontWeight: 750, outline: 'none' }}
-                >
-                  Datenschutzerklärung
-                </span>{' '}
-                sowie die{' '}
-                <span
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => {
-                    setShowAvvModal(true);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      setShowAvvModal(true);
-                    }
-                  }}
-                  style={{ color: '#15803d', textDecoration: 'underline', cursor: 'pointer', fontWeight: 750, outline: 'none' }}
-                >
-                  Vereinbarung zur Auftragsverarbeitung (AVV nach Art. 28 DSGVO / Art. 9 nDSG)
-                </span>.
+              {/* Revisionssicherheits-Hinweis */}
+              <div style={{ fontSize: '0.66rem', color: '#94a3b8', textAlign: 'center', lineHeight: 1.4, padding: '0 6px' }}>
+                🔒 Revisionssichere B2B-Registrierung mit kryptografischem Audit-Trail (GoBD, BGB &amp; DSGVO konform)
               </div>
             </form>
           )}

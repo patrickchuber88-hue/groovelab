@@ -1,12 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ShieldCheck, FileText, Building, Undo2, Scale, Printer, Accessibility } from 'lucide-react';
+import { X, ShieldCheck, FileText, Building, Undo2, Scale, Printer, Accessibility, Shield, Server, FileCheck, HeartHandshake } from 'lucide-react';
 import { useMasterPricing } from '../context/MasterPricingContext';
+
+export type LegalTab = 
+  | 'impressum' 
+  | 'privacy' 
+  | 'terms' 
+  | 'avv' 
+  | 'sla' 
+  | 'school_parent_info' 
+  | 'child_protection' 
+  | 'cancellation' 
+  | 'accessibility';
 
 interface LegalTextModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'impressum' | 'privacy' | 'terms' | 'cancellation' | 'accessibility';
+  initialTab?: LegalTab;
 }
 
 export const LegalTextModal: React.FC<LegalTextModalProps> = ({
@@ -15,7 +26,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
   initialTab = 'impressum'
 }) => {
   const masterPricing = useMasterPricing();
-  const [activeTab, setActiveTab] = useState<'impressum' | 'privacy' | 'terms' | 'cancellation' | 'accessibility'>(initialTab);
+  const [activeTab, setActiveTab] = useState<LegalTab>(initialTab);
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -41,6 +52,18 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
     } else if (activeTab === 'terms') {
       docTitle = 'Campus-Groovelab – Allgemeine Geschäftsbedingungen (AGB)';
       tabHeading = 'Allgemeine Geschäftsbedingungen (AGB) – Teil A (B2B) & Teil B (B2C)';
+    } else if (activeTab === 'avv') {
+      docTitle = 'Campus-Groovelab – Auftragsverarbeitungsvertrag (AVV / Art. 28 DSGVO)';
+      tabHeading = 'Vereinbarung zur Auftragsverarbeitung (AVV nach Art. 28 DSGVO & nDSG) inkl. TOM';
+    } else if (activeTab === 'sla') {
+      docTitle = 'Campus-Groovelab – Service Level Agreement (SLA)';
+      tabHeading = 'Service Level Agreement (SLA) & Verfügbarkeitsgarantie (B2B)';
+    } else if (activeTab === 'school_parent_info') {
+      docTitle = 'Campus-Groovelab – Datenschutz-Musterinformation nach Art. 13 DSGVO';
+      tabHeading = 'Muster-Datenschutzinformation (Art. 13 DSGVO) für Erziehungsberechtigte & Schüler';
+    } else if (activeTab === 'child_protection') {
+      docTitle = 'Campus-Groovelab – Kinderschutz-Leitfaden & Netiquette (§ 8a SGB VIII)';
+      tabHeading = 'Kinderschutz-Leitfaden, Vier-Augen-Prinzip & Digitale Netiquette (§ 8a SGB VIII)';
     } else if (activeTab === 'cancellation') {
       docTitle = 'Campus-Groovelab – Widerrufsbelehrung & Muster-Widerrufsformular';
       tabHeading = 'Widerrufsbelehrung & Muster-Widerrufsformular (B2C)';
@@ -207,7 +230,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose, activeTab]);
 
-  const handleTabChange = (tab: 'impressum' | 'privacy' | 'terms' | 'cancellation' | 'accessibility') => {
+  const handleTabChange = (tab: LegalTab) => {
     setActiveTab(tab);
     if (contentRef.current) {
       contentRef.current.scrollTo({ top: 0, behavior: 'smooth' });
@@ -428,15 +451,21 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 background: '#e2e8f0',
                 padding: '3px',
                 borderRadius: '12px',
-                gap: '2px'
+                gap: '2px',
+                overflowX: 'auto',
+                WebkitOverflowScrolling: 'touch'
               }}
             >
               {[
-                { id: 'impressum', label: 'Impressum', icon: Building },
-                { id: 'privacy', label: 'Datenschutz', icon: ShieldCheck },
-                { id: 'terms', label: 'AGB', icon: FileText },
-                { id: 'cancellation', label: 'Widerruf (B2C)', icon: Undo2 },
-                { id: 'accessibility', label: 'Barrierefreiheit (BFSG)', icon: Accessibility }
+                { id: 'impressum' as const, label: 'Impressum', icon: Building },
+                { id: 'privacy' as const, label: 'Datenschutz', icon: ShieldCheck },
+                { id: 'terms' as const, label: 'AGB', icon: FileText },
+                { id: 'avv' as const, label: 'AVV (Art. 28)', icon: FileCheck },
+                { id: 'sla' as const, label: 'SLA', icon: Server },
+                { id: 'school_parent_info' as const, label: 'Eltern-Info (Art. 13)', icon: Shield },
+                { id: 'child_protection' as const, label: 'Kinderschutz (§ 8a)', icon: HeartHandshake },
+                { id: 'cancellation' as const, label: 'Widerruf (B2C)', icon: Undo2 },
+                { id: 'accessibility' as const, label: 'Barrierefreiheit (BFSG)', icon: Accessibility }
               ].map(tab => {
                 const isActive = activeTab === tab.id;
                 const Icon = tab.icon;
@@ -448,9 +477,9 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                     aria-selected={isActive}
                     aria-controls={`legal-tabpanel-${tab.id}`}
                     tabIndex={isActive ? 0 : -1}
-                    onClick={() => handleTabChange(tab.id as any)}
+                    onClick={() => handleTabChange(tab.id)}
                     style={{
-                      flex: 1,
+                      flex: '0 0 auto',
                       padding: '8px 12px',
                       borderRadius: '9px',
                       border: 'none',
@@ -498,6 +527,10 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
               {activeTab === 'impressum' && 'Impressum & Anbieterkennzeichnung'}
               {activeTab === 'privacy' && 'Datenschutzerklärung nach Art. 13, 14 & 21 DSGVO'}
               {activeTab === 'terms' && 'Allgemeine Geschäftsbedingungen (AGB) – Teil A (B2B) & Teil B (B2C)'}
+              {activeTab === 'avv' && 'Vereinbarung zur Auftragsverarbeitung (AVV nach Art. 28 DSGVO & nDSG) inkl. TOM'}
+              {activeTab === 'sla' && 'Service Level Agreement (SLA) & Verfügbarkeitsgarantie (B2B)'}
+              {activeTab === 'school_parent_info' && 'Muster-Datenschutzinformation (Art. 13 DSGVO) für Erziehungsberechtigte & Schüler'}
+              {activeTab === 'child_protection' && 'Kinderschutz-Leitfaden, Vier-Augen-Prinzip & Digitale Netiquette (§ 8a SGB VIII)'}
               {activeTab === 'cancellation' && 'Widerrufsbelehrung & Muster-Widerrufsformular (B2C)'}
               {activeTab === 'accessibility' && 'Erklärung zur Barrierefreiheit (BITV 2.0 / EN 301 549 / BFSG)'}
             </div>
@@ -899,7 +932,7 @@ Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig u
                 <div>
                   <strong style={{ color: '#0f172a' }}>7. B2B-Gewährleistung, Haftungsbegrenzung, Cyber-Security-Standard, Rechtswahl, Gerichtsstand &amp; Salvatorische Klausel</strong><br />
                   (1) Gegenüber Unternehmern und juristischen Personen des öffentlichen Rechts wird die verschuldensunabhängige Haftung des Betreibers für anfängliche Mängel (§ 536a Abs. 1 Alt. 1 BGB [DE] / § 1096 ABGB [AT] / Art. 259a OR [CH]) ausdrücklich und vollumfänglich ausgeschlossen. Bei einfacher Fahrlässigkeit haftet der Betreiber nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten) begrenzt auf den vertragstypisch vorhersehbaren Schaden. Eine Haftung für entgangenen Gewinn, mittelbare Schäden, Mangelfolgeschäden oder ausgefallene Unterrichtsstunden ist ausgeschlossen.<br />
-                  (2) <strong>Haftungshöchstgrenze (Liability Cap):</strong> Die Gesamthaftung des Betreibers für alle Schadensfälle innerhalb eines Kalenderjahres aus oder im Zusammenhang mit diesem Vertrag – gleich aus welchem Rechtsgrund – ist auf die Summe der vom Kunden in den letzten zwölf (12) Monaten vor Eintritt des schädigenden Ereignisses tatsächlich an den Betreiber entrichteten Netto-Vergütung, maximal jedoch auf einen Höchstbetrag von 10.000,00 € (bzw. CHF 10'000.00), beschränkt. Vorstehende Begrenzung gilt nicht bei Vorsatz, grober Fahrlässigkeit, bei Personenschäden (Verletzung von Leben, Körper oder Gesundheit) sowie bei gesetzlich zwingender Haftung (z. B. Produkthaftungsgesetz).<br />
+                  (2) <strong>Dynamische Haftungshöchstgrenze (Liability Cap) &amp; Koppelung an Cyber-Deckung:</strong> Die Gesamthaftung des Betreibers für alle Schadensfälle innerhalb eines Kalenderjahres aus oder im Zusammenhang mit diesem Vertrag – gleich aus welchem Rechtsgrund – ist auf die Summe der vom Kunden in den letzten zwölf (12) Monaten vor Eintritt des schädigenden Ereignisses tatsächlich an den Betreiber entrichteten Netto-Vergütung (mindestens jedoch 2.500,00 € und maximal 10.000,00 € bzw. CHF 10.000,00), beschränkt. Soweit ein Schaden durch die vom Betreiber nach Ziffer (6) unterhaltene gewerbliche Cyber- und IT-Haftpflichtversicherung gedeckt ist, beschränkt sich die Haftung der Höhe nach auf die von der Versicherung im konkreten Schadensfall tatsächlich erbrachte Versicherungsleistung (Deckungssumme 2.000.000,00 €). Vorstehende Begrenzungen gelten nicht bei Vorsatz, grober Fahrlässigkeit, bei Personenschäden (Verletzung von Leben, Körper oder Gesundheit) sowie bei gesetzlich zwingender Haftung (z. B. Produkthaftungsgesetz).<br />
                   (3) <strong>Datenverlust &amp; Mitverschuldensklausel (§ 254 BGB):</strong> Für den Verlust von Daten haftet der Betreiber der Höhe nach nur insoweit, als der Schaden auch bei ordnungsgemäßer und regelmäßiger Datensicherung durch den Kunden bzw. über das integrierte Schulausweis- und Datenexportmodul entstanden wäre. Die Haftung ist auf den typischen Wiederherstellungsaufwand beschränkt.<br />
                   (4) <strong>Mängelanzeigeobliegenheit (§ 536c BGB analog):</strong> Mängel der Plattform hat die Musikschule dem Betreiber unverzüglich nach deren Entdeckung in Textform (z. B. per E-Mail an <a href="mailto:support@campus-groovelab.de" style={{ color: '#2563eb' }}>support@campus-groovelab.de</a>) unter genauer Angabe der Fehlersymptome, des Auftretenszeitpunkts sowie Screenshots/Fehlerprotokollen anzuzeigen. Unterlässt die Musikschule die fristgerechte Anzeige schuldhaft, ist sie nicht berechtigt, Mietminderung geltend zu machen oder Schadensersatz wegen des Mangels zu verlangen, es sei denn, der Mangel war dem Betreiber bereits bekannt.<br />
                   (5) <strong>IT-Sicherheitsstandard &amp; Zero-Day-Vorfälle:</strong> Der Betreiber schuldet im Hinblick auf IT-Sicherheit die Einhaltung des anerkannten Stands der Technik (State of the Art nach Art. 32 DSGVO und BSI-Empfehlungen / OWASP ASVS Level 3). Für Sicherheitsvorfälle, die auf zuvor weltweit unbekannten Sicherheitslücken in Basissoftware-Komponenten (Zero-Day-Exploits) oder auf gezielten Cyber-Angriffen Dritter beruhen, haftet der Betreiber nicht, sofern er die branchenüblichen Schutzmaßnahmen nachweislich implementiert und verfügbare Sicherheitspatches unverzüglich eingespielt hat.<br />
@@ -981,6 +1014,414 @@ Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig u
                 <div>
                   <strong style={{ color: '#0f172a' }}>14. Salvatorische Erhaltungsklausel (§ 306 Abs. 2 BGB)</strong><br />
                   Sollten einzelne Bestimmungen dieser Plattform-Nutzungsbedingungen unwirksam oder undurchführbar sein, so bleibt die Gültigkeit der übrigen Bestimmungen hiervon unberührt. Anstelle der unwirksamen oder undurchführbaren Bestimmung gelten die gesetzlichen Vorschriften.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── AUFTRAGSVERARBEITUNGSVERTRAG (AVV / ART. 28 DSGVO) ── */}
+          {activeTab === 'avv' && (
+            <div 
+              role="tabpanel" 
+              id="legal-tabpanel-avv" 
+              aria-labelledby="legal-tab-avv" 
+              tabIndex={0} 
+              style={{ display: 'flex', flexDirection: 'column', gap: '18px', outline: 'none' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{
+                  background: '#f0fdf4',
+                  color: '#15803d',
+                  border: '1px solid #bbf7d0',
+                  padding: '3px 12px',
+                  borderRadius: '100px',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase'
+                }}>
+                  Art. 28 DSGVO &amp; Schweizer nDSG • Behördenstandard
+                </span>
+              </div>
+
+              <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
+                Vereinbarung zur Auftragsverarbeitung (AVV)
+              </h4>
+              <p style={{ margin: '-10px 0 0 0', fontSize: '0.80rem', color: '#64748b' }}>
+                Behördentauglicher Stand-Alone Vertrag nach Art. 28 Abs. 3 DSGVO für Musikschulen, kommunale Träger und Datenschutzbeauftragte inklusive vollständiger Technisch-Organisatorischer Maßnahmen (TOMs).
+              </p>
+
+              <div style={{
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '20px',
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                boxShadow: '0 2px 10px rgba(15, 23, 42, 0.02)'
+              }}>
+                <div>
+                  <strong style={{ color: '#0f172a' }}>1. Präambel, Gegenstand &amp; Dauer der Auftragsverarbeitung</strong><br />
+                  (1) Dieser Vertrag konkretisiert die datenschutzrechtlichen Rechte und Pflichten der Parteien im Rahmen der Nutzung der cloudbasierten Schulmanagement- und Übeplattform <strong>Campus-Groovelab</strong>.<br />
+                  (2) Die Musikschule ist und bleibt datenschutzrechtlich die alleinige <strong>Verantwortliche</strong> (Art. 4 Nr. 7 DSGVO / Art. 5 lit. j nDSG). Der Betreiber Patrick Huber (Einzelunternehmen) handelt ausschließlich als weisungsgebundener <strong>Auftragsverarbeiter</strong> (Art. 28 DSGVO / Art. 9 nDSG).<br />
+                  (3) Die Laufzeit dieser Vereinbarung entspricht der Laufzeit des Hauptvertrages über die Plattformbereitstellung.
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>2. Weisungsbefugnis des Auftraggebers (Art. 28 Abs. 3 lit. a DSGVO)</strong><br />
+                  (1) Der Auftragnehmer verarbeitet personenbezogene Daten ausschließlich auf dokumentierte Weisung des Auftraggebers. Die Weisungen werden anfänglich durch den Hauptvertrag festgelegt und können vom Auftraggeber nachträglich in Textform geändert oder ergänzt werden.<br />
+                  (2) Ist der Auftragnehmer der Ansicht, dass eine Weisung des Auftraggebers gegen die DSGVO oder andere Datenschutzvorschriften der Union oder der Mitgliedstaaten verstößt, weist er den Auftraggeber unverzüglich darauf hin.
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>3. Verpflichtung auf das Datengeheimnis (Art. 28 Abs. 3 lit. b DSGVO)</strong><br />
+                  Der Auftragnehmer gewährleistet, dass sich die zur Verarbeitung der personenbezogenen Daten befugten Personen zur Vertraulichkeit verpflichtet haben oder einer angemessenen gesetzlichen Verschwiegenheitspflicht unterliegen.
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>4. Technisch-Organisatorische Maßnahmen (Art. 28 Abs. 3 lit. c &amp; Art. 32 DSGVO)</strong><br />
+                  (1) Der Auftragnehmer trifft alle nach Art. 32 DSGVO erforderlichen technischen und organisatorischen Maßnahmen, um ein dem Risiko für die Rechte und Freiheiten der betroffenen Personen angemessenes Schutzniveau zu gewährleisten.<br />
+                  (2) Die konkret vereinbarten Maßnahmen ergeben sich aus <strong>Anlage 2</strong> zu diesem Vertrag. Der Auftragnehmer behält sich vor, getroffene Sicherheitsmaßnahmen an den technischen Fortschritt anzupassen, sofern das vertraglich vereinbarte Schutzniveau nicht unterschritten wird.
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>5. Unterauftragsverhältnisse (Art. 28 Abs. 3 lit. d &amp; Art. 28 Abs. 2 DSGVO)</strong><br />
+                  (1) Der Auftraggeber erteilt seine allgemeine Genehmigung zur Hinzuziehung von Unterauftragsverarbeitern. Genehmigt ist der Einsatz der <strong>Hetzner Online GmbH</strong>, Industriestr. 25, 91710 Gunzenhausen, Deutschland (Serverstandorte: Falkenstein/Vogtland und Nürnberg, Deutschland; ISO/IEC 27001 zertifiziert).<br />
+                  (2) Der Auftragnehmer informiert den Auftraggeber mindestens vierzehn (14) Tage im Voraus über jede beabsichtigte Änderung in Bezug auf die Hinzuziehung oder Ersetzung von Unterauftragsverarbeitern. Dem Auftraggeber steht ein Widerspruchsrecht aus wichtigem datenschutzrechtlichem Grund zu.
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>6. Unterstützungspflichten des Auftragnehmers (Art. 28 Abs. 3 lit. e &amp; f DSGVO)</strong><br />
+                  (1) <strong>Betroffenenrechte:</strong> Der Auftragnehmer unterstützt den Auftraggeber nach Möglichkeit mit geeigneten technischen und organisatorischen Maßnahmen bei der Erfüllung von Betroffenenrechten (Art. 12–22 DSGVO).<br />
+                  (2) <strong>Meldung von Datenschutzverletzungen:</strong> Der Auftragnehmer meldet dem Auftraggeber Verletzungen des Schutzes personenbezogener Daten unverzüglich, spätestens binnen <strong>48 Stunden</strong> nach Bekanntwerden (zur Wahrung der behördlichen 72h-Meldepflicht nach Art. 33 DSGVO).<br />
+                  (3) <strong>Datenschutz-Folgenabschätzungen:</strong> Der Auftragnehmer unterstützt den Auftraggeber bei der Einhaltung der in den Art. 32 bis 36 DSGVO genannten Pflichten (einschließlich Bereitstellung des behördlichen DPO-Compliance-Dossiers).
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>7. Löschung &amp; Rückgabe von Daten (Art. 28 Abs. 3 lit. g DSGVO)</strong><br />
+                  Nach Beendigung der Erbringung der Verarbeitungsleistungen löscht der Auftragnehmer alle personenbezogenen Daten nach Ablauf einer 30-tägigen Karenzfrist für den Datenexport unwiederbringlich und nach den Vorgaben der DIN 66398, sofern nicht nach dem Recht der Union oder der Mitgliedstaaten eine Verpflichtung zur Speicherung besteht.
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>8. Nachweis- &amp; Überprüfungsrechte (Art. 28 Abs. 3 lit. h DSGVO)</strong><br />
+                  Der Auftragnehmer stellt dem Auftraggeber alle erforderlichen Informationen zum Nachweis der Einhaltung der in Art. 28 DSGVO niedergelegten Pflichten zur Verfügung und ermöglicht Überprüfungen (einschließlich Inspektionen), die vom Auftraggeber oder einem von diesem beauftragten Prüfer durchgeführt werden.
+                </div>
+
+                {/* ANLAGE 1 */}
+                <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '20px' }}>
+                  <strong style={{ color: '#0f172a', fontSize: '0.90rem' }}>ANLAGE 1: Gegenstand, Art &amp; Zweck der Verarbeitung, Datenarten &amp; Betroffene</strong><br /><br />
+                  <strong>1. Gegenstand &amp; Zweck:</strong> Bereitstellung einer mandantenisolierten Cloud-Plattform zur digitalen Unterrichtsorganisation, Stundenplanung, Raumverwaltung, didaktischen Übebegleitung (Loopstation, Meisterwerk-Protokoll) und Schulkommunikation.<br /><br />
+                  <strong>2. Kategorien betroffener Personen:</strong><br />
+                  • Schülerinnen und Schüler der Musikschule<br />
+                  • Erziehungsberechtigte von minderjährigen Schülerinnen und Schülern<br />
+                  • Lehrkräfte und Dozenten der Musikschule<br />
+                  • Verwaltungsmitarbeiter und Schulleitungen<br /><br />
+                  <strong>3. Kategorien personenbezogener Daten:</strong><br />
+                  • Lehrkräfte &amp; Verwaltung: Vorname, Nachname, dienstliche E-Mail-Adresse, Kürzel, Fächer-/Instrumentenzuordnung, Raum- und Stundenplanzuweisungen.<br />
+                  • Schüler: Vorname, abgekürzter Nachname (z. B. „Max M.“), Geburtstag (Tag 1..31 zur Altersstufenberechnung; kein Geburtsmonat, kein Geburtsjahr), Instrumentenfach, Unterrichtszeit, Raum, stilisierter Musiker-Avatar.<br />
+                  • Erziehungsberechtigte: Identifikator der Elternfreigabe, verschlüsselter Hash der Eltern-PIN, Quittierungszeitstempel für häusliches Üben.<br />
+                  • Didaktische Daten: Übe-Zeiten, Gamification-XP, Level, Hausaufgaben-Notizen, temporäre didaktische Audioaufnahmen (Hausaufgaben- und Loopstation-Spuren im privaten Audio-Tresor).<br />
+                  • Metadaten &amp; Logfiles: IP-Adresse (gehasht/anonymisiert), User-Agent, Sitzungs-Lease-ID, Audit-Logs für Sicherheitsereignisse.<br /><br />
+                  <strong>4. Ausdrücklich ausgeschlossene Datenkategorien:</strong> Besondere Kategorien personenbezogener Daten gem. Art. 9 DSGVO (insbesondere Gesundheitsdaten, Atteste, Diagnosen oder biometrische Erkennungsdaten) sowie Bank-, SEPA- oder Kreditkartendaten von Schülern und Eltern.
+                </div>
+
+                {/* ANLAGE 2 */}
+                <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '20px' }}>
+                  <strong style={{ color: '#0f172a', fontSize: '0.90rem' }}>ANLAGE 2: Technisch-Organisatorische Maßnahmen (TOMs gem. Art. 32 DSGVO)</strong><br /><br />
+                  <strong>1. Vertraulichkeit (Art. 32 Abs. 1 lit. b DSGVO):</strong><br />
+                  • <em>Zutrittskontrolle:</em> Zutritt zu den Servern wird durch das zertifizierte Sicherheitskonzept der Hetzner Online GmbH (biometrische Zutrittskontrollen, 24/7-Kameraüberwachung, Vereinzelungsschleusen) gesichert.<br />
+                  • <em>Zugangskontrolle:</em> Authentifizierung über passwortlose FIDO2-Hardware-Passkeys (WebAuthn), kryptografische Schulausweis-Tokens und PBKDF2-gehashte PINs (100.000 Runden SHA-512). Progressive Rate-Limiter (3-Strike-Sperre) gegen Brute-Force.<br />
+                  • <em>Zugriffskontrolle:</em> Strikte PostgreSQL Row Level Security (RLS) mit Mandantentrennung auf Datenbankebene (<code style={{ background: '#e2e8f0', padding: '2px 4px', borderRadius: '4px' }}>school_id = get_current_user_school_id()</code>). View-Maskierung sensibler Felder (<code style={{ background: '#e2e8f0', padding: '2px 4px', borderRadius: '4px' }}>users_view</code> liefert niemals Klartext-Geheimnisse).<br />
+                  • <em>Trennungskontrolle:</em> Mandantenisolierte Datenspeicherung; rollenbasierte Autorisierungs-Gates (Admin, Teacher, Student).<br />
+                  • <em>Pseudonymisierung &amp; Verschlüsselung:</em> Durchgehende TLS 1.3 Transportverschlüsselung; Ruhedatenverschlüsselung (AES-256); Ephemere signierte HMAC-Zugriffstokens (60s Gültigkeit) für didaktische Audios.<br /><br />
+                  <strong>2. Integrität (Art. 32 Abs. 1 lit. b DSGVO):</strong><br />
+                  • <em>Weitergabekontrolle:</em> Kein unverschlüsselter Datentransport; Übertragungen erfolgen ausschließlich über HTTPS/WSS.<br />
+                  • <em>Eingabekontrolle:</em> Revisionssichere, manipulationsgeschützte Audit-Logs (<code style={{ background: '#e2e8f0', padding: '2px 4px', borderRadius: '4px' }}>public.audit_logs</code>) mit SHA-256 Hash-Chaining nach GoBD- und OWASP ASVS Level 3-Standard.<br /><br />
+                  <strong>3. Verfügbarkeit &amp; Belastbarkeit (Art. 32 Abs. 1 lit. b &amp; c DSGVO):</strong><br />
+                  • Tägliche automatisierte verschlüsselte Backups im ISO 27001-zertifizierten deutschen Rechenzentrum.<br />
+                  • Redundante Stromversorgung (USV/Diesel-Notstromaggregate) und mehrfach redundante Netzanbindung.<br />
+                  • Lokaler IndexedDB Audio-Tresor auf Endgeräten für 0ms Offline-Pufferung und Ausfallsicherheit.<br /><br />
+                  <strong>4. Verfahren zur regelmäßigen Überprüfung, Bewertung &amp; Evaluierung (Art. 32 Abs. 1 lit. d DSGVO):</strong><br />
+                  • Automatisierte Security Drift Guards und Secret-Leak-Scanner im Continuous-Integration-Workflow.<br />
+                  • Regelmäßige interne Security-Audits und Schwachstellenscans.<br />
+                  • Notfallwiederherstellungsplan (Disaster Recovery Plan) mit dokumentierten Wiederherstellungstests.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── SERVICE LEVEL AGREEMENT (SLA / B2B) ── */}
+          {activeTab === 'sla' && (
+            <div 
+              role="tabpanel" 
+              id="legal-tabpanel-sla" 
+              aria-labelledby="legal-tab-sla" 
+              tabIndex={0} 
+              style={{ display: 'flex', flexDirection: 'column', gap: '18px', outline: 'none' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{
+                  background: '#eff6ff',
+                  color: '#1d4ed8',
+                  border: '1px solid #bfdbfe',
+                  padding: '3px 12px',
+                  borderRadius: '100px',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase'
+                }}>
+                  B2B Service Level Agreement • 99,5 % Verfügbarkeit
+                </span>
+              </div>
+
+              <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
+                Service Level Agreement (SLA) &amp; Verfügbarkeitsgarantie
+              </h4>
+              <p style={{ margin: '-10px 0 0 0', fontSize: '0.80rem', color: '#64748b' }}>
+                Verbindliche Qualitätsstandards, Störungsklassen P1–P4, garantierte Reaktionszeiten und Gutschriftsregelungen (Service Credits) für Musikschulen.
+              </p>
+
+              <div style={{
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '20px',
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                boxShadow: '0 2px 10px rgba(15, 23, 42, 0.02)'
+              }}>
+                <div>
+                  <strong style={{ color: '#0f172a' }}>1. Geltungsbereich &amp; Verfügbarkeitszusage</strong><br />
+                  (1) Dieses Service Level Agreement regelt die Verfügbarkeit und den Support der Cloud-Plattform Campus-Groovelab für vertraglich gebundene Musikschulen und kommunale Träger.<br />
+                  (2) Der Betreiber garantiert eine <strong>Verfügbarkeit der Cloud-Infrastruktur von 99,5 % im Jahresmittel</strong> (Berechnungsgrundlage: 24 Stunden an 365 Tagen abzüglich vereinbarter Wartungsfenster).
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>2. Geplante Wartungsfenster</strong><br />
+                  (1) Geplante Wartungsarbeiten zur Aktualisierung der Server, Sicherheits-Patches und Datenbank-Optimierungen werden vorzugsweise außerhalb der regulären Kernunterrichtszeiten durchgeführt (werktags zwischen 22:00 Uhr und 06:00 Uhr MEZ oder an Sonn- und gesetzlichen Feiertagen).<br />
+                  (2) Wartungsarbeiten werden der Musikschule mit einer Frist von mindestens <strong>48 Stunden</strong> per E-Mail oder System-Banner angekündigt. Während ordnungsgemäß angekündigter Wartungsfenster gilt die Plattform nicht als unverfügbar.
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>3. Störungsklassen &amp; Reaktionszeiten</strong><br />
+                  Meldungen über technische Störungen werden nach folgendem Klassifizierungsschema bearbeitet (Kern-Supportzeiten an Werktagen: Mo–Fr 08:30–17:00 Uhr MEZ):<br /><br />
+                  • <strong>Priorität 1 (Kritisch – Systemausfall):</strong> Die Plattform oder wesentliche Kernfunktionen (Login, Datenbankzugriff) sind für alle oder eine Vielzahl von Nutzern vollständig nicht erreichbar.<br />
+                  &nbsp;&nbsp;➔ <em>Erste Reaktionszeit:</em> <strong>&lt; 2 Stunden</strong> während der Kernzeit (max. 4 Stunden außerhalb).<br />
+                  &nbsp;&nbsp;➔ <em>Wiederherstellung / Workaround angestrebt:</em> <strong>&lt; 8 Stunden</strong>.<br /><br />
+                  • <strong>Priorität 2 (Hoch – Wesentliche Teilsysteme beeinträchtigt):</strong> Wichtige Funktionen (z. B. Stundenplaner, Audio-Player oder Raumverwaltung) weisen erhebliche Mängel auf, der Basisbetrieb läuft jedoch eingeschränkt weiter.<br />
+                  &nbsp;&nbsp;➔ <em>Erste Reaktionszeit:</em> <strong>&lt; 4 Stunden</strong>.<br />
+                  &nbsp;&nbsp;➔ <em>Lösung oder Fehlerumgehung angestrebt:</em> <strong>&lt; 24 Stunden</strong>.<br /><br />
+                  • <strong>Priorität 3 (Mittel – Einzelfunktion beeinträchtigt):</strong> Einzelne Komfortfunktionen (z. B. Gamification-XP, Profilavatar-Wechsel) sind fehlerhaft, der reguläre Unterrichtsbetrieb ist nicht gefährdet.<br />
+                  &nbsp;&nbsp;➔ <em>Erste Reaktionszeit:</em> <strong>&lt; 8 Stunden</strong>.<br />
+                  &nbsp;&nbsp;➔ <em>Bearbeitung:</em> Im regulären wöchentlichen Releasezyklus.<br /><br />
+                  • <strong>Priorität 4 (Niedrig – Allgemeine Supportanfragen &amp; Bedienhinweise):</strong> Allgemeine Beratungs-, Bedien- oder Einrichtungsfragen.<br />
+                  &nbsp;&nbsp;➔ <em>Erste Reaktionszeit:</em> <strong>&lt; 24 Stunden</strong> an Werktagen.
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>4. Service Credits &amp; Minderungsgutschriften</strong><br />
+                  Wird die garantierte Verfügbarkeit von 99,5 % in einem Abrechnungsmonat aus vom Betreiber zu vertretenden Gründen unterschritten, erhält die Musikschule auf schriftliche Anforderung innerhalb von 30 Tagen folgende Gutschriften auf die monatliche Hosting-Flatrate:<br /><br />
+                  • <strong>99,00 % bis 99,49 % Verfügbarkeit:</strong> 5 % Gutschrift auf das Monats-Hosting.<br />
+                  • <strong>98,00 % bis 98,99 % Verfügbarkeit:</strong> 10 % Gutschrift auf das Monats-Hosting.<br />
+                  • <strong>Unter 98,00 % Verfügbarkeit:</strong> 20 % Gutschrift auf das Monats-Hosting.<br /><br />
+                  Service Credits werden mit künftigen Abrechnungen verrechnet. Weitergehende Schadensersatzansprüche bleiben von den Regelungen des § 7 der AGB unberührt.
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>5. Ausschlüsse (Höhere Gewalt &amp; Netzinfrastruktur)</strong><br />
+                  Als Ausfallzeit gelten nicht: (a) Ausfälle infolge höherer Gewalt, kriegerischer Ereignisse, Naturkatastrophen oder behördlicher Anordnungen; (b) flächendeckende Störungen überregionaler Internet-Backbone-Betreiber oder Telekommunikationsanbieter; (c) DDoS-Angriffe oder Cyber-Attacken, die trotz angemessener und dem Stand der Technik entsprechender Schutzmaßnahmen nicht abgewehrt werden konnten; (d) Ausfälle, die auf Fehlbedienungen oder fehlerhafter IT-Infrastruktur der Musikschule beruhen.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── MUSTER-DATENSCHUTZINFORMATION NACH ART. 13 DSGVO FÜR MUSIKSCHULEN ── */}
+          {activeTab === 'school_parent_info' && (
+            <div 
+              role="tabpanel" 
+              id="legal-tabpanel-school_parent_info" 
+              aria-labelledby="legal-tab-school_parent_info" 
+              tabIndex={0} 
+              style={{ display: 'flex', flexDirection: 'column', gap: '18px', outline: 'none' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{
+                  background: '#fef3c7',
+                  color: '#92400e',
+                  border: '1px solid #fde68a',
+                  padding: '3px 12px',
+                  borderRadius: '100px',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase'
+                }}>
+                  Muster für Musikschulen • Art. 13 DSGVO / Art. 19 nDSG
+                </span>
+              </div>
+
+              <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
+                Muster-Datenschutzinformation für Eltern &amp; Schüler
+              </h4>
+              <p style={{ margin: '-10px 0 0 0', fontSize: '0.80rem', color: '#64748b' }}>
+                Ready-to-Use Vorlage zur Aushändigung durch die Musikschule an Erziehungsberechtigte und Schülerinnen/Schüler gemäß Art. 13 und 14 DSGVO.
+              </p>
+
+              <div style={{
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '20px',
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                boxShadow: '0 2px 10px rgba(15, 23, 42, 0.02)'
+              }}>
+                <div style={{ background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: '12px', padding: '14px', fontSize: '0.82rem', color: '#475569' }}>
+                  <strong>Hinweis für die Musikschulleitung / Datenschutzbeauftragte:</strong><br />
+                  Dieses Musterdokument können Sie mit Ihren Einrichtungsdaten ergänzen und Ihren Schülerinnen, Schülern und Erziehungsberechtigten bei der Anmeldung oder beim ersten Login in gedruckter oder digitaler Form aushändigen.
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>1. Name und Kontaktdaten des Verantwortlichen</strong><br />
+                  Verantwortliche Stelle im Sinne der Datenschutz-Grundverordnung (DSGVO) ist:<br />
+                  <strong>[Name Ihrer Musikschule / Trägerschaft]</strong><br />
+                  [Straße, Hausnummer, PLZ, Ort]<br />
+                  Telefon: [Telefonnummer] • E-Mail: [E-Mail-Adresse der Musikschule]<br />
+                  Vertreten durch die Schulleitung: [Name der Schulleitung]
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>2. Kontaktdaten des Datenschutzbeauftragten</strong><br />
+                  Unseren behördlichen/betrieblichen Datenschutzbeauftragten erreichen Sie unter:<br />
+                  [Name des DPO / Stelle], E-Mail: [datenschutz@musikschule-musterstadt.de]
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>3. Zwecke und Rechtsgrundlagen der Datenverarbeitung</strong><br />
+                  Wir nutzen die Schul-Cloud <strong>Campus-Groovelab</strong> zur didaktischen Begleitung und organisatorischen Abwicklung des Musikschulunterrichts:<br /><br />
+                  • <strong>Unterrichtsorganisation &amp; Stundenplan:</strong> Bereitstellung von Stundenplänen, Raumzuteilungen und Unterrichtsterminen. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (Erfüllung des Unterrichtsvertrags).<br />
+                  • <strong>Didaktisches Üben &amp; Hausaufgaben:</strong> Führung des digitalen Hausaufgabenhefts, Übe-Timer und Meisterwerk-Protokoll. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO.<br />
+                  • <strong>Didaktische Audioaufnahmen (Hausaufgaben/Loops):</strong> Freiwillige Aufnahmen im häuslichen Üben zur pädagogischen Rückmeldung mit der Lehrkraft. Rechtsgrundlage ist Art. 6 Abs. 1 lit. a DSGVO (Einwilligung) bzw. Art. 6 Abs. 1 lit. b DSGVO.
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>4. Datenminimierung &amp; Kategorien personenbezogener Daten</strong><br />
+                  Die Plattform arbeitet nach dem Grundsatz der strikten Datenminimierung:<br />
+                  • Schüler werden standardmäßig nur mit Vornamen und abgekürztem Nachnamen geführt (z. B. „Lukas M.“).<br />
+                  • Es werden keine Bank-, Kontoverbindungs- oder Kreditkartendaten in der Schülerplattform erfasst.<br />
+                  • Es werden keine sensiblen Gesundheitsdaten (Art. 9 DSGVO) oder ärztlichen Atteste gespeichert; bei Abwesenheiten genügt die Angabe „verhindert“.<br />
+                  • Für Kinder von 6 bis 9 Jahren verbleibt das Endgerät bei den Eltern (Screenless Practice mit 1-Klick-Quittierung am realen Instrument).
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>5. Empfänger der Daten (Auftragsverarbeitung)</strong><br />
+                  Die Daten werden in unserem Auftrag (Art. 28 DSGVO) durch den technischen Plattformbetreiber verarbeitet:<br />
+                  <strong>Patrick Huber – Softwareentwicklung &amp; Cloud-Dienstleistungen</strong>, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden, Deutschland.<br />
+                  Das Hosting erfolgt ausnahmslos in ISO 27001-zertifizierten deutschen Rechenzentren (Hetzner Online GmbH, Falkenstein &amp; Nürnberg). Eine Übermittlung in Drittstaaten außerhalb der EU/EWR findet nicht statt.
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>6. Speicherdauer &amp; Löschfristen (DIN 66398)</strong><br />
+                  • Schülerdaten bleiben für die Dauer des aktiven Unterrichtsverhältnisses gespeichert.<br />
+                  • Temporäre Audioaufnahmen (Hausaufgaben- und Übespuren) verbleiben bis zum Ende des jeweiligen Schuljahres im geschützten Cloud-Speicher und können von Eltern und Schülern jederzeit per 1-Klick gelöscht werden.<br />
+                  • Nach Beendigung des Musikschulvertrags werden alle Daten nach einer 30-tägigen Export-Karenzfrist endgültig und unwiederbringlich gelöscht.
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>7. Ihre Rechte als betroffene Person (Art. 15–21 DSGVO)</strong><br />
+                  Sie haben gegenüber der Musikschule jederzeit das Recht auf Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16 DSGVO), Löschung (Art. 17 DSGVO), Einschränkung der Verarbeitung (Art. 18 DSGVO), Datenübertragbarkeit (Art. 20 DSGVO) sowie Widerspruch (Art. 21 DSGVO). Zudem steht Ihnen ein Beschwerderecht bei der zuständigen Landesdatenschutzaufsichtsbehörde zu.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── KINDERSCHUTZ-LEITFADEN & NETIQUETTE (§ 8a SGB VIII) ── */}
+          {activeTab === 'child_protection' && (
+            <div 
+              role="tabpanel" 
+              id="legal-tabpanel-child_protection" 
+              aria-labelledby="legal-tab-child_protection" 
+              tabIndex={0} 
+              style={{ display: 'flex', flexDirection: 'column', gap: '18px', outline: 'none' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{
+                  background: '#fdf2f8',
+                  color: '#be185d',
+                  border: '1px solid #fbcfe8',
+                  padding: '3px 12px',
+                  borderRadius: '100px',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase'
+                }}>
+                  Kinderschutz &amp; BKiSchG • § 8a SGB VIII
+                </span>
+              </div>
+
+              <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
+                Kinderschutz-Leitfaden, Vier-Augen-Prinzip &amp; Digitale Netiquette
+              </h4>
+              <p style={{ margin: '-10px 0 0 0', fontSize: '0.80rem', color: '#64748b' }}>
+                Institutionelles Schutzkonzept zur Prävention digitaler Grenzverletzungen und Wahrung des Kindeswohls im Musikschulalltag.
+              </p>
+
+              <div style={{
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '20px',
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+                boxShadow: '0 2px 10px rgba(15, 23, 42, 0.02)'
+              }}>
+                <div>
+                  <strong style={{ color: '#0f172a' }}>1. Präambel &amp; Institutioneller Schutzauftrag (§ 8a SGB VIII / BKiSchG)</strong><br />
+                  (1) Musikschulen sind geschützte Bildungsräume, an denen das körperliche, geistige und seelische Wohl von Kindern und Jugendlichen oberste Priorität besitzt. Die Plattform Campus-Groovelab wurde unter strikter Beachtung des Bundeskinderschutzgesetzes (BKiSchG) und der fachlichen Empfehlungen der Landesjugendämter konzipiert.<br />
+                  (2) Digitale Lehr- und Lernwerkzeuge dürfen zu keinem Zeitpunkt zur Anbahnung unüberwachter oder grenzverletzender Kontakte missbraucht werden.
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>2. Vier-Augen-Prinzip &amp; Transparenzgebot bei 1:1-Kommunikation</strong><br />
+                  (1) Um unüberwachte digitale Einzelkontakte zwischen erwachsenen Lehrkräften und minderjährigen Schülerinnen und Schülern wirksam auszuschließen, gilt in allen internen Kommunikationsmodulen (Campus Direct Messages, Hausaufgaben-Notizen) das <strong>Vier-Augen-Prinzip</strong>.<br />
+                  (2) Erziehungsberechtigte haben über den PIN-geschützten Elternbereich jederzeit vollen Einblick in den gesamten digitalen Nachrichten- und Hausaufgabenverlauf ihres Kindes. Es existieren keine verdeckten oder selbstlöschenden Kanäle.<br />
+                  (3) Lehrkräfte sind angehalten, Nachrichten ausschließlich im sachlichen Kontext von Unterrichtsinhalten, Notenmaterial, Terminabsprachen und didaktischem Feedback zu formulieren.
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>3. Verbot privater Peer-to-Peer Schüler-Chats</strong><br />
+                  Zur Vorbeugung von Cybermobbing, Belästigung und unkontrollierter Gruppendynamik unter Minderjährigen ist ein privater, unüberwachter Direkt-Chat zwischen Schülern untereinander serverseitig <strong>vollständig deaktiviert</strong>. Schülern steht lediglich die ensemble-bezogene Shoutbox im Rahmen moderierter Band- und Kammermusik-Räume unter Aufsicht der jeweiligen Lehrkraft zur Verfügung.
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>4. Bildschirmfreies Üben für jüngere Kinder (Screenless Practice)</strong><br />
+                  Für Kinder im Grundschulalter (insbesondere 6 bis 9 Jahre) empfiehlt und unterstützt Campus-Groovelab das didaktische Konzept des bildschirmfreien Übens. Das Smartphone oder Tablet verbleibt bei den Erziehungsberechtigten; Übezeiten am echten Instrument werden über eine 1-Klick-Quittierung verbucht, ohne dass Kinder während des Musizierens auf ein Display schauen müssen.
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>5. Digitale Netiquette &amp; Kommunikationsregeln</strong><br />
+                  • Einander respektvoll, ermutigend und wertschätzend begegnen.<br />
+                  • Keine Weitergabe persönlicher Telefonnummern oder privater Social-Media-Accounts (z. B. WhatsApp, TikTok, Instagram) über die Schulplattform.<br />
+                  • Keine Veröffentlichung oder Weitergabe von Schülerfotos, Videoaufnahmen oder Tonspuren an Dritte oder auf öffentlichen Plattformen ohne ausdrückliche schriftliche Einwilligung aller Erziehungsberechtigten.<br />
+                  • Strikte Einhaltung der Nachtruhe: Lehrkräfte und Schulleitungen sind angehalten, an Werktagen nach 20:00 Uhr sowie an Wochenenden keine unterrichtsbezogenen Nachrichten an Schüler zu versenden (Recht auf Nichterreichbarkeit).
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>6. Meldekanal &amp; Eskalationsverfahren bei Verdachtsmeldungen</strong><br />
+                  Haben Schülerinnen, Schüler, Eltern oder Lehrkräfte den Eindruck, dass Grenzen überschritten werden, oder bestehen Anhaltspunkte für Kindeswohlgefährdungen, stehen folgende Melde- und Hilfewege zur Verfügung:<br /><br />
+                  • <strong>Schulinterne Meldestelle:</strong> Wenden Sie sich vertraulich an die Schulleitung oder die benannte Kinderschutz-Fachkraft Ihrer Musikschule.<br />
+                  • <strong>Plattform-Meldekanal:</strong> Verdachtsmeldungen können jederzeit vertraulich an den Betreiber gerichtet werden:<br />
+                  &nbsp;&nbsp;E-Mail: <a href="mailto:kinderschutz@campus-groovelab.de" style={{ color: '#be185d', fontWeight: 700 }}>kinderschutz@campus-groovelab.de</a><br />
+                  • <strong>Externe Notfall-Hilfetelefone:</strong><br />
+                  &nbsp;&nbsp;Nummer gegen Kummer (Kinder- &amp; Jugendtelefon): <strong>116 111</strong> (kostenfrei &amp; anonym)<br />
+                  &nbsp;&nbsp;Elterntelefon: <strong>0800 111 0550</strong> (kostenfrei &amp; anonym)<br />
+                  &nbsp;&nbsp;Hilfetelefon Sexueller Missbrauch: <strong>0800 22 55 530</strong>
                 </div>
               </div>
             </div>

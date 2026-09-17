@@ -15,7 +15,11 @@ import {
   HardDrive, Cloud, Crown, Rocket, Cpu, Fingerprint, Smartphone, KeyRound, RotateCw, LayoutGrid, Mic, Smile, Radio, Archive,
   Disc3, Menu, ScrollText
 } from 'lucide-react';
-import { isWebAuthnSupported, registerUserBiometrics, authenticateUserBiometrics, getStoredBiometricProfiles, removeBiometricProfile, BiometricVaultProfile } from '../utils/webauthn';
+import { useSecretarySettings } from './secretary/hooks/useSecretarySettings';
+import { useSecretaryLicenses, computeB2BPricingMetrics } from './secretary/hooks/useSecretaryLicenses';
+import { useSecretaryBookings } from './secretary/hooks/useSecretaryBookings';
+import { useSecretaryLiveLab } from './secretary/hooks/useSecretaryLiveLab';
+import { useSecretaryNavigation } from './secretary/hooks/useSecretaryNavigation';
 import { usePremiumOnboardingTour, TourStep } from './PremiumOnboardingTour';
 import { CampusGroovelabBrand, CampusGroovelabText, CampusGroovelabLogo } from './CampusGroovelabBrand';
 import QRCode from 'react-qr-code';
@@ -24,7 +28,6 @@ import { UpdateAnnouncementHero } from './common/UpdateAnnouncementHero';
 import { ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
 import { StudentToDelete } from './ConfirmDeleteStudentModal';
 import { deleteStudentFully } from '../utils/studentDeletionService';
-import { scrubSharedDeviceCache } from '../utils/sharedDeviceScrubber';
 import { getParentOnboardingUrl, isDevEnvironment } from '../utils/tenantUrlHelper';
 import { isUUID } from '../utils/uuidValidator';
 import { getAlphabeticalHue, getAlphabeticalUniColor } from '../utils/adminColorHelpers';
@@ -55,10 +58,9 @@ import {
   isTestOrGenericStudent, 
   deduplicateRoster 
 } from '../services/studentRosterService';
-import { notesService, UserNote } from '../services/notesService';
 import { formatCleanNoteContent } from './notes/notesConstants';
 import { DEFAULT_FOKUS_LEVELS } from '../utils/studentProgressEngine';
-import { generateStarterPin, generateSecureQrToken } from './secretary/utils/secretaryAuthUtils';
+import { generateStarterPin } from './secretary/utils/secretaryAuthUtils';
 import { useSecretaryStaff } from './secretary/hooks/useSecretaryStaff';
 import { useSecretaryStudents } from './secretary/hooks/useSecretaryStudents';
 import { useSecretaryCrisis } from './secretary/hooks/useSecretaryCrisis';
@@ -566,39 +568,28 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     fetchOperatorBillingSettings();
   }, []);
 
-  // Navigation
-  const [activeTab, setActiveTab] = useState<'secretary' | 'campus' | 'groovelab'>(() => {
-    const saved = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace')) : null;
-    if (saved === 'campus' || saved === 'groovelab' || saved === 'secretary') return saved as any;
-    return 'secretary';
+  // 🧭 Step 3.20: Modular Secretary Navigation, Responsive Viewport & Shell Engine
+  const {
+    activeTab,
+    setActiveTab,
+    secretarySubTab,
+    setSecretarySubTab,
+    campusSubTab,
+    setCampusSubTab,
+    groovelabSubTab,
+    setGroovelabSubTab,
+    mobileSecretaryDrawerOpen,
+    setMobileSecretaryDrawerOpen,
+    windowWidth,
+    windowHeight,
+    containerWidth,
+    setContainerWidth,
+    containerRef,
+    getTabTitle,
+    handleSecretaryLogout
+  } = useSecretaryNavigation({
+    onLogout
   });
-  const [secretarySubTab, setSecretarySubTab] = useState<'briefing' | 'employees' | 'licenses' | 'setup' | 'rooms' | 'equipment' | 'crisis' | 'audit' | 'duties' | 'announcements'>(() => {
-    const saved = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_secretary_subtab') || localStorage.getItem('groovelab_secretary_subtab')) : null;
-    const valid = ['briefing', 'employees', 'licenses', 'setup', 'rooms', 'equipment', 'crisis', 'audit', 'duties', 'announcements'];
-    if (saved && valid.includes(saved)) return (saved === 'duties' ? 'announcements' : saved) as any;
-    return 'briefing';
-  });
-
-  // 🛡️ Zero Data Remanence & Forensic Purge beim Sekretariats-Logout (DSGVO Art. 17 / Art. 32)
-  const handleSecretaryLogout = async () => {
-    try {
-      if (typeof window !== 'undefined') {
-        sessionStorage.removeItem('groovelab_secretary_subtab');
-        sessionStorage.removeItem('groovelab_active_workspace');
-        localStorage.removeItem('groovelab_secretary_subtab');
-        localStorage.removeItem('groovelab_active_workspace');
-        localStorage.removeItem('groovelab_school_overrides');
-        localStorage.removeItem('campus_school_overrides');
-        localStorage.removeItem('groovelab_school_profile');
-      }
-      await scrubSharedDeviceCache();
-    } catch (e) {
-      console.warn('[SecretaryDashboard] Logout scrubber note:', e);
-    }
-    if (onLogout) {
-      onLogout();
-    }
-  };
 
   // 🎙️ Dynamic Multi-Layer Audio-Vault Calculator (Local-First + Cloud Reconciliation)
   const getEffectiveStorageUsedBytes = (profile: any): number => {
@@ -875,143 +866,13 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       refreshStorageQuota();
     }
   }, [currentSchoolProfile?.id]);
-  const [campusSubTab, setCampusSubTab] = useState<'briefing' | 'subjects' | 'onboarding' | 'students' | 'events' | 'schedules' | 'status' | 'rooms'>(() => {
-    const saved = typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_campus_subtab') || localStorage.getItem('groovelab_campus_subtab')) : null;
-    const valid = ['briefing', 'subjects', 'onboarding', 'students', 'events', 'schedules', 'status', 'rooms'];
-    if (saved && valid.includes(saved)) return saved as any;
-    return 'briefing';
-  });
+  // [EXTRACTED to useSecretaryNavigation: campusSubTab]
   const [enabledCampusSubjects, setEnabledCampusSubjects] = useState<boolean>(true);
   const [enabledCampusRooms, setEnabledCampusRooms] = useState<boolean>(true);
   const [enabledCampusEvents, setEnabledCampusEvents] = useState<boolean>(true);
   const [enabledCampusSchedules, setEnabledCampusSchedules] = useState<boolean>(true);
   const [enabledCalendarWidget, setEnabledCalendarWidget] = useState<boolean>(true);
-  const [enabledQrLogin, setEnabledQrLogin] = useState<boolean>(true);
-
-  const handleToggleSetting = async (key: string, value: boolean, setter: (val: boolean) => void) => {
-    setter(value);
-    try {
-      const currentOp = openingHours || {};
-      const updatedOp = { ...currentOp, [key]: value };
-      setOpeningHours(updatedOp);
-      if (schoolId) {
-        await supabase.from('schools').update({ opening_hours: updatedOp }).eq('id', schoolId);
-      }
-    } catch (err) {
-      console.error('Error saving setting:', err);
-    }
-  };
-
-  const handleSaveSettingValue = async (key: string, value: any, setter?: (val: any) => void) => {
-    if (setter) setter(value);
-    try {
-      const currentOp = openingHours || {};
-      const updatedOp = { ...currentOp, [key]: value };
-      setOpeningHours(updatedOp);
-      if (schoolId) {
-        await supabase.from('schools').update({ opening_hours: updatedOp }).eq('id', schoolId);
-      }
-    } catch (err) {
-      console.error('Error saving setting value:', err);
-    }
-  };
-
-  const handleToggleAutoClean = async (nextVal: boolean) => {
-    setAutoDeleteExpiredUsers(nextVal);
-    setInitialSettings((prev: any) => prev ? ({ ...prev, autoDeleteExpiredUsers: nextVal }) : prev);
-    try {
-      const currentOp = openingHours || {};
-      const updatedOp = { ...currentOp, auto_delete_expired_users: nextVal };
-      setOpeningHours(updatedOp);
-      
-      try {
-        const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
-        const overrides = JSON.parse(overridesStr);
-        if (schoolId) {
-          overrides[schoolId] = {
-            ...(overrides[schoolId] || {}),
-            auto_delete_expired_users: nextVal,
-            opening_hours: updatedOp
-          };
-          localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
-        }
-      } catch (e) {}
-
-      if (schoolId) {
-        const { error } = await supabase
-          .from('schools')
-          .update({
-            auto_delete_expired_users: nextVal,
-            opening_hours: updatedOp
-          })
-          .eq('id', schoolId);
-        
-        if (error) {
-          await supabase
-            .from('schools')
-            .update({
-              opening_hours: updatedOp
-            })
-            .eq('id', schoolId);
-        }
-      }
-    } catch (err) {
-      console.error('[SecretarySettings] Error toggling auto-clean:', err);
-    }
-  };
-
-  const handleUpdateSchoolYear = async (newMonth: number, newDay: number) => {
-    setSchoolYearStartMonth(newMonth);
-    setSchoolYearStartDay(newDay);
-    setInitialSettings((prev: any) => prev ? ({ ...prev, schoolYearStartMonth: newMonth, schoolYearStartDay: newDay }) : prev);
-
-    try {
-      const currentOp = openingHours || {};
-      const updatedOp = {
-        ...currentOp,
-        school_year_start_month: newMonth,
-        school_year_start_day: newDay,
-        auto_delete_expired_users: autoDeleteExpiredUsers
-      };
-      setOpeningHours(updatedOp);
-
-      try {
-        const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
-        const overrides = JSON.parse(overridesStr);
-        if (schoolId) {
-          overrides[schoolId] = {
-            ...(overrides[schoolId] || {}),
-            school_year_start_month: newMonth,
-            school_year_start_day: newDay,
-            opening_hours: updatedOp
-          };
-          localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
-        }
-      } catch (e) {}
-
-      if (schoolId) {
-        const { error } = await supabase
-          .from('schools')
-          .update({
-            school_year_start_month: newMonth,
-            school_year_start_day: newDay,
-            opening_hours: updatedOp
-          })
-          .eq('id', schoolId);
-
-        if (error) {
-          await supabase
-            .from('schools')
-            .update({
-              opening_hours: updatedOp
-            })
-            .eq('id', schoolId);
-        }
-      }
-    } catch (err) {
-      console.error('[SecretarySettings] Error updating school year start:', err);
-    }
-  };
+  // [EXTRACTED to useSecretarySettings: handleToggleSetting, handleSaveSettingValue, handleToggleAutoClean, handleUpdateSchoolYear]
   const [schedulesRoomsViewMode, setSchedulesRoomsViewMode] = useState<'designer' | 'live'>('designer');
   const [roomsSubView, setRoomsSubView] = useState<'overview' | 'plan' | 'settings'>('overview');
   const [liveViewDay, setLiveViewDay] = useState<number>(1);
@@ -1021,15 +882,13 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [adHocStudentName, setAdHocStudentName] = useState<string>('');
   const [adHocStartTime, setAdHocStartTime] = useState<string>('14:00');
   const [adHocDuration, setAdHocDuration] = useState<number>(45);
-  const [groovelabSubTab, setGroovelabSubTab] = useState<'live' | 'students' | 'coaches' | 'kiosk' | 'settings'>('live');
+  // [EXTRACTED to useSecretaryNavigation: groovelabSubTab]
   const [teachersManageStudents, setTeachersManageStudents] = useState<boolean>(false);
   const [teachersManageTeachers, setTeachersManageTeachers] = useState<boolean>(false);
   const [campusTeachersManageStudents, setCampusTeachersManageStudents] = useState<boolean>(false);
   const [campusTeachersManageTeachers, setCampusTeachersManageTeachers] = useState<boolean>(false);
-  const [pendingBookings, setPendingBookings] = useState<any[]>([]);
-  const [realtimeToast, setRealtimeToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
-  const [activeSessions, setActiveSessions] = useState<any[]>([]);
-  const [liveSearchQuery, setLiveSearchQuery] = useState<string>('');
+  // [EXTRACTED to useSecretaryBookings: pendingBookings]
+  // [EXTRACTED to useSecretaryLiveLab: realtimeToast, activeSessions, liveSearchQuery]
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(() => {
     if (typeof window !== 'undefined') {
       const isGhost = userId === 'master-support-id' || sessionStorage.getItem('groovelab_support_ghost') === 'true';
@@ -1048,169 +907,181 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     return null;
   });
 
-  // Biometrics & Passkeys Settings States
-  const [biometricsStatus, setBiometricsStatus] = useState<'idle' | 'registering' | 'verifying' | 'success' | 'error'>('idle');
-  const [biometricsMessage, setBiometricsMessage] = useState<string>('');
-  const [localPasskeyProfiles, setLocalPasskeyProfiles] = useState<BiometricVaultProfile[]>(() => getStoredBiometricProfiles());
-  const [copiedSettingsPin, setCopiedSettingsPin] = useState(false);
-  const [copiedSettingsLink, setCopiedSettingsLink] = useState(false);
+  // Secretary Settings, Master Data, Biometrics & Disaster Recovery Engine
+  const {
+    schoolName,
+    setSchoolName,
+    schoolSubdomain,
+    setSchoolSubdomain,
+    schoolZipCode,
+    setSchoolZipCode,
+    schoolCity,
+    setSchoolCity,
+    schoolStreet,
+    setSchoolStreet,
+    schoolHouseNumber,
+    setSchoolHouseNumber,
+    schoolPhoneNumber,
+    setSchoolPhoneNumber,
+    schoolEmail,
+    setSchoolEmail,
+    absenceEmail,
+    setAbsenceEmail,
+    logoUrl,
+    setLogoUrl,
+    openingHours,
+    setOpeningHours,
+    kioskPinLength,
+    setKioskPinLength,
+    bypassPin,
+    setBypassPin,
+    logRetention,
+    setLogRetention,
+    syncInterval,
+    setSyncInterval,
+    calendarUrls,
+    setCalendarUrls,
+    newCalendarUrlInput,
+    setNewCalendarUrlInput,
+    schoolYearStartMonth,
+    setSchoolYearStartMonth,
+    schoolYearStartDay,
+    setSchoolYearStartDay,
+    autoDeleteExpiredUsers,
+    setAutoDeleteExpiredUsers,
+    initialSettings,
+    setInitialSettings,
+    isSavingSettings,
+    isSettingsDirty,
+    initSettingsFromSchool,
+    handleSaveAllSettings,
+    handleToggleSetting,
+    handleSaveSettingValue,
+    handleToggleAutoClean,
+    handleUpdateSchoolYear,
+    handleAddCalendarUrl,
+    handleRemoveCalendarUrl,
+    activeSecretarySettingsModal,
+    setActiveSecretarySettingsModal,
+    settingsTab,
+    setSettingsTab,
+    showResetModal,
+    setShowResetModal,
+    resetConfirmText,
+    setResetConfirmText,
+    isResetting,
+    copiedSettingsPin,
+    setCopiedSettingsPin,
+    copiedSettingsLink,
+    setCopiedSettingsLink,
+    copiedKioskLink,
+    setCopiedKioskLink,
+    copiedSchoolLink,
+    setCopiedSchoolLink,
+    biometricsStatus,
+    setBiometricsStatus,
+    biometricsMessage,
+    setBiometricsMessage,
+    isCurrentDevicePasskeyActive,
+    handleEnrollBiometrics,
+    handleTestBiometrics,
+    handleRemoveBiometrics,
+    isExporting,
+    isRestoring,
+    lastBackupDate,
+    setLastBackupDate,
+    daysSinceLastBackup,
+    showBackupAlert,
+    handleExportBackup,
+    handleRestoreBackup,
+    handleResetSchool
+  } = useSecretarySettings({
+    schoolId: schoolId || '',
+    userId: userId || '',
+    currentUserProfile,
+    currentSchoolProfile,
+    setCurrentSchoolProfile,
+    fetchDashboardData: () => fetchDashboardData()
+  });
 
-  const isCurrentDevicePasskeyActive = useMemo(() => {
-    if (!currentUserProfile?.id) return false;
-    return localPasskeyProfiles.some(p => p.userId === currentUserProfile.id);
-  }, [localPasskeyProfiles, currentUserProfile?.id]);
-
-  const handleEnrollBiometrics = async () => {
-    if (!currentUserProfile) return;
-    setBiometricsStatus('registering');
-    setBiometricsMessage('');
-    try {
-      if (!isWebAuthnSupported()) {
-        throw new Error('Biometrisches Anmelden (Touch ID / Face ID) wird von diesem Browser/Gerät nicht unterstützt.');
-      }
-      const email = currentUserProfile.email || `${currentUserProfile.id}@campus-groovelab.de`;
-      const profile = await registerUserBiometrics(
-        email,
-        currentUserProfile.id,
-        currentUserProfile.first_name,
-        currentUserProfile.last_name || '',
-        currentUserProfile.role || 'admin',
-        currentUserProfile.id,
-        null,
-        '/campus_login_hero.png',
-        schoolName || 'Musikschule'
-      );
-
-      await supabase.from('user_credentials').insert({
-        user_id: currentUserProfile.id,
-        credential_id: profile.credentialId,
-        public_key: JSON.stringify({ registered: true, device: navigator.userAgent }),
-        device_name: navigator.userAgent.includes('Mac') ? 'Mac Touch ID' : 'WebAuthn Device'
-      });
-
-      setLocalPasskeyProfiles(getStoredBiometricProfiles());
-      setBiometricsStatus('success');
-      setBiometricsMessage('Touch ID / Face ID wurde erfolgreich für dieses Gerät eingerichtet!');
-      setTimeout(() => setBiometricsStatus('idle'), 4000);
-    } catch (err: any) {
-      console.error('Biometrics enrollment failed:', err);
-      setBiometricsStatus('error');
-      setBiometricsMessage(err.message || 'Die Einrichtung wurde abgebrochen oder ist fehlgeschlagen.');
-    }
-  };
-
-  const handleTestBiometrics = async () => {
-    if (!currentUserProfile) return;
-    setBiometricsStatus('verifying');
-    setBiometricsMessage('');
-    try {
-      await authenticateUserBiometrics(currentUserProfile.id);
-      setBiometricsStatus('success');
-      setBiometricsMessage('✓ Authentifizierung erfolgreich! Touch ID / Face ID funktioniert einwandfrei.');
-      setTimeout(() => setBiometricsStatus('idle'), 4000);
-    } catch (err: any) {
-      console.error('Biometrics verification failed:', err);
-      setBiometricsStatus('error');
-      setBiometricsMessage(err.message || 'Die Verifikation ist fehlgeschlagen oder wurde abgebrochen.');
-    }
-  };
-
-  const handleRemoveBiometrics = () => {
-    if (!currentUserProfile?.id) return;
-    const confirm = window.confirm('Möchtest du den Touch ID / Face ID Passkey von diesem Gerät entfernen?');
-    if (!confirm) return;
-    removeBiometricProfile(currentUserProfile.id);
-    setLocalPasskeyProfiles(getStoredBiometricProfiles());
-    setBiometricsStatus('success');
-    setBiometricsMessage('Passkey wurde von diesem Gerät entfernt.');
-    setTimeout(() => setBiometricsStatus('idle'), 3000);
-  };
-
-  const [tickets, setTickets] = useState<any[]>([]);
-  const [roomIssues, setRoomIssues] = useState<UserNote[]>([]);
   const [schoolEvents, setSchoolEvents] = useState<any[]>([]);
   const [showAddEventModal, setShowAddEventModal] = useState<boolean>(false);
-  const [showLogbookModal, setShowLogbookModal] = useState<boolean>(false);
-  const [showFacilityLogModal, setShowFacilityLogModal] = useState<boolean>(false);
 
-  const handleResolveRoomIssue = async (issueId: string) => {
-    await notesService.resolveRoomIssue(issueId, 'secretary', schoolId);
-    setRoomIssues(prev => prev.map(n => n.id === issueId ? { ...n, is_completed: true, is_acknowledged: true, acknowledged_at: new Date().toISOString(), resolved_by: 'secretary' } : n));
-  };
+  // 🏢 Step 3.18: Modular Secretary Room Bookings, Logbook & Facility Issues Engine
+  const {
+    pendingBookings,
+    setPendingBookings,
+    logbookBookings,
+    setLogbookBookings,
+    editingLogbookBookingId,
+    setEditingLogbookBookingId,
+    editBookingDate,
+    setEditBookingDate,
+    editBookingStartTime,
+    setEditBookingStartTime,
+    editBookingEndTime,
+    setEditBookingEndTime,
+    editBookingTitle,
+    setEditBookingTitle,
+    editBookingRoomId,
+    setEditBookingRoomId,
+    roomIssues,
+    setRoomIssues,
+    showLogbookModal,
+    setShowLogbookModal,
+    showFacilityLogModal,
+    setShowFacilityLogModal,
+    fetchPendingBookings,
+    fetchLogbookBookings,
+    fetchRoomIssues,
+    handleConfirmBooking,
+    handleRejectBooking,
+    handleUpdateLogbookBooking,
+    handleDeleteLogbookBooking,
+    handleConfirmLogbookBooking,
+    handleResolveRoomIssue,
+    handleReopenRoomIssue
+  } = useSecretaryBookings({
+    schoolId: schoolId || '',
+    supabase
+  });
 
-  const handleReopenRoomIssue = async (issueId: string) => {
-    await notesService.reopenRoomIssue(issueId, schoolId);
-    setRoomIssues(prev => prev.map(n => n.id === issueId ? { ...n, is_completed: false, is_acknowledged: false, acknowledged_at: null, resolved_by: null } : n));
-  };
-  const [logbookBookings, setLogbookBookings] = useState<any[]>([]);
-  const [editingLogbookBookingId, setEditingLogbookBookingId] = useState<string | null>(null);
-  const [editBookingDate, setEditBookingDate] = useState<string>('');
-  const [editBookingStartTime, setEditBookingStartTime] = useState<string>('');
-  const [editBookingEndTime, setEditBookingEndTime] = useState<string>('');
-  const [editBookingTitle, setEditBookingTitle] = useState<string>('');
-  const [editBookingRoomId, setEditBookingRoomId] = useState<string>('');
-  const [newEventTitle, setNewEventTitle] = useState<string>('');
-  const [newEventDesc, setNewEventDesc] = useState<string>('');
-  const [newEventTarget, setNewEventTarget] = useState<'all' | 'students' | 'teachers'>('all');
-  const [newEventCategory, setNewEventCategory] = useState<'general' | 'announcement' | 'event' | 'holidays'>('general');
-  const [newEventIsEmergency, setNewEventIsEmergency] = useState<boolean>(false);
-  const [newEventPublishedAt, setNewEventPublishedAt] = useState<string>('');
-  const [newEventExpiresAt, setNewEventExpiresAt] = useState<string>('');
-  const [newEventAttachmentUrl, setNewEventAttachmentUrl] = useState<string>('');
-  const [isUploadingAttachment, setIsUploadingAttachment] = useState<boolean>(false);
-  const [isAddingCustomEq, setIsAddingCustomEq] = useState<boolean>(false);
-  const [customEqInput, setCustomEqInput] = useState<string>('');
   const [activeContextMenu, setActiveContextMenu] = useState<{ student: any; top: number; right: number } | null>(null);
-  const [copiedSchoolLink, setCopiedSchoolLink] = useState<boolean>(false);
-  const [copiedKioskLink, setCopiedKioskLink] = useState<boolean>(false);
+  // [EXTRACTED to useSecretarySettings: copiedSchoolLink, copiedKioskLink]
   const [showOwnQrModal, setShowOwnQrModal] = useState<boolean>(false);
   const [qrModalUser, setQrModalUser] = useState<any | null>(null);
-  const [copiedQrLink, setCopiedQrLink] = useState<boolean>(false);
-
-  // Live Real-Time Sync for Room Issues & Facility Defects across tabs and devices
-  useEffect(() => {
-    if (!schoolId) return;
-    const handleSync = async () => {
-      try {
-        const fetchedIssues = await notesService.fetchSchoolRoomIssues(schoolId);
-        setRoomIssues(fetchedIssues);
-      } catch (err) {
-        console.warn('Real-time room issues sync notice:', err);
-      }
-    };
-
-    const unsubscribe = notesService.onSync(handleSync);
-    const unsubscribeRealtime = notesService.subscribeSchoolRealtime(schoolId, handleSync);
-
-    return () => {
-      unsubscribe();
-      unsubscribeRealtime();
-    };
-  }, [schoolId]);
-
+  // 🎸 Step 3.19: Modular GrooveLab Live Lab, Sessions & Realtime Notifications Engine
+  const {
+    activeSessions,
+    setActiveSessions,
+    helpRequests,
+    setHelpRequests,
+    tickets,
+    setTickets,
+    liveSearchQuery,
+    setLiveSearchQuery,
+    realtimeToast,
+    setRealtimeToast,
+    holidayXpActive,
+    setHolidayXpActive,
+    selectedRoomId,
+    setSelectedRoomId,
+    zoomFactor,
+    setZoomFactor,
+    handleZoomChange,
+    handleToggleHolidayXp,
+    fetchLiveStatusData,
+    handleLogoutStudent,
+    showRealtimeNotification
+  } = useSecretaryLiveLab({
+    schoolId: schoolId || '',
+    userId,
+    supabase
+  });
 
   // Visual Live Lab states & refs
-  const [helpRequests, setHelpRequests] = useState<any[]>([]);
   const [selectedCoachProfile, setSelectedCoachProfile] = useState<any>(null);
-  const [containerWidth, setContainerWidth] = useState(1000);
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-  const [windowHeight, setWindowHeight] = useState(window.innerHeight);
-  const [mobileSecretaryDrawerOpen, setMobileSecretaryDrawerOpen] = useState(false);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setWindowWidth(window.innerWidth);
-      setWindowHeight(window.innerHeight);
-    };
-    window.addEventListener('resize', handleResize);
-    window.addEventListener('orientationchange', handleResize);
-    window.addEventListener('groovelab_orientation_changed', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('orientationchange', handleResize);
-      window.removeEventListener('groovelab_orientation_changed', handleResize);
-    };
-  }, []);
+  // [EXTRACTED to useSecretaryNavigation: containerWidth, windowWidth, windowHeight, mobileSecretaryDrawerOpen, handleResize]
 
   useEffect(() => {
     if (!activeContextMenu) return;
@@ -1319,22 +1190,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     }
   }, [schoolId]);
 
-  const observerRef = React.useRef<ResizeObserver | null>(null);
-  const containerRef = React.useCallback((node: HTMLDivElement | null) => {
-    if (observerRef.current) {
-      observerRef.current.disconnect();
-      observerRef.current = null;
-    }
-    if (node) {
-      const observer = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          setContainerWidth(entry.contentRect.width || 1000);
-        }
-      });
-      observer.observe(node);
-      observerRef.current = observer;
-    }
-  }, []);
+  // [EXTRACTED to useSecretaryNavigation: observerRef, containerRef]
 
   const handleResetTeacherPin = async (teacherId: string) => {
     const newPin = Math.floor(1000 + Math.random() * 9000).toString();
@@ -1390,52 +1246,14 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     }
   };
 
-  const [holidayXpActive, setHolidayXpActive] = useState<boolean>(() => {
-    return localStorage.getItem(`groovelab_holiday_xp_active_${schoolId}`) === 'true';
-  });
-  const [bulkTxtInput, setBulkTxtInput] = useState<string>('');
-  const [selectedTeacherForOverride, setSelectedTeacherForOverride] = useState<any>(null);
-  const [newPasswordOverride, setNewPasswordOverride] = useState<string>('');
-  const [newRoleOverride, setNewRoleOverride] = useState<string>('');
-  const [overrideFavRoom1, setOverrideFavRoom1] = useState<string>('');
-  const [overrideFavRoom2, setOverrideFavRoom2] = useState<string>('');
-
   // Rooms and Stations States for Live Lab
   const [rooms, setRooms] = useState<any[]>([]);
   const [stations, setStations] = useState<any[]>([]);
-  const [selectedRoomId, setSelectedRoomId] = useState<string>('');
-  const [zoomFactor, setZoomFactor] = useState<number>(1.0);
-
-  // Zoom logic matching TeacherDashboard
-  useEffect(() => {
-    if (selectedRoomId && userId) {
-      const savedZoom = localStorage.getItem(`groovelab_room_zoom_${userId}_${selectedRoomId}`);
-      if (savedZoom) {
-        const parsed = parseFloat(savedZoom);
-        if (!isNaN(parsed)) {
-          setZoomFactor(parsed);
-          return;
-        }
-      }
-    }
-    setZoomFactor(1.0);
-  }, [selectedRoomId, userId]);
-
-  const handleZoomChange = (value: number) => {
-    setZoomFactor(value);
-    if (selectedRoomId && userId) {
-      localStorage.setItem(`groovelab_room_zoom_${userId}_${selectedRoomId}`, value.toString());
-    }
-  };
 
   // Trial & Linking States
   const [bands, setBands] = useState<any[]>([]);
   const [showTrialLogModal, setShowTrialLogModal] = useState(false);
-  const [trialLogs, setTrialLogs] = useState<any[]>([]);
-  const [trialLogsLoading, setTrialLogsLoading] = useState(false);
-  const [selectedCampusStudentId, setSelectedCampusStudentId] = useState<string>('');
-  const [selectedGroovelabStudentId, setSelectedGroovelabStudentId] = useState<string>('');
-  const [linkingInProgress, setLinkingInProgress] = useState<boolean>(false);
+  // [EXTRACTED to useSecretaryLicenses: trialLogs, trialLogsLoading]
 
   // Overhauled Room Board States
   const [roomSearchQuery, setRoomSearchQuery] = useState<string>('');
@@ -1446,9 +1264,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [showParentInfoSheetModal, setShowParentInfoSheetModal] = useState<boolean>(false);
   const [guidanceInitialTab, setGuidanceInitialTab] = useState<'teacher' | 'parent'>('teacher');
 
-  const [userQuota, setUserQuota] = useState<number>(150);
-  const [activeUserQuota, setActiveUserQuota] = useState<number>(150);
-  const [pendingUserQuota, setPendingUserQuota] = useState<number | null>(null);
+  // [EXTRACTED to useSecretaryLicenses: userQuota, activeUserQuota, pendingUserQuota]
   const [showDualRoleNotice, setShowDualRoleNotice] = useState<boolean>(() => {
     return typeof window !== 'undefined' && sessionStorage.getItem('groovelab_dual_role_switched_notice') === 'true';
   });
@@ -1456,118 +1272,202 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   // School Data & Subscription
   const [isAvvSigned, setIsAvvSigned] = useState<boolean>(true);
   const [showAvvModal, setShowAvvModal] = useState<boolean>(false);
-  const [schoolName, setSchoolName] = useState<string>('');
-  const [schoolYearStartMonth, setSchoolYearStartMonth] = useState<number>(9);
-  const [schoolYearStartDay, setSchoolYearStartDay] = useState<number>(1);
-  const [autoDeleteExpiredUsers, setAutoDeleteExpiredUsers] = useState<boolean>(false);
-  const [schoolSubdomain, setSchoolSubdomain] = useState<string>('');
-  const [openingHours, setOpeningHours] = useState<any>(null);
-  const [schoolZipCode, setSchoolZipCode] = useState<string>('');
-  const [schoolCity, setSchoolCity] = useState<string>('');
-  const [schoolStreet, setSchoolStreet] = useState<string>('');
-  const [schoolHouseNumber, setSchoolHouseNumber] = useState<string>('');
-  const [schoolPhoneNumber, setSchoolPhoneNumber] = useState<string>('');
-  const [schoolEmail, setSchoolEmail] = useState<string>('');
-  const [absenceEmail, setAbsenceEmail] = useState<string>('');
-  const [editColor, setEditColor] = useState<string>('#1a73e8'); // Google Blue
-  const [hasCampusSub, setHasCampusSub] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return true;
-    const stored = localStorage.getItem(`hasCampusSub_${schoolId}`);
-    if (stored !== null) return stored === 'true';
-    const booked = localStorage.getItem(`isBillingBooked_${schoolId}`) === 'true';
-    return booked ? true : false;
-  });
-  const [hasGroovelabSub, setHasGroovelabSub] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return true;
-    const stored = localStorage.getItem(`hasGroovelabSub_${schoolId}`);
-    if (stored !== null) return stored === 'true';
-    const booked = localStorage.getItem(`isBillingBooked_${schoolId}`) === 'true';
-    return booked ? true : false;
-  });
-  const [campusActivatedThisMonth, setCampusActivatedThisMonth] = useState<boolean>(false);
-  const [groovelabActivatedThisMonth, setGroovelabActivatedThisMonth] = useState<boolean>(false);
-  const [studentBillingOption, setStudentBillingOption] = useState<string>('option2');
-  const [isBillingBooked, setIsBillingBooked] = useState<boolean>(() => {
-    return typeof window !== 'undefined' && localStorage.getItem(`isBillingBooked_${schoolId}`) === 'true';
-  });
-  const [bookedExtraUsers, setBookedExtraUsers] = useState<number>(() => {
-    if (typeof window === 'undefined') return 0;
-    const val = localStorage.getItem(`bookedExtraUsers_${schoolId}`);
-    let baseVal = val ? parseInt(val, 10) : 0;
-    const hasUnbooked = localStorage.getItem(`unbooked_52_temp_${schoolId}`);
-    if (!hasUnbooked) {
-      baseVal = Math.max(0, baseVal - 52);
-      localStorage.setItem(`bookedExtraUsers_${schoolId}`, baseVal.toString());
-      localStorage.setItem(`unbooked_52_temp_${schoolId}`, 'true');
-    }
-    return baseVal;
-  });
-  const [extraUsersSliderVal, setExtraUsersSliderVal] = useState<number>(0);
-  const [extraBillingOption, setExtraBillingOption] = useState<string>('option1');
-  const [nextBillingOption, setNextBillingOption] = useState<string>(() => {
-    return typeof window !== 'undefined' ? (localStorage.getItem(`nextBillingOption_${schoolId}`) || '') : '';
-  });
-  const [nextBillingOptionEffectiveAt, setNextBillingOptionEffectiveAt] = useState<string>(() => {
-    return typeof window !== 'undefined' ? (localStorage.getItem(`nextBillingOptionEffectiveAt_${schoolId}`) || '') : '';
-  });
-  const [showChangeTariffModal, setShowChangeTariffModal] = useState<boolean>(false);
-  const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
-  const [checkoutStep, setCheckoutStep] = useState<number>(1);
-  const [billingPayer, setBillingPayer] = useState<'school' | 'student'>('school');
-  const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
-  const [customUmlageAmount, setCustomUmlageAmount] = useState<number>(0.49);
-  const [agreedToTerms, setAgreedToTerms] = useState<boolean>(false);
-  const [couponCode, setCouponCode] = useState<string>('');
-  const [isCouponApplied, setIsCouponApplied] = useState<boolean>(false);
-  const [couponDiscount, setCouponDiscount] = useState<number>(0);
-  const [showCouponInput, setShowCouponInput] = useState<boolean>(false);
-  const [hasCustomBillingAddress, setHasCustomBillingAddress] = useState<boolean>(false);
-  const [customBillingName, setCustomBillingName] = useState<string>('');
-  const [customBillingStreet, setCustomBillingStreet] = useState<string>('');
-  const [customBillingZip, setCustomBillingZip] = useState<string>('');
-  const [customBillingCity, setCustomBillingCity] = useState<string>('');
-  const [customBillingEmail, setCustomBillingEmail] = useState<string>('');
-  const [customBillingLeitwegId, setCustomBillingLeitwegId] = useState<string>(() => currentSchoolProfile?.leitweg_id || '');
-  const [hasCustomActivationBillingAddress, setHasCustomActivationBillingAddress] = useState<boolean>(false);
-  const [customActivationBillingName, setCustomActivationBillingName] = useState<string>('');
-  const [customActivationBillingStreet, setCustomActivationBillingStreet] = useState<string>('');
-  const [customActivationBillingZip, setCustomActivationBillingZip] = useState<string>('');
-  const [customActivationBillingCity, setCustomActivationBillingCity] = useState<string>('');
-  const [customActivationBillingEmail, setCustomActivationBillingEmail] = useState<string>('');
-  const [selectedStorageAddonGb, setSelectedStorageAddonGb] = useState<number>(() => {
-    if (typeof window === 'undefined') return 0;
-    return Number(localStorage.getItem(`groovelab_storage_addon_gb_${schoolId}`) || localStorage.getItem('groovelab_storage_addon_gb') || 0);
-  });
-  const [selectedStorageAddonFee, setSelectedStorageAddonFee] = useState<number>(() => {
-    if (typeof window === 'undefined') return 0;
-    const gb = Number(localStorage.getItem(`groovelab_storage_addon_gb_${schoolId}`) || localStorage.getItem('groovelab_storage_addon_gb') || 0);
-    return gb === 5 ? 1.49 : gb === 10 ? 1.99 : gb === 20 ? 3.99 : gb === 25 ? 3.99 : gb === 50 ? 6.99 : gb === 100 ? 11.99 : gb === 250 ? 24.99 : 0;
-  });
-  const [showStorageManagerModal, setShowStorageManagerModal] = useState<boolean>(false);
-  const [isSubmittingStorage, setIsSubmittingStorage] = useState<boolean>(false);
-  const [storageBookingSuccessModal, setStorageBookingSuccessModal] = useState<{
-    isOpen: boolean;
-    receiptNumber: string;
-    newGb: number;
-    newFee: number;
-    isDowngrade: boolean;
-    effectiveDate?: string;
-  } | null>(null);
-  const [showSwitchBillingModelModal, setShowSwitchBillingModelModal] = useState<boolean>(false);
-  const [selectedSwitchTargetPayer, setSelectedSwitchTargetPayer] = useState<'school' | 'student'>('student');
-  const [isSwitchingPayer, setIsSwitchingPayer] = useState<boolean>(false);
-  const [showStorageTerminationModal, setShowStorageTerminationModal] = useState<boolean>(false);
-  const [storageTerminationDays, setStorageTerminationDays] = useState<number>(30);
-  const [agreedToSepa, setAgreedToSepa] = useState<boolean>(false);
-  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
-  const [showConfirmExtra, setShowConfirmExtra] = useState<boolean>(false);
-  const [isSchoolTrial, setIsSchoolTrial] = useState<boolean>(false);
-  const [schoolTrialEndsAt, setSchoolTrialEndsAt] = useState<string | null>(null);
-  const [schoolStatus, setSchoolStatus] = useState<string>('active');
-  const [subscriptionBypass, setSubscriptionBypass] = useState<boolean>(false);
+  const [enabledQrLogin, setEnabledQrLogin] = useState<boolean>(true);
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState<boolean>(false);
 
-  const [contractStartDate, setContractStartDate] = useState<string | null>(() => {
-    return typeof window !== 'undefined' ? (localStorage.getItem(`contractStartDate_${schoolId}`) || localStorage.getItem(`simulatedContractStartDate_${schoolId}`)) : null;
+  const INSTRUMENT_TAGS = ['Schlagzeug', 'Piano', 'Gitarre', 'Gesang', 'Geige', 'Querflöte', 'Saxophon', 'Bass', 'Keyboard', 'Trompete'];
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const activeSubjectsList = useMemo(() => {
+    const placeholders = new Set([
+      'ohne zuweisung', 'ohnezuweisung', 'allgemein', 
+      'nicht festgelegt', 'nichtfestgelegt', 'nicht zugeordnet', 
+      'nichtzugeordnet', 'none', 'null', ''
+    ]);
+    const activeSubs = Array.from(new Set(
+      subjects
+        .filter((s: any) => s.is_active && s.name)
+        .map((s: any) => s.name.trim())
+    )).filter(name => !placeholders.has(name.toLowerCase()));
+    
+    return activeSubs.length > 0 ? activeSubs : INSTRUMENT_TAGS;
+  }, [subjects]);
+
+  // [EXTRACTED to useSecretarySettings: schoolName, schoolSubdomain, schoolAddress, openingHours, schoolYearStart]
+  const [editColor, setEditColor] = useState<string>('#1a73e8'); // Google Blue
+
+  // 💳 Bounded Context: Licenses, Subscriptions, User Quota & B2B Billing Hook
+  const {
+    hasCampusSub,
+    setHasCampusSub,
+    hasGroovelabSub,
+    setHasGroovelabSub,
+    campusActivatedThisMonth,
+    setCampusActivatedThisMonth,
+    groovelabActivatedThisMonth,
+    setGroovelabActivatedThisMonth,
+    studentBillingOption,
+    setStudentBillingOption,
+    isBillingBooked,
+    setIsBillingBooked,
+    bookedExtraUsers,
+    setBookedExtraUsers,
+    extraUsersSliderVal,
+    setExtraUsersSliderVal,
+    extraBillingOption,
+    setExtraBillingOption,
+    nextBillingOption,
+    setNextBillingOption,
+    nextBillingOptionEffectiveAt,
+    setNextBillingOptionEffectiveAt,
+    showChangeTariffModal,
+    setShowChangeTariffModal,
+    showCheckoutModal,
+    setShowCheckoutModal,
+    checkoutStep,
+    setCheckoutStep,
+    billingPayer,
+    setBillingPayer,
+    showSuccessModal,
+    setShowSuccessModal,
+    customUmlageAmount,
+    setCustomUmlageAmount,
+    agreedToTerms,
+    setAgreedToTerms,
+    couponCode,
+    setCouponCode,
+    isCouponApplied,
+    setIsCouponApplied,
+    couponDiscount,
+    setCouponDiscount,
+    showCouponInput,
+    setShowCouponInput,
+    hasCustomBillingAddress,
+    setHasCustomBillingAddress,
+    customBillingName,
+    setCustomBillingName,
+    customBillingStreet,
+    setCustomBillingStreet,
+    customBillingZip,
+    setCustomBillingZip,
+    customBillingCity,
+    setCustomBillingCity,
+    customBillingEmail,
+    setCustomBillingEmail,
+    customBillingLeitwegId,
+    setCustomBillingLeitwegId,
+    hasCustomActivationBillingAddress,
+    setHasCustomActivationBillingAddress,
+    customActivationBillingName,
+    setCustomActivationBillingName,
+    customActivationBillingStreet,
+    setCustomActivationBillingStreet,
+    customActivationBillingZip,
+    setCustomActivationBillingZip,
+    customActivationBillingCity,
+    setCustomActivationBillingCity,
+    customActivationBillingEmail,
+    setCustomActivationBillingEmail,
+    selectedStorageAddonGb,
+    setSelectedStorageAddonGb,
+    selectedStorageAddonFee,
+    setSelectedStorageAddonFee,
+    showStorageManagerModal,
+    setShowStorageManagerModal,
+    isSubmittingStorage,
+    setIsSubmittingStorage,
+    storageBookingSuccessModal,
+    setStorageBookingSuccessModal,
+    showSwitchBillingModelModal,
+    setShowSwitchBillingModelModal,
+    selectedSwitchTargetPayer,
+    setSelectedSwitchTargetPayer,
+    isSwitchingPayer,
+    setIsSwitchingPayer,
+    showStorageTerminationModal,
+    setShowStorageTerminationModal,
+    storageTerminationDays,
+    setStorageTerminationDays,
+    agreedToSepa,
+    setAgreedToSepa,
+    selectedInvoice,
+    setSelectedInvoice,
+    showConfirmExtra,
+    setShowConfirmExtra,
+    isSchoolTrial,
+    setIsSchoolTrial,
+    schoolTrialEndsAt,
+    setSchoolTrialEndsAt,
+    schoolStatus,
+    setSchoolStatus,
+    subscriptionBypass,
+    setSubscriptionBypass,
+    contractStartDate,
+    setContractStartDate,
+    isCancelled,
+    setIsCancelled,
+    schoolContractEndsAt,
+    setSchoolContractEndsAt,
+    cancellationReason,
+    setCancellationReason,
+    lastCancellationId,
+    setLastCancellationId,
+    showCancelModal,
+    setShowCancelModal,
+    showModuleUpgradeModal,
+    setShowModuleUpgradeModal,
+    upgradeTargetModule,
+    setUpgradeTargetModule,
+    upgradeProcessing,
+    setUpgradeProcessing,
+    userQuota,
+    setUserQuota,
+    activeUserQuota,
+    setActiveUserQuota,
+    pendingUserQuota,
+    setPendingUserQuota,
+    handleSaveQuota,
+    tariffBookings,
+    setTariffBookings,
+    loadingTariffBookings,
+    setLoadingTariffBookings,
+    fetchTariffBookings,
+    trialLogs,
+    setTrialLogs,
+    trialLogsLoading,
+    setTrialLogsLoading,
+    fetchTrialLogs,
+    generateMailtoLink,
+    handleConfirmStudentTrial,
+    handleDeactivateStudentTrial,
+    trialDaysRemaining,
+    isTrialExpired,
+    getTrialDaysRemaining,
+    getSchoolYearEndInfo,
+    getRemainingMonthsAndPrice,
+    getDynamicAnnualPrice,
+    downloadCancellationReceiptPdf,
+    downloadUpgradeConfirmationPdf,
+    handleDeveloperReset,
+    handleToggleCampusSub,
+    handleToggleGroovelabSub,
+    handleUpdateStudentBillingOption,
+    handleUpdateExtraBillingOption,
+    initBillingFromSchool
+  } = useSecretaryLicenses({
+    schoolId: schoolId || '',
+    schoolNumericId: schoolNumericId || '',
+    schoolName,
+    currentSchoolProfile,
+    setCurrentSchoolProfile,
+    currentUserProfile,
+    supabase,
+    fetchDashboardData: () => fetchDashboardData(),
+    masterPricing,
+    effectiveSchoolRates,
+    subjects,
+    openingHours,
+    schoolYearStartMonth,
+    schoolYearStartDay
   });
   const [simulatedToday, setSimulatedToday] = useState<string>(() => {
     if (typeof window !== 'undefined') {
@@ -1639,15 +1539,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   };
 
   const [expandedYears, setExpandedYears] = useState<Record<string, boolean>>({ '2026': true, '2025': true });
-  const [isCancelled, setIsCancelled] = useState<boolean>(() => {
-    return typeof window !== 'undefined' && localStorage.getItem(`isCancelled_${schoolId}`) === 'true';
-  });
-  const [schoolContractEndsAt, setSchoolContractEndsAt] = useState<string | null>(null);
-  const [cancellationReason, setCancellationReason] = useState<string>('');
-  const [lastCancellationId, setLastCancellationId] = useState<string>('');
-  const [showModuleUpgradeModal, setShowModuleUpgradeModal] = useState<boolean>(false);
-  const [upgradeTargetModule, setUpgradeTargetModule] = useState<'campus' | 'groovelab'>('campus');
-  const [upgradeProcessing, setUpgradeProcessing] = useState<boolean>(false);
+  // [EXTRACTED to useSecretaryLicenses: isCancelled, schoolContractEndsAt, cancellationReason, lastCancellationId, showModuleUpgradeModal, upgradeTargetModule, upgradeProcessing]
 
   const [showDateSimulation, setShowDateSimulation] = useState<boolean>(() => {
     if (typeof window === 'undefined' || !isDevEnvironment()) return false;
@@ -1684,317 +1576,22 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       window.removeEventListener('groovelab_date_sim_toggle', handleToggleSync);
     };
   }, []);
-  const [showCancelModal, setShowCancelModal] = useState<boolean>(false);
+  // [EXTRACTED to useSecretaryLicenses: showCancelModal]
   const [selectedModalOption, setSelectedModalOption] = useState<string>('option1');
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [limitsEnabled, setLimitsEnabled] = useState<boolean>(false);
   const [selectedDashboardMonth, setSelectedDashboardMonth] = useState<number>(() => new Date().getMonth());
   const [selectedDashboardYear, setSelectedDashboardYear] = useState<number>(() => new Date().getFullYear());
   const [activeBillingSubTab, setActiveBillingSubTab] = useState<'overview' | 'matching' | 'history' | 'ledger'>('overview');
-  const [tariffBookings, setTariffBookings] = useState<any[]>([]);
-  const [loadingTariffBookings, setLoadingTariffBookings] = useState<boolean>(false);
+  // [EXTRACTED to useSecretaryLicenses: tariffBookings, loadingTariffBookings]
   const [activeStudentsModalList, setActiveStudentsModalList] = useState<{ list: any[], month: string, amount?: number, campusCount?: number, groovelabCount?: number, passiveCount?: number } | null>(null);
   const [activationSearchQuery, setActivationSearchQuery] = useState<string>('');
   const [modalStudentSearchQuery, setModalStudentSearchQuery] = useState<string>('');
 
-  // Dynamic School Year End Calculation (German/Austrian Standard: Sept 1 to Aug 31)
-  const getSchoolYearEndInfo = (simDate?: string | Date | null, existingEndIso?: string | null) => {
-    if (existingEndIso) {
-      const d = new Date(existingEndIso);
-      const day = d.getDate();
-      const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
-      const monthName = monthNames[d.getMonth()] || 'August';
-      const year = d.getFullYear();
-      return {
-        endDate: d,
-        endDateIso: existingEndIso,
-        formattedDate: `${day}. ${monthName} ${year}`,
-        schoolYearLabel: `${year - 1}/${year}`
-      };
-    }
-    const now = simDate 
-      ? (typeof simDate === 'string' && !simDate.includes('T') ? new Date(simDate + 'T14:00:00') : new Date(simDate)) 
-      : new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1; // 1-12
-    // Standard Schuljahr: 01.09. bis 31.08.
-    // Frist 1 Monat zum 31.08. (d.h. 31.07.)
-    // Bei Kündigung ab August (Monat 8) oder später gilt Kündigung zum 31.08. des Folgejahres
-    const targetEndYear = currentMonth >= 8 ? currentYear + 1 : currentYear;
-    const schoolYearStartYear = targetEndYear - 1;
-    const endDate = new Date(Date.UTC(targetEndYear, 7, 31, 21, 59, 59, 999));
-    return {
-      endDate,
-      endDateIso: endDate.toISOString(),
-      formattedDate: `31. August ${targetEndYear}`,
-      schoolYearLabel: `${schoolYearStartYear}/${targetEndYear}`
-    };
-  };
-
-  const downloadCancellationReceiptPdf = async (cancellationInfo: {
-    cancellationId?: string;
-    cancelledAt?: string | Date;
-    effectiveEndDateFormatted: string;
-    schoolName?: string;
-  }) => {
-    try {
-      const { default: jsPDF } = await import('jspdf');
-      const doc = new jsPDF('p', 'mm', 'a4');
-      const sName = cancellationInfo.schoolName || schoolName || currentSchoolProfile?.name || 'Musikschule';
-      const cId = cancellationInfo.cancellationId || `KD-${schoolNumericId}-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}`;
-
-      // Header Brand
-      doc.setFillColor(248, 250, 252);
-      doc.rect(0, 0, 210, 36, 'F');
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(16);
-      doc.setTextColor(15, 23, 42);
-      doc.text('Campus-Groovelab', 16, 16);
-
-      doc.setFontSize(8.5);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(100, 116, 139);
-      doc.text('Rechtssichere Kündigungsbestätigung gem. § 312k Abs. 4 BGB', 16, 23);
-      doc.text(`Aktenzeichen: ${cId}`, 16, 29);
-
-      // Status Badge
-      doc.setFillColor(254, 243, 199);
-      doc.roundedRect(135, 10, 60, 14, 3, 3, 'F');
-      doc.setTextColor(180, 83, 9);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7.5);
-      doc.text('KÜNDIGUNG BESTÄTIGT', 138, 19);
-
-      // Main Card Box
-      doc.setDrawColor(226, 232, 240);
-      doc.setLineWidth(0.4);
-      doc.roundedRect(16, 44, 178, 100, 4, 4, 'S');
-
-      doc.setFontSize(11);
-      doc.setTextColor(15, 23, 42);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Kündigung des Cloud-Infrastruktur-Abonnements', 22, 54);
-
-      doc.setFontSize(8.5);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(71, 85, 105);
-      doc.text(`Vertragspartner: ${sName}`, 22, 63);
-      doc.text(`Kundennummer / Schul-ID: #${schoolNumericId}`, 22, 70);
-
-      const cAt = cancellationInfo.cancelledAt ? new Date(cancellationInfo.cancelledAt) : new Date();
-      const cAtStr = cAt.toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-      doc.text(`Eingangszeitpunkt der Kündigung: ${cAtStr} Uhr`, 22, 77);
-
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(15, 23, 42);
-      doc.text(`Wirksamkeitsdatum der Beendigung: ${cancellationInfo.effectiveEndDateFormatted}, 23:59:59 Uhr`, 22, 88);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(71, 85, 105);
-      doc.text('Status bis Vertragsende: Vollzugriff aktiv (keine Leistungseinschränkungen)', 22, 96);
-      doc.text('Abrechnung: Es erfolgen nach dem Wirksamkeitsdatum keine weiteren Abbuchungen.', 22, 103);
-      doc.text('Aufbewahrungsfristen: Rechnungsbelege bleiben 10 Jahre gem. § 147 AO abrufbar.', 22, 110);
-      doc.text('Reaktivierung: Der Vertrag kann vor dem Wirksamkeitsdatum jederzeit reaktiviert werden.', 22, 117);
-
-      // Legal compliance footer
-      doc.setFontSize(7.5);
-      doc.setTextColor(148, 163, 184);
-      doc.text('Dieses Dokument wurde elektronisch erstellt und ist gem. § 312k Abs. 4 BGB i.V.m. § 126b BGB rechtsverbindlich.', 16, 156);
-      doc.text('Campus-Groovelab Cloud Services • Hosting & School Management Infrastructure', 16, 161);
-
-      doc.save(`Kuendigungsbestaetigung_Campus_Groovelab_${sName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
-    } catch (e) {
-      console.error("Error generating cancellation PDF:", e);
-      alert("Kündigungsbeleg konnte nicht als PDF erstellt werden.");
-    }
-  };
-
-  const downloadUpgradeConfirmationPdf = async (upgradeInfo: {
-    upgradeId: string;
-    targetModule: 'campus' | 'groovelab';
-    schoolName?: string;
-    effectiveEndDateFormatted: string;
-  }) => {
-    try {
-      const { default: jsPDF } = await import('jspdf');
-      const doc = new jsPDF('p', 'mm', 'a4');
-      const sName = upgradeInfo.schoolName || schoolName || currentSchoolProfile?.name || 'Musikschule';
-      const modName = upgradeInfo.targetModule === 'campus' ? 'Campus Modul' : 'GrooveLab Modul';
-
-      // Header Brand
-      doc.setFillColor(248, 250, 252);
-      doc.rect(0, 0, 210, 36, 'F');
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(16);
-      doc.setTextColor(15, 23, 42);
-      doc.text('Campus-Groovelab', 16, 16);
-
-      doc.setFontSize(8.5);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(100, 116, 139);
-      doc.text('Vertragsänderungsbestätigung gem. § 311 Abs. 1 i.V.m. § 312i BGB', 16, 23);
-      doc.text(`Aktenzeichen: ${upgradeInfo.upgradeId}`, 16, 29);
-
-      // Status Badge
-      doc.setFillColor(220, 252, 231);
-      doc.roundedRect(130, 10, 65, 14, 3, 3, 'F');
-      doc.setTextColor(22, 101, 52);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7.5);
-      doc.text('UPGRADE BESTÄTIGT', 133, 19);
-
-      // Main Card Box
-      doc.setDrawColor(226, 232, 240);
-      doc.setLineWidth(0.4);
-      doc.roundedRect(16, 44, 178, 105, 4, 4, 'S');
-
-      doc.setFontSize(11);
-      doc.setTextColor(15, 23, 42);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`Modul-Upgrade: Hinzubuchung von ${modName} (Kombi-Vorteil)`, 22, 54);
-
-      doc.setFontSize(8.5);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(71, 85, 105);
-      doc.text(`Vertragspartner: ${sName}`, 22, 63);
-      doc.text(`Kundennummer / Schul-ID: #${schoolNumericId}`, 22, 70);
-
-      const nowStr = new Date().toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-      doc.text(`Abschlusszeitpunkt: ${nowStr} Uhr`, 22, 77);
-
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(15, 23, 42);
-      doc.text('Neuer Infrastruktur-Hosting-Tarif: 19,90 € / Mo. (Kombi-Paket Campus + GrooveLab)', 22, 88);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(71, 85, 105);
-      doc.text('Kombi-Vorteilsrabatt: -4,90 € / Mo. dauerhaft auf das Infrastruktur-Bündel.', 22, 96);
-      doc.text(`Laufzeit-Synchronisation: Co-Terminus bis Schuljahresende (${upgradeInfo.effectiveEndDateFormatted}).`, 22, 103);
-      doc.text('Datenschutz (Art. 28 DSGVO): AVV automatisch um neue Modul-Verarbeitungskategorien erweitert.', 22, 110);
-      doc.text('Sofortige Freischaltung: Alle Funktionen ab sofort für Lehrkräfte & Schüler aktiv.', 22, 117);
-
-      // Legal compliance footer
-      doc.setFontSize(7.5);
-      doc.setTextColor(148, 163, 184);
-      doc.text('Dieses Dokument wurde elektronisch erstellt und ist gem. § 311 Abs. 1 BGB i.V.m. § 126b BGB rechtsverbindlich.', 16, 160);
-      doc.text('Campus-Groovelab Cloud Services • Hosting & School Management Infrastructure', 16, 165);
-
-      doc.save(`Vertragsaenderung_Kombi_Paket_${sName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
-    } catch (e) {
-      console.error("Error generating upgrade PDF:", e);
-    }
-  };
-
-  const getDynamicAnnualPrice = (startDateStr: string | null | undefined, discountPercentOrCoFinancing: number | boolean = 0): number => {
-    const contractDateObj = startDateStr ? new Date(startDateStr) : new Date('2026-06-12T19:30:38+02:00');
-    const month = contractDateObj.getMonth() + 1; // 1-indexed
-
-    const monthsMap: Record<number, number> = {
-      9: 12,  // September
-      10: 11, // October
-      11: 10, // November
-      12: 9,  // December
-      1: 8,   // January
-      2: 7,   // February
-      3: 6,   // March
-      4: 5,   // April
-      5: 4,   // May
-      6: 3,   // June
-      7: 2,   // July
-      8: 1    // August
-    };
-
-    const monthsRemaining = monthsMap[month] !== undefined ? monthsMap[month] : 12;
-    // Proportional calculation based on standard full-year prices
-    const basePrice = effectiveSchoolRates.priceStudent * (masterPricing.billingMonthsPerYear || 11);
-    const fullPrice = (monthsRemaining / 12) * basePrice;
-    
-    let discountPercent = 0;
-    if (typeof discountPercentOrCoFinancing === 'boolean') {
-      discountPercent = discountPercentOrCoFinancing ? 10 : 0;
-    } else {
-      discountPercent = discountPercentOrCoFinancing;
-    }
-    
-    const finalPrice = fullPrice * (1 - discountPercent / 100);
-    return parseFloat(finalPrice.toFixed(2));
-  };
-
-  const handleDeveloperReset = async () => {
-    const simulated = typeof window !== 'undefined' ? localStorage.getItem(`simulatedContractStartDate_${schoolId}`) : null;
-    try {
-      const { error } = await supabase
-        .from('schools')
-        .update({
-          is_billing_booked: false,
-          has_campus_subscription: false,
-          has_groovelab_subscription: false,
-          campus_activated_this_month: false,
-          groovelab_activated_this_month: false,
-          contract_start_date: simulated || null,
-          contract_ends_at: null,
-          student_billing_option: 'option2',
-          extra_billing_option: 'option1',
-          user_quota: 150,
-          pending_user_quota: null
-        })
-        .eq('id', schoolId);
-      if (error) throw error;
-
-      // Reset pilot agreement signature
-      try {
-        await supabase
-          .from('pilot_agreements')
-          .delete()
-          .eq('school_id', schoolId);
-      } catch (err) {
-        console.error("Error resetting pilot agreement signature:", err);
-      }
-    } catch (err: any) {
-      console.error("Developer reset database error:", err);
-    }
-
-    setIsAvvSigned(false);
-    setIsBillingBooked(false);
-    setBookedExtraUsers(0);
-    setExtraUsersSliderVal(0);
-    setStudentBillingOption('option2');
-    setBillingPayer('school');
-    setExtraBillingOption('option1');
-    setNextBillingOption('');
-    setNextBillingOptionEffectiveAt('');
-    setContractStartDate(simulated || null);
-    setIsCancelled(false);
-    setHasCampusSub(false);
-    setHasGroovelabSub(false);
-    setSelectedStorageAddonGb(0);
-    setSelectedStorageAddonFee(0);
-    setCampusActivatedThisMonth(false);
-    setGroovelabActivatedThisMonth(false);
-    setCheckoutStep(1);
-    setAgreedToSepa(false);
-    setAgreedToTerms(false);
-
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(`isBillingBooked_${schoolId}`, 'false');
-      localStorage.setItem(`bookedExtraUsers_${schoolId}`, '0');
-      localStorage.removeItem(`nextBillingOption_${schoolId}`);
-      localStorage.removeItem(`nextBillingOptionEffectiveAt_${schoolId}`);
-      if (simulated) {
-        localStorage.setItem(`contractStartDate_${schoolId}`, simulated);
-      } else {
-        localStorage.removeItem(`contractStartDate_${schoolId}`);
-      }
-      localStorage.setItem(`isCancelled_${schoolId}`, 'false');
-      localStorage.removeItem(`unbooked_52_temp_${schoolId}`);
-    }
-  };
+  // [EXTRACTED to useSecretaryLicenses: getSchoolYearEndInfo, downloadCancellationReceiptPdf, downloadUpgradeConfirmationPdf, getDynamicAnnualPrice, handleDeveloperReset]
   
   // Apple-style settings panel states
-  const [settingsTab, setSettingsTab] = useState<'general' | 'sync' | 'security_privacy' | 'backup'>('general');
-  const [activeSecretarySettingsModal, setActiveSecretarySettingsModal] = useState<'general' | 'links' | 'sync' | 'security_privacy' | 'backup' | 'school_year' | 'danger_zone' | null>(null);
+  // [EXTRACTED to useSecretarySettings: settingsTab, activeSecretarySettingsModal]
   const [activeCampusSettingsModal, setActiveCampusSettingsModal] = useState<'boards' | 'homework' | 'timer' | 'schedule' | 'parent' | 'kiosk' | 'permissions' | 'feedback' | null>(null);
   const [activeGroovelabSettingsModal, setActiveGroovelabSettingsModal] = useState<'bands' | 'songs' | 'live' | 'radar' | 'avatars' | 'rooms' | 'permissions' | 'feedback' | null>(null);
 
@@ -2034,322 +1631,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [glCoachModerationRequired, setGlCoachModerationRequired] = useState<boolean>(false);
   const [glJamRecordingCompression, setGlJamRecordingCompression] = useState<boolean>(true);
 
-  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
-  const [initialSettings, setInitialSettings] = useState<any>(null);
-  const [kioskPinLength, setKioskPinLength] = useState<number>(4);
-  const [kioskAutoLogout, setKioskAutoLogout] = useState<number>(5);
-  const [bypassPin, setBypassPin] = useState<string>('1234');
-  const [notificationAbsence, setNotificationAbsence] = useState<boolean>(true);
-  const [notificationConflict, setNotificationConflict] = useState<boolean>(true);
-  const [notificationHomework, setNotificationHomework] = useState<boolean>(false);
-  const [logRetention, setLogRetention] = useState<string>('90');
-  const [syncInterval, setSyncInterval] = useState<string>('daily');
-  const [logoUrl, setLogoUrl] = useState<string>('');
-  const [calendarUrl, setCalendarUrl] = useState<string>('');
-  const [calendarUrls, setCalendarUrls] = useState<string[]>([]);
-  const [newCalendarUrlInput, setNewCalendarUrlInput] = useState<string>('');
-  
-  // Danger Zone / School Reset States
-  const [showResetModal, setShowResetModal] = useState<boolean>(false);
-  const [resetConfirmText, setResetConfirmText] = useState<string>('');
-  const [isResetting, setIsResetting] = useState<boolean>(false);
-
-  const handleResetSchool = async () => {
-    if (resetConfirmText !== schoolName) {
-      alert(`Fehler: Bitte geben Sie genau den Namen der Musikschule („${schoolName}“) zur Bestätigung ein.`);
-      return;
-    }
-    
-    setIsResetting(true);
-    try {
-      const { error } = await supabase.rpc('reset_school_data', {
-        p_school_id: schoolId,
-        p_admin_id: userId
-      });
-      if (error) throw error;
-      
-      alert('Erfolg: Die Musikschule wurde erfolgreich auf Werkseinstellungen zurückgesetzt! Alle Schüler- und Lehrerdaten wurden gelöscht. Ihr Administrator-Profil ist weiterhin aktiv.');
-      setShowResetModal(false);
-      setResetConfirmText('');
-      
-      fetchDashboardData();
-      window.location.reload();
-    } catch (err: any) {
-      console.error('Error resetting school:', err);
-      alert('Fehler beim Zurücksetzen der Musikschule: ' + (err.message || err));
-    } finally {
-      setIsResetting(false);
-    }
-  };
-
-  // Backup & Restore States & Functions
-  const [isExporting, setIsExporting] = useState<boolean>(false);
-  const [isRestoring, setIsRestoring] = useState<boolean>(false);
-  const [lastBackupDate, setLastBackupDate] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null;
-    return localStorage.getItem(`groovelab_last_backup_${schoolId}`);
-  });
-
-  const handleExportBackup = async () => {
-    setIsExporting(true);
-    try {
-      const [
-        schoolRes,
-        usersRes,
-        roomsRes,
-        schedulesRes,
-        bandsRes,
-        studentsRes,
-        stationsRes
-      ] = await Promise.all([
-        supabase.from('schools').select('*').eq('id', schoolId).single(),
-        supabase.from('users').select('*').eq('school_id', schoolId),
-        supabase.from('rooms').select('*').eq('school_id', schoolId),
-        supabase.from('schedules').select('*').eq('school_id', schoolId),
-        supabase.from('bands').select('*').eq('school_id', schoolId),
-        supabase.from('students').select('*').eq('school_id', schoolId),
-        supabase.from('stations').select('*, rooms!inner(school_id)').eq('rooms.school_id', schoolId)
-      ]);
-
-      if (schoolRes.error) throw schoolRes.error;
-      if (usersRes.error) throw usersRes.error;
-      if (roomsRes.error) throw roomsRes.error;
-      if (schedulesRes.error) throw schedulesRes.error;
-      if (bandsRes.error) throw bandsRes.error;
-      if (studentsRes.error) throw studentsRes.error;
-      if (stationsRes.error) throw stationsRes.error;
-
-      const bandIds = (bandsRes.data || []).map((b: any) => b.id);
-      const studentIds = (studentsRes.data || []).map((s: any) => s.id);
-
-      const [
-        bandMembersRes,
-        studentFirstNamesRes,
-        studentLastNamesRes,
-        emailPrefixesRes,
-        emailSuffixesRes,
-        activationDaysRes
-      ] = await Promise.all([
-        bandIds.length > 0
-          ? supabase.from('band_members').select('*').in('band_id', bandIds)
-          : Promise.resolve({ data: [], error: null }),
-        studentIds.length > 0
-          ? supabase.from('student_first_names').select('*').in('student_id', studentIds)
-          : Promise.resolve({ data: [], error: null }),
-        studentIds.length > 0
-          ? supabase.from('student_last_names').select('*').in('student_id', studentIds)
-          : Promise.resolve({ data: [], error: null }),
-        studentIds.length > 0
-          ? supabase.from('email_prefixes').select('*').in('student_id', studentIds)
-          : Promise.resolve({ data: [], error: null }),
-        studentIds.length > 0
-          ? supabase.from('email_suffixes').select('*').in('student_id', studentIds)
-          : Promise.resolve({ data: [], error: null }),
-        studentIds.length > 0
-          ? supabase.from('activation_days').select('*').in('student_id', studentIds)
-          : Promise.resolve({ data: [], error: null })
-      ]);
-
-      if (bandMembersRes.error) throw bandMembersRes.error;
-      if (studentFirstNamesRes.error) throw studentFirstNamesRes.error;
-      if (studentLastNamesRes.error) throw studentLastNamesRes.error;
-      if (emailPrefixesRes.error) throw emailPrefixesRes.error;
-      if (emailSuffixesRes.error) throw emailSuffixesRes.error;
-      if (activationDaysRes.error) throw activationDaysRes.error;
-
-      const backupData = {
-        schoolId,
-        version: '1.0',
-        exportDate: new Date().toISOString(),
-        school: schoolRes.data,
-        users: usersRes.data || [],
-        rooms: roomsRes.data || [],
-        stations: (stationsRes.data || []).map(({ rooms, ...s }: any) => s),
-        schedules: schedulesRes.data || [],
-        bands: bandsRes.data || [],
-        bandMembers: bandMembersRes.data || [],
-        students: studentsRes.data || [],
-        studentFirstNames: studentFirstNamesRes.data || [],
-        studentLastNames: studentLastNamesRes.data || [],
-        emailPrefixes: emailPrefixesRes.data || [],
-        emailSuffixes: emailSuffixesRes.data || [],
-        activationDays: activationDaysRes.data || []
-      };
-
-      const jsonBlob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
-      const downloadUrl = URL.createObjectURL(jsonBlob);
-      const downloadAnchor = document.createElement('a');
-      downloadAnchor.setAttribute("href", downloadUrl);
-      downloadAnchor.setAttribute("download", `Backup_Campus_Groovelab_${schoolName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.json`);
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      downloadAnchor.remove();
-      URL.revokeObjectURL(downloadUrl);
-
-      const nowStr = new Date().toISOString();
-      localStorage.setItem(`groovelab_last_backup_${schoolId}`, nowStr);
-      setLastBackupDate(nowStr);
-    } catch (err) {
-      console.error('[Backup] Export failed:', err);
-      alert('Backup-Export fehlgeschlagen: ' + (err as any).message);
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const handleRestoreBackup = async (file: File) => {
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const backupData = JSON.parse(e.target?.result as string);
-        
-        if (backupData.schoolId !== schoolId) {
-          alert('Fehler: Dieses Backup gehört zu einer anderen Musikschule und kann hier nicht eingespielt werden.');
-          return;
-        }
-        if (!backupData.users || !backupData.rooms || !backupData.schedules || !backupData.students) {
-          alert('Fehler: Ungültiges Backup-Format.');
-          return;
-        }
-
-        const confirmWord = prompt('WARNUNG: Dies wird ALLE aktuellen Daten dieser Musikschule (Stundenpläne, Räume, Benutzer, Schülerkartei) unwiderruflich überschreiben! Tippen Sie zur Bestätigung das Wort "RESTORE" ein:');
-        if (confirmWord !== 'RESTORE') {
-          alert('Wiederherstellung abgebrochen.');
-          return;
-        }
-
-        setIsRestoring(true);
-
-        try {
-          const [
-            uRes, rRes, sRes, bRes, stRes, stationsRes
-          ] = await Promise.all([
-            supabase.from('users').select('*').eq('school_id', schoolId),
-            supabase.from('rooms').select('*').eq('school_id', schoolId),
-            supabase.from('schedules').select('*').eq('school_id', schoolId),
-            supabase.from('bands').select('*').eq('school_id', schoolId),
-            supabase.from('students').select('*').eq('school_id', schoolId),
-            supabase.from('stations').select('*, rooms!inner(school_id)').eq('rooms.school_id', schoolId)
-          ]);
-          const currentData = {
-            schoolId,
-            exportDate: new Date().toISOString(),
-            users: uRes.data || [],
-            rooms: rRes.data || [],
-            stations: (stationsRes.data || []).map(({ rooms, ...s }: any) => s),
-            schedules: sRes.data || [],
-            bands: bRes.data || [],
-            students: stRes.data || []
-          };
-          localStorage.setItem(`groovelab_rollback_backup_${schoolId}`, JSON.stringify(currentData));
-        } catch (rollBackErr) {
-          console.warn('Rollback backup failed, proceeding anyway:', rollBackErr);
-        }
-
-        // Delete all current stations explicitly first, then delete rooms
-        await supabase.from('stations').delete().in('room_id', (await supabase.from('rooms').select('id').eq('school_id', schoolId)).data?.map((r: any) => r.id) || []);
-        await supabase.from('band_members').delete().in('band_id', (await supabase.from('bands').select('id').eq('school_id', schoolId)).data?.map((b: any) => b.id) || []);
-        await supabase.from('bands').delete().eq('school_id', schoolId);
-        await supabase.from('schedules').delete().eq('school_id', schoolId);
-        const restoreStudentIds = (await supabase.from('students').select('id').eq('school_id', schoolId)).data?.map((s: any) => s.id) || [];
-        await supabase.from('student_first_names').delete().in('student_id', restoreStudentIds);
-        await supabase.from('student_last_names').delete().in('student_id', restoreStudentIds);
-        await supabase.from('email_prefixes').delete().in('student_id', restoreStudentIds);
-        await supabase.from('email_suffixes').delete().in('student_id', restoreStudentIds);
-        await supabase.from('activation_days').delete().in('student_id', restoreStudentIds);
-        await supabase.from('students').delete().eq('school_id', schoolId);
-        await supabase.from('rooms').delete().eq('school_id', schoolId);
-        await supabase.from('users').delete().eq('school_id', schoolId).neq('id', userId);
-
-        if (backupData.school) {
-          const { id, created_at, ...schoolSettings } = backupData.school;
-          await supabase.from('schools').update(schoolSettings).eq('id', schoolId);
-        }
-
-        if (backupData.users.length > 0) {
-          const usersToInsert = backupData.users.filter((u: any) => u.id !== userId);
-          if (usersToInsert.length > 0) {
-            const { error } = await supabase.from('users').insert(usersToInsert);
-            if (error) throw error;
-          }
-          // Update the current logged-in user with their backup data (excluding primary key/email conflicts)
-          const currentUserBackup = backupData.users.find((u: any) => u.id === userId);
-          if (currentUserBackup) {
-            const { id, created_at, email, ...updatableFields } = currentUserBackup;
-            await supabase.from('users').update(updatableFields).eq('id', userId);
-          }
-        }
-        if (backupData.rooms.length > 0) {
-          const { error } = await supabase.from('rooms').insert(backupData.rooms);
-          if (error) throw error;
-        }
-        if (backupData.stations && backupData.stations.length > 0) {
-          const { error } = await supabase.from('stations').insert(backupData.stations);
-          if (error) throw error;
-        }
-        if (backupData.students.length > 0) {
-          const { error } = await supabase.from('students').insert(backupData.students);
-          if (error) throw error;
-        }
-        if (backupData.studentFirstNames && backupData.studentFirstNames.length > 0) {
-          const { error } = await supabase.from('student_first_names').insert(backupData.studentFirstNames);
-          if (error) throw error;
-        }
-        if (backupData.studentLastNames && backupData.studentLastNames.length > 0) {
-          const { error } = await supabase.from('student_last_names').insert(backupData.studentLastNames);
-          if (error) throw error;
-        }
-        if (backupData.studentNames && backupData.studentNames.length > 0) {
-          const firstNamesToInsert = backupData.studentNames.map((sn: any) => ({
-            student_id: sn.student_id,
-            first_name: sn.first_name
-          }));
-          const lastNamesToInsert = backupData.studentNames.map((sn: any) => ({
-            student_id: sn.student_id,
-            last_name: sn.last_name
-          }));
-          const { error: fErr } = await supabase.from('student_first_names').insert(firstNamesToInsert);
-          if (fErr) throw fErr;
-          const { error: lErr } = await supabase.from('student_last_names').insert(lastNamesToInsert);
-          if (lErr) throw lErr;
-        }
-        if (backupData.emailPrefixes && backupData.emailPrefixes.length > 0) {
-          const { error } = await supabase.from('email_prefixes').insert(backupData.emailPrefixes);
-          if (error) throw error;
-        }
-        if (backupData.emailSuffixes && backupData.emailSuffixes.length > 0) {
-          const { error } = await supabase.from('email_suffixes').insert(backupData.emailSuffixes);
-          if (error) throw error;
-        }
-        if (backupData.activationDays && backupData.activationDays.length > 0) {
-          const { error } = await supabase.from('activation_days').insert(backupData.activationDays);
-          if (error) throw error;
-        }
-        if (backupData.schedules.length > 0) {
-          const { error } = await supabase.from('schedules').insert(backupData.schedules);
-          if (error) throw error;
-        }
-        if (backupData.bands && backupData.bands.length > 0) {
-          const { error } = await supabase.from('bands').insert(backupData.bands);
-          if (error) throw error;
-        }
-        if (backupData.bandMembers && backupData.bandMembers.length > 0) {
-          const { error } = await supabase.from('band_members').insert(backupData.bandMembers);
-          if (error) throw error;
-        }
-
-        alert('Daten erfolgreich wiederhergestellt! Das Dashboard wird neu geladen.');
-        window.location.reload();
-      } catch (err) {
-        console.error('[Backup] Restore failed:', err);
-        alert('Wiederherstellung fehlgeschlagen: ' + (err as any).message);
-      } finally {
-        setIsRestoring(false);
-      }
-    };
-    reader.readAsText(file);
-  };
-
+  // [EXTRACTED to useSecretarySettings: initialSettings, kioskPinLength, bypassPin, logRetention, syncInterval, logoUrl, calendarUrls, showResetModal, handleResetSchool, handleExportBackup, handleRestoreBackup]
   // Tokens & Settings
   const [kioskToken, setKioskToken] = useState<string>('');
   const [campusToken, setCampusToken] = useState<string>('');
@@ -2363,24 +1645,15 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
   const [allTeachers, setAllTeachers] = useState<any[]>([]);
   const allTeachersRef = useRef<any[]>([]);
 
-  const INSTRUMENT_TAGS = ['Schlagzeug', 'Piano', 'Gitarre', 'Gesang', 'Geige', 'Querflöte', 'Saxophon', 'Bass', 'Keyboard', 'Trompete'];
-
-  // Subjects (Unterrichtsfächer) states
-  const [subjects, setSubjects] = useState<any[]>([]);
-  const activeSubjectsList = useMemo(() => {
-    const placeholders = new Set([
-      'ohne zuweisung', 'ohnezuweisung', 'allgemein', 
-      'nicht festgelegt', 'nichtfestgelegt', 'nicht zugeordnet', 
-      'nichtzugeordnet', 'none', 'null', ''
-    ]);
-    const activeSubs = Array.from(new Set(
-      subjects
-        .filter((s: any) => s.is_active && s.name)
-        .map((s: any) => s.name.trim())
-    )).filter(name => !placeholders.has(name.toLowerCase()));
-    
-    return activeSubs.length > 0 ? activeSubs : INSTRUMENT_TAGS;
-  }, [subjects]);
+  // Unified teacher profiles list for bulk operations & modals
+  const allUniqueTeacherProfiles = useMemo(() => {
+    return [...(campusTeachers || []), ...(bypassTeachers || []), ...(coaches || []), ...(allTeachers || [])].reduce((acc: any[], t: any) => {
+      if (t?.id && !acc.some((x: any) => x.id === t.id)) {
+        acc.push(t);
+      }
+      return acc;
+    }, []);
+  }, [campusTeachers, bypassTeachers, coaches, allTeachers]);
 
   const {
     employees,
@@ -2591,98 +1864,71 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     return typeof window !== 'undefined' && localStorage.getItem(`dismissedInvoiceAlert_${schoolId}`) === 'true';
   });
 
-  // Global pricing calculations for use in briefing & invoice lists
-  const billedCampus_global = isBillingBooked ? (hasCampusSub || campusActivatedThisMonth) : hasCampusSub;
-  const billedGroovelab_global = isBillingBooked ? (hasGroovelabSub || groovelabActivatedThisMonth) : hasGroovelabSub;
-  const activeModulesCount_global = (billedCampus_global ? 1 : 0) + (billedGroovelab_global ? 1 : 0);
-  const moduleCost_global = (billedCampus_global && billedGroovelab_global) ? effectiveSchoolRates.priceKombi : ((billedCampus_global ? effectiveSchoolRates.priceCampus : 0) + (billedGroovelab_global ? effectiveSchoolRates.priceGroovelab : 0));
-  const activeStudentsCount_global = students.filter((s: any) => s.isCampusActive || s.is_campus_active).length;
-  const activeGroovelabStudentsCount_global = students.filter((s: any) => s.isGroovelabActive || s.is_groovelab_active).length;
-  const maxActiveStudentsCount_global = Math.max(activeStudentsCount_global, activeGroovelabStudentsCount_global);
-  const passiveStudentsCount_global = Math.max(0, students.length - maxActiveStudentsCount_global);
-  const allUniqueTeacherProfiles = [...campusTeachers, ...bypassTeachers, ...coaches, ...allTeachers].reduce((acc: any[], t: any) => {
-    if (t && t.id && !acc.some(existing => existing.id === t.id)) {
-      acc.push(t);
-    }
-    return acc;
-  }, []).sort((a: any, b: any) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
-
-  // Anti-Abuse Rule: Pure Management is unlimited 100% free.
-  // Double-Roles (Management + Teacher): Max 2 profiles are free; 3rd and subsequent double-roles are billed (0,49 € / Mo.).
-  let freeDoubleRoleCount = 0;
-  const billableTeachersCount = allUniqueTeacherProfiles.filter((t: any) => {
-    const isManagement = t.role === 'admin' || t.role === 'secretary' || (Array.isArray(t.roles) && (t.roles.includes('admin') || t.roles.includes('secretary')));
-    const isTeacher = t.role === 'teacher' || (Array.isArray(t.roles) && t.roles.includes('teacher')) || (t.studentCount && t.studentCount > 0);
-    
-    if (isManagement && isTeacher) {
-      if (freeDoubleRoleCount < 2) {
-        freeDoubleRoleCount++;
-        return false; // Free double-role exemption
-      }
-      return true; // Exceeded 2 free double-roles -> Billed at 0,49 € / Mo.
-    }
-    if (isManagement && !isTeacher) {
-      return false; // Pure Management -> Always 100% Free
-    }
-    return true; // Pure Teacher -> Billed
-  }).length;
-
-  const isSammelzahler = billingPayer === 'school' || studentBillingOption === 'option2' || studentBillingOption === 'option1';
-  const campusActivationFeeTotal_global = isSammelzahler ? activeStudentsCount_global * effectiveSchoolRates.priceStudent : 0;
-  const groovelabActivationFeeTotal_global = activeGroovelabStudentsCount_global * effectiveSchoolRates.priceStudent;
-  const passiveStudentFeeTotal_global = passiveStudentsCount_global * 0.09;
-  const teacherServiceFeeTotal_global = billableTeachersCount * effectiveSchoolRates.priceTeacher;
-  const storageAddonFee_global = selectedStorageAddonGb > 0 ? (selectedStorageAddonFee || Number(currentSchoolProfile?.storage_addon_monthly_fee || 0)) : 0;
-
-  const baseB2B_global = subscriptionBypass
-    ? 0
-    : (moduleCost_global + teacherServiceFeeTotal_global + passiveStudentFeeTotal_global + groovelabActivationFeeTotal_global + campusActivationFeeTotal_global + storageAddonFee_global);
-  const studentLevyMonthly_global = campusActivationFeeTotal_global;
-  const extraLevyMonthly_global = extraBillingOption === 'option2' ? bookedExtraUsers * effectiveSchoolRates.priceTeacher : 0;
-  const studentSharePreview_global = 0;
-  const schoolShareBookedExtra_global = 0;
-  const currentTotalB2B_global = baseB2B_global;
-  const mixedTotal_global = currentTotalB2B_global;
-
-  const daysSinceLastBackup = useMemo(() => {
-    if (!lastBackupDate) return null;
-    const lastDate = new Date(lastBackupDate);
-    const diffTime = Math.abs(new Date().getTime() - lastDate.getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  }, [lastBackupDate]);
-
-  const showBackupAlert = useMemo(() => {
-    return !lastBackupDate || (daysSinceLastBackup !== null && daysSinceLastBackup > 14);
-  }, [lastBackupDate, daysSinceLastBackup]);
-
-  const isSettingsDirty = useMemo(() => {
-    if (!initialSettings) return false;
-    return (
-      schoolName !== initialSettings.schoolName ||
-      schoolSubdomain !== initialSettings.schoolSubdomain ||
-      schoolZipCode !== initialSettings.schoolZipCode ||
-      schoolCity !== initialSettings.schoolCity ||
-      schoolStreet !== initialSettings.schoolStreet ||
-      schoolHouseNumber !== initialSettings.schoolHouseNumber ||
-      schoolPhoneNumber !== initialSettings.schoolPhoneNumber ||
-      schoolEmail !== initialSettings.schoolEmail ||
-      absenceEmail !== initialSettings.absenceEmail ||
-      logoUrl !== initialSettings.logoUrl ||
-      JSON.stringify(calendarUrls) !== JSON.stringify(initialSettings.calendarUrls) ||
-      kioskPinLength !== initialSettings.kioskPinLength ||
-      bypassPin !== initialSettings.bypassPin ||
-      logRetention !== initialSettings.logRetention ||
-      syncInterval !== initialSettings.syncInterval ||
-      schoolYearStartMonth !== initialSettings.schoolYearStartMonth ||
-      schoolYearStartDay !== initialSettings.schoolYearStartDay ||
-      autoDeleteExpiredUsers !== initialSettings.autoDeleteExpiredUsers
-    );
-  }, [
-    initialSettings,
-    schoolName, schoolSubdomain, schoolZipCode, schoolCity, schoolStreet, schoolHouseNumber, schoolPhoneNumber, schoolEmail, absenceEmail,
-    logoUrl, calendarUrls, kioskPinLength, bypassPin, logRetention, syncInterval,
-    schoolYearStartMonth, schoolYearStartDay, autoDeleteExpiredUsers
+  // Global pricing calculations for use in briefing & invoice lists (EXTRACTED to computeB2BPricingMetrics)
+  const {
+    billedCampus_global,
+    billedGroovelab_global,
+    activeModulesCount_global,
+    moduleCost_global,
+    activeStudentsCount_global,
+    activeGroovelabStudentsCount_global,
+    passiveStudentsCount_global,
+    billableTeachersCount,
+    isSammelzahler,
+    campusActivationFeeTotal_global,
+    groovelabActivationFeeTotal_global,
+    passiveStudentFeeTotal_global,
+    teacherServiceFeeTotal_global,
+    storageAddonFee_global,
+    baseB2B_global,
+    studentLevyMonthly_global,
+    extraLevyMonthly_global,
+    studentSharePreview_global,
+    schoolShareBookedExtra_global,
+    currentTotalB2B_global,
+    mixedTotal_global
+  } = useMemo(() => computeB2BPricingMetrics({
+    isBillingBooked,
+    hasCampusSub,
+    campusActivatedThisMonth,
+    hasGroovelabSub,
+    groovelabActivatedThisMonth,
+    effectiveSchoolRates,
+    students,
+    campusTeachers,
+    bypassTeachers,
+    coaches,
+    allTeachers,
+    billingPayer,
+    studentBillingOption,
+    selectedStorageAddonGb,
+    selectedStorageAddonFee,
+    currentSchoolProfile,
+    subscriptionBypass,
+    extraBillingOption,
+    bookedExtraUsers
+  }), [
+    isBillingBooked,
+    hasCampusSub,
+    campusActivatedThisMonth,
+    hasGroovelabSub,
+    groovelabActivatedThisMonth,
+    effectiveSchoolRates,
+    students,
+    campusTeachers,
+    bypassTeachers,
+    coaches,
+    allTeachers,
+    billingPayer,
+    studentBillingOption,
+    selectedStorageAddonGb,
+    selectedStorageAddonFee,
+    currentSchoolProfile,
+    subscriptionBypass,
+    extraBillingOption,
+    bookedExtraUsers
   ]);
+  // [EXTRACTED to useSecretarySettings: daysSinceLastBackup, showBackupAlert, isSettingsDirty]
 
   const {
     pendingSchedules,
@@ -2864,8 +2110,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
   // UI states
   const [loading, setLoading] = useState(true);
-  const [updatingAlertId, setUpdatingAlertId] = useState<string | null>(null);
-  const [updatingTeacherId, setUpdatingTeacherId] = useState<string | null>(null);
   const [briefingData, setBriefingData] = useState<SecretaryBriefingData | null>(null);
   const {
     crisisNotifications,
@@ -3000,8 +2244,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'user_notes' }, async () => {
         try {
-          const updated = await notesService.fetchSchoolRoomIssues(schoolId);
-          setRoomIssues(updated);
+          fetchRoomIssues();
         } catch (e) {}
       })
       .subscribe();
@@ -3015,26 +2258,6 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
   useEffect(() => {
     fetchDashboardData();
-    fetchLiveStatusData();
-
-    // Visibility-aware heartbeat: real-time websockets handle instant events, heartbeat provides 60s backup
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        fetchLiveStatusData();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        fetchLiveStatusData();
-      }
-    }, 60000);
-
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
   }, [schoolId]);
 
   useEffect(() => {
@@ -3058,322 +2281,12 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     };
   }, []);
 
-  const fetchLiveStatusData = async () => {
-    try {
-      // Fetch active sessions for Live Lab
-      const { data: sessData, error: sessErr } = await supabase
-        .from('sessions')
-        .select('id, user_id, station_id, check_in_time, check_out_time, users!inner(id, first_name, last_name, instrument, avatar_url, photo_url, school_id), stations(id, name, school_id)')
-        .is('check_out_time', null)
-        .eq('users.school_id', schoolId);
+  // [EXTRACTED to useSecretaryLiveLab: fetchLiveStatusData, handleLogoutStudent, showRealtimeNotification]
 
-      if (!sessErr && sessData) {
-        const schoolSess = sessData
-          .filter((s: any) => {
-            const u = Array.isArray(s.users) ? s.users[0] : s.users;
-            return u?.school_id === schoolId;
-          })
-          .map((s: any) => ({
-            ...s,
-            users: Array.isArray(s.users) ? s.users[0] : s.users,
-            stations: Array.isArray(s.stations) ? s.stations[0] : s.stations
-          }));
-        setActiveSessions(schoolSess);
-      }
+  // [EXTRACTED to useSecretaryBookings: fetchPendingBookings, handleConfirmBooking, handleRejectBooking, fetchLogbookBookings, handleUpdateLogbookBooking, handleDeleteLogbookBooking, handleConfirmLogbookBooking]
 
-      // Fetch help requests
-      const { data: helpData } = await supabase
-        .from('help_requests')
-        .select('id, user_id, station_id, message, status, created_at, school_id, users(id, first_name, last_name, instrument)')
-        .eq('school_id', schoolId)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
-      setHelpRequests(helpData || []);
+  // [EXTRACTED to useSecretaryLicenses: fetchTariffBookings]
 
-      // Fetch groovelab tickets
-      const { data: ticketsData } = await supabase
-        .from('groovelab_tickets')
-        .select('id, school_id, title, status, priority, created_at')
-        .eq('school_id', schoolId)
-        .order('created_at', { ascending: false });
-      if (ticketsData) setTickets(ticketsData);
-
-    } catch (err) {
-      console.error("Error fetching live status data:", err);
-    }
-  };
-
-  const handleLogoutStudent = React.useCallback(async (sessionId: string) => {
-    if (!window.confirm('Ausloggen?')) return;
-    await supabase.from('sessions').update({ check_out_time: new Date().toISOString() }).eq('id', sessionId);
-    fetchLiveStatusData();
-  }, [schoolId]);
-
-  const showRealtimeNotification = (message: string) => {
-    setRealtimeToast({ message, visible: true });
-    
-    setTimeout(() => {
-      setRealtimeToast(prev => ({ ...prev, visible: false }));
-    }, 5000);
-
-    if ('Notification' in window) {
-      if (Notification.permission === 'granted') {
-        new Notification('Campus Musäk', {
-          body: message,
-          icon: '/favicon.ico'
-        });
-      } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission().then(permission => {
-          if (permission === 'granted') {
-            new Notification('Campus Musäk', {
-              body: message,
-              icon: '/favicon.ico'
-            });
-          }
-        });
-      }
-    }
-  };
-
-  const fetchPendingBookings = async () => {
-    if (!schoolId) return;
-    try {
-      const { data, error } = await supabase
-        .from('room_bookings')
-        .select(`
-          id,
-          room_id,
-          date,
-          start_time,
-          end_time,
-          title,
-          booked_by,
-          rooms:room_id (
-            name
-          ),
-          profiles:users!booked_by (
-            first_name,
-            last_name
-          )
-        `)
-        .eq('school_id', schoolId)
-        .eq('status', 'pending')
-        .order('date', { ascending: true })
-        .order('start_time', { ascending: true });
-
-      if (error) throw error;
-      setPendingBookings(data || []);
-    } catch (err) {
-      console.error('Error fetching pending room bookings:', err);
-    }
-  };
-
-  const handleConfirmBooking = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('room_bookings')
-        .update({ status: 'approved' })
-        .eq('id', id);
-
-      if (error) throw error;
-      
-      setPendingBookings(prev => prev.filter(b => b.id !== id));
-      window.dispatchEvent(new CustomEvent('refresh-bookings'));
-      alert('Raumbuchung erfolgreich bestätigt.');
-    } catch (err: any) {
-      alert('Fehler beim Bestätigen: ' + err.message);
-    }
-  };
-
-  const handleRejectBooking = async (id: string) => {
-    if (!window.confirm('Möchtest du diese vorläufige Raumbuchung wirklich ablehnen und löschen?')) return;
-    try {
-      const { error } = await supabase
-        .from('room_bookings')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      
-      setPendingBookings(prev => prev.filter(b => b.id !== id));
-      window.dispatchEvent(new CustomEvent('refresh-bookings'));
-      alert('Raumbuchung abgelehnt und gelöscht.');
-    } catch (err: any) {
-      alert('Fehler beim Ablehnen: ' + err.message);
-    }
-  };
-
-  const fetchLogbookBookings = async () => {
-    if (!schoolId) return;
-    try {
-      const { data, error } = await supabase
-        .from('room_bookings')
-        .select(`
-          id,
-          room_id,
-          date,
-          start_time,
-          end_time,
-          title,
-          booked_by,
-          status,
-          rooms:room_id (
-            id,
-            name
-          ),
-          profiles:booked_by (
-            first_name,
-            last_name,
-            role
-          )
-        `)
-        .eq('school_id', schoolId)
-        .order('date', { ascending: false })
-        .order('start_time', { ascending: false });
-
-      if (error) throw error;
-      setLogbookBookings(data || []);
-    } catch (err: any) {
-      console.error('Error fetching logbook bookings:', err);
-    }
-  };
-
-  const handleUpdateLogbookBooking = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('room_bookings')
-        .update({
-          date: editBookingDate,
-          start_time: editBookingStartTime.length === 5 ? `${editBookingStartTime}:00` : editBookingStartTime,
-          end_time: editBookingEndTime.length === 5 ? `${editBookingEndTime}:00` : editBookingEndTime,
-          title: editBookingTitle,
-          room_id: editBookingRoomId
-        })
-        .eq('id', id);
-
-      if (error) throw error;
-
-      alert('Raumbuchung erfolgreich aktualisiert.');
-      setEditingLogbookBookingId(null);
-      fetchLogbookBookings();
-      fetchPendingBookings();
-      window.dispatchEvent(new CustomEvent('refresh-bookings'));
-    } catch (err: any) {
-      alert('Fehler beim Aktualisieren: ' + err.message);
-    }
-  };
-
-  const handleDeleteLogbookBooking = async (id: string) => {
-    if (!window.confirm('Möchtest du diese Raumbuchung wirklich löschen?')) return;
-    try {
-      const { error } = await supabase
-        .from('room_bookings')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      alert('Raumbuchung erfolgreich gelöscht.');
-      fetchLogbookBookings();
-      fetchPendingBookings();
-      window.dispatchEvent(new CustomEvent('refresh-bookings'));
-    } catch (err: any) {
-      alert('Fehler beim Löschen: ' + err.message);
-    }
-  };
-
-  const handleConfirmLogbookBooking = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('room_bookings')
-        .update({ status: 'approved' })
-        .eq('id', id);
-
-      if (error) throw error;
-
-      alert('Raumbuchung erfolgreich bestätigt.');
-      fetchLogbookBookings();
-      fetchPendingBookings();
-      window.dispatchEvent(new CustomEvent('refresh-bookings'));
-    } catch (err: any) {
-      alert('Fehler beim Bestätigen: ' + err.message);
-    }
-  };
-
-  const fetchTariffBookings = async (overrideSchoolData?: any) => {
-    if (!schoolId) return;
-    setLoadingTariffBookings(true);
-    try {
-      const { data, error } = await supabase
-        .from('school_tariff_bookings')
-        .select('*')
-        .eq('school_id', schoolId)
-        .order('created_at', { ascending: false });
-
-      if (!error && data && data.length > 0) {
-        setTariffBookings(data);
-      } else {
-        // Authoritative Baseline Guarantee: If the school has an active contract (is_billing_booked = true),
-        // but no booking row exists yet in school_tariff_bookings (e.g. booked prior to migration 346),
-        // synthesize the verified initial contract receipt directly from authoritative school records!
-        const schoolObj = overrideSchoolData || currentSchoolProfile;
-        const booked = schoolObj?.is_billing_booked ?? isBillingBooked;
-        if (booked) {
-          let sCampus = schoolObj?.has_campus_subscription ?? hasCampusSub;
-          let sGroove = schoolObj?.has_groovelab_subscription ?? hasGroovelabSub;
-          if (!sCampus && !sGroove) {
-            sCampus = true;
-            sGroove = true;
-          }
-          const sBillingOpt = schoolObj?.student_billing_option || studentBillingOption || 'option1';
-          const sStorageGb = Number(schoolObj?.storage_addon_gb ?? selectedStorageAddonGb ?? 0);
-          const sStorageFee = Number(schoolObj?.storage_addon_monthly_fee ?? selectedStorageAddonFee ?? 0);
-          const sStorageStatus = schoolObj?.storage_addon_status || (sStorageGb > 0 ? 'active' : 'none');
-          const sDowngradeGb = schoolObj?.storage_pending_downgrade_gb ?? null;
-          const sDowngradeDate = schoolObj?.storage_pending_effective_date ?? null;
-          const sContractStart = schoolObj?.contract_start_date || '2026-09-01';
-
-          const baseRate = (sCampus && sGroove) ? 19.90 : sCampus ? 14.90 : sGroove ? 9.90 : 19.90;
-          const totalNet = baseRate + sStorageFee;
-          const schoolHex = (schoolId || '000000').replace(/-/g, '').slice(0, 6).toUpperCase();
-
-          const initialBaselineReceipt = {
-            id: `baseline-${schoolId}`,
-            school_id: schoolId,
-            receipt_number: `TB-${schoolHex}-260901-INIT`,
-            booking_type: 'SUBSCRIPTION_BOOKING',
-            has_campus_subscription: sCampus,
-            has_groovelab_subscription: sGroove,
-            student_billing_option: sBillingOpt,
-            storage_addon_gb: sStorageGb,
-            storage_addon_monthly_fee: sStorageFee,
-            storage_addon_status: sStorageStatus,
-            storage_pending_downgrade_gb: sDowngradeGb,
-            storage_pending_effective_date: sDowngradeDate,
-            total_monthly_rate_net: totalNet,
-            currency: 'EUR',
-            effective_date: sContractStart,
-            notes: 'Initialer Schuljahres-Vertragsabschluss 2026/2027 (Campus-Groovelab)',
-            booked_by_name: schoolObj?.avv_signee_name || 'Schulleitung',
-            created_at: sContractStart ? `${sContractStart}T09:00:00Z` : new Date().toISOString()
-          };
-
-          setTariffBookings([initialBaselineReceipt]);
-
-          // Attempt async persistence if table exists
-          try {
-            await supabase.from('school_tariff_bookings').insert([initialBaselineReceipt]);
-          } catch (e) {}
-        } else {
-          setTariffBookings([]);
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching tariff bookings:', err);
-    } finally {
-      setLoadingTariffBookings(false);
-    }
-  };
 
   const fetchDashboardData = async () => {
     try {
@@ -3558,113 +2471,12 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
 
         setSelectedStorageAddonGb(storageGbFromDb);
         setSelectedStorageAddonFee(effectiveStorageFee);
-        setLogoUrl(schoolData.logo_url || '');
-        const rawUrl = schoolData.calendar_url || '';
-        setCalendarUrl(rawUrl);
-        let parsedUrls: string[] = [];
-        try {
-          if (rawUrl.startsWith('[')) {
-            parsedUrls = JSON.parse(rawUrl);
-          } else if (rawUrl) {
-            parsedUrls = [rawUrl];
-          }
-        } catch (e) {
-          if (rawUrl) parsedUrls = [rawUrl];
-        }
-        setCalendarUrls(parsedUrls);
-        const loadedKioskPinLength = op.kiosk_pin_length || 4;
-        const loadedBypassPin = op.bypass_pin || '1234';
-        const loadedLogRetention = op.log_retention || '90';
-        const loadedSyncInterval = op.sync_interval || 'daily';
-        
-        setKioskPinLength(loadedKioskPinLength);
-        setBypassPin(loadedBypassPin);
-        setLogRetention(loadedLogRetention);
-        setSyncInterval(loadedSyncInterval);
-
-        const loadedStartMonth = Number(schoolData.school_year_start_month || op.school_year_start_month || 9);
-        const loadedStartDay = Number(schoolData.school_year_start_day || op.school_year_start_day || 1);
-        const loadedAutoDelete = Boolean(schoolData.auto_delete_expired_users === true || op.auto_delete_expired_users === true || op.auto_delete_expired_users === 'true');
-
-        setSchoolYearStartMonth(loadedStartMonth);
-        setSchoolYearStartDay(loadedStartDay);
-        setAutoDeleteExpiredUsers(loadedAutoDelete);
-
-        setInitialSettings({
-          schoolName: schoolData.name || '',
-          schoolSubdomain: schoolData.subdomain || '',
-          schoolZipCode: schoolData.zip_code || '',
-          schoolCity: schoolData.city || '',
-          schoolStreet: schoolData.street || '',
-          schoolHouseNumber: schoolData.house_number || '',
-          schoolPhoneNumber: schoolData.phone_number || '',
-          schoolEmail: schoolData.email || '',
-          absenceEmail: schoolData.absence_email || '',
-          logoUrl: schoolData.logo_url || '',
-          calendarUrls: parsedUrls,
-          kioskPinLength: loadedKioskPinLength,
-          bypassPin: loadedBypassPin,
-          logRetention: loadedLogRetention,
-          syncInterval: loadedSyncInterval,
-          schoolYearStartMonth: loadedStartMonth,
-          schoolYearStartDay: loadedStartDay,
-          autoDeleteExpiredUsers: loadedAutoDelete
-        });
+        initSettingsFromSchool(schoolData);
         setKioskToken(schoolData.groovelab_kiosk_token || '');
         setCampusToken(schoolData.campus_login_token || '');
         setAllowMessagesGlobal(schoolData.allow_messages_global ?? true);
-        const dbCampus = schoolData.has_campus_subscription;
-        const dbGroove = schoolData.has_groovelab_subscription;
-        let effectiveCampus: boolean;
-        let effectiveGroove: boolean;
-
-        if (isBooked) {
-          if (dbCampus === true || dbGroove === true) {
-            effectiveCampus = Boolean(dbCampus);
-            effectiveGroove = Boolean(dbGroove);
-          } else {
-            const storedCampus = typeof window !== 'undefined' ? localStorage.getItem(`hasCampusSub_${schoolId}`) : null;
-            const storedGroove = typeof window !== 'undefined' ? localStorage.getItem(`hasGroovelabSub_${schoolId}`) : null;
-            if (storedCampus !== null || storedGroove !== null) {
-              effectiveCampus = storedCampus === 'true';
-              effectiveGroove = storedGroove === 'true';
-            } else {
-              // Standard baseline in Campus-Groovelab for booked schools: Kombi-Paket (both active)
-              effectiveCampus = true;
-              effectiveGroove = true;
-            }
-          }
-        } else {
-          effectiveCampus = Boolean(dbCampus);
-          effectiveGroove = Boolean(dbGroove);
-        }
-
-        setHasCampusSub(effectiveCampus);
-        setHasGroovelabSub(effectiveGroove);
-        schoolData.has_campus_subscription = effectiveCampus;
-        schoolData.has_groovelab_subscription = effectiveGroove;
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(`hasCampusSub_${schoolId}`, String(effectiveCampus));
-          localStorage.setItem(`hasGroovelabSub_${schoolId}`, String(effectiveGroove));
-        }
-
-        if (isBooked && (dbCampus === null || dbCampus === undefined || (!dbCampus && !dbGroove))) {
-          supabase
-            .from('schools')
-            .update({
-              has_campus_subscription: effectiveCampus,
-              has_groovelab_subscription: effectiveGroove
-            })
-            .eq('id', schoolId)
-            .then();
-        }
-
-        setCampusActivatedThisMonth(schoolData.campus_activated_this_month ?? false);
-        setGroovelabActivatedThisMonth(schoolData.groovelab_activated_this_month ?? false);
-        
-        const uq = schoolData.user_quota || 150;
-        setUserQuota(uq);
-        setActiveUserQuota(uq);
+        // Hydrate all billing, license, subscription and quota settings (EXTRACTED to useSecretaryLicenses)
+        initBillingFromSchool(schoolData);
         
         // Load cloud-persisted GoBD invoices into local cache (v3)
         if (schoolId) {
@@ -3710,64 +2522,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
           });
         }
 
-        // Calculate bookedExtraUsers from user_quota (anything above 150 is extra)
-        const extraFromDb = Math.max(0, uq - 150);
-        setBookedExtraUsers(extraFromDb);
-        localStorage.setItem(`bookedExtraUsers_${schoolId}`, extraFromDb.toString());
 
-        // Restore contractStartDate from DB contract_start_date or created_at
-        if (schoolData.contract_start_date) {
-          setContractStartDate(schoolData.contract_start_date);
-          localStorage.setItem(`contractStartDate_${schoolId}`, schoolData.contract_start_date);
-        } else {
-          const simulated = localStorage.getItem(`simulatedContractStartDate_${schoolId}`);
-          if (simulated) {
-            setContractStartDate(simulated);
-            localStorage.setItem(`contractStartDate_${schoolId}`, simulated);
-          } else if (schoolData.created_at) {
-            setContractStartDate(schoolData.created_at);
-            localStorage.setItem(`contractStartDate_${schoolId}`, schoolData.created_at);
-          }
-        }
-
-        // Restore extraBillingOption
-        if (schoolData.extra_billing_option) {
-          setExtraBillingOption(schoolData.extra_billing_option);
-        }
-
-        // Restore isCancelled and schoolContractEndsAt from DB contract_ends_at
-        const dbIsCancelled = !!schoolData.contract_ends_at;
-        setSchoolContractEndsAt(schoolData.contract_ends_at || null);
-        if (dbIsCancelled) {
-          setIsCancelled(true);
-          if (typeof window !== 'undefined') localStorage.setItem(`isCancelled_${schoolId}`, 'true');
-        } else {
-          setIsCancelled(false);
-          if (typeof window !== 'undefined') localStorage.removeItem(`isCancelled_${schoolId}`);
-        }
-        
-        if (isBooked) {
-          setIsBillingBooked(true);
-          setIsSchoolTrial(false);
-          setSchoolStatus('active');
-          if (typeof window !== 'undefined') {
-            localStorage.setItem(`isBillingBooked_${schoolId}`, 'true');
-          }
-          setHasCampusSub(effectiveCampus);
-          setHasGroovelabSub(effectiveGroove);
-          const billingOpt = schoolData.student_billing_option || 'option2';
-          setStudentBillingOption(billingOpt);
-          setBillingPayer((billingOpt === 'option2' || billingOpt === 'option3_2' || billingOpt === 'option3_3') ? 'school' : 'student');
-        } else {
-          setIsBillingBooked(false);
-          if (typeof window !== 'undefined' && storedIsBookedStr !== 'false') {
-            localStorage.removeItem(`isBillingBooked_${schoolId}`);
-          }
-          setHasCampusSub(false);
-          setHasGroovelabSub(false);
-        }
-        
-        setPendingUserQuota(schoolData.pending_user_quota);
       }
 
       let allUsers: any[] = usersResult.data || [];
@@ -4562,10 +3317,9 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
         setTickets(ticketsData);
       }
 
-      // Fetch school room issues & facility defects
+      // Fetch school room issues & facility defects (EXTRACTED to useSecretaryBookings)
       try {
-        const fetchedIssues = await notesService.fetchSchoolRoomIssues(schoolId);
-        setRoomIssues(fetchedIssues);
+        await fetchRoomIssues();
       } catch (err) {
         console.warn('Could not fetch room issues:', err);
       }
@@ -4682,185 +3436,7 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
       setLoading(false);
     }
   };
-
-  const handleResolveTicket = async (ticketId: string) => {
-    try {
-      const response = await fetch('/api/groovelab/tickets/resolve', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ ticketId })
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to resolve ticket');
-      }
-      alert('Schaden erfolgreich behoben.');
-      fetchDashboardData();
-    } catch (err: any) {
-      alert('Fehler beim Beheben des Schadens: ' + err.message);
-    }
-  };
-
-  const handleBulkTeacherImport = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!bulkTxtInput.trim()) {
-      alert('Bitte geben Sie Lehrerdaten ein.');
-      return;
-    }
-    
-    const lines = bulkTxtInput.split('\n');
-    let successCount = 0;
-    let failCount = 0;
-    
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      
-      const parts = trimmed.split(',');
-      if (parts.length < 2) {
-        failCount++;
-        continue;
-      }
-      
-      const namePart = parts[0].trim();
-      const email = parts[1].trim();
-      const instrument = parts[2]?.trim() || 'Nicht festgelegt';
-      const roleText = parts[3]?.trim()?.toLowerCase() || 'teacher';
-      
-      const nameParts = namePart.split(/\s+/);
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
-      
-      if (!firstName || !email) {
-        failCount++;
-        continue;
-      }
-      
-      try {
-        const pin = generateStarterPin(roleText === 'admin' ? 'admin' : 'teacher', true, true);
-        const qrToken = generateSecureQrToken();
-        const { error } = await supabase
-          .from('users')
-          .insert({
-            school_id: schoolId,
-            first_name: firstName,
-            last_name: lastName,
-            email,
-            instrument,
-            role: roleText === 'admin' ? 'admin' : 'teacher',
-            is_active: true,
-            is_groovelab_active: true,
-            is_campus_active: true,
-            ausweis_nummer: pin,
-            teacher_qr_token: qrToken
-          });
-          
-        if (error) throw error;
-        successCount++;
-      } catch (err) {
-        console.error('Bulk import error for line: ' + trimmed, err);
-        failCount++;
-      }
-    }
-    
-    alert(`Import abgeschlossen. Erfolgreich: ${successCount}, Fehlerhaft: ${failCount}`);
-    setBulkTxtInput('');
-    fetchDashboardData();
-  };
-
-  const handleAdminOverride = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedTeacherForOverride) return;
-    
-    try {
-      const newFavs: string[] = [];
-      if (overrideFavRoom1) newFavs.push(overrideFavRoom1);
-      if (overrideFavRoom2) newFavs.push(overrideFavRoom2);
-
-      const updates: any = {
-        preferred_room_ids: newFavs
-      };
-      if (newRoleOverride) {
-        updates.role = newRoleOverride;
-      }
-      if (newPasswordOverride) {
-        updates.personal_pin = newPasswordOverride;
-      }
-      
-      const { error } = await supabase
-        .from('users')
-        .update(updates)
-        .eq('id', selectedTeacherForOverride.id);
-        
-      if (error) throw error;
-      
-      alert('Lehrkraft-Details und Favoriten-Räume erfolgreich überschrieben.');
-      setSelectedTeacherForOverride(null);
-      setNewPasswordOverride('');
-      setNewRoleOverride('');
-      setOverrideFavRoom1('');
-      setOverrideFavRoom2('');
-      fetchDashboardData();
-    } catch (err: any) {
-      alert('Fehler beim Überschreiben: ' + err.message);
-    }
-  };
-
-  const handleToggleHolidayXp = (newValue: boolean) => {
-    setHolidayXpActive(newValue);
-    localStorage.setItem(`groovelab_holiday_xp_active_${schoolId}`, newValue ? 'true' : 'false');
-    alert(`Ferien Bonus XP erfolgreich ${newValue ? 'aktiviert' : 'deaktiviert'}.`);
-  };
-
-  const handleResolveAlert = async (alertId: string) => {
-    try {
-      setUpdatingAlertId(alertId);
-      const { error } = await supabase
-        .from('system_alerts')
-        .update({ resolved: true })
-        .eq('id', alertId);
-
-      if (error) throw error;
-      setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, resolved: true } : a));
-      fetchDashboardData();
-    } catch (err: any) {
-      alert('Fehler beim Aktualisieren: ' + err.message);
-    } finally {
-      setUpdatingAlertId(null);
-    }
-  };
-
-  const handleIncreaseLimit = async (teacherId: string, alertId?: string) => {
-    try {
-      setUpdatingTeacherId(teacherId);
-      const { data: userData } = await supabase
-        .from('users')
-        .select('max_students')
-        .eq('id', teacherId)
-        .single();
-
-      const currentLimit = userData?.max_students || 10;
-      const newLimit = currentLimit + 5;
-
-      const { error: userErr } = await supabase
-        .from('users')
-        .update({ max_students: newLimit })
-        .eq('id', teacherId);
-
-      if (userErr) throw userErr;
-      if (alertId) await handleResolveAlert(alertId);
-
-      alert(`Kapazität erfolgreich erweitert. Neues Schüler-Limit: ${newLimit}`);
-      fetchDashboardData();
-    } catch (err: any) {
-      alert('Fehler: ' + err.message);
-    } finally {
-      setUpdatingTeacherId(null);
-    }
-  };
-
+  // [EXTRACTED to useSecretaryLiveLab: handleToggleHolidayXp]
   const handleRegenerateTokens = async () => {
     try {
       setRegeneratingTokens(true);
@@ -4899,68 +3475,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     }
   };
 
-  const handleToggleCampusSub = async (newValue: boolean) => {
-    if (isBillingBooked && !newValue) {
-      alert("Dieses Modul ist Teil deiner aktiven Buchung für das Schuljahr 2026/2027 und kann nicht deaktiviert werden.");
-      return;
-    }
-    setHasCampusSub(newValue);
-    if (newValue) {
-      setCampusActivatedThisMonth(true);
-    }
-    if (isBillingBooked) {
-      try {
-        const updateData: any = { has_campus_subscription: newValue };
-        if (newValue) updateData.campus_activated_this_month = true;
-        await supabase
-          .from('schools')
-          .update(updateData)
-          .eq('id', schoolId);
-      } catch (err: any) {
-        console.warn("Could not update campus sub:", err);
-      }
-    }
-  };
+  // [EXTRACTED to useSecretaryLicenses: handleToggleCampusSub, handleToggleGroovelabSub]
 
-  const handleToggleGroovelabSub = async (newValue: boolean) => {
-    if (isBillingBooked && !newValue) {
-      alert("Dieses Modul ist Teil deiner aktiven Buchung für das Schuljahr 2026/2027 und kann nicht deaktiviert werden.");
-      return;
-    }
-    setHasGroovelabSub(newValue);
-    if (newValue) {
-      setGroovelabActivatedThisMonth(true);
-    }
-    if (isBillingBooked) {
-      try {
-        const updateData: any = { has_groovelab_subscription: newValue };
-        if (newValue) updateData.groovelab_activated_this_month = true;
-        await supabase
-          .from('schools')
-          .update(updateData)
-          .eq('id', schoolId);
-      } catch (err: any) {
-        console.warn("Could not update groovelab sub:", err);
-      }
-    }
-    if (newValue) {
-      // Auto-seed GrooveLab subject if it doesn't exist yet
-      const grooveLabExists = subjects.some(s => s.name.toLowerCase() === 'groovelab');
-      if (!grooveLabExists) {
-        const { error: insertErr } = await supabase
-          .from('subjects')
-          .insert({
-            school_id: schoolId,
-            name: 'GrooveLab',
-            category: 'Allgemein',
-            description: 'Automatisch angelegtes Fach für GrooveLab-Unterricht'
-          });
-        if (insertErr) {
-          console.error('Error seeding GrooveLab subject:', insertErr);
-        }
-      }
-    }
-  };
 
   useEffect(() => {
     const handleSchoolUpdated = (e?: Event) => {
@@ -4981,31 +3497,8 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     };
   }, [schoolId]);
 
-  const handleUpdateStudentBillingOption = async (option: string) => {
-    try {
-      setStudentBillingOption(option);
-      const { error } = await supabase
-        .from('schools')
-        .update({ student_billing_option: option })
-        .eq('id', schoolId);
-      if (error) throw error;
-    } catch (err: any) {
-      console.error('Error updating student billing option:', err);
-    }
-  };
+  // [EXTRACTED to useSecretaryLicenses: handleUpdateStudentBillingOption, handleUpdateExtraBillingOption]
 
-  const handleUpdateExtraBillingOption = async (option: string) => {
-    try {
-      setExtraBillingOption(option);
-      const { error } = await supabase
-        .from('schools')
-        .update({ extra_billing_option: option })
-        .eq('id', schoolId);
-      if (error) throw error;
-    } catch (err: any) {
-      console.error('Error updating extra billing option:', err);
-    }
-  };
 
   const handleToggleIsPaused = async (newValue: boolean) => {
     try {
@@ -5033,466 +3526,15 @@ export function SecretaryDashboard({ schoolId, userId, userRole, userRoles, onLo
     }
   };
 
-  const handleSaveQuota = async () => {
-    try {
-      const { error } = await supabase
-        .from('schools')
-        .update({
-          pending_user_quota: userQuota,
-          quota_updated_at: new Date().toISOString()
-        })
-        .eq('id', schoolId);
+  // [EXTRACTED to useSecretaryLicenses: handleSaveQuota, getRemainingMonthsAndPrice, fetchTrialLogs, generateMailtoLink, handleConfirmStudentTrial, handleDeactivateStudentTrial]
 
-      if (error) throw error;
-      setPendingUserQuota(userQuota);
-      alert(`Erfolgreich! Dein gewünschtes Kontingent von ${userQuota} Usern wurde für den nächsten Monat vorgemerkt und kann bis zum Monatsende geändert werden.`);
-      fetchDashboardData();
-    } catch (err: any) {
-      alert('Fehler beim Speichern: ' + err.message);
-    }
-  };
-
-  const handleAddCalendarUrl = () => {
-    if (!newCalendarUrlInput.trim()) return;
-    if (!newCalendarUrlInput.startsWith('http://') && !newCalendarUrlInput.startsWith('https://')) {
-      alert('Bitte eine gültige URL (beginnend mit http:// oder https://) eingeben.');
-      return;
-    }
-    if (calendarUrls.includes(newCalendarUrlInput.trim())) {
-      alert('Dieser Kalender-Feed ist bereits hinzugefügt.');
-      return;
-    }
-    setCalendarUrls([...calendarUrls, newCalendarUrlInput.trim()]);
-    setNewCalendarUrlInput('');
-  };
-
-  const handleRemoveCalendarUrl = (indexToRemove: number) => {
-    setCalendarUrls(calendarUrls.filter((_, idx) => idx !== indexToRemove));
-  };
-
-  const [isSavingSettings, setIsSavingSettings] = useState(false);
-
-  const handleSaveAllSettings = async (customOverrides?: Partial<{ autoDeleteExpiredUsers: boolean; schoolYearStartMonth: number; schoolYearStartDay: number; kioskPinLength: number; bypassPin: string; logRetention: string; syncInterval: string }> | any) => {
-    if (!schoolName.trim()) {
-      alert('Bitte einen Musikschulnamen eingeben.');
-      return;
-    }
-    setIsSavingSettings(true);
-    try {
-      const overrides = (customOverrides && typeof customOverrides === 'object' && !('nativeEvent' in customOverrides)) ? customOverrides : undefined;
-      const effAutoDelete = overrides?.autoDeleteExpiredUsers !== undefined ? overrides.autoDeleteExpiredUsers : autoDeleteExpiredUsers;
-      const effMonth = overrides?.schoolYearStartMonth !== undefined ? overrides.schoolYearStartMonth : schoolYearStartMonth;
-      const effDay = overrides?.schoolYearStartDay !== undefined ? overrides.schoolYearStartDay : schoolYearStartDay;
-      const effKioskPinLength = overrides?.kioskPinLength !== undefined ? overrides.kioskPinLength : kioskPinLength;
-      const effBypassPin = overrides?.bypassPin !== undefined ? overrides.bypassPin : bypassPin;
-      const effLogRetention = overrides?.logRetention !== undefined ? overrides.logRetention : logRetention;
-      const effSyncInterval = overrides?.syncInterval !== undefined ? overrides.syncInterval : syncInterval;
-
-      const updatedOp = {
-        ...(openingHours || {}),
-        kiosk_pin_length: effKioskPinLength,
-        bypass_pin: effBypassPin,
-        log_retention: effLogRetention,
-        sync_interval: effSyncInterval,
-        school_year_start_month: effMonth,
-        school_year_start_day: effDay,
-        auto_delete_expired_users: effAutoDelete
-      };
-
-      const serializedUrls = JSON.stringify(calendarUrls);
-
-      const updatePayload: any = {
-        name: schoolName,
-        subdomain: schoolSubdomain || null,
-        street: schoolStreet || null,
-        house_number: schoolHouseNumber || null,
-        zip_code: schoolZipCode || null,
-        city: schoolCity || null,
-        phone_number: schoolPhoneNumber || null,
-        email: schoolEmail || null,
-        absence_email: absenceEmail || null,
-        logo_url: logoUrl || null,
-        calendar_url: serializedUrls || null,
-        opening_hours: updatedOp,
-        school_year_start_month: effMonth,
-        school_year_start_day: effDay,
-        auto_delete_expired_users: effAutoDelete
-      };
-
-      let { error } = await supabase
-        .from('schools')
-        .update(updatePayload)
-        .eq('id', schoolId);
-
-      if (error) {
-        console.warn('[SecretarySettings] Retrying update with opening_hours JSON fallback due to column error:', error);
-        const { error: fallbackError } = await supabase
-          .from('schools')
-          .update({
-            name: schoolName,
-            subdomain: schoolSubdomain || null,
-            street: schoolStreet || null,
-            house_number: schoolHouseNumber || null,
-            zip_code: schoolZipCode || null,
-            city: schoolCity || null,
-            phone_number: schoolPhoneNumber || null,
-            email: schoolEmail || null,
-            absence_email: absenceEmail || null,
-            logo_url: logoUrl || null,
-            calendar_url: serializedUrls || null,
-            opening_hours: updatedOp
-          })
-          .eq('id', schoolId);
-        if (fallbackError) throw fallbackError;
-      }
-
-      setOpeningHours(updatedOp);
-      setSchoolYearStartMonth(effMonth);
-      setSchoolYearStartDay(effDay);
-      setAutoDeleteExpiredUsers(effAutoDelete);
-      setKioskPinLength(effKioskPinLength);
-      setBypassPin(effBypassPin);
-      setLogRetention(effLogRetention);
-      setSyncInterval(effSyncInterval);
-
-      setInitialSettings({
-        schoolName: schoolName || '',
-        schoolSubdomain: schoolSubdomain || '',
-        schoolZipCode: schoolZipCode || '',
-        schoolCity: schoolCity || '',
-        schoolStreet: schoolStreet || '',
-        schoolHouseNumber: schoolHouseNumber || '',
-        schoolPhoneNumber: schoolPhoneNumber || '',
-        schoolEmail: schoolEmail || '',
-        absenceEmail: absenceEmail || '',
-        logoUrl: logoUrl || '',
-        calendarUrls: calendarUrls,
-        kioskPinLength: effKioskPinLength,
-        bypassPin: effBypassPin,
-        logRetention: effLogRetention,
-        syncInterval: effSyncInterval,
-        schoolYearStartMonth: effMonth,
-        schoolYearStartDay: effDay,
-        autoDeleteExpiredUsers: effAutoDelete
-      });
-
-      // Update local storage school profile & groovelab_school_overrides
-      try {
-        const storedProfile = localStorage.getItem('groovelab_school_profile');
-        if (storedProfile) {
-          const parsed = JSON.parse(storedProfile);
-          parsed.auto_delete_expired_users = effAutoDelete;
-          parsed.school_year_start_month = effMonth;
-          parsed.school_year_start_day = effDay;
-          parsed.opening_hours = updatedOp;
-          localStorage.setItem('groovelab_school_profile', JSON.stringify(parsed));
-        }
-        const overridesStr = localStorage.getItem('groovelab_school_overrides') || '{}';
-        const overrides = JSON.parse(overridesStr);
-        if (schoolId) {
-          overrides[schoolId] = {
-            ...(overrides[schoolId] || {}),
-            auto_delete_expired_users: effAutoDelete,
-            school_year_start_month: effMonth,
-            school_year_start_day: effDay,
-            opening_hours: updatedOp
-          };
-          localStorage.setItem('groovelab_school_overrides', JSON.stringify(overrides));
-        }
-      } catch (e) {
-        // ignore
-      }
-
-      alert('Einstellungen erfolgreich in der Datenbank gespeichert! 🏢');
-      fetchDashboardData();
-    } catch (err: any) {
-      alert('Fehler beim Speichern: ' + err.message);
-    } finally {
-      setIsSavingSettings(false);
-    }
-  };
-
-  const getRemainingMonthsAndPrice = () => {
-    const now = new Date();
-    const startMonth = Number(schoolYearStartMonth || 9);
-    const startDay = Number(schoolYearStartDay || 1);
-    const isChf = masterPricing.currency === 'CHF';
-    const activeCurrency = isChf ? 'CHF' : 'EUR';
-    const rate = studentBillingOption === 'student_full' 
-      ? (effectiveSchoolRates.priceStudent || (isChf ? 1.00 : 0.49))
-      : (isChf ? 0.80 : 0.40);
-    
-    const calc = calculateSchoolYearDirectBilling(now, activeCurrency, rate, startMonth, startDay);
-    return { 
-      monthsCount: calc.remainingPaidMonths, 
-      pricePerMonth: calc.monthlyRate, 
-      totalPrice: calc.totalAmount,
-      periodDescription: calc.periodDescription,
-      endMonthName: calc.paidEndMonthName
-    };
-  };
-
-  const fetchTrialLogs = async () => {
-    setTrialLogsLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('audit_logs')
-        .select('*')
-        .eq('school_id', schoolId)
-        .eq('table_name', 'users')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      
-      const filtered = (data || []).filter((log: any) => {
-        if (!log.new_data) return false;
-        const isTrialStart = log.new_data.is_trial === true && (!log.old_data || log.old_data.is_trial !== true);
-        const isPermanentActivation = log.old_data?.is_trial === true && log.new_data.is_trial === false && log.new_data.is_campus_active !== false;
-        
-        // Only show student self-initiated trial starts, and staff-initiated permanent activations
-        const isStudentTrialStart = isTrialStart && (!log.changed_by || log.changed_by === log.record_id);
-        const isStaffActivation = isPermanentActivation && log.changed_by && log.changed_by !== log.record_id;
-        
-        return isStudentTrialStart || isStaffActivation;
-      });
-      
-      setTrialLogs(filtered);
-    } catch (err) {
-      console.error('Error fetching trial logs:', err);
-    } finally {
-      setTrialLogsLoading(false);
-    }
-  };
-
-  const generateMailtoLink = (student: any) => {
-    const { monthsCount, pricePerMonth, totalPrice, periodDescription } = getRemainingMonthsAndPrice();
-    const employeeName = currentUserProfile ? `${currentUserProfile.first_name} ${currentUserProfile.last_name || ''}`.trim() : 'Ihre Musikschule';
-    const isChf = masterPricing.currency === 'CHF';
-    const defaultTemplate = `Liebe Eltern,\n\nihr Kind {student_name} hat die Campus-App der Musikschule aktiviert und nutzt aktuell die 30-tägige kostenlose Probezeit.\n\nUm den Zugang dauerhaft freizuschalten, antworten Sie bitte einfach kurz auf diese E-Mail.\n\nDie Kosten belaufen sich für das restliche Schuljahr auf {months_count} Monate zu je {price_per_month} ${isChf ? 'CHF' : 'EUR'}, insgesamt also {total_price} (Laufzeit: {period_description}, ohne automatische Verlängerung).\n\nHerzliche Grüße\n{employee_name}\n{school_name}`;
-    
-    let template = openingHours?.campus_settings?.mailto_template || defaultTemplate;
-    
-    const studentName = `${student.first_name || ''} ${student.last_name || ''}`.trim();
-    template = template.replace(/{student_name}/g, studentName);
-    template = template.replace(/{months_count}/g, monthsCount.toString());
-    template = template.replace(/{price_per_month}/g, isChf ? pricePerMonth.toFixed(2) : pricePerMonth.toFixed(2).replace('.', ','));
-    template = template.replace(/{total_price}/g, isChf ? `CHF ${totalPrice.toFixed(2)}` : `${totalPrice.toFixed(2).replace('.', ',')} €`);
-    template = template.replace(/{period_description}/g, periodDescription || '');
-    template = template.replace(/{employee_name}/g, employeeName);
-    template = template.replace(/{school_name}/g, schoolName || 'Ihre Musikschule');
-    
-    const subject = `Campus-Freischaltung für ${studentName}`;
-    return `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(template)}`;
-  };
-
-  const handleConfirmStudentTrial = async (studentId: string) => {
-    if (!window.confirm("Möchtest du diesen Schüler dauerhaft für den Campus freischalten (Probezeit beenden)?")) return;
-    try {
-      const { error } = await supabase
-        .from('users')
-        .update({
-          is_trial: false,
-          trial_ends_at: null,
-          is_campus_active: true
-        })
-        .eq('id', studentId);
-      if (error) throw error;
-      alert("Schüler wurde erfolgreich dauerhaft aktiviert!");
-      fetchDashboardData();
-    } catch (err: any) {
-      alert("Fehler bei der Aktivierung: " + err.message);
-    }
-  };
-
-  const handleDeactivateStudentTrial = async (studentId: string) => {
-    if (!window.confirm("Möchtest du die Probezeit dieses Schülers sofort beenden und das Profil auf Basis umstellen?")) return;
-    try {
-      const { error } = await supabase
-        .from('users')
-        .update({
-          is_campus_active: false,
-          is_trial: false,
-          trial_ends_at: null
-        })
-        .eq('id', studentId);
-      if (error) throw error;
-      alert("Probezeit beendet. Schülerprofil ist nun im Basis-Status.");
-      fetchDashboardData();
-    } catch (err: any) {
-      alert("Fehler beim Umstellen auf Basis: " + err.message);
-    }
-  };
   // [EXTRACTED to SecretaryVerwaltungTab: renderAnnouncementsBoard]
 
 
-// [EXTRACTED to SecretaryStudentsView]
-
-    const handleLinkProfiles = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedCampusStudentId || !selectedGroovelabStudentId) {
-      alert('Bitte wähle beide Profile aus.');
-      return;
-    }
-    if (selectedCampusStudentId === selectedGroovelabStudentId) {
-      alert('Du kannst nicht dasselbe Profil mit sich selbst verknüpfen.');
-      return;
-    }
-
-    try {
-      setLinkingInProgress(true);
-
-      // 1. Update target Campus profile: set is_groovelab_active to true
-      const { error: updateTargetErr } = await supabase
-        .from('users')
-        .update({ is_groovelab_active: true })
-        .eq('id', selectedCampusStudentId);
-      if (updateTargetErr) throw updateTargetErr;
-
-      // 2. Re-link sessions
-      await supabase
-        .from('sessions')
-        .update({ user_id: selectedCampusStudentId })
-        .eq('user_id', selectedGroovelabStudentId);
-
-      // 3. Re-link band members (if not already member)
-      const { data: existingMembers } = await supabase
-        .from('band_members')
-        .select('band_id')
-        .eq('user_id', selectedCampusStudentId);
-      const targetBands = new Set(existingMembers?.map(m => m.band_id) || []);
-
-      const { data: oldMemberships } = await supabase
-        .from('band_members')
-        .select('*')
-        .eq('user_id', selectedGroovelabStudentId);
-
-      if (oldMemberships) {
-        for (const membership of oldMemberships) {
-          if (!targetBands.has(membership.band_id)) {
-            // Re-link
-            await supabase
-              .from('band_members')
-              .update({ user_id: selectedCampusStudentId })
-              .eq('id', membership.id);
-          } else {
-            // Already member, delete old membership to avoid duplicates
-            await supabase
-              .from('band_members')
-              .delete()
-              .eq('id', membership.id);
-          }
-        }
-      }
-
-      // 4. Re-link band song slots
-      await supabase
-        .from('band_song_slots')
-        .update({ user_id: selectedCampusStudentId })
-        .eq('user_id', selectedGroovelabStudentId);
-
-      // 5. Re-link user song skills
-      await supabase
-        .from('user_song_skills')
-        .update({ user_id: selectedCampusStudentId })
-        .eq('user_id', selectedGroovelabStudentId);
-
-      // 6. Delete old GrooveLab profile
-      const { error: deleteOldErr } = await supabase
-        .from('users')
-        .delete()
-        .eq('id', selectedGroovelabStudentId);
-      if (deleteOldErr) throw deleteOldErr;
-
-      // Physically purge assets from Supabase Storage
-      await deleteUserStorageAssets([selectedGroovelabStudentId]);
-
-      alert('Die Profile wurden erfolgreich verknüpft! Die GrooveLab-Daten wurden auf das Campus-Profil übertragen.');
-      setSelectedCampusStudentId('');
-      setSelectedGroovelabStudentId('');
-      fetchDashboardData();
-    } catch (err: any) {
-      alert('Fehler bei der Verknüpfung: ' + err.message);
-    } finally {
-      setLinkingInProgress(false);
-    }
-  };
-
-  const handleToggleTeacherGroovelab = async (teacherId: string, currentVal: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('users')
-        .update({ is_groovelab_active: !currentVal })
-        .eq('id', teacherId);
-
-      if (error) throw error;
-      alert(`GrooveLab-Zugang erfolgreich ${!currentVal ? 'aktiviert' : 'deaktiviert'}.`);
-      fetchDashboardData();
-    } catch (err: any) {
-      alert('Fehler: ' + err.message);
-    }
-  };
-
-  const handleScheduleDecision = async (id: string, approve: boolean) => {
-    try {
-      const nextStatus = approve ? 'approved' : 'draft';
-      const { error } = await supabase
-        .from('schedules')
-        .update({ status: nextStatus })
-        .eq('id', id);
-
-      if (error) throw error;
-      fetchDashboardData();
-    } catch (err: any) {
-      alert('Fehler: ' + err.message);
-    }
-  };
-
-  const getTabTitle = () => {
-    switch (activeTab) {
-      case 'secretary':
-        switch (secretarySubTab) {
-          case 'briefing': return '📊 Tägliches Briefing & Status';
-          case 'crisis': return '🛡️ Operations-Cockpit: Ausfall-Management';
-          case 'equipment': return '🎸 Instrumente & Ausstattung';
-          case 'employees': return '👥 Mitarbeiterverwaltung';
-          case 'licenses': return '💳 Abrechnung & Infrastruktur';
-          case 'setup': return '⚙️ Setup & Systemeinstellungen';
-          default: return '💼 Verwaltung';
-        }
-      case 'campus':
-        switch (campusSubTab) {
-          case 'briefing': return '🎓 Campus-Zentrale';
-          case 'onboarding': return 'Lehrer-Onboarding';
-          case 'schedules': return 'Stundenpläne';
-          case 'status': return 'Einstellungen';
-          default: return '🎓 Campus Verwaltung';
-        }
-      case 'groovelab':
-        switch (groovelabSubTab as any) {
-          case 'live': return 'Live Lab';
-          case 'coaches': return 'Lehrer';
-          case 'students': return 'Schüler';
-          case 'kiosk': return 'Einstellungen';
-          default: return '🎸 GrooveLab Verwaltung';
-        }
-      default: return '';
-    }
-  };
+// [EXTRACTED to SecretaryStudentsView & useSecretarySchedules: handleLinkProfiles, handleToggleTeacherGroovelab, handleScheduleDecision]
 
 
-
-  const getTrialDaysRemaining = () => {
-    if (!isSchoolTrial || !schoolTrialEndsAt) return 0;
-    const diff = new Date(schoolTrialEndsAt).getTime() - Date.now();
-    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-  };
-  const trialDaysRemaining = getTrialDaysRemaining();
-
-  const isTrialExpired = !subscriptionBypass && (
-    schoolStatus === 'expired' || 
-    (isSchoolTrial && schoolTrialEndsAt && new Date(schoolTrialEndsAt).getTime() < Date.now())
-  );
-
+  // [EXTRACTED to useSecretaryNavigation: getTabTitle]
   const showBlockedOverlay = isTrialExpired && !(activeTab === 'secretary' && secretarySubTab === 'licenses');
 
   return (
