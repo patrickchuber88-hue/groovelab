@@ -1,5 +1,5 @@
-const CACHE_NAME = 'groovelab-static-v1789626571941';
-const DYNAMIC_CACHE = 'groovelab-dynamic-v1789626571941';
+const CACHE_NAME = 'groovelab-static-v1789628786374';
+const DYNAMIC_CACHE = 'groovelab-dynamic-v1789628786374';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -51,6 +51,10 @@ function isValidPushHost(urlStr) {
 }
 
 function limitCacheSize(cacheName, maxItems) {
+  // 🛡️ Enterprise Precache Shield: Never evict from the core App-Shell precache!
+  if (cacheName === CACHE_NAME) {
+    return;
+  }
   caches.open(cacheName).then(function(cache) {
     cache.keys().then(function(keys) {
       if (keys.length > maxItems) {
@@ -347,9 +351,9 @@ self.addEventListener('fetch', function(event) {
         return fetch(event.request).then(function(networkResponse) {
           if (networkResponse && networkResponse.status === 200) {
             const responseClone = networkResponse.clone();
-            caches.open(CACHE_NAME).then(function(cache) {
+            caches.open(DYNAMIC_CACHE).then(function(cache) {
               cache.put(event.request, responseClone);
-              limitCacheSize(CACHE_NAME, 80);
+              limitCacheSize(DYNAMIC_CACHE, 150);
             });
           }
           return networkResponse;

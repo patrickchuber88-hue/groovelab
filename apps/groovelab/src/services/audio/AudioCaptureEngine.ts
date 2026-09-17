@@ -56,8 +56,14 @@ export class AudioCaptureEngine {
     peakDbfs: -100,
     truePeakDbtp: -100,
     integratedLufs: -70,
-    isOverloaded: false
+    isOverloaded: false,
+    isHeadphonesConnected: false
   };
+
+  // Hardware Device Awareness
+  private isHeadphonesConnected = false;
+  private isDeviceListenerActive = false;
+  private headphoneListeners: Set<(connected: boolean) => void> = new Set();
 
   // Listeners
   private metricsListeners: Set<MetricsListener> = new Set();
@@ -81,6 +87,43 @@ export class AudioCaptureEngine {
 
   public getMetrics(): AudioEngineMetrics {
     return { ...this.currentMetrics };
+  }
+
+  public getIsHeadphonesConnected(): boolean {
+    return this.isHeadphonesConnected;
+  }
+
+  public subscribeHeadphones(listener: (connected: boolean) => void): () => void {
+    this.headphoneListeners.add(listener);
+    listener(this.isHeadphonesConnected);
+    return () => this.headphoneListeners.delete(listener);
+  }
+
+  public async detectHeadphones(): Promise<boolean> {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) {
+      return false;
+    }
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const hasHeadphones = devices.some(d => {
+        const label = (d.label || '').toLowerCase();
+        return (
+          label.includes('headphone') ||
+          label.includes('headset') ||
+          label.includes('airpods') ||
+          label.includes('buds') ||
+          label.includes('earphones') ||
+          label.includes('bluetooth') ||
+          (d.kind === 'audiooutput' && label.includes('external'))
+        );
+      });
+      this.isHeadphonesConnected = hasHeadphones;
+      this.currentMetrics.isHeadphonesConnected = hasHeadphones;
+      this.headphoneListeners.forEach(l => l(hasHeadphones));
+      return hasHeadphones;
+    } catch {
+      return false;
+    }
   }
 
   public subscribeMetrics(listener: MetricsListener): () => void {
@@ -129,10 +172,23 @@ export class AudioCaptureEngine {
         this.isWorkletRegistered = true;
       }
 
-      // 2. Strict WebRTC Bypass Constraints
+      // 2. Hardware Device Awareness & Feedback Guard
+      if (!this.isDeviceListenerActive && typeof navigator !== 'undefined' && navigator.mediaDevices?.addEventListener) {
+        navigator.mediaDevices.addEventListener('devicechange', () => {
+          this.detectHeadphones();
+        });
+        this.isDeviceListenerActive = true;
+      }
+      await this.detectHeadphones();
+
+      // Adaptive WebRTC Constraints:
+      // If no headphones are connected and strictStudioBypass is not requested, enable AEC
+      // to eliminate screeching acoustic feedback loops during backing track playback!
+      const shouldEnableAec = !this.isHeadphonesConnected && !this.config.strictStudioBypass;
+
       const constraints: MediaStreamConstraints = {
         audio: {
-          echoCancellation: false,
+          echoCancellation: shouldEnableAec,
           noiseSuppression: false,
           autoGainControl: false,
           channelCount: this.config.channelCount,

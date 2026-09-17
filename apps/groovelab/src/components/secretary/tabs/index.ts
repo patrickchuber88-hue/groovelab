@@ -18,3 +18,7 @@ export * from '../SecretaryCrisisView';
 export * from '../SecretarySetupView';
 export * from '../SecretarySubjectsView';
 export * from '../SecretaryBillingModalsHub';
+export * from '../SecretaryGeneralModalsHub';
+export * from '../SecretaryMobileNavigation';
+export * from './SecretaryGroovelabTab';
+export * from './SecretaryCampusTab';

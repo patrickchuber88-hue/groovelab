@@ -1,9 +1,14 @@
-import React, { lazy, Suspense } from 'react';
-import { Award, Search, Check } from 'lucide-react';
+import React, { lazy, Suspense, useState, useEffect, useRef, useMemo } from 'react';
+import { Award, Search, Check, ChevronDown } from 'lucide-react';
 import { ErrorBoundary } from '../ui/ErrorBoundary';
 import { APP_INSTRUMENT_ICONS, APP_INSTRUMENT_COLORS, brandColor as defaultBrandColor } from '../../constants/instruments';
 
 const GroupedSongCard = lazy(() => import('../GroupedSongCard').then(m => ({ default: m.GroupedSongCard })));
+
+const INITIAL_PRACTICE_BATCH = 12;
+const PRACTICE_BATCH_STEP = 12;
+const INITIAL_REPERTOIRE_BATCH = 16;
+const REPERTOIRE_BATCH_STEP = 16;
 
 export interface StudentPracticeRepertoireTabsProps {
   activeStudentTab: 'practice' | 'repertoire';
@@ -59,6 +64,72 @@ export function StudentPracticeRepertoireTabs({
   isMobile
 }: StudentPracticeRepertoireTabsProps) {
   const activeBrandColor = brandColor || defaultBrandColor;
+
+  // 1% Goldstandard Progressive DOM Batching (PERF-02)
+  const [visiblePracticeCount, setVisiblePracticeCount] = useState(INITIAL_PRACTICE_BATCH);
+  const [visibleRepertoireCount, setVisibleRepertoireCount] = useState(INITIAL_REPERTOIRE_BATCH);
+  const practiceSentinelRef = useRef<HTMLDivElement | null>(null);
+  const repertoireSentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // Reset pagination window on filter / search change
+  useEffect(() => {
+    setVisiblePracticeCount(INITIAL_PRACTICE_BATCH);
+  }, [practiceSearchQuery, practiceAlphaFilter]);
+
+  // Keep expanded card visible if toggled
+  useEffect(() => {
+    if (expandedSongId) {
+      const idx = groupedPracticeSongs.findIndex((g: any) => g.song_id === expandedSongId);
+      if (idx >= 0 && idx >= visiblePracticeCount) {
+        setVisiblePracticeCount(Math.ceil((idx + 1) / PRACTICE_BATCH_STEP) * PRACTICE_BATCH_STEP);
+      }
+    }
+  }, [expandedSongId, groupedPracticeSongs, visiblePracticeCount]);
+
+  // Infinite scroll intersection observers with graceful fallback
+  useEffect(() => {
+    const sentinel = practiceSentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        setVisiblePracticeCount(prev => {
+          if (prev < groupedPracticeSongs.length) {
+            return Math.min(prev + PRACTICE_BATCH_STEP, groupedPracticeSongs.length);
+          }
+          return prev;
+        });
+      }
+    }, { rootMargin: '300px' });
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [groupedPracticeSongs.length]);
+
+  useEffect(() => {
+    const sentinel = repertoireSentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        setVisibleRepertoireCount(prev => {
+          if (prev < groupedRepertoireSongs.length) {
+            return Math.min(prev + REPERTOIRE_BATCH_STEP, groupedRepertoireSongs.length);
+          }
+          return prev;
+        });
+      }
+    }, { rootMargin: '300px' });
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [groupedRepertoireSongs.length]);
+
+  const displayedPracticeSongs = useMemo(() => {
+    return groupedPracticeSongs.slice(0, visiblePracticeCount);
+  }, [groupedPracticeSongs, visiblePracticeCount]);
+
+  const displayedRepertoireSongs = useMemo(() => {
+    return groupedRepertoireSongs.slice(0, visibleRepertoireCount);
+  }, [groupedRepertoireSongs, visibleRepertoireCount]);
 
   if (activeStudentTab === 'practice') {
     return (
@@ -215,7 +286,7 @@ export function StudentPracticeRepertoireTabs({
             </div>
           ) : null}
           <div className="exercises-grid">
-            {groupedPracticeSongs.map((group: any) => (
+            {displayedPracticeSongs.map((group: any) => (
               <div key={group.song_id} style={{ position: 'relative' }}>
                 <Suspense fallback={null}>
                   <GroupedSongCard 
@@ -236,6 +307,39 @@ export function StudentPracticeRepertoireTabs({
               </div>
             ))}
           </div>
+
+          {/* Progressive DOM Batch Sentinel & Accessible Fallback Button (PERF-02) */}
+          {visiblePracticeCount < groupedPracticeSongs.length && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '24px', gap: '8px' }}>
+              <div ref={practiceSentinelRef} style={{ height: '10px', width: '100%', pointerEvents: 'none' }} aria-hidden="true" />
+              <button
+                type="button"
+                onClick={() => setVisiblePracticeCount(prev => Math.min(prev + PRACTICE_BATCH_STEP, groupedPracticeSongs.length))}
+                aria-label={`Weitere Songs laden. Aktuell ${displayedPracticeSongs.length} von ${groupedPracticeSongs.length} Songs angezeigt.`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '12px 24px',
+                  borderRadius: '16px',
+                  border: '1px solid #e2e8f0',
+                  background: '#ffffff',
+                  color: '#1e293b',
+                  fontWeight: 800,
+                  fontSize: '0.875rem',
+                  cursor: 'pointer',
+                  minHeight: '44px',
+                  touchAction: 'manipulation',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <ChevronDown size={18} color={activeBrandColor} />
+                <span>Weitere Songs laden ({displayedPracticeSongs.length} von {groupedPracticeSongs.length})</span>
+              </button>
+            </div>
+          )}
         </section>
       </ErrorBoundary>
     );
@@ -262,7 +366,7 @@ export function StudentPracticeRepertoireTabs({
                 <p style={{ fontSize: '1rem', lineHeight: 1.6, maxWidth: '400px', margin: '0 auto' }}>Übe weiter! Sobald ein Song auf 100% ist, landet er hier in deiner Hall of Fame.</p>
               </div>
             ) : (
-              groupedRepertoireSongs.map((group: any) => (
+              displayedRepertoireSongs.map((group: any) => (
                 <div key={group.song_id} className="glass-panel" style={{ padding: isMobile ? '10px 14px' : '14px 18px', background: 'white', borderRadius: '18px', border: '1px solid #f1f5f9' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <div style={{ minWidth: 0, flex: 1, paddingRight: '10px' }}>
@@ -306,6 +410,39 @@ export function StudentPracticeRepertoireTabs({
               ))
             )}
           </div>
+
+          {/* Progressive DOM Batch Sentinel & Accessible Fallback Button for Repertoire (PERF-02) */}
+          {visibleRepertoireCount < groupedRepertoireSongs.length && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '24px', gap: '8px' }}>
+              <div ref={repertoireSentinelRef} style={{ height: '10px', width: '100%', pointerEvents: 'none' }} aria-hidden="true" />
+              <button
+                type="button"
+                onClick={() => setVisibleRepertoireCount(prev => Math.min(prev + REPERTOIRE_BATCH_STEP, groupedRepertoireSongs.length))}
+                aria-label={`Weitere Repertoire-Songs laden. Aktuell ${displayedRepertoireSongs.length} von ${groupedRepertoireSongs.length} Songs angezeigt.`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '12px 24px',
+                  borderRadius: '16px',
+                  border: '1px solid #e2e8f0',
+                  background: '#ffffff',
+                  color: '#1e293b',
+                  fontWeight: 800,
+                  fontSize: '0.875rem',
+                  cursor: 'pointer',
+                  minHeight: '44px',
+                  touchAction: 'manipulation',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <ChevronDown size={18} color="#34a853" />
+                <span>Weitere Songs laden ({displayedRepertoireSongs.length} von {groupedRepertoireSongs.length})</span>
+              </button>
+            </div>
+          )}
           </div>
         </section>
       </ErrorBoundary>

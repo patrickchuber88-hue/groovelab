@@ -3726,11 +3726,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     const loadSchoolUsers = async () => {
       try {
         const targetSchoolId = schoolData?.id || 
-                               (typeof window !== 'undefined' ? (localStorage.getItem('groovelab_last_school_id') || localStorage.getItem('groovelab_school_id')) : null) ||
-                               '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
-        const schoolName = schoolData?.name || 'Musäk Bad Säckingen';
-        const isMusaek = targetSchoolId === '53e83805-1d5a-4ed8-988e-1fb0b8200b9c' || 
-                         schoolName.toLowerCase().includes('musäk') || 
+                               (typeof window !== 'undefined' ? (localStorage.getItem('groovelab_last_school_id') || localStorage.getItem('groovelab_school_id')) : null);
+        if (!targetSchoolId) return;
+        const schoolName = schoolData?.name || 'Musikschule';
+        const isMusaek = schoolName.toLowerCase().includes('musäk') || 
                          schoolName.toLowerCase().includes('säckingen');
 
         let resolvedAdmin: any = null;
@@ -3839,6 +3838,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         });
       } catch (e) {
         console.warn('[Bypass counts error]:', e);
+        const resolvedSchoolId = schoolData?.id || (typeof localStorage !== 'undefined' ? localStorage.getItem('groovelab_school_id') : '') || '';
         setBypassUserCounts({
           hasAdmin: true,
           hasTeacher: true,
@@ -3847,21 +3847,21 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             id: 'f8d28267-0552-48b5-b1cd-0e415409ecd4',
             name: 'Manuel Wagner',
             role: 'admin',
-            school_id: '53e83805-1d5a-4ed8-988e-1fb0b8200b9c'
+            school_id: resolvedSchoolId
           },
           teacherUser: {
             id: '11079eae-664a-49a4-8692-771d83a3193c',
             name: 'Peter Pan',
             role: 'teacher',
-            school_id: '53e83805-1d5a-4ed8-988e-1fb0b8200b9c'
+            school_id: resolvedSchoolId
           },
           studentUser: {
             id: '15102f5e-c504-4c33-93ab-436285197c8c',
             name: 'Linus',
             role: 'student',
-            school_id: '53e83805-1d5a-4ed8-988e-1fb0b8200b9c'
+            school_id: resolvedSchoolId
           },
-          schoolName: 'Musäk Bad Säckingen'
+          schoolName: schoolData?.name || 'Musikschule'
         });
       }
     };
@@ -7178,7 +7178,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               onClick={async () => {
                 const uid = sessionStorage.getItem('groovelab_user_id');
                 if (uid) {
-                  const targetSchoolId = schoolData?.id || localStorage.getItem('groovelab_school_id') || '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
+                  const targetSchoolId = schoolData?.id || localStorage.getItem('groovelab_school_id');
+                  if (!targetSchoolId) {
+                    alert('Labor-Modus Override fehlgeschlagen: Keine Musikschul-Kennung ermittelbar.');
+                    return;
+                  }
                   const { data, error } = await supabase.rpc('authenticate_by_credential', {
                     p_credential: uid,
                     p_school_id: targetSchoolId
@@ -7294,14 +7298,19 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             type="button"
             onClick={async () => {
               try {
+                const fallbackSchoolId = schoolData?.id || (typeof localStorage !== 'undefined' ? localStorage.getItem('groovelab_school_id') : '') || '';
                 const targetUser = bypassUserCounts.adminUser || {
                   id: 'f8d28267-0552-48b5-b1cd-0e415409ecd4',
                   name: 'Manuel Wagner',
                   role: 'admin',
-                  school_id: '53e83805-1d5a-4ed8-988e-1fb0b8200b9c'
+                  school_id: fallbackSchoolId
                 };
                 console.log('[Bypass] Logging in as Verwaltung / Schulleitung:', targetUser.name);
-                const effectiveSchoolId = targetUser.school_id || '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
+                const effectiveSchoolId = targetUser.school_id || fallbackSchoolId;
+                if (!effectiveSchoolId) {
+                  alert('Bypass Fehler: Keine gültige Musikschul-ID zugewiesen.');
+                  return;
+                }
                 try {
                   const { data: authResult, error: rpcErr } = await supabase.rpc('authenticate_by_credential', {
                     p_credential: targetUser.id,
@@ -7350,7 +7359,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               gap: '8px'
             }}
           >
-            🏛️ BYPASS: {bypassUserCounts.adminUser?.role === 'secretary' ? 'VERWALTUNG' : 'SCHULLEITUNG'} ({bypassUserCounts.adminUser?.name || 'Manuel Wagner'} • {bypassUserCounts.schoolName || 'Musäk Bad Säckingen'})
+            🏛️ BYPASS: {bypassUserCounts.adminUser?.role === 'secretary' ? 'VERWALTUNG' : 'SCHULLEITUNG'} ({bypassUserCounts.adminUser?.name || 'Manuel Wagner'} • {bypassUserCounts.schoolName || schoolData?.name || 'Musikschule'})
           </button>
 
           {/* 3. Lehrer Bypass */}
@@ -7358,14 +7367,19 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             type="button"
             onClick={async () => {
               try {
+                const fallbackSchoolId = schoolData?.id || (typeof localStorage !== 'undefined' ? localStorage.getItem('groovelab_school_id') : '') || '';
                 const targetUser = bypassUserCounts.teacherUser || {
                   id: '11079eae-664a-49a4-8692-771d83a3193c',
                   name: 'Peter Pan',
                   role: 'teacher',
-                  school_id: '53e83805-1d5a-4ed8-988e-1fb0b8200b9c'
+                  school_id: fallbackSchoolId
                 };
                 console.log('[Bypass] Logging in as Lehrer:', targetUser.name);
-                const effectiveSchoolId = targetUser.school_id || '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
+                const effectiveSchoolId = targetUser.school_id || fallbackSchoolId;
+                if (!effectiveSchoolId) {
+                  alert('Bypass Fehler: Keine gültige Musikschul-ID zugewiesen.');
+                  return;
+                }
                 try {
                   const { data: authResult, error: rpcErr } = await supabase.rpc('authenticate_by_credential', {
                     p_credential: targetUser.id,
@@ -7413,7 +7427,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
               gap: '8px'
             }}
           >
-            🎓 BYPASS: LEHRKRAFT ({bypassUserCounts.teacherUser?.name || 'Peter Pan'} • {bypassUserCounts.schoolName || 'Musäk Bad Säckingen'})
+            🎓 BYPASS: LEHRKRAFT ({bypassUserCounts.teacherUser?.name || 'Peter Pan'} • {bypassUserCounts.schoolName || schoolData?.name || 'Musikschule'})
           </button>
 
           {/* 4. Schüler Bypass */}
@@ -7421,14 +7435,19 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             type="button"
             onClick={async () => {
               try {
+                const fallbackSchoolId = schoolData?.id || (typeof localStorage !== 'undefined' ? localStorage.getItem('groovelab_school_id') : '') || '';
                 const targetUser = bypassUserCounts.studentUser || {
                   id: '15102f5e-c504-4c33-93ab-436285197c8c',
                   name: 'Linus',
                   role: 'student',
-                  school_id: '53e83805-1d5a-4ed8-988e-1fb0b8200b9c'
+                  school_id: fallbackSchoolId
                 };
                 console.log('[Bypass] Logging in as Schüler:', targetUser.name);
-                const effectiveSchoolId = targetUser.school_id || '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
+                const effectiveSchoolId = targetUser.school_id || fallbackSchoolId;
+                if (!effectiveSchoolId) {
+                  alert('Bypass Fehler: Keine gültige Musikschul-ID zugewiesen.');
+                  return;
+                }
                 try {
                   const { data: authResult, error: rpcErr } = await supabase.rpc('authenticate_by_credential', {
                     p_credential: targetUser.id,

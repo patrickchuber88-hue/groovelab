@@ -123,14 +123,36 @@ export function useCampusDashboardDataLoader({
       if (isInitial && !user) setLoading(true);
       console.log(`[Dashboard] Fetching data for user: ${userId}`);
       
-      // Stage 1 light: Fetch user record and current session in parallel with automatic retries
-      const [userRes, sessionRes] = await Promise.all([
-        safeSupabaseQuery(async () => await supabase.from('users').select('*, schools(*)').eq('id', userId).maybeSingle()),
-        safeSupabaseQuery(async () => await supabase.from('sessions').select('*, stations(name, color)').eq('user_id', userId).is('check_out_time', null).order('check_in_time', { ascending: false }).limit(1).maybeSingle())
-      ]).catch(err => {
-        console.error('[Dashboard] Critical Fetch Error Stage 1 Light:', err);
-        return [ {error: err}, {error: err} ] as any;
-      });
+      // Stage 1 Fast Bootstrap RPC: Fetch consolidated student dashboard bootstrap in 1 fast roundtrip
+      let bootstrapData: any = null;
+      let userRes: any = null;
+      let sessionRes: any = null;
+
+      try {
+        const { data: bData, error: bErr } = await supabase.rpc('get_student_dashboard_bootstrap', { p_user_id: userId });
+        if (!bErr && bData && !bData.error && bData.user) {
+          bootstrapData = bData;
+          userRes = { data: bData.user, error: null };
+          sessionRes = { data: bData.active_session, error: null };
+          if (bData.teachers?.length > 0) setTeachers(bData.teachers);
+          if (typeof bData.total_presence_mins === 'number') setTotalPresenceMins(bData.total_presence_mins);
+        }
+      } catch (_) {
+        // Graceful fallback to direct queries below
+      }
+
+      if (!userRes) {
+        // Stage 1 light fallback: Fetch user record and current session in parallel with automatic retries
+        const [uRes, sRes] = await Promise.all([
+          safeSupabaseQuery(async () => await supabase.from('users').select('*, schools(*)').eq('id', userId).maybeSingle()),
+          safeSupabaseQuery(async () => await supabase.from('sessions').select('*, stations(name, color)').eq('user_id', userId).is('check_out_time', null).order('check_in_time', { ascending: false }).limit(1).maybeSingle())
+        ]).catch(err => {
+          console.error('[Dashboard] Critical Fetch Error Stage 1 Light:', err);
+          return [ {error: err}, {error: err} ] as any;
+        });
+        userRes = uRes;
+        sessionRes = sRes;
+      }
 
       if (userRes?.error) {
         console.error('[Dashboard] User Fetch Error or Network Issue:', userRes.error);
@@ -158,8 +180,13 @@ export function useCampusDashboardDataLoader({
       }
 
       if (!userData && isLocalhost) {
-        const targetSchoolId = typeof window !== 'undefined' ? (localStorage.getItem('groovelab_last_school_id') || localStorage.getItem('groovelab_school_id') || '53e83805-1d5a-4ed8-988e-1fb0b8200b9c') : '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
-        const schoolName = 'Musäk Bad Säckingen';
+        const targetSchoolId = typeof window !== 'undefined' ? (localStorage.getItem('groovelab_last_school_id') || localStorage.getItem('groovelab_school_id') || '') : '';
+        if (!targetSchoolId) {
+          console.warn('[useCampusDashboardDataLoader] Fail-Closed: Cannot construct dev data without a resolved school_id.');
+          setLoading(false);
+          return;
+        }
+        const schoolName = 'Lokale Musikschule';
 
         if (userId === '88888888-8888-8888-8888-888888888888' || (sessionStorage.getItem('groovelab_active_workspace') === 'master_admin')) {
           userData = {
@@ -611,9 +638,10 @@ export function useCampusDashboardDataLoader({
         return;
       }
 
-      // Stage 1 student heavy: Fetch sessions history and band memberships for students
       const [allSessionsRes, membershipsRes] = await Promise.all([
-        supabase.from('sessions').select('check_in_time, check_out_time, last_active_at').eq('user_id', userId),
+        typeof bootstrapData?.total_presence_mins === 'number'
+          ? Promise.resolve({ data: null, error: null })
+          : supabase.from('sessions').select('check_in_time, check_out_time, last_active_at').eq('user_id', userId),
         supabase.from('band_members').select('id, instrument, confetti_seen, bands(id, name, school_id, song_id, status, photo_url, songs(*), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url)))))').eq('user_id', userId)
       ]).catch(err => {
         console.error('[Dashboard] Critical Fetch Error Student Stage 1 Heavy:', err);
@@ -648,10 +676,12 @@ export function useCampusDashboardDataLoader({
       songsQuery = songsQuery.order('level').order('artist');
 
       const [skillsRes, wallRes, membersRes, userBandsRes, bandsRes, teachersRes, activeSessionsRes] = await Promise.all([
-        supabase.from('user_song_skills').select(`
-          id, progress_percent, is_stage_ready, is_pending_approval, instrument, part_number, difficulty_level, is_favorite, verified_by_id,
-          songs (*)
-        `).eq('user_id', userId),
+        bootstrapData?.skills
+          ? Promise.resolve({ data: bootstrapData.skills, error: null })
+          : supabase.from('user_song_skills').select(`
+              id, progress_percent, is_stage_ready, is_pending_approval, instrument, part_number, difficulty_level, is_favorite, verified_by_id,
+              songs (*)
+            `).eq('user_id', userId),
         songsQuery,
         Promise.resolve({ data: [], error: null }),
         bandIds.length > 0
@@ -664,7 +694,9 @@ export function useCampusDashboardDataLoader({
             `).in('id', bandIds)
           : Promise.resolve({ data: [], error: null }),
         supabase.from('bands').select('*, songs(id, title, artist, instrumentation), band_members(*, users!user_id(id, first_name, last_name, photo_url, role)), band_songs(*, songs(id, title, artist, instrumentation), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url))), coach:users!coach_id (first_name, last_name, photo_url)').eq('school_id', schoolId).order('name', { ascending: true }),
-        supabase.from('users').select('id, first_name, last_name, role, avatar_url, photo_url, instrument, last_seen, ausfall_until, ausfall_start, phone, is_active, nickname, is_groovelab_active, is_campus_active').eq('school_id', schoolId).in('role', ['teacher', 'admin']).order('first_name'),
+        bootstrapData?.teachers
+          ? Promise.resolve({ data: bootstrapData.teachers, error: null })
+          : supabase.from('users').select('id, first_name, last_name, role, avatar_url, photo_url, instrument, last_seen, ausfall_until, ausfall_start, phone, is_active, nickname, is_groovelab_active, is_campus_active').eq('school_id', schoolId).in('role', ['teacher', 'admin']).order('first_name'),
         supabase.from('sessions').select('user_id, station_id, gps_verified, users!inner(role, school_id, last_seen, is_groovelab_active)').is('check_out_time', null).eq('users.school_id', schoolId).eq('users.role', 'student')
       ]).catch(err => {
         console.error('[Dashboard] Critical Fetch Error Stage 2:', err);

@@ -31,6 +31,7 @@ export interface AudioEngineMetrics {
   truePeakDbtp: number;
   integratedLufs: number;
   isOverloaded: boolean;
+  isHeadphonesConnected?: boolean;
 }
 
 export interface AudioCaptureConfig {
@@ -40,6 +41,8 @@ export interface AudioCaptureConfig {
   enableTruePeakDetection: boolean;
   enableSubsonicHpf: boolean;
   profile: InstrumentProfileType;
+  strictStudioBypass?: boolean;
+  enableFeedbackGuard?: boolean;
 }
 
 export interface StreamChunkConfig {

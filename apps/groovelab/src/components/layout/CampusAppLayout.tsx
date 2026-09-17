@@ -48,7 +48,7 @@ export interface CampusAppLayoutProps extends CampusMainContentRouterProps {
   children?: React.ReactNode;
 }
 
-export const CampusAppLayout: React.FC<CampusAppLayoutProps> = ({
+export const CampusAppLayout: React.FC<CampusAppLayoutProps> = React.memo(({
   // Toast
   toastMessage,
   setToastMessage,
@@ -494,4 +494,6 @@ export const CampusAppLayout: React.FC<CampusAppLayoutProps> = ({
       </div>
     </div>
   );
-};
+});
+
+CampusAppLayout.displayName = 'CampusAppLayout';

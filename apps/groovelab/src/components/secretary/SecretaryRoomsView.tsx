@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import {
   AlertCircle, Calendar, Clock, DoorOpen, Music, Ruler, School, ShieldAlert,
   Sliders, Sparkles, Tag, Trash2, Users, Wrench, X, Plus, Edit2, ChevronDown,
-  ChevronRight, FileText, Check, ArrowRight, Activity
+  ChevronRight, FileText, Check, ArrowRight, Activity, Building, Building2,
+  HelpCircle, Download, AlertTriangle, MapPin, Search, Layers, Coffee, FileSpreadsheet
 } from 'lucide-react';
 
 export interface SecretaryRoomsViewProps {
@@ -754,12 +755,15 @@ export function SecretaryRoomsView({
                               fontWeight: 800, 
                               background: isRoomCsvExpanded ? '#f1f5f9' : '#ffffff',
                               border: '1px solid #cbd5e1',
+                              color: '#334155',
                               cursor: 'pointer',
                               fontFamily: 'Urbanist',
                               transition: 'all 0.2s'
                             }}
                           >
-                            📄 Sammel-Onboarding (CSV) {isRoomCsvExpanded ? '▲' : '▼'}
+                            <FileSpreadsheet size={14} style={{ color: '#475569' }} />
+                            <span>Sammel-Onboarding (CSV)</span>
+                            {isRoomCsvExpanded ? <ChevronDown size={14} style={{ transform: 'rotate(180deg)', color: '#64748b' }} /> : <ChevronDown size={14} style={{ color: '#64748b' }} />}
                           </button>
 
                           <button
@@ -783,7 +787,8 @@ export function SecretaryRoomsView({
                               transition: 'all 0.2s'
                             }}
                           >
-                            Raum anlegen
+                            <Plus size={14} style={{ color: '#ffffff' }} />
+                            <span>Raum anlegen</span>
                           </button>
                         </>
                       )}
@@ -816,8 +821,8 @@ export function SecretaryRoomsView({
                           marginBottom: '2px',
                           flexWrap: 'wrap'
                         }}>
-                          <span style={{ fontSize: '0.68rem', color: '#34a853', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist' }}>
-                            ⚡ smarte-auto-zuweisung:
+                          <span style={{ fontSize: '0.68rem', color: '#34a853', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Urbanist', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <Sparkles size={11} style={{ color: '#34a853' }} /> smarte-auto-zuweisung:
                           </span>
                           
                           {roomFilterFloor && roomFilterFloor !== 'All' && (
@@ -831,8 +836,8 @@ export function SecretaryRoomsView({
                               borderRadius: '100px',
                               boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
                             }}>
-                              <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                                🏢 {roomFilterFloor}
+                              <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                <Layers size={13} style={{ color: '#0f172a' }} /> {roomFilterFloor}
                               </span>
                               <span style={{ fontSize: '0.6rem', fontWeight: 900, background: '#f1f5f9', color: '#64748b', padding: '1px 6px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                                 Stockwerk
@@ -851,8 +856,8 @@ export function SecretaryRoomsView({
                               borderRadius: '100px',
                               boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
                             }}>
-                              <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>
-                                🏠 {buildingMap[selectedBuildingId]?.name || 'Ohne Zuordnung'}
+                              <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                <Building2 size={13} style={{ color: '#0f172a' }} /> {buildingMap[selectedBuildingId]?.name || 'Ohne Zuordnung'}
                               </span>
                               <span style={{ fontSize: '0.6rem', fontWeight: 900, background: '#fce8e6', color: '#ea4335', padding: '1px 6px', borderRadius: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                                 Gebäude
@@ -966,7 +971,7 @@ export function SecretaryRoomsView({
                     }}
                   >
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#0f172a', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      <Activity size={13} style={{ color: '#ea4335' }} /> Auslastung:
+                      <Activity size={13} style={{ color: '#475569' }} /> Auslastung:
                     </span>
                     {(() => {
                       const totalSlots = matrixAllocations.filter(p => p.roomId).length;
@@ -1024,7 +1029,8 @@ export function SecretaryRoomsView({
                           gap: '6px'
                         }}
                       >
-                        🏢 Alle Gebäude ({uniqueRooms.length})
+                        <Building2 size={15} style={{ color: selectedBuildingId === 'All' ? '#ffffff' : '#475569' }} />
+                        <span>Alle Gebäude ({uniqueRooms.length})</span>
                       </button>
                       {/* Ohne Zuordnung tab */}
                       <button
@@ -1049,25 +1055,27 @@ export function SecretaryRoomsView({
                           gap: '6px'
                         }}
                       >
-                        ❓ Ohne Zuordnung ({uniqueRooms.filter(r => !r.building_id).length})
+                        <HelpCircle size={15} style={{ color: selectedBuildingId === '' ? '#ffffff' : '#475569' }} />
+                        <span>Ohne Zuordnung ({uniqueRooms.filter(r => !r.building_id).length})</span>
                       </button>
                       {/* Specific buildings tabs */}
                       {buildings.map(b => {
                         const count = uniqueRooms.filter(r => r.building_id === b.id).length;
+                        const isSelected = selectedBuildingId === b.id;
                         return (
                           <button
                             key={b.id}
                             type="button"
                             role="tab"
-                            aria-selected={selectedBuildingId === b.id}
+                            aria-selected={isSelected}
                             aria-label={`Gebäude ${b.name} (${count} Räume) anzeigen`}
                             onClick={() => { setSelectedBuildingId(b.id); }}
                             style={{
                               padding: '10px 18px',
                               borderRadius: '12px',
                               border: 'none',
-                              background: selectedBuildingId === b.id ? '#ea4335' : '#f1f5f9',
-                              color: selectedBuildingId === b.id ? '#ffffff' : '#475569',
+                              background: isSelected ? '#ea4335' : '#f1f5f9',
+                              color: isSelected ? '#ffffff' : '#475569',
                               fontWeight: 800,
                               fontSize: '0.8rem',
                               cursor: 'pointer',
@@ -1078,7 +1086,8 @@ export function SecretaryRoomsView({
                               gap: '6px'
                             }}
                           >
-                            🏠 {b.name} ({count})
+                            <Building size={15} style={{ color: isSelected ? '#ffffff' : '#475569' }} />
+                            <span>{b.name} ({count})</span>
                           </button>
                         );
                       })}
@@ -1141,7 +1150,8 @@ export function SecretaryRoomsView({
                           }}
                           className="hover-scale no-pdf"
                         >
-                          📥 PDF Export
+                          <Download size={14} style={{ color: '#ea4335' }} />
+                          <span>PDF Export</span>
                         </button>
                       </div>
                       {filteredRooms.length === 0 ? (
@@ -1206,7 +1216,7 @@ export function SecretaryRoomsView({
                                                   boxShadow: hasConflict ? '0 0 8px rgba(239,68,68,0.15)' : 'none',
                                                   animation: hasConflict ? 'pulse 2s infinite' : 'none'
                                                 }}
-                                                title={hasConflict ? '⚠️ Zeitliche Überschneidung in diesem Raum!' : undefined}
+                                                title={hasConflict ? 'Zeitliche Überschneidung in diesem Raum!' : undefined}
                                               >
                                                 <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#0f172a' }}>{getPlanDisplayName(plan)}</span>
                                                 <span style={{ fontSize: '0.58rem', fontWeight: 700, color }}>{plan.instrument}</span>
@@ -1241,11 +1251,11 @@ export function SecretaryRoomsView({
                                                   boxShadow: hasConflict ? '0 0 8px rgba(239,68,68,0.2)' : '0 2px 6px rgba(245, 158, 11, 0.12)',
                                                   animation: hasConflict ? 'pulse 2s infinite' : 'none'
                                                 }}
-                                                title={hasConflict ? '⚠️ Zeitliche Überschneidung mit einem regulären Stundenplan!' : 'Vorläufige Raumbuchung (Freigabe erforderlich)'}
+                                                title={hasConflict ? 'Zeitliche Überschneidung mit einem regulären Stundenplan!' : 'Vorläufige Raumbuchung (Freigabe erforderlich)'}
                                               >
                                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
-                                                  <span style={{ fontSize: '0.60rem', fontWeight: 900, color: hasConflict ? '#b91c1c' : '#b45309', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                                    ⏳ Vorläufig
+                                                  <span style={{ fontSize: '0.60rem', fontWeight: 900, color: hasConflict ? '#b91c1c' : '#b45309', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                    <Clock size={10} style={{ color: hasConflict ? '#b91c1c' : '#b45309' }} /> Vorläufig
                                                   </span>
                                                   <span style={{ fontSize: '0.58rem', fontWeight: 800, background: hasConflict ? '#fee2e2' : '#fef3c7', color: hasConflict ? '#ef4444' : '#92400e', padding: '1px 5px', borderRadius: '4px' }}>
                                                     {dateFormatted}
@@ -1262,8 +1272,8 @@ export function SecretaryRoomsView({
                                                   {bStart}–{bEnd}
                                                 </span>
                                                 {hasConflict && (
-                                                  <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#dc2626', background: '#fee2e2', padding: '2px 4px', borderRadius: '4px' }}>
-                                                    ⚠️ Konflikt mit Plan!
+                                                  <span style={{ fontSize: '0.58rem', fontWeight: 800, color: '#dc2626', background: '#fee2e2', padding: '2px 4px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                    <AlertTriangle size={10} style={{ color: '#dc2626' }} /> Konflikt mit Plan!
                                                   </span>
                                                 )}
                                                 {(handleConfirmBooking || handleRejectBooking) && (
@@ -1378,7 +1388,8 @@ export function SecretaryRoomsView({
                         }}
                         className="hover-scale"
                       >
-                        ➕ Gebäude anlegen
+                        <Plus size={14} style={{ color: '#ea4335' }} />
+                        <span>Gebäude anlegen</span>
                       </button>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '500px', overflowY: 'auto', paddingRight: '4px' }}>
@@ -1398,8 +1409,8 @@ export function SecretaryRoomsView({
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>
-                              🏢
+                            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#f1f5f9', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <Building2 size={18} />
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column' }}>
                               <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>Alle Gebäude</span>
@@ -1463,8 +1474,8 @@ export function SecretaryRoomsView({
                               }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#f1f5f9', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>
-                                  ❓
+                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#f1f5f9', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                  <HelpCircle size={18} />
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                                   <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>Ohne Zuordnung</span>
@@ -1542,16 +1553,16 @@ export function SecretaryRoomsView({
                               }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
-                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#e0f2fe', color: '#0369a1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0 }}>
-                                  🏠
+                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#f1f5f9', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                  <Building size={18} />
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
                                   <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     {b.name}
                                   </span>
                                   {b.address && (
-                                    <span style={{ fontSize: '0.65rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                      📍 {b.address}
+                                    <span style={{ fontSize: '0.65rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                      <MapPin size={11} style={{ color: '#64748b' }} /> {b.address}
                                     </span>
                                   )}
                                 </div>
@@ -1564,17 +1575,17 @@ export function SecretaryRoomsView({
                                   type="button"
                                   aria-label={`Gebäude ${b.name} bearbeiten`}
                                   onClick={(e) => { e.stopPropagation(); openBuildingEditor(b); }}
-                                  style={{ background: 'transparent', border: 'none', color: '#ea4335', cursor: 'pointer', padding: 0 }}
+                                  style={{ background: 'transparent', border: 'none', color: '#475569', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                 >
-                                  ✏️
+                                  <Edit2 size={13} style={{ color: '#475569' }} />
                                 </button>
                                 <button
                                   type="button"
                                   aria-label={`Gebäude ${b.name} löschen`}
                                   onClick={(e) => { e.stopPropagation(); handleDeleteBuilding(b.id); }}
-                                  style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0 }}
+                                  style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                 >
-                                  🗑️
+                                  <Trash2 size={13} style={{ color: '#ef4444' }} />
                                 </button>
                               </div>
                             </div>
@@ -1597,7 +1608,7 @@ export function SecretaryRoomsView({
                         alignItems: 'center'
                       }}>
                         <div style={{ flex: 1.5, minWidth: '200px', position: 'relative' }}>
-                          <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b', fontSize: '0.8rem' }}>🔍</span>
+                          <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
                           <input 
                             type="text" 
                             placeholder="Raum suchen..." 
@@ -1663,7 +1674,9 @@ export function SecretaryRoomsView({
                             gap: '14px',
                             marginTop: '10px'
                           }}>
-                            <div style={{ fontSize: '3rem', opacity: 0.65 }}>🚪</div>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
+                              <DoorOpen size={48} />
+                            </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                               <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>
                                 Keine Räume gefunden
@@ -1692,7 +1705,8 @@ export function SecretaryRoomsView({
                               }}
                               className="hover-scale"
                             >
-                              Raum anlegen
+                              <Plus size={14} style={{ color: '#ffffff' }} />
+                              <span>Raum anlegen</span>
                             </button>
                           </div>
                         ) : (
@@ -1820,7 +1834,8 @@ export function SecretaryRoomsView({
                                               }}
                                               title="Klicken, um die vorläufigen Buchungen im Belegungsplan zu prüfen"
                                             >
-                                              ⏳ {roomPending.length === 1 ? '1 vorläufige Buchung' : `${roomPending.length} vorläufige Buchungen`}
+                                              <Clock size={10} style={{ color: '#b45309' }} />
+                                              <span>{roomPending.length === 1 ? '1 vorläufige Buchung' : `${roomPending.length} vorläufige Buchungen`}</span>
                                             </span>
                                           );
                                         })()}
@@ -1830,8 +1845,8 @@ export function SecretaryRoomsView({
                                           {room.floor || localFloorMappings[room.id] || 'Allgemein'}
                                         </span>
                                         {room.building_id && (
-                                          <span style={{ fontSize: '0.65rem', color: '#ea4335', fontWeight: 800 }}>
-                                            🏠 {buildingMap[room.building_id]?.name || 'Gebäude'}
+                                          <span style={{ fontSize: '0.65rem', color: '#ea4335', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                            <Building size={11} style={{ color: '#ea4335' }} /> {buildingMap[room.building_id]?.name || 'Gebäude'}
                                           </span>
                                         )}
                                       </div>
@@ -1914,7 +1929,7 @@ export function SecretaryRoomsView({
                                         fontSize: '0.68rem',
                                         fontWeight: 800,
                                         cursor: 'pointer',
-                                        background: room.is_groovelab_active ? '#fef3c7' : '#f1f5f9',
+                                        background: room.is_groovelab_active ? '#fefce8' : '#f1f5f9',
                                         color: room.is_groovelab_active ? '#a16207' : '#64748b',
                                         transition: 'all 0.15s ease',
                                         fontFamily: 'Urbanist'
@@ -1936,13 +1951,15 @@ export function SecretaryRoomsView({
                                           background: '#f1f5f9', 
                                           color: '#475569', 
                                           padding: '3px 8px', 
-                                          borderRadius: '6px',
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
+                                          borderRadius: '6px', 
+                                          display: 'inline-flex', 
+                                          alignItems: 'center', 
+                                          gap: '3px',
                                           fontFamily: 'Urbanist'
                                         }}
                                       >
-                                        🎸 {formatInstrumentName(inst)}
+                                        <Music size={10} style={{ color: '#475569' }} />
+                                        <span>{formatInstrumentName(inst)}</span>
                                       </span>
                                     ))}
 
@@ -2066,7 +2083,8 @@ export function SecretaryRoomsView({
                         }}
                         className="hover-scale"
                       >
-                        ➕ Stockwerk anlegen
+                        <Plus size={14} style={{ color: '#ea4335' }} />
+                        <span>Stockwerk anlegen</span>
                       </button>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '500px', overflowY: 'auto', paddingRight: '4px' }}>
@@ -2089,8 +2107,8 @@ export function SecretaryRoomsView({
                               }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#e6f4ea', color: '#34a853', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>
-                                  🏢
+                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#f1f5f9', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                  <Layers size={18} />
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                                   <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', fontFamily: 'Urbanist' }}>Alle Stockwerke</span>
@@ -2228,10 +2246,10 @@ export function SecretaryRoomsView({
                                             });
                                           }
                                         }}
-                                        style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0, fontSize: '0.75rem' }}
+                                        style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center' }}
                                         title="Stockwerk löschen"
                                       >
-                                        🗑️
+                                        <Trash2 size={13} style={{ color: '#ef4444' }} />
                                       </button>
                                     )}
                                   </span>
@@ -2300,7 +2318,7 @@ export function SecretaryRoomsView({
                     {/* Modal Header */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '24px 28px', borderBottom: '1px solid #f1f5f9' }}>
                       <h4 id="room-settings-modal-title" style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'Urbanist' }}>
-                        <DoorOpen size={18} color="#ea4335" /> {editingRoom ? `„${editingRoom.name}“ bearbeiten` : 'Neuen Raum anlegen'}
+                        <DoorOpen size={18} color="#0f172a" /> {editingRoom ? `„${editingRoom.name}“ bearbeiten` : 'Neuen Raum anlegen'}
                       </h4>
                       <button
                         type="button"
@@ -2324,7 +2342,7 @@ export function SecretaryRoomsView({
                         {/* Name */}
                         <div>
                           <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
-                            <Tag size={12} color="#ea4335" /> Raumname *
+                            <Tag size={12} color="#475569" /> Raumname *
                           </label>
                           <input
                             aria-label="Raumname"
@@ -2338,7 +2356,7 @@ export function SecretaryRoomsView({
                         {/* Gebäude */}
                         <div>
                           <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
-                            <School size={12} color="#ea4335" /> Gebäude
+                            <School size={12} color="#475569" /> Gebäude
                           </label>
                           <select
                             aria-label="Gebäude auswählen"
@@ -2357,7 +2375,7 @@ export function SecretaryRoomsView({
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                           <div>
                             <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
-                              <Users size={12} color="#ea4335" /> Max. Schüler
+                              <Users size={12} color="#475569" /> Max. Schüler
                             </label>
                             <input
                               type="number"
@@ -2373,7 +2391,7 @@ export function SecretaryRoomsView({
                           </div>
                           <div>
                             <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
-                              <Ruler size={12} color="#ea4335" /> Größe in m²
+                              <Ruler size={12} color="#475569" /> Größe in m²
                             </label>
                             <input
                               type="number"
@@ -2392,7 +2410,7 @@ export function SecretaryRoomsView({
                         {/* Modul */}
                         <div>
                           <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px', fontFamily: 'Urbanist' }}>
-                            <Sliders size={12} color="#ea4335" /> Module Freigabe
+                            <Sliders size={12} color="#475569" /> Module Freigabe
                           </label>
                           <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
                             <div 
@@ -2476,7 +2494,7 @@ export function SecretaryRoomsView({
                         {/* Akustisch ungeeignete Instrumente */}
                         <div>
                           <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px', fontFamily: 'Urbanist' }}>
-                            <ShieldAlert size={12} color="#ea4335" /> Akustisch ungeeignet für
+                            <ShieldAlert size={12} color="#475569" /> Akustisch ungeeignet für
                           </label>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                             {['Schlagzeug', 'Klavier', 'E-Piano', 'Gitarre', 'Bass', 'Gesang', 'Bläser', 'Keyboard'].map(inst => {
@@ -2515,7 +2533,7 @@ export function SecretaryRoomsView({
                         {/* Vorhandene Instrumente */}
                         <div>
                           <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px', fontFamily: 'Urbanist' }}>
-                            <Music size={12} color="#ea4335" /> Vorhandene Instrumente (mit Modell)
+                            <Music size={12} color="#475569" /> Vorhandene Instrumente (mit Modell)
                           </label>
                           
                           {/* List of existing */}
@@ -2564,9 +2582,9 @@ export function SecretaryRoomsView({
                                 setNewInstrumentName('');
                                 setNewInstrumentModel('');
                               }}
-                              style={{ width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', border: 'none', background: '#ea4335', color: 'white', fontSize: '1.1rem', fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}
+                              style={{ width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', border: 'none', background: '#ea4335', color: 'white', cursor: 'pointer', flexShrink: 0 }}
                             >
-                              +
+                              <Plus size={16} />
                             </button>
                           </div>
                         </div>
@@ -2574,7 +2592,7 @@ export function SecretaryRoomsView({
                         {/* Sonstiges */}
                         <div>
                           <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
-                            <Sparkles size={12} color="#ea4335" /> Sonstige Ausstattung
+                            <Sparkles size={12} color="#475569" /> Sonstige Ausstattung
                           </label>
                           <input
                             aria-label="Sonstige Ausstattung"
@@ -2671,7 +2689,7 @@ export function SecretaryRoomsView({
                     {/* Modal Header */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '24px 28px', borderBottom: '1px solid #f1f5f9' }}>
                       <h4 id="building-modal-title" style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'Urbanist' }}>
-                        <School size={18} color="#ea4335" /> {editingBuilding ? `„${editingBuilding.name}“ bearbeiten` : 'Neues Gebäude anlegen'}
+                        <School size={18} color="#0f172a" /> {editingBuilding ? `„${editingBuilding.name}“ bearbeiten` : 'Neues Gebäude anlegen'}
                       </h4>
                       <button
                         type="button"
@@ -2688,7 +2706,7 @@ export function SecretaryRoomsView({
                       <div style={{ padding: '28px 28px 32px 28px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
                         <div>
                           <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
-                            <School size={12} color="#ea4335" /> Gebäudename *
+                            <School size={12} color="#475569" /> Gebäudename *
                           </label>
                           <input
                             aria-label="Gebäudename"
@@ -2701,7 +2719,7 @@ export function SecretaryRoomsView({
                         </div>
                         <div>
                           <label style={{ fontSize: '0.68rem', fontWeight: 900, textTransform: 'uppercase', color: '#475569', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px', fontFamily: 'Urbanist' }}>
-                            <School size={12} color="#ea4335" /> Adresse
+                            <School size={12} color="#475569" /> Adresse
                           </label>
                           <input
                             aria-label="Adresse des Gebäudes"
@@ -2750,7 +2768,7 @@ export function SecretaryRoomsView({
                         {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'][selectedDayPlan.dayOfWeek]} · Lese-Ansicht
                       </span>
                       <h3 id="dayplan-detail-title" style={{ margin: '0 0 2px 0', fontSize: '1.1rem', fontWeight: 900, color: '#0f172a', fontFamily: 'Urbanist' }}>{getPlanDisplayName(selectedDayPlan)}</h3>
-                      <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 700 }}>🎸 {selectedDayPlan.instrument}</span>
+                      <span style={{ fontSize: '0.72rem', color: '#475569', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Music size={12} style={{ color: '#475569' }} /> {selectedDayPlan.instrument}</span>
                     </div>
                     <button type="button" aria-label="Details schließen" onClick={() => setSelectedDayPlan(null)} style={{ background: '#f1f5f9', border: 'none', color: '#64748b', cursor: 'pointer', padding: '7px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <X size={16} />
@@ -2776,7 +2794,7 @@ export function SecretaryRoomsView({
                         return (
                           <div key={idx} style={{ padding: '9px 11px', borderRadius: '10px', border: '1px solid #f1f5f9', background: isBreak ? '#fffbeb' : '#f8fafc', borderLeft: isBreak ? '4px solid #f59e0b' : '4px solid #3b82f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div>
-                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d1d1f', display: 'block' }}>{isBreak ? '☕ Pause' : slot.student_name}</span>
+                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1d1d1f', display: 'flex', alignItems: 'center', gap: '4px' }}>{isBreak ? (<><Coffee size={12} style={{ color: '#b45309' }} /> Pause</>) : slot.student_name}</span>
                               <span style={{ fontSize: '0.6rem', color: '#475569', fontWeight: 650, display: 'block', marginTop: '1px' }}>
                                 {isBreak ? 'Pause' : `Instrument: ${slot.student_instrument || selectedDayPlan.instrument || 'Instrument'}`}
                               </span>

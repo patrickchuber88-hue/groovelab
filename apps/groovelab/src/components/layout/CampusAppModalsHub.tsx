@@ -127,7 +127,7 @@ export interface CampusAppModalsHubProps {
  * 🏛️ Komponente: CampusAppModalsHub
  * Konsolidierter Orchestrator für alle Dialoge, Modals und Sicherheits-Gates im Campus-Groovelab App Root.
  */
-export const CampusAppModalsHub: React.FC<CampusAppModalsHubProps> = ({
+export const CampusAppModalsHub: React.FC<CampusAppModalsHubProps> = React.memo(({
   user,
   setUser,
   school,
@@ -430,4 +430,6 @@ export const CampusAppModalsHub: React.FC<CampusAppModalsHubProps> = ({
       />
     </>
   );
-};
+});
+
+CampusAppModalsHub.displayName = 'CampusAppModalsHub';

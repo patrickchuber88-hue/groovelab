@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { getEffectiveNetworkProfile } from './networkAwarenessService';
+import { registerHeartbeatJob } from './heartbeatOrchestrator';
 import { 
   getAllPendingAudioRecords, 
   removeOfflineAudioRecord, 
@@ -456,10 +457,15 @@ if (typeof window !== 'undefined') {
     notifyListeners();
   });
 
-  // Background Heartbeat every 60 seconds to retry pending syncs if connected
-  setInterval(() => {
-    if (navigator.onLine && !isCurrentlySyncing) {
-      flushAllOfflineData();
+  // 1% Goldstandard: Register visibility-aware heartbeat (auto-pauses when tab is hidden)
+  registerHeartbeatJob({
+    id: 'offline-sync-flush',
+    intervalMs: 60000,
+    runImmediatelyOnWakeup: true,
+    onTick: () => {
+      if (typeof navigator !== 'undefined' && navigator.onLine && !isCurrentlySyncing) {
+        flushAllOfflineData();
+      }
     }
-  }, 60000);
+  });
 }

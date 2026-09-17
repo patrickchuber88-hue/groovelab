@@ -346,7 +346,11 @@ export function useAuthSessionActions({
 
     let effectiveUser = userToLogin;
     if (!effectiveUser && isLocalhost) {
-      const targetSchoolId = typeof window !== 'undefined' ? (localStorage.getItem('groovelab_last_school_id') || localStorage.getItem('groovelab_school_id') || '53e83805-1d5a-4ed8-988e-1fb0b8200b9c') : '53e83805-1d5a-4ed8-988e-1fb0b8200b9c';
+      const targetSchoolId = typeof window !== 'undefined' ? (localStorage.getItem('groovelab_last_school_id') || localStorage.getItem('groovelab_school_id') || '') : '';
+      if (!targetSchoolId) {
+        console.warn('[useAuthSessionActions] Fail-Closed: Cannot construct session without a resolved school_id.');
+        return;
+      }
       const isStudent = existingWorkspace === 'student' || userId === '15102f5e-c504-4c33-93ab-436285197c8c';
       const isTeacher = existingWorkspace === 'teacher' || userId === '98b6a599-7ff7-4f99-b51d-b6a4c348a0a0' || userId === '11079eae-664a-49a4-8692-771d83a3193c';
       const isMaster = existingWorkspace === 'master_admin' || userId === '88888888-8888-8888-8888-888888888888';
