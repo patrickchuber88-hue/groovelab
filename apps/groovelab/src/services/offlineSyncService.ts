@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { getEffectiveNetworkProfile } from './networkAwarenessService';
 import { 
   getAllPendingAudioRecords, 
   removeOfflineAudioRecord, 
@@ -207,13 +208,19 @@ export const enqueueOfflineAction = (
 /**
  * Flush audio records from IndexedDB Audio Vault to Supabase Storage
  */
-export const flushOfflineAudioQueue = async (): Promise<{ success: number; failed: number }> => {
+export const flushOfflineAudioQueue = async (forceUpload: boolean = false): Promise<{ success: number; failed: number; postponed?: number }> => {
   let successCount = 0;
   let failedCount = 0;
 
   try {
     const records = await getAllPendingAudioRecords();
     if (records.length === 0) return { success: 0, failed: 0 };
+
+    const netProfile = getEffectiveNetworkProfile();
+    if (!forceUpload && !netProfile.shouldAutoUploadMedia) {
+      console.log(`[OfflineSync] Mobile/constrained network active (${netProfile.tier}). Postponing ${records.length} heavy audio uploads until WiFi or manual override.`);
+      return { success: 0, failed: 0, postponed: records.length };
+    }
 
     console.log(`[OfflineSync] Flushing ${records.length} pending lossless audio records from IndexedDB...`);
 
@@ -409,7 +416,7 @@ export const flushOfflineSyncQueue = async (): Promise<{ success: number; failed
 /**
  * Flush all offline data (mutations + audio recordings)
  */
-export const flushAllOfflineData = async (): Promise<{ mutationsSynced: number; audioSynced: number }> => {
+export const flushAllOfflineData = async (forceAudioUpload: boolean = false): Promise<{ mutationsSynced: number; audioSynced: number }> => {
   if (isCurrentlySyncing) return { mutationsSynced: 0, audioSynced: 0 };
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     console.log('[OfflineSync] Device is currently offline. Postponing sync.');
@@ -422,7 +429,7 @@ export const flushAllOfflineData = async (): Promise<{ mutationsSynced: number; 
   try {
     const [mutationsResult, audioResult] = await Promise.all([
       flushOfflineSyncQueue(),
-      flushOfflineAudioQueue()
+      flushOfflineAudioQueue(forceAudioUpload)
     ]);
 
     lastSuccessfulSyncTime = Date.now();

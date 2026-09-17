@@ -11,6 +11,7 @@
 
 import { SharedAudioEngine } from '../../utils/sharedAudioEngine';
 import { StreamChunkConfig } from './types';
+import { recordNetworkSample, getEffectiveNetworkProfile } from '../networkAwarenessService';
 
 const DB_NAME = 'groovelab_audio_cache_db';
 const STORE_NAME = 'audio_blobs';
@@ -79,6 +80,7 @@ export class SpotifyGradeStreamController {
 
   /**
    * Stores a complete audio buffer in IndexedDB for instant zero-latency repeat playback.
+   * Enforces LRU quota management (Max 75 entries / ~250MB) to protect tablet flash storage.
    */
   public async setCachedAudio(cacheKey: string, data: ArrayBuffer): Promise<void> {
     if (!this.config.cacheInIndexedDb) return;
@@ -87,6 +89,24 @@ export class SpotifyGradeStreamController {
       return new Promise((resolve) => {
         const tx = db.transaction(STORE_NAME, 'readwrite');
         const store = tx.objectStore(STORE_NAME);
+
+        // Prune older cached items if entry count exceeds 75
+        const countReq = store.count();
+        countReq.onsuccess = () => {
+          if (countReq.result > 75) {
+            const cursorReq = store.openCursor();
+            let deleted = 0;
+            cursorReq.onsuccess = () => {
+              const cursor = cursorReq.result;
+              if (cursor && deleted < 15) {
+                cursor.delete();
+                deleted++;
+                cursor.continue();
+              }
+            };
+          }
+        };
+
         store.put(data, cacheKey);
         tx.oncomplete = () => resolve();
         tx.onerror = () => resolve();
@@ -119,7 +139,8 @@ export class SpotifyGradeStreamController {
       }
     }
 
-    // 2. High-Speed Network Fetch with Initial Burst Check
+    // 2. High-Speed Network Fetch with Initial Burst Check & Latency Sampling
+    const startTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
     try {
       // Fetch full file (or Range) with progress tracking
       const response = await fetch(audioUrl, {
@@ -128,6 +149,8 @@ export class SpotifyGradeStreamController {
           'Accept': 'audio/*, application/octet-stream'
         }
       });
+
+      const ttfb = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - startTime;
 
       if (!response.ok) {
         throw new Error(`[SpotifyGradeStreamController] HTTP error: ${response.status} ${response.statusText}`);
@@ -139,6 +162,8 @@ export class SpotifyGradeStreamController {
       const reader = response.body?.getReader();
       if (!reader) {
         const arrayBuffer = await response.arrayBuffer();
+        const totalDuration = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - startTime;
+        recordNetworkSample(Math.round(ttfb), arrayBuffer.byteLength, Math.round(totalDuration));
         await this.setCachedAudio(cacheKey, arrayBuffer);
         return await audioCtx.decodeAudioData(arrayBuffer);
       }
@@ -157,6 +182,9 @@ export class SpotifyGradeStreamController {
           onProgress(receivedBytes, totalBytes);
         }
       }
+
+      const totalDuration = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - startTime;
+      recordNetworkSample(Math.round(ttfb), receivedBytes, Math.round(totalDuration));
 
       // Assemble full array
       const fullArray = new Uint8Array(receivedBytes);

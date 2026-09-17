@@ -42,6 +42,7 @@ import { UniversalLatencyEngine } from '../../utils/universalLatencyEngine';
 import { useFocusInterruptionGuard } from '../../hooks/useFocusInterruptionGuard';
 import { FocusInterruptionBanner } from '../focus/FocusInterruptionBanner';
 import { FocusAbortedModal } from '../focus/FocusAbortedModal';
+import { getEffectiveNetworkProfile } from '../../services/networkAwarenessService';
 
 export interface Track {
   id: number;
@@ -2668,8 +2669,8 @@ export const GrooveLoopstation: React.FC<GrooveLoopstationProps> = ({
       await stabilizeAudioStream(stream, 300);
       mediaStreamRef.current = stream;
 
-      // 🎙️ 320 kbps Broadcast Studio-Grade Codec Bitrate (Maximum Opus/AAC transparency)
-      const targetBitrate = 320000;
+      // 🎙️ 1% Goldstandard Adaptive Bitrate (320 kbps Studio / 128 kbps Mobile Smart-Audio / 80 kbps Saver)
+      const targetBitrate = getEffectiveNetworkProfile().targetAudioBitrate || 320000;
       let mimeType = 'audio/webm;codecs=opus';
       if (typeof MediaRecorder !== 'undefined') {
         if (!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {

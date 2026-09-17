@@ -16,3 +16,5 @@ export * from '../SecretaryAnnouncementsView';
 export * from '../SecretaryAuditView';
 export * from '../SecretaryCrisisView';
 export * from '../SecretarySetupView';
+export * from '../SecretarySubjectsView';
+export * from '../SecretaryBillingModalsHub';

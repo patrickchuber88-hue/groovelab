@@ -5,6 +5,8 @@ import { storeBlob, getBlob, deleteBlob } from '../utils/blobStorage';
 import { computePeaksFromArrayBuffer } from '../utils/waveformHelper';
 import { validateMediaBlob } from '../utils/mediaSecurityValidator';
 import { uploadAudioWithIntegrityVerification, getSecureAudioUrl } from '../utils/audioStorageHelper';
+import { saveOfflineAudioRecord } from '../utils/offlineAudioVault';
+import { getEffectiveNetworkProfile } from '../services/networkAwarenessService';
 import { subscribeUserToPush, unsubscribeUserFromPush } from '../utils/webPush';
 import { 
   Award, Lock, Smartphone, HelpCircle, Trophy, Sparkles, Star, Rocket,
@@ -2227,13 +2229,26 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
     }
   };
 
-  // Must-Have 4: DSGVO Art. 20 Full Data Portability JSON Archive Export
+  // Must-Have 4: DSGVO Art. 20 Full Data Portability JSON Archive Export (Authoritative Server RPC + Local Hybrid)
   const handleExportFullDataArchive = async () => {
     try {
       const fullStudentName = formatStudentPureFirstName(studentUser?.first_name, 'Schueler');
       const safeName = fullStudentName.replace(/[^a-zA-Z0-9_-]/g, '_');
       const now = new Date();
       const dateStr = now.toISOString().split('T')[0];
+
+      // 1. Authoritative Server RPC Call (DSGVO Art. 20)
+      let serverGdprData: any = null;
+      try {
+        const { data, error } = await supabase.rpc('request_gdpr_data_export', {
+          p_student_id: studentId
+        });
+        if (!error && data) {
+          serverGdprData = data;
+        }
+      } catch (rpcErr) {
+        console.warn('[GDPR Export] Server RPC fallback to client assembly:', rpcErr);
+      }
 
       // Gather all local recordings metadata
       const localRecordingsStr = typeof window !== 'undefined' ? localStorage.getItem(`campus_junior_recordings_${studentId}`) || '[]' : '[]';
@@ -2258,8 +2273,10 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
           generated_at: now.toISOString(),
           student_id: studentId,
           school_name: (studentUser as any)?.schools?.name || 'Campus-Groovelab Partner-Musikschule',
-          instrument: studentUser?.instrument || 'Instrumentalunterricht'
+          instrument: studentUser?.instrument || 'Instrumentalunterricht',
+          source: serverGdprData ? 'authoritative_database_rpc' : 'client_local_assembly'
         },
+        authoritative_server_data: serverGdprData || null,
         profile: {
           first_name: studentUser?.first_name || '',
           instrument: studentUser?.instrument || '',
@@ -2286,7 +2303,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `CampusGroovelab_Datenarchiv_${safeName}_${dateStr}.json`);
+      link.setAttribute('download', `CampusGroovelab_DSGVO_Art20_Datenarchiv_${safeName}_${dateStr}.json`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -5267,9 +5284,14 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         }
       }
 
+      // 🎧 1% Goldstandard Adaptive Bitrate Governance:
+      // Dynamically select 320 kbps (WiFi), 128 kbps (Cellular Smart-Audio: -60% data), or 80 kbps (Saver: -80% data)
+      const netProfile = getEffectiveNetworkProfile();
+      const targetBitrate = netProfile.targetAudioBitrate || 128000;
+
       const recorder = mimeType 
-        ? new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 320000 }) 
-        : new MediaRecorder(stream, { audioBitsPerSecond: 320000 });
+        ? new MediaRecorder(stream, { mimeType, audioBitsPerSecond: targetBitrate }) 
+        : new MediaRecorder(stream, { audioBitsPerSecond: targetBitrate });
       juniorMediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (e) => {
@@ -5416,7 +5438,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
   };
 
   // 💾 3. Dual-Storage Engine (Local IndexedDB Vault + Cloud Supabase + Audio-Biography Sync)
-  const saveJuniorRecording = async () => {
+  const saveJuniorRecording = async (forceMobileUpload: boolean = false) => {
     if (!juniorRecordedBlob || !studentId) return;
     setJuniorIsSaving(true);
     try {
@@ -5540,9 +5562,48 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
       cancelJuniorRecording();
       setJuniorRecordTitle('');
 
-      // 4. Background Cloud Storage & Database Sync (8s Timeout Guard)
+      // 4. Background Cloud Storage & Database Sync (1% Mobile Deferred Sync Policy)
       (async () => {
         try {
+          const netProfile = getEffectiveNetworkProfile();
+          const shouldUploadImmediately = forceMobileUpload || netProfile.shouldAutoUploadMedia;
+
+          if (!shouldUploadImmediately) {
+            // 🛡️ 1% Goldstandard Deferred Sync: Store securely in offline vault to sync automatically when back in WiFi
+            try {
+              await saveOfflineAudioRecord({
+                id: recUniqueId,
+                blob: saveBlob,
+                mimeType: contentType,
+                durationSeconds: juniorRecordDuration,
+                studentId,
+                schoolId: targetSchoolId,
+                context: 'homework',
+                title: songTitle,
+                metadata: {
+                  storagePath: filePath,
+                  schoolId: targetSchoolId,
+                  deferredMobile: true,
+                  syncTable: 'progress_matrix',
+                  syncPayload: {
+                    student_id: studentId,
+                    school_id: studentUser?.school_id || targetSchoolId,
+                    topic_name: songTitle,
+                    homework_notes: JSON.stringify([`AUDIO:${localBlobKey}|${juniorRecordDuration}|${new Date().toISOString()}|${songTitle}|${authorRole}|${isTeacherSession ? 'public' : 'private'}|${recUniqueId}`]),
+                    audio_url: localBlobKey,
+                    is_current_homework: false,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                  }
+                }
+              });
+              console.log(`[StudentAvatarDashboard] Recording ${recUniqueId} enqueued for WiFi upload (Mobile Deferred).`);
+            } catch (vaultErr) {
+              console.warn('[StudentAvatarDashboard] Offline vault enqueue exception:', vaultErr);
+            }
+            return;
+          }
+
           // 🛡️ Enterprise Media Security & Revisionssicherer Upload mit SHA-256 Prüfsumme
           let finalAudioUrl = localBlobKey;
           let checksumSha256 = 'verified';
@@ -14217,6 +14278,7 @@ export function StudentAvatarDashboard({ studentId, initialUser, parentActiveTab
         juniorRecordDuration={juniorRecordDuration}
         juniorRecordTitle={juniorRecordTitle}
         juniorRecordedUrl={juniorRecordedUrl}
+        juniorRecordedBlob={juniorRecordedBlob}
         juniorTeacherRecordings={juniorTeacherRecordings}
         lehrwerke={lehrwerke}
         localProgress={localProgress}

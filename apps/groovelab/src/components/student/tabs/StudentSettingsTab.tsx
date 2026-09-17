@@ -3286,6 +3286,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                           handleDownloadAudioOnly={handleDownloadAudioOnly}
                           handleDownloadBiographyOnly={handleDownloadBiographyOnly}
                           handleDownloadChronicleAndStickers={handleDownloadChronicleAndStickers}
+                          handleExportGdprReport={handleExportGdprReport}
+                          handleExportFullDataArchive={handleExportFullDataArchive}
                         />
                       </div>
                     )}

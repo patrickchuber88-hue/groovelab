@@ -4,8 +4,10 @@ import {
   Clock, Timer, Flame, BookOpen, Play, Pause, Square, RotateCcw, Volume2, VolumeX, X,
   Zap, Music, School, Calendar, CalendarX, Check, Target, MessageSquare, Pencil, User,
   Phone, Users, Shield, Palmtree, Settings, FileText, ThumbsUp, Heart, AlertTriangle,
-  Mic, Disc, Download, Key, Headphones, Sliders, SlidersHorizontal, Bell, Crown, RefreshCw
+  Mic, Disc, Download, Key, Headphones, Sliders, SlidersHorizontal, Bell, Crown, RefreshCw,
+  Signal, Wifi, WifiOff
 } from 'lucide-react';
+import { useNetworkProfile } from '../../../hooks/useNetworkProfile';
 import { ALL_STICKERS } from '../../../domain/stickersAndTresor';
 import { UpdateAnnouncementHero } from '../../common/UpdateAnnouncementHero';
 import { AudioTrackCarousel, AudioTrackItem } from '../../AudioTrackCarousel';
@@ -88,7 +90,6 @@ export interface StudentBriefingTabProps {
   lehrwerke: any[];
   localProgress: any;
   progressItems: any[];
-  saveJuniorRecording: (...args: any[]) => void;
   scheduleOccurrences: any[];
   schoolFokusLevels: any;
   schoolYearOccurrences: any[];
@@ -116,6 +117,8 @@ export interface StudentBriefingTabProps {
   showJuniorRecordModal: boolean;
   showJuniorRecordingsModal: boolean;
   showJuniorTimerModal: boolean;
+  juniorRecordedBlob?: Blob | null;
+  saveJuniorRecording?: (...args: any[]) => any;
   isJuniorPadActive?: boolean;
   setIsJuniorPadActive?: React.Dispatch<React.SetStateAction<boolean>>;
   songStats: any;
@@ -216,6 +219,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
     juniorRecordDuration,
     juniorRecordTitle,
     juniorRecordedUrl,
+    juniorRecordedBlob,
     juniorTeacherRecordings,
     lehrwerke,
     localProgress,
@@ -271,6 +275,9 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
 
   // 📱 Prevent tablet display sleep during music practice on music stand
   usePwaWakeLock(true);
+
+  // 📶 1% Goldstandard Network Awareness for Mobile Audio Recording & Streaming
+  const { isCellular, formatBytes, badgeText } = useNetworkProfile();
 
   const activeWeeklyFocusKey = useMemo(() => {
     let focusKey: string | null = null;
@@ -3617,6 +3624,22 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               <span style={{ fontSize: '0.95rem', color: '#64748b', fontWeight: 700 }}>
                                 🔴 Aufnahme läuft... Spiel dein Bestes!
                               </span>
+                              <div style={{ marginTop: '6px' }}>
+                                <span style={{ 
+                                  fontSize: '0.74rem', 
+                                  fontWeight: 800, 
+                                  color: isCellular ? '#b45309' : '#15803d', 
+                                  background: isCellular ? '#fef3c7' : '#dcfce7', 
+                                  padding: '3px 10px', 
+                                  borderRadius: '12px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}>
+                                  {isCellular ? <Signal size={12} /> : <Wifi size={12} />}
+                                  {isCellular ? 'Smart-Audio (128k • Spart 60% Daten)' : 'Studio-Qualität (320k)'}
+                                </span>
+                              </div>
                             </div>
 
                             <button
@@ -3826,6 +3849,78 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                               <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
                                 💡 Tippe in das Feld, um deiner Aufnahme einen eigenen Namen zu geben.
                               </span>
+                            </div>
+
+                            {/* 🛡️ 1% Goldstandard Mobile & Network Awareness Cardlet */}
+                            <div style={{
+                              width: '100%',
+                              background: isCellular ? '#fffbeb' : '#f0fdf4',
+                              border: isCellular ? '1.5px solid #fef3c7' : '1.5px solid #dcfce7',
+                              borderRadius: '16px',
+                              padding: '12px 14px',
+                              boxSizing: 'border-box',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '8px',
+                              textAlign: 'left'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <Shield size={16} color={isCellular ? '#d97706' : '#16a34a'} />
+                                  <span style={{ fontSize: '0.82rem', fontWeight: 850, color: isCellular ? '#92400e' : '#15803d' }}>
+                                    {isCellular ? 'Im lokalen Tresor gesichert' : 'WLAN • Bereit zur Synchronisation'}
+                                  </span>
+                                </div>
+                                {juniorRecordedBlob?.size ? (
+                                  <span style={{ 
+                                    fontSize: '0.74rem', 
+                                    fontWeight: 800, 
+                                    color: '#475569', 
+                                    background: '#ffffff', 
+                                    padding: '2px 8px', 
+                                    borderRadius: '8px',
+                                    border: '1px solid #e2e8f0'
+                                  }}>
+                                    {formatBytes(juniorRecordedBlob.size)}
+                                  </span>
+                                ) : null}
+                              </div>
+
+                              {isCellular && (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', paddingTop: '2px', flexWrap: 'wrap' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <Signal size={13} color="#b45309" />
+                                    <span style={{ fontSize: '0.74rem', color: '#78350f', fontWeight: 600 }}>
+                                      Mobiles Netz: Smart-Audio. Upload erfolgt im WLAN.
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => saveJuniorRecording && saveJuniorRecording(true)}
+                                    disabled={juniorIsSaving}
+                                    title="Trotzdem sofort über Mobilfunk übertragen"
+                                    style={{
+                                      background: '#0f172a',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      borderRadius: '10px',
+                                      padding: '6px 12px',
+                                      fontSize: '0.74rem',
+                                      fontWeight: 800,
+                                      cursor: juniorIsSaving ? 'not-allowed' : 'pointer',
+                                      whiteSpace: 'nowrap',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      minHeight: '32px'
+                                    }}
+                                    className="hover-scale-mini"
+                                  >
+                                    <Zap size={12} color="#facc15" />
+                                    <span>Jetzt mobil senden</span>
+                                  </button>
+                                </div>
+                              )}
                             </div>
 
                             {/* 4. Klare Kinder-Buttons */}
