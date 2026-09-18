@@ -45,8 +45,8 @@ Zusammenführung aller administrativen Aufgabenbereiche in eine modulare, wieder
 
 ## 🎯 Backlog: Schüler-Lehrer Match-Funktion (Blind-Tipp, Live-Showdown & Meilenstein-Pass)
 
-* **Status:** Geparkt auf der Roadmap (Temporär aus der aktiven UI entfernt)
-* **Bereich:** Hausaufgabenheft & Meisterwerk-Dokumentation (`MeisterwerkDocumentTab.tsx`)
+* **Status:** ✅ **VOLLSTÄNDIG REAKTIVIERT & LIVE (Track 3 / Goldstandard Didaktik & Gamification)**
+* **Bereich:** Hausaufgabenheft & Meisterwerk-Dokumentation (`MeisterwerkDocumentTab.tsx`, `MeisterwerkDocumentationModal.tsx`)
 * **Zielgruppe:** Schüler (Campus & GrooveLab) und Lehrkräfte
 
 ### 1. Pädagogische Motivation & Spielmechanik
@@ -101,7 +101,7 @@ Das Datenmodell und die Komponenten bleiben im Codebase-Fundament erhalten und k
 
 ## 📜 Backlog: Enterprise Medien-Einwilligungen & Art. 8 / 17 DSGVO Suite (Lehrer-Badges, Programmheft-Guard & Sekretariats-Inbox)
 
-* **Status:** Geparkt auf der Roadmap (Temporär aus der aktiven UI entfernt zur Vermeidung von DSGVO-Fristfallen und Zero-Mail-Bruch)
+* **Status:** ✅ **VOLLSTÄNDIG REAKTIVIERT & LIVE (Track 2 / Commit 89bd0d09 / SEC-22)**
 * **Bereich:** Elternbereich (`ParentConsentSettingsView.tsx`), Lehrkraft-Ansichten (`TeacherStudentsView.tsx`), Event-Planung (`CampusEventsBoard.tsx`), Schulsekretariat (`SecretaryAuditView.tsx` / DSGVO-Inbox)
 * **Zielgruppe:** Erziehungsberechtigte, Musiklehrkräfte, Schulleitung & Sekretariat
 

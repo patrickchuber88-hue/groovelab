@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import Confetti from 'react-confetti';
 import { AudioTrackCarousel } from '../../AudioTrackCarousel';
+import { MeisterOhrSticker } from '../../MeisterOhrSticker';
 import { CampusPinUnlockModal } from '../../CampusPinUnlockModal';
 import { SpeechDictationButton } from '../SpeechDictationButton';
 import { MechanicalMetronomeIcon } from './MeisterwerkAudioPlayers';
@@ -1930,15 +1931,17 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           von {skill.songs?.artist}
                         </p>
                         <span style={{ fontSize: '0.74rem', color: '#475569', fontWeight: 800 }}>
-                          {progress}%
+                          {readOnly && isMatchModeEnabled && !isMatchRevealed
+                            ? (studentRating !== null ? `Dein Tipp: ${studentRating}%` : 'Tipp noch offen 🎵')
+                            : (readOnly && isMatchRevealed ? `Stand: ${progress}%` : `${progress}%`)}
                         </span>
                         <div style={{ width: '100%', height: '7px', background: '#e8e8ed', borderRadius: '3.5px', marginTop: '6px', overflow: 'hidden' }}>
                           <div style={{
-                            width: `${progress}%`,
+                            width: `${readOnly && isMatchModeEnabled && !isMatchRevealed ? (studentRating ?? 0) : progress}%`,
                             height: '100%',
                             background: (status === 'MASTERED' || skill.is_stage_ready || progress === 100)
                               ? 'hsl(130, 65%, 82%)'
-                              : 'hsl(47, 85%, 84%)',
+                              : (readOnly && isMatchModeEnabled && !isMatchRevealed ? '#16a34a' : 'hsl(47, 85%, 84%)'),
                             transition: 'width 0.4s ease'
                           }} />
                         </div>
@@ -2038,8 +2041,37 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span style={{ fontSize: '0.86rem', fontWeight: 900, color: songProgressPercent === 100 ? '#34a853' : '#0f172a', transition: 'color 0.3s ease' }}>
-                            {`Fortschritt: ${songProgressPercent}%`}
+                            {readOnly && isMatchModeEnabled
+                              ? (lastMatchedTeacherPercent !== null ? `Lehrer-Stand: ${lastMatchedTeacherPercent}%` : 'Fortschritt (Wird im Unterricht gematcht)')
+                              : `Fortschritt: ${songProgressPercent}%`}
                           </span>
+
+                          {/* Teacher's Match-Mode Toggle Pill */}
+                          {!readOnly && (
+                            <button
+                              type="button"
+                              onClick={handleToggleMatchMode}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '3px 8px',
+                                borderRadius: '99px',
+                                fontSize: '0.68rem',
+                                fontWeight: 800,
+                                border: isMatchModeEnabled ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                                background: isMatchModeEnabled ? '#f0fdf4' : '#f8fafc',
+                                color: isMatchModeEnabled ? '#166534' : '#64748b',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease'
+                              }}
+                              className="hover-scale"
+                              title={isMatchModeEnabled ? 'Match-Modus ist aktiv (Schüler schätzt heimlich mit)' : 'Match-Modus ist aus (Schüler sieht nur Read-Only)'}
+                            >
+                              <span>🎯 Match-Modus:</span>
+                              <span style={{ fontWeight: 900 }}>{isMatchModeEnabled ? 'Aktiv' : 'Aus'}</span>
+                            </button>
+                          )}
                         </div>
                         
                         {songProgressPercent === 100 ? (
@@ -2132,8 +2164,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         </div>
                       )}
 
-                      {/* READ-ONLY PROGRESS DISPLAY FOR STUDENT */}
-                      {readOnly && (
+                      {/* READ-ONLY FALLBACK (When Match-Modus is OFF for Student) */}
+                      {readOnly && !isMatchModeEnabled && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <input
@@ -2161,6 +2193,465 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           </div>
                         </div>
                       )}
+
+                      {/* STUDENT BLIND-RATING SLIDER (With Zero-Bias Protection) */}
+                      {readOnly && isMatchModeEnabled && (() => {
+                        const currentPct = studentRating ?? 0;
+                        const feelings = [
+                          { max: 15, text: 'Aller Anfang!', icon: '🐌' },
+                          { max: 40, text: 'Wird schon!', icon: '🐢' },
+                          { max: 65, text: 'Groovt gut!', icon: '🎸' },
+                          { max: 85, text: 'Fast da!', icon: '⚡' },
+                          { max: 100, text: 'Bühnenreif!', icon: '🚀' }
+                        ];
+                        const feeling = feelings.find(f => currentPct <= f.max) || feelings[feelings.length - 1];
+
+                        return (
+                          <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '10px',
+                            background: '#f0fdf4',
+                            padding: '14px 16px',
+                            borderRadius: '16px',
+                            border: '1.5px solid #bbf7d0',
+                            animation: 'fadeIn 0.2s ease'
+                          }}>
+                            {/* Top Header Row */}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+                              <span style={{ fontSize: '0.86rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                🎧 Wie gut klappt es schon:
+                                <span style={{ color: currentPct > 0 ? '#15803d' : '#64748b', fontWeight: 950, fontSize: '0.94rem' }}>
+                                  {currentPct}% • {feeling.icon} {feeling.text}
+                                </span>
+                              </span>
+                              <span style={{ fontSize: '0.68rem', color: '#15803d', background: '#dcfce7', padding: '2px 8px', borderRadius: '99px', fontWeight: 800 }}>
+                                🔒 Lehrer-Wertung verdeckt
+                              </span>
+                            </div>
+
+                            {/* Interactive Slider */}
+                            <input
+                              type="range"
+                              min="0"
+                              max="100"
+                              value={studentRating ?? 0}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value, 10);
+                                handleStudentRatingChange(val);
+                              }}
+                              style={{
+                                width: '100%',
+                                accentColor: '#16a34a',
+                                height: '14px',
+                                borderRadius: '7px',
+                                cursor: 'pointer',
+                                touchAction: 'manipulation',
+                                pointerEvents: 'auto',
+                                background: currentPct > 0
+                                  ? `linear-gradient(to right, #16a34a 0%, #16a34a ${currentPct}%, #e2e8f0 ${currentPct}%, #e2e8f0 100%)`
+                                  : '#e2e8f0',
+                                WebkitAppearance: 'none',
+                                outline: 'none',
+                                transition: 'all 0.15s ease'
+                              }}
+                            />
+
+                            {/* Action & Status Row: Lifecycle-Aware Child-Friendly Commit Button */}
+                            {(() => {
+                              const isFullyCompleted = matchHistory.length >= 3;
+                              const targetMatchNum = Math.min(matchHistory.length + 1, 3);
+                              const hasFreshStudentRating = Boolean(
+                                studentRating !== null &&
+                                studentRating !== undefined &&
+                                studentRatingUpdatedAt &&
+                                (!lastMatchedAt || new Date(studentRatingUpdatedAt).getTime() > new Date(lastMatchedAt).getTime())
+                              );
+
+                              return (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    {isFullyCompleted ? (
+                                      <span style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '5px',
+                                        background: '#dcfce7',
+                                        color: '#15803d',
+                                        padding: '5px 12px',
+                                        borderRadius: '99px',
+                                        fontSize: '0.74rem',
+                                        fontWeight: 850
+                                      }}>
+                                        <span>🏆 Alle 3 Meilensteine gemeistert!</span>
+                                      </span>
+                                    ) : (hasFreshStudentRating && isStudentRatingCommitted) ? (
+                                      <span style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '5px',
+                                        background: '#dcfce7',
+                                        color: '#15803d',
+                                        padding: '5px 12px',
+                                        borderRadius: '99px',
+                                        fontSize: '0.74rem',
+                                        fontWeight: 850
+                                      }}>
+                                        <Check size={14} strokeWidth={3} />
+                                        <span>Tipp für Match {targetMatchNum} ist sicher bei deiner Lehrkraft!</span>
+                                      </span>
+                                    ) : (
+                                      <span style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        background: matchHistory.length > 0 ? '#f0fdf4' : '#fffbeb',
+                                        color: matchHistory.length > 0 ? '#15803d' : '#b45309',
+                                        padding: '4px 10px',
+                                        borderRadius: '99px',
+                                        fontSize: '0.72rem',
+                                        fontWeight: 800,
+                                        border: `1px solid ${matchHistory.length > 0 ? '#bbf7d0' : '#fde68a'}`
+                                      }}>
+                                        <span>{matchHistory.length > 0 ? `🌱 Tipp für Match ${targetMatchNum} einstellen (${currentPct}%)` : '⚠️ 1. Tipp noch nicht abgeschickt'}</span>
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={handleCommitStudentRating}
+                                    disabled={isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted)}
+                                    style={{
+                                      border: 'none',
+                                      background: (isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted))
+                                        ? '#e2e8f0'
+                                        : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                                      color: (isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted)) ? '#475569' : '#ffffff',
+                                      padding: '9px 20px',
+                                      borderRadius: '99px',
+                                      fontSize: '0.78rem',
+                                      fontWeight: 900,
+                                      cursor: (isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted)) ? 'default' : 'pointer',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      boxShadow: (isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted)) ? 'none' : '0 3px 10px rgba(22, 163, 74, 0.35)',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    className={(isFullyCompleted || (hasFreshStudentRating && isStudentRatingCommitted)) ? '' : 'hover-scale'}
+                                  >
+                                    {isFullyCompleted ? (
+                                      <span>✓ Alle Matches abgeschlossen</span>
+                                    ) : (hasFreshStudentRating && isStudentRatingCommitted) ? (
+                                      <>
+                                        <Check size={14} strokeWidth={3} />
+                                        <span>Tipp {targetMatchNum} eingeloggt ({studentRating}%)</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Lock size={14} />
+                                        <span>🔒 Tipp für Match {targetMatchNum} abschicken ({currentPct}%)</span>
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                              );
+                            })()}
+
+                            {/* 3 VISUAL REWARD TIERS (Kid-Friendly & Gamified) */}
+                            <div style={{ marginTop: '4px' }}>
+                              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', marginBottom: '4px' }}>
+                                🎁 Belohnungs-Stufen für dein nächstes Match:
+                              </div>
+                              <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                                gap: '8px'
+                              }}>
+                                <div style={{
+                                  background: '#fefce8',
+                                  border: '1.5px solid #fde047',
+                                  borderRadius: '12px',
+                                  padding: '8px 10px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px'
+                                }}>
+                                  <span style={{ fontSize: '1.2rem' }}>🎯</span>
+                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#854d0e' }}>Volltreffer (±10%)</span>
+                                    <span style={{ fontSize: '0.66rem', fontWeight: 750, color: '#a16207' }}>+50 XP & Meister-Ohr</span>
+                                  </div>
+                                </div>
+
+                                <div style={{
+                                  background: '#f0f9ff',
+                                  border: '1.5px solid #bae6fd',
+                                  borderRadius: '12px',
+                                  padding: '8px 10px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px'
+                                }}>
+                                  <span style={{ fontSize: '1.2rem' }}>✨</span>
+                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#0369a1' }}>Super Gehör (±20%)</span>
+                                    <span style={{ fontSize: '0.66rem', fontWeight: 750, color: '#0284c7' }}>+25 XP</span>
+                                  </div>
+                                </div>
+
+                                <div style={{
+                                  background: '#faf5ff',
+                                  border: '1.5px solid #e9d5ff',
+                                  borderRadius: '12px',
+                                  padding: '8px 10px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px'
+                                }}>
+                                  <span style={{ fontSize: '1.2rem' }}>🚀</span>
+                                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontSize: '0.72rem', fontWeight: 900, color: '#7e22ce' }}>Weiter-Rocker (&gt;20%)</span>
+                                    <span style={{ fontSize: '0.66rem', fontWeight: 750, color: '#9333ea' }}>+5 XP Mut-Bonus</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* 1. DUAL-BALKEN SHOWDOWN RACE BOX (Animated 1.2s Comparison) */}
+                      {showdownState && (
+                        <div style={{
+                          background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                          borderRadius: '20px',
+                          padding: '16px 20px',
+                          color: '#ffffff',
+                          margin: '8px 0',
+                          boxShadow: '0 10px 30px rgba(0,0,0,0.25)',
+                          border: '1.5px solid rgba(255,255,255,0.12)',
+                          animation: 'fadeIn 0.25s ease'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', fontWeight: 900, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                              <span>🏁 LIVE-MATCH SHOWDOWN</span>
+                            </div>
+                            {showdownState.isRunning ? (
+                              <span style={{ fontSize: '0.72rem', color: '#facc15', fontWeight: 800, animation: 'pulse 1s infinite' }}>
+                                ⚡ Showdown läuft...
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '0.74rem', fontWeight: 900, color: '#86efac', background: 'rgba(34,197,94,0.2)', padding: '2px 8px', borderRadius: '99px' }}>
+                                Δ {Math.abs(showdownState.teacherTarget - showdownState.studentTarget)}% Differenz
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Top Bar: Lehrkraft */}
+                          <div style={{ marginBottom: '10px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 800, color: '#cbd5e1', marginBottom: '4px' }}>
+                              <span>👨‍🏫 Lehrkraft:</span>
+                              <span style={{ color: '#4ade80', fontWeight: 900, fontVariantNumeric: 'tabular-nums' }}>
+                                {Math.round(showdownState.currentTeacherVal)}%
+                              </span>
+                            </div>
+                            <div style={{ width: '100%', height: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '99px', overflow: 'hidden' }}>
+                              <div style={{
+                                width: `${showdownState.currentTeacherVal}%`,
+                                height: '100%',
+                                background: 'linear-gradient(90deg, #16a34a, #4ade80)',
+                                borderRadius: '99px',
+                                transition: showdownState.isRunning ? 'none' : 'width 0.2s ease',
+                                boxShadow: '0 0 10px rgba(74, 222, 128, 0.4)'
+                              }} />
+                            </div>
+                          </div>
+
+                          {/* Bottom Bar: Schüler */}
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 800, color: '#cbd5e1', marginBottom: '4px' }}>
+                              <span>👧 {readOnly ? 'Dein Tipp:' : 'Schüler-Tipp:'}</span>
+                              <span style={{ color: '#facc15', fontWeight: 900, fontVariantNumeric: 'tabular-nums' }}>
+                                {Math.round(showdownState.currentStudentVal)}%
+                              </span>
+                            </div>
+                            <div style={{ width: '100%', height: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '99px', overflow: 'hidden' }}>
+                              <div style={{
+                                width: `${showdownState.currentStudentVal}%`,
+                                height: '100%',
+                                background: 'linear-gradient(90deg, #eab308, #fde047)',
+                                borderRadius: '99px',
+                                transition: showdownState.isRunning ? 'none' : 'width 0.2s ease',
+                                boxShadow: '0 0 10px rgba(250, 204, 21, 0.4)'
+                              }} />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* TEACHER MATCH STATUS & ACTION BAR (Apple-Grade Lifecycle-Aware Single-Line) */}
+                      {!readOnly && isMatchModeEnabled && (() => {
+                        const targetMatchNum = Math.min(matchHistory.length + 1, 3);
+                        const isFullyCompleted = matchHistory.length >= 3;
+                        const latestMatch = matchHistory.length > 0 ? matchHistory[matchHistory.length - 1] : null;
+                        const diff = (lastMatchedTeacherPercent !== null && lastMatchedStudentPercent !== null)
+                          ? Math.abs(lastMatchedTeacherPercent - lastMatchedStudentPercent)
+                          : (studentRating !== null ? Math.abs(songProgressPercent - studentRating) : null);
+
+                        const hasFreshStudentRating = Boolean(
+                          studentRating !== null &&
+                          studentRating !== undefined &&
+                          studentRatingUpdatedAt &&
+                          (!lastMatchedAt || new Date(studentRatingUpdatedAt).getTime() > new Date(lastMatchedAt).getTime())
+                        );
+
+                        const canExecuteMatch = !isFullyCompleted && hasFreshStudentRating && !showdownState?.isRunning;
+
+                        return (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            background: '#f8fafc',
+                            padding: '10px 14px',
+                            borderRadius: '14px',
+                            border: canExecuteMatch ? '1.5px solid #bbf7d0' : '1px solid #e2e8f0',
+                            gap: '10px',
+                            flexWrap: 'wrap',
+                            marginTop: '2px'
+                          }}>
+                            {/* Left Side: Student Tip Status, Compact Result Pill & 3-Dot Milestone Tracker */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              {isFullyCompleted ? (
+                                <span style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  background: '#dcfce7',
+                                  color: '#15803d',
+                                  padding: '4px 10px',
+                                  borderRadius: '99px',
+                                  fontWeight: 900,
+                                  fontSize: '0.74rem'
+                                }}>
+                                  <span>🏆 Song komplett gematcht (3/3)</span>
+                                </span>
+                              ) : hasFreshStudentRating ? (
+                                <>
+                                  <span style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    background: '#dcfce7',
+                                    color: '#15803d',
+                                    padding: '4px 10px',
+                                    borderRadius: '99px',
+                                    fontWeight: 900,
+                                    fontSize: '0.74rem'
+                                  }}>
+                                    <Check size={13} strokeWidth={3} />
+                                    <span>Tipp {targetMatchNum} liegt bereit: {studentRating}%</span>
+                                  </span>
+                                </>
+                              ) : matchHistory.length > 0 ? (
+                                <>
+                                  {latestMatch && (
+                                    <span style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      background: latestMatch.tier === 'tier1' ? '#fef3c7' : (latestMatch.tier === 'tier2' ? '#e0f2fe' : '#f3e8ff'),
+                                      color: latestMatch.tier === 'tier1' ? '#92400e' : (latestMatch.tier === 'tier2' ? '#075985' : '#6b21a8'),
+                                      border: `1px solid ${latestMatch.tier === 'tier1' ? '#fde68a' : (latestMatch.tier === 'tier2' ? '#bae6fd' : '#e9d5ff')}`,
+                                      padding: '4px 9px',
+                                      borderRadius: '99px',
+                                      fontWeight: 850,
+                                      fontSize: '0.72rem'
+                                    }}>
+                                      <span>{latestMatch.tier === 'tier1' ? '🎯' : (latestMatch.tier === 'tier2' ? '✨' : '🚀')}</span>
+                                      <span>
+                                        Match #{matchHistory.length} beendet
+                                        {diff !== null && ` (Δ ${diff}%)`} • +{latestMatch.xp_amount} XP
+                                      </span>
+                                    </span>
+                                  )}
+                                  <span style={{ fontWeight: 700, color: '#64748b', fontSize: '0.74rem' }}>
+                                    ⏳ Wartet auf Schüler-Tipp für Match {targetMatchNum}
+                                  </span>
+                                </>
+                              ) : (
+                                <span style={{ fontWeight: 700, color: '#64748b', fontSize: '0.74rem' }}>
+                                  ⏳ Schüler-Tipp steht noch aus (Match 1/3)
+                                </span>
+                              )}
+
+                              {/* Apple-Style 3-Dot Milestone Tracker */}
+                              <div style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                background: '#ffffff',
+                                border: '1px solid #e2e8f0',
+                                padding: '4px 8px',
+                                borderRadius: '99px'
+                              }} title={`Match ${matchHistory.length} von 3 belegt`}>
+                                {[0, 1, 2].map((idx) => (
+                                  <div
+                                    key={idx}
+                                    style={{
+                                      width: '7px',
+                                      height: '7px',
+                                      borderRadius: '50%',
+                                      background: idx < matchHistory.length
+                                        ? '#16a34a'
+                                        : (idx === matchHistory.length && hasFreshStudentRating ? '#38bdf8' : '#cbd5e1')
+                                    }}
+                                  />
+                                ))}
+                                <span style={{ fontSize: '0.66rem', fontWeight: 800, color: '#64748b', marginLeft: '2px' }}>
+                                  {matchHistory.length}/3
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Right Side: Action Button */}
+                            <button
+                              type="button"
+                              onClick={handleCheckMatch}
+                              disabled={!canExecuteMatch}
+                              style={{
+                                border: 'none',
+                                background: canExecuteMatch
+                                  ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)'
+                                  : '#cbd5e1',
+                                color: canExecuteMatch ? '#ffffff' : '#64748b',
+                                padding: '7px 16px',
+                                borderRadius: '99px',
+                                fontSize: '0.76rem',
+                                fontWeight: 900,
+                                cursor: canExecuteMatch ? 'pointer' : 'not-allowed',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                boxShadow: canExecuteMatch ? '0 2px 8px rgba(22, 163, 74, 0.3)' : 'none',
+                                transition: 'all 0.15s ease'
+                              }}
+                              className={canExecuteMatch ? 'hover-scale' : ''}
+                            >
+                              <Sparkles size={13} />
+                              <span>
+                                {isFullyCompleted
+                                  ? '🏆 3/3 Meilensteine belegt'
+                                  : (!hasFreshStudentRating && matchHistory.length > 0)
+                                    ? `⏳ Wartet auf Tipp ${targetMatchNum}`
+                                    : `🎯 Match ${targetMatchNum} prüfen`}
+                              </span>
+                            </button>
+                          </div>
+                        );
+                      })()}
 
                       {/* Sub sliders (Rhythm, Finger, Expression) */}
                       {isSubSlidersExpanded && (
@@ -2331,6 +2822,51 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         }
                         return null;
                       })()}
+
+                      {/* Song Match Milestone Stickers Pass */}
+                      {matchHistory && matchHistory.length > 0 && (
+                        <div style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '10px',
+                          marginTop: '12px',
+                          padding: '14px 16px',
+                          background: '#f8fafc',
+                          borderRadius: '16px',
+                          border: '1px solid #e2e8f0'
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            fontSize: '0.74rem',
+                            fontWeight: 900,
+                            color: '#475569',
+                            letterSpacing: '0.04em',
+                            textTransform: 'uppercase'
+                          }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span>🎯</span> Meilenstein-Pass ({matchHistory.length}/3 Matches)
+                            </span>
+                          </div>
+                          <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '10px'
+                          }}>
+                            {matchHistory.map((entry: any, idx: number) => (
+                              <MeisterOhrSticker
+                                key={`match-sticker-${idx}`}
+                                matchedAt={entry.matched_at}
+                                teacherPercent={entry.teacher_percent}
+                                studentPercent={entry.student_percent}
+                                xpAmount={entry.xp_amount}
+                                isCompact={true}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

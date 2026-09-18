@@ -982,7 +982,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   // Dual-Metacognition Match Model State
   const [studentRating, setStudentRating] = useState<number | null>(null);
-  const [isMatchModeEnabled, setIsMatchModeEnabled] = useState<boolean>(false);
+  const [isMatchModeEnabled, setIsMatchModeEnabled] = useState<boolean>(true);
   const [lastMatchedAt, setLastMatchedAt] = useState<string | null>(null);
   const [lastMatchedTeacherPercent, setLastMatchedTeacherPercent] = useState<number | null>(null);
   const [lastMatchedStudentPercent, setLastMatchedStudentPercent] = useState<number | null>(null);
@@ -7814,8 +7814,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
       setIsCurrentHomework(isHw);
     }
 
-    // Dual Match Model State (Parked on Roadmap)
-    setIsMatchModeEnabled(false);
+    // Dual Match Model State: Re-activated in Track 3
+    const localMatchMode = localStorage.getItem(`song_match_mode_${student.id}_${skill.id}`);
+    const isMatchEnabled = localMatchMode !== null
+      ? localMatchMode === 'true'
+      : Boolean(skill.is_match_mode_enabled ?? dbItem?.is_match_mode_enabled ?? true);
+    setIsMatchModeEnabled(isMatchEnabled);
 
     const localStudentRating = localStorage.getItem(`song_student_rating_${student.id}_${skill.id}`);
     const sRating = localStudentRating !== null && localStudentRating !== undefined ? parseInt(localStudentRating, 10) : (skill.student_rating ?? (dbItem?.student_rating ?? null));
