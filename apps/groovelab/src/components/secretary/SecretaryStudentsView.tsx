@@ -187,7 +187,7 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
     const campusStudentsOnly = students;
 
     const uniqueInstruments = Array.from(new Set(campusStudentsOnly.map(s => s.instrument || 'Nicht festgelegt')));
-    const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
+    const allUniqueTeachers = [...(campusTeachers || []), ...(bypassTeachers || []), ...(coaches || [])].reduce((acc: any[], t: any) => {
       if (!acc.some(existing => existing.id === t.id)) {
         acc.push(t);
       }

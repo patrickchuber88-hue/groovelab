@@ -376,7 +376,7 @@ export const ParentDataVaultSettingsView: React.FC<ParentDataVaultSettingsViewPr
             className="hover-scale"
           >
             <Download size={15} />
-            <span>{downloadingSection === 'chronicle' ? 'Exportiere...' : 'Sticker & Chronik exportieren'}</span>
+            <span>{downloadingSection === 'chronicle' ? 'Exportiere...' : 'Export'}</span>
           </button>
         </div>
 

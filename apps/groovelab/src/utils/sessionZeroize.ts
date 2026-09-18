@@ -36,7 +36,10 @@ export function executeSessionZeroize(options: { preserveDeviceKey?: boolean; re
       'groovelab_cached_user',
       'gl_active_session_lease_id',
       'groovelab_is_master_admin',
-      'groovelab_active_workspace'
+      'groovelab_active_workspace',
+      'campus_session_locked',
+      'campus_locked_at',
+      'campus_last_active_ts'
     ];
     sessionKeysToScrub.forEach((k) => {
       try {

@@ -98,7 +98,23 @@ export const SecurityAuthModalsHub: React.FC<SecurityAuthModalsHubProps> = ({
 
       {/* 3. Universal 45-Minute Inactivity Screen Lock (OWASP ASVS L3) */}
       {isScreenLockedByInactivity && (
-        <Suspense fallback={null}>
+        <Suspense
+          fallback={
+            <div
+              style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 999999,
+                backdropFilter: 'blur(28px)',
+                WebkitBackdropFilter: 'blur(28px)',
+                backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            />
+          }
+        >
           <SessionLockModal
             user={user}
             supabase={supabase}

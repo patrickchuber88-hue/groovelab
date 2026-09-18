@@ -903,8 +903,13 @@ export function SecretaryVerwaltungTab(props: SecretaryVerwaltungTabProps) {
 
   // Compute all unique teachers for announcement recipient selection
   const allUniqueTeachers = useMemo(() => {
-    return [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
-      if (!acc.some(existing => existing.id === t.id)) {
+    const list = [
+      ...(Array.isArray(campusTeachers) ? campusTeachers : []),
+      ...(Array.isArray(bypassTeachers) ? bypassTeachers : []),
+      ...(Array.isArray(coaches) ? coaches : [])
+    ];
+    return list.reduce((acc: any[], t: any) => {
+      if (t?.id && !acc.some(existing => existing.id === t.id)) {
         acc.push(t);
       }
       return acc;

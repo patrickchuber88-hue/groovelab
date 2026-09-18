@@ -231,7 +231,7 @@ export function useSecretaryStudents({
     let successCount = 0;
     let failCount = 0;
 
-    const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
+    const allUniqueTeachers = [...(campusTeachers || []), ...(bypassTeachers || []), ...(coaches || [])].reduce((acc: any[], t: any) => {
       if (!acc.some(existing => existing.id === t.id)) {
         acc.push(t);
       }

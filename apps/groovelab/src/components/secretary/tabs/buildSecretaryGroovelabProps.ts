@@ -18,6 +18,12 @@ export interface BuildSecretaryGroovelabPropsParams {
   liveLab: any;
   dashboardData: any;
 
+  // Teachers (State from SecretaryDashboard)
+  campusTeachers?: any[];
+  allTeachers?: any[];
+  coaches?: any[];
+  bypassTeachers?: any[];
+
   // Permissions & Toggles
   teachersManageStudents: boolean;
   setTeachersManageStudents: React.Dispatch<React.SetStateAction<boolean>>;
@@ -102,10 +108,10 @@ export function buildSecretaryGroovelabProps(
     handleCreateStudentGroovelab: studentsHook.handleCreateStudentGroovelab,
 
     // Coaches (Teachers)
-    coaches: staff.coaches,
-    campusTeachers: staff.campusTeachers,
-    allTeachers: staff.allTeachers,
-    bypassTeachers: staff.bypassTeachers,
+    coaches: params.coaches ?? staff?.coaches ?? [],
+    campusTeachers: params.campusTeachers ?? staff?.campusTeachers ?? [],
+    allTeachers: params.allTeachers ?? staff?.allTeachers ?? [],
+    bypassTeachers: params.bypassTeachers ?? staff?.bypassTeachers ?? [],
     teachersManageTeachers,
     setTeachersManageTeachers,
     coachSearchQuery: staff.coachSearchQuery,

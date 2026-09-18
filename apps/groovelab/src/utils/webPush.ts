@@ -34,6 +34,28 @@ function isDevelopmentHost(): boolean {
   );
 }
 
+/**
+ * Detects if the current app is running in PWA standalone mode (installed on homescreen).
+ * On iOS, Web Push requires the app to be added to the Homescreen (iOS 16.4+).
+ */
+export function isPwaStandaloneMode(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (window.navigator as any).standalone === true ||
+    document.referrer.includes('android-app://')
+  );
+}
+
+/**
+ * Checks if the user is on an iOS device where standalone installation is required for Web Push.
+ */
+export function isIosDevice(): boolean {
+  if (typeof window === 'undefined') return false;
+  const ua = window.navigator.userAgent.toLowerCase();
+  return /iphone|ipad|ipod/.test(ua) || (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1);
+}
+
 export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (isDevelopmentHost()) {
     return null;

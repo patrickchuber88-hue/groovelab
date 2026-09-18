@@ -20,6 +20,12 @@ export interface BuildSecretaryVerwaltungPropsParams {
   // Navigation & Shell
   navigation: any;
 
+  // Teachers (State from SecretaryDashboard)
+  campusTeachers?: any[];
+  bypassTeachers?: any[];
+  coaches?: any[];
+  allTeachers?: any[];
+
   // Hook Bundles
   settings: any;
   extendedSettings: any;
@@ -162,11 +168,11 @@ export function buildSecretaryVerwaltungProps(
     getPlanDisplayName: schedules.getPlanDisplayName,
 
     // Staff & Employees
-    campusTeachers: staff.campusTeachers,
-    bypassTeachers: staff.bypassTeachers,
-    coaches: staff.coaches,
-    allTeachers: staff.allTeachers,
-    employees: staff.employees,
+    campusTeachers: params.campusTeachers ?? staff?.campusTeachers ?? [],
+    bypassTeachers: params.bypassTeachers ?? staff?.bypassTeachers ?? [],
+    coaches: params.coaches ?? staff?.coaches ?? [],
+    allTeachers: params.allTeachers ?? staff?.allTeachers ?? [],
+    employees: staff?.employees ?? [],
     setEmployees: staff.setEmployees,
     revealedPins: staff.revealedPins,
     setRevealedPins: staff.setRevealedPins,

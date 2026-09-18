@@ -157,7 +157,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
             const todayTeachersCount = todayTeacherIds.length;
 
             // 2. Heutige Abwesenheiten
-            const activeAusfallTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].filter(t => {
+            const activeAusfallTeachers = [...(campusTeachers || []), ...(bypassTeachers || []), ...(coaches || [])].filter(t => {
               const untilVal = t.ausfall_until;
               if (!untilVal) return false;
               return String(untilVal).substring(0, 10) >= todayDateStr;

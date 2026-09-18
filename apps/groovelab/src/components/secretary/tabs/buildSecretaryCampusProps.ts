@@ -23,6 +23,12 @@ export interface BuildSecretaryCampusPropsParams {
   schedules: any;
   dashboardData: any;
 
+  // Teachers (State from SecretaryDashboard)
+  campusTeachers?: any[];
+  allTeachers?: any[];
+  coaches?: any[];
+  bypassTeachers?: any[];
+
   // Modals & Navigation triggers
   showGuidanceModal: boolean;
   setShowGuidanceModal: React.Dispatch<React.SetStateAction<boolean>>;
@@ -200,11 +206,11 @@ export function buildSecretaryCampusProps(
     // Onboarding & Teachers
     teachersManageTeachers,
     setTeachersManageTeachers,
-    campusTeachers: staff.campusTeachers,
-    allTeachers: staff.allTeachers,
-    coaches: staff.coaches,
-    bypassTeachers: staff.bypassTeachers,
-    unsubmittedTeachers: staff.unsubmittedTeachers,
+    campusTeachers: params.campusTeachers ?? staff?.campusTeachers ?? [],
+    allTeachers: params.allTeachers ?? staff?.allTeachers ?? [],
+    coaches: params.coaches ?? staff?.coaches ?? [],
+    bypassTeachers: params.bypassTeachers ?? staff?.bypassTeachers ?? [],
+    unsubmittedTeachers: schedules?.unsubmittedTeachers ?? staff?.unsubmittedTeachers ?? {},
     teacherSearchQuery: staff.teacherSearchQuery,
     setTeacherSearchQuery: staff.setTeacherSearchQuery,
     teacherFilterInstrument: staff.teacherFilterInstrument,

@@ -250,7 +250,7 @@ export function useSecretaryAnnouncements({
   }, []);
 
   const getAnnouncementTargetedTeachers = useCallback((announcement: any) => {
-    const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
+    const allUniqueTeachers = [...(campusTeachers || []), ...(bypassTeachers || []), ...(coaches || [])].reduce((acc: any[], t: any) => {
       if (!acc.some(existing => existing.id === t.id)) {
         acc.push(t);
       }

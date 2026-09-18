@@ -758,7 +758,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                   })()}
 
                   {(() => {
-                    const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
+                    const allUniqueTeachers = [...(campusTeachers || []), ...(bypassTeachers || []), ...(coaches || [])].reduce((acc: any[], t: any) => {
                       if (!acc.some(existing => existing.id === t.id)) {
                         acc.push(t);
                       }
@@ -949,7 +949,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
               {/* Subtab: Onboarding */}
               {campusSubTab === 'onboarding' && (() => {
                 // Deduplicate teachers
-                const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
+                const allUniqueTeachers = [...(campusTeachers || []), ...(bypassTeachers || []), ...(coaches || [])].reduce((acc: any[], t: any) => {
                   if (!acc.some(existing => existing.id === t.id)) {
                     acc.push(t);
                   }
@@ -3698,7 +3698,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
 
               {/* Onboarding Sidebar */}
               {campusSubTab === 'onboarding' && (() => {
-                const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
+                const allUniqueTeachers = [...(campusTeachers || []), ...(bypassTeachers || []), ...(coaches || [])].reduce((acc: any[], t: any) => {
                   if (!acc.some(existing => existing.id === t.id)) {
                     acc.push(t);
                   }
@@ -3915,7 +3915,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
 
               {/* Student Board Sidebar */}
               {campusSubTab === 'students' && (() => {
-                const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
+                const allUniqueTeachers = [...(campusTeachers || []), ...(bypassTeachers || []), ...(coaches || [])].reduce((acc: any[], t: any) => {
                   if (!acc.some(existing => existing.id === t.id)) {
                     acc.push(t);
                   }

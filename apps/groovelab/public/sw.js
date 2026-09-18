@@ -1,5 +1,5 @@
-const CACHE_NAME = 'groovelab-static-v1789744954399';
-const DYNAMIC_CACHE = 'groovelab-dynamic-v1789744954399';
+const CACHE_NAME = 'groovelab-static-v1789752840385';
+const DYNAMIC_CACHE = 'groovelab-dynamic-v1789752840385';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -145,6 +145,11 @@ self.addEventListener('push', function(event) {
           supabaseKey: payload.supabaseKey || null
         }
       };
+      // 🛡️ Enterprise Push Goldstandard: Update native app badge count if supported
+      if ('setAppBadge' in self.navigator) {
+        self.navigator.setAppBadge(payload.badgeCount || 1).catch(function() {});
+      }
+
       event.waitUntil(
         self.registration.showNotification(payload.title || 'Campus-Groovelab', options)
       );

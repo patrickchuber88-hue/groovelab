@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { CampusUiLevel } from '../components/campus/CampusLevelSwitcher';
 import { LegalModalsHub } from '../components/modals/LegalModalsHub';
-import { useInactivityTimeout } from './useInactivityTimeout';
+import { useInactivityTimeout, HARD_LOCK_TIMEOUT_MS } from './useInactivityTimeout';
+import { executeSessionZeroize } from '../utils/sessionZeroize';
 import { isDevEnvironment } from '../utils/tenantUrlHelper';
 import { safeReplaceState } from '../utils/historyUtils';
 
@@ -359,8 +360,55 @@ export function useCampusDeviceAndParentControls({
     };
   }, [user?.id, setUser]);
 
-  // 🔒 Dynamic Inactivity Idle Screen Lock (Enterprise Goldstandard):
-  const [isScreenLockedByInactivity, setIsScreenLockedByInactivity] = useState(false);
+  // 🔒 Dynamic Inactivity Idle Screen Lock (Enterprise Goldstandard / Reload-Resistant):
+  const [isScreenLockedByInactivity, setIsScreenLockedByInactivityRaw] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const isLocked = sessionStorage.getItem('campus_session_locked') === 'true' ||
+                       localStorage.getItem('campus_session_locked') === 'true';
+      if (isLocked) {
+        const lockedAtStr = sessionStorage.getItem('campus_locked_at') || localStorage.getItem('campus_locked_at');
+        if (lockedAtStr) {
+          const lockedAt = parseInt(lockedAtStr, 10);
+          if (!isNaN(lockedAt) && Date.now() - lockedAt >= HARD_LOCK_TIMEOUT_MS) {
+            console.warn('[SessionLock] Hard lock timeout exceeded on boot (> 2 hours). Executing session zeroize...');
+            executeSessionZeroize({ preserveDeviceKey: true, redirectUrl: '/' });
+            return false;
+          }
+        }
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  });
+
+  const setIsScreenLockedByInactivity = useCallback<React.Dispatch<React.SetStateAction<boolean>>>((action) => {
+    setIsScreenLockedByInactivityRaw((prev) => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      if (typeof window !== 'undefined') {
+        try {
+          const isPwa = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+          if (next) {
+            sessionStorage.setItem('campus_session_locked', 'true');
+            sessionStorage.setItem('campus_locked_at', String(Date.now()));
+            if (isPwa) {
+              localStorage.setItem('campus_session_locked', 'true');
+              localStorage.setItem('campus_locked_at', String(Date.now()));
+            }
+          } else {
+            sessionStorage.removeItem('campus_session_locked');
+            sessionStorage.removeItem('campus_locked_at');
+            sessionStorage.setItem('campus_last_active_ts', String(Date.now()));
+            if (isPwa) {
+              localStorage.removeItem('campus_session_locked');
+              localStorage.removeItem('campus_locked_at');
+            }
+          }
+        } catch (_) {}
+      }
+      return next;
+    });
+  }, []);
 
   const effectiveInactivityTimeoutMs = useMemo(() => {
     const activeRole = (user?.role || '').toLowerCase();
@@ -375,7 +423,8 @@ export function useCampusDeviceAndParentControls({
 
   useInactivityTimeout({
     timeoutMs: effectiveInactivityTimeoutMs,
-    enabled: Boolean(currentView === 'dashboard' && !isScreenLockedByInactivity),
+    enabled: Boolean(currentView === 'dashboard'),
+    isScreenLocked: isScreenLockedByInactivity,
     onTimeout: () => {
       console.warn(`[Inactivity] Idle timeout reached (${effectiveInactivityTimeoutMs / 60000}m). Activating Privacy Screen Lock...`);
       try {

@@ -1236,7 +1236,7 @@ export const SecretaryGroovelabTab: React.FC<SecretaryGroovelabTabProps> = ({
               const uniqueInstruments = Array.from(new Set(activeGroovelabStudents.map(s => s.instrument || 'Nicht festgelegt')));
 
               // We need teachers list for the dropdown select in row
-              const allUniqueTeachers = [...campusTeachers, ...bypassTeachers, ...coaches].reduce((acc: any[], t: any) => {
+              const allUniqueTeachers = [...(campusTeachers || []), ...(bypassTeachers || []), ...(coaches || [])].reduce((acc: any[], t: any) => {
                 if (!acc.some(existing => existing.id === t.id)) {
                   acc.push(t);
                 }

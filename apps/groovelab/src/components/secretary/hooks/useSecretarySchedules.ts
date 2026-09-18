@@ -217,7 +217,7 @@ export function useSecretarySchedules({
       return unsuitable.some((inst: string) => inst.toLowerCase() === instrumentName.toLowerCase());
     };
 
-    const allTeachersList = [...campusTeachers, ...bypassTeachers, ...coaches];
+    const allTeachersList = [...(campusTeachers || []), ...(bypassTeachers || []), ...(coaches || [])];
     const teacherProfileMap = new Map<string, any>();
     allTeachersList.forEach(t => teacherProfileMap.set(t.id, t));
 
