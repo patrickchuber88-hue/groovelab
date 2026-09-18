@@ -1,6 +1,7 @@
 import { getParentOnboardingUrl, getTeacherLoginUrl, getCanonicalQrLandingUrl } from './tenantUrlHelper';
 import { capitalizeFirstLetter, formatSongTitleCase } from './nameHelper';
 import { generateLocalQrDataUrl } from './localQrGenerator';
+import { generateEpcGiroCodePayload, formatIbanWithSpaces } from './epcGiroCode';
 import { ACTIVE_LEGAL_VERSION } from '../legal/legalContent';
 
 export const generateConsentPDF = async (
@@ -2502,6 +2503,22 @@ export interface B2BInvoiceParams {
   serviceCreditPercent?: number;
 }
 
+/**
+ * Berechnet das kalendermäßige Zahlungsziel unter Beachtung von § 193 BGB.
+ * Fällt der 14. Tag auf einen Samstag oder Sonntag, verschiebt sich die Fälligkeit
+ * automatisch auf den nächsten Bankarbeitstag (Montag).
+ */
+export function calculateDueDateWithBgb193(startDate: Date, days: number = 14): Date {
+  const date = new Date(startDate.getTime() + days * 24 * 60 * 60 * 1000);
+  const dayOfWeek = date.getDay(); // 0 = Sonntag, 6 = Samstag
+  if (dayOfWeek === 6) {
+    date.setDate(date.getDate() + 2); // Samstag -> Montag
+  } else if (dayOfWeek === 0) {
+    date.setDate(date.getDate() + 1); // Sonntag -> Montag
+  }
+  return date;
+}
+
 export const generateB2BSchoolInvoicePDF = async (params: B2BInvoiceParams) => {
   const { default: jsPDF } = await import('jspdf');
   const doc = new jsPDF({
@@ -2536,27 +2553,22 @@ export const generateB2BSchoolInvoicePDF = async (params: B2BInvoiceParams) => {
 
   // 1. Header Bar
   doc.setFillColor(brandEmerald[0], brandEmerald[1], brandEmerald[2]);
-  doc.rect(0, 0, 210, 8, 'F');
+  doc.rect(0, 0, 210, 6, 'F');
 
-  // 2. Issuer Information (Top Right)
+  // 2. Company / Platform Brand
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
   doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
-  doc.text('Campus-Groovelab', 20, 25);
+  doc.text('Campus-Groovelab', 20, 24);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
-  doc.text('Cloud-Infrastruktur & Musikschul-Hosting', 20, 30);
-  doc.text('Server-Standort: Falkenstein / Nürnberg (Hetzner Cloud Germany)', 20, 34);
+  doc.text('Cloud-Hosting & Bereitstellungssysteme für Musikschulen', 20, 29);
+  doc.text('Server-Standort: Deutschland (Hetzner ISO 27001 / BSI TR-03116)', 20, 33);
+  doc.text('Betrieb: Campus-Groovelab Plattformbetrieb • campus-groovelab.de', 20, 37);
 
-  // Invoice Details Box (Right)
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
-  doc.text(`RECHNUNG`, 140, 25);
-
-  doc.setFont('helvetica', 'normal');
+  // Invoice Details (Right Aligned Column)
   doc.setFontSize(8.5);
   doc.setTextColor(slateDark[0], slateDark[1], slateDark[2]);
   doc.text(`Rechnungs-Nr.:`, 140, 31);
@@ -2571,7 +2583,7 @@ export const generateB2BSchoolInvoicePDF = async (params: B2BInvoiceParams) => {
   doc.text(servicePeriod, 170, 41);
 
   doc.text(`Zahlungsziel:`, 140, 46);
-  const dueDate = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+  const dueDate = calculateDueDateWithBgb193(now, 14);
   doc.text(dueDate.toLocaleDateString('de-DE'), 170, 46);
 
   // 3. Recipient Address
@@ -2821,9 +2833,32 @@ export const generateB2BSchoolInvoicePDF = async (params: B2BInvoiceParams) => {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
-  doc.text(`Bitte überweisen Sie den Rechnungsbetrag von ${grandTotal.toFixed(2).replace('.', ',')} € bis zum ${dueDate.toLocaleDateString('de-DE')}.`, 20, currentY + 5);
-  doc.text(`Verwendungszweck: ${invoiceNumber} (${params.school.name})`, 20, currentY + 9);
-  doc.text('Hinweis: Die Software-Bereitstellung erfolgt lizenzkaufgebührenfrei. Abgerechnet werden Cloud-Hosting und Server-Ressourcen.', 20, currentY + 14);
+  doc.text(`Bitte überweisen Sie den Rechnungsbetrag von ${grandTotal.toFixed(2).replace('.', ',')} € bis zum ${dueDate.toLocaleDateString('de-DE')} (§ 193 BGB Werktagsfrist).`, 20, currentY + 5);
+  doc.text('Zahlungsempfänger: Campus-Groovelab Plattformbetrieb', 20, currentY + 9);
+  doc.text(`IBAN: ${formatIbanWithSpaces('DE89370400440532948211')}   •   BIC: GENODEFFXXX`, 20, currentY + 13);
+  doc.text(`Verwendungszweck: ${invoiceNumber} (${params.school.name})`, 20, currentY + 17);
+  doc.text('Hinweis: Die Software-Bereitstellung erfolgt lizenzkaufgebührenfrei. Abgerechnet werden Cloud-Hosting und Server-Ressourcen.', 20, currentY + 22);
+
+  // EPC-GiroCode QR Rendering for instant mobile banking scan
+  try {
+    const epcPayload = generateEpcGiroCodePayload({
+      iban: 'DE89370400440532948211',
+      bic: 'GENODEFFXXX',
+      recipientName: 'Campus-Groovelab Plattformbetrieb',
+      amount: grandTotal,
+      referenceCode: invoiceNumber
+    });
+    const qrDataUrl = await generateLocalQrDataUrl(epcPayload, 200);
+    if (qrDataUrl) {
+      doc.addImage(qrDataUrl, 'PNG', 160, currentY - 2, 28, 28);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6);
+      doc.setTextColor(slateMuted[0], slateMuted[1], slateMuted[2]);
+      doc.text('EPC-GiroCode (Banking-App)', 155, currentY + 28);
+    }
+  } catch (epcErr) {
+    console.warn('[pdfGenerator] EPC GiroCode generation failed:', epcErr);
+  }
 
   // 8. Footer
   doc.setDrawColor(borderLight[0], borderLight[1], borderLight[2]);

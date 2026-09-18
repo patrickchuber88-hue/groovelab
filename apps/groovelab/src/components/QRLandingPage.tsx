@@ -1526,8 +1526,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           return;
         }
 
-        // Falls eine PIN existiert, aber dieses Gerät noch nicht im Cache freigeschaltet ist -> Zwingend 4-stellige PIN verlangen!
-        if (userData.role === 'student' && hasPinCreated && !wasUnlocked) {
+        // Falls eine PIN existiert, aber dieses Gerät noch nicht im Cache freigeschaltet ist (oder PIN immer erzwungen wird) -> Zwingend 4-stellige PIN verlangen!
+        const mustEnforcePinOnStart = Boolean(userData.pin_enforced_for_preview === true);
+        if (userData.role === 'student' && hasPinCreated && (!wasUnlocked || mustEnforcePinOnStart)) {
           sessionStorage.setItem('groovelab_qr_token', token);
           setPinPurpose('unlock_preview');
           setPageState('pin_required');
@@ -11182,6 +11183,29 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                         />
                         <Music size={14} style={{ color: '#34a853', flexShrink: 0 }} />
                         <span>Repertoire- &amp; Songvorschläge senden</span>
+                      </label>
+
+                      {/* Toggle 6: Always Require PIN (Device Trust Bypass) */}
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.78rem', color: '#15803d', fontWeight: 700, cursor: 'pointer', borderTop: '1px dashed #bbf7d0', paddingTop: '10px', marginTop: '4px' }}>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(profile.pin_enforced_for_preview)}
+                          onChange={async (e) => {
+                            const checked = e.target.checked;
+                            const { error } = await supabase.from('users').update({ pin_enforced_for_preview: checked }).eq('id', profile.id);
+                            if (!error) {
+                              setProfile(prev => prev ? { ...prev, pin_enforced_for_preview: checked } : null);
+                              if (checked) {
+                                // Sofortige Cache-Bereinigung für diesen Schüler
+                                sessionStorage.removeItem(`groovelab_parent_unlocked_${token}`);
+                                sessionStorage.removeItem(`groovelab_parent_unlocked_${profile.id}`);
+                              }
+                            }
+                          }}
+                          style={{ accentColor: '#16a34a' }}
+                        />
+                        <ShieldCheck size={14} style={{ color: '#16a34a', flexShrink: 0 }} />
+                        <span>Auf diesem Gerät bei jedem Start nach PIN fragen (Sperre für geteilte Tablets)</span>
                       </label>
                     </div>
                   </div>

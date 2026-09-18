@@ -107,3 +107,32 @@ Für alle Gebührenaufstellungen, Vorschau-Modals, PDF-Rechnungen und Onboarding
 
 - Alle Rechnungsgenerierungen, Zahlungsstatus-Änderungen und Tarifwechsel müssen unveränderlich in `public.audit_logs` mit Zeitstempel und Schul-ID protokolliert werden.
 - Bei Schüler-Direktabrechnung werden Zahlungsdaten niemals auf eigenen Servern gespeichert, sondern ausschließlich über zertifizierte PCI-DSS Level 1 Zahlungsdienstleister abgewickelt.
+
+---
+
+## 8. GoBD-Rechnungslegung, WORM-Unveränderbarkeit & Stornoregeln (§§ 146/147 AO, § 14 UStG)
+
+1. **Lückenlose Rechnungsnummern-Sequenz:**
+   - Jede Rechnung erhält eine thread-sicher vergebene Rechnungsnummer im Format `{PREFIX}-{YEAR}-{SCHOOL_CODE}-{0001}` (z. B. `RE-2026-MUSA-0001`).
+   - Sequenzen werden atomar über `invoice_sequences` vergeben; Nummernkreise weisen nach § 14 Abs. 4 Nr. 4 UStG weder Lücken noch Duplikate auf.
+2. **GoBD-WORM-Unveränderbarkeit (Freeze):**
+   - Rechnungen im Status `issued`, `paid` oder `cancelled` sind per Datenbanktrigger `trg_protect_gobd_invoices` physisch gegen jegliche `UPDATE`-Mutationen an Beträgen, Daten oder Positionen geschützt.
+   - Ein physisches `DELETE` von Rechnungsdatensätzen ist nach § 147 AO absolut unzulässig.
+3. **Korrekturen ausschließlich via Stornorechnung / Gutschrift:**
+   - Fehlerhafte Rechnungen werden nicht gelöscht, sondern über `issue_cancellation_invoice()` storniert.
+   - Die Funktion erzeugt eine gegenbuchungsfähige Gutschrift (Typ `STORNO`) mit negativem Cent-Betrag (`-amount_cents`), eigener Rechnungsnummer und Verknüpfung zur Originalrechnung (`canceled_invoice_id`).
+4. **Cent-Arithmetik (Integer):**
+   - Beträge werden in der Datenbank und in Zod-Schnittstellen ausnahmslos als ganzzahlige Cent-Beträge (`amount_cents BIGINT`) gespeichert, um Rundungsverluste aus Floating-Point-Zahlen physikalisch auszuschließen.
+5. **Umsatzsteuerbefreiung:**
+   - Rechnungen weisen standardmäßig den Vermerk *„Steuerbefreit gem. § 4 Nr. 21 UStG (Musikschulunterricht)“* aus.
+6. **Kalendermäßiges Zahlungsziel & Werktags-Klausel (§§ 286, 193 BGB):**
+   - Das formelle Zahlungsziel auf Rechnungen ist auf **14 Tage** festgesetzt (Begründung der rechtlichen Fälligkeit).
+   - Fällt der 14. Tag auf ein Wochenende (Samstag/Sonntag) oder einen gesetzlichen Feiertag, verschiebt sich die Fälligkeit gemäß § 193 BGB automatisch auf den nächsten Werktag (Montag).
+7. **EPC-GiroCode (Europäischer QR-Standard):**
+   - Jede Rechnung enthält den offiziellen EPC-QR-Code (European Payments Council) zur beleglosen 1-Scan-Zahlung in Banking-Apps.
+   - Bankverbindung des Plattformbetriebs: *Campus-Groovelab Plattformbetrieb*, IBAN `DE89 3704 0044 0532 9482 11`, BIC `GENODEFFXXX`.
+8. **Didaktische Immunität & Schonfristen (§ 242 BGB):**
+   - Musikschulen erhalten eine reale **Basis-Schonfrist von 28 Tagen (4 Wochen)** und in den Monaten Juli/August ein **Sommer-Moratorium von 42 Tagen (6 Wochen)**.
+   - Schüler und Lehrkräfte werden bei Zahlungsverzug niemals gesperrt (didaktische Immunität).
+   - Erst ab Tag 44 greift ein administrativer Schreibschutz im Sekretariat, der per 48h-Vertrauenspass oder Master-Kulanzjoker jederzeit entsperrt werden kann.
+

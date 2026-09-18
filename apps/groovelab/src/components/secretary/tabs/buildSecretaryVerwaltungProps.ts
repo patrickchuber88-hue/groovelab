@@ -1,5 +1,11 @@
 import React from 'react';
 import type { SecretaryVerwaltungTabProps } from './SecretaryVerwaltungTab';
+import {
+  parseRoomName,
+  getFloorColor,
+  getAlphabeticalColor,
+  getAlphabeticalUniColor
+} from '../utils/secretaryFormatters';
 
 export interface BuildSecretaryVerwaltungPropsParams {
   // Identity & Core Infrastructure
@@ -25,6 +31,19 @@ export interface BuildSecretaryVerwaltungPropsParams {
   bypassTeachers?: any[];
   coaches?: any[];
   allTeachers?: any[];
+
+  // Rooms & State from SecretaryDashboard
+  rooms?: any[];
+  setRooms?: React.Dispatch<React.SetStateAction<any[]>>;
+  roomSearchQuery?: string;
+  setRoomSearchQuery?: React.Dispatch<React.SetStateAction<string>> | ((query: string) => void);
+  userMap?: Record<string, string>;
+  isAvvSigned?: boolean;
+  setShowAvvModal?: React.Dispatch<React.SetStateAction<boolean>> | ((val: boolean) => void);
+  simulatedToday?: string;
+  setSimulatedToday?: React.Dispatch<React.SetStateAction<string>> | ((val: string) => void);
+  dismissedInvoiceAlert?: boolean;
+  setDismissedInvoiceAlert?: React.Dispatch<React.SetStateAction<boolean>> | ((val: boolean) => void);
 
   // Hook Bundles
   settings: any;
@@ -138,34 +157,34 @@ export function buildSecretaryVerwaltungProps(
     fetchDashboardData: dashboardData.fetchDashboardData,
 
     // Rooms & Allocation
-    rooms: dashboardData.rooms,
-    setRooms: dashboardData.setRooms,
-    buildings: dashboardData.buildings,
-    setBuildings: dashboardData.setBuildings,
-    matrixAllocations: schedules.matrixAllocations,
-    roomSearchQuery: dashboardData.roomSearchQuery,
-    setRoomSearchQuery: dashboardData.setRoomSearchQuery,
-    selectedDayPlan: schedules.selectedDayPlan,
-    setSelectedDayPlan: schedules.setSelectedDayPlan,
+    rooms: params.rooms ?? dashboardData?.rooms ?? [],
+    setRooms: params.setRooms ?? dashboardData?.setRooms ?? (() => {}),
+    buildings: dashboardData?.buildings ?? [],
+    setBuildings: dashboardData?.setBuildings ?? (() => {}),
+    matrixAllocations: schedules?.matrixAllocations ?? [],
+    roomSearchQuery: params.roomSearchQuery ?? dashboardData?.roomSearchQuery ?? '',
+    setRoomSearchQuery: params.setRoomSearchQuery ?? dashboardData?.setRoomSearchQuery ?? (() => {}),
+    selectedDayPlan: schedules?.selectedDayPlan,
+    setSelectedDayPlan: schedules?.setSelectedDayPlan,
     roomsSubView,
     setRoomsSubView,
     schedulesRoomsViewMode,
     setSchedulesRoomsViewMode,
-    roomIssues: dashboardData.roomIssues,
-    setRoomIssues: dashboardData.setRoomIssues,
+    roomIssues: bookings?.roomIssues ?? dashboardData?.roomIssues ?? [],
+    setRoomIssues: bookings?.setRoomIssues ?? dashboardData?.setRoomIssues ?? (() => {}),
     onOpenFacilityLogModal,
-    pendingBookings: bookings.pendingBookings,
-    setPendingBookings: bookings.setPendingBookings,
-    pendingSchedules: schedules.pendingSchedules,
+    pendingBookings: bookings?.pendingBookings ?? [],
+    setPendingBookings: bookings?.setPendingBookings ?? (() => {}),
+    pendingSchedules: schedules?.pendingSchedules ?? [],
     handleConfirmBooking: bookings.handleConfirmBooking,
     handleRejectBooking: bookings.handleRejectBooking,
-    parseRoomName: dashboardData.parseRoomName,
-    getFloorColor: dashboardData.getFloorColor,
-    getAlphabeticalColor: dashboardData.getAlphabeticalColor,
+    parseRoomName,
+    getFloorColor,
+    getAlphabeticalColor,
     formatInstrumentName,
-    getAlphabeticalUniColor: dashboardData.getAlphabeticalUniColor,
+    getAlphabeticalUniColor,
     checkTimeOverlap,
-    getPlanDisplayName: schedules.getPlanDisplayName,
+    getPlanDisplayName: schedules?.getPlanDisplayName,
 
     // Staff & Employees
     campusTeachers: params.campusTeachers ?? staff?.campusTeachers ?? [],
@@ -209,23 +228,23 @@ export function buildSecretaryVerwaltungProps(
     // Briefing
     expandedSidebarTeacherId: staff.expandedSidebarTeacherId,
     setExpandedSidebarTeacherId: staff.setExpandedSidebarTeacherId,
-    selectedFilterTeacherId: schedules.selectedFilterTeacherId,
-    setSelectedFilterTeacherId: schedules.setSelectedFilterTeacherId,
-    students: studentsHook.students,
-    userMap: dashboardData.userMap,
-    roomMap: dashboardData.roomMap,
-    isAvvSigned: dashboardData.isAvvSigned,
-    setShowAvvModal: dashboardData.setShowAvvModal,
-    showLogbookModal: bookings.showLogbookModal,
-    setShowLogbookModal: bookings.setShowLogbookModal,
-    showStorageManagerModal: dashboardData.showStorageManagerModal,
-    setShowStorageManagerModal: dashboardData.setShowStorageManagerModal,
-    dismissedInvoiceAlert: dashboardData.dismissedInvoiceAlert,
-    setDismissedInvoiceAlert: dashboardData.setDismissedInvoiceAlert,
-    selectedInvoice: dashboardData.selectedInvoice,
-    setSelectedInvoice: dashboardData.setSelectedInvoice,
-    contractStartDate: dashboardData.contractStartDate,
-    simulatedToday: dashboardData.simulatedToday,
+    selectedFilterTeacherId: schedules?.selectedFilterTeacherId,
+    setSelectedFilterTeacherId: schedules?.setSelectedFilterTeacherId,
+    students: studentsHook?.students ?? [],
+    userMap: params.userMap ?? dashboardData?.userMap ?? {},
+    roomMap: dashboardData?.roomMap ?? {},
+    isAvvSigned: params.isAvvSigned ?? settings?.isAvvSigned ?? dashboardData?.isAvvSigned ?? true,
+    setShowAvvModal: params.setShowAvvModal ?? settings?.setShowAvvModal ?? dashboardData?.setShowAvvModal ?? (() => {}),
+    showLogbookModal: bookings?.showLogbookModal ?? false,
+    setShowLogbookModal: bookings?.setShowLogbookModal ?? (() => {}),
+    showStorageManagerModal: licenses?.showStorageManagerModal ?? dashboardData?.showStorageManagerModal ?? false,
+    setShowStorageManagerModal: licenses?.setShowStorageManagerModal ?? dashboardData?.setShowStorageManagerModal ?? (() => {}),
+    dismissedInvoiceAlert: params.dismissedInvoiceAlert ?? dashboardData?.dismissedInvoiceAlert ?? false,
+    setDismissedInvoiceAlert: params.setDismissedInvoiceAlert ?? dashboardData?.setDismissedInvoiceAlert ?? (() => {}),
+    selectedInvoice: licenses?.selectedInvoice ?? dashboardData?.selectedInvoice ?? null,
+    setSelectedInvoice: licenses?.setSelectedInvoice ?? dashboardData?.setSelectedInvoice ?? (() => {}),
+    contractStartDate: licenses?.contractStartDate ?? dashboardData?.contractStartDate ?? null,
+    simulatedToday: params.simulatedToday ?? dashboardData?.simulatedToday ?? '',
     studentLevyMonthly_global: licenses.studentLevyMonthly_global,
     extraLevyMonthly_global: licenses.extraLevyMonthly_global,
     studentSharePreview_global: licenses.studentSharePreview_global,
@@ -358,8 +377,8 @@ export function buildSecretaryVerwaltungProps(
     schoolStatus: licenses.schoolStatus,
     setSchoolStatus: licenses.setSchoolStatus,
     subscriptionBypass: licenses.subscriptionBypass,
-    setContractStartDate: dashboardData.setContractStartDate,
-    setSimulatedToday: dashboardData.setSimulatedToday,
+    setContractStartDate: licenses?.setContractStartDate ?? dashboardData?.setContractStartDate ?? (() => {}),
+    setSimulatedToday: params.setSimulatedToday ?? dashboardData?.setSimulatedToday ?? (() => {}),
     expandedYears: extendedSettings.expandedYears,
     setExpandedYears: extendedSettings.setExpandedYears,
     isCancelled: licenses.isCancelled,

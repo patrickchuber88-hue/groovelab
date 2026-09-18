@@ -1658,6 +1658,12 @@ export function useSecretaryDashboardData(options: UseSecretaryDashboardDataOpti
   }, [schoolId, fetchDashboardData]);
 
   return {
+    rooms,
+    setRooms,
+    subjects,
+    setSubjects,
+    userMap,
+    setUserMap,
     loading,
     setLoading,
     schoolInvoices,
