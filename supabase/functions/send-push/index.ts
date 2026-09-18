@@ -59,7 +59,31 @@ serve(async (req) => {
       });
     }
 
-    const { userId, title, body, url, notificationId } = await req.json();
+    const rawPayload = await req.json().catch(() => null);
+    if (!rawPayload || typeof rawPayload !== "object") {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Enterprise Strict Inbound Validation Guard
+    const userId = typeof rawPayload.userId === "string" ? rawPayload.userId.trim() : "";
+    const title = typeof rawPayload.title === "string" ? rawPayload.title.trim() : "";
+    const body = typeof rawPayload.body === "string" ? rawPayload.body.trim() : "";
+    const url = typeof rawPayload.url === "string" ? rawPayload.url.trim() : undefined;
+    const notificationId = typeof rawPayload.notificationId === "string" ? rawPayload.notificationId.trim() : undefined;
+
+    // Reject unknown/prototype-polluting properties
+    const allowedKeys = new Set(["userId", "title", "body", "url", "notificationId"]);
+    for (const key of Object.keys(rawPayload)) {
+      if (!allowedKeys.has(key)) {
+        return new Response(JSON.stringify({ error: `Rejected unexpected parameter: ${key}` }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
 
     if (!userId || !title || !body) {
       return new Response(JSON.stringify({ error: "Missing required fields (userId, title, body)" }), {

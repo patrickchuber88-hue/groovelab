@@ -1,3 +1,99 @@
+export interface ServerMetric {
+  id: string;
+  created_at: string;
+  cpu_load: number;
+  mem_used_mb: number;
+  mem_total_mb: number;
+  swap_used_mb?: number;
+  active_connections: number;
+  disk_used_gb?: number;
+  disk_total_gb?: number;
+  volume_used_gb?: number;
+  volume_total_gb?: number;
+}
+
+export interface LoadTier {
+  id: string;
+  name: string;
+  schools: number;
+  users: number;
+  peakUsers: number;
+  targetRps: number;
+  totalRequests: number;
+  badge: string;
+  hardwareFit: string;
+  recommendedHardware: string;
+  description: string;
+}
+
+export const LOAD_TIERS: LoadTier[] = [
+  {
+    id: 'tier_1',
+    name: '3 Schulen',
+    schools: 3,
+    users: 1500,
+    peakUsers: 75,
+    targetRps: 15,
+    totalRequests: 450,
+    badge: '1.500 Nutzer',
+    hardwareFit: '🟢 Hetzner CX23 (Ideal)',
+    recommendedHardware: 'Hetzner Cloud CX23 (2 vCPU, 4 GB RAM) arbeitet im optimalen Ruhezustand (CPU-Last ca. 12%).',
+    description: 'Regionale Musikschul-Kooperation mit 3 Standorten.'
+  },
+  {
+    id: 'tier_2',
+    name: '10 Schulen',
+    schools: 10,
+    users: 5000,
+    peakUsers: 250,
+    targetRps: 50,
+    totalRequests: 1500,
+    badge: '5.000 Nutzer',
+    hardwareFit: '🟢 Hetzner CX23 (Optimal)',
+    recommendedHardware: 'Hetzner Cloud CX23 (2 vCPU, 4 GB RAM) meistert 5.000 User mühelos (CPU-Last ca. 28%).',
+    description: 'Kreisverband / städtischer Verbund mit 10 aktiven Musikschulen.'
+  },
+  {
+    id: 'tier_3',
+    name: '50 Schulen',
+    schools: 50,
+    users: 25000,
+    peakUsers: 1250,
+    targetRps: 250,
+    totalRequests: 7500,
+    badge: '25.000 Nutzer',
+    hardwareFit: '🟡 Hetzner CX23 (Gute Auslastung)',
+    recommendedHardware: 'Hetzner Cloud CX23 läuft bei ca. 65% Auslastung. Spitzenzeiten werden stabil verarbeitet.',
+    description: 'Großstadt-Netzwerk / Landesverband mit 25.000 Schülern.'
+  },
+  {
+    id: 'tier_4',
+    name: '100 Schulen',
+    schools: 100,
+    users: 50000,
+    peakUsers: 2500,
+    targetRps: 500,
+    totalRequests: 15000,
+    badge: '50.000 Nutzer',
+    hardwareFit: '🟠 Upgrade auf CX32 empfohlen',
+    recommendedHardware: 'Hetzner Cloud CX32 (4 vCPU, 8 GB RAM) wird für 100 Schulen und 50.000 Schüler für P95 < 25ms empfohlen.',
+    description: 'Bundeslandweites Musikschul-Portal mit 50.000 Schülern.'
+  },
+  {
+    id: 'tier_5',
+    name: '500 Schulen',
+    schools: 500,
+    users: 250000,
+    peakUsers: 12500,
+    targetRps: 2500,
+    totalRequests: 75000,
+    badge: '250.000 Nutzer',
+    hardwareFit: '🟣 Dedicated Cluster (Hetzner AX)',
+    recommendedHardware: 'Dedicated Server Cluster (Hetzner AX-Linie mit Load-Balancer) für 250.000 Schüler empfohlen.',
+    description: 'Bundesweites Verbands-Ökosystem mit 250.000 Schülern.'
+  }
+];
+
 export interface School {
   id: string;
   name: string;
