@@ -34,3 +34,4 @@ Jedes Dokument folgt dem bewährten MADR-Format (Markdown Architectural Decision
 - [ADR-005: Barrierefreiheit nach BFSG 2025 ohne Reduktion von Marken-Akzentfarben](./ADR-005_BFSG_2025_WCAG_AA_BRAND_PRESERVATION.md)
 - [ADR-006: Monolith-Entflechtung & Bounded-Context-Orchestrierung](./ADR-006_MONOLITH_DECOMPOSITION_BOUNDED_CONTEXTS.md)
 - [ADR-007: Zero-Secret-Leakage, Dynamic SQL Masking & Zero-PII Telemetry](./ADR-007_ZERO_SECRET_LEAKAGE_AND_DYNAMIC_SQL_MASKING.md)
+- [ADR-008: Zero-Trust Multi-Tenancy & PgBouncer Session Isolation](./ADR-008_ZERO_TRUST_SESSION_AND_MULTI_TENANCY.md)

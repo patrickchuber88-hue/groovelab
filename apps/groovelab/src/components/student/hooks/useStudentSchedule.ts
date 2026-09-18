@@ -1,0 +1,301 @@
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { supabase, checkSupabaseConnection } from '../../../lib/supabase';
+import { formatTeacherFullName } from '../../../utils/nameHelper';
+
+interface UseStudentScheduleProps {
+  studentId: string;
+  studentUser: any;
+  studentUiLevel: string;
+  inMemoryParentPinRef: React.MutableRefObject<string>;
+  onRefreshData?: () => Promise<void>;
+}
+
+export function useStudentSchedule({
+  studentId,
+  studentUser,
+  studentUiLevel,
+  inMemoryParentPinRef,
+  onRefreshData
+}: UseStudentScheduleProps) {
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [scheduleOccurrences, setScheduleOccurrences] = useState<any[]>([]);
+  const [schoolYearOccurrences, setSchoolYearOccurrences] = useState<any[]>([]);
+  const [briefingData, setBriefingData] = useState<any>(null);
+  const [isOfflineScheduleActive, setIsOfflineScheduleActive] = useState(false);
+  const [carrierGhostingDetected, setCarrierGhostingDetected] = useState(false);
+
+  // Global Master PIN Gate for appointment modifications & absence
+  const [showGlobalParentPinModal, setShowGlobalParentPinModal] = useState(false);
+  const [globalPinInput, setGlobalPinInput] = useState('');
+  const [globalPinError, setGlobalPinError] = useState('');
+  const [globalPinPendingAction, setGlobalPinPendingAction] = useState<(() => void) | null>(null);
+  const [isVerifyingGlobalPin, setIsVerifyingGlobalPin] = useState(false);
+
+  // Reschedule Bottom Sheet
+  const [isRescheduleSheetOpen, setIsRescheduleSheetOpen] = useState(false);
+  const [activeRescheduleBottomSheetOcc, setActiveRescheduleBottomSheetOcc] = useState<any | null>(null);
+  const [isRescheduleLoading, setIsRescheduleLoading] = useState(false);
+
+  // Quick Appointment Chat (Shoutbox)
+  const [showAppointmentChat, setShowAppointmentChat] = useState(false);
+  const [appointmentChatData, setAppointmentChatData] = useState<any | null>(null);
+  const [rescheduleChatDraft, setRescheduleChatDraft] = useState('');
+
+  // Crisis Notifications
+  const [unreadCrisisNotifs, setUnreadCrisisNotifs] = useState<any[]>([]);
+
+  const isStudentAbsenceAllowed = Boolean(studentUser?.parent_allow_absences ?? (studentUiLevel === 'pro'));
+  const isStudentRescheduleAllowed = Boolean(studentUser?.parent_allow_reschedule_confirm ?? (studentUiLevel === 'pro'));
+
+  const fetchSchedule = useCallback(async () => {
+    if (!studentId) return;
+    setScheduleLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('schedule_occurrences')
+        .select('*, teacher:users!schedule_occurrences_teacher_id_fkey(*)')
+        .eq('student_id', studentId)
+        .order('date', { ascending: true });
+
+      if (!error && data) {
+        setScheduleOccurrences(data);
+        setIsOfflineScheduleActive(false);
+        try {
+          localStorage.setItem(`campus_schedule_cache_${studentId}`, JSON.stringify(data));
+        } catch (e) {}
+      } else {
+        // Fallback to cache
+        const cached = localStorage.getItem(`campus_schedule_cache_${studentId}`);
+        if (cached) {
+          setScheduleOccurrences(JSON.parse(cached));
+          setIsOfflineScheduleActive(true);
+        }
+      }
+    } catch (err) {
+      console.warn('Schedule fetch exception:', err);
+      const cached = localStorage.getItem(`campus_schedule_cache_${studentId}`);
+      if (cached) {
+        setScheduleOccurrences(JSON.parse(cached));
+        setIsOfflineScheduleActive(true);
+      }
+    } finally {
+      setScheduleLoading(false);
+    }
+  }, [studentId]);
+
+  useEffect(() => {
+    fetchSchedule();
+  }, [fetchSchedule]);
+
+  const cancelledSchoolYearOccurrences = useMemo(() => {
+    return scheduleOccurrences.filter(o => o.status === 'cancelled' || o.status === 'canceled_by_student');
+  }, [scheduleOccurrences]);
+
+  // Actions
+  const handleConfirmReschedule = async (occId: string) => {
+    try {
+      await supabase
+        .from('schedule_occurrences')
+        .update({
+          status: 'rescheduled',
+          student_acknowledged: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', occId);
+
+      setScheduleOccurrences(prev => prev.map(o => o.id === occId ? { ...o, status: 'rescheduled', student_acknowledged: true } : o));
+    } catch (e) {
+      console.error('Error confirming reschedule:', e);
+    }
+  };
+
+  const handleCancelOccurrence = async (occ: any, skipPinCheck = false) => {
+    if (!skipPinCheck && !isStudentAbsenceAllowed) {
+      setGlobalPinPendingAction(() => () => handleCancelOccurrence(occ, true));
+      setGlobalPinInput('');
+      setGlobalPinError('');
+      setShowGlobalParentPinModal(true);
+      return;
+    }
+
+    try {
+      const targetId = occ.id;
+      await supabase
+        .from('schedule_occurrences')
+        .update({
+          status: 'canceled_by_student',
+          canceled_by_role: 'student',
+          student_acknowledged: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', targetId);
+
+      setScheduleOccurrences(prev => prev.map(o => o.id === targetId ? { ...o, status: 'canceled_by_student' } : o));
+    } catch (e) {
+      console.error('Error cancelling occurrence:', e);
+    }
+  };
+
+  const handleUndoCancelOccurrence = async (occ: any, skipPinCheck = false) => {
+    if (!skipPinCheck && !isStudentAbsenceAllowed) {
+      setGlobalPinPendingAction(() => () => handleUndoCancelOccurrence(occ, true));
+      setGlobalPinInput('');
+      setGlobalPinError('');
+      setShowGlobalParentPinModal(true);
+      return;
+    }
+
+    try {
+      const targetId = occ.id;
+      await supabase
+        .from('schedule_occurrences')
+        .update({
+          status: 'scheduled',
+          canceled_by_role: null,
+          student_acknowledged: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', targetId);
+
+      setScheduleOccurrences(prev => prev.map(o => o.id === targetId ? { ...o, status: 'scheduled' } : o));
+    } catch (e) {
+      console.error('Error un-cancelling occurrence:', e);
+    }
+  };
+
+  const handleRejectReschedule = async (occ: any) => {
+    try {
+      await supabase
+        .from('schedule_occurrences')
+        .update({
+          status: 'rejected',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', occ.id);
+
+      setScheduleOccurrences(prev => prev.map(o => o.id === occ.id ? { ...o, status: 'rejected' } : o));
+    } catch (e) {
+      console.error('Error rejecting reschedule:', e);
+    }
+  };
+
+  const handleAcknowledgeCancellation = async (occId: string) => {
+    try {
+      await supabase
+        .from('schedule_occurrences')
+        .update({
+          student_acknowledged: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', occId);
+
+      setScheduleOccurrences(prev => prev.map(o => o.id === occId ? { ...o, student_acknowledged: true } : o));
+    } catch (e) {
+      console.error('Error acknowledging cancellation:', e);
+    }
+  };
+
+  const handleConfirmCrisisNotification = async (notifId: string) => {
+    setUnreadCrisisNotifs(prev => prev.filter(n => n.id !== notifId));
+  };
+
+  // Global Parent PIN Verification
+  const handleVerifyGlobalParentPin = async (inputPin: string) => {
+    setIsVerifyingGlobalPin(true);
+    setGlobalPinError('');
+    try {
+      const { data: ok, error } = await supabase.rpc('verify_parent_pin', {
+        student_id: studentId,
+        input_pin: inputPin
+      });
+
+      if (!error && ok) {
+        inMemoryParentPinRef.current = inputPin;
+        setShowGlobalParentPinModal(false);
+        setGlobalPinInput('');
+        if (globalPinPendingAction) {
+          const action = globalPinPendingAction;
+          setGlobalPinPendingAction(null);
+          action();
+        }
+      } else {
+        setGlobalPinError('Falsche Eltern-Master-PIN.');
+      }
+    } catch (e: any) {
+      setGlobalPinError(e.message || 'Prüfung fehlgeschlagen.');
+    } finally {
+      setIsVerifyingGlobalPin(false);
+    }
+  };
+
+  const handleVerifyGlobalParentPinAsync = async (inputPin: string): Promise<boolean> => {
+    try {
+      const { data: ok } = await supabase.rpc('verify_parent_pin', {
+        student_id: studentId,
+        input_pin: inputPin
+      });
+      if (ok) {
+        inMemoryParentPinRef.current = inputPin;
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleBiometricUnlockForGlobalPin = async () => {
+    setShowGlobalParentPinModal(false);
+    if (globalPinPendingAction) {
+      const action = globalPinPendingAction;
+      setGlobalPinPendingAction(null);
+      action();
+    }
+  };
+
+  return {
+    scheduleLoading,
+    setScheduleLoading,
+    scheduleOccurrences,
+    setScheduleOccurrences,
+    schoolYearOccurrences,
+    setSchoolYearOccurrences,
+    cancelledSchoolYearOccurrences,
+    briefingData,
+    setBriefingData,
+    isOfflineScheduleActive,
+    carrierGhostingDetected,
+    setCarrierGhostingDetected,
+    fetchSchedule,
+    handleConfirmReschedule,
+    handleCancelOccurrence,
+    handleUndoCancelOccurrence,
+    handleRejectReschedule,
+    handleAcknowledgeCancellation,
+    unreadCrisisNotifs,
+    setUnreadCrisisNotifs,
+    handleConfirmCrisisNotification,
+    isRescheduleSheetOpen,
+    setIsRescheduleSheetOpen,
+    activeRescheduleBottomSheetOcc,
+    setActiveRescheduleBottomSheetOcc,
+    isRescheduleLoading,
+    showAppointmentChat,
+    setShowAppointmentChat,
+    appointmentChatData,
+    setAppointmentChatData,
+    rescheduleChatDraft,
+    setRescheduleChatDraft,
+    showGlobalParentPinModal,
+    setShowGlobalParentPinModal,
+    globalPinInput,
+    setGlobalPinInput,
+    globalPinError,
+    setGlobalPinError,
+    globalPinPendingAction,
+    setGlobalPinPendingAction,
+    handleVerifyGlobalParentPin,
+    handleVerifyGlobalParentPinAsync,
+    handleBiometricUnlockForGlobalPin
+  };
+}

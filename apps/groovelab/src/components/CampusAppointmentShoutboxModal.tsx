@@ -1368,7 +1368,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
             lineHeight: 1.3
           }}>
             <Lock size={11} color="#94a3b8" style={{ flexShrink: 0 }} />
-            <span>Elektronischer Bote • Fristen des Musikschulvertrags beachten • TLS 1.3</span>
+            <span>Elektronischer Bote • Bitte keine Diagnosen oder Gesundheitsdaten senden • 60-Tage-Auto-Purge</span>
           </div>
         </div>
       </div>

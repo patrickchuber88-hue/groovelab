@@ -5157,6 +5157,21 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                     <Send size={16} strokeWidth={2.4} />
                   </button>
                 </form>
+
+                {/* 🛡️ Enterprise Data Privacy & Cryptographic Vault Notice */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  marginTop: '6px',
+                  fontSize: '0.66rem',
+                  color: '#94a3b8',
+                  lineHeight: 1.2
+                }}>
+                  <Lock size={10} color="#94a3b8" style={{ flexShrink: 0 }} />
+                  <span>AES-256 Datenbankverschlüsselung • Bitte keine Diagnosen oder Gesundheitsdaten senden</span>
+                </div>
               </div>
             ))}
           </div>
