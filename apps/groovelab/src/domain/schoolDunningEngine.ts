@@ -30,14 +30,14 @@ export interface SchoolDunningStatus {
   unpaidInvoicesCount: number;
   overdueInvoicesList: OverdueInvoiceSummary[];
 
-  // Behavioral Access Flags
+  // Behavioral Access Flags (Unantastbares Didactic Immunity Axiom)
   isSecretaryReadOnly: boolean;
-  isAudioTresorReadOnly: boolean;
-  isTeacherReadOnly: boolean;
+  isAudioTresorReadOnly: boolean; // Immer false: Didaktische Immunität für Schulinhalte & Übetracks
+  isTeacherReadOnly: boolean;     // Immer false: Keine Aussperrung von Lehrkräften aus dem Unterricht
 
-  // Real-time Countdowns (Days remaining until next restriction)
-  adminCountdownDays: number;   // Days remaining until next admin restriction
-  teacherCountdownDays: number; // Days remaining until next teacher restriction
+  // Real-time Countdowns (Tage bis zum nächsten administrativen Schritt)
+  adminCountdownDays: number;   // Tage bis zum administrativen Schreibschutz im Sekretariat
+  teacherCountdownDays: number; // Bleibt 0 (Lehrkräfte werden nicht gesperrt)
 
   // Status Meta
   isDelinquent: boolean;        // True if level >= level_1_reminder
@@ -233,26 +233,25 @@ export function computeSchoolDunningStatus(
     level = 'level_0_current'; // Grace Period
   }
 
-  // 5. Behavioral Flags (overruled by 48h Trust Extension if active)
+  // 5. Behavioral Flags (Didaktische Immunität gem. § 242 BGB)
+  // Rechnungsrückstände des Schulträgers dürfen niemals den Unterrichtsbetrieb
+  // oder pädagogische Übetracks gefährden (Verhältnismäßigkeitsgrundsatz).
   const isDunningFeeApplied = maxOverdueDays >= level3Threshold;
   let isSecretaryReadOnly = maxOverdueDays >= level3Threshold;
-  let isAudioTresorReadOnly = maxOverdueDays >= level3Threshold;
-  let isTeacherReadOnly = maxOverdueDays >= level5Threshold;
+  const isAudioTresorReadOnly = false; // Didaktische Immunität
+  const isTeacherReadOnly = false;     // Didaktische Immunität
 
   if (isTrustExtended) {
-    // 48h trust pass temporarily suspends the administrative and audio-tresor read-only lock
+    // 48h Vertrauenspass hebt auch den administrativen Schreibschutz im Sekretariat auf
     isSecretaryReadOnly = false;
-    isAudioTresorReadOnly = false;
   }
 
-  // 6. Countdowns
+  // 6. Countdowns (Sekretariat)
   const adminCountdownDays = (maxOverdueDays >= level2Threshold && maxOverdueDays < level3Threshold)
     ? Math.max(1, level3Threshold - maxOverdueDays)
     : 0;
 
-  const teacherCountdownDays = (maxOverdueDays >= level4Threshold && maxOverdueDays < level5Threshold)
-    ? Math.max(1, level5Threshold - maxOverdueDays)
-    : 0;
+  const teacherCountdownDays = 0; // Didaktische Immunität: Keine Lehrkraft-Aussperrung
 
   return {
     level,
@@ -325,7 +324,7 @@ export function getDunningVisualConfig(level: SchoolDunningLevel) {
         badgeBg: 'rgba(239, 68, 68, 0.12)',
         badgeColor: '#dc2626',
         badgeBorder: 'rgba(239, 68, 68, 0.3)',
-        title: 'Didaktischer Schreibstopp aktiv (Tag 59+)',
+        title: 'Verwaltungs-Schreibstopp aktiv – Kassenamt kontaktieren (Tag 59+)',
         severity: 'critical' as const
       };
     case 'level_4_teacher_warning':
@@ -333,7 +332,7 @@ export function getDunningVisualConfig(level: SchoolDunningLevel) {
         badgeBg: 'rgba(249, 115, 22, 0.12)',
         badgeColor: '#ea580c',
         badgeBorder: 'rgba(249, 115, 22, 0.3)',
-        title: 'Vorwarnung Lehrkräfte (Tag 52–58)',
+        title: 'Dringende Mahnung Schulträger (Tag 52–58)',
         severity: 'warning' as const
       };
     case 'level_3_admin_readonly':
@@ -341,7 +340,7 @@ export function getDunningVisualConfig(level: SchoolDunningLevel) {
         badgeBg: 'rgba(239, 68, 68, 0.1)',
         badgeColor: '#ef4444',
         badgeBorder: 'rgba(239, 68, 68, 0.25)',
-        title: 'Administrativer Schreibschutz aktiv (Tag 44–51)',
+        title: 'Administrativer Schreibschutz im Sekretariat (Tag 44–51)',
         severity: 'high' as const
       };
     case 'level_2_warning':
@@ -349,7 +348,7 @@ export function getDunningVisualConfig(level: SchoolDunningLevel) {
         badgeBg: 'rgba(245, 158, 11, 0.12)',
         badgeColor: '#d97706',
         badgeBorder: 'rgba(245, 158, 11, 0.3)',
-        title: 'Dringende Mahnung: 7-Tage-Vorwarnung (Tag 37–43)',
+        title: 'Zahlungserinnerung: 7-Tage-Vorwarnung (Tag 37–43)',
         severity: 'warning' as const
       };
     case 'level_1_reminder':
@@ -357,7 +356,7 @@ export function getDunningVisualConfig(level: SchoolDunningLevel) {
         badgeBg: 'rgba(59, 130, 246, 0.08)',
         badgeColor: '#2563eb',
         badgeBorder: 'rgba(59, 130, 246, 0.2)',
-        title: 'Zahlungserinnerung (Tag 29–36)',
+        title: 'Freundliche Zahlungserinnerung (Tag 29–36)',
         severity: 'info' as const
       };
     case 'level_0_current':
@@ -366,7 +365,7 @@ export function getDunningVisualConfig(level: SchoolDunningLevel) {
         badgeBg: 'rgba(16, 185, 129, 0.08)',
         badgeColor: '#059669',
         badgeBorder: 'rgba(16, 185, 129, 0.2)',
-        title: 'Fristgerecht / Kulanzphase (Tag 1–28)',
+        title: 'Fristgerecht / Karenzphase (Tag 1–28)',
         severity: 'success' as const
       };
   }

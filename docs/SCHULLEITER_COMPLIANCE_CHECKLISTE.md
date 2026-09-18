@@ -34,10 +34,13 @@
 ## 🛑 Teil 2: Was die Schulleitung NIEMALS tun darf (Die 5 Haftungsfallen)
 
 ```
-[❌] FALLE 1: Honorarkräften einseitig Räume oder Termine vorschreiben!
+[❌] FALLE 1: Honorarkräften einseitig Räume oder Termine vorschreiben oder hoheitlich zuteilen!
      ► GEFAHR: Sofortige Feststellung von Scheinselbstständigkeit durch die DRV 
        nach dem Herrenberg-Urteil (BSG B 12 R 3/20 R) mit existenzbedrohenden Beitragsnachforderungen!
-     ► REGEL: Honorarkräfte wählen ihre Raumslots in Campus-Groovelab stets selbst (Anfragemodell).
+     ► REGEL (Der rechtssichere 3-Stufen-Workflow):
+       1. Lehrkraft stimmt Termine autonom mit Schülern/Eltern ab (didaktische Autonomie).
+       2. Lehrkraft reicht in Campus-Groovelab eine unverbindliche Raumbelegungsanfrage ein.
+       3. Das Schulsekretariat prüft lediglich die Raumkollision und bestätigt die Raumverfügbarkeit (niemals Termine hoheitlich „zuteilen“!).
 
 [❌] FALLE 2: Lehrer-Aktivitätsstatistiken oder Antwortzeiten auswerten!
      ► GEFAHR: Schwerer Verstoß gegen § 87 BetrVG / LPVG (Verbot der Mitarbeiterüberwachung). 

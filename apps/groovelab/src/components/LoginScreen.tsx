@@ -8,6 +8,7 @@ import { getDistanceFromLatLonInM } from '../utils/geo';
 import { isWebAuthnSupported, registerBiometrics, authenticateUserBiometrics, getStoredBiometricProfiles, saveBiometricProfile, removeBiometricProfile, BiometricVaultProfile, getSanitizedRpId } from '../utils/webauthn';
 import { StudentMobileScheduleWizard } from './StudentMobileScheduleWizard';
 import { LegalTextModal } from './LegalTextModal';
+import { setLocalhostDevLegalBypassed } from './LegalConsentGate';
 import { DpoAuditPortal } from './DpoAuditPortal';
 import { validateNewPin } from '../utils/pinValidation';
 import { createMasterSessionLease } from '../utils/masterAuditLogger';
@@ -7245,6 +7246,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 }
 
                 await createMasterSessionLease(targetId, 'bypass_dev').catch(() => {});
+                setLocalhostDevLegalBypassed(true);
+                sessionStorage.setItem(`gl_legal_status_v_${targetId}_min_2026.1`, 'true');
                 sessionStorage.setItem('groovelab_is_master_admin', 'true');
                 sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
                 sessionStorage.setItem('groovelab_active_platform', 'campus');
@@ -7323,6 +7326,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   console.warn('[Bypass] Auth credential notice:', authErr);
                 }
                 await registerClientSessionLease({ id: targetUser.id, role: targetUser.role }, effectiveSchoolId).catch(() => {});
+                setLocalhostDevLegalBypassed(true);
+                sessionStorage.setItem(`gl_legal_status_v_${targetUser.id}_min_2026.1`, 'true');
                 sessionStorage.removeItem('groovelab_is_master_admin');
                 localStorage.removeItem('groovelab_is_master_admin');
                 sessionStorage.removeItem('groovelab_support_ghost');
@@ -7392,6 +7397,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   console.warn('[Bypass] Auth credential notice:', authErr);
                 }
                 await registerClientSessionLease({ id: targetUser.id, role: targetUser.role }, effectiveSchoolId).catch(() => {});
+                setLocalhostDevLegalBypassed(true);
+                sessionStorage.setItem(`gl_legal_status_v_${targetUser.id}_min_2026.1`, 'true');
                 sessionStorage.removeItem('groovelab_is_master_admin');
                 localStorage.removeItem('groovelab_is_master_admin');
                 sessionStorage.removeItem('groovelab_support_ghost');
@@ -7460,6 +7467,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   console.warn('[Bypass] Auth credential notice:', authErr);
                 }
                 await registerClientSessionLease({ id: targetUser.id, role: targetUser.role }, effectiveSchoolId).catch(() => {});
+                setLocalhostDevLegalBypassed(true);
+                sessionStorage.setItem(`gl_legal_status_v_${targetUser.id}_min_2026.1`, 'true');
                 sessionStorage.removeItem('groovelab_is_master_admin');
                 localStorage.removeItem('groovelab_is_master_admin');
                 sessionStorage.removeItem('groovelab_support_ghost');

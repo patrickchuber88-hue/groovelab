@@ -6,26 +6,61 @@ import { isUUID } from '../utils/uuidValidator';
 import { isDevEnvironment } from '../utils/tenantUrlHelper';
 
 /**
- * Computes a deterministic session proof bound to user, active role, session lease ID and legal version.
- * Prevents trivial boolean client-side tampering while enabling instantaneous (0ms) render times.
+ * Session-Cache für den legalen Zustimmungsstatus.
+ * Ermöglicht 0ms Instant-Rendering ohne Layout-Shift.
+ * Die autoritative Entscheidung liegt ausnahmslos beim Server-RPC `check_user_legal_status`
+ * und den PostgreSQL RLS-Policies (OWASP ASVS Level 3 / Fail-Closed Doktrin).
  */
-function computeSessionProof(userId: string, role: string, leaseId: string, minVersion: string): string {
-  const seed = `${userId}:${role}:${leaseId || 'no_lease'}:${minVersion}`;
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = ((hash << 5) - hash) + seed.charCodeAt(i);
-    hash |= 0;
+const LEGAL_SESSION_CACHE_PREFIX = 'gl_legal_status_v';
+export const DEV_LEGAL_BYPASS_STORAGE_KEY = 'gl_dev_bypass_legal_gate';
+
+/**
+ * 🛡️ 1% Goldstandard Localhost Immunität:
+ * Auf Localhost dev environment ist der Bypass standardmäßig aktiv (Zero Friction),
+ * es sei denn, der Entwickler hat ihn im Dev-Menü explizit auf 'false' gesetzt, um die Maske zu testen.
+ * In Production (oder bei echten Domains) gibt diese Funktion AUSNAHMSLOS false zurück (Fail-Closed).
+ */
+export function isLocalhostDevLegalBypassed(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (!isDevEnvironment()) return false;
+  try {
+    const override = localStorage.getItem(DEV_LEGAL_BYPASS_STORAGE_KEY);
+    if (override === 'false') {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
   }
-  return `gl_proof_${Math.abs(hash).toString(16)}`;
 }
 
-function getLeaseId(): string {
-  if (typeof window === 'undefined') return '';
+export function setLocalhostDevLegalBypassed(bypassed: boolean): void {
+  if (typeof window === 'undefined') return;
   try {
-    return sessionStorage.getItem('gl_active_session_lease_id') || '';
+    localStorage.setItem(DEV_LEGAL_BYPASS_STORAGE_KEY, bypassed ? 'true' : 'false');
+  } catch {}
+}
+
+function isSessionCacheCompliant(userId: string, minVersion: string): boolean {
+  if (typeof window === 'undefined' || !userId) return false;
+  try {
+    const key = `${LEGAL_SESSION_CACHE_PREFIX}_${userId}_min_${minVersion}`;
+    return sessionStorage.getItem(key) === 'true';
   } catch {
-    return '';
+    return false;
   }
+}
+
+function setSessionCacheCompliant(userId: string, minVersion: string, compliant: boolean): void {
+  if (typeof window === 'undefined' || !userId) return;
+  try {
+    const key = `${LEGAL_SESSION_CACHE_PREFIX}_${userId}_min_${minVersion}`;
+    if (compliant) {
+      sessionStorage.setItem(key, 'true');
+    } else {
+      sessionStorage.removeItem(key);
+    }
+  } catch {}
 }
 
 interface LegalConsentGateProps {
@@ -48,45 +83,20 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
   const isStudent = role === 'student';
   const isDev = typeof window !== 'undefined' && isDevEnvironment();
 
-  const leaseId = getLeaseId();
-  const proofKey = user?.id ? `gl_legal_proof_${user.id}_min_${MINIMUM_ENFORCED_VERSION}` : '';
-  const currentProof = user?.id ? computeSessionProof(user.id, role, leaseId, MINIMUM_ENFORCED_VERSION) : '';
+  const isDevBypassed = isDev && isLocalhostDevLegalBypassed();
+  const cachedCompliant = user?.id 
+    ? (isSessionCacheCompliant(user.id, MINIMUM_ENFORCED_VERSION) || isDevBypassed) 
+    : false;
 
-  const getStoredProof = (): string | null => {
-    if (typeof window === 'undefined' || !proofKey) return null;
-    try {
-      return sessionStorage.getItem(proofKey) || localStorage.getItem(proofKey);
-    } catch {
-      return null;
-    }
-  };
-
-  const saveProof = (proof: string) => {
-    if (typeof window === 'undefined' || !proofKey) return;
-    try {
-      sessionStorage.setItem(proofKey, proof);
-      localStorage.setItem(proofKey, proof);
-    } catch {}
-  };
-
-  const clearProof = () => {
-    if (typeof window === 'undefined' || !proofKey) return;
-    try {
-      sessionStorage.removeItem(proofKey);
-      localStorage.removeItem(proofKey);
-    } catch {}
-  };
-
-  const isProofValid = typeof window !== 'undefined' && Boolean(user?.id) && Boolean(currentProof) && getStoredProof() === currentProof;
-
-  // Initialize compliant state optimistically if valid cryptographic session proof is present
+  // Initialize compliant state optimistically if valid session cache or localhost dev bypass is present
   const [isCompliant, setIsCompliant] = useState<boolean>(() => {
     if (!user?.id || !isUUID(user.id) || user.is_ghost_mode) return true;
-    return Boolean(isProofValid);
+    if (isDevBypassed) return true;
+    return Boolean(cachedCompliant);
   });
   const [isChecking, setIsChecking] = useState<boolean>(() => {
-    if (!user?.id || !isUUID(user.id) || user.is_ghost_mode) return false;
-    return !isProofValid;
+    if (!user?.id || !isUUID(user.id) || user.is_ghost_mode || isDevBypassed) return false;
+    return !cachedCompliant;
   });
   const [isNetworkBlocked, setIsNetworkBlocked] = useState<boolean>(false);
   const [retryCount, setRetryCount] = useState<number>(0);
@@ -119,15 +129,13 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
         setIsCompliant(true);
         setIsChecking(false);
         setIsNetworkBlocked(false);
-        if (currentProof) {
-          saveProof(currentProof);
-        }
+        setSessionCacheCompliant(user.id, MINIMUM_ENFORCED_VERSION, true);
       }
     };
     return () => {
       channel.close();
     };
-  }, [user?.id, proofKey, currentProof]);
+  }, [user?.id]);
 
   // 2. Authoritative check with adaptive timeout & resilient schema fallback
   useEffect(() => {
@@ -144,8 +152,19 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
         return;
       }
 
-      // If proof is not valid, we show the non-blocking progress indicator
-      if (!isProofValid) {
+      // 🛡️ 1% Goldstandard: Localhost Dev-Immunity Fast Path
+      if (isDev && isLocalhostDevLegalBypassed()) {
+        if (isMounted) {
+          setIsCompliant(true);
+          setIsChecking(false);
+          setIsNetworkBlocked(false);
+          setSessionCacheCompliant(user.id, MINIMUM_ENFORCED_VERSION, true);
+        }
+        return;
+      }
+
+      // If cached session is not compliant, we show the non-blocking progress indicator
+      if (!cachedCompliant) {
         setIsChecking(true);
       }
       setErrorMsg(null);
@@ -193,7 +212,8 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
               console.info('[LegalConsentGate] Dev environment: auto-passing on transient RPC error.');
               setIsCompliant(true);
               setIsNetworkBlocked(false);
-            } else if (!isProofValid) {
+              setSessionCacheCompliant(user.id, MINIMUM_ENFORCED_VERSION, true);
+            } else if (!cachedCompliant) {
               setIsCompliant(false);
               setIsNetworkBlocked(true);
             }
@@ -206,19 +226,25 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
           if (data && data.is_compliant === true) {
             setIsCompliant(true);
             setIsNetworkBlocked(false);
-            if (currentProof) {
-              saveProof(currentProof);
-            }
+            setSessionCacheCompliant(user.id, MINIMUM_ENFORCED_VERSION, true);
           } else {
-            setIsCompliant(false);
-            setIsNetworkBlocked(false);
-            if (data?.latest_accepted_version) {
-              setLatestAcceptedVersion(data.latest_accepted_version);
-              setIsMajorUpdateFlow(true);
+            // 🛡️ 1% Goldstandard Localhost Immunität: Im Dev-Modus mit aktivem Bypass niemals zurücksetzen
+            if (isDev && isLocalhostDevLegalBypassed()) {
+              console.info('[LegalConsentGate] Localhost Dev-Immunity: preserving active bypass state.');
+              setIsCompliant(true);
+              setIsNetworkBlocked(false);
+              setSessionCacheCompliant(user.id, MINIMUM_ENFORCED_VERSION, true);
             } else {
-              setIsMajorUpdateFlow(false);
+              setIsCompliant(false);
+              setIsNetworkBlocked(false);
+              if (data?.latest_accepted_version) {
+                setLatestAcceptedVersion(data.latest_accepted_version);
+                setIsMajorUpdateFlow(true);
+              } else {
+                setIsMajorUpdateFlow(false);
+              }
+              setSessionCacheCompliant(user.id, MINIMUM_ENFORCED_VERSION, false);
             }
-            clearProof();
           }
           setIsChecking(false);
         }
@@ -230,7 +256,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
             console.info('[LegalConsentGate] Dev environment: auto-passing on network timeout.');
             setIsCompliant(true);
             setIsNetworkBlocked(false);
-          } else if (!isProofValid) {
+          } else if (!cachedCompliant) {
             setIsCompliant(false);
             setIsNetworkBlocked(true);
           }
@@ -289,9 +315,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
         return;
       }
 
-      if (currentProof) {
-        saveProof(currentProof);
-      }
+      setSessionCacheCompliant(user.id, MINIMUM_ENFORCED_VERSION, true);
 
       // Realtime Cross-Tab Broadcast notification
       try {
@@ -313,6 +337,49 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // 3b. 1% Goldstandard Localhost Dev-Bypass Action (Persistent Dual-Action)
+  const handleDevBypassClick = async () => {
+    if (user?.id) {
+      setLocalhostDevLegalBypassed(true);
+      setSessionCacheCompliant(user.id, MINIMUM_ENFORCED_VERSION, true);
+
+      // Fire-and-forget: Asynchroner DB-Eintrag, damit auch PostgreSQL autoritativ synchronisiert ist
+      try {
+        const consentTypes: string[] = [primaryDocKey];
+        const docHashes: Record<string, string> = {
+          [primaryDocKey]: await computeSha256(primaryDoc.fullTextMarkdown)
+        };
+        if (isStudent) {
+          consentTypes.push('consent_media_audio');
+          docHashes['consent_media_audio'] = await computeSha256(audioDoc.fullTextMarkdown);
+        }
+        void supabase.rpc('record_user_legal_consent', {
+          p_user_id: user.id,
+          p_school_id: user.school_id || null,
+          p_role: role,
+          p_consent_types: consentTypes,
+          p_version: ACTIVE_LEGAL_VERSION,
+          p_document_hashes: docHashes,
+          p_user_agent: 'Localhost Dev-Sandbox Bypass (1-Klick)',
+          p_ip_hash: null,
+          p_metadata: { dev_bypass: true, client_timestamp: new Date().toISOString() }
+        });
+      } catch {}
+
+      // Cross-Tab Broadcast
+      try {
+        if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+          const channel = new BroadcastChannel('gl_legal_consent_sync');
+          channel.postMessage({ type: 'CONSENT_GRANTED', userId: user.id, version: ACTIVE_LEGAL_VERSION });
+          channel.close();
+        }
+      } catch {}
+    }
+
+    setIsCompliant(true);
+    setIsNetworkBlocked(false);
   };
 
   // If already compliant, render normal children directly (Instant-Load 0ms)
@@ -364,13 +431,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
             <span>Localhost Dev-Sandbox</span>
             <button
               type="button"
-              onClick={() => {
-                if (currentProof) {
-                  saveProof(currentProof);
-                }
-                setIsCompliant(true);
-                setIsNetworkBlocked(false);
-              }}
+              onClick={handleDevBypassClick}
               style={{
                 background: '#0284c7',
                 color: '#ffffff',
@@ -382,7 +443,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
                 cursor: 'pointer'
               }}
             >
-              Überspringen
+              Dev Bypass (1-Klick)
             </button>
           </div>
         )}
@@ -489,13 +550,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
           {isDev && (
             <button
               type="button"
-              onClick={() => {
-                if (currentProof) {
-                  saveProof(currentProof);
-                }
-                setIsCompliant(true);
-                setIsNetworkBlocked(false);
-              }}
+              onClick={handleDevBypassClick}
               style={{
                 width: '100%',
                 marginTop: '14px',
@@ -638,14 +693,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
           <span>Localhost Dev-Sandbox</span>
           <button
             type="button"
-            onClick={() => {
-              if (proofKey && currentProof) {
-                try {
-                  sessionStorage.setItem(proofKey, currentProof);
-                } catch {}
-              }
-              setIsCompliant(true);
-            }}
+            onClick={handleDevBypassClick}
             style={{
               background: '#0284c7',
               color: '#ffffff',
@@ -816,7 +864,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
               padding: '16px 18px'
             }}>
               <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
-                Wichtigste Kernpunkte im Überblick (Transparenzgebot Art. 12 DSGVO):
+                Wichtigste Kernpunkte im Überblick (Transparenzgebot gem. § 307 BGB &amp; Art. 12 DSGVO):
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {primaryDoc.summaryPoints.map((pt, idx) => (

@@ -17,9 +17,21 @@ export interface LegalReleaseConfig {
 }
 
 export const LEGAL_RELEASE_CONFIG: LegalReleaseConfig = {
-  activeVersion: '2026.3',
+  activeVersion: '2026.4',
   minimumEnforcedVersion: '2026.1', // 🛡️ Bestandsschutz: 2026.1 bleibt rechtswirksam; kein Zwangsaussperren für Bestandskunden
   changelogs: {
+    '2026.4': {
+      version: '2026.4',
+      title: 'Rollout-Readiness & BGH Insurance Hardening',
+      date: '18.09.2026',
+      highlights: [
+        'Volljuristische Entkoppelung des B2B-Haftungsdeckels (max. 10.000 €) von Regulierungsentscheidungen des Versicherers (§ 307 BGB)',
+        'SLA-Wartungsfenster: Zulässiges tägliches Regelfenster von Montag bis Sonntag 00:00–06:00 Uhr (Berlin) mit 24h-Vorankündigung',
+        'Lückenlose Verankerung der unbedingten Bruttopreisgarantie für Bestandskunden bei Übergang zur Regelbesteuerung',
+        'Herrenberg-Präzisierung: Raumbelegungsanfrage durch Lehrkraft und Verfügbarkeitsbestätigung durch das Schulsekretariat',
+        'Ausschluss der verschuldensunabhängigen Garantiehaftung für anfängliche Mängel gem. § 536a Abs. 1 Alt. 1 BGB'
+      ]
+    },
     '2026.3': {
       version: '2026.3',
       title: 'Zero-Liability & Stand-Alone AVV Release',
@@ -133,21 +145,21 @@ export const LEGAL_DOCUMENTS: Record<string, LegalDocumentDefinition> = {
     isMandatory: true,
     version: ACTIVE_LEGAL_VERSION,
     summaryPoints: [
-      '0,00 € Software-Lizenzkaufgebühren (SaaS-Mietvertrag über reine Cloud-Infrastruktur gem. § 535 BGB)',
-      'Subsidiaritäts- & Redundanz-Doktrin: Plattform ist didaktisches Convenience-Tool; Primärkommunikation & ERP verbleiben bei der Musikschule',
-      'Schule ist alleinige datenschutzrechtliche Verantwortliche (Art. 4 Nr. 7 DSGVO); Betreiber ist weisungsgebundener Auftragsverarbeiter (Art. 28 DSGVO)',
-      'Ausschließliches Hosting in ISO 27001-zertifizierten deutschen Rechenzentren (Hetzner Falkenstein & Nürnberg) • 0 % US-Cloud-Abhängigkeit',
-      'Vorfallsmeldung des Betreibers binnen 48 Stunden an die Schule (24h-Puffer für 72h-Behördenmeldung nach Art. 33 DSGVO)',
-      'Herrenberg-Compliance: Vollständige Übermittlungsfreiheit für Lehrkräfte; Ausschluss von Weisungsbefugnis und Leistungsüberwachung',
-      'Dynamischer B2B Liability Cap: Haftung für leichte Fahrlässigkeit gedeckelt unter Berücksichtigung der 2.000.000 € IT-Haftpflichtversicherung',
-      'Ausschluss anfänglicher Mängel gem. § 536a Abs. 1 BGB • BGH-konformes Aufrechnungsverbot & 12-monatige Verjährungsverkürzung'
+      '0,00 € Lizenzgebühren für die Software: Bereitstellung als reiner, flexibler Cloud-Service gem. § 535 BGB (keine teure Kaufsoftware, keine Investitionskosten)',
+      'Didaktisches Ergänzungs-Werkzeug: Bereichert den Musikschulalltag, ersetzt aber bewusst kein bestehendes Schulverwaltungssystem (wie iMikel, MSVplus oder Musikschul-Manager; § 254 BGB)',
+      'Volle Datenhoheit bei der Musikschule (Art. 4 Nr. 7 DSGVO): Weisungsgebundene Auftragsverarbeitung (AVV nach Art. 28 DSGVO) inklusive vollständiger TOMs',
+      '100 % Datenschutz-Souveränität (Standort Deutschland): Ausschließliches Hosting in ISO 27001-zertifizierten Rechenzentren (Hetzner, Nürnberg/Falkenstein) • 0 % US-Cloud-Abhängigkeit',
+      '24-Stunden-Sicherheitspuffer für die Schulleitung: Vorfallsmeldung des Betreibers binnen 48 Stunden zur stressfreien Wahrung der 72h-Behördenfrist (Art. 33 DSGVO)',
+      'Pädagogische Freiheit & Herrenberg-Schutzschild: Freiheit der Unterrichtsgestaltung für Lehrkräfte; Ausschluss von Weisungsbefugnis und Leistungsüberwachung (BSG Herrenberg-Urteil)',
+      'Verlässlicher 2.000.000 € Versicherungsschutz: Haftung für einfache Fahrlässigkeit auf den vertragstypischen Schaden begrenzt, maximal gedeckelt durch eine gewerbliche 2-Mio.-€ IT- & Cyber-Police',
+      'Moderne Cloud-Wartung statt Mängelhaftung alter Prägung: Kontinuierliche Fehlerbehebung; Ausschluss verschuldensunabhängiger Garantiehaftung (§ 536a BGB) & 12 Monate Verjährung'
     ],
     checkboxLabel: 'Ich bestätige als vertretungsberechtigte Person der Musikschule den B2B-Infrastrukturvertrag (AGB Teil A) sowie die Vereinbarung zur Auftragsverarbeitung (AVV nach Art. 28 DSGVO) inklusive der Technisch-Organisatorischen Maßnahmen (TOMs).',
     fullTextMarkdown: `
 ### 1. Vertragsgegenstand, Rechtsnatur, Pädagogischer Add-On-Status & Subsidiaritäts-Grundsatz (SaaS-Mietvertrag)
 (1) Diese Bestimmungen regeln die Bereitstellung der cloudbasierten Schulmanagement- und Übeplattform **Campus-Groovelab** durch den Betreiber Patrick Huber (Einzelunternehmen, Karl-Fürstenberg-Str. 59, 79618 Rheinfelden, Deutschland; nachfolgend „Betreiber“). Der Vertrag qualifiziert sich rechtlich als **Software-as-a-Service (SaaS)-Mietvertrag gemäß § 535 ff. BGB (DE) / §§ 1090 ff. ABGB (AT) / Art. 253 ff. OR (CH)** über die Bereitstellung von schlüsselfertiger Cloud-Infrastruktur, Datenbank-Hosting, Datensicherung und Systemwartung.
 (2) **Software-Bereitstellung & Lizenzgebühren-Freiheit:** Die Basis-Software wird im Rahmen des gebuchten Cloud-Infrastruktur-Pakets ohne gesonderte Software-Lizenzkaufgebühren bereitgestellt (0,00 € / CHF 0.00 inklusive). Die Vergütung bemisst sich ausschließlich nach den vertraglich vereinbarten monatlichen Server-Hosting-, Bereitstellungs- und Infrastrukturpauschalen.
-(3) **Pädagogischer Add-On-Charakter & Subsidiaritäts-Grundsatz (Fast-Track / Convenience-Doktrin):** Campus-Groovelab ist ein didaktisches Zusatz-, Erleichterungs- und Übermittlungswerkzeug („Convenience-Tool / Fast-Track-Option“) zur Beschleunigung und didaktischen Bereicherung des Musikschulalltags. Die Plattform ersetzt ausdrücklich kein amtliches Schulverwaltungssystem (ERP-Software wie ASV, WinSchool oder Musikschul-Manager) und stellt zu keinem Zeitpunkt den ausschließlichen oder verbindlich vorgeschriebenen Dienst-, Weisungs- oder Kommunikationskanal der Musikschule dar.
+(3) **Pädagogischer Add-On-Charakter & Subsidiaritäts-Grundsatz (Fast-Track / Convenience-Doktrin):** Campus-Groovelab ist ein didaktisches Zusatz-, Erleichterungs- und Übermittlungswerkzeug („Convenience-Tool / Fast-Track-Option“) zur Beschleunigung und didaktischen Bereicherung des Musikschulalltags. Die Plattform ersetzt ausdrücklich kein amtliches Schulverwaltungssystem (ERP-Software wie iMikel, MSVplus oder Musikschul-Manager) und stellt zu keinem Zeitpunkt den ausschließlichen oder verbindlich vorgeschriebenen Dienst-, Weisungs- oder Kommunikationskanal der Musikschule dar.
 (4) **Primärwege & Weisungsautonomie der Schule:** Die offizielle dienstrechtliche Kommunikation, verbindliche Arbeitsanweisungen der Schulleitung sowie die hoheitliche Verwaltung von Schüler- und Honorarstammdaten verbleiben vollumfänglich auf den herkömmlichen Primärkanälen der Musikschule (behördliche E-Mail, interne Kommunikationssysteme wie MS Teams, Telefon, behördliche ERP-Software oder Aushang). Lehrkräfte und Mitarbeiter sind zu jedem Zeitpunkt berechtigt, Stundenpläne, Raumwünsche und Terminänderungen alternativ auf dem herkömmlichen Weg (per E-Mail, telefonisch oder schriftlich) an das Schulsekretariat zu übermitteln.
 (5) **Raumbuchungen & Terminabstimmungen unter Vorbehalt (Technisches Botenmodell):** Raumbuchungsanfragen, Stundenplanübermittlungen und Terminabstimmungen in der Plattform stellen unverbindliche Voranfragen („unter Vorbehalt“) bzw. technische Botenübermittlungen im Auftrag des Nutzers dar; sie begründen zu keinem Zeitpunkt eine automatische Buchungsgarantie oder rechtsgeschäftliche Bindungswirkung für das Raum- und Stundenkontingent der Musikschule. Die verbindliche Zuteilung und Einpflege in das amtliche Schul-ERP obliegt allein der Schulleitung bzw. dem Schulsekretariat.
 (6) **Notfall-, Nachrangigkeits- & Schadenminderungsklausel (§ 254 BGB):** Die Musikschule verpflichtet sich im Rahmen ihrer vertraglichen Schadensminderungspflicht (§ 254 BGB), den regulären Schulbetrieb und die primäre Notfallkommunikation (Telefon, E-Mail, herkömmliche Vertretungspläne) unabhängig von der Plattform redundant vorzuhalten. Bei kurzzeitigen Serverstörungen, Netzausfällen oder Wartungsfenstern findet der Schulunterricht regulär statt; Raum- und Terminabstimmungen sind über die Primärkanäle abzuwickeln. Eine Haftung des Betreibers für ausgefallene Unterrichtsstunden, verpasste Bandproben oder Honorarausfälle ist ausgeschlossen, es sei denn, der Ausfall beruht auf einer vorsätzlichen oder grob fahrlässigen Pflichtverletzung des Betreibers.
@@ -186,17 +198,17 @@ export const LEGAL_DOCUMENTS: Record<string, LegalDocumentDefinition> = {
 
 ### 5. Arbeitszeit-Compliance, Herrenberg-Schutzschild (BSG B 12 R 3/20 R) & Kinderschutz (§ 8a SGB VIII)
 (1) **Arbeitgeber-Alleinverantwortung nach dem Arbeitszeitgesetz (ArbZG):** Campus-Groovelab ist ein asynchrones pädagogisches Arbeits- und Lernmittel. Die Musikschule ist als Arbeitgeberin allein verantwortlich für die Einhaltung der Vorschriften des ArbZG, der Höchstarbeitszeiten sowie der 11-stündigen Ruhezeit (§ 5 ArbZG). Dem Personal steht das Recht auf Nichterreichbarkeit uneingeschränkt zu.
-(2) **Herrenberg-Compliance & Freistellung bei Honorarkräften (§ 7a SGB IV):** Campus-Groovelab dient den Lehrkräften zur didaktischen Unterstützung und begründet zu keinem Zeitpunkt eine Weisungs- oder Direktionsgewalt. Stundenplanentwürfe stellen unverbindliche Dispositionsvorschläge dar. Lehrkräften steht die Übermittlungsfreiheit auf herkömmlichen Wegen vollumfänglich offen. Bindet die Musikschule freie Mitarbeiter ein, stellt sie in eigener Verantwortung sicher, dass keine weisungsgebundene Eingliederung im Sinne der BSG-Rechtsprechung (Herrenberg-Urteil) vorliegt. Die Schule stellt den Betreiber von jeglichen Nachforderungen von Sozialversicherungsbeiträgen oder Säumniszuschlägen durch Sozialkassen (§ 7a SGB IV) im Innenverhältnis frei, sofern diese auf der internen Beauftragungspraxis der Schule beruhen.
+(2) **Herrenberg-Compliance & Freistellung bei Honorarkräften (§ 7a SGB IV / BSG B 12 R 3/20 R):** Campus-Groovelab dient den Lehrkräften zur didaktischen Unterstützung und begründet zu keinem Zeitpunkt eine Weisungs- oder Direktionsgewalt. Der Stundenplan- und Raumbelegungsprozess folgt dem zweiseitigen Ressourcenmodell: Lehrkräfte stimmen Termine autonom mit Schülern ab und übermitteln unverbindliche Raumreservierungsanfragen; das Schulsekretariat prüft lediglich Kollisionen und bestätigt die Raumverfügbarkeit (keine hoheitliche Terminzuteilung). Lehrkräften steht die Übermittlungsfreiheit auf herkömmlichen Wegen vollumfänglich offen. Bindet die Musikschule freie Mitarbeiter ein, stellt sie in eigener Verantwortung sicher, dass keine weisungsgebundene Eingliederung im Sinne der BSG-Rechtsprechung (Herrenberg-Urteil) vorliegt. Die Schule stellt den Betreiber von jeglichen Nachforderungen von Sozialversicherungsbeiträgen oder Säumniszuschlägen durch Sozialkassen (§ 7a SGB IV) im Innenverhältnis frei, sofern diese auf der internen Beauftragungspraxis der Schule beruhen.
 (3) **Institutioneller Kinderschutz & Vier-Augen-Prinzip (§ 8a SGB VIII):** Chatverläufe zwischen Lehrkräften und minderjährigen Schülern sind für Erziehungsberechtigte über das Eltern-Portal transparent einsehbar (Vier-Augen-Prinzip). Ein unüberwachter Privatchat zwischen Minderjährigen untereinander ist serverseitig ausgeschlossen. Verdachtsmeldungen können an kinderschutz@campus-groovelab.de gerichtet werden.
 (4) **Ausschluss von Leistungs- und Verhaltenskontrolle (§ 87 Abs. 1 Nr. 6 BetrVG):** Die Plattform verzichtet vollständig auf Funktionen zur Verhaltens- oder Leistungskontrolle von Lehrkräften.
 
 ### 6. B2B-Gewährleistung, Haftungsbegrenzung & Versicherungsschutz
 (1) **Ausschluss anfänglicher Mängel (§ 536a Abs. 1 Alt. 1 BGB):** Die verschuldensunabhängige Haftung des Betreibers für anfängliche Mängel (§ 536a Abs. 1 Alt. 1 BGB [DE] / § 1096 ABGB [AT] / Art. 259a OR [CH]) wird ausdrücklich und vollumfänglich ausgeschlossen.
 (2) **Haftungsmaßstab:** Bei einfacher Fahrlässigkeit haftet der Betreiber nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten) begrenzt auf den vertragstypisch vorhersehbaren Schaden. Die Haftung für entgangenen Gewinn, mittelbare Schäden, Mangelfolgeschäden oder ausgefallene Unterrichtsstunden ist ausgeschlossen.
-(3) **Dynamischer B2B Liability Cap & Versicherungsschutz:**
-(a) Der Betreiber unterhält eine gewerbliche IT-Haftpflicht- sowie eine Cyber-Risiko-Versicherung mit einer Deckungssumme von mindestens 2.000.000,00 € je Versicherungsfall.
-(b) Für Schäden, die durch einfache Fahrlässigkeit bei Verletzung von Kardinalpflichten verursacht werden, ist die Haftung des Betreibers der Höhe nach auf den vertragstypisch vorhersehbaren Schaden begrenzt, maximal jedoch auf den Betrag, der durch die IT- und Cyber-Haftpflichtversicherung im konkreten Schadensfall tatsächlich gedeckt und reguliert wird.
-(c) Soweit die Versicherung aus Gründen, die nicht im Risikobereich des Betreibers liegen, nicht eintrittspflichtig ist, ist die Gesamthaftung je Kalenderjahr auf die Summe der vom Kunden in den vorangegangenen zwölf (12) Monaten tatsächlich gezahlten Netto-Vergütung (maximal 10.000,00 € bzw. CHF 10'000.00) beschränkt.
+(3) **BGH-konformer B2B Liability Cap & Versicherungsschutz (§ 307 BGB):**
+(a) Der Betreiber unterhält zur Absicherung von Großschäden und Cyberrisiken eine gewerbliche IT-Vermögensschaden- sowie eine Cyber-Risiko-Versicherung mit einer Deckungssumme von mindestens 2.000.000,00 € je Versicherungsfall.
+(b) Für Schäden, die durch einfache Fahrlässigkeit bei Verletzung von wesentlichen Vertragspflichten (Kardinalpflichten) verursacht werden, ist die Haftung des Betreibers der Höhe nach auf den vertragstypisch vorhersehbaren Schaden begrenzt, maximal jedoch auf die Summe der vom Kunden in den vorangegangenen zwölf (12) Monaten tatsächlich an den Betreiber gezahlten Netto-Vergütung (höchstens 10.000,00 € bzw. CHF 10'000.00 je Kalenderjahr).
+(c) Die Haftungsgrenze nach Buchstabe (b) gilt als eigenständige, unbedingte Höchstbegrenzung im Sinne von § 307 BGB und besteht unabhängig davon, ob oder in welcher Höhe der Versicherer im konkreten Schadensfall leistet.
 (d) Die vorstehenden Haftungsbegrenzungen gelten nicht bei Vorsatz, grober Fahrlässigkeit, bei Verletzung von Leben, Körper oder Gesundheit sowie bei gesetzlich zwingender Haftung (Produkthaftungsgesetz).
 (4) **Mitverschuldensklausel bei Datenverlust (§ 254 BGB):** Für Datenverlust haftet der Betreiber der Höhe nach nur insoweit, als der Schaden auch bei ordnungsgemäßer und täglicher Datensicherung durch den Kunden bzw. über die integrierten Exportwerkzeuge entstanden wäre (beschränkt auf den typischen Wiederherstellungsaufwand).
 (5) **12-monatige Verjährungsverkürzung:** Gewährleistungs- und Schadensersatzansprüche des Kunden verjähren innerhalb von zwölf (12) Monaten ab gesetzlichem Verjährungsbeginn (ausgenommen Ansprüche wegen Vorsatz, grober Fahrlässigkeit sowie Personenschäden).
@@ -449,7 +461,7 @@ Der Auftragnehmer stellt dem Auftraggeber alle erforderlichen Informationen zum 
     version: ACTIVE_LEGAL_VERSION,
     summaryPoints: [
       'Verfügbarkeitsgarantie von 99,5 % im Jahresmittel für die Cloud-Infrastruktur',
-      'Geplante Wartungsfenster außerhalb der Kernunterrichtszeiten (sonntags 02:00–06:00 Uhr MEZ)',
+      'Geplante Wartungsfenster außerhalb der Kernunterrichtszeiten (Montag bis Sonntag 00:00–06:00 Uhr deutscher Zeit)',
       'Vier definierte Störungsklassen von P1 (Kritisch < 4h Reaktionszeit) bis P4 (Trivial < 72h)',
       'Subsidiaritätsklausel: Schadenminderungspflicht der Schule zur Vorhaltung herkömmlicher Ersatzwege',
       'Haftungsausschluss bei Ausfällen durch höhere Gewalt, Dritte oder unzureichende Endgeräte'
@@ -462,7 +474,7 @@ Der Auftragnehmer stellt dem Auftraggeber alle erforderlichen Informationen zum 
 
 ### 2. Berechnung der Verfügbarkeit & Wartungsfenster
 (1) Die Verfügbarkeit bemisst sich an der Erreichbarkeit der zentralen API-Endpunkte und der Webanwendung am Übergabepunkt des Rechenzentrums an das Internet.
-(2) **Geplante Wartungsfenster:** Zur Durchführung notwendiger Sicherheits-Patches, Betriebssystem-Updates und Datenbankoptimierungen sind regelmäßige Wartungsfenster vorgesehen. Diese finden standardmäßig **sonntags zwischen 02:00 Uhr und 06:00 Uhr MEZ** statt und gelten nicht als Ausfallzeit. Außerordentliche Notfallwartungen zur Abwehr akuter Cyber-Angriffe werden mit einer Vorlaufzeit von mindestens 2 Stunden angekündigt.
+(2) **Geplante Wartungsfenster:** Zur Durchführung notwendiger Sicherheits-Patches, Betriebssystem-Updates und Datenbankoptimierungen sind reguläre Wartungsfenster vorgesehen. Diese finden standardmäßig **täglich von Montag bis Sonntag zwischen 00:00 Uhr und 06:00 Uhr deutscher Zeit (Berlin)** statt und gelten nicht als Ausfallzeit im Sinne der Verfügbarkeitsberechnung (SLA 99,5 %), sofern sie dem Kunden mindestens 24 Stunden zuvor per E-Mail oder Systemhinweis angekündigt wurden. Dringende Sicherheits-Patches zur unverzüglichen Abwehr akuter Cyber-Angriffe können ohne Vorankündigungsfrist eingespielt werden.
 (3) **Nicht anrechenbare Ausfallzeiten:** Von der Verfügbarkeitsberechnung ausgenommen sind Ausfälle, die verursacht werden durch: (a) Höhere Gewalt, Streik, Naturkatastrophen; (b) Angriffe auf die Infrastruktur Dritter (DDoS-Attacken), sofern branchenübliche Schutzmaßnahmen aktiv waren; (c) Fehlfunktionen der Hard- oder Software auf Seiten der Musikschule oder der Endnutzer; (d) Störungen der Internetverbindung zwischen Endgerät und Rechenzentrum.
 
 ### 3. Störungsklassen & Reaktionszeiten

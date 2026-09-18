@@ -37,9 +37,12 @@ Die Softwarearchitektur von **Campus-Groovelab** wurde gezielt darauf ausgelegt,
 
 Um das Restrisiko einer sozialversicherungsrechtlichen Nachforderung bei Betriebsprüfungen der DRV auszuschließen, erlässt der Schulträger folgende **verbindliche Dienstanweisung**:
 
-### 🛑 1. Verbot hoheitlicher Termin- und Raumzuweisungen
-* Schulleitung und Sekretariat dürfen Honorarlehrkräften über Campus-Groovelab **niemals einseitig Unterrichtstage, Uhrzeiten oder Räume vorschreiben**.
-* Der Workflow muss immer von der Honorarkraft ausgehen: Die Lehrkraft wählt im Stundenplaner einen verfügbaren Zeit- und Raumslot; das Sekretariat bestätigt lediglich die raumtechnische Verfügbarkeit.
+### 🛑 1. Verbot hoheitlicher Termin- und Raumzuweisungen (Der 3-Stufen-Workflow)
+* Schulleitung und Sekretariat dürfen Honorarlehrkräften über Campus-Groovelab **niemals einseitig Unterrichtstage, Uhrzeiten oder Räume vorschreiben oder hoheitlich zuteilen**.
+* Der Ablauf muss zwingend nach dem dreistufigen Ressourcen- und Autonomiemodell erfolgen:
+  1. **Autonome Didaktik:** Die Lehrkraft stimmt Unterrichtszeiten direkt mit Schülern und Erziehungsberechtigten ab.
+  2. **Unverbindliche Raumanfrage:** Die Lehrkraft übermittelt eine unverbindliche Raum- und Belegungsanfrage an die Schulverwaltung.
+  3. **Verfügbarkeitsbestätigung:** Das Sekretariat führt ausschließlich eine Kollisionsprüfung durch und bestätigt die raumtechnische Verfügbarkeit (kein Zuteilungsakt). Ist der Raum belegt, wählt die Lehrkraft autonom eine Alternative.
 
 ### 🛑 2. Verbot von Anwesenheits- und Verhaltenskontrollen
 * Es ist strikt untersagt, die Login-Aktivität, Chat-Antwortzeiten oder die Häufigkeit von Hausaufgabeneinträgen einer Honorarkraft zu überwachen oder als Kriterium für Honorarzahlungen heranzuziehen.

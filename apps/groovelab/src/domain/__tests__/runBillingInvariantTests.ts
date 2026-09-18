@@ -333,22 +333,23 @@ const sch3 = { id: 'sch', has_campus_subscription: true, has_groovelab_subscript
 const d3 = computeSchoolDunningStatus(sch3, makeInv(47), REF);
 assert(d3.level === 'level_3_admin_readonly', `Level 3: 47 Tage → erwartet level_3_admin_readonly, erhalten ${d3.level}`);
 assert(d3.isSecretaryReadOnly === true,   'Level 3: Sekretariat MUSS Read-Only sein');
-assert(d3.isAudioTresorReadOnly === true, 'Level 3: Audio-Tresor MUSS Read-Only sein');
-assert(d3.isTeacherReadOnly === false,    'Level 3: Lehrkräfte behalten Schreibzugriff');
+assert(d3.isAudioTresorReadOnly === false, 'Level 3: Audio-Tresor behält didaktische Immunität');
+assert(d3.isTeacherReadOnly === false,    'Level 3: Lehrkräfte behalten didaktische Immunität');
 assert(d3.isDunningFeeApplied === true,   'Level 3: Verzugspauschale MUSS erhoben werden');
 
-// Level 4: 52–58 Tage — Lehrer-Vorwarnung
+// Level 4: 52–58 Tage — Mahnung Schulträger
 const d4 = computeSchoolDunningStatus({ id: 'sch' }, makeInv(55), REF);
 assert(d4.level === 'level_4_teacher_warning', `Level 4: 55 Tage → erwartet level_4_teacher_warning, erhalten ${d4.level}`);
 assert(d4.isSecretaryReadOnly === true,  'Level 4: Sekretariat bleibt Read-Only');
-assert(d4.isTeacherReadOnly === false,   'Level 4: Lehrkräfte noch nicht gesperrt');
+assert(d4.isTeacherReadOnly === false,   'Level 4: Lehrkräfte behalten didaktische Immunität');
+assert(d4.isAudioTresorReadOnly === false, 'Level 4: Audio-Tresor behält didaktische Immunität');
 
-// Level 5: ≥ 59 Tage — Vollsperrung
+// Level 5: ≥ 59 Tage — Verwaltungs-Schreibstopp (Sekretariat)
 const d5 = computeSchoolDunningStatus({ id: 'sch' }, makeInv(65), REF);
 assert(d5.level === 'level_5_full_readonly', `Level 5: 65 Tage → erwartet level_5_full_readonly, erhalten ${d5.level}`);
 assert(d5.isSecretaryReadOnly === true,   'Level 5: Sekretariat Read-Only');
-assert(d5.isTeacherReadOnly === true,     'Level 5: Lehrkräfte MÜSSEN Read-Only sein');
-assert(d5.isAudioTresorReadOnly === true, 'Level 5: Audio-Tresor MUSS Read-Only sein');
+assert(d5.isTeacherReadOnly === false,    'Level 5: Lehrkräfte behalten unantastbare didaktische Immunität');
+assert(d5.isAudioTresorReadOnly === false, 'Level 5: Audio-Tresor behält unantastbare didaktische Immunität');
 
 // Sommer-Moratorium (Juli/August): Karenz = 42 statt 28 Tage
 const SUMMER_REF = '2026-08-01T12:00:00Z';

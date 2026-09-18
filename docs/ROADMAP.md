@@ -4,6 +4,45 @@ Dieses Dokument dient als zentrale Entwicklungs-Roadmap für geplante, evaluiert
 
 ---
 
+## 🏆 Priorität 1: Modulare Dashboard-Konsolidierung & Shared Suite Core (Admin / Sekretariat / Master-Admin)
+
+* **Status:** 🚀 **PRIORITÄT 1 (In Vorbereitung / Nächster Kern-Meilenstein)**
+* **Bereich:** Globale Verwaltungs-Architektur (`AdminDashboard.tsx`, `SecretaryDashboard.tsx`, `MasterAdminDashboard.tsx`)
+* **Zielgruppe:** Schulleitung, Schulsekretariat, Master-Administratoren & Entwicklerteam
+
+### 1. Ausgangsbefund & Architektur-Motivation (Forensische Over-Engineering-Analyse)
+Im Ist-Bestand der Plattform existieren historisch gewachsen drei parallele Administrations-Dashboards:
+1. `SecretaryDashboard.tsx` (modulare Monolith-Suite mit ~2.950 LOC, hochveredelt mit B2B-Governance, Ausfall-Cockpit, Stundenplänen und Live-Lab Blueprint).
+2. `AdminDashboard.tsx` (älteres Schul-Admin-Dashboard mit teils redundanten Personal-, Lizenz- und Einstellungsansichten).
+3. `MasterAdminDashboard.tsx` (mandantenübergreifendes Betreiber-Dashboard für Plattform-Statistiken, System-Health und globale Mandantensteuerung).
+
+Obwohl alle drei Dashboards auf identische fachliche Domänen (Schulen, Personal, Schüler, Lizenzen, Audit-Logs, Stundenpläne) zugreifen, existieren duplizierte State-Logiken, parallele RPC-Hooks und redundante UI-Container. Dies widerspricht dem **DRY-Axiom** und dem **Monolith Goldstandard**.
+
+### 2. Zielarchitektur: The "Shared Suite Core"
+Zusammenführung aller administrativen Aufgabenbereiche in eine modulare, wiederverwendbare Komponenten- und Hook-Architektur:
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                      SHARED ADMINISTRATIVE SUITE CORE                           │
+│                     packages/shared-admin-ui (oder src/components/admin-core)   │
+├───────────────────┬───────────────────┬───────────────────┬─────────────────────┤
+│ 👥 Personal-Suite │ 🎓 Schüler-Suite  │ 💳 Billing & SLA  │ 📜 Audit & Betroff. │
+│ (Mitarbeiter/Team)│ (Klassen/Import)  │ (Tarife/Hosting)  │ (Art. 17/30 DSGVO)  │
+├───────────────────┴───────────────────┴───────────────────┴─────────────────────┤
+│ 🛡️ Bounded Context Role Gates (Schulleitung vs. Sekretariat vs. Master-Admin)   │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+1. **Gemeinsame Sub-Views (Single Source of Truth):**
+   - Extraktion von `StaffManagementView`, `StudentDirectoryView`, `LicenseGovernanceView`, `FacilityLogView` und `AuditTrailView` in autarke, rein zustandsgesteuerte Kern-Komponenten.
+2. **Deklarative Rollen-Gates & Berechtigungs-Filter:**
+   - Einbindung über strikte Berechtigungs-Props (`canManageBilling={role === 'admin'}`, `canAccessPlatformMaster={user.is_master_admin}`).
+   - Beseitigung redundanter Duplikate bei gleichzeitiger Wahrung hermetischer Mandantentrennung.
+3. **Drastische Reduktion von Bundle-Größe & Wartungsaufwand:**
+   - Einsparung von über 4.000 redundanten Codezeilen über alle Dashboards hinweg.
+   - 0ms Reaktivität und konsistente User-Experience für Schulleitungen und Sekretariate.
+
+---
+
 ## 🎯 Backlog: Schüler-Lehrer Match-Funktion (Blind-Tipp, Live-Showdown & Meilenstein-Pass)
 
 * **Status:** Geparkt auf der Roadmap (Temporär aus der aktiven UI entfernt)
