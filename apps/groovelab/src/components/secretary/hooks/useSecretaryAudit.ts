@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
+import { deleteStudentFully } from '../../../utils/studentDeletionService';
 
 export interface AuditLogItem {
   id: string;
@@ -23,6 +24,19 @@ export interface AuditLogItem {
   } | null;
   new_data?: Record<string, any> | null;
   old_data?: Record<string, any> | null;
+}
+
+export interface GdprDeletionRequest {
+  id: string;
+  student_id: string;
+  school_id: string;
+  requested_by: string;
+  scope: string;
+  status: 'pending' | 'completed' | 'rejected';
+  notes?: string;
+  created_at: string;
+  completed_at?: string;
+  student_name?: string;
 }
 
 export interface UseSecretaryAuditParams {
@@ -45,6 +59,11 @@ export interface UseSecretaryAuditReturn {
   exportAuditLogsToCsv: () => void;
   translateKey: (key: string) => string;
   translateValue: (key: string, val: any) => string;
+  gdprRequests: GdprDeletionRequest[];
+  gdprLoading: boolean;
+  fetchGdprRequests: () => Promise<void>;
+  completeGdprRequest: (requestId: string, studentId: string, notes?: string) => Promise<{ success: boolean; error?: string }>;
+  rejectGdprRequest: (requestId: string, reason: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 export function useSecretaryAudit({
@@ -58,6 +77,8 @@ export function useSecretaryAudit({
   const [auditSearchQuery, setAuditSearchQuery] = useState<string>('');
   const [auditActionFilter, setAuditActionFilter] = useState<string>('All');
   const [auditLimit, setAuditLimit] = useState<number>(200);
+  const [gdprRequests, setGdprRequests] = useState<GdprDeletionRequest[]>([]);
+  const [gdprLoading, setGdprLoading] = useState<boolean>(false);
 
   const translateKey = useCallback((key: string): string => {
     const keyMap: Record<string, string> = {
@@ -169,11 +190,88 @@ export function useSecretaryAudit({
     }
   }, [schoolId]);
 
+  const fetchGdprRequests = useCallback(async () => {
+    if (!schoolId) return;
+    setGdprLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('gdpr_deletion_requests')
+        .select('*')
+        .eq('school_id', schoolId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      const enriched: GdprDeletionRequest[] = (data || []).map((req: any) => ({
+        ...req,
+        student_name: userMap[req.student_id] || 'Schüler'
+      }));
+      setGdprRequests(enriched);
+    } catch (err) {
+      console.warn('[useSecretaryAudit] Error loading GDPR deletion requests:', err);
+    } finally {
+      setGdprLoading(false);
+    }
+  }, [schoolId, userMap]);
+
+  const completeGdprRequest = useCallback(async (requestId: string, studentId: string, notes?: string) => {
+    try {
+      // 1. Fully delete student data safely (cleaning up foreign keys & storage)
+      await deleteStudentFully(studentId, { activePlatform: 'all' });
+
+      // 2. Resolve request via RPC
+      const { error } = await supabase.rpc('resolve_gdpr_deletion_request', {
+        p_request_id: requestId,
+        p_status: 'completed',
+        p_notes: notes || 'Art. 17 DSGVO Löschung vollständig durchgeführt'
+      });
+
+      if (error) {
+        // Fallback update
+        await supabase
+          .from('gdpr_deletion_requests')
+          .update({ status: 'completed', completed_at: new Date().toISOString(), notes: notes || 'Art. 17 DSGVO Löschung durchgeführt' })
+          .eq('id', requestId);
+      }
+
+      await fetchGdprRequests();
+      await fetchAuditLogs(auditLimit);
+      return { success: true };
+    } catch (err: any) {
+      console.error('[useSecretaryAudit] completeGdprRequest failed:', err);
+      return { success: false, error: err.message || 'Löschantrag konnte nicht abgeschlossen werden.' };
+    }
+  }, [auditLimit, fetchAuditLogs, fetchGdprRequests]);
+
+  const rejectGdprRequest = useCallback(async (requestId: string, reason: string) => {
+    try {
+      const { error } = await supabase.rpc('resolve_gdpr_deletion_request', {
+        p_request_id: requestId,
+        p_status: 'rejected',
+        p_notes: reason
+      });
+
+      if (error) {
+        await supabase
+          .from('gdpr_deletion_requests')
+          .update({ status: 'rejected', completed_at: new Date().toISOString(), notes: reason })
+          .eq('id', requestId);
+      }
+
+      await fetchGdprRequests();
+      await fetchAuditLogs(auditLimit);
+      return { success: true };
+    } catch (err: any) {
+      console.error('[useSecretaryAudit] rejectGdprRequest failed:', err);
+      return { success: false, error: err.message || 'Löschantrag konnte nicht abgelehnt werden.' };
+    }
+  }, [auditLimit, fetchAuditLogs, fetchGdprRequests]);
+
   useEffect(() => {
     if (activeTab === 'secretary' && secretarySubTab === 'audit') {
       fetchAuditLogs(auditLimit);
+      fetchGdprRequests();
     }
-  }, [activeTab, secretarySubTab, auditLimit, fetchAuditLogs]);
+  }, [activeTab, secretarySubTab, auditLimit, fetchAuditLogs, fetchGdprRequests]);
 
   const exportAuditLogsToCsv = useCallback(() => {
     if (auditLogs.length === 0) return;
@@ -273,6 +371,11 @@ export function useSecretaryAudit({
     fetchAuditLogs,
     exportAuditLogsToCsv,
     translateKey,
-    translateValue
+    translateValue,
+    gdprRequests,
+    gdprLoading,
+    fetchGdprRequests,
+    completeGdprRequest,
+    rejectGdprRequest
   };
 }

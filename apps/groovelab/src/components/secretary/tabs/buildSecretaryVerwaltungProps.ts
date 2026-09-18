@@ -529,6 +529,10 @@ export function buildSecretaryVerwaltungProps(
     setAuditLimit: audit.setAuditLimit,
     exportAuditLogsToCsv: audit.exportAuditLogsToCsv,
     translateKey: audit.translateKey,
-    translateValue: audit.translateValue
+    translateValue: audit.translateValue,
+    gdprRequests: audit.gdprRequests,
+    gdprLoading: audit.gdprLoading,
+    completeGdprRequest: audit.completeGdprRequest,
+    rejectGdprRequest: audit.rejectGdprRequest
   };
 }

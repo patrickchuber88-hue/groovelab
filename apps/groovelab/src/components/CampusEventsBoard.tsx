@@ -696,6 +696,7 @@ export function CampusEventsBoard({
   const [eventTechResponsible, setEventTechResponsible] = useState('');
   const [eventCoordResponsible, setEventCoordResponsible] = useState('');
   const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [studentConsentsMap, setStudentConsentsMap] = useState<Record<string, Record<string, boolean>>>({});
 
   const isMeEventResponsible = (ev: any) => {
     if (!ev) return false;
@@ -1441,6 +1442,28 @@ export function CampusEventsBoard({
             return nameA.localeCompare(nameB);
           });
           setAllUsers(sorted);
+
+          // 🛡️ DSGVO & Media Protection: Load student consents for concert programs
+          const studentIds = sorted.filter((u: any) => u.role === 'student').map((u: any) => u.id);
+          if (studentIds.length > 0) {
+            try {
+              const { data: consentsData } = await supabase
+                .from('student_consents')
+                .select('student_id, consent_type, granted')
+                .in('student_id', studentIds);
+
+              if (consentsData) {
+                const cMap: Record<string, Record<string, boolean>> = {};
+                consentsData.forEach((c: any) => {
+                  if (!cMap[c.student_id]) cMap[c.student_id] = {};
+                  cMap[c.student_id][c.consent_type] = Boolean(c.granted);
+                });
+                setStudentConsentsMap(cMap);
+              }
+            } catch (cErr) {
+              console.warn('[CampusEventsBoard] Notice: Could not load student consents:', cErr);
+            }
+          }
         }
       } catch (err) {
         console.error('Error fetching users:', err);
@@ -8909,7 +8932,14 @@ export function CampusEventsBoard({
                     onMouseEnter={() => setActiveStudentSuggestionIndex(idx)}
                   >
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ color: isHighlighted ? brandColor : '#0f172a' }}>{student.first_name} {student.last_name}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ color: isHighlighted ? brandColor : '#0f172a' }}>{student.first_name} {student.last_name}</span>
+                        {studentConsentsMap[student.id]?.concert_program === false && (
+                          <span style={{ background: '#fee2e2', color: '#b91c1c', fontSize: '0.62rem', fontWeight: 850, padding: '1px 5px', borderRadius: '4px', border: '1px solid #fca5a5' }}>
+                            Kein Programm
+                          </span>
+                        )}
+                      </div>
                       {student.instrument && <span style={{ fontSize: '0.7rem', color: '#64748b' }}>{student.instrument}</span>}
                     </div>
                     <div style={{
@@ -8943,41 +8973,49 @@ export function CampusEventsBoard({
                 Noch keine Schüler zugewiesen. Nutze die Suche oben.
               </span>
             ) : (
-              selectedStudents.map(student => (
-                <div 
-                  key={student.id} 
-                  style={{ 
-                    display: 'inline-flex', 
-                    alignItems: 'center', 
-                    gap: '6px', 
-                    padding: '4px 10px', 
-                    background: '#e0f2fe',
-                    color: '#0369a1',
-                    borderRadius: '20px',
-                    fontSize: '0.78rem',
-                    fontWeight: 650,
-                    border: '1px solid #bae6fd'
-                  }}
-                >
-                  <span>{student.first_name} {student.last_name} {student.instrument && `(${student.instrument})`}</span>
-                  <button
-                    type="button"
-                    onClick={() => setNewPpSelectedStudentIds(prev => prev.filter(id => id !== student.id))}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#0284c7',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: 0
+              selectedStudents.map(student => {
+                const hasProgramConsent = studentConsentsMap[student.id]?.concert_program !== false;
+                return (
+                  <div 
+                    key={student.id} 
+                    style={{ 
+                      display: 'inline-flex', 
+                      alignItems: 'center', 
+                      gap: '6px', 
+                      padding: '4px 10px', 
+                      background: hasProgramConsent ? '#e0f2fe' : '#fffbeb',
+                      color: hasProgramConsent ? '#0369a1' : '#b45309',
+                      borderRadius: '20px',
+                      fontSize: '0.78rem',
+                      fontWeight: 650,
+                      border: hasProgramConsent ? '1px solid #bae6fd' : '1px solid #fde68a'
                     }}
                   >
-                    <X size={13} />
-                  </button>
-                </div>
-              ))
+                    <span>{student.first_name} {student.last_name} {student.instrument && `(${student.instrument})`}</span>
+                    {!hasProgramConsent && (
+                      <span style={{ background: '#fee2e2', color: '#b91c1c', fontSize: '0.62rem', fontWeight: 850, padding: '1px 5px', borderRadius: '4px', border: '1px solid #fca5a5' }}>
+                        Kein Programm
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setNewPpSelectedStudentIds(prev => prev.filter(id => id !== student.id))}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: hasProgramConsent ? '#0284c7' : '#b45309',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 0
+                      }}
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                );
+              })
             )}
           </div>
         </div>
@@ -10722,11 +10760,19 @@ export function CampusEventsBoard({
                                               }
                                               return (
                                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                                                  {assigned.map((st: any) => (
-                                                    <span key={st.id} style={{ display: 'inline-block', padding: '3px 8px', background: '#e0f2fe', color: '#0369a1', borderRadius: '12px', fontSize: '0.74rem', fontWeight: 650, border: '1px solid #bae6fd' }}>
-                                                      {st.first_name} {st.last_name} {st.instrument && `(${st.instrument})`}
-                                                    </span>
-                                                  ))}
+                                                  {assigned.map((st: any) => {
+                                                    const hasProgramConsent = studentConsentsMap[st.id]?.concert_program !== false;
+                                                    return (
+                                                      <span key={st.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '3px 8px', background: hasProgramConsent ? '#e0f2fe' : '#fffbeb', color: hasProgramConsent ? '#0369a1' : '#b45309', borderRadius: '12px', fontSize: '0.74rem', fontWeight: 650, border: hasProgramConsent ? '1px solid #bae6fd' : '1px solid #fde68a' }}>
+                                                        <span>{st.first_name} {st.last_name} {st.instrument && `(${st.instrument})`}</span>
+                                                        {!hasProgramConsent && (
+                                                          <span style={{ background: '#fee2e2', color: '#b91c1c', fontSize: '0.62rem', fontWeight: 850, padding: '1px 5px', borderRadius: '4px', border: '1px solid #fca5a5' }}>
+                                                            Kein Programm
+                                                          </span>
+                                                        )}
+                                                      </span>
+                                                    );
+                                                  })}
                                                 </div>
                                               );
                                             })()}

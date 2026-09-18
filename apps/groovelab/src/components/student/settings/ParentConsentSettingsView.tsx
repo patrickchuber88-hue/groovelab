@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, Users, Award, ShieldCheck, Mail, AlertTriangle, Check, RotateCcw } from 'lucide-react';
+import { Camera, Users, Award, ShieldCheck, Bell, AlertTriangle, Check, RotateCcw } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 
 export interface ParentConsentSettingsViewProps {
@@ -120,10 +120,10 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
     },
     {
       key: 'newsletter',
-      icon: <Mail size={20} color="#f59e0b" />,
-      title: 'Musikschul-Briefe & Eltern-Info',
-      desc: 'Einladungen zu Ferienkursen, Meisterkursen und Elternabenden der Musikschule per E-Mail.',
-      badge: 'Service'
+      icon: <Bell size={20} color="#f59e0b" />,
+      title: 'Campus Push-Mitteilungen & Eltern-Info',
+      desc: 'Wichtige Ankündigungen, Einladungen zu Schülervorspielen und Eltern-Informationen direkt als In-App-Mitteilung (100% Zero-Mail).',
+      badge: 'Zero-Mail'
     },
   ];
 

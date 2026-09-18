@@ -465,6 +465,10 @@ export interface SecretaryVerwaltungTabProps {
   exportAuditLogsToCsv: () => void;
   translateKey: (key: string) => string;
   translateValue: (key: string, val: any) => string;
+  gdprRequests?: any[];
+  gdprLoading?: boolean;
+  completeGdprRequest?: (requestId: string, studentId: string, notes?: string) => Promise<{ success: boolean; error?: string }>;
+  rejectGdprRequest?: (requestId: string, reason: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 export function SecretaryVerwaltungTab(props: SecretaryVerwaltungTabProps) {
@@ -899,6 +903,10 @@ export function SecretaryVerwaltungTab(props: SecretaryVerwaltungTabProps) {
     exportAuditLogsToCsv,
     translateKey,
     translateValue,
+    gdprRequests,
+    gdprLoading,
+    completeGdprRequest,
+    rejectGdprRequest,
   } = props;
 
   // Compute all unique teachers for announcement recipient selection
@@ -1494,6 +1502,10 @@ export function SecretaryVerwaltungTab(props: SecretaryVerwaltungTabProps) {
             exportAuditLogsToCsv={exportAuditLogsToCsv}
             translateKey={translateKey}
             translateValue={translateValue}
+            gdprRequests={gdprRequests}
+            gdprLoading={gdprLoading}
+            completeGdprRequest={completeGdprRequest}
+            rejectGdprRequest={rejectGdprRequest}
           />
         </Suspense>
       )}

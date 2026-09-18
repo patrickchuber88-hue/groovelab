@@ -6,7 +6,7 @@ import {
   RotateCcw, Volume2, Moon, QrCode, X, Eye, EyeOff, Zap, Music, Library, School,
   Calendar, CalendarX, Check, CheckCircle, Target, Pencil, User, Mail, Phone, Users,
   Shield, Settings, Bell, FileText, AlertTriangle, ShieldCheck, CheckCheck, Mic, Download,
-  Key, Delete, Sliders, Compass, Lightbulb, Copy, Fingerprint, Headphones, ChevronLeft
+  Key, Delete, Sliders, Compass, Lightbulb, Copy, Fingerprint, Headphones, ChevronLeft, Camera
 } from 'lucide-react';
 import { formatTeacherFullName } from '../../../utils/nameHelper';
 import { CampusGroovelabText } from '../../CampusGroovelabBrand';
@@ -26,6 +26,7 @@ import { ParentCancellationLogSettingsView } from '../settings/ParentCancellatio
 import { ParentFamilyProfilesSettingsView } from '../settings/ParentFamilyProfilesSettingsView';
 import { ParentDataVaultSettingsView } from '../settings/ParentDataVaultSettingsView';
 import { ParentDevelopmentGridSettingsView } from '../settings/ParentDevelopmentGridSettingsView';
+import { ParentConsentSettingsView } from '../settings/ParentConsentSettingsView';
 
 export interface StudentSettingsTabProps {
   activeStudentSettingsModal: string | null;
@@ -1408,6 +1409,15 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                         icon: ShieldCheck
                       },
                       {
+                        id: 'consents',
+                        title: 'Medien & Einwilligungen',
+                        subtitle: 'Foto-Freigaben, Programmheft & Push',
+                        badge: 'Art. 7 & 8 DSGVO',
+                        gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        shadowColor: 'rgba(16, 185, 129, 0.40)',
+                        icon: Camera
+                      },
+                      {
                         id: 'downloads',
                         title: 'Downloads & Datentresor',
                         subtitle: 'Art. 20 Datensouveränität & 4 Archiv-Pakete',
@@ -1681,7 +1691,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                     background: '#ffffff',
                     borderRadius: isMobile ? 0 : '24px',
                     width: '100%',
-                    maxWidth: isMobile ? '100vw' : (activeStudentSettingsModal === 'billing' ? '920px' : (activeStudentSettingsModal === 'downloads' ? '760px' : '680px')),
+                    maxWidth: isMobile ? '100vw' : (activeStudentSettingsModal === 'billing' ? '920px' : ((activeStudentSettingsModal === 'downloads' || activeStudentSettingsModal === 'consents') ? '760px' : '680px')),
                     height: isMobile ? '100dvh' : 'auto',
                     maxHeight: isMobile ? '100dvh' : '88vh',
                     display: 'flex',
@@ -1759,6 +1769,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             {activeStudentSettingsModal === 'security' && (isAdultStudent ? 'PIN & Sicherheit' : 'PIN & Eltern-Schutz')}
                             {activeStudentSettingsModal === 'billing' && (isAdultStudent ? 'Vertrag & Belege' : 'Belege & Bereitstellung')}
                             {activeStudentSettingsModal === 'legal' && 'Datenschutz & Rechtliches'}
+                            {activeStudentSettingsModal === 'consents' && 'Medien & Einwilligungen'}
                             {activeStudentSettingsModal === 'downloads' && 'Downloads & Datentresor'}
                           </h3>
                         </div>
@@ -1812,6 +1823,8 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                               ? 'linear-gradient(135deg, #34a853 0%, #15803d 100%)'
                               : activeStudentSettingsModal === 'billing'
                               ? 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)'
+                              : activeStudentSettingsModal === 'consents'
+                              ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
                               : activeStudentSettingsModal === 'downloads'
                               ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)'
                               : 'linear-gradient(135deg, #64748b 0%, #475569 100%)',
@@ -1831,6 +1844,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             {activeStudentSettingsModal === 'security' && <Lock size={20} color="#ffffff" />}
                             {activeStudentSettingsModal === 'billing' && <FileText size={20} color="#ffffff" />}
                             {activeStudentSettingsModal === 'legal' && <ShieldCheck size={20} color="#ffffff" />}
+                            {activeStudentSettingsModal === 'consents' && <Camera size={20} color="#ffffff" />}
                             {activeStudentSettingsModal === 'downloads' && <Download size={20} color="#ffffff" />}
                           </div>
                           <div>
@@ -1849,6 +1863,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                               {activeStudentSettingsModal === 'security' && (isAdultStudent ? 'PIN & Account-Sicherheit' : 'PIN & Sicherheit')}
                               {activeStudentSettingsModal === 'billing' && (isAdultStudent ? 'Vertrag & Belege' : 'Belege & Bereitstellung')}
                               {activeStudentSettingsModal === 'legal' && 'Datenschutz, DSGVO & Transparenz'}
+                              {activeStudentSettingsModal === 'consents' && 'Medien-Einwilligungen & Foto-Freigaben'}
                               {activeStudentSettingsModal === 'downloads' && 'Downloads & Didaktik-Datentresor'}
                             </h3>
                             <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
@@ -1863,6 +1878,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                               {activeStudentSettingsModal === 'security' && (isAdultStudent ? '4-stellige persönliche PIN für schnellen und sicheren Login.' : (securityPinTarget === 'parent' ? '6-stellige Eltern-PIN zum Schutz des Kontrollzentrums & der Ruhezeiten.' : '4-stellige Schüler-PIN für dein Kind (schützt Stundenplan & Profil).'))}
                               {activeStudentSettingsModal === 'billing' && (isAdultStudent ? 'Übersicht über deine gebuchten Module und Zahlungsnachweise.' : 'Übersicht über 100% freie App, Bereitstellung & Zahlungsnachweise.')}
                               {activeStudentSettingsModal === 'legal' && '100% datensparsam in deutschen Rechenzentren, Auskunftsrechte nach Art. 15 DSGVO & Impressum.'}
+                              {activeStudentSettingsModal === 'consents' && 'DSGVO-Einwilligungen nach Art. 7 & 8: Fotos, Konzert-Programmheft und Push-Mitteilungen.'}
                               {activeStudentSettingsModal === 'downloads' && 'Volle Datensouveränität nach Art. 20 DSGVO: Sichere alle Übedaten, Audioaufnahmen und Sammel-Sticker.'}
                             </p>
                           </div>
@@ -3234,6 +3250,13 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                           </p>
                         </div>
                       </div>
+                    )}
+
+                    {activeStudentSettingsModal === 'consents' && (
+                      <ParentConsentSettingsView
+                        studentUser={studentUser}
+                        studentId={studentId}
+                      />
                     )}
 
                     {activeStudentSettingsModal === 'downloads' && (

@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Edit3, Eye, EyeOff, FileText, Headphones,
-  Search, Trash2, UserPlus
+  Search, Trash2, UserPlus, CameraOff
 } from 'lucide-react';
 import { maskLastName } from '../../utils/nameHelper';
 import { getInstrumentAvatarUrl } from '../StudioAvatar';
+import { supabase } from '../../lib/supabase';
 
 export interface TeacherStudentsViewProps {
   allStudents: any[];
@@ -51,6 +52,31 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
   onOpenBandProfile,
   AvatarImage,
 }) => {
+  const [studentConsentsMap, setStudentConsentsMap] = useState<Record<string, { photo_internal?: boolean; photo_social_media?: boolean; concert_program?: boolean }>>({});
+
+  useEffect(() => {
+    let isMounted = true;
+    const studentIds = (allStudents || []).map(s => s.id).filter(Boolean);
+    if (studentIds.length === 0) return;
+
+    supabase
+      .from('student_consents')
+      .select('student_id, consent_type, granted')
+      .in('student_id', studentIds)
+      .then(({ data, error }: { data: any; error: any }) => {
+        if (!error && data && isMounted) {
+          const map: Record<string, any> = {};
+          data.forEach((row: any) => {
+            if (!map[row.student_id]) map[row.student_id] = {};
+            map[row.student_id][row.consent_type] = Boolean(row.granted);
+          });
+          setStudentConsentsMap(map);
+        }
+      });
+
+    return () => { isMounted = false; };
+  }, [allStudents]);
+
   return (
         <div style={{ display: 'flex', gap: windowWidth < 768 ? '16px' : '32px', alignItems: 'flex-start', flexWrap: 'wrap', width: '100%' }}>
           {/* Main Column */}
@@ -274,7 +300,7 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                                 </span>
                               )}
                             </div>
-                            <div style={{ marginTop: '2px' }}>
+                            <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                               {isStudentActive ? (
                                 <span style={{ 
                                   background: isGrooveLab ? '#fefce8' : '#d1fae5', 
@@ -291,6 +317,47 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                               ) : (
                                 <span style={{ background: '#f1f5f9', color: '#64748b', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '100px', display: 'inline-block' }}>
                                   Basis
+                                </span>
+                              )}
+
+                              {studentConsentsMap[student.id] && (studentConsentsMap[student.id].photo_internal === false || studentConsentsMap[student.id].photo_social_media === false) && (
+                                <span 
+                                  title="Foto-Sperre: Eltern haben Foto- oder Videoaufnahmen für diesen Schüler untersagt. Bitte keine Aufnahmen anfertigen."
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    background: '#fee2e2',
+                                    color: '#b91c1c',
+                                    border: '1px solid #fca5a5',
+                                    fontSize: '0.65rem',
+                                    fontWeight: 800,
+                                    padding: '2px 7px',
+                                    borderRadius: '100px'
+                                  }}
+                                >
+                                  <CameraOff size={11} strokeWidth={2.5} />
+                                  <span>Foto-Sperre</span>
+                                </span>
+                              )}
+
+                              {studentConsentsMap[student.id] && studentConsentsMap[student.id].concert_program === false && (
+                                <span 
+                                  title="Programm-Sperre: Nennung im gedruckten Konzertprogramm oder auf Plakaten untersagt."
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px',
+                                    background: '#fef3c7',
+                                    color: '#92400e',
+                                    border: '1px solid #fcd34d',
+                                    fontSize: '0.65rem',
+                                    fontWeight: 800,
+                                    padding: '2px 7px',
+                                    borderRadius: '100px'
+                                  }}
+                                >
+                                  <span>Kein Programm</span>
                                 </span>
                               )}
                             </div>
