@@ -156,6 +156,14 @@ const FORBIDDEN_FRONTEND_PATTERNS = [
     severity:    'HIGH',
     description: 'DSGVO Art. 8 & 32 Compliance: Direct unencrypted storage of raw audio base64 or data URLs in browser storage is forbidden. Use encryptedOfflineVault or IndexedDB with encryption.',
     allowedFiles: ['src/tests/']
+  },
+  {
+    id:          'FE-16',
+    name:        'Zero Master Admin Password UI & State Invariant (Zero-Password IAM)',
+    regex:       /(?:\b(?:adminPasswordInput|masterKeyInput|adminMasterPassword)\b|placeholder=['"][^'"]*Master-(?:Schlüssel|Passwort)|['"]p_password['"]\s*:\s*(?!null|undefined|'')[^,\}\s]+)/g,
+    severity:    'CRITICAL',
+    description: '100% Zero-Password Master Admin IAM (OWASP ASVS L4 / NIST SP 800-63B AAL3): Master Admin authentication is strictly passwordless. No password state, input field, placeholder or active p_password parameter is allowed in client UI components.',
+    allowedFiles: ['src/tests/']
   }
 ];
 
@@ -287,6 +295,15 @@ for (const filePath of migrationFiles) {
         process.stderr.write(`       Details: Parent step-up leases in save_parent_controls must be timeboxed to a maximum of 15 minutes (INTERVAL '15 minutes') to protect shared family devices.\n`);
         violationsCount++;
       }
+    }
+
+    // 1% Invariant SQL-04: Zero Hardcoded Default Passwords in Migrations
+    const defaultCredMatch = content.match(/ADD\s+COLUMN[^\n;]*(?:password|passwort|master_admin_password)[^\n;]*DEFAULT\s+['"][^'"]+['"]/i);
+    if (defaultCredMatch) {
+      process.stderr.write(`\n  🔴 [FAIL] [CRITICAL] Hardcoded Default Credential in Migration ${baseName}\n`);
+      process.stderr.write(`       File: ${relPath}\n`);
+      process.stderr.write(`       Details: SQL migrations must NEVER specify hardcoded default credentials in ADD COLUMN DDL statements. Use DEFAULT NULL.\n`);
+      violationsCount++;
     }
   }
 }

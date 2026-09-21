@@ -38,6 +38,8 @@ PATTERNS=(
     "(^|[^a-zA-Z0-9_])SG\.[0-9a-zA-Z_-]{22}\.[0-9a-zA-Z_-]{43}"
     "(^|[^a-zA-Z0-9_])sk-ant-api[0-9]{2}-[0-9a-zA-Z_-]{80,}"
     "(^|[^a-zA-Z0-9_])sk-(proj-)?[0-9a-zA-Z]{32,}"
+    "ADD[[:space:]]+COLUMN.*(password|passwort).*DEFAULT[[:space:]]+['\"][^'\"]+['\"]"
+    "master_admin_password[[:space:]]*=[[:space:]]*['\"][^'\"]+['\"]"
 )
 
 for file in $FILES; do

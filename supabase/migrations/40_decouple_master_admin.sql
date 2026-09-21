@@ -6,7 +6,7 @@
 
 -- 1. Spalten für Master-Admin-Zugangsdaten hinzufügen (falls noch nicht geschehen)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS master_admin_username TEXT DEFAULT 'admin';
-ALTER TABLE users ADD COLUMN IF NOT EXISTS master_admin_password TEXT DEFAULT 'groovelab2026';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS master_admin_password TEXT DEFAULT NULL;
 
 -- 2. Alle existierenden Nutzer als Master-Admin deaktivieren (inklusive Patrick Huber)
 -- Patrick Huber (ID: '55555555-5555-5555-5555-555555555555') behält seine normale Lehrer-Rolle für Bad Säckingen.
@@ -33,11 +33,11 @@ INSERT INTO users (
   true,
   'fa9b8c7d-6e5f-4a3b-2c1d-0e9f8a7b6c5d', -- Einzigartiger UUID-Token für den Master-Admin
   'admin',
-  'groovelab2026',
+  NULL, -- Initiales Master-Passwort wird über autoritative RPCs / TOTP verwaltet
   NULL -- Keine Zuweisung zu einer Schule
 )
 ON CONFLICT (id) DO UPDATE SET
   is_master_admin = true,
   master_admin_username = COALESCE(users.master_admin_username, 'admin'),
-  master_admin_password = COALESCE(users.master_admin_password, 'groovelab2026'),
+  master_admin_password = COALESCE(users.master_admin_password, NULL),
   school_id = NULL;

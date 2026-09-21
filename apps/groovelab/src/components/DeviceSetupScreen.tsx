@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Music, Tablet, X, ShieldCheck, FileText, Lock } from 'lucide-react';
+import { Music, Tablet, X, ShieldCheck, FileText, Lock, Fingerprint } from 'lucide-react';
 import { generateConsentPDF } from '../utils/pdfGenerator';
 import { isUUID } from '../utils/uuidValidator';
+import { authenticateMasterBiometricPasskey } from '../utils/webauthn';
 
 interface DeviceSetupScreenProps {
   school?: any;
@@ -49,8 +50,8 @@ export function DeviceSetupScreen({
   // Secret Master Admin click combo state
   const [logoClicks, setLogoClicks] = useState(0);
   const [showAdminModal, setShowAdminModal] = useState(false);
-  const [adminUsernameInput, setAdminUsernameInput] = useState('');
-  const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [adminAuthMode, setAdminAuthMode] = useState<'passkey' | 'totp'>('passkey');
+  const [adminTotpInput, setAdminTotpInput] = useState('');
   const [adminLoginLoading, setAdminLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
@@ -62,36 +63,55 @@ export function DeviceSetupScreen({
     }
   }, [logoClicks]);
 
-  const handleAdminLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!adminUsernameInput.trim() || !adminPasswordInput.trim()) return;
+  const handleAdminPasskeyLogin = async () => {
     try {
       setAdminLoginLoading(true);
       setLoginError(null);
-      
-      const { data: user, error: userErr } = await supabase.rpc('login_master_admin', {
-        p_username: adminUsernameInput.trim(),
-        p_password: adminPasswordInput.trim()
-      });
-
-      if (userErr || !user || !user.id || user.is_master_admin !== true) {
-        throw new Error('Ungültige Master-Admin Anmeldedaten.');
+      const res = await authenticateMasterBiometricPasskey(supabase);
+      if (!res.success || !res.user) {
+        throw new Error(res.error || 'Passkey-Authentifizierung fehlgeschlagen.');
       }
-
-      console.log('[Setup] Master Admin logged in from Device Setup.');
-      
-      // Clean inputs
-      setAdminUsernameInput('');
-      setAdminPasswordInput('');
-      setShowAdminModal(false);
-
-      // Finalize login (reload to activate Master Admin Dashboard)
-      sessionStorage.setItem('groovelab_user_id', user.id);
-      sessionStorage.setItem('groovelab_location_mode', 'home');
+      if (res.lease_token) {
+        sessionStorage.setItem('gl_active_session_lease_id', res.lease_token);
+      }
+      sessionStorage.setItem('groovelab_user_id', res.user.id);
+      sessionStorage.setItem('groovelab_is_master_admin', 'true');
+      sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
+      sessionStorage.setItem('groovelab_active_platform', 'campus');
       window.location.reload();
     } catch (err: any) {
       setLoginError(err.message);
-    } finally {
+      setAdminLoginLoading(false);
+    }
+  };
+
+  const handleAdminTotpLogin = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanCode = adminTotpInput.replace(/\s+/g, '').trim();
+    if (cleanCode.length !== 6 || !/^\d{6}$/.test(cleanCode)) {
+      setLoginError('Bitte den 6-stelligen Code aus der Google Authenticator App eingeben.');
+      return;
+    }
+    try {
+      setAdminLoginLoading(true);
+      setLoginError(null);
+      const { data: user, error: userErr } = await supabase.rpc('login_master_admin', {
+        p_username: 'admin',
+        p_totp_code: cleanCode
+      });
+      if (userErr || !user || !user.id || user.is_master_admin !== true) {
+        throw new Error(user?.error || userErr?.message || 'Ungültiger Authenticator-Code.');
+      }
+      if (user.lease_token) {
+        sessionStorage.setItem('gl_active_session_lease_id', user.lease_token);
+      }
+      sessionStorage.setItem('groovelab_user_id', user.id);
+      sessionStorage.setItem('groovelab_is_master_admin', 'true');
+      sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
+      sessionStorage.setItem('groovelab_active_platform', 'campus');
+      window.location.reload();
+    } catch (err: any) {
+      setLoginError(err.message);
       setAdminLoginLoading(false);
     }
   };
@@ -1164,8 +1184,8 @@ export function DeviceSetupScreen({
             <button 
               onClick={() => {
                 setShowAdminModal(false);
-                setAdminUsernameInput('');
-                setAdminPasswordInput('');
+                setAdminAuthMode('passkey');
+                setAdminTotpInput('');
                 setLoginError(null);
               }} 
               style={{
@@ -1184,120 +1204,176 @@ export function DeviceSetupScreen({
                 color: '#64748b',
                 transition: 'all 0.2s'
               }}
-              
-              
+              aria-label="Schließen"
             >
               <X size={20} />
             </button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#eab308' }}>
-                <ShieldCheck size={28} />
+              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: adminAuthMode === 'passkey' ? '#fef9c3' : '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: adminAuthMode === 'passkey' ? '#ca8a04' : '#16a34a' }}>
+                {adminAuthMode === 'passkey' ? <Fingerprint size={28} /> : <ShieldCheck size={28} />}
               </div>
               <div>
-                <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#0f172a', textAlign: 'left' }}>Master-Admin Login</h2>
-                <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left' }}>GrooveLab Master Administration</p>
+                <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#0f172a', textAlign: 'left' }}>
+                  {adminAuthMode === 'passkey' ? 'Master-Admin Login' : 'Google Authenticator'}
+                </h2>
+                <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left' }}>
+                  {adminAuthMode === 'passkey' ? '100% Passwortlose FIDO2-IAM' : '6-stelliger TOTP Einmalcode'}
+                </p>
               </div>
             </div>
 
-            <form onSubmit={handleAdminLogin} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-              <div style={{ textAlign: 'left' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Benutzername
-                </label>
+            {loginError && (
+              <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#ef4444', padding: '12px', borderRadius: '12px', fontSize: '12px', fontWeight: 700, textAlign: 'center' }}>
+                {loginError}
+              </div>
+            )}
+
+            {adminAuthMode === 'passkey' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '14px', padding: '14px', fontSize: '12px', color: '#475569', lineHeight: 1.5, textAlign: 'left' }}>
+                  <strong>NIST SP 800-63B AAL3:</strong> Passwörter wurden abgeschafft. Melden Sie sich direkt mit Ihrem registrierten Hardware-Passkey (Touch ID, Face ID, YubiKey) an.
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleAdminPasskeyLogin}
+                  disabled={adminLoginLoading}
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    borderRadius: '14px',
+                    background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                    color: '#ffffff',
+                    border: '1.5px solid #eab308',
+                    fontSize: '0.95rem',
+                    fontWeight: 800,
+                    cursor: adminLoginLoading ? 'wait' : 'pointer',
+                    boxShadow: '0 8px 24px rgba(15, 23, 42, 0.15)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '10px'
+                  }}
+                >
+                  <Fingerprint size={20} color="#eab308" />
+                  <span>{adminLoginLoading ? 'Verifiziere Passkey...' : 'Mit Passkey anmelden (Touch ID)'}</span>
+                </button>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '2px 0' }}>
+                  <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+                  <span style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Oder</span>
+                  <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdminAuthMode('totp');
+                    setLoginError(null);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: '12px',
+                    background: '#f1f5f9',
+                    color: '#0f172a',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.88rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <ShieldCheck size={16} color="#16a34a" />
+                  <span>Mit Google Authenticator (TOTP) anmelden</span>
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleAdminTotpLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', lineHeight: 1.4, textAlign: 'center' }}>
+                  Geben Sie den 6-stelligen Code aus Ihrer <strong>Google Authenticator</strong> App ein.
+                </p>
+
                 <input
                   type="text"
-                  value={adminUsernameInput}
-                  onChange={(e) => setAdminUsernameInput(e.target.value)}
-                  placeholder="z.B. admin"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  value={adminTotpInput}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^0-9]/g, '');
+                    setAdminTotpInput(val);
+                    if (val.length === 6) {
+                      setTimeout(() => {
+                        handleAdminTotpLogin();
+                      }, 50);
+                    }
+                  }}
+                  placeholder="000 000"
+                  autoFocus
                   required
                   style={{
                     width: '100%',
                     boxSizing: 'border-box',
-                    padding: '14px 16px',
+                    padding: '12px',
                     borderRadius: '12px',
-                    background: '#ffffff',
-                    border: '1.5px solid #e2e8f0',
-                    color: '#1e293b',
-                    fontSize: '0.95rem',
-                    fontWeight: 600,
-                    outline: 'none',
-                    transition: 'all 0.2s'
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#eab308';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = '#e2e8f0';
+                    background: '#f8fafc',
+                    border: '2px solid #22c55e',
+                    color: '#0f172a',
+                    fontSize: '1.3rem',
+                    fontWeight: 900,
+                    textAlign: 'center',
+                    letterSpacing: '6px',
+                    fontFamily: 'monospace',
+                    outline: 'none'
                   }}
                 />
-              </div>
 
-              <div style={{ textAlign: 'left' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Passwort
-                </label>
-                <input
-                  type="password"
-                  value={adminPasswordInput}
-                  onChange={(e) => setAdminPasswordInput(e.target.value)}
-                  placeholder="••••••••"
-                  required
+                <button
+                  type="submit"
+                  disabled={adminLoginLoading || adminTotpInput.length !== 6}
                   style={{
                     width: '100%',
-                    boxSizing: 'border-box',
-                    padding: '14px 16px',
-                    borderRadius: '12px',
-                    background: '#ffffff',
-                    border: '1.5px solid #e2e8f0',
-                    color: '#1e293b',
+                    padding: '14px',
+                    borderRadius: '14px',
+                    background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                    color: '#ffffff',
+                    border: 'none',
                     fontSize: '0.95rem',
+                    fontWeight: 800,
+                    cursor: (adminLoginLoading || adminTotpInput.length !== 6) ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 8px 24px rgba(22, 163, 74, 0.25)',
+                    opacity: (adminLoginLoading || adminTotpInput.length !== 6) ? 0.6 : 1
+                  }}
+                >
+                  {adminLoginLoading ? 'Prüfe Code...' : 'Code bestätigen & Einloggen'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdminAuthMode('passkey');
+                    setLoginError(null);
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#64748b',
+                    fontSize: '0.80rem',
+                    cursor: 'pointer',
                     fontWeight: 600,
-                    outline: 'none',
-                    transition: 'all 0.2s'
+                    textDecoration: 'underline',
+                    textAlign: 'center'
                   }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#eab308';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = '#e2e8f0';
-                  }}
-                />
-              </div>
-
-              {loginError && (
-                <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#ef4444', padding: '12px', borderRadius: '12px', fontSize: '12px', fontWeight: 700, textAlign: 'center' }}>
-                  {loginError}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={adminLoginLoading}
-                style={{
-                  width: '100%',
-                  padding: '14px',
-                  borderRadius: '14px',
-                  background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-                  color: '#ffffff',
-                  border: 'none',
-                  fontSize: '0.95rem',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  boxShadow: '0 8px 24px rgba(15, 23, 42, 0.15)',
-                  transition: 'all 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  marginTop: '10px'
-                }}
-                
-                
-              >
-                {adminLoginLoading ? 'Verifiziere...' : 'Einloggen'}
-              </button>
-            </form>
+                >
+                  ‹ Zurück zur Passkey-Anmeldung
+                </button>
+              </form>
+            )}
           </div>
         </div>
       )}

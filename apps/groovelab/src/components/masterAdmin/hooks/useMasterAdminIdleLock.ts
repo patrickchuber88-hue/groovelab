@@ -71,23 +71,24 @@ export function useMasterAdminIdleLock({ currentUser, adminUsername, adminUserId
           // Fallback to login_master_admin with TOTP
           const { data: authTotp, error: authTotpErr } = await supabase.rpc('login_master_admin', {
             p_username: adminUsername || 'admin',
-            p_password: ' ',
             p_totp_code: pinOrPass
           });
           if (!authTotpErr && authTotp && (authTotp.id || authTotp.is_master_admin)) {
             isVerified = true;
           }
         }
-      } else {
-        // 2. Otherwise verify as Master Admin Password via login_master_admin
+      } else if (pinOrPass.toUpperCase().startsWith('GL-') || pinOrPass.length >= 12) {
+        // 2. Otherwise verify as Break-Glass Recovery Code via login_master_admin
         const { data: authData, error: authErr } = await supabase.rpc('login_master_admin', {
           p_username: adminUsername || 'admin',
-          p_password: pinOrPass
+          p_recovery_code: pinOrPass
         });
 
-        if (!authErr && authData && (authData.id || authData.requires_2fa || authData.is_master_admin)) {
+        if (!authErr && authData && (authData.id || authData.is_master_admin)) {
           isVerified = true;
         }
+      } else {
+        throw new Error('Bitte den 6-stelligen Google Authenticator Code oder Notfall-Code (GL-...) eingeben.');
       }
 
       if (isVerified) {

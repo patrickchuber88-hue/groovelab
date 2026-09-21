@@ -5,13 +5,12 @@
 
 -- 1. Spalten für Master-Admin-Zugangsdaten hinzufügen (falls nicht vorhanden)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS master_admin_username TEXT DEFAULT 'admin';
-ALTER TABLE users ADD COLUMN IF NOT EXISTS master_admin_password TEXT DEFAULT 'groovelab2026';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS master_admin_password TEXT DEFAULT NULL;
 
 -- 2. Aktualisiere bestehende Master-Admins mit Zugangsdaten
 UPDATE users 
 SET is_master_admin = true,
-    master_admin_username = COALESCE(master_admin_username, 'admin'),
-    master_admin_password = COALESCE(master_admin_password, 'groovelab2026')
+    master_admin_username = COALESCE(master_admin_username, 'admin')
 WHERE is_master_admin = true;
 
 -- 3. Standard-Master-Admin (Patrick Huber) anlegen, falls noch kein Master-Admin existiert
@@ -34,5 +33,5 @@ SELECT
   true,
   '7b8e1a2c-4d5f-6a7b-8c9d-0e1f2a3b4c5d',
   'admin',
-  'groovelab2026'
+  NULL
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE is_master_admin = true);

@@ -52,8 +52,11 @@ function testZeroSecretLeakage() {
 
   const masterAdminDir = path.resolve(__dirname, '../components/masterAdmin');
   const masterAdminDashboardPath = path.resolve(__dirname, '../components/MasterAdminDashboard.tsx');
+  const loginScreenPath = path.resolve(__dirname, '../components/LoginScreen.tsx');
+  const startseitePath = path.resolve(__dirname, '../components/Startseite.tsx');
+  const deviceSetupPath = path.resolve(__dirname, '../components/DeviceSetupScreen.tsx');
 
-  const allMasterAdminFiles: string[] = [masterAdminDashboardPath];
+  const allMasterAdminFiles: string[] = [masterAdminDashboardPath, loginScreenPath, startseitePath, deviceSetupPath];
   function scanDir(dir: string) {
     fs.readdirSync(dir).forEach(file => {
       const full = path.join(dir, file);
@@ -385,6 +388,47 @@ function testHighSecurityHardenings() {
 }
 
 // ------------------------------------------------------------------------------
+// SUITE 9: 100% ZERO MASTER ADMIN PASSWORD INVARIANT (OWASP ASVS L4 / NIST SP 800-63B)
+// ------------------------------------------------------------------------------
+function testZeroMasterAdminPasswordInvariant() {
+  console.log('\n--- SUITE 9: 100% ZERO MASTER ADMIN PASSWORD INVARIANT ---');
+
+  const entryFiles = [
+    path.resolve(__dirname, '../components/MasterAdminDashboard.tsx'),
+    path.resolve(__dirname, '../components/LoginScreen.tsx'),
+    path.resolve(__dirname, '../components/Startseite.tsx'),
+    path.resolve(__dirname, '../components/DeviceSetupScreen.tsx'),
+    path.resolve(__dirname, '../components/masterAdmin/tabs/OperatorTab.tsx'),
+    path.resolve(__dirname, '../components/masterAdmin/hooks/useMasterAdminOperator.ts'),
+    path.resolve(__dirname, '../components/masterAdmin/hooks/useMasterAdminIdleLock.ts')
+  ];
+
+  entryFiles.forEach(filePath => {
+    if (!fs.existsSync(filePath)) return;
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const base = path.basename(filePath);
+
+    // Check 1: Zero master password input fields, states or placeholders
+    const hasPasswordStateOrInput = /(?:\b(?:adminPasswordInput|masterKeyInput|adminMasterPassword)\b|placeholder=['"][^'"]*Master-(?:Schlüssel|Passwort))/i.test(content);
+    assert(
+      !hasPasswordStateOrInput,
+      'Zero Master Admin Password',
+      `Zero master password state or input field in ${base}`,
+      `Found forbidden master password state or input in ${base}`
+    );
+
+    // Check 2: Zero active p_password parameter in login_master_admin RPC calls
+    const callsWithPassword = /rpc\(\s*['"]login_master_admin['"]\s*,\s*\{[^}]*p_password\s*:\s*(?!null|undefined|'')[^,\}\s]+/gs.test(content);
+    assert(
+      !callsWithPassword,
+      'Zero Master Admin Password',
+      `Zero active p_password argument in login_master_admin calls in ${base}`,
+      `Found active p_password passed to login_master_admin in ${base}`
+    );
+  });
+}
+
+// ------------------------------------------------------------------------------
 // EXECUTION & SUMMARY
 // ------------------------------------------------------------------------------
 async function runAll() {
@@ -396,6 +440,7 @@ async function runAll() {
   await testActionContracts();
   testCoordinatorShellLoc();
   testHighSecurityHardenings();
+  testZeroMasterAdminPasswordInvariant();
 
   console.log('\n================================================================');
   console.log('AUDIT SUMMARY');

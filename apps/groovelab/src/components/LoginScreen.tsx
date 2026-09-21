@@ -5,7 +5,7 @@ import { downloadLocalQrCodePng } from '../utils/localQrGenerator';
 import { supabase } from '../lib/supabase';
 import { Music, Tablet, ShieldCheck, FileText, X, Check, School, AlertCircle, ArrowRight, Download, User, Upload, Key, KeyRound, RotateCw, HelpCircle, Lock, Calendar, Clock, ArrowLeft, Mail, Users, Plus, Fingerprint, Timer, Trophy, Smartphone, Camera, CameraOff, Unlink, SwitchCamera, Star, Ban, Sparkles, Pencil } from 'lucide-react';
 import { getDistanceFromLatLonInM } from '../utils/geo';
-import { isWebAuthnSupported, registerBiometrics, authenticateUserBiometrics, getStoredBiometricProfiles, saveBiometricProfile, removeBiometricProfile, BiometricVaultProfile, getSanitizedRpId } from '../utils/webauthn';
+import { isWebAuthnSupported, registerBiometrics, authenticateUserBiometrics, getStoredBiometricProfiles, saveBiometricProfile, removeBiometricProfile, BiometricVaultProfile, getSanitizedRpId, authenticateMasterBiometricPasskey } from '../utils/webauthn';
 import { StudentMobileScheduleWizard } from './StudentMobileScheduleWizard';
 import { LegalTextModal } from './LegalTextModal';
 import { setLocalhostDevLegalBypassed } from './LegalConsentGate';
@@ -1439,11 +1439,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   // Secret Master Admin click combo state
   const [logoClicks, setLogoClicks] = useState(0);
   const [showAdminModal, setShowAdminModal] = useState(false);
-  const [adminAuthStep, setAdminAuthStep] = useState<1 | 2>(1);
-  const [adminPendingUser, setAdminPendingUser] = useState<any>(null);
+  const [adminAuthMode, setAdminAuthMode] = useState<'passkey' | 'totp' | 'recovery'>('passkey');
   const [adminTotpInput, setAdminTotpInput] = useState<string>('');
-  const [adminUsernameInput, setAdminUsernameInput] = useState('');
-  const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [adminRecoveryInput, setAdminRecoveryInput] = useState<string>('');
   const [adminLoginLoading, setAdminLoginLoading] = useState(false);
 
   // Teacher check-in choice modal state
@@ -1478,69 +1476,82 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const handleAdminLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!adminUsernameInput.trim() || !adminPasswordInput.trim()) return;
+  const handleAdminPasskeyLogin = async () => {
     try {
       setAdminLoginLoading(true);
       setError(null);
-      
-      const { data: user, error: userErr } = await supabase
-        .rpc('login_master_admin', {
-          p_username: adminUsernameInput.trim(),
-          p_password: adminPasswordInput.trim()
-        });
-
-      if (userErr || !user) {
-        throw new Error('Ungültige Master-Admin Anmeldedaten.');
+      const result = await authenticateMasterBiometricPasskey(supabase);
+      if (!result.success || !result.user) {
+        throw new Error(result.error || 'Passkey-Authentifizierung fehlgeschlagen.');
       }
-
-      if (user.error) {
-        throw new Error(user.error);
+      if (result.lease_token) {
+        sessionStorage.setItem('gl_active_session_lease_id', result.lease_token);
       }
-
-      if (user.requires_2fa || user.is_2fa_enabled) {
-        setAdminPendingUser(user);
-        setAdminAuthStep(2);
-        setError(null);
-        setAdminLoginLoading(false);
-        return;
-      }
-
-      await completeAdminLogin(user);
+      await completeAdminLogin(result.user);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || 'Passkey-Anmeldung fehlgeschlagen.');
       setAdminLoginLoading(false);
     }
   };
 
-  const handleAdminVerifyTotp = async (e?: React.FormEvent) => {
+  const handleAdminTotpLogin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!adminPendingUser) return;
     const cleanCode = adminTotpInput.replace(/\s+/g, '').trim();
     if (cleanCode.length !== 6 || !/^\d{6}$/.test(cleanCode)) {
-      setError('Bitte den 6-stelligen Code aus der Authenticator-App eingeben.');
+      setError('Bitte den 6-stelligen Code aus der Google Authenticator App eingeben.');
       return;
     }
     setAdminLoginLoading(true);
     setError(null);
     try {
-      // 1. Authoritative: Server-Side Zero-Secret 2FA Verification (Fail-Closed)
       const { data: verifiedUser, error: verifyErr } = await supabase
         .rpc('login_master_admin', {
-          p_username: adminUsernameInput.trim(),
-          p_password: adminPasswordInput.trim(),
+          p_username: 'admin',
           p_totp_code: cleanCode
         });
 
       if (!verifyErr && verifiedUser && verifiedUser.id && !verifiedUser.error) {
+        if (verifiedUser.lease_token) {
+          sessionStorage.setItem('gl_active_session_lease_id', verifiedUser.lease_token);
+        }
         await completeAdminLogin(verifiedUser);
         return;
       }
 
-      throw new Error(verifiedUser?.error || verifyErr?.message || 'Ungültiger 2FA-Code. Bitte aktuellen Code aus der Authenticator-App eingeben.');
+      throw new Error(verifiedUser?.error || verifyErr?.message || 'Ungültiger Google Authenticator Code.');
     } catch (err: any) {
       setError(err.message || '2FA-Verifikation fehlgeschlagen.');
+      setAdminLoginLoading(false);
+    }
+  };
+
+  const handleAdminRecoveryLogin = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanCode = adminRecoveryInput.trim();
+    if (!cleanCode) {
+      setError('Bitte den Notfall-Wiederherstellungscode eingeben.');
+      return;
+    }
+    setAdminLoginLoading(true);
+    setError(null);
+    try {
+      const { data: verifiedUser, error: verifyErr } = await supabase
+        .rpc('login_master_admin', {
+          p_username: 'admin',
+          p_recovery_code: cleanCode
+        });
+
+      if (!verifyErr && verifiedUser && verifiedUser.id && !verifiedUser.error) {
+        if (verifiedUser.lease_token) {
+          sessionStorage.setItem('gl_active_session_lease_id', verifiedUser.lease_token);
+        }
+        await completeAdminLogin(verifiedUser);
+        return;
+      }
+
+      throw new Error(verifiedUser?.error || verifyErr?.message || 'Ungültiger oder bereits verwendeter Notfall-Code.');
+    } catch (err: any) {
+      setError(err.message || 'Notfall-Login fehlgeschlagen.');
       setAdminLoginLoading(false);
     }
   };
@@ -1548,17 +1559,15 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
   const completeAdminLogin = async (user: any) => {
     console.log('[Login] Master Admin logged in successfully.');
     setShowAdminModal(false);
-    setAdminUsernameInput('');
-    setAdminPasswordInput('');
-    setAdminAuthStep(1);
+    setAdminAuthMode('passkey');
     setAdminTotpInput('');
-    setAdminPendingUser(null);
+    setAdminRecoveryInput('');
     
     sessionStorage.setItem('groovelab_user_id', user.id);
     sessionStorage.setItem('groovelab_is_master_admin', 'true');
     sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
     sessionStorage.setItem('groovelab_active_platform', 'campus');
-    await createMasterSessionLease(user.id, 'master_pin');
+    await createMasterSessionLease(user.id, 'passkey_fido2');
 
     finalizeLogin(user, null, true);
   };
@@ -1909,10 +1918,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       let finalStationId = null;
       let isHome = false;
 
-      const userSchool = Array.isArray(user.schools) ? user.schools[0] : user.schools;
+      const userSchool = effectiveSchool || (Array.isArray(user.schools) ? user.schools[0] : user.schools);
       const isMaster = user.is_master_admin === true;
-
-
 
       const isAdminOrSecretary = user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'secretary';
       const isTeacher = user.role?.toLowerCase() === 'teacher' || isAdminOrSecretary;
@@ -1923,9 +1930,25 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
 
           // Contract start date & booking check bypassed for timetable onboarding/design
 
-          // Check school's module subscriptions based on active login portal
-          const hasCampusSub = userSchool?.has_campus_subscription ?? false;
-          const hasGroovelabSub = userSchool?.has_groovelab_subscription ?? false;
+          // Check school's module subscriptions based on active login portal with dual attribute naming parity
+          const hasCampusSub = Boolean(
+            userSchool?.has_campus_subscription ?? 
+            userSchool?.is_campus_active ?? 
+            effectiveSchool?.has_campus_subscription ?? 
+            effectiveSchool?.is_campus_active ?? 
+            schoolData?.has_campus_subscription ?? 
+            schoolData?.is_campus_active ?? 
+            false
+          );
+          const hasGroovelabSub = Boolean(
+            userSchool?.has_groovelab_subscription ?? 
+            userSchool?.is_groovelab_active ?? 
+            effectiveSchool?.has_groovelab_subscription ?? 
+            effectiveSchool?.is_groovelab_active ?? 
+            schoolData?.has_groovelab_subscription ?? 
+            schoolData?.is_groovelab_active ?? 
+            false
+          );
 
           if (isGroovelabKiosk) {
             if (!hasGroovelabSub && !isTrial) {
@@ -2251,8 +2274,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             photo_url: user.photo_url || user.avatar_url || null,
             instrument: user.instrument || user.groovelab_instrument || null,
             role: 'student',
-            school_id: user.school_id || null,
-            qr_token: user.qr_token || null
+            school_id: user.school_id || effectiveSchool?.id || null,
+            qr_token: user.qr_token || null,
+            has_personal_pin: Boolean(user.has_personal_pin),
+            is_pin_activated: Boolean(user.is_pin_activated),
+            schools: effectiveSchool || user.schools || null
           };
           if (existingIdx !== -1) {
             profiles[existingIdx] = { ...profiles[existingIdx], ...entry };
@@ -2303,12 +2329,53 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
       setError(null);
       const effectiveSchoolId = schoolData?.id || p.school_id || (typeof window !== 'undefined' ? localStorage.getItem('groovelab_last_school_id') : null);
 
-      // 1. PIN-Schranke: Falls das Schülerprofil PIN-geschützt ist (Zero-Trust Schülersicherheit)
-      if (p.has_personal_pin || p.is_pin_activated) {
-        setPinVerificationUser({
+      // 1. Autoritativer Auth-RPC via authenticate_by_credential (Zero-Trust SSOT)
+      // Wir übergeben p.qr_token falls vorhanden, andernfalls direkt die p.id (UUID)
+      const credentialToVerify = p.qr_token || p.id;
+      let authenticatedUser: any = null;
+
+      if (credentialToVerify && effectiveSchoolId) {
+        try {
+          const { data: authResult, error: rpcErr } = await supabase.rpc('authenticate_by_credential', {
+            p_credential: credentialToVerify,
+            p_school_id: effectiveSchoolId
+          });
+          if (!rpcErr && authResult?.success && authResult?.user) {
+            authenticatedUser = authResult.user;
+            if (authResult.lease_token) {
+              sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
+            }
+          } else if (rpcErr || !authResult?.success) {
+            console.warn('[FamilyLogin] RPC auth response:', rpcErr?.message || authResult?.error);
+          }
+        } catch (authErr) {
+          console.warn('[FamilyLogin] RPC auth notice:', authErr);
+        }
+      }
+
+      // Fallback-Hydratisierung falls RPC offline oder unvollständig
+      if (!authenticatedUser) {
+        authenticatedUser = {
           ...p,
           role: 'student',
-          school_id: effectiveSchoolId
+          school_id: effectiveSchoolId,
+          schools: schoolData || p.schools || { id: effectiveSchoolId, name: schoolName, has_campus_subscription: true, is_campus_active: true }
+        };
+      } else {
+        // Sicherstellen, dass schools stets vollständig mit schoolData angereichert ist
+        if (!authenticatedUser.schools && schoolData) {
+          authenticatedUser.schools = schoolData;
+        }
+      }
+
+      // 2. PIN-Schranke: Falls das Schülerprofil PIN-geschützt ist (Zero-Trust Schülersicherheit)
+      const isPinProtected = Boolean(authenticatedUser.has_personal_pin || authenticatedUser.is_pin_activated || p.has_personal_pin || p.is_pin_activated);
+      if (isPinProtected) {
+        setPinVerificationUser({
+          ...authenticatedUser,
+          role: 'student',
+          school_id: effectiveSchoolId,
+          schools: authenticatedUser.schools || schoolData || p.schools
         });
         setPinVerificationIsWithinRoom(true);
         setPinVerificationInput('');
@@ -2317,31 +2384,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         return;
       }
 
-      // 2. Autoritativer Auth-Flow:
-      let authenticatedUser: any = null;
-
-      // Falls ein gespeicherter qr_token vorliegt, autoritativen Auth-RPC ausführen
-      if (p.qr_token && effectiveSchoolId) {
-        try {
-          const { data: authResult, error: rpcErr } = await supabase.rpc('authenticate_by_credential', {
-            p_credential: p.qr_token,
-            p_school_id: effectiveSchoolId
-          });
-          if (!rpcErr && authResult?.success && authResult?.user) {
-            authenticatedUser = authResult.user;
-            if (authResult.lease_token) {
-              sessionStorage.setItem('gl_active_session_lease_id', authResult.lease_token);
-            }
-          }
-        } catch (authErr) {
-          console.warn('[FamilyLogin] QR token auth notice:', authErr);
-        }
-      }
-
       // 3. Ergänzende Absicherung: Kryptographischen Session-Lease registrieren
       if (effectiveSchoolId) {
         try {
-          const leaseRes = await registerClientSessionLease({ id: p.id, role: 'student' }, effectiveSchoolId);
+          const leaseRes = await registerClientSessionLease({ id: authenticatedUser.id, role: 'student' }, effectiveSchoolId);
           if (leaseRes.revoked) {
             alert('Sitzung widerrufen: Dieses Profil wurde zentral abgemeldet. Bitte melde dich erneut mit Ausweis oder QR-Code an.');
             setLoading(false);
@@ -2350,15 +2396,6 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
         } catch (leaseErr) {
           console.warn('[FamilyLogin] Session lease registration notice:', leaseErr);
         }
-      }
-
-      if (!authenticatedUser) {
-        authenticatedUser = {
-          ...p,
-          role: 'student',
-          school_id: effectiveSchoolId,
-          schools: schoolData || { id: effectiveSchoolId, name: schoolName, has_campus_subscription: true }
-        };
       }
 
       await finalizeLogin(authenticatedUser, null, true);
@@ -7257,11 +7294,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 let targetId = '88888888-8888-8888-8888-888888888888';
                 try {
                   const { data: masterAuth, error: masterErr } = await supabase.rpc('login_master_admin', {
-                    p_username: 'admin',
-                    p_password: 'groovelab2026'
+                    p_username: 'admin'
                   });
-                  if (!masterErr && masterAuth && masterAuth.id) {
-                    targetId = masterAuth.id;
+                  if (!masterErr && masterAuth && (masterAuth.id || masterAuth.user_id)) {
+                    targetId = masterAuth.id || masterAuth.user_id;
                   }
                 } catch (rpcErr) {
                   console.warn('[Bypass] login_master_admin RPC fallback to canonical ID:', rpcErr);
@@ -8148,8 +8184,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             <button 
               onClick={() => {
                 setShowAdminModal(false);
-                setAdminUsernameInput('');
-                setAdminPasswordInput('');
+                setAdminAuthMode('passkey');
+                setAdminTotpInput('');
+                setAdminRecoveryInput('');
+                setError(null);
               }} 
               style={{
                 position: 'absolute',
@@ -8167,90 +8205,38 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 color: '#64748b',
                 transition: 'all 0.2s'
               }}
-              
-              
+              aria-label="Modal schließen"
             >
               <X size={20} />
             </button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: adminAuthStep === 2 ? '#dcfce7' : '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center', color: adminAuthStep === 2 ? '#16a34a' : '#eab308' }}>
-                <ShieldCheck size={28} />
+              <div style={{ 
+                width: '48px', 
+                height: '48px', 
+                borderRadius: '16px', 
+                background: adminAuthMode === 'passkey' ? '#fef9c3' : adminAuthMode === 'totp' ? '#dcfce7' : '#fee2e2', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                color: adminAuthMode === 'passkey' ? '#ca8a04' : adminAuthMode === 'totp' ? '#16a34a' : '#dc2626' 
+              }}>
+                {adminAuthMode === 'passkey' ? <Fingerprint size={28} /> : adminAuthMode === 'totp' ? <ShieldCheck size={28} /> : <Key size={28} />}
               </div>
               <div>
                 <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 900, color: '#0f172a' }}>
-                  {adminAuthStep === 2 ? '2-Faktor-Authentifizierung' : 'Master-Admin Login'}
+                  {adminAuthMode === 'passkey' ? 'Master-Admin Leitstand' : adminAuthMode === 'totp' ? 'Google Authenticator' : 'Notfall-Wiederherstellung'}
                 </h2>
                 <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  {adminAuthStep === 2 ? 'Sicherheitsprüfung via Google Authenticator' : 'Campus-Groovelab Master Administration'}
+                  {adminAuthMode === 'passkey' ? '100% Passwortlose FIDO2 Passkey-IAM' : adminAuthMode === 'totp' ? 'RFC 6238 TOTP Einmalcode' : 'Single-Use Break-Glass Key'}
                 </p>
               </div>
             </div>
 
-            {adminAuthStep === 1 ? (
-              <form onSubmit={handleAdminLogin} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Benutzername
-                  </label>
-                  <input
-                    type="text"
-                    value={adminUsernameInput}
-                    onChange={(e) => setAdminUsernameInput(e.target.value)}
-                    placeholder="z.B. admin"
-                    required
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      padding: '14px 16px',
-                      borderRadius: '12px',
-                      background: '#ffffff',
-                      border: '1.5px solid #e2e8f0',
-                      color: '#000000',
-                      fontSize: '0.95rem',
-                      fontWeight: 600,
-                      outline: 'none',
-                      transition: 'all 0.2s'
-                    }}
-                    onFocus={(e) => {
-                      e.currentTarget.style.borderColor = '#eab308';
-                    }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.borderColor = '#e2e8f0';
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#64748b', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Passwort
-                  </label>
-                  <input
-                    type="password"
-                    value={adminPasswordInput}
-                    onChange={(e) => setAdminPasswordInput(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      padding: '14px 16px',
-                      borderRadius: '12px',
-                      background: '#ffffff',
-                      border: '1.5px solid #e2e8f0',
-                      color: '#000000',
-                      fontSize: '0.95rem',
-                      fontWeight: 600,
-                      outline: 'none',
-                      transition: 'all 0.2s'
-                    }}
-                    onFocus={(e) => {
-                      e.currentTarget.style.borderColor = '#eab308';
-                    }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.borderColor = '#e2e8f0';
-                    }}
-                  />
+            {adminAuthMode === 'passkey' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px', fontSize: '13px', color: '#475569', lineHeight: 1.5 }}>
+                  <strong>Zero-Trust & NIST SP 800-63B AAL3:</strong> Authentifizieren Sie sich phishing-resistent mit Ihrem hardwaregebundenen Passkey (Apple Touch ID, Face ID oder YubiKey).
                 </div>
 
                 {error && (
@@ -8260,32 +8246,88 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 )}
 
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleAdminPasskeyLogin}
                   disabled={adminLoginLoading}
                   style={{
                     width: '100%',
-                    padding: '14px',
-                    borderRadius: '14px',
+                    padding: '16px',
+                    borderRadius: '16px',
                     background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
                     color: '#ffffff',
-                    border: 'none',
-                    fontSize: '0.95rem',
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    boxShadow: '0 8px 24px rgba(15, 23, 42, 0.15)',
+                    border: '1.5px solid #eab308',
+                    fontSize: '1rem',
+                    fontWeight: 900,
+                    cursor: adminLoginLoading ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 8px 24px rgba(15, 23, 42, 0.2)',
                     transition: 'all 0.2s',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '8px',
-                    marginTop: '10px'
+                    gap: '12px'
                   }}
                 >
-                  {adminLoginLoading ? 'Verifiziere...' : 'Weiter zur Authentifizierung'}
+                  <Fingerprint size={22} color="#eab308" />
+                  <span>{adminLoginLoading ? 'Verifiziere Passkey...' : 'Mit Passkey anmelden (Touch ID)'}</span>
                 </button>
-              </form>
-            ) : (
-              <form onSubmit={handleAdminVerifyTotp} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '4px 0' }}>
+                  <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+                  <span style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Oder</span>
+                  <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdminAuthMode('totp');
+                    setError(null);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    borderRadius: '14px',
+                    background: '#f1f5f9',
+                    color: '#0f172a',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '0.9rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <ShieldCheck size={18} color="#16a34a" />
+                  <span>Mit Google Authenticator (TOTP) anmelden</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdminAuthMode('recovery');
+                    setError(null);
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#64748b',
+                    fontSize: '0.78rem',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    textDecoration: 'underline',
+                    textAlign: 'center'
+                  }}
+                >
+                  Notfall-Wiederherstellungscode eingeben
+                </button>
+              </div>
+            )}
+
+            {adminAuthMode === 'totp' && (
+              <form onSubmit={handleAdminTotpLogin} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                 <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', lineHeight: 1.4, textAlign: 'center' }}>
                   Geben Sie den 6-stelligen Code aus Ihrer <strong>Google Authenticator</strong> App ein.
                 </p>
@@ -8302,7 +8344,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                       setAdminTotpInput(val);
                       if (val.length === 6) {
                         setTimeout(() => {
-                          handleAdminVerifyTotp();
+                          handleAdminTotpLogin();
                         }, 50);
                       }
                     }}
@@ -8358,11 +8400,117 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   {adminLoginLoading ? 'Prüfe Code...' : 'Code bestätigen & Leitstand öffnen'}
                 </button>
 
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAdminAuthMode('passkey');
+                      setError(null);
+                    }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#64748b',
+                      fontSize: '0.80rem',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      textDecoration: 'underline',
+                      textAlign: 'left'
+                    }}
+                  >
+                    ‹ Zurück zu Passkey
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAdminAuthMode('recovery');
+                      setError(null);
+                    }}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#64748b',
+                      fontSize: '0.80rem',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      textDecoration: 'underline',
+                      textAlign: 'right'
+                    }}
+                  >
+                    Notfall-Code nutzen
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {adminAuthMode === 'recovery' && (
+              <form onSubmit={handleAdminRecoveryLogin} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', lineHeight: 1.4, textAlign: 'center' }}>
+                  Geben Sie Ihren einmaligen <strong>Break-Glass Notfall-Wiederherstellungscode</strong> ein.
+                </p>
+
+                <div>
+                  <input
+                    type="text"
+                    value={adminRecoveryInput}
+                    onChange={(e) => setAdminRecoveryInput(e.target.value.toUpperCase())}
+                    placeholder="GL-XXXX-XXXX-XXXX"
+                    autoFocus
+                    required
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      padding: '14px',
+                      borderRadius: '14px',
+                      background: '#f8fafc',
+                      border: '2px solid #ef4444',
+                      color: '#0f172a',
+                      fontSize: '1.1rem',
+                      fontWeight: 800,
+                      textAlign: 'center',
+                      letterSpacing: '2px',
+                      fontFamily: 'monospace',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+
+                {error && (
+                  <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#dc2626', padding: '12px', borderRadius: '12px', fontSize: '12px', fontWeight: 700, textAlign: 'center' }}>
+                    {error}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={adminLoginLoading || !adminRecoveryInput.trim()}
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    borderRadius: '14px',
+                    background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontSize: '0.95rem',
+                    fontWeight: 800,
+                    cursor: (adminLoginLoading || !adminRecoveryInput.trim()) ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 8px 24px rgba(239, 68, 68, 0.25)',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    opacity: (adminLoginLoading || !adminRecoveryInput.trim()) ? 0.6 : 1
+                  }}
+                >
+                  {adminLoginLoading ? 'Prüfe Notfall-Code...' : 'Notfall-Code entwerten & Einloggen'}
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
-                    setAdminAuthStep(1);
-                    setAdminTotpInput('');
+                    setAdminAuthMode('passkey');
                     setError(null);
                   }}
                   style={{
@@ -8376,7 +8524,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                     textAlign: 'center'
                   }}
                 >
-                  ‹ Zurück zur Passworteingabe
+                  ‹ Zurück zur Passkey-Anmeldung
                 </button>
               </form>
             )}
@@ -8631,7 +8779,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                   const user = {
                     ...pinSetupUser,
                     is_pin_activated: true,
-                    has_personal_pin: true
+                    has_personal_pin: true,
+                    schools: pinSetupUser.schools || schoolData
                   };
                   setPinSetupUser(null);
                   
@@ -8760,7 +8909,10 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 }
 
                 if (isMatch) {
-                  const user = pinVerificationUser;
+                  const user = {
+                    ...pinVerificationUser,
+                    schools: pinVerificationUser.schools || schoolData
+                  };
                   setPinVerificationUser(null);
                   setPinVerificationAttempts(0);
                   

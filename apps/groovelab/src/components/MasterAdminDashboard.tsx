@@ -733,8 +733,6 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 onUpdateBillingSettings={operator.handleUpdateBillingSettings}
                 adminUsername={operator.adminUsername}
                 setAdminUsername={operator.setAdminUsername}
-                adminPassword={operator.adminPassword}
-                setAdminPassword={operator.setAdminPassword}
                 updatingAdmin={operator.updatingAdmin}
                 onUpdateAdminCredentials={operator.handleUpdateAdminCredentials}
                 twoFactorEnabled={operator.twoFactorEnabled}
@@ -747,6 +745,11 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 onConfirmTwoFactor={operator.handleConfirmTwoFactor}
                 masterPasskeyActive={operator.masterPasskeyActive}
                 onRegisterPasskey={operator.handleRegisterPasskey}
+                recoveryCodes={operator.recoveryCodes}
+                showRecoveryModal={operator.showRecoveryModal}
+                setShowRecoveryModal={operator.setShowRecoveryModal}
+                generatingRecovery={operator.generatingRecovery}
+                onGenerateRecoveryCodes={operator.handleGenerateRecoveryCodes}
                 showGiroCodeModal={operator.showGiroCodeModal}
                 setShowGiroCodeModal={operator.setShowGiroCodeModal}
               />

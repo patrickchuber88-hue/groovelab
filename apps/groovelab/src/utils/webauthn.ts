@@ -475,3 +475,163 @@ export const authenticateParentBiometricPasskey = async (
   }
 };
 
+/**
+ * Authoritative Biometric Passkey Login for Master Admin Cockpit
+ * Zero-Trust & NIST SP 800-63B AAL3:
+ * 1. Requests fresh 32-byte cryptographic challenge nonce from server
+ * 2. Invokes browser navigator.credentials.get with userVerification: 'required'
+ * 3. Verifies credential and receives verified session lease via authenticate_webauthn_credential
+ */
+export const authenticateMasterBiometricPasskey = async (
+  supabase: any
+): Promise<{ success: boolean; user?: any; lease_token?: string; error?: string }> => {
+  if (!isWebAuthnSupported()) {
+    return { success: false, error: 'WebAuthn / Biometrie wird von diesem Gerät oder Browser nicht unterstützt.' };
+  }
+
+  try {
+    const { data: chalData, error: chalErr } = await supabase.rpc('generate_webauthn_challenge', {
+      p_type: 'auth'
+    });
+
+    if (chalErr || !chalData?.challenge) {
+      return { success: false, error: 'Sicherheits-Challenge konnte nicht vom Server bezogen werden.' };
+    }
+
+    const challengeBuffer = new Uint8Array(
+      chalData.challenge.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []
+    ).buffer;
+
+    const rpId = getSanitizedRpId();
+
+    const assertion = (await navigator.credentials.get({
+      publicKey: {
+        challenge: challengeBuffer,
+        userVerification: 'required',
+        timeout: 60000,
+        ...(rpId ? { rpId } : {})
+      },
+    })) as PublicKeyCredential;
+
+    if (!assertion) {
+      return { success: false, error: 'Keine biometrische Bestätigung empfangen.' };
+    }
+
+    const { data: authResult, error: authErr } = await supabase.rpc('authenticate_webauthn_credential', {
+      p_credential_id: assertion.id,
+      p_challenge: chalData.challenge,
+      p_school_id: null
+    });
+
+    if (authErr || !authResult?.success || !authResult?.user) {
+      return {
+        success: false,
+        error: authResult?.error || authErr?.message || 'Passkey nicht erkannt oder keinem Master-Admin-Konto zugeordnet.'
+      };
+    }
+
+    if (!authResult.user.is_master_admin) {
+      return {
+        success: false,
+        error: 'Zugriff verweigert: Dieses Passkey-Konto besitzt keine Master-Admin-Berechtigung.'
+      };
+    }
+
+    return {
+      success: true,
+      user: authResult.user,
+      lease_token: authResult.lease_token
+    };
+  } catch (err: any) {
+    if (err.name === 'NotAllowedError' || err.name === 'AbortError') {
+      return { success: false, error: 'Biometrische Authentifizierung abgebrochen.' };
+    }
+    return { success: false, error: err.message || 'Passkey-Authentifizierung fehlgeschlagen.' };
+  }
+};
+
+/**
+ * Registers a new hardware-bound Passkey for Master Admin with authoritative server persistence
+ */
+export const registerMasterPasskeyAuthoritative = async (
+  supabase: any,
+  masterUserId: string,
+  deviceName: string = 'Master TouchID / YubiKey'
+): Promise<{ success: boolean; error?: string }> => {
+  if (!isWebAuthnSupported()) {
+    return { success: false, error: 'WebAuthn / Biometrie wird von diesem Gerät nicht unterstützt.' };
+  }
+
+  try {
+    const { data: chalData, error: chalErr } = await supabase.rpc('generate_webauthn_challenge', {
+      p_user_id: masterUserId,
+      p_type: 'register'
+    });
+
+    if (chalErr || !chalData?.challenge) {
+      return { success: false, error: 'Registrierungs-Challenge konnte nicht vom Server bezogen werden.' };
+    }
+
+    const rpId = getSanitizedRpId();
+    const challengeBuffer = new Uint8Array(
+      chalData.challenge.match(/.{1,2}/g)?.map((byte: string) => parseInt(byte, 16)) || []
+    ).buffer;
+
+    const credential = (await navigator.credentials.create({
+      publicKey: {
+        challenge: challengeBuffer,
+        rp: {
+          name: 'Campus-Groovelab Master Cockpit',
+          ...(rpId ? { id: rpId } : {})
+        },
+        user: {
+          id: new TextEncoder().encode(masterUserId).buffer,
+          name: 'master-admin',
+          displayName: 'Master Administrator'
+        },
+        pubKeyCredParams: [
+          { alg: -7, type: 'public-key' },  // ES256
+          { alg: -257, type: 'public-key' } // RS256
+        ],
+        authenticatorSelection: {
+          userVerification: 'required',
+          residentKey: 'preferred'
+        },
+        timeout: 60000
+      }
+    })) as PublicKeyCredential;
+
+    if (!credential) {
+      return { success: false, error: 'Passkey-Erstellung vom Benutzer abgebrochen.' };
+    }
+
+    const rawId = arrayBufferToBase64url(credential.rawId);
+
+    const { data: regResult, error: regErr } = await supabase.rpc('register_webauthn_credential', {
+      p_user_id: masterUserId,
+      p_credential_id: credential.id,
+      p_public_key: rawId,
+      p_device_name: deviceName,
+      p_challenge: chalData.challenge
+    });
+
+    if (regErr || !regResult?.success) {
+      return { success: false, error: regResult?.error || regErr?.message || 'Passkey-Registrierung in der Datenbank fehlgeschlagen.' };
+    }
+
+    // Save local hint so UI knows a passkey is registered locally
+    localStorage.setItem(MASTER_PASSKEY_STORAGE_KEY, JSON.stringify({
+      userId: masterUserId,
+      credentialId: credential.id,
+      createdAt: new Date().toISOString()
+    }));
+
+    return { success: true };
+  } catch (err: any) {
+    if (err.name === 'NotAllowedError' || err.name === 'AbortError') {
+      return { success: false, error: 'Passkey-Erstellung abgebrochen.' };
+    }
+    return { success: false, error: err.message || 'Passkey-Registrierung fehlgeschlagen.' };
+  }
+};
+

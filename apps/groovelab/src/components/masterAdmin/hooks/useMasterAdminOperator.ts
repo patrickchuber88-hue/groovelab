@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { verifyTOTP } from '../../../utils/totp';
-import { isMasterPasskeyRegistered, registerMasterPasskey } from '../../../utils/webauthn';
+import { isMasterPasskeyRegistered, registerMasterPasskeyAuthoritative } from '../../../utils/webauthn';
 
 interface UseMasterAdminOperatorOptions {
   currentUser?: any;
@@ -31,7 +31,6 @@ export function useMasterAdminOperator({ currentUser, onNotify }: UseMasterAdmin
 
   const [adminUser, setAdminUser] = useState<any>(null);
   const [adminUsername, setAdminUsername] = useState<string>('admin');
-  const [adminPassword, setAdminPassword] = useState<string>('');
   const [updatingAdmin, setUpdatingAdmin] = useState(false);
   const [updatingBilling, setUpdatingBilling] = useState(false);
 
@@ -41,6 +40,9 @@ export function useMasterAdminOperator({ currentUser, onNotify }: UseMasterAdmin
   const [twoFactorCodeInput, setTwoFactorCodeInput] = useState<string>('');
 
   const [masterPasskeyActive, setMasterPasskeyActive] = useState<boolean>(false);
+  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
+  const [showRecoveryModal, setShowRecoveryModal] = useState<boolean>(false);
+  const [generatingRecovery, setGeneratingRecovery] = useState<boolean>(false);
   const [showGiroCodeModal, setShowGiroCodeModal] = useState<boolean>(false);
 
   const notify = useCallback((msg: string) => {
@@ -61,7 +63,6 @@ export function useMasterAdminOperator({ currentUser, onNotify }: UseMasterAdmin
       if (data) {
         setAdminUser(data);
         setAdminUsername(data.master_admin_username || data.username || 'admin');
-        setAdminPassword('');
         setTwoFactorEnabled(Boolean(data.is_2fa_enabled));
       } else {
         setAdminUsername(localStorage.getItem('cg_master_admin_username') || 'admin');
@@ -85,7 +86,6 @@ export function useMasterAdminOperator({ currentUser, onNotify }: UseMasterAdmin
 
       const { error: rpcErr } = await supabase.rpc('update_master_admin_credentials', {
         p_username: adminUsername.trim(),
-        p_password: adminPassword.trim() || undefined,
         p_user_id: targetUserId || undefined
       });
 
@@ -94,8 +94,7 @@ export function useMasterAdminOperator({ currentUser, onNotify }: UseMasterAdmin
       localStorage.setItem('cg_master_admin_username', adminUsername.trim());
       localStorage.removeItem('cg_master_admin_password');
 
-      notify('🟢 Master-Admin Zugangsdaten & Passwort erfolgreich gespeichert!');
-      setAdminPassword('');
+      notify('🟢 Master-Admin Benutzername erfolgreich gespeichert!');
       await fetchAdminUser();
     } catch (err: any) {
       console.error('Master admin credentials update error:', err);
@@ -103,7 +102,7 @@ export function useMasterAdminOperator({ currentUser, onNotify }: UseMasterAdmin
     } finally {
       setUpdatingAdmin(false);
     }
-  }, [adminUsername, adminPassword, currentUser, adminUser, notify, fetchAdminUser]);
+  }, [adminUsername, currentUser, adminUser, notify, fetchAdminUser]);
 
   const handleUpdateBillingSettings = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -240,15 +239,38 @@ export function useMasterAdminOperator({ currentUser, onNotify }: UseMasterAdmin
 
   const handleRegisterPasskey = useCallback(async () => {
     try {
-      const success = await registerMasterPasskey(adminUsername);
-      if (success) {
+      const targetUserId = (currentUser?.id && currentUser.id !== 'master_admin') 
+        ? currentUser.id 
+        : adminUser?.id || '88888888-8888-8888-8888-888888888888';
+
+      const res = await registerMasterPasskeyAuthoritative(supabase, targetUserId, 'Master Touch ID / YubiKey');
+      if (res.success) {
         setMasterPasskeyActive(true);
-        notify('✅ Touch ID / Passkey erfolgreich für Master-Admin registriert!');
+        notify('✅ Touch ID / Passkey erfolgreich in der Datenbank für Master-Admin registriert!');
+      } else {
+        throw new Error(res.error);
       }
     } catch (e: any) {
       alert('Passkey-Registrierung fehlgeschlagen: ' + (e?.message || e));
     }
-  }, [adminUsername, notify]);
+  }, [currentUser, adminUser, notify]);
+
+  const handleGenerateRecoveryCodes = useCallback(async () => {
+    try {
+      setGeneratingRecovery(true);
+      const { data, error } = await supabase.rpc('generate_master_admin_recovery_codes');
+      if (error || !data?.success) {
+        throw new Error(data?.error || error?.message || 'Generierung fehlgeschlagen.');
+      }
+      setRecoveryCodes(data.codes || []);
+      setShowRecoveryModal(true);
+      notify('🛡️ 3 neue Break-Glass Notfall-Wiederherstellungscodes generiert!');
+    } catch (err: any) {
+      alert('Fehler bei Notfall-Code-Generierung: ' + (err?.message || err));
+    } finally {
+      setGeneratingRecovery(false);
+    }
+  }, [notify]);
 
   return {
     billingCompany,
@@ -282,8 +304,6 @@ export function useMasterAdminOperator({ currentUser, onNotify }: UseMasterAdmin
     adminUser,
     adminUsername,
     setAdminUsername,
-    adminPassword,
-    setAdminPassword,
     updatingAdmin,
     updatingBilling,
     twoFactorEnabled,
@@ -293,6 +313,10 @@ export function useMasterAdminOperator({ currentUser, onNotify }: UseMasterAdmin
     twoFactorCodeInput,
     setTwoFactorCodeInput,
     masterPasskeyActive,
+    recoveryCodes,
+    showRecoveryModal,
+    setShowRecoveryModal,
+    generatingRecovery,
     showGiroCodeModal,
     setShowGiroCodeModal,
     fetchAdminUser,
@@ -300,6 +324,7 @@ export function useMasterAdminOperator({ currentUser, onNotify }: UseMasterAdmin
     handleUpdateBillingSettings,
     handleToggleTwoFactor,
     handleConfirmTwoFactor,
-    handleRegisterPasskey
+    handleRegisterPasskey,
+    handleGenerateRecoveryCodes
   };
 }

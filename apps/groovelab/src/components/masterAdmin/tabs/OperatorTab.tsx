@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { 
   Building2, Building, Landmark, CreditCard, Shield, ShieldCheck, 
-  Key, Lock, QrCode, Check, RefreshCw, Smartphone, Fingerprint
+  Key, Lock, QrCode, Check, RefreshCw, Smartphone, Fingerprint, ShieldAlert
 } from 'lucide-react';
 import { TwoFactorSetupModal } from './operator/TwoFactorSetupModal';
+import { RecoveryCodesModal } from './operator/RecoveryCodesModal';
 import { EpcGiroCodeModal } from './operator/EpcGiroCodeModal';
 import { formatIbanBlocks } from '../hooks/useMasterAdminOperator';
 
@@ -41,8 +42,6 @@ interface OperatorTabProps {
 
   adminUsername: string;
   setAdminUsername: (val: string) => void;
-  adminPassword: string;
-  setAdminPassword: (val: string) => void;
   updatingAdmin: boolean;
   onUpdateAdminCredentials: (e: React.FormEvent) => Promise<void>;
 
@@ -57,6 +56,12 @@ interface OperatorTabProps {
 
   masterPasskeyActive: boolean;
   onRegisterPasskey: () => Promise<void>;
+
+  recoveryCodes?: string[];
+  showRecoveryModal?: boolean;
+  setShowRecoveryModal?: (val: boolean) => void;
+  generatingRecovery?: boolean;
+  onGenerateRecoveryCodes?: () => Promise<void>;
 
   showGiroCodeModal: boolean;
   setShowGiroCodeModal: (val: boolean) => void;
@@ -96,8 +101,6 @@ export const OperatorTab: React.FC<OperatorTabProps> = ({
 
   adminUsername,
   setAdminUsername,
-  adminPassword,
-  setAdminPassword,
   updatingAdmin,
   onUpdateAdminCredentials,
 
@@ -112,6 +115,12 @@ export const OperatorTab: React.FC<OperatorTabProps> = ({
 
   masterPasskeyActive,
   onRegisterPasskey,
+
+  recoveryCodes,
+  showRecoveryModal,
+  setShowRecoveryModal,
+  generatingRecovery,
+  onGenerateRecoveryCodes,
 
   showGiroCodeModal,
   setShowGiroCodeModal
@@ -489,7 +498,7 @@ export const OperatorTab: React.FC<OperatorTabProps> = ({
         gap: '28px',
         alignItems: 'start'
       }}>
-        {/* Card 3: Root-Zugangsdaten */}
+        {/* Card 3: Root-Identität & Zero-Password IAM */}
         <div style={{
           background: '#ffffff',
           borderRadius: '24px',
@@ -498,13 +507,17 @@ export const OperatorTab: React.FC<OperatorTabProps> = ({
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)'
         }}>
           <h3 style={{ fontSize: '1.2rem', fontWeight: 900, margin: '0 0 16px 0', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: '"Outfit", sans-serif' }}>
-            <Key size={18} color="#0f172a" /> Master-Admin Zugangsdaten
+            <Key size={18} color="#0f172a" /> Master-Admin Identität
           </h3>
+
+          <div style={{ padding: '14px', borderRadius: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: '0.80rem', color: '#334155', lineHeight: 1.5, marginBottom: '16px' }}>
+            🛡️ <strong>100% Passwortlose FIDO2-Doktrin:</strong> Klassische Passwörter wurden im Master-Admin-Leitstand vollständig abgeschafft. Zugänge sind durch hardwaregebundene FIDO2 Passkeys (Touch ID, YubiKey) und TOTP geschützt.
+          </div>
 
           <form onSubmit={onUpdateAdminCredentials} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
-                Master-Benutzername
+                Master-Benutzername / Alias
               </label>
               <input
                 type="text"
@@ -512,19 +525,6 @@ export const OperatorTab: React.FC<OperatorTabProps> = ({
                 onChange={(e) => setAdminUsername(e.target.value)}
                 required
                 style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #cbd5e1', fontSize: '0.88rem', fontWeight: 700 }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '0.70rem', color: '#64748b', fontWeight: 800, marginBottom: '6px', textTransform: 'uppercase' }}>
-                Neues Master-Passwort (optional)
-              </label>
-              <input
-                type="password"
-                value={adminPassword}
-                onChange={(e) => setAdminPassword(e.target.value)}
-                placeholder="Leer lassen, um aktuelles Passwort zu behalten"
-                style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}
               />
             </div>
 
@@ -546,12 +546,12 @@ export const OperatorTab: React.FC<OperatorTabProps> = ({
                 gap: '8px'
               }}
             >
-              <Check size={16} /> {updatingAdmin ? 'Wird gespeichert...' : 'Zugangsdaten aktualisieren'}
+              <Check size={16} /> {updatingAdmin ? 'Wird gespeichert...' : 'Benutzername speichern'}
             </button>
           </form>
         </div>
 
-        {/* Card 4: FIDO2 Passkeys & Zwei-Faktor-Schutz */}
+        {/* Card 4: FIDO2 Passkeys, Zwei-Faktor-Schutz & Break-Glass Recovery */}
         <div style={{
           background: '#ffffff',
           borderRadius: '24px',
@@ -560,44 +560,17 @@ export const OperatorTab: React.FC<OperatorTabProps> = ({
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)'
         }}>
           <h3 style={{ fontSize: '1.2rem', fontWeight: 900, margin: '0 0 16px 0', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: '"Outfit", sans-serif' }}>
-            <ShieldCheck size={18} color="#0f172a" /> Erweiterte Authentifizierung
+            <ShieldCheck size={18} color="#0f172a" /> Hardware-Sicherheit &amp; Recovery
           </h3>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {/* 2FA Status */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', borderRadius: '14px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Smartphone size={20} color="#64748b" />
-                <div>
-                  <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#0f172a' }}>Zwei-Faktor-Schutz (TOTP)</div>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Authenticator-Apps (Apple, Google, 1Password)</div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={onToggleTwoFactor}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: '8px',
-                  background: twoFactorEnabled ? '#dcfce7' : '#fee2e2',
-                  color: twoFactorEnabled ? '#15803d' : '#b91c1c',
-                  border: 'none',
-                  fontSize: '0.76rem',
-                  fontWeight: 800,
-                  cursor: 'pointer'
-                }}
-              >
-                {twoFactorEnabled ? 'Aktiv (Deaktivieren)' : 'Jetzt einrichten'}
-              </button>
-            </div>
-
             {/* Touch ID / FIDO2 Passkeys */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', borderRadius: '14px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Fingerprint size={20} color="#64748b" />
+                <Fingerprint size={20} color="#ca8a04" />
                 <div>
-                  <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#0f172a' }}>Touch ID / WebAuthn Passkey</div>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Passwortloser Biometrie-Login für Mac/iPhone</div>
+                  <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#0f172a' }}>Touch ID / FIDO2 Passkey</div>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Phishing-resistenter Hardware-Schlüssel in DB hinterlegt</div>
                 </div>
               </div>
               <button
@@ -617,6 +590,63 @@ export const OperatorTab: React.FC<OperatorTabProps> = ({
                 {masterPasskeyActive ? 'Kopplung erneuern' : 'Passkey registrieren'}
               </button>
             </div>
+
+            {/* 2FA Status */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', borderRadius: '14px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Smartphone size={20} color="#16a34a" />
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#0f172a' }}>Zwei-Faktor-Schutz (RFC 6238 TOTP)</div>
+                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Google Authenticator / 1Password Einmalcodes</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onToggleTwoFactor}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  background: twoFactorEnabled ? '#dcfce7' : '#fee2e2',
+                  color: twoFactorEnabled ? '#15803d' : '#b91c1c',
+                  border: 'none',
+                  fontSize: '0.76rem',
+                  fontWeight: 800,
+                  cursor: 'pointer'
+                }}
+              >
+                {twoFactorEnabled ? 'Aktiv (Verwalten)' : 'Jetzt einrichten'}
+              </button>
+            </div>
+
+            {/* Break-Glass Recovery Codes */}
+            {onGenerateRecoveryCodes && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', borderRadius: '14px', background: '#fff1f2', border: '1px solid #fecdd3' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <ShieldAlert size={20} color="#e11d48" />
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#9f1239' }}>Break-Glass Notfall-Codes</div>
+                    <div style={{ fontSize: '0.72rem', color: '#be123c' }}>Einmal-Schlüssel für den Hardware-Verlustfall</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={onGenerateRecoveryCodes}
+                  disabled={generatingRecovery}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    background: '#e11d48',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontSize: '0.76rem',
+                    fontWeight: 800,
+                    cursor: generatingRecovery ? 'wait' : 'pointer'
+                  }}
+                >
+                  {generatingRecovery ? 'Generiere...' : 'Codes erzeugen'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -631,6 +661,14 @@ export const OperatorTab: React.FC<OperatorTabProps> = ({
         onClose={() => setShowTwoFactorModal(false)}
         onConfirm={onConfirmTwoFactor}
       />
+
+      {recoveryCodes && setShowRecoveryModal && (
+        <RecoveryCodesModal
+          isOpen={Boolean(showRecoveryModal)}
+          codes={recoveryCodes}
+          onClose={() => setShowRecoveryModal(false)}
+        />
+      )}
 
       <EpcGiroCodeModal
         isOpen={showGiroCodeModal}
