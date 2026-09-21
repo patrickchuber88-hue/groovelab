@@ -700,7 +700,7 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
                   style={{ marginTop: '2px', cursor: 'pointer', accentColor: '#15803d', flexShrink: 0 }}
                 />
                 <span>
-                  Ich handele im Namen einer Musikschule, Bildungsinstitution, Gebietskörperschaft oder als selbständiger Unternehmer (§ 14 BGB / § 1 UGB / Art. 1 OR). Mir ist bekannt, dass das Angebot von Teil A der AGB ausschließlich für Geschäftskunden (B2B) gilt.
+                  Ich handele im Namen einer Musikschule, Bildungsinstitution, Gebietskörperschaft oder als selbständiges Unternehmen. Mir ist bekannt, dass das Angebot von Teil A der AGB ausschließlich für Geschäftskunden (B2B) gilt.
                 </span>
               </label>
 
@@ -781,7 +781,7 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
                     }}
                     style={{ color: '#15803d', textDecoration: 'underline', cursor: 'pointer', fontWeight: 750, outline: 'none' }}
                   >
-                    Vereinbarung zur Auftragsverarbeitung (AVV nach Art. 28 DSGVO / Art. 9 nDSG)
+                    Vereinbarung zur Auftragsverarbeitung (AVV)
                   </span>{' '}
                   vollständig zur Kenntnis genommen und akzeptiere diese verbindlich für die Bildungseinrichtung.
                 </span>
@@ -809,7 +809,7 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
 
               {/* Revisionssicherheits-Hinweis */}
               <div style={{ fontSize: '0.66rem', color: '#94a3b8', textAlign: 'center', lineHeight: 1.4, padding: '0 6px' }}>
-                🔒 Revisionssichere B2B-Registrierung mit kryptografischem Audit-Trail (GoBD, BGB &amp; DSGVO konform)
+                🔒 Revisionssichere B2B-Registrierung mit kryptografischem Audit-Trail (Rechtssicher &amp; DSGVO-konform)
               </div>
             </form>
           )}

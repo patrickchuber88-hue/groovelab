@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, AlertTriangle, Check } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, Check, Trash2 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 
 export interface ParentConsentSettingsViewProps {
@@ -155,12 +155,13 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
         </div>
       </div>
 
-      {/* Art. 17 DSGVO Löschantrag */}
+      {/* Revisionssicherer Löschantrag */}
       <div style={{
+        marginTop: '8px',
+        padding: '16px',
         background: '#f8fafc',
-        border: '1.5px dashed #cbd5e1',
-        borderRadius: '18px',
-        padding: '18px',
+        border: '1px solid #e2e8f0',
+        borderRadius: '16px',
         display: 'flex',
         flexDirection: 'column',
         gap: '10px',
@@ -169,11 +170,11 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <AlertTriangle size={18} color="#94a3b8" />
           <h4 style={{ margin: 0, fontSize: '0.86rem', fontWeight: 850, color: '#334155' }}>
-            Recht auf Vergessenwerden (Art. 17 DSGVO)
+            Recht auf vollständige Datenlöschung
           </h4>
         </div>
         <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b', lineHeight: 1.45 }}>
-          Du hast das Recht, alle nicht gesetzlich aufbewahrungspflichtigen Daten (Audios, Memos, Übestatistiken) löschen zu lassen. Gesetzliche Buchungsbelege bleiben gemäß § 147 AO für 10 Jahre revisionssicher archiviert.
+          Du hast das Recht, alle nicht gesetzlich aufbewahrungspflichtigen Daten (Audios, Memos, Übestatistiken) löschen zu lassen. Gesetzliche Buchungsbelege bleiben gemäß gesetzlicher Aufbewahrungspflicht für 10 Jahre revisionssicher archiviert.
         </p>
 
         {deletionRequested ? (
@@ -192,51 +193,65 @@ export const ParentConsentSettingsView: React.FC<ParentConsentSettingsViewProps>
             type="button"
             onClick={() => setShowDeletionModal(true)}
             style={{
-              alignSelf: 'flex-start',
-              background: '#ffffff',
-              border: '1.5px solid #fecaca',
-              color: '#dc2626',
-              borderRadius: '10px',
-              padding: '8px 14px',
-              fontSize: '0.76rem',
+              padding: '10px 14px',
+              borderRadius: '12px',
+              border: '1px solid #fecaca',
+              background: '#fef2f2',
+              color: '#991b1b',
+              fontSize: '0.78rem',
               fontWeight: 800,
               cursor: 'pointer',
-              marginTop: '4px'
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              touchAction: 'manipulation'
             }}
-            className="hover-scale"
           >
-            Löschantrag nach Art. 17 DSGVO stellen
+            <Trash2 size={15} />
+            Löschantrag stellen
           </button>
         )}
       </div>
 
-      {/* Confirmation Modal */}
+      {/* Bestätigungsmodal für Datenlöschung */}
       {showDeletionModal && (
         <div style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(15, 23, 42, 0.7)',
-          backdropFilter: 'blur(6px)',
-          zIndex: 999999,
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '20px'
+          padding: '16px',
+          zIndex: 99999
         }}>
           <div style={{
             background: '#ffffff',
-            borderRadius: '24px',
-            padding: '26px',
-            maxWidth: '440px',
+            borderRadius: '20px',
+            padding: '24px',
+            maxWidth: '400px',
             width: '100%',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.2)',
-            textAlign: 'left',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '14px'
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            textAlign: 'center'
           }}>
-            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 900, color: '#0f172a' }}>
-              Datenlöschung nach Art. 17 DSGVO beantragen?
+            <div style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '50%',
+              background: '#fee2e2',
+              color: '#dc2626',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px'
+            }}>
+              <AlertTriangle size={24} />
+            </div>
+
+            <h3 style={{ margin: '0 0 8px', fontSize: '1.05rem', fontWeight: 850, color: '#0f172a' }}>
+              Vollständige Datenlöschung beantragen?
             </h3>
             <p style={{ margin: 0, fontSize: '0.80rem', color: '#475569', lineHeight: 1.5 }}>
               Dieser Antrag veranlasst die dauerhafte Löschung aller Übungsaufnahmen, Chat-Verläufe und Sticker-Fortschritte deines Kindes. Dieser Vorgang kann <strong>nicht rückgängig</strong> gemacht werden.

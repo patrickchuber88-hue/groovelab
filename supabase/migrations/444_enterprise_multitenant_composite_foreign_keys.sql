@@ -54,6 +54,17 @@ BEGIN
     -- A. user_song_skills -> users_raw(id, school_id)
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'user_song_skills') THEN
         IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_schema = 'public' AND table_name = 'user_song_skills' AND column_name = 'school_id'
+        ) THEN
+            ALTER TABLE public.user_song_skills ADD COLUMN school_id UUID REFERENCES public.schools(id) ON DELETE CASCADE;
+            UPDATE public.user_song_skills uss
+            SET school_id = u.school_id
+            FROM public.users_raw u
+            WHERE uss.user_id = u.id AND uss.school_id IS NULL;
+        END IF;
+
+        IF NOT EXISTS (
             SELECT 1 FROM pg_constraint 
             WHERE conname = 'fk_user_song_skills_user_school' AND conrelid = 'public.user_song_skills'::regclass
         ) THEN
@@ -65,8 +76,19 @@ BEGIN
         END IF;
     END IF;
 
-    -- B. progress_matrix -> students(id, school_id)
+    -- B. progress_matrix -> users_raw(id, school_id)
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'progress_matrix') THEN
+        IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_schema = 'public' AND table_name = 'progress_matrix' AND column_name = 'school_id'
+        ) THEN
+            ALTER TABLE public.progress_matrix ADD COLUMN school_id UUID REFERENCES public.schools(id) ON DELETE CASCADE;
+            UPDATE public.progress_matrix pm
+            SET school_id = u.school_id
+            FROM public.users_raw u
+            WHERE pm.student_id = u.id AND pm.school_id IS NULL;
+        END IF;
+
         IF NOT EXISTS (
             SELECT 1 FROM pg_constraint 
             WHERE conname = 'fk_progress_matrix_student_school' AND conrelid = 'public.progress_matrix'::regclass
@@ -74,7 +96,7 @@ BEGIN
             ALTER TABLE public.progress_matrix 
             ADD CONSTRAINT fk_progress_matrix_student_school 
             FOREIGN KEY (student_id, school_id) 
-            REFERENCES public.students(id, school_id) 
+            REFERENCES public.users_raw(id, school_id) 
             ON DELETE CASCADE;
         END IF;
     END IF;

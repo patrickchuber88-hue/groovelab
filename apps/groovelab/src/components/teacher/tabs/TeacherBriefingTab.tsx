@@ -1,14 +1,15 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useMemo, useState } from 'react';
 import { 
   Calendar, ChevronLeft, ChevronRight, X, Palmtree, CalendarX, 
   Users, Check, Sparkles, Activity, AlertTriangle, Zap,
-  Clock, ShieldCheck, HelpCircle
+  Clock, ShieldCheck, HelpCircle, Timer, AlertCircle, Edit3, Sliders, Wrench
 } from 'lucide-react';
 import { UpdateAnnouncementHero } from '../../common/UpdateAnnouncementHero';
 import { MobileBriefingCarousel } from '../../ui/MobileBriefingCarousel';
 import { TourStartButton } from '../../PremiumOnboardingTour';
 import { BriefingNotesCard } from '../../notes/BriefingNotesCard';
 import { BriefingToolboxCard } from '../../campus/BriefingToolboxCard';
+import { TeacherQuickToolboxDrawer } from '../TeacherQuickToolboxDrawer';
 import { TeacherMakeupRadarWidget } from '../TeacherMakeupRadarWidget';
 import { formatAbsenceEndDate } from '../../../utils/teacherAbsenceHelper';
 import { 
@@ -19,9 +20,8 @@ import {
 } from '../utils/teacherDashboardUtils';
 
 const TeacherFeedWidget = lazy(() => import('../TeacherFeedWidget').then(m => ({ default: m.TeacherFeedWidget })));
-const TeacherHausaufgabenWidget = lazy(() => import('../TeacherHausaufgabenWidget').then(m => ({ default: m.TeacherHausaufgabenWidget })));
+import { TeacherHausaufgabenWidget } from '../TeacherHausaufgabenWidget';
 const TeacherTagesplanWidget = lazy(() => import('../TeacherTagesplanWidget').then(m => ({ default: m.TeacherTagesplanWidget })));
-const TeacherTagesplanRoomIssuesBanner = lazy(() => import('../TeacherTagesplanWidget').then(m => ({ default: m.TeacherTagesplanRoomIssuesBanner })));
 const TeacherTourDemoSchedule = lazy(() => import('../TeacherTagesplanWidget').then(m => ({ default: m.TeacherTourDemoSchedule })));
 
 export interface TeacherBriefingTabProps {
@@ -267,6 +267,245 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
     isStudentBirthdayToday = () => false
   } = props;
 
+  const [isQuickToolboxOpen, setIsQuickToolboxOpen] = useState(false);
+  const [avatarLoadError, setAvatarLoadError] = useState(false);
+
+  const isRestDay = isWeekend || isFreeDay;
+  const effectiveLeftColumnTab = leftColumnTab;
+
+  const resolvedAvatarSrc = useMemo(() => {
+    if (avatarLoadError || !teacherBriefingAvatarSrc) {
+      return activePlatform === 'groovelab' 
+        ? '/avatar_ghost.jpg' 
+        : '/avatars/gitarre_avatar_new.png';
+    }
+    return teacherBriefingAvatarSrc;
+  }, [avatarLoadError, teacherBriefingAvatarSrc, activePlatform]);
+
+  const { activeLessonsCount, totalActiveStudentsToday } = useMemo(() => {
+    if (!briefingData?.timeline) return { activeLessonsCount: 0, totalActiveStudentsToday: 0 };
+    
+    // Group timeline items by timeSlot to get distinct teaching units (UE)
+    const uniqueSlotsMap = new Map<string, any[]>();
+    briefingData.timeline.forEach((s: any) => {
+      if (
+        (s.student || (s.students && s.students.length > 0) || s.isGroup) &&
+        !s.is_room_booking &&
+        !s.isRoomBooking &&
+        s.status !== 'canceled_by_student' &&
+        s.status !== 'teacher_ausfall' &&
+        s.status !== 'cancelled' &&
+        s.status !== 'canceled_by_teacher_ausfall' &&
+        s.status !== 'rescheduled_away'
+      ) {
+        const timeKey = s.timeSlot || s.id;
+        if (!uniqueSlotsMap.has(timeKey)) {
+          uniqueSlotsMap.set(timeKey, []);
+        }
+        uniqueSlotsMap.get(timeKey)!.push(s);
+      }
+    });
+
+    const ueCount = uniqueSlotsMap.size;
+    let studentsCount = 0;
+    uniqueSlotsMap.forEach((slots) => {
+      const studentIds = new Set<string>();
+      slots.forEach((slot: any) => {
+        if (slot.students && Array.isArray(slot.students)) {
+          slot.students.forEach((st: any) => {
+            if (st.id) studentIds.add(st.id);
+            else if (st.name) studentIds.add(st.name);
+          });
+        } else if (slot.student?.id) {
+          studentIds.add(slot.student.id);
+        } else if (slot.student?.name) {
+          studentIds.add(slot.student.name);
+        }
+      });
+      studentsCount += Math.max(1, studentIds.size);
+    });
+
+    return { activeLessonsCount: ueCount, totalActiveStudentsToday: studentsCount };
+  }, [briefingData?.timeline]);
+
+  const avgPracticeTime = useMemo(() => {
+    if (!briefingData?.timeline) return { value: '0', unit: 'Min' };
+    const activeTimelineStudents = briefingData.timeline.filter((s: any) => 
+      (s.student || (s.students && s.students.length > 0) || s.isGroup) && 
+      !s.is_room_booking &&
+      !s.isRoomBooking &&
+      s.status !== 'canceled_by_student' && 
+      s.status !== 'teacher_ausfall' && 
+      s.status !== 'cancelled' && 
+      s.status !== 'canceled_by_teacher_ausfall' && 
+      s.status !== 'rescheduled_away'
+    );
+    if (activeTimelineStudents.length === 0) return { value: '0', unit: 'Min' };
+    const totalMins = activeTimelineStudents.reduce((acc: number, s: any) => {
+      const studentObj = s.student || (s.students?.[0]);
+      const focusMins = studentObj?.weekly_focus_minutes || studentObj?.total_focus_minutes || (studentObj?.streakFlame ? studentObj.streakFlame * 15 : 0);
+      return acc + focusMins;
+    }, 0);
+    const avgMins = Math.round(totalMins / activeTimelineStudents.length);
+    if (avgMins >= 60) {
+      return { value: (avgMins / 60).toFixed(1), unit: 'Std' };
+    }
+    return { value: String(avgMins), unit: 'Min' };
+  }, [briefingData?.timeline]);
+
+  const workloadMinutes = useMemo(() => {
+    if (!briefingData?.timeline) return 0;
+    const countedTimeSlots = new Set<string>();
+    let totalMins = 0;
+    briefingData.timeline.forEach((s: any) => {
+      if (
+        (s.student || (s.students && s.students.length > 0) || s.isGroup) &&
+        !s.is_room_booking &&
+        !s.isRoomBooking &&
+        s.status !== 'canceled_by_student' &&
+        s.status !== 'teacher_ausfall' &&
+        s.status !== 'cancelled' &&
+        s.status !== 'canceled_by_teacher_ausfall' &&
+        s.status !== 'rescheduled_away'
+      ) {
+        const timeKey = s.timeSlot || s.id;
+        if (!countedTimeSlots.has(timeKey)) {
+          countedTimeSlots.add(timeKey);
+          totalMins += (s.duration || 30);
+        }
+      }
+    });
+    return totalMins;
+  }, [briefingData?.timeline]);
+
+  const workloadHours = Math.floor(workloadMinutes / 60);
+  const workloadRemainingMinutes = workloadMinutes % 60;
+  const workloadHoursStr = workloadRemainingMinutes > 0 
+    ? `${workloadHours}h ${workloadRemainingMinutes}m` 
+    : `${workloadHours}h`;
+
+  const cancellationsCount = useMemo(() => {
+    if (!briefingData?.timeline) return 0;
+    return briefingData.timeline.filter((s: any) => 
+      s.status === 'canceled_by_student' || 
+      s.status === 'teacher_ausfall' || 
+      s.status === 'cancelled' || 
+      s.status === 'canceled_by_teacher_ausfall' ||
+      s.status === 'rescheduled_away' ||
+      s.isRescheduledPending
+    ).length;
+  }, [briefingData?.timeline]);
+
+  const dynamicGreeting = useMemo(() => {
+    const hours = parseInt((currentTimeStr || '13:00').split(':')[0], 10);
+    let greeting = 'Guten Tag';
+    if (hours >= 5 && hours < 11.5) {
+      greeting = 'Guten Morgen';
+    } else if (hours >= 11.5 && hours < 17.5) {
+      greeting = 'Guten Tag';
+    } else if (hours >= 17.5 && hours < 23) {
+      greeting = 'Guten Abend';
+    }
+    return {
+      greeting,
+      subtitle: 'Hier ist deine Übersicht für einen produktiven Tag.'
+    };
+  }, [currentTimeStr]);
+
+  const renderMobileKpis = () => {
+    if (isTeacherCurrentlyAbsent && !bypassAbsenceView) return null;
+
+    return (
+      <div 
+        style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(4, 1fr)', 
+          gap: '8px', 
+          width: '100%', 
+          boxSizing: 'border-box' 
+        }}
+      >
+        {/* KPI 1: UE heute */}
+        <div style={{
+          background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+          borderRadius: '16px',
+          padding: '10px 8px',
+          color: '#ffffff',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center',
+          boxShadow: '0 4px 12px rgba(99, 102, 241, 0.25)',
+          minWidth: 0
+        }}>
+          <span style={{ fontSize: '0.62rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.05em' }}>UE</span>
+          <span style={{ fontSize: '1.25rem', fontWeight: 950, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{activeLessonsCount}</span>
+          <span style={{ fontSize: '0.62rem', fontWeight: 700, opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+            {totalActiveStudentsToday} Sch.
+          </span>
+        </div>
+
+        {/* KPI 2: Ø Übe-Zeit */}
+        <div style={{
+          background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
+          borderRadius: '16px',
+          padding: '10px 8px',
+          color: '#ffffff',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center',
+          boxShadow: '0 4px 12px rgba(52, 168, 83, 0.25)',
+          minWidth: 0
+        }}>
+          <span style={{ fontSize: '0.62rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ø Üben</span>
+          <span style={{ fontSize: '1.25rem', fontWeight: 950, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{avgPracticeTime.value}</span>
+          <span style={{ fontSize: '0.62rem', fontWeight: 700, opacity: 0.8 }}>{avgPracticeTime.unit}</span>
+        </div>
+
+        {/* KPI 3: Tages-Pensum */}
+        <div style={{
+          background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)',
+          borderRadius: '16px',
+          padding: '10px 8px',
+          color: '#0f172a',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center',
+          boxShadow: '0 4px 12px rgba(234, 179, 8, 0.25)',
+          minWidth: 0
+        }}>
+          <span style={{ fontSize: '0.62rem', fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pensum</span>
+          <span style={{ fontSize: '1.15rem', fontWeight: 950, letterSpacing: '-0.02em', lineHeight: 1.1, color: '#0f172a' }}>{workloadHoursStr}</span>
+          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#0f172a', opacity: 0.85 }}>Heute</span>
+        </div>
+
+        {/* KPI 4: Ausfälle */}
+        <div style={{
+          background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+          borderRadius: '16px',
+          padding: '10px 8px',
+          color: '#ffffff',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center',
+          boxShadow: '0 4px 12px rgba(239, 68, 68, 0.25)',
+          minWidth: 0
+        }}>
+          <span style={{ fontSize: '0.62rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ausfälle</span>
+          <span style={{ fontSize: '1.25rem', fontWeight: 950, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{cancellationsCount}</span>
+          <span style={{ fontSize: '0.62rem', fontWeight: 700, opacity: 0.8 }}>Heute</span>
+        </div>
+      </div>
+    );
+  };
+
   const renderAbsenceCardWidget = () => {
     const isAbsent = isTeacherCurrentlyAbsent;
     const absenceUntilFormatted = isAbsent ? formatAbsenceEndDate(teacher?.ausfall_until ?? (teacher as any)?.ausfallUntil) : '';
@@ -281,7 +520,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
-              const today = new Date().toLocaleDateString('sv-SE');
+              const today = getSimulatedNow().toLocaleDateString('sv-SE');
               setAbsenceStartDate(today);
               setAbsenceUntilDate(today);
               setQuickAbsencePreset('today');
@@ -289,7 +528,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
             }
           }}
           onClick={() => {
-            const today = new Date().toLocaleDateString('sv-SE');
+            const today = getSimulatedNow().toLocaleDateString('sv-SE');
             setAbsenceStartDate(today);
             setAbsenceUntilDate(today);
             setQuickAbsencePreset('today');
@@ -353,7 +592,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              const today = new Date().toLocaleDateString('sv-SE');
+              const today = getSimulatedNow().toLocaleDateString('sv-SE');
               setAbsenceStartDate(today);
               setAbsenceUntilDate(today);
               setQuickAbsencePreset('today');
@@ -534,36 +773,34 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
   };
 
   const renderHausaufgabenWidget = () => (
-    <Suspense fallback={<div style={{ padding: '20px', textAlign: 'center', color: '#64748b' }}>Hausaufgabenheft wird geladen...</div>}>
-      <TeacherHausaufgabenWidget
-        teacher={teacher}
-        activeStudent={activeStudent}
-        activeGroupStudents={activeGroupStudents}
-        selectedGroupStudentId={selectedGroupStudentId}
-        setSelectedGroupStudentId={setSelectedGroupStudentId}
-        allStudents={allStudents}
-        bypassAbsenceView={bypassAbsenceView}
-        selectedStudentProfile={selectedStudentProfile}
-        setSelectedStudentProfile={setSelectedStudentProfile}
-        docStudent={docStudent}
-        setDocStudent={setDocStudent}
-        dynamicPrepMirror={dynamicPrepMirror}
-        setDynamicPrepMirror={setDynamicPrepMirror}
-        loadingPrepMirror={loadingPrepMirror}
-        setLoadingPrepMirror={setLoadingPrepMirror}
-        briefingData={briefingData}
-        isFreeDay={isFreeDay}
-        isWeekend={isWeekend}
-        isTourDemoScheduleActive={isTourDemoScheduleActive}
-        firstSlotStartStr={firstSlotStartStr}
-        getSimulatedNow={getSimulatedNow}
-        showRealNames={showRealNames}
-        widgetState={widgetState}
-        onOpenStudio={() => {
-          if (onTabChange) onTabChange('studio');
-        }}
-      />
-    </Suspense>
+    <TeacherHausaufgabenWidget
+      teacher={teacher}
+      activeStudent={activeStudent}
+      activeGroupStudents={activeGroupStudents}
+      selectedGroupStudentId={selectedGroupStudentId}
+      setSelectedGroupStudentId={setSelectedGroupStudentId}
+      allStudents={allStudents}
+      bypassAbsenceView={bypassAbsenceView}
+      selectedStudentProfile={selectedStudentProfile}
+      setSelectedStudentProfile={setSelectedStudentProfile}
+      docStudent={docStudent}
+      setDocStudent={setDocStudent}
+      dynamicPrepMirror={dynamicPrepMirror}
+      setDynamicPrepMirror={setDynamicPrepMirror}
+      loadingPrepMirror={loadingPrepMirror}
+      setLoadingPrepMirror={setLoadingPrepMirror}
+      briefingData={briefingData}
+      isFreeDay={isFreeDay}
+      isWeekend={isWeekend}
+      isTourDemoScheduleActive={isTourDemoScheduleActive}
+      firstSlotStartStr={firstSlotStartStr}
+      getSimulatedNow={getSimulatedNow}
+      showRealNames={showRealNames}
+      widgetState={widgetState}
+      onOpenStudio={() => {
+        if (onTabChange) onTabChange('studio');
+      }}
+    />
   );
 
   const renderTourDemoScheduleJSX = () => (
@@ -574,22 +811,6 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
         windowWidth={windowWidth}
         showRealNames={showRealNames}
         toggleRealNames={toggleRealNames}
-      />
-    </Suspense>
-  );
-
-  const renderTagesplanRoomIssuesBanner = (isDesktop: boolean = true) => (
-    <Suspense fallback={null}>
-      <TeacherTagesplanRoomIssuesBanner
-        isDesktop={isDesktop}
-        relevantRoomIssuesToday={relevantRoomIssuesToday}
-        teacherTodayRooms={teacherTodayRooms}
-        handleResolveRoomIssueInTagesplan={handleResolveRoomIssueInTagesplan}
-        getIssueRoomLabel={getIssueRoomLabel}
-        teacher={teacher}
-        userId={userId}
-        rooms={rooms}
-        handleUpdateIssueRoom={handleUpdateIssueRoomInTagesplan}
       />
     </Suspense>
   );
@@ -651,6 +872,8 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
           isTourDemoScheduleActive={isTourDemoScheduleActive}
           showRealNames={showRealNames}
           toggleRealNames={toggleRealNames}
+          rooms={rooms}
+          handleUpdateIssueRoom={handleUpdateIssueRoomInTagesplan}
           userId={userId}
           urgentCancellations={urgentCancellations}
           onOpenUrgentModal={() => setIsUrgentModalOpen(true)}
@@ -1075,22 +1298,48 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                     }}>
                       <div>
                         <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 900, color: '#0f172a' }}>
-                          Hi, <span style={{ color: '#007aff' }}>{resolvedTeacherFullName}</span>!
+                          Hi, <span style={{ color: '#2563eb' }}>{resolvedTeacherFullName}</span>!
                         </h2>
                         <p style={{ margin: '4px 0 0 0', fontSize: '0.84rem', color: '#64748b', fontWeight: 600 }}>
-                          Dein Tagesplan ist bereit.
+                          {isWeekend ? 'Schönes Wochenende!' : ((isFreeDay && !isTourDemoScheduleActive) ? 'Heute hast du frei!' : 'Dein Tagesplan ist bereit.')}
                         </p>
                       </div>
-                      <TourStartButton onClick={startTour} platformTheme={activePlatform === 'campus' ? 'campus' : 'groovelab'} />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <button
+                          type="button"
+                          role="button"
+                          aria-label="Toolbox öffnen"
+                          tabIndex={0}
+                          onClick={() => setIsQuickToolboxOpen(true)}
+                          style={{
+                            width: '40px',
+                            height: '40px',
+                            borderRadius: '12px',
+                            border: activePlatform === 'campus' ? '1.5px solid #bbf7d0' : '1.5px solid #fef08a',
+                            background: activePlatform === 'campus' ? '#f0fdf4' : '#fefce8',
+                            color: activePlatform === 'campus' ? '#16a34a' : '#ca8a04',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
+                          }}
+                          className="hover-scale"
+                          title="Stimmgerät &amp; Metronom"
+                        >
+                          <Wrench size={18} />
+                        </button>
+                        <TourStartButton onClick={startTour} platformTheme={activePlatform === 'campus' ? 'campus' : 'groovelab'} />
+                      </div>
                     </div>
                   </div>
                 }
-                kpisGrid={null}
+                kpisGrid={renderMobileKpis()}
                 tagesplanWidget={isTourDemoScheduleActive ? renderTourDemoScheduleJSX() : renderTagesplanWidget()}
                 absenceWidget={renderAbsenceCardWidget()}
                 hausaufgabenWidget={renderHausaufgabenWidget()}
                 mitteilungenWidget={renderFeedWidget()}
-                customTabs={[
+                additionalTabs={[
                   {
                     id: 'notes',
                     label: 'Notizen',
@@ -1103,7 +1352,7 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                         allStudents={allStudents}
                         todayStudents={todayTagesplanStudents}
                         rooms={rooms}
-                        currentRoom={activeTimelineSlot?.room || activeTimelineSlot?.rooms?.name || teacherTodayRooms[0] || 'Raum 4'}
+                        currentRoom={activeTimelineSlot?.room || activeTimelineSlot?.rooms?.name || teacherTodayRooms[0] || ''}
                         teacherTodayRooms={teacherTodayRooms}
                         onOpenDrawer={() => setShowNotesDrawer(true)}
                         onOpenHomeworkModal={(stud) => {
@@ -1114,104 +1363,327 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
                   },
                   {
                     id: 'toolbox',
-                    label: 'Werkzeuge',
-                    icon: Zap,
+                    label: 'Toolbox',
+                    icon: Sliders,
                     content: <BriefingToolboxCard />
                   }
                 ]}
               />
             ) : (
-              /* Desktop Layout */
+              /* Desktop Layout (1:1 Goldstandard Parity) */
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+                {/* Gamified KPI Cards row (Desktop 1:1 Server Parity) */}
+                {(!isTeacherCurrentlyAbsent || bypassAbsenceView) && (
+                  <div id="tour-teacher-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+
+                    {/* Card 1: Heutige Schüler */}
+                    <div style={{
+                      position: 'relative', overflow: 'hidden',
+                      background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white',
+                      borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.3)',
+                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
+                      padding: '16px', boxSizing: 'border-box',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }} className="hover-scale">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Schüler Heute</span>
+                        <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
+                          <Users size={14} color="white" />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{activeLessonsCount}</span>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>UE</span>
+                        {totalActiveStudentsToday > activeLessonsCount && (
+                          <span style={{ fontSize: '0.68rem', fontWeight: 700, opacity: 0.85, marginLeft: '2px' }}>
+                            ({totalActiveStudentsToday} Schüler)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Card 2: Ø Übe-Zeit */}
+                    <div style={{
+                      position: 'relative', overflow: 'hidden',
+                      background: 'linear-gradient(135deg, #34a853 0%, #34a853 100%)', color: 'white',
+                      borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(52, 168, 83, 0.3)',
+                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
+                      padding: '16px', boxSizing: 'border-box',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }} className="hover-scale">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ø Übe-Zeit</span>
+                        <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
+                          <Timer size={14} color="white" />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                        <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{avgPracticeTime.value}</span>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>{avgPracticeTime.unit}</span>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 700, opacity: 0.75, marginLeft: '2px' }}>/ Woche</span>
+                      </div>
+                    </div>
+
+                    {/* Card 3: Tages-Pensum */}
+                    <div style={{
+                      position: 'relative', overflow: 'hidden',
+                      background: 'linear-gradient(135deg, #facc15 0%, #eab308 100%)', color: '#0f172a',
+                      borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(234, 179, 8, 0.35)',
+                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
+                      padding: '16px', boxSizing: 'border-box',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)'
+                    }} className="hover-scale">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 850, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Tages-Pensum</span>
+                        <div style={{ background: 'rgba(15, 23, 42, 0.12)', padding: '6px', borderRadius: '10px' }}>
+                          <Clock size={14} color="#0f172a" />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                        <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#0f172a' }}>{workloadHoursStr}</span>
+                      </div>
+                    </div>
+
+                    {/* Card 4: Ausfälle */}
+                    <div style={{
+                      position: 'relative', overflow: 'hidden',
+                      background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', color: 'white',
+                      borderRadius: '20px', boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.3)',
+                      display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '70px',
+                      padding: '16px', boxSizing: 'border-box',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }} className="hover-scale">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <span style={{ fontSize: '0.68rem', fontWeight: 800, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Ausfälle</span>
+                        <div style={{ background: 'rgba(255, 255, 255, 0.15)', padding: '6px', borderRadius: '10px' }}>
+                          <AlertCircle size={14} color="white" />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
+                        <span style={{ fontSize: '1.6rem', fontWeight: 950, letterSpacing: '-0.02em', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{cancellationsCount}</span>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9 }}>Heute</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* 2-Column Desktop Grid */}
                 <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', width: '100%' }}>
-                  {/* Left Column: Switcher + Content */}
+                  {/* Left Column: Hero Card + Switcher + Content */}
                   <div style={{ flex: '1 1 50%', display: 'flex', flexDirection: 'column', gap: '12px', minWidth: 0 }}>
-                    {/* Switcher Bar */}
+                    {/* Hero Card Banner */}
                     <div style={{
+                      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.40) 100%)',
+                      backdropFilter: 'blur(24px) saturate(1.8)',
+                      WebkitBackdropFilter: 'blur(24px) saturate(1.8)',
+                      border: '1px solid rgba(255, 255, 255, 0.5)',
+                      borderRadius: '24px',
                       display: 'flex',
-                      background: '#f1f5f9',
-                      padding: '4px',
-                      borderRadius: '14px',
-                      gap: '4px',
-                      width: 'fit-content'
+                      alignItems: 'stretch',
+                      justifyContent: 'space-between',
+                      boxShadow: '0 8px 32px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+                      transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                      width: '100%',
+                      minHeight: '200px',
+                      flex: '0 1 auto',
+                      boxSizing: 'border-box',
+                      overflow: 'hidden'
                     }}>
+                      <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
+                        <div style={{
+                          width: '190px',
+                          height: '100%',
+                          flexShrink: 0,
+                          position: 'relative',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          overflow: 'hidden',
+                          borderRight: '1px solid rgba(0, 0, 0, 0.05)'
+                        }} className="hover-scale hero-avatar-container">
+                          <img 
+                            src={resolvedAvatarSrc} 
+                            alt="" 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                            onError={() => setAvatarLoadError(true)}
+                          />
+                        </div>
+                        <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0, flex: 1 }}>
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            background: '#ffffff',
+                            border: '1px solid rgba(0, 0, 0, 0.06)',
+                            borderRadius: '100px',
+                            padding: '4px 10px',
+                            alignSelf: 'flex-start',
+                            marginBottom: '6px',
+                            flexShrink: 0
+                          }}>
+                            <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853', animation: 'pulse 2s infinite' }} />
+                            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#475569', letterSpacing: '0.04em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
+                              {currentTimeStr || '13:00'} UHR
+                            </span>
+                          </div>
+
+                          <h3 style={{ margin: 0, fontSize: '28px', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", lineHeight: 1.2 }}>
+                            {isWeekend ? 'Schönes Wochenende,' : `${dynamicGreeting.greeting},`}{' '}
+                            <span style={{ color: '#2563eb', fontWeight: 900, letterSpacing: '-0.01em', display: 'inline' }}>
+                              {resolvedTeacherFullName}
+                            </span>!
+                          </h3>
+                          <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', color: '#64748b', fontWeight: 600, lineHeight: 1.35, maxWidth: '420px' }}>
+                            {isWeekend
+                              ? 'Keine Termine heute – Zeit zum Durchatmen und Erholen.'
+                              : ((isFreeDay && !isTourDemoScheduleActive) ? 'Heute hast du frei! Genieße deinen freien Tag.' : (isTourDemoScheduleActive ? 'Bereit für einen produktiven Tag? Hier ist deine Übersicht.' : dynamicGreeting.subtitle))
+                            }
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Segmented Switcher for Left Column: Tages-Kompass, Notizen & Toolbox */}
+                    <div 
+                      role="tablist"
+                      aria-label="Bereichsauswahl linke Spalte"
+                      style={{
+                        display: 'flex',
+                        background: '#f1f5f9',
+                        padding: '4px',
+                        borderRadius: '14px',
+                        gap: '4px',
+                        width: '100%',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      {/* 1. Tages-Kompass */}
                       <button
+                        type="button"
+                        role="tab"
+                        id="tab-briefing"
+                        aria-selected={effectiveLeftColumnTab === 'briefing'}
+                        aria-controls="tabpanel-briefing"
                         onClick={() => setLeftColumnTab('briefing')}
                         style={{
-                          background: leftColumnTab === 'briefing' ? '#ffffff' : 'transparent',
-                          color: leftColumnTab === 'briefing' ? '#0f172a' : '#64748b',
-                          border: 'none',
-                          padding: '6px 14px',
+                          flex: 1,
+                          padding: '7px 8px',
                           borderRadius: '10px',
-                          fontWeight: 800,
-                          fontSize: '0.8rem',
+                          border: effectiveLeftColumnTab === 'briefing' ? '1px solid #cbd5e1' : 'none',
+                          background: effectiveLeftColumnTab === 'briefing' ? '#ffffff' : 'transparent',
+                          color: effectiveLeftColumnTab === 'briefing' ? '#0f172a' : '#64748b',
+                          fontWeight: effectiveLeftColumnTab === 'briefing' ? 850 : 600,
+                          fontSize: '0.76rem',
                           cursor: 'pointer',
-                          boxShadow: leftColumnTab === 'briefing' ? '0 2px 6px rgba(0,0,0,0.05)' : 'none'
+                          boxShadow: effectiveLeftColumnTab === 'briefing' ? '0 2px 6px rgba(0,0,0,0.04)' : 'none',
+                          transition: 'all 0.15s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '5px'
                         }}
                       >
-                        Hausaufgaben
+                        <Sparkles size={13} color={effectiveLeftColumnTab === 'briefing' ? '#0f172a' : '#64748b'} />
+                        <span>Tages-Kompass</span>
                       </button>
+
+                      {/* 2. Notizen */}
                       <button
+                        type="button"
+                        role="tab"
+                        id="tab-notes"
+                        aria-selected={effectiveLeftColumnTab === 'notes'}
+                        aria-controls="tabpanel-notes"
                         onClick={() => setLeftColumnTab('notes')}
                         style={{
-                          background: leftColumnTab === 'notes' ? '#ffffff' : 'transparent',
-                          color: leftColumnTab === 'notes' ? '#0f172a' : '#64748b',
-                          border: 'none',
-                          padding: '6px 14px',
+                          flex: 1,
+                          padding: '7px 8px',
                           borderRadius: '10px',
-                          fontWeight: 800,
-                          fontSize: '0.8rem',
+                          border: effectiveLeftColumnTab === 'notes' ? '1px solid #cbd5e1' : 'none',
+                          background: effectiveLeftColumnTab === 'notes' ? '#ffffff' : 'transparent',
+                          color: effectiveLeftColumnTab === 'notes' ? '#0f172a' : '#64748b',
+                          fontWeight: effectiveLeftColumnTab === 'notes' ? 850 : 600,
+                          fontSize: '0.76rem',
                           cursor: 'pointer',
-                          boxShadow: leftColumnTab === 'notes' ? '0 2px 6px rgba(0,0,0,0.05)' : 'none'
+                          boxShadow: effectiveLeftColumnTab === 'notes' ? '0 2px 6px rgba(0,0,0,0.04)' : 'none',
+                          transition: 'all 0.15s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '5px'
                         }}
                       >
-                        Notizen
+                        <Edit3 size={13} color={effectiveLeftColumnTab === 'notes' ? '#0f172a' : '#64748b'} />
+                        <span>Notizen</span>
                       </button>
+
+                      {/* 3. Toolbox */}
                       <button
+                        type="button"
+                        role="tab"
+                        id="tab-toolbox"
+                        aria-selected={effectiveLeftColumnTab === 'toolbox'}
+                        aria-controls="tabpanel-toolbox"
                         onClick={() => setLeftColumnTab('toolbox')}
                         style={{
-                          background: leftColumnTab === 'toolbox' ? '#ffffff' : 'transparent',
-                          color: leftColumnTab === 'toolbox' ? '#0f172a' : '#64748b',
-                          border: 'none',
-                          padding: '6px 14px',
+                          flex: 1,
+                          padding: '7px 8px',
                           borderRadius: '10px',
-                          fontWeight: 800,
-                          fontSize: '0.8rem',
+                          border: effectiveLeftColumnTab === 'toolbox' ? '1px solid #cbd5e1' : 'none',
+                          background: effectiveLeftColumnTab === 'toolbox' ? '#ffffff' : 'transparent',
+                          color: effectiveLeftColumnTab === 'toolbox' ? '#0f172a' : '#64748b',
+                          fontWeight: effectiveLeftColumnTab === 'toolbox' ? 850 : 600,
+                          fontSize: '0.76rem',
                           cursor: 'pointer',
-                          boxShadow: leftColumnTab === 'toolbox' ? '0 2px 6px rgba(0,0,0,0.05)' : 'none'
+                          boxShadow: effectiveLeftColumnTab === 'toolbox' ? '0 2px 6px rgba(0,0,0,0.04)' : 'none',
+                          transition: 'all 0.15s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '5px'
                         }}
                       >
-                        Tools
+                        <Sliders size={13} color={effectiveLeftColumnTab === 'toolbox' ? '#0f172a' : '#64748b'} />
+                        <span>Toolbox</span>
                       </button>
                     </div>
 
-                    {leftColumnTab === 'briefing' ? (
-                      renderHausaufgabenWidget()
-                    ) : leftColumnTab === 'notes' ? (
-                      <BriefingNotesCard
-                        user={teacher}
-                        schoolId={teacher?.school_id || schoolData?.id}
-                        activeStudent={activeStudent}
-                        allStudents={allStudents}
-                        todayStudents={todayTagesplanStudents}
-                        rooms={rooms}
-                        currentRoom={activeTimelineSlot?.room || activeTimelineSlot?.rooms?.name || teacherTodayRooms[0] || 'Raum 4'}
-                        teacherTodayRooms={teacherTodayRooms}
-                        onOpenDrawer={() => setShowNotesDrawer(true)}
-                        onOpenHomeworkModal={(stud) => {
-                          setDocStudent(stud);
-                        }}
-                      />
+                    {effectiveLeftColumnTab === 'notes' ? (
+                      <div role="tabpanel" id="tabpanel-notes" aria-labelledby="tab-notes" tabIndex={0} style={{ width: '100%' }}>
+                        <BriefingNotesCard
+                          user={teacher}
+                          schoolId={teacher?.school_id || schoolData?.id}
+                          activeStudent={activeStudent}
+                          allStudents={allStudents}
+                          todayStudents={todayTagesplanStudents}
+                          rooms={rooms}
+                          currentRoom={activeTimelineSlot?.room || activeTimelineSlot?.rooms?.name || teacherTodayRooms[0] || ''}
+                          teacherTodayRooms={teacherTodayRooms}
+                          onOpenDrawer={() => setShowNotesDrawer(true)}
+                          onOpenHomeworkModal={(stud) => {
+                            setDocStudent(stud);
+                          }}
+                        />
+                      </div>
+                    ) : effectiveLeftColumnTab === 'toolbox' ? (
+                      <div role="tabpanel" id="tabpanel-toolbox" aria-labelledby="tab-toolbox" tabIndex={0} style={{ width: '100%' }}>
+                        <BriefingToolboxCard />
+                      </div>
                     ) : (
-                      <BriefingToolboxCard />
+                      <div role="tabpanel" id="tabpanel-briefing" aria-labelledby="tab-briefing" tabIndex={0} style={{ width: '100%', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                        {renderHausaufgabenWidget()}
+                      </div>
                     )}
+
                   </div>
 
                   {/* Right Column: Tagesplan */}
                   <div style={{ flex: '1 1 50%', display: 'flex', flexDirection: 'column', gap: '12px', minWidth: 0 }}>
                     {isTourDemoScheduleActive ? renderTourDemoScheduleJSX() : renderTagesplanWidget()}
-                    {renderTagesplanRoomIssuesBanner(true)}
                   </div>
                 </div>
               </div>
@@ -1306,6 +1778,13 @@ export const TeacherBriefingTab: React.FC<TeacherBriefingTabProps> = (props) => 
           {renderFeedWidget()}
         </aside>
       )}
+
+      {/* Floating Quick Toolbox Drawer */}
+      <TeacherQuickToolboxDrawer
+        isOpen={isQuickToolboxOpen}
+        onClose={() => setIsQuickToolboxOpen(false)}
+        activePlatform={activePlatform}
+      />
     </div>
   );
 };

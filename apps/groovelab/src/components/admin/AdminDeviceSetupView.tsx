@@ -1037,7 +1037,7 @@ export function AdminDeviceSetupView({
                         <span style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1e293b' }}>Zero-Trust & DSGVO-Parität</span>
                       </div>
                       <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b', lineHeight: 1.4 }}>
-                        Keine Erfassung von Standort- oder GPS-Koordinaten (§ 87 BetrVG / Art. 5 & 8 DSGVO). Schüler-Anwesenheit wird ausschließlich über die physische Station autorisiert.
+                        Keine Erfassung von Standort- oder GPS-Koordinaten (Vollständiger Datenschutz &amp; kein Mitarbeiter-Tracking). Schüler-Anwesenheit wird ausschließlich über die physische Station autorisiert.
                       </p>
                     </div>
                   </div>

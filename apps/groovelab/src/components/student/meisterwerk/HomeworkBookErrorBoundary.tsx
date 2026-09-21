@@ -49,7 +49,7 @@ export class HomeworkBookErrorBoundary extends React.Component<HomeworkBookError
           <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1e293b', marginBottom: '8px' }}>
             Hausaufgabenheft konnte nicht geladen werden
           </h3>
-          <p style={{ fontSize: '0.9rem', color: '#64748b', lineHeight: 1.5, marginBottom: '24px' }}>
+          <p style={{ fontSize: '0.9rem', color: '#64748b', lineHeight: 1.5, marginBottom: '16px' }}>
             Die Verbindung zur Cloud wurde kurzzeitig unterbrochen oder die Komponente wird gerade aktualisiert.
           </p>
           <button
@@ -68,6 +68,23 @@ export class HomeworkBookErrorBoundary extends React.Component<HomeworkBookError
           >
             Erneut versuchen
           </button>
+          {this.state.errorMessage && (
+            <div style={{
+              marginTop: '16px',
+              padding: '10px 14px',
+              background: '#fff1f2',
+              border: '1px solid #fecaca',
+              borderRadius: '12px',
+              fontSize: '0.74rem',
+              color: '#991b1b',
+              textAlign: 'left',
+              fontFamily: 'monospace',
+              overflowX: 'auto',
+              wordBreak: 'break-all'
+            }}>
+              Fehler: {this.state.errorMessage}
+            </div>
+          )}
         </div>
       );
     }

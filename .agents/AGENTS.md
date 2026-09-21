@@ -133,6 +133,15 @@
     - **Admin/Sekretariat**: Roter Akzent (`#ea4335`).
   - Monochrome Icons in allen aktiven Button-Zuständen.
 
+## ⚖️ Clean Dashboard Wording & Juristische Trennungs-Doktrin (Zero Paragraphen in Dashboards)
+- **Striktes Verbot von Paragraphen im Dashboard-Frontend**: Paragraphenzeichen (`§`, `§§`) und juristische Gesetzeszitate (z. B. `§ 130 BGB`, `§ 147 AO`, `§ 254 BGB`, `§ 8a SGB VIII` etc.) gehören **NIEMALS** in die sichtbaren Benutzeroberflächen unserer Dashboards (Lehrkräfte, Schüler, Eltern, Schulleitung, Sekretariat). Keine juristische Verunsicherung oder bürokratische Kälte im Lern- und Arbeitsbereich.
+- **Kanonischer Ort der rechtlichen Fundierung**: Gesetzliche Paragraphen, juristische Rechtsgrundlagen und Normen gehören **AUSSCHLIESSLICH** in die AGBs, das Impressum, die Datenschutzerklärung, die Auftragsverarbeitungsverträge (AVV) oder offizielle Vertragsbestätigungs-PDFs.
+- **Menschlich-didaktischer Wording-Standard**: In allen Dashboard-Ansichten, Modals, Tabellen, Tooltips und Badges gilt eine klare, professionelle, didaktische Sprache:
+  - Statt *„Volljuristischer Nachweis nach § 130 BGB“* -> *„Revisionssichere Lesebestätigungen“*, *„Status & Kenntnisnahmen“* oder *„Bestätigt“*.
+  - Statt *„Beweislast gem. § 280 BGB“* -> *„Dokumentierte Benachrichtigung“*.
+  - Statt *„Subventions- & Prüfungsschutz gem. § 147 AO“* -> *„Gesetzliche Archivierung“*.
+  - Statt *„Aufsichtspflicht nach § 832 BGB“* -> *„Sicherheit & Aufsicht“*.
+
 ## Platform Naming
 - Always refer to the platform as **Campus-Groovelab** in all UI elements, user communications, messages, and document descriptions.
 - Ensure the spelling is precisely "Campus-Groovelab" (with a double 'o' in "Groovelab").

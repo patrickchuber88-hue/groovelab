@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Sparkles, Zap, Crown, Check, ArrowRight, X } from 'lucide-react';
 import { CampusUiLevel } from './CampusLevelSwitcher';
 
@@ -13,6 +13,17 @@ export const CampusLevelSelectModal: React.FC<CampusLevelSelectModalProps> = ({
   onSelectLevel,
   onClose
 }) => {
+  useEffect(() => {
+    if (!onClose) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
   const tiers: {
     id: CampusUiLevel;
     badge: string;
@@ -100,34 +111,43 @@ export const CampusLevelSelectModal: React.FC<CampusLevelSelectModalProps> = ({
       zIndex: 99999,
       padding: '20px'
     }}>
-      <div style={{
-        background: '#ffffff',
-        borderRadius: '32px',
-        maxWidth: '820px',
-        width: '100%',
-        maxHeight: '92vh',
-        overflowY: 'auto',
-        padding: 'clamp(24px, 5vw, 36px) clamp(16px, 4vw, 30px)',
-        boxShadow: '0 30px 70px -10px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.9) inset',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '24px',
-        animation: 'slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
-        boxSizing: 'border-box',
-        position: 'relative'
-      }}>
+      <div 
+        role="dialog"
+        aria-modal="true"
+        aria-label="Dashboard UI-Level auswählen"
+        style={{
+          background: '#ffffff',
+          borderRadius: '32px',
+          maxWidth: '820px',
+          width: '100%',
+          maxHeight: '92vh',
+          overflowY: 'auto',
+          padding: 'clamp(24px, 5vw, 36px) clamp(16px, 4vw, 30px)',
+          boxShadow: '0 30px 70px -10px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.9) inset',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '24px',
+          animation: 'slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+          boxSizing: 'border-box',
+          position: 'relative'
+        }}
+      >
         
         {/* Close Button */}
         {onClose && (
           <button
             type="button"
             onClick={onClose}
+            aria-label="Schließen"
+            title="Schließen"
             style={{
               position: 'absolute',
               top: '16px',
               right: '16px',
-              width: '36px',
-              height: '36px',
+              width: '44px',
+              height: '44px',
+              minWidth: '44px',
+              minHeight: '44px',
               borderRadius: '50%',
               background: '#f1f5f9',
               border: '1px solid #e2e8f0',
@@ -140,7 +160,6 @@ export const CampusLevelSelectModal: React.FC<CampusLevelSelectModalProps> = ({
               touchAction: 'manipulation'
             }}
             className="hover-scale"
-            title="Schließen"
           >
             <X size={18} />
           </button>
@@ -198,7 +217,17 @@ export const CampusLevelSelectModal: React.FC<CampusLevelSelectModalProps> = ({
             return (
               <div
                 key={tier.id}
+                role="button"
+                tabIndex={0}
+                aria-pressed={isSelected}
+                aria-label={`Dashboard Level ${tier.title} auswählen (${tier.badge})`}
                 onClick={() => onSelectLevel(tier.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onSelectLevel(tier.id);
+                  }
+                }}
                 style={{
                   background: tier.bgGradient,
                   borderRadius: '24px',
@@ -216,7 +245,8 @@ export const CampusLevelSelectModal: React.FC<CampusLevelSelectModalProps> = ({
                   gap: '18px',
                   position: 'relative',
                   transform: isSelected ? 'translateY(-2px)' : 'none',
-                  transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+                  transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                  touchAction: 'manipulation'
                 }}
                 className="hover-card-colorful"
               >

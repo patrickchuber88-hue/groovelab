@@ -54,8 +54,6 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     cors: true,
-    // Alle URL-Pfade (wie /qr/:token) auf index.html fallbacken — SPA-Routing
-    historyApiFallback: true,
     watch: {
       // Ignoriere Build-Output und temporäre Verzeichnisse, damit Dev-Server bei Hintergrund-Builds nicht einfriert
       ignored: ['**/dist/**', '**/.git/**', '**/coverage/**', '**/*.log', '**/.system_generated/**']
@@ -160,13 +158,31 @@ export default defineConfig({
           if (id.includes('MasterAdminDashboard') || id.includes('masterAdmin/')) {
             return 'master-admin-core';
           }
+          if (id.includes('AdminCampusRoomsView')) {
+            return 'admin-campus-rooms';
+          }
           if (id.includes('components/admin/')) {
             return 'admin-subviews';
           }
           if (id.includes('AdminDashboard')) {
             return 'admin-core-suite';
           }
-          if (id.includes('secretary/Secretary') || id.includes('SecretaryAnnouncementsView') || id.includes('SecretaryDutiesView') || id.includes('SecretaryCrisisView') || id.includes('SecretaryAuditView') || id.includes('SecretaryEquipmentView') || id.includes('SecretaryRoomsView') || id.includes('SecretaryLicensesView') || id.includes('SecretarySetupView')) {
+          if (id.includes('SecretaryLicensesView')) {
+            return 'secretary-licenses-view';
+          }
+          if (id.includes('SecretaryRoomsView')) {
+            return 'secretary-rooms-view';
+          }
+          if (id.includes('SecretaryAuditView')) {
+            return 'secretary-audit-view';
+          }
+          if (id.includes('SecretaryBriefingView')) {
+            return 'secretary-briefing-view';
+          }
+          if (id.includes('SecretaryBillingModalsHub')) {
+            return 'secretary-billing-modals';
+          }
+          if (id.includes('secretary/Secretary') || id.includes('SecretaryAnnouncementsView') || id.includes('SecretaryDutiesView') || id.includes('SecretaryCrisisView') || id.includes('SecretaryEquipmentView') || id.includes('SecretarySetupView') || id.includes('SecretaryEmployeesView') || id.includes('SecretaryStudentsView')) {
             return 'secretary-subviews';
           }
           if (id.includes('SecretaryDashboard')) {

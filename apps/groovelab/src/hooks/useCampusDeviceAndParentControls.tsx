@@ -161,15 +161,18 @@ export function useCampusDeviceAndParentControls({
 
   useEffect(() => {
     const handleLevelChangeEvt = (e: any) => {
-      if (e?.detail) {
-        setCampusStudentUiLevel(e.detail);
+      if (!e?.detail) return;
+      const raw = e.detail;
+      const levelStr = typeof raw === 'object' && raw?.uiLevel ? raw.uiLevel : raw;
+      if (levelStr === 'junior' || levelStr === 'teen' || levelStr === 'pro') {
+        setCampusStudentUiLevel(levelStr);
         try {
-          const activeId = localStorage.getItem('groovelab_current_user_id') || localStorage.getItem('campus_active_user_id');
-          if (activeId) {
-            localStorage.setItem(`campus_student_ui_level_${activeId}`, e.detail);
+          const targetId = typeof raw === 'object' && raw?.studentId ? raw.studentId : (localStorage.getItem('groovelab_current_user_id') || localStorage.getItem('campus_active_user_id'));
+          if (targetId) {
+            localStorage.setItem(`campus_student_ui_level_${targetId}`, levelStr);
           }
         } catch {}
-        localStorage.setItem('campus_student_ui_level', e.detail);
+        localStorage.setItem('campus_student_ui_level', levelStr);
       }
     };
     const handleParentModeChange = (e: any) => {

@@ -208,7 +208,7 @@ export const OperatorTab: React.FC<OperatorTabProps> = ({
               gap: '5px'
             }}>
               {taxMode === 'standard_vat' ? <Landmark size={12} color="#475569" /> : <Building size={12} color="#475569" />}
-              <span>{taxMode === 'standard_vat' ? 'Regelbesteuerung (19% MwSt)' : 'Kleinunternehmer (§ 19 UStG)'}</span>
+              <span>{taxMode === 'standard_vat' ? 'Regelbesteuerung (19% MwSt)' : 'Kleinunternehmer (0% MwSt)'}</span>
             </span>
           </div>
 
@@ -320,7 +320,7 @@ export const OperatorTab: React.FC<OperatorTabProps> = ({
                     checked={taxMode === 'small_business'}
                     onChange={() => setTaxMode('small_business')}
                   />
-                  <span>§ 19 UStG (0% MwSt)</span>
+                  <span>Kleinunternehmer (0% MwSt)</span>
                 </label>
 
                 <label style={{

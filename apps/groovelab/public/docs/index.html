@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Campus-Groovelab | Executive Pitch & Legal Documents Hub</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Plus Jakarta Sans", "Segoe UI", Roboto, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 860px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .brand-tag {
+      display: inline-block;
+      background: #facc15;
+      color: #0f172a;
+      font-weight: 800;
+      font-size: 11px;
+      padding: 4px 12px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 8px;
+    }
+
+    p.subtitle {
+      font-size: 14px;
+      color: #94a3b8;
+      max-width: 580px;
+      margin: 0 auto 24px auto;
+      line-height: 1.5;
+    }
+
+    .zip-cta-card {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    }
+
+    .zip-info h3 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 4px;
+    }
+
+    .zip-info p {
+      font-size: 13px;
+      color: #94a3b8;
+    }
+
+    .btn-zip {
+      background: #facc15;
+      color: #0f172a;
+      text-decoration: none;
+      font-weight: 800;
+      font-size: 13.5px;
+      padding: 12px 22px;
+      border-radius: 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      box-shadow: 0 4px 14px rgba(250, 204, 21, 0.25);
+    }
+
+    .btn-zip:hover {
+      background: #eab308;
+      transform: translateY(-1px);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 680px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+      .zip-cta-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+      }
+      .btn-zip {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .card:hover {
+      border-color: #64748b;
+      transform: translateY(-2px);
+    }
+
+    .card-top {
+      margin-bottom: 16px;
+    }
+
+    .card-badge {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.08);
+      color: #cbd5e1;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .card h2 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 6px;
+      line-height: 1.3;
+    }
+
+    .card p {
+      font-size: 12.5px;
+      color: #94a3b8;
+      line-height: 1.45;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-download {
+      flex: 1;
+      background: #ffffff;
+      color: #0f172a;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 12px;
+      padding: 9px 12px;
+      border-radius: 8px;
+      text-align: center;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      transition: background 0.15s ease;
+    }
+
+    .btn-download:hover {
+      background: #f1f5f9;
+    }
+
+    .btn-view {
+      background: rgba(255, 255, 255, 0.06);
+      color: #cbd5e1;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 12px;
+      padding: 9px 12px;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #334155;
+      transition: all 0.15s ease;
+    }
+
+    .btn-view:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #ffffff;
+    }
+
+    .footer {
+      margin-top: 40px;
+      font-size: 12px;
+      color: #64748b;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="header">
+      <div class="brand-tag">Campus-Groovelab Executive Portal</div>
+      <h1>Download-Zentrale: Pitch & Legal Portfolio</h1>
+      <p class="subtitle">
+        Alle 6 autoritativen Dokumente für die Musikschule Bad Säckingen – 100% wasserdicht basierend auf den realen Codebase-Tarifen (0,49 € Voll-Aktivierung / 0,09 € Basis-Audio-Tresor), exakt 1 Seite DIN A4 im Apple HIG Goldstandard.
+      </p>
+    </div>
+
+    <!-- ZIP Download -->
+    <div class="zip-cta-card">
+      <div class="zip-info">
+        <h3>📦 Alle 6 Dokumente als Komplettpaket</h3>
+        <p>Enthält alle 6 PDFs in voller Auflösung (1,2 MB ZIP-Archiv)</p>
+      </div>
+      <a href="Campus-Groovelab_Pitch_Paket_Bad_Saeckingen.zip" download class="btn-zip">
+        ⬇️ Komplettpaket (ZIP) herunterladen
+      </a>
+    </div>
+
+    <!-- 6 Documents Grid -->
+    <div class="grid">
+
+      <!-- 1. Herrenberg Shield -->
+      <div class="card">
+        <div class="card-top">
+          <span class="card-badge" style="color: #4ade80; background: rgba(74, 222, 128, 0.1);">1 Seite • Legal Shield</span>
+          <h2>Herrenberg-Compliance & DRV-Schutzschirm</h2>
+          <p>Forensisches Gutachten (BSG B 12 R 3/20 R) mit Statusfeststellungs-Matrix. Schützt Träger & Schulleiter vor Scheinselbstständigkeit.</p>
+        </div>
+        <div class="card-actions">
+          <a href="herrenberg_compliance_legal_shield.pdf" download class="btn-download">⬇️ PDF Herunterladen</a>
+          <a href="herrenberg_compliance_legal_shield.pdf" target="_blank" class="btn-view">👁️ Ansehen</a>
+        </div>
+      </div>
+
+      <!-- 2. Bad Säckingen Factsheet -->
+      <div class="card">
+        <div class="card-top">
+          <span class="card-badge" style="color: #facc15; background: rgba(250, 204, 21, 0.1);">1 Seite • Partnerschaft</span>
+          <h2>Partnerschafts-Factsheet Bad Säckingen</h2>
+          <p>Reallabor-Deal: 0 € Softwarekosten, 20 % bis 49 % sofortige Umsatzbeteiligung ab Tag 1, 90 Min. monatlicher Fachbeirat.</p>
+        </div>
+        <div class="card-actions">
+          <a href="partnerschaft_factsheet_bad_saeckingen.pdf" download class="btn-download">⬇️ PDF Herunterladen</a>
+          <a href="partnerschaft_factsheet_bad_saeckingen.pdf" target="_blank" class="btn-view">👁️ Ansehen</a>
+        </div>
+      </div>
+
+      <!-- 3. Marktpotenzial DACH -->
+      <div class="card">
+        <div class="card-top">
+          <span class="card-badge">1 Seite • Marktanalyse</span>
+          <h2>Marktpotenzial & Zielgruppen DACH</h2>
+          <p>> 2.100 Musikschulen, 1,95 Mio. Schüler, 57.000 Lehrkräfte. Detaillierte ARR-Skalierung (10 bis 200 Schulen).</p>
+        </div>
+        <div class="card-actions">
+          <a href="marktpotenzial_dach_campus_groovelab.pdf" download class="btn-download">⬇️ PDF Herunterladen</a>
+          <a href="marktpotenzial_dach_campus_groovelab.pdf" target="_blank" class="btn-view">👁️ Ansehen</a>
+        </div>
+      </div>
+
+      <!-- 4. Kosten & Rentabilität -->
+      <div class="card">
+        <div class="card-top">
+          <span class="card-badge">1 Seite • Financials</span>
+          <h2>Kostenkalkulation & Rentabilität</h2>
+          <p>Reale monatliche Kosten (Hetzner, Google AI Ultra 99,99 €, IT-Haftpflicht nach ARR-Staffel) mit > 98 % Nettomarge.</p>
+        </div>
+        <div class="card-actions">
+          <a href="kosten_und_rentabilitaet_campus_groovelab.pdf" download class="btn-download">⬇️ PDF Herunterladen</a>
+          <a href="kosten_und_rentabilitaet_campus_groovelab.pdf" target="_blank" class="btn-view">👁️ Ansehen</a>
+        </div>
+      </div>
+
+      <!-- 5. Schulleiter Mehrwert -->
+      <div class="card">
+        <div class="card-top">
+          <span class="card-badge">1 Seite • Schulleitung</span>
+          <h2>Schulleiter-Mehrwert & Pain Points</h2>
+          <p>Die 5 größten Hebel: Herrenberg-Schutz, DSGVO-Raum, Teenager-Motivation, Stundenausfall-Cockpit & Raumgovernance.</p>
+        </div>
+        <div class="card-actions">
+          <a href="schulleiter_mehrwert_campus_groovelab.pdf" download class="btn-download">⬇️ PDF Herunterladen</a>
+          <a href="schulleiter_mehrwert_campus_groovelab.pdf" target="_blank" class="btn-view">👁️ Ansehen</a>
+        </div>
+      </div>
+
+      <!-- 6. Executive Briefing -->
+      <div class="card">
+        <div class="card-top">
+          <span class="card-badge">1 Seite • Management</span>
+          <h2>Executive Management Briefing</h2>
+          <p>Prägnante 1-Seiten-Gesamtübersicht für die Sitzung: Geschäftsmodell, Sicherheitsarchitektur und Kooperationsfahrplan.</p>
+        </div>
+        <div class="card-actions">
+          <a href="executive_management_briefing_campus_groovelab.pdf" download class="btn-download">⬇️ PDF Herunterladen</a>
+          <a href="executive_management_briefing_campus_groovelab.pdf" target="_blank" class="btn-view">👁️ Ansehen</a>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="footer">
+      Campus-Groovelab Platform | Bereitgestellt für Patrick Huber & Musikschule Bad Säckingen
+    </div>
+  </div>
+
+</body>
+</html>

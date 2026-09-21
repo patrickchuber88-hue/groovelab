@@ -106,38 +106,12 @@ export const StudentAccessSection: React.FC<StudentAccessSectionProps> = ({
   const handleResetStudentPin = async () => {
     try {
       setIsResettingPin(true);
-      // 1. Try atomic RPC first
-      let rpcOk = false;
-      try {
-        const { data: rpcRes, error: rpcErr } = await supabase.rpc('request_student_pin_reset', {
-          p_student_id: student.id
-        });
-        if (!rpcErr && rpcRes?.success) {
-          rpcOk = true;
-        }
-      } catch (e) {
-        console.warn('request_student_pin_reset RPC notice:', e);
-      }
-
-      // 2. Fallback updates if RPC is not deployed yet
-      if (!rpcOk) {
-        const userResetPayload: any = { 
-          onboarding_pin: null, 
-          personal_pin: null,
-          parent_pin: null,
-          is_pin_activated: false,
-          status: 'offen'
-        };
-        try {
-          await supabase.from('users').update(userResetPayload).eq('id', student.id);
-        } catch (e) {}
-        const { error: userResetErr } = await supabase.from('users').update(userResetPayload).eq('id', student.id);
-        if (userResetErr && userResetErr.message?.includes('onboarding_pin')) {
-          delete userResetPayload.onboarding_pin;
-          await supabase.from('users').update(userResetPayload).eq('id', student.id);
-        }
-        await supabase.from('students').update({ onboarding_pin: null, is_pin_activated: false, status: 'offen' }).eq('id', student.id);
-        await supabase.from('pending_students').update({ is_pin_activated: false, status: 'offen' }).eq('id', student.id);
+      // 1. Authoritative Fail-Closed Server RPC
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('request_student_pin_reset', {
+        p_student_id: student.id
+      });
+      if (rpcErr || !rpcRes?.success) {
+        throw new Error(rpcErr?.message || rpcRes?.error || 'Server-Autorisierung für PIN-Reset fehlgeschlagen.');
       }
 
       // Invalidate any local biometric credentials for this student

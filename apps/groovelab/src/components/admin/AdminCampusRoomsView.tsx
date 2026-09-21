@@ -14,7 +14,7 @@ const capitalizeName = (str: string | null | undefined): string => {
 };
 
 const checkRoomMatchesInstrumentFilter = (room: any, filterType: string, schoolId?: string): boolean => {
-  if (!filterType || filterType === 'Alle') return true;
+  if (!filterType || filterType.toLowerCase() === 'alle' || filterType.toLowerCase() === 'all') return true;
   if (!room) return false;
 
   const localMap = (() => {
@@ -686,8 +686,12 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
 
     // Filter rooms by floor, equipment, search query AND availability filters
     const roomsToRender = (rooms.filter(room => {
-      if (selectedFloor !== 'Alle' && room.floor !== selectedFloor) return false;
-      if (selectedEquipmentFilter !== 'Alle') {
+      if (activePlatform === 'campus' && room.is_campus_active === false) return false;
+      if (selectedFloor && selectedFloor.toLowerCase() !== 'alle' && selectedFloor.toLowerCase() !== 'all') {
+        const normalizedRoomFloor = (!room.floor || room.floor === 'Allgemein') ? 'EG' : room.floor;
+        if (normalizedRoomFloor !== selectedFloor && room.floor !== selectedFloor) return false;
+      }
+      if (selectedEquipmentFilter && selectedEquipmentFilter.toLowerCase() !== 'alle' && selectedEquipmentFilter.toLowerCase() !== 'all') {
         if (!checkRoomMatchesInstrumentFilter(room, selectedEquipmentFilter, admin?.school_id)) {
           return false;
         }

@@ -17,6 +17,7 @@ interface MobileBriefingCarouselProps {
   absenceWidget?: React.ReactNode;
   ausfallWidget?: React.ReactNode;
   customTabs?: CarouselTabItem[];
+  additionalTabs?: CarouselTabItem[];
   themeColor?: string;
 }
 
@@ -29,6 +30,7 @@ export const MobileBriefingCarousel: React.FC<MobileBriefingCarouselProps> = ({
   absenceWidget,
   ausfallWidget,
   customTabs,
+  additionalTabs,
   themeColor = '#34a853'
 }) => {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -37,7 +39,7 @@ export const MobileBriefingCarousel: React.FC<MobileBriefingCarouselProps> = ({
 
   const effectiveAbsenceWidget = absenceWidget || ausfallWidget;
 
-  const tabs: CarouselTabItem[] = customTabs || [
+  const defaultTabs: CarouselTabItem[] = [
     {
       id: 'cockpit',
       label: 'Cockpit',
@@ -81,6 +83,10 @@ export const MobileBriefingCarousel: React.FC<MobileBriefingCarouselProps> = ({
       )
     }
   ];
+
+  const tabs: CarouselTabItem[] = customTabs || (
+    additionalTabs ? [...defaultTabs, ...additionalTabs] : defaultTabs
+  );
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;

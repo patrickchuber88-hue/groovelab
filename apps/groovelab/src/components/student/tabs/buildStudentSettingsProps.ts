@@ -1,5 +1,6 @@
 import React from 'react';
 import { StudentSettingsTabProps } from './StudentSettingsTab';
+import { exportStudentGdprDossier } from '../../../services/gdprDataExportService';
 
 export interface BuildStudentSettingsParams {
   studentId: string;
@@ -31,8 +32,20 @@ export function buildStudentSettingsProps(params: BuildStudentSettingsParams): S
   return {
     activeStudentSettingsModal: parent.activeStudentSettingsModal as any,
     activeTab: profile.activeTab,
-    applyAndSaveParentControls: async () => {},
     avatar: streaks.avatar,
+    applyAndSaveParentControls: async (updates: any) => {
+      if (updates?.uiLevel) {
+        profile.setStudentUiLevel(updates.uiLevel);
+        if (onProfileUpdate) {
+          try {
+            onProfileUpdate({ campus_ui_level: updates.uiLevel });
+          } catch (e) {
+            console.warn('Could not propagate uiLevel to root:', e);
+          }
+        }
+      }
+      await parent.applyAndSaveParentControls(updates);
+    },
     bedtimeEnd: parent.bedtimeEnd,
     bedtimeModeEnabled: parent.bedtimeModeEnabled,
     bedtimeStart: parent.bedtimeStart,
@@ -65,7 +78,21 @@ export function buildStudentSettingsProps(params: BuildStudentSettingsParams): S
     handleRegisterParentPasskey: parent.handleRegisterParentPasskey,
     handleCloseSettingsModal: () => parent.setActiveStudentSettingsModal(null),
     handleDownloadGoBdReceipt: async () => {},
-    handleExportGdprReport: async () => {},
+    handleExportGdprReport: async () => {
+      try {
+        if (!profile.studentUser) return;
+        await exportStudentGdprDossier(profile.studentUser, {
+          evolutionLevel: streaks.evolutionLevel,
+          flameType: streaks.flameType,
+          totalMinutes: streaks.totalMinutes,
+          parentPermissions: parent.parentPermissions,
+          homeworkNotes: feed.homeworkNotes,
+          stickers: feed.stickers
+        });
+      } catch (err) {
+        console.error('[GDPR Art. 15 Export] Error:', err);
+      }
+    },
     handleExportFullDataArchive: async () => {},
     handleOpenSettingsModule: (mod) => parent.setActiveStudentSettingsModal(mod),
     handleRemoveFamilyProfile: parent.handleRemoveFamilyProfile,
@@ -111,7 +138,7 @@ export function buildStudentSettingsProps(params: BuildStudentSettingsParams): S
     pushNotifPracticeReminder: false,
     pushNotifScheduleChanges: false,
     pushNotifWeeklyDigest: false,
-    recentlyChangedDiff: null,
+    recentlyChangedDiff: parent.recentlyChangedDiff,
     renderParentGateModal: () => null,
     renderRecoveryKeyModal: () => null,
     scheduleOccurrences: schedule.scheduleOccurrences,
@@ -143,7 +170,7 @@ export function buildStudentSettingsProps(params: BuildStudentSettingsParams): S
     setPushNotifPracticeReminder: () => {},
     setPushNotifScheduleChanges: () => {},
     setPushNotifWeeklyDigest: () => {},
-    setRecentlyChangedDiff: () => {},
+    setRecentlyChangedDiff: parent.setRecentlyChangedDiff,
     setRecoveryKeyError: parent.setRecoveryKeyError,
     setRecoveryKeyInput: parent.setRecoveryKeyInput,
     setSecurityPinTarget: () => {},

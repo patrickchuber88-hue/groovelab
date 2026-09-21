@@ -142,6 +142,29 @@ function InstrumentBadge({ instrument, color }: { instrument: string; color: str
   );
 }
 
+// 🏛️ Tier-1 L1-Cache Hydration: Sofortige 0ms-Sichtbarkeit des Stundenplaner-Entwurfs
+const readInitialTeacherDraftState = (teacherId: string) => {
+  if (typeof window === 'undefined' || !teacherId) return null;
+  try {
+    const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+    const keys = [
+      `groovelab_teacher_draft_state_${activePlatform}_${teacherId}`,
+      `groovelab_teacher_draft_state_campus_${teacherId}`,
+      `groovelab_teacher_draft_state_groovelab_${teacherId}`
+    ];
+    for (const k of keys) {
+      const raw = localStorage.getItem(k);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.drafts) && parsed.drafts.length > 0) {
+          return parsed;
+        }
+      }
+    }
+  } catch (e) {}
+  return null;
+};
+
 export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
   const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
 
@@ -311,9 +334,17 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
       });
     });
   };
-  const [boards, setBoards] = useState<DayBoard[]>([]);
+  const initialDraftState = useMemo(() => readInitialTeacherDraftState(userId), [userId]);
+  const [boards, setBoards] = useState<DayBoard[]>(() => {
+    if (initialDraftState?.drafts) {
+      const activeId = initialDraftState.activeDraftId || 'default';
+      const target = initialDraftState.drafts.find((d: any) => d.id === activeId) || initialDraftState.drafts[0];
+      if (target?.boards) return target.boards;
+    }
+    return [];
+  });
   const [undoStack, setUndoStack] = useState<{ boards: DayBoard[]; students: Student[] }[]>([]);
-  const [drafts, setDrafts] = useState<{ id: string; name: string; boards: DayBoard[] }[]>([]);
+  const [drafts, setDrafts] = useState<{ id: string; name: string; boards: DayBoard[] }[]>(() => initialDraftState?.drafts || []);
   const draftsRef = useRef<{ id: string; name: string; boards: DayBoard[] }[]>([]);
   draftsRef.current = drafts;
 
@@ -335,15 +366,16 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
     setStudents(lastSnapshot.students);
     setToast({ message: 'Änderung rückgängig gemacht ↩️', type: 'success' });
   };
-  const [activeDraftId, setActiveDraftId] = useState<string>('default');
+  const [activeDraftId, setActiveDraftId] = useState<string>(() => initialDraftState?.activeDraftId || 'default');
   const activeDraftIdRef = useRef<string>('default');
   activeDraftIdRef.current = activeDraftId;
-  const [submittedDraftId, setSubmittedDraftId] = useState<string>('');
+  const [submittedDraftId, setSubmittedDraftId] = useState<string>(() => initialDraftState?.submittedDraftId || '');
   const lastSavedStateRef = useRef<string>('');
   const [students, setStudents] = useState<Student[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(() => !initialDraftState);
   const [submitting, setSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [showCelebration, setShowCelebration] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarTab, setSidebarTab] = useState<'all' | 'unassigned' | 'assigned'>('unassigned');
@@ -510,7 +542,9 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
   const [hasSubmittedSchedule, setHasSubmittedSchedule] = useState(false);
   const [hasUnsubmittedEdits, setHasUnsubmittedEdits] = useState(false);
   const [lastSubmittedTime, setLastSubmittedTime] = useState<string | null>(null);
-  const [scheduleStatus, setScheduleStatus] = useState<'none' | 'pending' | 'approved'>('none');
+  const [submittedAtIso, setSubmittedAtIso] = useState<string>('');
+  const submittedAtIsoRef = useRef<string>('');
+  const [scheduleStatus, setScheduleStatus] = useState<'none' | 'pending' | 'approved' | 'needs_revision'>('none');
 
   // RoentgenMatrixView interactive behavior states
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
@@ -559,9 +593,22 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
   // Dynamic Theme calculations
   const activePlatformStored = typeof localStorage !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'campus';
   const isGroovelab = activePlatformStored === 'groovelab';
-  const isTeacher = currentUserRole === 'teacher' || (!currentUserRole && typeof localStorage !== 'undefined' && localStorage.getItem('user_role') === 'teacher');
+
+  // 🏛️ Herrenberg-Goldstandard & Dual-Role Guard:
+  // Bestimme den aktiven Arbeitsbereich. Befindet sich der Benutzer im Bereich 'teacher' (Campus Lehrkraft),
+  // agiert er IMMER und AUSNAHMSLOS in der didaktischen Lehrkraft-Rolle (didaktische Termin- & Schülerplanung ohne Raumauswahl).
+  // Raumzuweisung und Genehmigung/Ablehnung sind physikalisch auf den Bereich 'secretary' (Schulverwaltung) beschränkt.
+  const activeWorkspace = typeof window !== 'undefined'
+    ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace') || '')
+    : '';
+  const isSecretaryWorkspace = activeWorkspace === 'secretary' || (
+    (currentUserRole === 'admin' || currentUserRole === 'secretary') &&
+    activeWorkspace !== 'teacher' &&
+    activePlatformStored === 'admin'
+  );
+  const isTeacher = !isSecretaryWorkspace;
   const isCampus = !isGroovelab;
-  const isAdminPlatform = (activePlatformStored === 'admin' || activePlatformStored === 'secretary') && !isTeacher;
+  const isAdminPlatform = isSecretaryWorkspace;
 
   let brandColor = '#34a853'; // Campus Green by default
   let lightBg = 'rgba(52, 168, 83, 0.06)';
@@ -819,18 +866,42 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
         }))
       }));
 
+      // Guard against race conditions during an active submission
+      if (isSubmittingRef.current) {
+        return;
+      }
+
       // Update our drafts list for the active draft ID using draftsRef to prevent circular cascades
       const currentDraftsList = draftsRef.current.length > 0 ? draftsRef.current : drafts;
+      const effectiveSubmittedAt = submittedAtIsoRef.current || submittedAtIso || ((currentDraftsList.find(d => d.id === submittedDraftId) as any)?.submittedAt) || null;
+
       const updatedDrafts = currentDraftsList.map(d => {
         if (d.id === activeDraftId) {
-          return { ...d, boards: boardDefinitions };
+          // Invariant: Never downgrade 'ready_for_admin_review' back to 'approved' or unsubmitted during autosave
+          const preservedStatus = (d as any).status === 'ready_for_admin_review' || (d.id === submittedDraftId && scheduleStatus === 'pending')
+            ? 'ready_for_admin_review'
+            : (d as any).status;
+          const preservedSubmittedAt = (d as any).submittedAt || (d.id === submittedDraftId ? effectiveSubmittedAt : null);
+
+          // 🛡️ Fail-Safe: If boardDefinitions has 0 students but d.boards previously had students, DO NOT wipe out!
+          const newStudentCount = boardDefinitions.reduce((acc, b) => acc + (b.students || []).filter(s => !s.isBreak).length, 0);
+          const oldStudentCount = (d.boards || []).reduce((acc, b) => acc + (b.students || []).filter((s: any) => !s.isBreak).length, 0);
+          const effectiveBoards = (newStudentCount === 0 && oldStudentCount > 0) ? d.boards : boardDefinitions;
+
+          return { 
+            ...d, 
+            status: preservedStatus,
+            submittedAt: preservedSubmittedAt,
+            boards: effectiveBoards 
+          };
         }
         return d;
       });
 
       const draftStateToSave = {
         activeDraftId,
-        submittedDraftId,
+        submittedDraftId: submittedDraftId || '',
+        submittedAt: submittedDraftId ? effectiveSubmittedAt : null,
         drafts: updatedDrafts
       };
 
@@ -853,6 +924,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
 
       // Debounce Supabase write (1000ms delay)
       const handler = setTimeout(() => {
+        if (isSubmittingRef.current) return;
         supabase
           .from('users')
           .update({
@@ -1167,7 +1239,9 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
 
   const loadInitialData = async () => {
     try {
-      setLoading(true);
+      if (!draftsRef.current || draftsRef.current.length === 0) {
+        setLoading(true);
+      }
       const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
       const isCampus = activePlatform === 'campus';
       const columnName = isCampus ? 'campus_räume' : 'groovelab_räume';
@@ -1382,6 +1456,33 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
             ? rawPlannedEarly.allTeacherStudentIds
             : (Array.isArray(rawPlannedEarly?.unassignedStudentIds) ? rawPlannedEarly.unassignedStudentIds : [])
         );
+
+        // 🛡️ Enterprise+ Goldstandard: Harvest all student IDs embedded in stored drafts and boards
+        if (rawPlannedEarly?.drafts && Array.isArray(rawPlannedEarly.drafts)) {
+          rawPlannedEarly.drafts.forEach((d: any) => {
+            (d.boards || []).forEach((b: any) => {
+              (b.students || []).forEach((st: any) => {
+                if (st?.id && !st.id.startsWith('break-')) savedTeacherStudentIds.add(st.id);
+                if (Array.isArray(st?.groupStudents)) {
+                  st.groupStudents.forEach((gs: any) => {
+                    if (gs?.id) savedTeacherStudentIds.add(gs.id);
+                  });
+                }
+              });
+            });
+          });
+        } else if (Array.isArray(rawPlannedEarly)) {
+          rawPlannedEarly.forEach((b: any) => {
+            (b.students || []).forEach((st: any) => {
+              if (st?.id && !st.id.startsWith('break-')) savedTeacherStudentIds.add(st.id);
+              if (Array.isArray(st?.groupStudents)) {
+                st.groupStudents.forEach((gs: any) => {
+                  if (gs?.id) savedTeacherStudentIds.add(gs.id);
+                });
+              }
+            });
+          });
+        }
 
         const teacherAssignedStudentIds = new Set([...schedStudentIds, ...occStudentIds, ...groupStudentIds]);
 
@@ -1645,7 +1746,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
         } catch (e) {}
       }
 
-      // FAIL-SAFE MERGE: Never drop any locally created drafts
+      // FAIL-SAFE MERGE: Never drop any locally created drafts, but strictly deduplicate by ID and Name
       if (localParsedDrafts.length > 0) {
         if (loadedDrafts.length === 0) {
           loadedDrafts = localParsedDrafts;
@@ -1654,14 +1755,44 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
           if (localSubmittedAt) loadedSubmittedAt = localSubmittedAt;
         } else {
           const dbDraftIdSet = new Set(loadedDrafts.map(d => d.id));
+          const dbDraftNameSet = new Set(loadedDrafts.map(d => (d.name || '').trim().toLowerCase()));
+
           for (const ld of localParsedDrafts) {
-            if (!dbDraftIdSet.has(ld.id)) {
+            const ldName = (ld.name || '').trim().toLowerCase();
+            const existingById = loadedDrafts.find(d => d.id === ld.id);
+            const existingByName = !existingById && (ldName === 'entwurf 1' || ldName === 'standard-entwurf')
+              ? loadedDrafts.find(d => (d.name || '').trim().toLowerCase() === 'entwurf 1' || (d.name || '').trim().toLowerCase() === 'standard-entwurf')
+              : null;
+
+            const existing = existingById || existingByName;
+
+            if (existing) {
+              // Deduplication match: merge boards if existing is empty and local has students
+              const existingStudentCount = (existing.boards || []).reduce((acc: number, b: any) => acc + (b.students || []).filter((s: any) => !s.isBreak).length, 0);
+              const localStudentCount = (ld.boards || []).reduce((acc: number, b: any) => acc + (b.students || []).filter((s: any) => !s.isBreak).length, 0);
+
+              if (existingStudentCount === 0 && localStudentCount > 0) {
+                existing.boards = ld.boards;
+              }
+            } else if (!dbDraftIdSet.has(ld.id) && !dbDraftNameSet.has(ldName)) {
+              // Genuinely distinct local draft
               loadedDrafts.push(ld);
+              dbDraftIdSet.add(ld.id);
+              dbDraftNameSet.add(ldName);
             }
           }
-          if (localActiveDraftId && loadedDrafts.some(d => d.id === localActiveDraftId)) {
+
+          // Active draft precedence: A draft with populated students must ALWAYS take precedence over an empty draft
+          const activeCandidate = loadedDrafts.find(d => d.id === localActiveDraftId);
+          const activeCandidateCount = activeCandidate ? (activeCandidate.boards || []).reduce((acc: number, b: any) => acc + (b.students || []).filter((s: any) => !s.isBreak).length, 0) : 0;
+          const bestPopulatedDraft = loadedDrafts.find(d => (d.boards || []).some((b: any) => (b.students || []).some((s: any) => !s.isBreak)));
+
+          if (activeCandidate && (activeCandidateCount > 0 || !bestPopulatedDraft)) {
             loadedActiveDraftId = localActiveDraftId;
+          } else if (bestPopulatedDraft) {
+            loadedActiveDraftId = bestPopulatedDraft.id;
           }
+
           if (localSubmittedDraftId) {
             loadedSubmittedDraftId = localSubmittedDraftId;
           }
@@ -1704,7 +1835,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
         return undefined;
       };
 
-      // Rename legacy 'Standard-Entwurf' to 'Entwurf 1' and filter out any students not explicitly assigned to this teacher (eliminating orphan drafts)
+      // Rename legacy 'Standard-Entwurf' to 'Entwurf 1' and preserve all students with Zero-Drop Fail-Safe
       loadedDrafts = loadedDrafts.map(d => ({
         ...d,
         name: d.name === 'Standard-Entwurf' ? 'Entwurf 1' : d.name,
@@ -1726,9 +1857,17 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                       instrument: resolved.instrument || gs.instrument,
                       duration: resolved.duration || gs.duration
                     });
+                  } else {
+                    validMembers.push({
+                      ...gs,
+                      first_name: gs.first_name || 'Schüler',
+                      last_name: gs.last_name || '',
+                      instrument: gs.instrument || 'Musiker',
+                      duration: gs.duration || 30
+                    });
                   }
                 });
-                if (validMembers.length === 0) return null;
+                if (validMembers.length === 0) return s;
                 if (validMembers.length === 1) {
                   const m = validMembers[0];
                   return {
@@ -1748,7 +1887,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                   groupStudents: validMembers
                 };
               }
-              return null;
+              return s;
             }
             const resolved = resolveStudentFromDraft(s);
             if (resolved) {
@@ -1761,7 +1900,14 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                 duration: resolved.duration || s.duration
               };
             }
-            return null;
+            // 🛡️ Fail-Safe Preservation: NEVER drop a student from a teacher's draft!
+            return {
+              ...s,
+              first_name: s.first_name || 'Schüler',
+              last_name: s.last_name || '',
+              instrument: s.instrument || 'Musiker',
+              duration: s.duration || 30
+            };
           }).filter(Boolean) as Student[]
         }))
       }));
@@ -1819,6 +1965,8 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
         let submissionDate: Date | null = null;
         if (loadedSubmittedAt) {
           submissionDate = new Date(loadedSubmittedAt);
+          setSubmittedAtIso(loadedSubmittedAt);
+          submittedAtIsoRef.current = loadedSubmittedAt;
         } else {
           // Find the latest created_at in schedData
           const dates = schedData.map(s => s.created_at ? new Date(s.created_at).getTime() : 0).filter(t => t > 0);
@@ -2085,7 +2233,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
               dayOfWeek: i,
               startAnchor: dayConfig?.start || '14:00',
               availabilityEnd: dayConfig?.end || '19:00',
-              roomId: defaultRoomId,
+              roomId: isTeacher ? undefined : defaultRoomId,
               students: []
             });
           }
@@ -2099,7 +2247,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
               id: `board-${crypto.randomUUID()}`,
               dayOfWeek: i,
               startAnchor: '14:00',
-              roomId: defaultRoomId,
+              roomId: isTeacher ? undefined : defaultRoomId,
               students: []
             });
           }
@@ -2113,8 +2261,10 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
       reconstructedBoards = reconstructedBoards.map(b => recalculateBoardTimes(b));
 
       // Guarantee that all drafts in loadedDrafts (especially Entwurf 1) have valid day boards assigned
+      const reconstructedStudentCount = reconstructedBoards.reduce((acc, b) => acc + (b.students || []).filter(s => !s.isBreak).length, 0);
       loadedDrafts = loadedDrafts.map(d => {
-        if (!d.boards || d.boards.length === 0 || d.id === loadedActiveDraftId) {
+        const dStudentCount = (d.boards || []).reduce((acc, b) => acc + (b.students || []).filter(s => !s.isBreak).length, 0);
+        if (!d.boards || d.boards.length === 0 || (d.id === loadedActiveDraftId && (reconstructedStudentCount > 0 || dStudentCount === 0))) {
           return { ...d, boards: reconstructedBoards };
         }
         return d;
@@ -2787,11 +2937,13 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
       const draftStateToSave = {
         activeDraftId: currentActiveId,
         submittedDraftId: submittedDraftId || '',
-        submittedAt: submittedDraftId ? (lastSubmittedTime || '') : '',
+        submittedAt: submittedDraftId ? (submittedAtIsoRef.current || submittedAtIso || (lastSubmittedTime ? new Date().toISOString() : '')) : null,
         drafts: updatedDrafts,
         allTeacherStudentIds,
         unassignedStudentIds
       };
+
+      lastSavedStateRef.current = JSON.stringify(draftStateToSave);
 
       // 1. Immediate local storage persistence
       localStorage.setItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, JSON.stringify(draftStateToSave));
@@ -4181,7 +4333,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
       }));
     } else {
       // Create fresh default boards
-      const defaultRoomId = rooms.length > 0 ? rooms[0].id : '';
+      const defaultRoomId = isTeacher ? undefined : (rooms.length > 0 ? rooms[0].id : '');
       for (let i = 1; i <= 5; i++) {
         initialBoards.push({
           id: `board-${crypto.randomUUID()}`,
@@ -4417,10 +4569,14 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
 
     try {
       setSubmitting(true);
+      isSubmittingRef.current = true;
       const validBoards = boards.filter(b => b.students.length > 0);
       const currentActiveId = activeDraftIdRef.current || activeDraftId;
       
       const now = new Date();
+      const nowIso = now.toISOString();
+      setSubmittedAtIso(nowIso);
+      submittedAtIsoRef.current = nowIso;
       const formattedDate = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
       const formattedTime = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
       const submitTimeString = `am ${formattedDate} um ${formattedTime} Uhr`;
@@ -4481,7 +4637,9 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
       };
 
       const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
-      localStorage.setItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, JSON.stringify(draftStateToSave));
+      const payloadToSaveStr = JSON.stringify(draftStateToSave);
+      lastSavedStateRef.current = payloadToSaveStr;
+      localStorage.setItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, payloadToSaveStr);
 
       await supabase
         .from('users')
@@ -4524,6 +4682,9 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
       await showAlert('Fehler beim Einreichen: ' + err.message);
     } finally {
       setSubmitting(false);
+      setTimeout(() => {
+        isSubmittingRef.current = false;
+      }, 1500);
     }
   };
 
@@ -4571,7 +4732,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [students, boards, handleAutoAssign, handleResetAllAssignments]);
 
-  if (loading) {
+  if (loading && activeTab === 'designer') {
     return (
       <div className="flex h-[400px] items-center justify-center text-slate-400">
         <div className="flex flex-col items-center gap-3">
@@ -4599,7 +4760,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
   const assignedCount = students.filter(s => !!s.assignedDay).length;
   const allCount = students.length;
 
-  const showOnboardingOverlay = !isOnboardingCompleted && (currentUserRole === 'teacher') && (selectedTeacherId === userId);
+  const showOnboardingOverlay = !isOnboardingCompleted && !isSecretaryWorkspace && (selectedTeacherId === userId);
 
   let onboardingOverlayContent = null;
   if (showOnboardingOverlay) {
@@ -4988,7 +5149,14 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
               drafts.find(d => (d as any).status === 'ready_for_admin_review') ||
               drafts.find(d => d.id === activeDraftId) ||
               drafts[0];
-            return targetDraft?.boards || [];
+            const candidateBoards = targetDraft?.boards;
+            if (candidateBoards && candidateBoards.some(b => (b.students || []).length > 0)) {
+              return candidateBoards;
+            }
+            if (boards && boards.some(b => (b.students || []).length > 0)) {
+              return boards;
+            }
+            return candidateBoards || boards || [];
           })()} 
           activeTab={activeTab} 
           setActiveTab={setActiveTab} 
@@ -5112,7 +5280,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
               {!isMobilePortrait && (
                 <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', minWidth: 0 }}>
                   <div 
-                    title="Didaktische Entwurfsplanung • Genehmigungsvorbehalt durch Schulsekretariat"
+                    title="Didaktische Terminplanung • Unverbindlicher Entwurf zur Raumprüfung & Freigabe durch Musikschule"
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -5134,7 +5302,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                   >
                     <span style={{ fontSize: '0.78rem', flexShrink: 0 }}>⚖️</span>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      Didaktische Entwurfsplanung • Genehmigungsvorbehalt durch Schulsekretariat
+                      Didaktische Terminplanung • Unverbindlicher Entwurf zur Raumprüfung & Freigabe durch Musikschule
                     </span>
                   </div>
                 </div>
@@ -5154,7 +5322,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(0,0,0,0.03)', padding: '3px 10px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.04)', minHeight: '36px' }}>
                   <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
-                    {currentUserRole === 'teacher' ? 'Dein Designer' : 'Stundenplan-Designer'}
+                    {isSecretaryWorkspace ? 'Stundenplan-Designer (Verwaltung)' : 'Dein Designer'}
                   </span>
                 </div>
 
@@ -5195,7 +5363,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
 
                 <div style={{ width: '1px', height: '16px', background: 'rgba(0,0,0,0.1)', margin: '0 4px' }} />
 
-                {currentUserRole === 'teacher' && selectedTeacherId === userId ? (
+                {!isSecretaryWorkspace && selectedTeacherId === userId ? (
                   <button type="button" onClick={handleEditTeacherAvailability} className="apple-btn" title="Unterrichtszeiten & Wunschtage ändern">
                     <Clock size={13} />
                     <span>Zeiten ändern</span>
@@ -5368,7 +5536,13 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                   onMouseOut={e => e.currentTarget.style.transform = 'none'}
                 >
                   <Send size={13} />
-                  <span>{submitting ? 'Wird übermittelt...' : 'Abstimmen & Freigeben'}</span>
+                  <span>
+                    {submitting 
+                      ? 'Wird übermittelt...' 
+                      : ((hasUnsubmittedEdits || scheduleStatus === 'needs_revision') 
+                        ? 'Änderungen erneut zur Freigabe einreichen' 
+                        : 'Stundenplan zur Freigabe einreichen')}
+                  </span>
                 </button>
               </div>
             </div>
@@ -5685,6 +5859,54 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
             </div>
           )}
 
+          {/* Teacher Review Pending Banner (ready_for_admin_review / pending) */}
+          {scheduleStatus === 'pending' && (
+            <div className="animation-slide-down" style={{
+              background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+              border: '1.5px solid #f59e0b',
+              borderRadius: '12px',
+              padding: '10px 14px',
+              fontSize: '0.78rem',
+              color: '#78350f',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '10px',
+              marginBottom: '6px',
+              boxShadow: '0 2px 10px rgba(245, 158, 11, 0.08)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Clock size={16} color="#d97706" style={{ flexShrink: 0 }} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                  <span style={{ fontWeight: 800, color: '#92400e' }}>
+                    Stundenplan zur Freigabe eingereicht {lastSubmittedTime ? `(${lastSubmittedTime})` : ''} · In Prüfung
+                  </span>
+                  <span style={{ fontSize: '0.72rem', color: '#b45309', fontWeight: 500 }}>
+                    Das Schulsekretariat weist die Räume zu. Sobald genehmigt, wird der Plan automatisch als Live-Plan aktiv.
+                  </span>
+                </div>
+              </div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: 'rgba(255, 255, 255, 0.85)',
+                border: '1px solid #fde68a',
+                padding: '3px 8px',
+                borderRadius: '6px',
+                fontSize: '0.68rem',
+                fontWeight: 700,
+                color: '#92400e',
+                whiteSpace: 'nowrap',
+                flexShrink: 0
+              }}>
+                <Lock size={11} color="#d97706" />
+                <span>Schreibschutz</span>
+              </div>
+            </div>
+          )}
+
           {/* Unsubmitted edits warning banner */}
           {hasUnsubmittedEdits && (
             <div className="animation-slide-down" style={{
@@ -5703,7 +5925,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <AlertTriangle size={16} strokeWidth={2.4} color="#92400e" aria-hidden="true" style={{ flexShrink: 0 }} />
-                <span>Du hast den Stundenplan angepasst. Klicke auf <strong>"Abstimmen & Freigeben"</strong>, um deinen Terminvorschlag zur Freigabe zu übermitteln.</span>
+                <span>Du hast den Stundenplan angepasst. Klicke auf <strong>"Stundenplan zur Freigabe einreichen"</strong>, um deinen Terminvorschlag an das Schulsekretariat zu übermitteln.</span>
               </div>
             </div>
           )}
@@ -6140,6 +6362,18 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
                         <>
                           <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Unterrichtstag</div>
                           <div style={{ fontSize: '1rem', fontWeight: 800, color: '#1d1d1f' }}>{dayLabel} ({board.students.filter(s => !s.isBreak).length})</div>
+                          <div style={{ marginTop: '3px', fontSize: '0.68rem', fontWeight: 600, color: (scheduleStatus === 'approved' && board.roomId) ? '#15803d' : '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                            <span 
+                              style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }} 
+                              title={(scheduleStatus === 'approved' && board.roomId) 
+                                ? `Zugewiesener Raum: ${rooms.find(r => r.id === board.roomId)?.name || 'Raum'}` 
+                                : 'Die Zuweisung freier Räume erfolgt nach Einreichung durch das Schulsekretariat'}
+                            >
+                              {(scheduleStatus === 'approved' && board.roomId) 
+                                ? (rooms.find(r => r.id === board.roomId)?.name || 'Raum zugewiesen')
+                                : 'Raum: Zuteilung durch Musikschule'}
+                            </span>
+                          </div>
                         </>
                       )}
 
@@ -7004,7 +7238,7 @@ export function ScheduleBoardMobile({ schoolId, userId }: ScheduleBoardProps) {
 
                         const isCampusTheme = localStorage.getItem('groovelab_active_platform') === 'campus';
                         const isGroovelabTheme = localStorage.getItem('groovelab_active_platform') === 'groovelab';
-                        const isAdminViewTheme = currentUserRole === 'admin' || currentUserRole === 'secretary';
+                        const isAdminViewTheme = isSecretaryWorkspace;
 
                         const studentInPool = students.find((s: Student) => s.id === bs.id);
                         const isPendingOnboarding = (bs.status === 'ausstehend' || (studentInPool ? (studentInPool.status === 'ausstehend' || studentInPool.isOnboarded === false) : false)) && !studentInPool?.hasPreferences;

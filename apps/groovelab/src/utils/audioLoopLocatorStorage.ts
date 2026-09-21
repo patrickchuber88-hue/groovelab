@@ -63,12 +63,27 @@ if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
 // ==============================================================================
 // ⚡ SUPABASE REALTIME BROADCAST (Cross-Device Synchronisation ohne Reload)
 // ==============================================================================
-let realtimeChannel: any = null;
-function getOrCreateRealtimeChannel() {
+function getCurrentStorageSchoolId(): string {
+  if (typeof window === 'undefined') return 'global';
+  try {
+    const userStr = localStorage.getItem('campus_user');
+    if (userStr) {
+      const parsed = JSON.parse(userStr);
+      if (parsed?.school_id) return parsed.school_id;
+    }
+  } catch {}
+  return 'global';
+}
+
+const realtimeChannelsBySchool: Record<string, any> = {};
+
+export function getOrCreateRealtimeChannel(targetSchoolId?: string) {
   if (typeof window === 'undefined') return null;
-  if (!realtimeChannel) {
+  const schoolScope = targetSchoolId || getCurrentStorageSchoolId();
+  if (!realtimeChannelsBySchool[schoolScope]) {
     try {
-      realtimeChannel = supabase.channel('campus_audio_locator_sync')
+      const channelName = `campus_audio_locator_sync_${schoolScope}`;
+      realtimeChannelsBySchool[schoolScope] = supabase.channel(channelName)
         .on('broadcast', { event: 'locator_changed' }, (payload: any) => {
           const { audioKey, locator } = payload?.payload || {};
           if (audioKey && typeof window !== 'undefined') {
@@ -94,7 +109,7 @@ function getOrCreateRealtimeChannel() {
       console.warn('[LoopLocatorStorage] Realtime channel init notice:', e);
     }
   }
-  return realtimeChannel;
+  return realtimeChannelsBySchool[schoolScope];
 }
 
 // Realtime-Kanal initialisieren
@@ -234,14 +249,15 @@ async function logLocatorAuditTrail(
     }
   }
 
-  // Cross-Device Realtime Broadcast anstoßen
+  // Cross-Device Realtime Broadcast anstoßen (Mandanten-isoliert)
   try {
-    const channel = getOrCreateRealtimeChannel();
+    const effectiveSchoolId = meta?.schoolId || locator?.schoolId;
+    const channel = getOrCreateRealtimeChannel(effectiveSchoolId);
     if (channel) {
       channel.send({
         type: 'broadcast',
         event: 'locator_changed',
-        payload: { audioKey: canonicalKey, locator }
+        payload: { audioKey: canonicalKey, locator, schoolId: effectiveSchoolId }
       });
     }
   } catch (bcErr) {

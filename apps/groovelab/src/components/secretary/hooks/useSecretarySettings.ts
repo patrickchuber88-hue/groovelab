@@ -602,7 +602,7 @@ export function useSecretarySettings({
         stationsRes
       ] = await Promise.all([
         supabase.from('schools').select('*').eq('id', schoolId).single(),
-        supabase.from('users').select('*').eq('school_id', schoolId),
+        supabase.from('users').select('id, school_id, first_name, last_name, nickname, role, roles, email, photo_url, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token, is_pin_activated, ausfall_until, created_at, preferred_room_ids, planned_boards, student_billing_payment_method, activated_at, student_billing_cash_paid, is_trial, trial_ends_at, exempt_from_direct_billing').eq('school_id', schoolId),
         supabase.from('rooms').select('*').eq('school_id', schoolId),
         supabase.from('schedules').select('*').eq('school_id', schoolId),
         supabase.from('bands').select('*').eq('school_id', schoolId),
@@ -724,7 +724,7 @@ export function useSecretarySettings({
           const [
             uRes, rRes, sRes, bRes, stRes, stationsRes
           ] = await Promise.all([
-            supabase.from('users').select('*').eq('school_id', schoolId),
+            supabase.from('users').select('id, school_id, first_name, last_name, nickname, role, roles, email, photo_url, instrument, is_active, ausweis_nummer, teacher_qr_token, is_campus_active, is_groovelab_active, is_premium_user, contract_ends_at, teacher_id, lesson_duration, qr_token, is_pin_activated, ausfall_until, created_at, preferred_room_ids, planned_boards, student_billing_payment_method, activated_at, student_billing_cash_paid, is_trial, trial_ends_at, exempt_from_direct_billing').eq('school_id', schoolId),
             supabase.from('rooms').select('*').eq('school_id', schoolId),
             supabase.from('schedules').select('*').eq('school_id', schoolId),
             supabase.from('bands').select('*').eq('school_id', schoolId),

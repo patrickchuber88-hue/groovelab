@@ -4,9 +4,10 @@ import { subscribeOfflineState, flushAllOfflineData, OfflineQueueState } from '.
 
 interface OfflineStatusBadgeProps {
   floating?: boolean;
+  variant?: 'floating' | 'header';
 }
 
-export const OfflineStatusBadge: React.FC<OfflineStatusBadgeProps> = ({ floating = true }) => {
+export const OfflineStatusBadge: React.FC<OfflineStatusBadgeProps> = ({ floating = true, variant = 'floating' }) => {
   const [offlineState, setOfflineState] = useState<OfflineQueueState>({
     pendingActionsCount: 0,
     pendingAudioCount: 0,
@@ -42,10 +43,21 @@ export const OfflineStatusBadge: React.FC<OfflineStatusBadgeProps> = ({ floating
     return null;
   }
 
-  const containerStyle: React.CSSProperties = floating ? {
+  // On desktop with header, suppress default floating badge so it does not cover the sidebar footer
+  const isHeaderMode = variant === 'header';
+  const isDesktop = typeof window !== 'undefined' ? window.innerWidth > 768 : true;
+  if (!isHeaderMode && floating && isDesktop) {
+    return null;
+  }
+
+  const containerStyle: React.CSSProperties = isHeaderMode ? {
+    display: 'inline-flex',
+    alignItems: 'center',
+    flexShrink: 0
+  } : floating ? {
     position: 'fixed',
-    bottom: '24px',
-    left: '24px',
+    bottom: 'calc(var(--bottom-bar-height, 68px) + env(safe-area-inset-bottom) + 12px)',
+    left: '16px',
     zIndex: 9999,
     animation: 'slideUpBadge 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
   } : {
@@ -84,8 +96,12 @@ export const OfflineStatusBadge: React.FC<OfflineStatusBadgeProps> = ({ floating
           100% { transform: rotate(360deg); }
         }
         .offline-badge-focus:focus-visible {
-          outline: 2px solid #38bdf8 !important;
+          outline: 2px solid #34a853 !important;
           outline-offset: 2px !important;
+        }
+        .offline-header-pill:hover {
+          background: #dcfce7 !important;
+          border-color: #86efac !important;
         }
       `}</style>
       <div 
@@ -99,18 +115,35 @@ export const OfflineStatusBadge: React.FC<OfflineStatusBadgeProps> = ({ floating
             handleManualSync();
           }
         }}
-        className={`offline-badge-focus ${isInteractive ? 'hover-scale-mini' : ''}`}
-        style={{
-          background: !offlineState.isOnline 
-            ? 'rgba(6, 78, 59, 0.95)' 
-            : (offlineState.isSyncing ? 'rgba(15, 23, 42, 0.92)' : 'rgba(22, 101, 52, 0.94)'),
+        className={`offline-badge-focus ${isHeaderMode ? 'offline-header-pill' : ''} ${isInteractive ? 'hover-scale-mini' : ''}`}
+        style={isHeaderMode ? {
+          background: '#f0fdf4',
+          border: '1.2px solid #bbf7d0',
+          color: '#166534',
+          height: '36px',
+          borderRadius: '10px',
+          padding: '0 12px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          fontSize: '0.75rem',
+          fontWeight: 750,
+          cursor: isInteractive ? 'pointer' : 'default',
+          userSelect: 'none',
+          transition: 'all 0.18s ease',
+          outline: 'none',
+          boxSizing: 'border-box',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
+          fontFamily: "'Plus Jakarta Sans', -apple-system, sans-serif"
+        } : {
+          background: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
-          color: '#ffffff',
+          color: '#166534',
           borderRadius: '24px',
-          padding: '8px 16px',
-          border: '1px solid rgba(255, 255, 255, 0.20)',
-          boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.35)',
+          padding: '7px 14px',
+          border: '1.2px solid #bbf7d0',
+          boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(52, 168, 83, 0.08)',
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
@@ -120,33 +153,34 @@ export const OfflineStatusBadge: React.FC<OfflineStatusBadgeProps> = ({ floating
           userSelect: 'none',
           transition: 'all 0.2s ease',
           outline: 'none',
-          touchAction: 'manipulation'
+          touchAction: 'manipulation',
+          fontFamily: "'Plus Jakarta Sans', -apple-system, sans-serif"
         }}
         title={isInteractive ? 'Klicken, um jetzt mit der Cloud zu synchronisieren' : undefined}
       >
         {!offlineState.isOnline ? (
           <>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#34d399', boxShadow: '0 0 10px #34d399', flexShrink: 0 }} />
-            <span>🟢 Offline-Tresor aktiv · Stundenpläne &amp; Hausaufgaben lokal verfügbar {offlineState.totalPending > 0 && `(${offlineState.totalPending} bereit)`}</span>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981', flexShrink: 0 }} />
+            <span>{isHeaderMode ? `Offline-Tresor aktiv ${offlineState.totalPending > 0 ? `(${offlineState.totalPending})` : ''}` : `🟢 Offline-Tresor aktiv · Stundenpläne & Hausaufgaben lokal verfügbar ${offlineState.totalPending > 0 ? `(${offlineState.totalPending} bereit)` : ''}`}</span>
           </>
         ) : offlineState.isSyncing ? (
           <>
             <RefreshCw 
-              size={14} 
-              color="#38bdf8" 
+              size={13} 
+              color="#0284c7" 
               style={{ flexShrink: 0, animation: 'badgeSpin 1s linear infinite' }} 
             />
-            <span>Synchronisiere mit Cloud...</span>
+            <span>{isHeaderMode ? 'Synchronisiere...' : 'Synchronisiere mit Cloud...'}</span>
           </>
         ) : recentlySynced ? (
           <>
-            <Check size={14} color="#4ade80" style={{ flexShrink: 0 }} />
-            <span>✨ Wieder online · Daten synchronisiert</span>
+            <Check size={14} color="#16a34a" style={{ flexShrink: 0 }} />
+            <span>{isHeaderMode ? '✨ Synchronisiert' : '✨ Wieder online · Daten synchronisiert'}</span>
           </>
         ) : (
           <>
-            <ShieldCheck size={14} color="#4ade80" style={{ flexShrink: 0 }} />
-            <span>{offlineState.totalPending} ausstehend • Sync bereit</span>
+            <ShieldCheck size={14} color="#16a34a" style={{ flexShrink: 0 }} />
+            <span>{offlineState.totalPending} ausstehend · Sync bereit</span>
           </>
         )}
       </div>

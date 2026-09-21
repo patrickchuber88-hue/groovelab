@@ -34,17 +34,6 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
 
   const primaryColor = (isParentOnly || isParentMode) ? '#0284c7' : '#34a853';
 
-  // WAI-ARIA Escape Listener
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
-
   // Determine PIN mode on mount
   useEffect(() => {
     if (isParentOnly) return;
@@ -103,6 +92,27 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
       }
     }
   };
+
+  // ⌨️ Barrierefreie Tastatureingabe für Desktop & Laptop (Ziffern 0-9, Backspace, Delete, Escape)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      } else if (e.key >= '0' && e.key <= '9') {
+        e.preventDefault();
+        handleKeyPress(e.key);
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        handleKeyPress('back');
+      } else if (e.key === 'Delete') {
+        e.preventDefault();
+        handleKeyPress('clear');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose, handleKeyPress]);
 
   const handleVerify = async (explicitPin?: string, isSixDigits: boolean = false) => {
     const pinToVerify = typeof explicitPin === 'string' ? explicitPin : pinInput;
@@ -317,6 +327,11 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
       }}>
         {keys.map((key) => {
           const isSpecial = key === 'C' || key === 'back';
+          const ariaLabel = key === 'back' 
+            ? 'Letzte Ziffer löschen' 
+            : key === 'C' 
+            ? 'PIN-Eingabe zurücksetzen' 
+            : `Ziffer ${key}`;
           return (
             <button
               key={key}
@@ -326,6 +341,7 @@ export const CampusPinUnlockModal: React.FC<CampusPinUnlockModalProps> = ({
                 else if (key === 'back') handleKeyPress('back');
                 else handleKeyPress(key);
               }}
+              aria-label={ariaLabel}
               style={{
                 padding: '16px',
                 minHeight: '48px',

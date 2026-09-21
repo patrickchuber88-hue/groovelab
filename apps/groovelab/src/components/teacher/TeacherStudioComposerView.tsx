@@ -10,8 +10,11 @@ import { formatTeacherFullName, formatSingleStudentAnonymized } from '../../util
 import {
   assignTeacherHomeworkToStudents,
   fetchTeacherSandboxEntry,
-  saveTeacherSandboxEntry
+  saveTeacherSandboxEntry,
+  fetchTeacherMediaAssets,
+  TeacherMediaAssets
 } from '../../services/teacherStudioService';
+import { TeacherMediaPickerDrawer } from './TeacherMediaPickerDrawer';
 import { requestMicrophonePermissionOnce, acquireAudioStream } from '../../services/audioPermissionService';
 import { buildCanonicalAudioStoragePath } from '../../utils/audioStorageHelper';
 import { storeBlob } from '../../utils/blobStorage';
@@ -94,8 +97,47 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
   );
   const [selectedTags, setSelectedTags] = useState<string[]>(['Rhythmus', 'Wechselschlag']);
   const [includeLehrwerk, setIncludeLehrwerk] = useState<boolean>(true);
-  const [lehrwerkTitle, setLehrwerkTitle] = useState<string>('Schule für E-Gitarre Band 1');
-  const [lehrwerkPages, setLehrwerkPages] = useState<string>('24, 25');
+
+  // ─── 📚 MEDIATHEK & MEDIEN-BAUKASTEN STATES ───
+  const [mediaAssets, setMediaAssets] = useState<TeacherMediaAssets | null>(null);
+  const [isLoadingMediaAssets, setIsLoadingMediaAssets] = useState<boolean>(true);
+  const [isMediaPickerOpen, setIsMediaPickerOpen] = useState<boolean>(false);
+  const [mediaPickerInitialTab, setMediaPickerInitialTab] = useState<'lehrwerke' | 'songs' | 'audios'>('lehrwerke');
+
+  // Modulare Bausteine im Paket
+  const [selectedLehrwerke, setSelectedLehrwerke] = useState<Array<{
+    id: string;
+    title: string;
+    author?: string;
+    instrument?: string;
+    pages: string;
+    bookColor?: { from: string; to: string; text: string };
+  }>>([
+    {
+      id: 'lw-default-1',
+      title: 'Schule für E-Gitarre Band 1',
+      author: 'Peter Bursch',
+      instrument: 'E-Gitarre',
+      pages: '24, 25'
+    }
+  ]);
+
+  const [selectedSongs, setSelectedSongs] = useState<Array<{
+    id: string;
+    title: string;
+    artist?: string;
+    instrument?: string;
+    tempo_bpm?: number;
+    key?: string;
+    audio_url?: string | null;
+  }>>([]);
+
+  const [selectedTeacherAudios, setSelectedTeacherAudios] = useState<Array<{
+    id: string;
+    title: string;
+    url: string;
+    duration?: number;
+  }>>([]);
 
   // 2. Audio & Media States (Step 2)
   const [isRecording, setIsRecording] = useState(false);
@@ -119,6 +161,88 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
   const [parentMemo, setParentMemo] = useState<string>(
     'Liebe Eltern, hören Sie kurz rein: Der Rhythmus sollte gleichmäßig wie ein Zug fließen.'
   );
+
+  // 🚀 Auto-Hydrate Mediathek Assets (100% DSGVO-rein, nur eigene Lehrer-Audios)
+  useEffect(() => {
+    let isMounted = true;
+    if (teacherId) {
+      setIsLoadingMediaAssets(true);
+      fetchTeacherMediaAssets(teacherId, schoolId)
+        .then(assets => {
+          if (isMounted) {
+            setMediaAssets(assets);
+            setIsLoadingMediaAssets(false);
+          }
+        })
+        .catch(err => {
+          console.warn('[TeacherStudioComposer] Error loading media assets:', err);
+          if (isMounted) setIsLoadingMediaAssets(false);
+        });
+    }
+    return () => { isMounted = false; };
+  }, [teacherId, schoolId]);
+
+  // Drawer & Builder Handlers
+  const handleOpenMediaPicker = (tab: 'lehrwerke' | 'songs' | 'audios' = 'lehrwerke') => {
+    setMediaPickerInitialTab(tab);
+    setIsMediaPickerOpen(true);
+  };
+
+  const handleAddLehrwerk = (lw: { id: string; title: string; author?: string; instrument?: string; bookColor?: any }) => {
+    setSelectedLehrwerke(prev => {
+      const exists = prev.find(item => item.title.toLowerCase() === lw.title.toLowerCase());
+      if (exists) {
+        return prev.filter(item => item.title.toLowerCase() !== lw.title.toLowerCase());
+      } else {
+        return [...prev, {
+          id: lw.id || `lw-${Date.now()}`,
+          title: lw.title,
+          author: lw.author,
+          instrument: lw.instrument,
+          pages: '1',
+          bookColor: lw.bookColor
+        }];
+      }
+    });
+  };
+
+  const handleUpdateLehrwerkPages = (id: string, pages: string) => {
+    setSelectedLehrwerke(prev => prev.map(item => item.id === id ? { ...item, pages } : item));
+  };
+
+  const handleRemoveLehrwerk = (id: string) => {
+    setSelectedLehrwerke(prev => prev.filter(item => item.id !== id));
+  };
+
+  const handleAddSong = (song: { id: string; title: string; artist?: string; tempo_bpm?: number; key?: string; audio_url?: string | null }) => {
+    setSelectedSongs(prev => {
+      const exists = prev.find(item => item.id === song.id || item.title.toLowerCase() === song.title.toLowerCase());
+      if (exists) {
+        return prev.filter(item => item.id !== song.id && item.title.toLowerCase() !== song.title.toLowerCase());
+      } else {
+        return [...prev, song];
+      }
+    });
+  };
+
+  const handleRemoveSong = (id: string) => {
+    setSelectedSongs(prev => prev.filter(item => item.id !== id));
+  };
+
+  const handleAddAudio = (audio: { url: string; label: string; duration?: number }) => {
+    setSelectedTeacherAudios(prev => {
+      const exists = prev.find(item => item.url === audio.url);
+      if (exists) {
+        return prev.filter(item => item.url !== audio.url);
+      } else {
+        return [...prev, { id: `audio-${Date.now()}`, title: audio.label, url: audio.url, duration: audio.duration }];
+      }
+    });
+  };
+
+  const handleRemoveAudio = (url: string) => {
+    setSelectedTeacherAudios(prev => prev.filter(item => item.url !== url));
+  };
 
   // 3. Distribution States (Step 3)
   const currentWeekIso = useMemo(() => {
@@ -341,26 +465,35 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
     setErrorMessage(null);
 
     try {
-      const parsedPages = includeLehrwerk
-        ? lehrwerkPages.split(',').map(p => parseInt(p.trim(), 10)).filter(n => !isNaN(n))
-        : [];
+      const lehrwerkePayload = selectedLehrwerke.map(lw => ({
+        id: lw.id,
+        title: lw.title,
+        pages: lw.pages
+      }));
 
-      const lehrwerkePayload = includeLehrwerk && lehrwerkTitle
-        ? [{
-            id: `lw-${Date.now()}`,
-            title: lehrwerkTitle,
-            pages: parsedPages.join(', ')
-          }]
-        : [];
+      const songsPayload = selectedSongs.map(s => ({
+        id: s.id,
+        title: s.title,
+        artist: s.artist,
+        bpm: s.tempo_bpm,
+        key: s.key,
+        audio_url: s.audio_url || undefined
+      }));
 
-      const audiosPayload = recordedAudioUrl
-        ? [{
-            id: `rec-${Date.now()}`,
-            name: `${topicName} (Master-Referenz ${audioBpm} BPM)`,
-            url: recordedAudioUrl,
-            duration_seconds: recordedAudioDuration
-          }]
-        : [];
+      const audiosPayload = [
+        ...(recordedAudioUrl ? [{
+          id: `rec-${Date.now()}`,
+          name: `${topicName} (Master-Referenz ${audioBpm} BPM)`,
+          url: recordedAudioUrl,
+          duration_seconds: recordedAudioDuration
+        }] : []),
+        ...selectedTeacherAudios.map(a => ({
+          id: a.id,
+          name: a.title,
+          url: a.url,
+          duration_seconds: a.duration || 30
+        }))
+      ];
 
       let compositeNotes = homeworkNotes;
       if (selectedTags.length > 0) {
@@ -392,7 +525,7 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
         topicName: topicName,
         notesContent: compositeNotes,
         lehrwerke: lehrwerkePayload,
-        songs: [],
+        songs: songsPayload,
         audios: audiosPayload,
         appendMode: appendMode
       });
@@ -464,7 +597,44 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
         boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
       }}>
         {/* Title & Template Chips */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+          {onClose && (
+            <button
+              type="button"
+              role="button"
+              tabIndex={0}
+              aria-label="Zurück zum Briefing Board"
+              onClick={onClose}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onClose();
+                }
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 14px',
+                minHeight: '40px',
+                borderRadius: '12px',
+                border: '1.5px solid #e2e8f0',
+                background: '#ffffff',
+                color: '#475569',
+                fontWeight: 800,
+                fontSize: '0.78rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.04)'
+              }}
+              className="hover-scale"
+              title="Zurück zum Briefing Board"
+            >
+              <ChevronLeft size={16} />
+              <span>Zurück zum Briefing</span>
+            </button>
+          )}
+
           <div style={{
             width: '42px',
             height: '42px',
@@ -784,39 +954,140 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                 </div>
               </div>
 
-              {/* Lehrwerk & Seiten */}
+              {/* Lehrwerk & Seiten: 1% Goldstandard Baukasten */}
               <div>
-                <label style={{ fontSize: '0.82rem', fontWeight: 850, color: '#0f172a', display: 'block', marginBottom: '8px' }}>
-                  Lehrwerk & Seiten
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '10px' }}>
-                  <input
-                    type="text"
-                    value={lehrwerkTitle}
-                    onChange={(e) => setLehrwerkTitle(e.target.value)}
-                    placeholder="Buch (z.B. Schule für E-Gitarre 1)"
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label style={{ fontSize: '0.82rem', fontWeight: 850, color: '#0f172a' }}>
+                    Lehrwerke & Seiten ({selectedLehrwerke.length})
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenMediaPicker('lehrwerke')}
                     style={{
-                      border: '1.5px solid #cbd5e1',
-                      borderRadius: '12px',
-                      padding: '10px 14px',
-                      fontSize: '0.84rem',
-                      fontWeight: 700
+                      background: '#f0f9ff',
+                      border: '1px solid #bae6fd',
+                      color: '#0284c7',
+                      borderRadius: '8px',
+                      padding: '4px 10px',
+                      fontSize: '0.74rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px'
                     }}
-                  />
-                  <input
-                    type="text"
-                    value={lehrwerkPages}
-                    onChange={(e) => setLehrwerkPages(e.target.value)}
-                    placeholder="Seiten (z.B. 24, 25)"
-                    style={{
-                      border: '1.5px solid #cbd5e1',
-                      borderRadius: '12px',
-                      padding: '10px 14px',
-                      fontSize: '0.84rem',
-                      fontWeight: 700
-                    }}
-                  />
+                  >
+                    <Plus size={13} />
+                    <span>Aus Mediathek wählen</span>
+                  </button>
                 </div>
+
+                {selectedLehrwerke.length === 0 ? (
+                  <div
+                    onClick={() => handleOpenMediaPicker('lehrwerke')}
+                    style={{
+                      padding: '16px',
+                      borderRadius: '12px',
+                      border: '1.5px dashed #cbd5e1',
+                      background: '#f8fafc',
+                      textAlign: 'center',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <BookOpen size={22} color="#94a3b8" style={{ margin: '0 auto 6px auto', display: 'block' }} />
+                    <span style={{ fontSize: '0.80rem', fontWeight: 700, color: '#64748b' }}>
+                      Kein Lehrwerk zugewiesen. Klicke hier, um Lehrwerke aus der Mediathek auszuwählen.
+                    </span>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {selectedLehrwerke.map((lw) => (
+                      <div
+                        key={lw.id}
+                        style={{
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '12px',
+                          padding: '10px 14px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '12px',
+                          flexWrap: 'wrap'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: '180px', flex: 1 }}>
+                          <div style={{
+                            width: '32px',
+                            height: '38px',
+                            borderRadius: '4px',
+                            background: 'linear-gradient(135deg, #334155 0%, #0f172a 100%)',
+                            color: '#ffffff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}>
+                            <BookOpen size={15} />
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {lw.title}
+                            </span>
+                            <div style={{ fontSize: '0.70rem', color: '#64748b', display: 'flex', gap: '6px' }}>
+                              {lw.author && <span>{lw.author}</span>}
+                              {lw.instrument && <span style={{ background: '#e2e8f0', padding: '0 4px', borderRadius: '3px' }}>{lw.instrument}</span>}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Inline Page Numbers Input */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <label style={{ fontSize: '0.74rem', fontWeight: 750, color: '#475569' }}>
+                            Seiten:
+                          </label>
+                          <input
+                            type="text"
+                            value={lw.pages}
+                            onChange={(e) => handleUpdateLehrwerkPages(lw.id, e.target.value)}
+                            placeholder="z.B. 24, 25"
+                            style={{
+                              width: '110px',
+                              border: '1.5px solid #cbd5e1',
+                              borderRadius: '8px',
+                              padding: '5px 8px',
+                              fontSize: '0.80rem',
+                              fontWeight: 800,
+                              color: '#0f172a',
+                              background: '#ffffff',
+                              outline: 'none'
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveLehrwerk(lw.id)}
+                            aria-label="Lehrwerk entfernen"
+                            title="Entfernen"
+                            style={{
+                              border: 'none',
+                              background: '#fee2e2',
+                              color: '#ef4444',
+                              borderRadius: '6px',
+                              width: '28px',
+                              height: '28px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Stepper Footer: Go to Step 2 */}
@@ -982,6 +1253,231 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* 🎵 REPERTOIRE-SONGS AUS DER MEDIATHEK */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label style={{ fontSize: '0.82rem', fontWeight: 850, color: '#0f172a' }}>
+                    Repertoire-Songs aus Mediathek ({selectedSongs.length})
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenMediaPicker('songs')}
+                    style={{
+                      background: '#fefce8',
+                      border: '1px solid #fef08a',
+                      color: '#a16207',
+                      borderRadius: '8px',
+                      padding: '4px 10px',
+                      fontSize: '0.74rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <Plus size={13} />
+                    <span>Song aus Mediathek wählen</span>
+                  </button>
+                </div>
+
+                {selectedSongs.length === 0 ? (
+                  <div
+                    onClick={() => handleOpenMediaPicker('songs')}
+                    style={{
+                      padding: '14px',
+                      borderRadius: '12px',
+                      border: '1.5px dashed #cbd5e1',
+                      background: '#f8fafc',
+                      textAlign: 'center',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Music size={20} color="#94a3b8" style={{ margin: '0 auto 4px auto', display: 'block' }} />
+                    <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b' }}>
+                      Kein Repertoire-Song gewählt. Klicke hier, um Titel mit BPM & Backing-Track hinzuzufügen.
+                    </span>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {selectedSongs.map(song => (
+                      <div
+                        key={song.id}
+                        style={{
+                          background: '#fffbeb',
+                          border: '1px solid #fde68a',
+                          borderRadius: '12px',
+                          padding: '10px 14px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '12px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                          <div style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '8px',
+                            background: '#facc15',
+                            color: '#0f172a',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}>
+                            <Music size={16} />
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {song.title}
+                            </span>
+                            <div style={{ fontSize: '0.70rem', color: '#64748b', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              <span>{song.artist}</span>
+                              {song.tempo_bpm && <span style={{ fontWeight: 800, color: '#854d0e' }}>{song.tempo_bpm} BPM</span>}
+                              {song.key && <span style={{ fontWeight: 800 }}>{song.key}</span>}
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveSong(song.id)}
+                          aria-label="Song entfernen"
+                          title="Entfernen"
+                          style={{
+                            border: 'none',
+                            background: '#fee2e2',
+                            color: '#ef4444',
+                            borderRadius: '6px',
+                            width: '28px',
+                            height: '28px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 🎙️ EIGENE LEHRER-AUDIOS AUS AUFGABENHEFT / TRESOR */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label style={{ fontSize: '0.82rem', fontWeight: 850, color: '#0f172a' }}>
+                    Eigene Lehrer-Demos & Übe-Memos ({selectedTeacherAudios.length})
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenMediaPicker('audios')}
+                    style={{
+                      background: '#f0fdf4',
+                      border: '1px solid #bbf7d0',
+                      color: '#16a34a',
+                      borderRadius: '8px',
+                      padding: '4px 10px',
+                      fontSize: '0.74rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <Plus size={13} />
+                    <span>Demo aus Mediathek wählen</span>
+                  </button>
+                </div>
+
+                {selectedTeacherAudios.length === 0 ? (
+                  <div
+                    onClick={() => handleOpenMediaPicker('audios')}
+                    style={{
+                      padding: '14px',
+                      borderRadius: '12px',
+                      border: '1.5px dashed #cbd5e1',
+                      background: '#f8fafc',
+                      textAlign: 'center',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Mic size={20} color="#94a3b8" style={{ margin: '0 auto 4px auto', display: 'block' }} />
+                    <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b' }}>
+                      Keine eigene Archiv-Aufnahme gewählt. Klicke hier, um eigene Demos aus dem Aufgabenheft hinzuzufügen.
+                    </span>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {selectedTeacherAudios.map(audio => (
+                      <div
+                        key={audio.id}
+                        style={{
+                          background: '#f0fdf4',
+                          border: '1px solid #bbf7d0',
+                          borderRadius: '12px',
+                          padding: '10px 14px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '12px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                          <div style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '8px',
+                            background: '#22c55e',
+                            color: '#ffffff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}>
+                            <Mic size={16} />
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {audio.title}
+                            </span>
+                            <div style={{ fontSize: '0.70rem', color: '#16a34a', display: 'flex', gap: '8px', alignItems: 'center', fontWeight: 700 }}>
+                              <span>Lehrer-Demo</span>
+                              {audio.duration && <span>{audio.duration}s</span>}
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveAudio(audio.url)}
+                          aria-label="Audio entfernen"
+                          title="Entfernen"
+                          style={{
+                            border: 'none',
+                            background: '#fee2e2',
+                            color: '#ef4444',
+                            borderRadius: '6px',
+                            width: '28px',
+                            height: '28px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Progressive Disclosure Pills: Add Optional Tools */}
@@ -1452,20 +1948,70 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                 )}
               </div>
 
-              {/* Text & Lehrwerk */}
+              {/* Text & Lehrwerke */}
               <div style={{ background: '#ffffff', borderRadius: '10px', padding: '10px', border: '1px solid #e2e8f0' }}>
-                <p style={{ margin: '0 0 6px 0', fontSize: '0.78rem', color: '#334155', lineHeight: 1.45, fontWeight: 600 }}>
+                <p style={{ margin: '0 0 8px 0', fontSize: '0.78rem', color: '#334155', lineHeight: 1.45, fontWeight: 600 }}>
                   {homeworkNotes || 'Keine Notizen angegeben.'}
                 </p>
-                {includeLehrwerk && lehrwerkTitle && (
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#fff7ed', border: '1px solid #ffedd5', padding: '2px 8px', borderRadius: '6px' }}>
-                    <BookOpen size={11} color="#ea580c" />
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#9a3412' }}>
-                      {lehrwerkTitle} (S. {lehrwerkPages})
-                    </span>
+
+                {/* Lehrwerke Badges */}
+                {selectedLehrwerke.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
+                    {selectedLehrwerke.map((lw) => (
+                      <div
+                        key={lw.id}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: '#fff7ed',
+                          border: '1px solid #ffedd5',
+                          padding: '3px 8px',
+                          borderRadius: '6px'
+                        }}
+                      >
+                        <BookOpen size={11} color="#ea580c" />
+                        <span style={{ fontSize: '0.70rem', fontWeight: 800, color: '#9a3412' }}>
+                          {lw.title} {lw.pages ? `(S. ${lw.pages})` : ''}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
+
+              {/* Repertoire-Songs in Preview */}
+              {selectedSongs.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {selectedSongs.map(song => (
+                    <div
+                      key={song.id}
+                      style={{
+                        background: '#ffffff',
+                        borderRadius: '10px',
+                        padding: '8px 10px',
+                        border: '1px solid #fef08a',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Music size={13} color="#ca8a04" />
+                        <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a' }}>
+                          {song.title}
+                        </span>
+                        <span style={{ fontSize: '0.66rem', color: '#64748b' }}>• {song.artist}</span>
+                      </div>
+                      {song.tempo_bpm && (
+                        <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#854d0e', background: '#fef9c3', padding: '1px 6px', borderRadius: '4px' }}>
+                          {song.tempo_bpm} BPM
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Audio Capsule if recorded */}
               {recordedAudioUrl && (
@@ -1488,6 +2034,36 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
                       🔁 {spotlightBars}
                     </span>
                   )}
+                </div>
+              )}
+
+              {/* Selected Teacher Audio Demos in Preview */}
+              {selectedTeacherAudios.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {selectedTeacherAudios.map(audio => (
+                    <div
+                      key={audio.id}
+                      style={{
+                        background: '#ffffff',
+                        borderRadius: '10px',
+                        padding: '8px 10px',
+                        border: '1px solid #bbf7d0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Mic size={13} color="#16a34a" />
+                        <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0f172a' }}>
+                          {audio.title}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '0.64rem', fontWeight: 800, color: '#166534', background: '#dcfce7', padding: '1px 6px', borderRadius: '4px' }}>
+                        {audio.duration || 30}s
+                      </span>
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -1514,17 +2090,21 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
             border: '1.5px solid #e2e8f0',
             borderRadius: '20px',
             padding: '20px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
             display: 'flex',
             flexDirection: 'column',
             gap: '12px'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.78rem', fontWeight: 850, color: '#64748b' }}>
+              <span style={{ fontSize: '0.80rem', fontWeight: 800, color: '#64748b' }}>
                 Bereit zum Senden:
               </span>
-              <span style={{ fontSize: '0.84rem', fontWeight: 900, color: '#0f172a' }}>
-                {selectedStudentIds.size} {selectedStudentIds.size === 1 ? 'Schüler' : 'Schüler'} ausgewählt
+              <span style={{
+                fontSize: '0.82rem',
+                fontWeight: 900,
+                color: selectedStudentIds.size > 0 ? '#0284c7' : '#94a3b8'
+              }}>
+                {selectedStudentIds.size} Schüler ausgewählt
               </span>
             </div>
 
@@ -1568,6 +2148,23 @@ export const TeacherStudioComposerView: React.FC<TeacherStudioComposerViewProps>
 
         </div>
       </div>
+
+      {/* 📚 MEDIATHEK & MEDIEN-BAUKASTEN DRAWER (FLYOUT) */}
+      <TeacherMediaPickerDrawer
+        isOpen={isMediaPickerOpen}
+        onClose={() => setIsMediaPickerOpen(false)}
+        teacherId={teacherId || ''}
+        schoolId={schoolId || ''}
+        mediaAssets={mediaAssets}
+        isLoadingAssets={isLoadingMediaAssets}
+        onAddLehrwerk={handleAddLehrwerk}
+        onAddSong={handleAddSong}
+        onAddAudio={handleAddAudio}
+        selectedLehrwerkTitles={selectedLehrwerke.map(lw => lw.title)}
+        selectedSongTitles={selectedSongs.map(s => s.title)}
+        selectedAudioUrls={selectedTeacherAudios.map(a => a.url)}
+        initialTab={mediaPickerInitialTab}
+      />
     </div>
   );
 };

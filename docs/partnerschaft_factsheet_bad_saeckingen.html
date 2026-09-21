@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Campus-Groovelab | Partnerschafts-Factsheet Bad Säckingen</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 10mm 12mm 10mm 12mm;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Plus Jakarta Sans", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #0f172a;
+      background: #ffffff;
+      line-height: 1.38;
+      font-size: 10.8px;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .sheet {
+      width: 100%;
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 8px 6px;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #0f172a;
+      margin-bottom: 10px;
+    }
+
+    .brand-title {
+      font-size: 19px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-tag {
+      background: #facc15;
+      color: #0f172a;
+      font-size: 8.5px;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 999px;
+      letter-spacing: 0.04em;
+    }
+
+    .doc-subtitle {
+      font-size: 10.5px;
+      color: #64748b;
+      font-weight: 600;
+      margin-top: 1px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+    }
+
+    .header-print-btn {
+      background: #0f172a;
+      color: #ffffff;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 10.5px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+      transition: all 0.15s ease;
+    }
+
+    .header-print-btn:hover {
+      background: #334155;
+      transform: translateY(-1px);
+    }
+
+    .header-meta {
+      text-align: right;
+      font-size: 9px;
+      color: #64748b;
+      line-height: 1.35;
+    }
+
+    .header-meta strong {
+      color: #0f172a;
+    }
+
+    /* Referenzschule Highlight */
+    .highlight-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-left: 4px solid #16a34a;
+      border-radius: 8px;
+      padding: 8px 12px;
+      margin-bottom: 9px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .highlight-card h3 {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #0f172a;
+      margin-bottom: 2px;
+    }
+
+    .highlight-card p {
+      font-size: 9.8px;
+      color: #475569;
+      line-height: 1.35;
+      max-width: 530px;
+    }
+
+    .badge-free {
+      background: #dcfce7;
+      border: 1px solid #bbf7d0;
+      color: #15803d;
+      font-size: 9.5px;
+      font-weight: 800;
+      padding: 3px 9px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+
+    /* Section Headers */
+    .section-header {
+      font-size: 8.8px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #64748b;
+      margin-bottom: 5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .section-header::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: #e2e8f0;
+    }
+
+    /* KPI Row */
+    .kpi-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 11px;
+      margin-bottom: 9px;
+    }
+
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .kpi-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 6px 8px;
+      text-align: center;
+    }
+
+    .kpi-label {
+      font-size: 9px;
+      color: #64748b;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .kpi-value {
+      font-size: 13.5px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-top: 1px;
+    }
+
+    /* 2 Columns Grid */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 9px;
+    }
+
+    .card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+
+    .card-title {
+      font-size: 10px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 9.3px;
+      margin-top: 4px;
+    }
+
+    th {
+      text-align: left;
+      font-size: 8.5px;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: #64748b;
+      padding: 3px 6px;
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    td {
+      padding: 3px 6px;
+      border-bottom: 1px solid #f1f5f9;
+      color: #334155;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .rate-pill {
+      background: #fef08a;
+      color: #854d0e;
+      font-weight: 800;
+      font-size: 8.5px;
+      padding: 1.5px 6px;
+      border-radius: 4px;
+      display: inline-block;
+    }
+
+    .bullet-list {
+      list-style: none;
+      font-size: 9.3px;
+      color: #334155;
+    }
+
+    .bullet-list li {
+      position: relative;
+      padding-left: 11px;
+      margin-bottom: 4px;
+      line-height: 1.34;
+    }
+
+    .bullet-list li::before {
+      content: "•";
+      position: absolute;
+      left: 2px;
+      color: #64748b;
+      font-weight: bold;
+    }
+
+    .bullet-list strong {
+      color: #0f172a;
+    }
+
+    /* Revenue Basis Box */
+    .revenue-basis-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 7px 10px;
+      margin-bottom: 8px;
+    }
+
+    .basis-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 5px;
+      margin-top: 4px;
+      text-align: center;
+      font-size: 8.2px;
+    }
+
+    .basis-col {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 4px 6px;
+    }
+
+    .basis-col strong {
+      display: block;
+      color: #0f172a;
+      font-size: 9.5px;
+      font-weight: 800;
+      margin-top: 1px;
+    }
+
+    /* Footer */
+    .footer {
+      border-top: 1px solid #e2e8f0;
+      padding-top: 5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 8.6px;
+      color: #64748b;
+    }
+
+    .footer strong {
+      color: #0f172a;
+    }
+
+    .floating-print-btn {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #0f172a;
+      color: #ffffff;
+      padding: 10px 18px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 12px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .floating-print-btn:hover {
+      transform: scale(1.03);
+    }
+
+    @media print {
+      body {
+        width: 100% !important;
+        background: #ffffff !important;
+      }
+      .sheet {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 2px !important;
+      }
+      .floating-print-btn, .header-print-btn {
+        display: none !important;
+      }
+      .highlight-card, .kpi-card, .card, .revenue-basis-card {
+        break-inside: avoid;
+        page-break-inside: avoid;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+    }
+  </style>
+  <script>
+    document.addEventListener('keydown', function(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
+        e.preventDefault();
+        window.print();
+      }
+    });
+  </script>
+</head>
+<body>
+
+  <div class="sheet">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <div class="brand-title">
+          Campus-Groovelab
+          <span class="brand-tag">Factsheet</span>
+        </div>
+        <div class="doc-subtitle">Strategische Partnerschaft & Pädagogischer Fachbeirat</div>
+      </div>
+      <div class="header-actions">
+        <button type="button" class="header-print-btn" onclick="window.print()">
+          🖨️ PDF drucken / speichern
+        </button>
+        <div class="header-meta">
+          <div><strong>Partner:</strong> Patrick Huber & Musikschule Bad Säckingen</div>
+          <div><strong>Status:</strong> Vertrauliche Diskussionsgrundlage</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Referenzschule Highlight -->
+    <div class="highlight-card">
+      <div>
+        <h3>1. Musikschule Bad Säckingen als Reallabor & Referenz</h3>
+        <p>Dauerhaft 100 % kostenfreier Vollzugriff auf alle Module (Campus + GrooveLab). Offizielles Reallabor für didaktische Praxiseinsätze.</p>
+      </div>
+      <div class="badge-free">Dauerhaft 0 € (Inklusive)</div>
+    </div>
+
+    <!-- 2. Reale Umsatzbasis einer Musikschule -->
+    <div class="section-header">2. Mathematisch verifizierte Umsatzbasis pro Musikschule (~185 € bis 200 € / Mo.)</div>
+    <div class="revenue-basis-card">
+      <div style="font-size: 9.1px; color: #475569; margin-bottom: 2px;">
+        Herleitung aus den autoritativen Plattform-Tarifen (0,49 € Aktivierung / 0,09 € Basis-Datensatz / 3,99 € Audio-Tresor 25 GB):
+      </div>
+      <div class="basis-grid">
+        <div class="basis-col">
+          Kombi-Hosting
+          <strong>19,90 €</strong>
+        </div>
+        <div class="basis-col">
+          20 Lehrkräfte
+          <strong>9,80 €</strong>
+        </div>
+        <div class="basis-col">
+          20 GrooveLab-Teens
+          <strong>9,80 €</strong>
+        </div>
+        <div class="basis-col">
+          250 Campus-Schüler
+          <strong>122,50 €</strong>
+        </div>
+        <div class="basis-col">
+          200 Basis-Schüler
+          <strong>18,00 €</strong>
+        </div>
+        <div class="basis-col">
+          +25 GB Audio-Tresor
+          <strong>3,99 €</strong>
+        </div>
+      </div>
+      <div style="font-size: 8.8px; color: #64748b; margin-top: 4px; text-align: right;">
+        Summe: <strong>183,99 € / Mo.</strong> (bei 300 Campus-Schülern: <strong>208,49 € / Mo.</strong> • Mittelwert: <strong>~185 € bis 200 €</strong>)
+      </div>
+    </div>
+
+    <!-- 3. Beteiligung & Zahlen -->
+    <div class="section-header">3. Sofortige Umsatzbeteiligung ab Tag 1 (20 % Basis-Beteiligung)</div>
+    <div class="kpi-card">
+      <p style="font-size: 9.8px; color: #475569; line-height: 1.34;">
+        Beteiligung an den monatlichen Gesamteinnahmen <strong>aller vertraglich gebundenen Schulen</strong> – unabhängig davon, wer den Erstkontakt hergestellt hat. Basis-Ausschüttung: <strong>20 %</strong> an allen monatlichen Plattform-Einnahmen.
+      </p>
+      <div class="kpi-row">
+        <div class="kpi-box">
+          <div class="kpi-label">10 Schulen</div>
+          <div class="kpi-value">~370 € / Mo.</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-label">25 Schulen</div>
+          <div class="kpi-value">~925 € / Mo.</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-label">50 Schulen</div>
+          <div class="kpi-value">~1.850 € / Mo.</div>
+        </div>
+        <div class="kpi-box" style="background: #fefce8; border-color: #fef08a;">
+          <div class="kpi-label" style="color: #854d0e;">100 Schulen</div>
+          <div class="kpi-value" style="color: #854d0e;">~3.700 € / Mo.</div>
+        </div>
+      </div>
+      <div style="font-size: 8.5px; color: #94a3b8; margin-top: 3px; text-align: right;">
+        *Kalkuliert mit konservativen 185 € / Monat pro Schule (Bereits bei 20 % Basisbeteiligung)
+      </div>
+    </div>
+
+    <!-- 4. Staffel & Rahmen -->
+    <div class="section-header">4. Erfolgsleiter durch Empfehlungen & Zeitlicher Rahmen</div>
+    <div class="grid-2">
+      <!-- Staffelungsplan -->
+      <div class="card">
+        <div class="card-title">📈 Steigerung bei aktiver Empfehlung</div>
+        <p style="font-size: 9.2px; color: #64748b; margin-bottom: 2px;">
+          Bei aktiver Gewinnung weiterer Schulen steigt der Anteil an <strong>allen</strong> Schulen:
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Eigene Empfehlungen</th>
+              <th>Anteil an ALLEN Schulen</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Basis (0 – 9)</td>
+              <td><span class="rate-pill">20 %</span></td>
+            </tr>
+            <tr>
+              <td>Ab 10 Schulen</td>
+              <td><span class="rate-pill">25 %</span></td>
+            </tr>
+            <tr>
+              <td>Ab 25 Schulen</td>
+              <td><span class="rate-pill">30 %</span></td>
+            </tr>
+            <tr>
+              <td>Ab 50 Schulen</td>
+              <td><span class="rate-pill">40 %</span></td>
+            </tr>
+            <tr>
+              <td><strong>Ab 100 Schulen</strong></td>
+              <td><span class="rate-pill" style="background: #facc15; font-weight: 800;">49 %</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="font-size: 8.8px; color: #15803d; margin-top: 4px; font-weight: 700;">
+          ➔ Bei 100 Schulen und 49 % Beteiligung: ca. <strong>9.000 € / Monat</strong> (108.000 € / Jahr).
+        </div>
+      </div>
+
+      <!-- Zeitaufwand & Jour-Fixe -->
+      <div class="card">
+        <div class="card-title">⏱️ Fachbeirat & Zeitaufwand</div>
+        <ul class="bullet-list">
+          <li><strong>Monatlicher Jour-Fixe:</strong> 1× monatlich ca. 90 Minuten für didaktisches Feedback, Feature-Review und Reallabor-Erfahrungen.</li>
+          <li><strong>All-inclusive Vergütung:</strong> Der zeitliche Aufwand ist mit der monatlichen Beteiligung komplett abgegolten. Keine Zeiterfassung.</li>
+          <li><strong>Koppelung an Fachbeirat:</strong> Die monatliche Auszahlung honoriert die aktive Mitwirkung. Findet das Treffen unentschuldigt nicht statt, entfällt die Auszahlung für diesen Kalendermonat.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 5. Gemeinsame Perspektive -->
+    <div class="section-header">5. Gemeinsame Perspektive & Rollenverteilung</div>
+    <div class="card" style="margin-bottom: 8px;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 9.3px; color: #334155;">
+        <div>
+          <strong>Pädagogische Ausrichtung & Reallabor:</strong><br>
+          Wie stark du dich über das Monatstreffen hinaus einbringst (z. B. Fachbeirat auf Website, kollegialer Austausch mit anderen Schulleitern), entscheiden wir gemeinsam nach deinen zeitlichen Möglichkeiten.
+        </div>
+        <div>
+          <strong>Systemarchitektur & Skalierung:</strong><br>
+          Software, Cloud-Hosting, Rechenzentrum und Support liegen zu 100 % bei Patrick Huber. Bei stabiler Marktpräsenz kann die Kooperation in eine feste gesellschaftsrechtliche Beteiligung übergehen.
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div>Campus-Groovelab | Partnerschafts- & Reallabor-Dokumentation</div>
+      <div><strong>Patrick Huber</strong> | Vertrauliche Diskussionsgrundlage</div>
+    </div>
+  </div>
+
+  <button class="floating-print-btn" onclick="window.print()">
+    🖨️ Als PDF drucken / speichern
+  </button>
+
+</body>
+</html>

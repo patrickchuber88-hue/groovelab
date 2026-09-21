@@ -1,10 +1,10 @@
 import { eq, desc } from 'drizzle-orm';
-import { withDrizzleTenant } from '../db/drizzle-tenant';
-import { documents } from '../db/schema';
-import { SecurityContext } from '../types/security-context';
+import { withDrizzleTenant, type DrizzleTransaction } from '../db/drizzle-tenant.js';
+import { documents } from '../db/schema.js';
+import { SecurityContext } from '../types/security-context.js';
 
 export async function getDocuments(context: SecurityContext) {
-  return await withDrizzleTenant(context, async (tx) => {
+  return await withDrizzleTenant(context, async (tx: any) => {
     return await tx.query.documents.findMany({
       orderBy: [desc(documents.createdAt)],
     });
@@ -15,7 +15,7 @@ export async function createDocument(
   context: SecurityContext,
   data: { title: string; content?: string; isConfidential?: boolean }
 ) {
-  return await withDrizzleTenant(context, async (tx) => {
+  return await withDrizzleTenant(context, async (tx: any) => {
     const [newDoc] = await tx
       .insert(documents)
       .values({
@@ -32,7 +32,7 @@ export async function createDocument(
 }
 
 export async function deleteDocument(context: SecurityContext, documentId: string) {
-  return await withDrizzleTenant(context, async (tx) => {
+  return await withDrizzleTenant(context, async (tx: any) => {
     const result = await tx
       .delete(documents)
       .where(eq(documents.id, documentId))

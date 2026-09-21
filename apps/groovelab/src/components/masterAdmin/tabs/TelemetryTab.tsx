@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Activity, Cpu, HardDrive, Database, Server, RefreshCw, Check } from 'lucide-react';
 import { ClientErrorTelemetryPanel } from '../components/ClientErrorTelemetryPanel';
 import type { ServerMetric } from '../MasterAdminTypes';
+import { supabase } from '../../../lib/supabase';
 
 interface TelemetryTabProps {
   serverMetrics: ServerMetric[];
@@ -18,18 +19,38 @@ export const TelemetryTab: React.FC<TelemetryTabProps> = ({
   apiLatencyMs,
   onRefresh
 }) => {
+  const [liveHealth, setLiveHealth] = useState<{ status: string; latency_ms: number; active_connections: number } | null>(null);
+
+  useEffect(() => {
+    let isCancelled = false;
+    const fetchHealth = async () => {
+      try {
+        const { data } = await supabase.rpc('get_system_health');
+        if (!isCancelled && data && typeof data === 'object') {
+          setLiveHealth(data as any);
+        }
+      } catch (e) {
+        console.warn('Could not probe get_system_health:', e);
+      }
+    };
+
+    fetchHealth();
+    return () => { isCancelled = true; };
+  }, [telemetryCountdown]);
+
   const latestMetric = serverMetrics[0] || null;
   const cpuVal = latestMetric ? latestMetric.cpu_load : 0.12;
   const ramUsed = latestMetric ? latestMetric.mem_used_mb : 1420;
   const ramTotal = latestMetric ? latestMetric.mem_total_mb : 4096;
   const ramPct = ramTotal > 0 ? (ramUsed / ramTotal) * 100 : 35;
-  const dbConns = latestMetric ? latestMetric.active_connections : 4;
+  const dbConns = liveHealth?.active_connections ?? (latestMetric ? latestMetric.active_connections : 4);
   const diskUsed = latestMetric?.disk_used_gb ?? 20.9;
   const diskTotal = latestMetric?.disk_total_gb ?? 37.0;
   const diskPct = (diskUsed / diskTotal) * 100;
   const volumeUsed = latestMetric?.volume_used_gb ?? 2.1;
   const volumeTotal = latestMetric?.volume_total_gb ?? 14.0;
   const volumePct = volumeTotal > 0 ? (volumeUsed / volumeTotal) * 100 : 15;
+  const effectiveLatency = liveHealth?.latency_ms ?? apiLatencyMs;
 
   return (
     <div
@@ -143,7 +164,7 @@ export const TelemetryTab: React.FC<TelemetryTabProps> = ({
           </div>
           <div>
             <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', fontFamily: '"Outfit", sans-serif' }}>
-              {apiLatencyMs} ms <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>Ping</span>
+              {effectiveLatency} ms <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#64748b' }}>P95 Latenz</span>
             </div>
             <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem', color: '#64748b', fontWeight: 550 }}>
               Falkenstein (178.105.10.2) • CX23

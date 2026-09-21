@@ -1407,7 +1407,7 @@ Deine Vorteile auf einen Blick:
                             <div style={{ fontSize: '0.66rem', color: '#64748b', marginTop: '1px', lineHeight: 1.3 }}>
                               {parentAllowAbsences
                                 ? `${student?.first_name || 'Kind'} darf Musikstunden eigenständig absagen.`
-                                : `Standard: Nur Erziehungsberechtigte mit Eltern-PIN (§ 106 BGB).`}
+                                : `Standard: Nur Erziehungsberechtigte mit Eltern-PIN.`}
                             </div>
                           </div>
                         </div>
@@ -1443,7 +1443,7 @@ Deine Vorteile auf einen Blick:
                             <div style={{ fontSize: '0.66rem', color: '#64748b', marginTop: '1px', lineHeight: 1.3 }}>
                               {parentAllowReschedule
                                 ? `Ersatztermine der Lehrkraft können direkt gebucht werden.`
-                                : `Standard: Ausweichtermine erfordern elterliche Freigabe (§ 615 BGB).`}
+                                : `Standard: Ausweichtermine erfordern elterliche Freigabe.`}
                             </div>
                           </div>
                         </div>

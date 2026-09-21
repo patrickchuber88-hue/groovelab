@@ -1,7 +1,7 @@
 import React from 'react';
 import QRCode from 'react-qr-code';
 import { Check } from 'lucide-react';
-import { formatTeacherFullName } from '../utils/nameHelper';
+import { formatTeacherFullName, formatSingleStudentAnonymized, maskLastName } from '../utils/nameHelper';
 import { getCanonicalQrLandingUrl } from '../utils/tenantUrlHelper';
 
 export const urlToDataUrl = async (url: string): Promise<string> => {
@@ -149,17 +149,35 @@ export const IDBadgeCard: React.FC<IDBadgeCardProps> = ({
   const isTeacherRole = user.role === 'teacher' || userRolesList.includes('teacher') || user.role === 'admin' || userRolesList.includes('admin') || user.role === 'secretary' || userRolesList.includes('secretary');
   const isStudentRole = (user.role === 'student' || userRolesList.includes('student')) && !isTeacherRole;
 
-  let displayFirstName = user.first_name || 'Member';
-  let displayLastName = user.last_name || user.instrument || 'Member';
+  let displayFirstName = 'Member';
+  let displayLastName = 'Member';
 
-  if (isStudentRole && user.last_name) {
-    const raw = user.last_name.trim();
-    if (raw.length > 0) {
-      if (raw.length === 2 && raw.endsWith('.')) {
-        displayLastName = raw;
+  if (isStudentRole) {
+    // 🛡️ 1% Goldstandard Student Privacy Invariant (OWASP ASVS Level 3 / DSGVO Art. 25):
+    // Student badges are ALWAYS strictly anonymized to "Vorname" (line 1) and "N." (line 2).
+    // Even if first_name contains full names (e.g. "Amelia Huber"), we cleanly extract the pure first name and mask the last name.
+    const rawFirst = (user.first_name || '').trim();
+    const rawLast = (user.last_name || '').trim();
+
+    if (rawFirst || rawLast) {
+      const anonymizedFull = formatSingleStudentAnonymized(
+        rawFirst || rawLast,
+        rawFirst ? rawLast : null,
+        user.id,
+        true // strictly enforce privacyMode = true
+      );
+      const nameParts = anonymizedFull.split(' ');
+      displayFirstName = nameParts[0] || 'Schüler';
+      if (nameParts.length > 1) {
+        displayLastName = nameParts.slice(1).join(' ');
+      } else if (rawLast) {
+        displayLastName = maskLastName(rawLast, true);
       } else {
-        displayLastName = raw.charAt(0).toUpperCase() + '.';
+        displayLastName = user.instrument || 'Schüler';
       }
+    } else {
+      displayFirstName = 'Schüler';
+      displayLastName = user.instrument || 'Campus';
     }
   } else if (isTeacherRole || !isStudentRole) {
     const fullTeacher = formatTeacherFullName(user.first_name, user.last_name);

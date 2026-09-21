@@ -6,6 +6,8 @@
  * spikes (e.g. September school start) by fast-failing and transparently serving from local cache.
  */
 
+import { reportClientError } from '../lib/errorTelemetry';
+
 export type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 
 interface CircuitBreakerOptions {
@@ -55,7 +57,7 @@ class DatabaseCircuitBreaker {
   public recordFailure(err?: any): void {
     const errMsg = err?.message || String(err || '');
     const isAbort = err?.name === 'AbortError' || errMsg.includes('AbortError') || errMsg.includes('aborted');
-    if (isAbort || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+    if (isAbort || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
       // Client-side cancellation, unmount, or device offline should not trip the server circuit breaker
       return;
     }
@@ -74,6 +76,11 @@ class DatabaseCircuitBreaker {
     if (this.failureCount >= this.failureThreshold || this.state === 'HALF_OPEN') {
       this.state = 'OPEN';
       console.error(`[CircuitBreaker] Circuit TRIPPED to OPEN. Throttling requests for ${this.cooldownMs}ms to protect server.`);
+      reportClientError(`Database Circuit Breaker TRIPPED to OPEN (${this.failureCount} aufeinanderfolgende Fehler): ${errMsg}`, {
+        severity: 'CRITICAL',
+        tag: 'CIRCUIT_BREAKER_TRIPPED',
+        context: 'DatabaseCircuitBreaker'
+      });
     }
   }
 

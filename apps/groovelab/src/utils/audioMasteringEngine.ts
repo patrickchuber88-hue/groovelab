@@ -36,6 +36,7 @@
  */
 
 import * as lamejs from '@breezystack/lamejs';
+import { reportAudioError } from '../lib/errorTelemetry';
 
 // 🌟 CENTRAL PLATFORM-WIDE LOUDNESS & PEAK STANDARDS
 export const TARGET_STUDIO_LUFS = -14.0;
@@ -77,11 +78,14 @@ export interface MasteringOptions {
   applyStereoDimension?: boolean;  // Default: true
   applyConvolutionReverb?: boolean;// Default: true
   reverbRoomType?: ReverbRoomType; // Default: 'medium'
+  reverbRoom?: ReverbRoomType;     // Alias for reverbRoomType
   reverbWetMix?: number;           // Default: 0.08 (8%)
   reverbPreDelayMs?: number;       // Default: 24 ms
+  enableReverb?: boolean;
+  instrumentFamily?: string;
 }
 
-export type ReverbRoomType = 'small' | 'medium' | 'large' | 'studio' | 'chamber' | 'hall' | 'cathedral';
+export type ReverbRoomType = 'small' | 'medium' | 'large' | 'studio' | 'chamber' | 'hall' | 'cathedral' | 'warm_livingroom' | 'concert_hall';
 
 export interface RoomAcousticProfile {
   id: 'small' | 'medium' | 'large';
@@ -173,6 +177,28 @@ export const ROOM_ACOUSTIC_PROFILES: Record<string, RoomAcousticProfile> = {
     decayRate: 1.8,
     preDelayMs: 36,
     hfDampFactor: 4.2
+  },
+  warm_livingroom: {
+    id: 'small',
+    name: 'Wohnzimmer',
+    emoji: '🏠',
+    sub: 'Zimmer & Studio',
+    defaultWet: 5.5,
+    durationSec: 0.65,
+    decayRate: 4.2,
+    preDelayMs: 16,
+    hfDampFactor: 7.5
+  },
+  concert_hall: {
+    id: 'medium',
+    name: 'Konzertsaal',
+    emoji: '🏛️',
+    sub: 'Konzertsaal',
+    defaultWet: 8.0,
+    durationSec: 1.15,
+    decayRate: 2.6,
+    preDelayMs: 24,
+    hfDampFactor: 5.5
   }
 };
 
@@ -222,6 +248,11 @@ export interface DualMasteringResult {
   midResonancePeakHz?: number;
   midResonanceCutDb?: number;
   durationSec?: number;
+  // Backwards-compatibility aliases
+  rawUrl?: string;
+  rawBlob?: Blob;
+  masterBlob?: Blob;
+  duration?: number;
 }
 
 // ==============================================================================
@@ -1244,7 +1275,9 @@ export async function safeDecodeAudioData(audioContext: BaseAudioContext, arrayB
     const timeout = setTimeout(() => {
       if (!settled) {
         settled = true;
-        reject(new Error('Audio decoding timed out in browser engine'));
+        const timeoutErr = new Error('Audio decoding timed out in browser engine');
+        reportAudioError(timeoutErr, 'safeDecodeAudioData', { tag: 'AUDIO_DECODE_TIMEOUT', severity: 'WARNING' });
+        reject(timeoutErr);
       }
     }, 8000);
 
@@ -1260,7 +1293,9 @@ export async function safeDecodeAudioData(audioContext: BaseAudioContext, arrayB
       if (!settled) {
         settled = true;
         clearTimeout(timeout);
-        reject(error || new Error('Audio decoding failed'));
+        const decodeErr = error || new Error('Audio decoding failed');
+        reportAudioError(decodeErr, 'safeDecodeAudioData', { tag: 'AUDIO_DECODE_FAILED', severity: 'WARNING' });
+        reject(decodeErr);
       }
     };
 
@@ -1883,7 +1918,8 @@ export async function processStudioMasteringAudioBuffer(
 // ==============================================================================
 export async function processStudioMastering(
   audioBlobOrFile: Blob | File,
-  options: MasteringOptions = DEFAULT_ACOUSTIC_MASTERING_OPTIONS
+  durationSecOrOptions: number | MasteringOptions = DEFAULT_ACOUSTIC_MASTERING_OPTIONS,
+  maybeOptions?: MasteringOptions
 ): Promise<{ 
   masteredBlob: Blob; 
   masteredUrl: string; 
@@ -1898,6 +1934,9 @@ export async function processStudioMastering(
   transientSofteningApplied?: boolean;
   durationSec?: number;
 }> {
+  const options: MasteringOptions = typeof durationSecOrOptions === 'number'
+    ? (maybeOptions || DEFAULT_ACOUSTIC_MASTERING_OPTIONS)
+    : (durationSecOrOptions || DEFAULT_ACOUSTIC_MASTERING_OPTIONS);
   const arrayBuffer = await audioBlobOrFile.arrayBuffer();
   const tempCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
   let decodedBuffer: AudioBuffer;
@@ -1933,8 +1972,12 @@ export async function processStudioMastering(
 // ==============================================================================
 export async function processDualMastering(
   audioInput: Blob | File,
-  options?: MasteringOptions
+  durationSecOrOptions?: number | MasteringOptions,
+  maybeOptions?: MasteringOptions
 ): Promise<DualMasteringResult> {
+  const options: MasteringOptions = typeof durationSecOrOptions === 'number'
+    ? (maybeOptions || DEFAULT_ACOUSTIC_MASTERING_OPTIONS)
+    : (durationSecOrOptions || DEFAULT_ACOUSTIC_MASTERING_OPTIONS);
   const mergedOptions: MasteringOptions = {
     ...DEFAULT_ACOUSTIC_MASTERING_OPTIONS,
     ...options
@@ -1991,7 +2034,12 @@ export async function processDualMastering(
       adaptiveHpfFreqHz: masterRes.adaptiveHpfFreqHz,
       crestFactorDb: masterRes.crestFactorDb,
       transientSofteningApplied: masterRes.transientSofteningApplied,
-      durationSec: masterRes.durationSec
+      durationSec: masterRes.durationSec,
+      // Backwards-compatible aliases
+      rawUrl: rawNormalizedUrl,
+      rawBlob: rawWavBlob,
+      masterBlob: masterRes.masteredBlob,
+      duration: masterRes.durationSec
     };
   } finally {
     try {

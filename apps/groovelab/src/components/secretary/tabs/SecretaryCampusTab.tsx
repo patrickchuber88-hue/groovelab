@@ -12,14 +12,14 @@ import {
   BookOpen, DoorOpen, Calendar, Sliders, LayoutDashboard, AlertCircle, Clock,
   ShieldCheck, ShieldAlert, Cpu, HardDrive, Zap, Trash2, Download, Eye, EyeOff,
   Music, Lock, Key, QrCode, GraduationCap, ClipboardList, FileText, CheckCircle,
-  BarChart2, LayoutGrid, Info, Activity, Lightbulb
+  BarChart2, LayoutGrid, Info, Activity, Lightbulb, GripVertical
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { SecretaryStudentsView } from '../SecretaryStudentsView';
 import { SecretarySubjectsView } from '../SecretarySubjectsView';
-import { CampusEventsBoard } from '../../CampusEventsBoard';
-import { AdminDashboard } from '../../AdminDashboard';
 import { AppleStyleTokenField } from '../../common/AppleStyleTokenField';
+const CampusEventsBoard = React.lazy(() => import('../../CampusEventsBoard').then(m => ({ default: m.CampusEventsBoard })));
+const AdminDashboard = React.lazy(() => import('../../AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 import { useRealNamesVisibility, maskLastName } from '../../../utils/nameHelper';
 import { getAlphabeticalHue } from '../../../utils/adminColorHelpers';
 import { DEFAULT_FOKUS_LEVELS } from '../../../utils/studentProgressEngine';
@@ -75,7 +75,10 @@ export interface SecretaryCampusTabProps {
   selectedStudentForDetail?: any;
   setSelectedStudentForDetail: (student: any) => void;
   setSettingsTab: React.Dispatch<React.SetStateAction<any>>;
+  approvalToast?: any;
   setApprovalToast: (toast: any) => void;
+  approvalSummaryModal?: any;
+  setApprovalSummaryModal?: (modal: any) => void;
 
   // Feature Toggles (Campus)
   enabledCampusSubjects: boolean;
@@ -220,7 +223,7 @@ export interface SecretaryCampusTabProps {
   handleDropOnMatrix: (e: React.DragEvent, targetRoomId: string | null, dayOrTime: any) => void;
   handleApproveAllPendingSchedules: () => Promise<void> | void;
   handleRejectTeacherDayPlan: (plan: any) => Promise<void> | void;
-  handleSaveAndApproveAll: (flag?: boolean) => Promise<void> | void;
+  handleSaveAndApproveAll: (flag?: boolean, targetTeacherId?: string) => Promise<void> | void;
   handleMergePlans: (plan1: any, plan2?: any) => Promise<void> | void;
   handleSplitPlan: (plan: any, splitIdx: number) => Promise<void> | void;
   runAutoRoomAllocation: () => void;
@@ -318,7 +321,10 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
   selectedStudentForDetail,
   setSelectedStudentForDetail,
   setSettingsTab,
+  approvalToast,
   setApprovalToast,
+  approvalSummaryModal,
+  setApprovalSummaryModal,
   enabledCampusSubjects,
   setEnabledCampusSubjects,
   enabledCampusRooms,
@@ -2001,7 +2007,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
 
                             {/* Room Timeline Rows */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                              {rooms.filter(room => room.is_campus_active !== false).map(room => {
+                              {rooms.filter(room => room.is_campus_active !== false).map((room, rIdx) => {
                                 const roomAllocations = matrixAllocations.filter(p => p.roomId === room.id && p.dayOfWeek === liveViewDay);
                                 
                                 // Conflict checker inside the timeline
@@ -2015,7 +2021,14 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                     {/* Left info box */}
                                     <div style={{ width: '180px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <strong style={{ fontSize: '0.85rem', color: '#1e293b', fontWeight: 800 }}>{room.name}</strong>
+                                        <strong style={{ fontSize: '0.85rem', color: '#1e293b', fontWeight: 800 }}>
+                                          {room.name}
+                                          {rooms.filter((r: any) => r.name === room.name).length > 1 && (
+                                            <span style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600, marginLeft: '5px' }}>
+                                              ({room.building_name || room.location || `Raum-Nr. ${room.room_number || (rIdx + 1)}`})
+                                            </span>
+                                          )}
+                                        </strong>
                                         {hasConflicts && (
                                           <span style={{ background: '#fef2f2', border: '1px solid #fee2e2', color: '#ef4444', fontSize: '0.58rem', fontWeight: 900, padding: '1px 5px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '2px' }} title="Zeitliche Überschneidung!">
                                             ⚠️ KOLLISION
@@ -2389,6 +2402,11 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                                       <strong style={{ fontSize: '0.78rem', color: draggedPlanId && !isCompatible ? '#991b1b' : '#0f172a', fontWeight: 800 }}>
                                         {room.name}
+                                        {rooms.filter((r: any) => r.name === room.name).length > 1 && (
+                                          <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 600, marginLeft: '4px' }}>
+                                            ({room.building_name || room.location || `Raum-Nr. ${room.room_number || (rIdx + 1)}`})
+                                          </span>
+                                        )}
                                       </strong>
                                       {draggedPlanId && !isCompatible && (
                                         <span style={{ fontSize: '0.6rem', color: '#ef4444', fontWeight: 600 }}>
@@ -2554,7 +2572,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                                   return null;
                                                 })()}
                                                 {isPendingBlock && (
-                                                  <span style={{ pointerEvents: 'none', fontSize: '0.58rem', fontWeight: 800, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', padding: '2px 6px', borderRadius: '6px', marginTop: '3px', display: 'inline-flex', alignItems: 'center', gap: '3px', width: 'fit-content' }}>
+                                                  <span style={{ pointerEvents: 'none', fontSize: '0.58rem', fontWeight: 800, color: '#0f172a', background: '#fef3c7', border: '1px solid #fde68a', padding: '2px 6px', borderRadius: '6px', marginTop: '3px', display: 'inline-flex', alignItems: 'center', gap: '3px', width: 'fit-content' }}>
                                                     <Activity size={10} style={{ color: '#b45309' }} />
                                                     <span>Review</span>
                                                   </span>
@@ -2765,6 +2783,11 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                           value={selectedDayPlan.roomId || ''}
                           onChange={(e) => {
                             const targetRoomId = e.target.value || null;
+                            const targetRoom = rooms.find(r => r.id === targetRoomId);
+                            const targetRoomName = targetRoom ? targetRoom.name : 'Kein Raum';
+                            const dayNamesList = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+                            const dayName = dayNamesList[selectedDayPlan.dayOfWeek] || `Tag ${selectedDayPlan.dayOfWeek}`;
+
                             setMatrixAllocations(prev => prev.map(p => {
                               if (p.id === selectedDayPlan.id) {
                                 const updated = { ...p, roomId: targetRoomId };
@@ -2773,6 +2796,67 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                               }
                               return p;
                             }));
+
+                            if (setApprovalToast) {
+                              setApprovalToast({
+                                message: `📍 ${dayName} (${selectedDayPlan.teacherName || 'Lehrkraft'}) zugeteilt an: ${targetRoomName}`,
+                                type: 'success'
+                              });
+                              setTimeout(() => setApprovalToast(null), 3500);
+                            }
+
+                            if (selectedDayPlan.teacherId && !selectedDayPlan.id.startsWith('adhoc_') && schoolId) {
+                              supabase
+                                .from('schedules')
+                                .update({ room_id: targetRoomId })
+                                .eq('school_id', schoolId)
+                                .eq('teacher_id', selectedDayPlan.teacherId)
+                                .eq('day_of_week', selectedDayPlan.dayOfWeek)
+                                .then(({ error }) => {
+                                  if (error) console.error('Error auto-syncing room_id to schedules:', error);
+                                });
+
+                              supabase
+                                .from('users')
+                                .select('id, planned_boards')
+                                .eq('id', selectedDayPlan.teacherId)
+                                .single()
+                                .then(({ data: uData }) => {
+                                  if (uData?.planned_boards) {
+                                    const raw = uData.planned_boards;
+                                    let modified = false;
+                                    if (raw.drafts && typeof raw.drafts === 'object') {
+                                      for (const d of Object.values(raw.drafts)) {
+                                        if ((d as any)?.boards) {
+                                          (d as any).boards.forEach((b: any) => {
+                                            if (b.dayOfWeek === selectedDayPlan.dayOfWeek) {
+                                              b.roomId = targetRoomId;
+                                              modified = true;
+                                            }
+                                          });
+                                        }
+                                      }
+                                    }
+                                    if (Array.isArray(raw.boards)) {
+                                      raw.boards.forEach((b: any) => {
+                                        if (b.dayOfWeek === selectedDayPlan.dayOfWeek) {
+                                          b.roomId = targetRoomId;
+                                          modified = true;
+                                        }
+                                      });
+                                    }
+                                    if (modified) {
+                                      supabase
+                                        .from('users')
+                                        .update({ planned_boards: raw, campus_räume: raw, groovelab_räume: raw })
+                                        .eq('id', selectedDayPlan.teacherId)
+                                        .then(({ error: uErr }) => {
+                                          if (uErr) console.error('Error auto-updating users.planned_boards on drawer select:', uErr);
+                                        });
+                                    }
+                                  }
+                                });
+                            }
                           }}
                           style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '9px 12px', fontSize: '0.8rem', fontWeight: 700, color: '#475569', outline: 'none', cursor: 'pointer' }}
                         >
@@ -4751,13 +4835,13 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                           handleDownloadTeacherSchedule(tId, data.teacherName, data.instrument);
                                         }}
                                         style={{
-                                          background: 'rgba(52, 168, 83, 0.08)',
-                                          border: '1px solid rgba(52, 168, 83, 0.2)',
-                                          color: '#34a853',
-                                          borderRadius: '6px',
                                           padding: '3px 7px',
+                                          borderRadius: '6px',
+                                          border: 'none',
+                                          background: 'rgba(52, 168, 83, 0.08)',
+                                          color: '#34a853',
                                           cursor: 'pointer',
-                                          display: 'inline-flex',
+                                          display: 'flex',
                                           alignItems: 'center',
                                           gap: '4px',
                                           fontSize: '0.64rem',
@@ -4777,67 +4861,212 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                         <Download size={12} />
                                         <span>Download</span>
                                       </button>
-                                      {data.isUnsubmitted ? (
-                                        <span style={{ 
-                                          fontSize: '0.66rem', 
-                                          background: 'rgba(245, 158, 11, 0.12)', 
-                                          color: '#d97706', 
-                                          fontWeight: 700, 
-                                          padding: '2px 6px', 
-                                          borderRadius: '6px' 
-                                        }}>
-                                          Entwurf
-                                        </span>
-                                      ) : (
-                                        <span style={{ 
-                                          fontSize: '0.66rem', 
-                                          background: isSelected ? 'rgba(52, 168, 83, 0.12)' : 'rgba(120, 120, 128, 0.08)', 
-                                          color: isSelected ? '#34a853' : '#8e8e93', 
-                                          fontWeight: 700, 
-                                          padding: '1px 5px', 
-                                          borderRadius: '6px' 
-                                        }}>
-                                          {data.blocks.length} {data.blocks.length === 1 ? 'Tag' : 'Tage'}
-                                        </span>
+                                      {data.hasPending && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleSaveAndApproveAll(true, tId);
+                                          }}
+                                          disabled={isSavingApproval}
+                                          style={{
+                                            padding: '3px 8px',
+                                            borderRadius: '6px',
+                                            border: 'none',
+                                            background: 'linear-gradient(135deg, #34a853, #2e7d32)',
+                                            color: '#ffffff',
+                                            cursor: isSavingApproval ? 'not-allowed' : 'pointer',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            fontSize: '0.64rem',
+                                            fontWeight: 800,
+                                            boxShadow: '0 1px 4px rgba(52, 168, 83, 0.25)',
+                                            transition: 'all 0.15s ease'
+                                          }}
+                                          title={`Stundenplan von ${data.teacherName} jetzt freigeben`}
+                                        >
+                                          <Check size={11} strokeWidth={2.8} />
+                                          <span>Freigeben</span>
+                                        </button>
                                       )}
-                                    </div>
-                                  </div>
+                                       {data.isUnsubmitted ? (
+                                         <span style={{ 
+                                           fontSize: '0.66rem', 
+                                           background: 'rgba(245, 158, 11, 0.12)', 
+                                           color: '#d97706', 
+                                           fontWeight: 700, 
+                                           padding: '2px 6px', 
+                                           borderRadius: '6px' 
+                                         }}>
+                                           Entwurf
+                                         </span>
+                                       ) : data.hasPending ? (
+                                         <span style={{ 
+                                           fontSize: '0.66rem', 
+                                           background: '#fffbeb', 
+                                           border: '1px solid #fde68a',
+                                           color: '#92400e', 
+                                           fontWeight: 750, 
+                                           padding: '2px 6px', 
+                                           borderRadius: '6px',
+                                           display: 'flex',
+                                           alignItems: 'center',
+                                           gap: '4px'
+                                         }}>
+                                           <Clock size={10} className="animate-spin" />
+                                           Review ausstehend
+                                         </span>
+                                       ) : (
+                                         <span style={{ 
+                                           fontSize: '0.66rem', 
+                                           background: isSelected ? 'rgba(52, 168, 83, 0.12)' : 'rgba(120, 120, 128, 0.08)', 
+                                           color: isSelected ? '#34a853' : '#8e8e93', 
+                                           fontWeight: 700, 
+                                           padding: '1px 5px', 
+                                           borderRadius: '6px' 
+                                         }}>
+                                           {data.blocks.length} {data.blocks.length === 1 ? 'Tag' : 'Tage'}
+                                         </span>
+                                       )}
+                                     </div>
+                                   </div>
 
-                                  {/* Collapsible content (Accordion Details) */}
-                                  {isExpanded && (
-                                    <div style={{ padding: '6px 8px 8px 8px', background: 'rgba(120, 120, 128, 0.04)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                      {data.isUnsubmitted ? (
-                                        <div style={{
-                                          padding: '12px 10px',
-                                          borderRadius: '8px',
-                                          border: '1px dashed rgba(245, 158, 11, 0.3)',
-                                          background: 'rgba(245, 158, 11, 0.05)',
-                                          color: '#d97706',
-                                          fontSize: '0.72rem',
-                                          fontWeight: 600,
-                                          textAlign: 'center',
-                                          display: 'flex',
-                                          flexDirection: 'column',
-                                          alignItems: 'center',
-                                          gap: '6px'
-                                        }}>
-                                          <Lock size={14} style={{ color: '#d97706' }} />
-                                          <span>Stundenplan noch nicht eingereicht</span>
-                                        </div>
-                                      ) : data.blocks.length === 0 ? (
-                                        <div style={{
-                                          padding: '12px 10px',
-                                          borderRadius: '8px',
-                                          border: '1px dashed rgba(52, 168, 83, 0.3)',
-                                          background: 'rgba(52, 168, 83, 0.05)',
-                                          color: '#34a853',
-                                          fontSize: '0.72rem',
-                                          fontWeight: 600,
-                                          textAlign: 'center'
-                                        }}>
-                                          Alle Tage erfolgreich zugeteilt! ✅
-                                        </div>
-                                      ) : (
+                                   {/* Collapsible content (Accordion Details) */}
+                                   {isExpanded && (
+                                     <div style={{ padding: '6px 8px 8px 8px', background: 'rgba(120, 120, 128, 0.04)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                       {data.isUnsubmitted ? (
+                                         <div style={{
+                                           padding: '12px 10px',
+                                           borderRadius: '8px',
+                                           border: '1px dashed rgba(245, 158, 11, 0.3)',
+                                           background: 'rgba(245, 158, 11, 0.05)',
+                                           color: '#d97706',
+                                           fontSize: '0.72rem',
+                                           fontWeight: 600,
+                                           textAlign: 'center',
+                                           display: 'flex',
+                                           flexDirection: 'column',
+                                           alignItems: 'center',
+                                           gap: '6px'
+                                         }}>
+                                           <Lock size={14} style={{ color: '#d97706' }} />
+                                           <span>Stundenplan noch nicht eingereicht</span>
+                                         </div>
+                                       ) : data.blocks.length === 0 ? (
+                                         data.hasPending ? (
+                                            <div style={{
+                                              padding: '12px 14px',
+                                              borderRadius: '12px',
+                                              border: '1.5px solid #fde68a',
+                                              background: 'linear-gradient(180deg, #fffbeb 0%, #fefce8 100%)',
+                                              color: '#92400e',
+                                              fontSize: '0.74rem',
+                                              display: 'flex',
+                                              flexDirection: 'column',
+                                              gap: '8px',
+                                              boxShadow: '0 2px 8px rgba(245, 158, 11, 0.06)'
+                                            }}>
+                                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 800, color: '#b45309' }}>
+                                                  <Clock size={15} style={{ color: '#d97706', flexShrink: 0 }} />
+                                                  <span>Neuer Stundenplan eingereicht</span>
+                                                </div>
+                                                <span style={{
+                                                  background: '#fef3c7',
+                                                  color: '#92400e',
+                                                  fontSize: '0.66rem',
+                                                  fontWeight: 800,
+                                                  padding: '2px 7px',
+                                                  borderRadius: '6px',
+                                                  border: '1px solid #fde68a'
+                                                }}>
+                                                  Review
+                                                </span>
+                                              </div>
+                                              <div style={{ fontSize: '0.70rem', color: '#78350f', lineHeight: 1.4 }}>
+                                                Tage mit Raumvorschlägen. Ziehe eine Karte per Drag & Drop in einen anderen Raum oder klicke darauf für Details:
+                                              </div>
+                                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px' }}>
+                                                {matrixAllocations
+                                                  .filter(p => p.teacherId === tId || (p.teacherId && p.teacherId.replace(/^teacher-/i, '') === tId.replace(/^teacher-/i, '')))
+                                                  .sort((a, b) => a.dayOfWeek - b.dayOfWeek)
+                                                  .map(p => {
+                                                    const dayNamesShort = ['', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+                                                    const rName = rooms.find((r: any) => r.id === p.roomId)?.name || p.roomId || 'Raum';
+                                                    const studentCount = p.slots?.filter((s: any) => !s.isBreak)?.length || 0;
+                                                    const isBeingDragged = draggedPlanId === p.id;
+                                                    return (
+                                                      <div 
+                                                        key={p.id}
+                                                        draggable
+                                                        onDragStart={(e) => handleDragStartMatrix(e, p.id, p.dayOfWeek)}
+                                                        onDragEnd={() => {
+                                                          setDraggedPlanId(null);
+                                                          setDraggedPlanDay(null);
+                                                        }}
+                                                        onClick={() => setSelectedDayPlan(p)}
+                                                        style={{ 
+                                                          display: 'flex', 
+                                                          justifyContent: 'space-between', 
+                                                          alignItems: 'center', 
+                                                          padding: '8px 10px', 
+                                                          background: '#ffffff', 
+                                                          borderRadius: '10px', 
+                                                          border: isBeingDragged ? '1.5px dashed #f59e0b' : '1px solid #fde68a', 
+                                                          opacity: isBeingDragged ? 0.5 : 1,
+                                                          boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+                                                          fontSize: '0.72rem',
+                                                          cursor: 'grab',
+                                                          userSelect: 'none',
+                                                          transition: 'all 0.15s ease'
+                                                        }}
+                                                        title="Klicken zum Bearbeiten oder per Drag & Drop in Raumspalte verschieben"
+                                                      >
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                          <GripVertical size={13} style={{ color: '#d97706', opacity: 0.6, flexShrink: 0 }} />
+                                                          <span style={{
+                                                            background: '#fef3c7',
+                                                            color: '#b45309',
+                                                            fontWeight: 800,
+                                                            fontSize: '0.68rem',
+                                                            padding: '2px 5px',
+                                                            borderRadius: '5px'
+                                                          }}>
+                                                            {dayNamesShort[p.dayOfWeek] || `Tag ${p.dayOfWeek}`}
+                                                          </span>
+                                                          <span style={{ fontWeight: 700, color: '#1e293b' }}>
+                                                            {p.startTime} – {p.endTime}
+                                                          </span>
+                                                        </div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                          <span style={{ color: '#047857', fontWeight: 700, background: 'rgba(52,168,83,0.08)', padding: '2px 6px', borderRadius: '5px' }}>
+                                                            {rName}
+                                                          </span>
+                                                          <span style={{ color: '#64748b', fontSize: '0.67rem', fontWeight: 600 }}>
+                                                            {studentCount} {studentCount === 1 ? 'Schüler' : 'Schüler'}
+                                                          </span>
+                                                        </div>
+                                                      </div>
+                                                    );
+                                                  })}
+                                              </div>
+                                            </div>
+                                          ) : (
+                                           <div style={{
+                                             padding: '12px 10px',
+                                             borderRadius: '8px',
+                                             border: '1px dashed rgba(52, 168, 83, 0.3)',
+                                             background: 'rgba(52, 168, 83, 0.05)',
+                                             color: '#34a853',
+                                             fontSize: '0.72rem',
+                                             fontWeight: 600,
+                                             textAlign: 'center'
+                                           }}>
+                                             Alle Tage erfolgreich zugeteilt! ✅
+                                           </div>
+                                         )
+                                       ) : (
                                         <div style={{ border: '1px solid rgba(0, 0, 0, 0.06)', borderRadius: '8px', overflow: 'hidden', background: '#ffffff' }}>
                                           {[...data.blocks]
                                             .sort((a, b) => {
@@ -5217,6 +5446,277 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
               )}
 
 
+              </div>
+            )}
+
+            {/* 🌟 Floating Apple-Style Feedback Toast */}
+            {(() => {
+              const toastMessage = approvalToast ? (
+                approvalToast.message || `📍 ${approvalToast.dayName || 'Tag'} (${approvalToast.teacherName || 'Lehrkraft'}) zugeteilt an: ${approvalToast.roomName || 'Raum'}`
+              ) : null;
+
+              if (!toastMessage) return null;
+
+              return (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="animation-slide-up"
+                  style={{
+                    position: 'fixed',
+                    bottom: '28px',
+                    right: '28px',
+                    zIndex: 99999,
+                    background: 'rgba(15, 23, 42, 0.92)',
+                    backdropFilter: 'blur(20px) saturate(190%)',
+                    WebkitBackdropFilter: 'blur(20px) saturate(190%)',
+                    color: '#ffffff',
+                    padding: '12px 20px',
+                    borderRadius: '16px',
+                    boxShadow: '0 20px 40px -10px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.12)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    fontSize: '0.84rem',
+                    fontWeight: 600,
+                    letterSpacing: '-0.01em',
+                    maxWidth: '420px',
+                    pointerEvents: 'auto'
+                  }}
+                >
+                  <div style={{
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    background: 'rgba(52, 168, 83, 0.2)',
+                    color: '#34a853',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <CheckCircle size={16} strokeWidth={2.6} />
+                  </div>
+                  <div style={{ flex: 1, lineHeight: 1.35 }}>
+                    {toastMessage}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setApprovalToast?.(null)}
+                    aria-label="Schließen"
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'rgba(255, 255, 255, 0.6)',
+                      cursor: 'pointer',
+                      padding: '4px',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              );
+            })()}
+
+            {/* 🏆 1% Tier-1 SaaS Enterprise Approval Summary Modal */}
+            {approvalSummaryModal?.isOpen && (
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="approval-modal-title"
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  zIndex: 100000,
+                  background: 'rgba(15, 23, 42, 0.6)',
+                  backdropFilter: 'blur(8px)',
+                  WebkitBackdropFilter: 'blur(8px)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '20px'
+                }}
+                onClick={() => setApprovalSummaryModal?.(null)}
+              >
+                <div
+                  className="animation-scale-up"
+                  style={{
+                    width: '100%',
+                    maxWidth: '540px',
+                    background: '#ffffff',
+                    borderRadius: '24px',
+                    boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(0, 0, 0, 0.06)',
+                    padding: '32px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '24px',
+                    position: 'relative'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Header with celebratory icon & badge */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '12px' }}>
+                    <div style={{
+                      width: '64px',
+                      height: '64px',
+                      borderRadius: '50%',
+                      background: 'linear-gradient(135deg, rgba(52, 168, 83, 0.16) 0%, rgba(46, 125, 50, 0.22) 100%)',
+                      border: '2px solid rgba(52, 168, 83, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#34a853',
+                      boxShadow: '0 8px 24px rgba(52, 168, 83, 0.25)'
+                    }}>
+                      <CheckCircle size={32} strokeWidth={2.4} />
+                    </div>
+                    <div>
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: 'rgba(52, 168, 83, 0.1)',
+                        color: '#2e7d32',
+                        padding: '4px 12px',
+                        borderRadius: '20px',
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
+                        marginBottom: '8px'
+                      }}>
+                        <span>100% Freigegeben & Aktiv</span>
+                      </div>
+                      <h3 id="approval-modal-title" style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>
+                        Stundenpläne erfolgreich freigegeben!
+                      </h3>
+                      <p style={{ fontSize: '0.84rem', color: '#64748b', margin: '6px 0 0 0', lineHeight: 1.45 }}>
+                        Alle geprüften Tage wurden autoritativ in die Live-Stundenpläne übernommen und stehen ab sofort Schülern und Eltern zur Verfügung.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 4-KPI Summary Grid */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(2, 1fr)',
+                    gap: '12px'
+                  }}>
+                    <div style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '14px',
+                      padding: '14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px'
+                    }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Unterrichtsstunden</span>
+                      <span style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a' }}>{approvalSummaryModal.totalSlots || 0}</span>
+                      <span style={{ fontSize: '0.70rem', color: '#34a853', fontWeight: 600 }}>Planmäßige Einheiten</span>
+                    </div>
+
+                    <div style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '14px',
+                      padding: '14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px'
+                    }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Unterrichtstage</span>
+                      <span style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a' }}>{approvalSummaryModal.daysCount || 0}</span>
+                      <span style={{ fontSize: '0.70rem', color: '#34a853', fontWeight: 600 }}>Wochentage genehmigt</span>
+                    </div>
+
+                    <div style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '14px',
+                      padding: '14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px'
+                    }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Lehrkräfte</span>
+                      <span style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a' }}>{approvalSummaryModal.teachersCount || 0}</span>
+                      <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={approvalSummaryModal.teacherNames?.join(', ')}>
+                        {approvalSummaryModal.teacherNames?.join(', ') || 'Lehrkraft'}
+                      </span>
+                    </div>
+
+                    <div style={{
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '14px',
+                      padding: '14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px'
+                    }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Belegte Räume</span>
+                      <span style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a' }}>{approvalSummaryModal.roomsCount || 0}</span>
+                      <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={approvalSummaryModal.roomNames?.join(', ')}>
+                        {approvalSummaryModal.roomNames?.join(', ') || 'Räume'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Status checklist */}
+                  <div style={{
+                    background: 'rgba(52, 168, 83, 0.06)',
+                    border: '1px solid rgba(52, 168, 83, 0.2)',
+                    borderRadius: '14px',
+                    padding: '14px 16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    fontSize: '0.76rem',
+                    color: '#1e3a24'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Check size={14} color="#34a853" strokeWidth={3} />
+                      <span>Live-Synchronisation auf Schülertablets & Eltern-PWA aktiviert</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Check size={14} color="#34a853" strokeWidth={3} />
+                      <span>Kalender- und Raumbelegungsplan vollständig synchronisiert</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Check size={14} color="#34a853" strokeWidth={3} />
+                      <span>Review-Anfragen im Schulsekretariat erfolgreich abgeschlossen</span>
+                    </div>
+                  </div>
+
+                  {/* Action Button */}
+                  <button
+                    type="button"
+                    onClick={() => setApprovalSummaryModal?.(null)}
+                    style={{
+                      background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '14px',
+                      padding: '14px 20px',
+                      fontSize: '0.88rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 14px rgba(52, 168, 83, 0.35)',
+                      transition: 'all 0.18s ease',
+                      width: '100%',
+                      outline: 'none'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
+                    onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
+                  >
+                    Verstanden & Weiter
+                  </button>
+                </div>
               </div>
             )}
 

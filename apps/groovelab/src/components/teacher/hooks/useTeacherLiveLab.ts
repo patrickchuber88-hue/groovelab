@@ -11,6 +11,9 @@ export interface UseTeacherLiveLabProps {
   onSessionChange?: (sess: any) => void;
   onLocationModeChange?: (mode: 'lab' | 'home') => void;
   fetchData: () => Promise<void>;
+  unreadShouts?: any[];
+  setUnreadShouts?: React.Dispatch<React.SetStateAction<any[]>>;
+  setHelpRequests?: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
 export function useTeacherLiveLab({
@@ -22,7 +25,10 @@ export function useTeacherLiveLab({
   setActiveSessions,
   onSessionChange,
   onLocationModeChange,
-  fetchData
+  fetchData,
+  unreadShouts = [],
+  setUnreadShouts,
+  setHelpRequests
 }: UseTeacherLiveLabProps) {
   const [showKioskView, setShowKioskView] = useState(false);
   const [showKioskPinSetup, setShowKioskPinSetup] = useState(false);
@@ -229,6 +235,56 @@ export function useTeacherLiveLab({
     }
   }, [fetchData]);
 
+  const handleResolveHelp = useCallback(async (requestId: string) => {
+    try {
+      const { error } = await supabase
+        .from('help_requests')
+        .update({ status: 'resolved' })
+        .eq('id', requestId);
+      
+      if (!error && setHelpRequests) {
+        setHelpRequests(prev => prev.filter(r => r.id !== requestId));
+      }
+    } catch (err) {
+      console.error('Failed to resolve help request:', err);
+    }
+  }, [setHelpRequests]);
+
+  const handleMarkAsRead = useCallback(async (shoutId: string) => {
+    if (!userId) return;
+    try {
+      const shout = (unreadShouts || []).find(s => s.id === shoutId);
+      if (!shout) return;
+      
+      const newReadBy = [...(shout.read_by || []), userId];
+      const { error } = await supabase.from('band_shoutbox').update({ read_by: newReadBy }).eq('id', shoutId);
+      if (!error && setUnreadShouts) {
+        setUnreadShouts(prev => prev.filter(s => s.id !== shoutId));
+      }
+    } catch (err) {
+      console.error('Failed to mark shout as read:', err);
+    }
+  }, [userId, unreadShouts, setUnreadShouts]);
+
+  const handleMarkAllAsRead = useCallback(async () => {
+    if (!userId || !unreadShouts || unreadShouts.length === 0) return;
+    try {
+      const updates = unreadShouts.map(shout => ({
+        id: shout.id,
+        read_by: [...(shout.read_by || []), userId]
+      }));
+
+      for (const update of updates) {
+        await supabase.from('band_shoutbox').update({ read_by: update.read_by }).eq('id', update.id);
+      }
+      if (setUnreadShouts) {
+        setUnreadShouts([]);
+      }
+    } catch (err) {
+      console.error('Failed to mark all shouts as read:', err);
+    }
+  }, [userId, unreadShouts, setUnreadShouts]);
+
   const [wallSongs, setWallSongs] = useState<any[]>([]);
   const [rehearsalSuggestions, setRehearsalSuggestions] = useState<any[]>([]);
 
@@ -253,6 +309,9 @@ export function useTeacherLiveLab({
     handleTeacherSelfCheckout,
     handleTeacherCheckout,
     handleLogoutStudent,
+    handleResolveHelp,
+    handleMarkAsRead,
+    handleMarkAllAsRead,
     wallSongs,
     setWallSongs,
     rehearsalSuggestions,

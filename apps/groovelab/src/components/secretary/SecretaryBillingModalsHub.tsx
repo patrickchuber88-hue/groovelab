@@ -4,7 +4,6 @@ import {
   Info, Sparkles, RefreshCw, ShieldCheck, Clock, Search,
   Cloud, Zap, Rocket, Crown, Database, CheckCircle2, Copy
 } from 'lucide-react';
-import jsPDF from 'jspdf';
 import { calculateSchoolYearDirectBilling, calculateTransitionEffectiveDate } from '../../utils/epcGiroCode';
 import { StorageTier, DEFAULT_STORAGE_TIERS } from '../../domain/pricingEngine';
 

@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { Shield } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useRealNamesVisibility, formatTeacherFullName } from '../utils/nameHelper';
 import { resolveCampusStudentAvatar } from './StudioAvatar';
 import { deleteStudentFully } from '../utils/studentDeletionService';
+import { PasskeyNudgeBanner } from './admin/PasskeyNudgeBanner';
+import { CourtProofExportModal } from './admin/CourtProofExportModal';
 
 // Domain Hooks
 import { useAdminDashboardData } from '../hooks/admin/useAdminDashboardData';
@@ -12,18 +15,18 @@ import { useAdminBands } from '../hooks/admin/useAdminBands';
 import { useAdminSongs } from '../hooks/admin/useAdminSongs';
 import { useAdminCampusRooms } from '../hooks/admin/useAdminCampusRooms';
 
-// Tab Components
-import { AdminStudentsView } from './admin/AdminStudentsView';
-import { AdminTeachersView } from './admin/AdminTeachersView';
-import { AdminBandsView } from './admin/AdminBandsView';
-import { AdminCampusRoomsView } from './admin/AdminCampusRoomsView';
-import { AdminGroovelabRoomsView } from './admin/AdminGroovelabRoomsView';
-import { AdminSongsView } from './admin/AdminSongsView';
-import { GrooveLabSongsView } from './admin/GrooveLabSongsView';
-import { AdminStatsView } from './admin/AdminStatsView';
-import { AdminMissionsView } from './admin/AdminMissionsView';
-import { AdminIDGalleryView as IDGallery } from './admin/AdminIDGalleryView';
-import { AdminDeviceSetupView as DeviceSetupScreen } from './admin/AdminDeviceSetupView';
+// Tab Components (Lazy-loaded for granular code-splitting)
+const AdminStudentsView = lazy(() => import('./admin/AdminStudentsView').then(m => ({ default: m.AdminStudentsView })));
+const AdminTeachersView = lazy(() => import('./admin/AdminTeachersView').then(m => ({ default: m.AdminTeachersView })));
+const AdminBandsView = lazy(() => import('./admin/AdminBandsView').then(m => ({ default: m.AdminBandsView })));
+const AdminCampusRoomsView = lazy(() => import('./admin/AdminCampusRoomsView').then(m => ({ default: m.AdminCampusRoomsView })));
+const AdminGroovelabRoomsView = lazy(() => import('./admin/AdminGroovelabRoomsView').then(m => ({ default: m.AdminGroovelabRoomsView })));
+const AdminSongsView = lazy(() => import('./admin/AdminSongsView').then(m => ({ default: m.AdminSongsView })));
+const GrooveLabSongsView = lazy(() => import('./admin/GrooveLabSongsView').then(m => ({ default: m.GrooveLabSongsView })));
+const AdminStatsView = lazy(() => import('./admin/AdminStatsView').then(m => ({ default: m.AdminStatsView })));
+const AdminMissionsView = lazy(() => import('./admin/AdminMissionsView').then(m => ({ default: m.AdminMissionsView })));
+const IDGallery = lazy(() => import('./admin/AdminIDGalleryView').then(m => ({ default: m.AdminIDGalleryView })));
+const DeviceSetupScreen = lazy(() => import('./admin/AdminDeviceSetupView').then(m => ({ default: m.AdminDeviceSetupView })));
 
 // Modals Hub
 import { AdminModalsMasterHub } from './admin/modals/AdminModalsMasterHub';
@@ -31,6 +34,8 @@ const ConfirmDeleteStudentModal = lazy(() => import('./ConfirmDeleteStudentModal
 const AdminQRModal = lazy(() => import('./admin/modals/AdminQRModal'));
 const TeacherDashboard = lazy(() => import('./TeacherDashboard').then(m => ({ default: m.TeacherDashboard })));
 const CampusSetupScreen = lazy(() => import('./CampusSetupScreen').then(m => ({ default: m.CampusSetupScreen })));
+const ScheduleBoard = lazy(() => import('./ScheduleBoard').then(m => ({ default: m.ScheduleBoard })));
+const CampusEventsBoard = lazy(() => import('./CampusEventsBoard').then(m => ({ default: m.CampusEventsBoard })));
 
 export interface AdminDashboardProps {
   userId: string;
@@ -101,6 +106,7 @@ export function AdminDashboard({
   const [showAVVModal, setShowAVVModal] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [showCourtProofExportModal, setShowCourtProofExportModal] = useState(false);
 
   // 3. Domain Hooks
   const studentsState = useAdminStudents({
@@ -143,7 +149,8 @@ export function AdminDashboard({
     setRooms,
     stations,
     setStations,
-    fetchData
+    fetchData,
+    teachers
   });
 
   // UI helpers
@@ -208,9 +215,9 @@ export function AdminDashboard({
       tabIndex={0}
       style={{ 
         flex: 1, 
-        padding: hideHeader ? '0px' : (activeTab === 'live' ? (isMobile ? '0px' : '0px 10px 10px 10px') : (isMobile ? '0px' : '10px')), 
-        overflowY: activeTab === 'live' ? (isMobile ? 'visible' : 'hidden') : 'auto',
-        height: activeTab === 'live' ? (isMobile ? 'auto' : '100%') : 'auto',
+        padding: hideHeader ? '0px' : ((activeTab === 'live' || activeTab === 'briefing') ? (isMobile ? '0px' : '0px 10px 10px 10px') : (isMobile ? '0px' : '10px')), 
+        overflowY: (activeTab === 'live' || activeTab === 'briefing') ? (isMobile ? 'visible' : 'hidden') : 'auto',
+        height: (activeTab === 'live' || activeTab === 'briefing') ? (isMobile ? 'auto' : '100%') : 'auto',
         display: 'flex',
         flexDirection: 'column',
         minWidth: 0,
@@ -263,9 +270,12 @@ export function AdminDashboard({
         </div>
       )}
 
-      {/* Header Quotas (when not in Live mode) */}
-      {!hideHeader && activeTab !== 'live' && activeTab !== 'schedule' && schoolObj?.limits_enabled && (
-        <header style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start', marginBottom: '24px', marginTop: '16px', gap: '20px', flexWrap: 'wrap' }}>
+      {/* Passkey Biometric Security Nudge for School Admins */}
+      <PasskeyNudgeBanner currentUser={admin} />
+
+      {/* Header Bar: Quotas (when limits_enabled and not in Live, Briefing, Schedule or Events mode) */}
+      {!hideHeader && activeTab !== 'live' && activeTab !== 'briefing' && activeTab !== 'schedule' && activeTab !== 'events' && schoolObj?.limits_enabled && (
+        <header style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '24px', marginTop: '16px', gap: '16px', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', gap: '20px', background: '#ffffff', padding: '12px 20px', borderRadius: '18px', border: '1.5px solid #f1f5f9', boxShadow: '0 2px 8px rgba(0,0,0,0.01)', flexWrap: 'wrap' }}>
             {[
               { label: 'Lehrkräfte', cur: teachers.length, max: schoolObj.max_teachers ?? 2, color: '#3b82f6' },
@@ -290,14 +300,14 @@ export function AdminDashboard({
         </header>
       )}
 
-      {/* TAB 1: LIVE LAB */}
-      {activeTab === 'live' && (
+      {/* TAB 1: LIVE LAB & BRIEFING */}
+      {(activeTab === 'live' || activeTab === 'briefing') && (
         <Suspense fallback={<div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>Lehrer-Dashboard wird geladen...</div>}>
           <TeacherDashboard 
             key={`teacher-dashboard-view-${activePlatform}`}
             userId={userId} 
             initialTeacher={admin}
-            hideHeader={activePlatform === 'campus' ? false : true} 
+            hideHeader={true} 
             hideSidebar={true}
             viewMode="admin" 
             activePlatform={activePlatform as any}
@@ -309,6 +319,29 @@ export function AdminDashboard({
             onSessionChange={onSessionChange}
             locationMode={locationMode}
             onLocationModeChange={onLocationModeChange}
+          />
+        </Suspense>
+      )}
+
+      {/* TAB: STUNDENPLAN (SCHEDULE) */}
+      {activeTab === 'schedule' && (
+        <Suspense fallback={<div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>Stundenplan wird geladen...</div>}>
+          <ScheduleBoard
+            schoolId={schoolObj?.id || admin?.school_id || ''}
+            userId={userId}
+          />
+        </Suspense>
+      )}
+
+      {/* TAB: TERMINE (EVENTS) */}
+      {activeTab === 'events' && (
+        <Suspense fallback={<div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>Termine & Kalender werden geladen...</div>}>
+          <CampusEventsBoard
+            userId={userId}
+            role={admin?.role || 'teacher'}
+            schoolId={schoolObj?.id || admin?.school_id || ''}
+            supabase={supabase}
+            brandColor={brandColor}
           />
         </Suspense>
       )}
@@ -361,6 +394,7 @@ export function AdminDashboard({
             handleAddStudent={studentsState.handleAddStudent}
             handleBulkAddSubmit={studentsState.handleBulkAddSubmit}
             handleDeleteStudent={studentsState.handleDeleteStudent}
+            handleRestoreStudent={studentsState.handleRestoreStudent}
             handleUpdateStudent={studentsState.handleUpdateStudent}
             parseBulkInput={studentsState.parseBulkInput}
             resolveUserAvatar={resolveUserAvatarBound}
@@ -515,23 +549,25 @@ export function AdminDashboard({
             />
           </Suspense>
         ) : (
-          <AdminGroovelabRoomsView
-            rooms={rooms}
-            stations={stations}
-            draggedRoomId={roomsState.draggedRoomId}
-            dragOverRoomId={roomsState.dragOverRoomId}
-            handleRoomDragStart={roomsState.handleRoomDragStart}
-            handleRoomDragOver={roomsState.handleRoomDragOver}
-            handleRoomDragEnter={roomsState.handleRoomDragEnter}
-            handleRoomDragLeave={roomsState.handleRoomDragLeave}
-            handleRoomDrop={roomsState.handleRoomDrop}
-            handleRoomDragEnd={roomsState.handleRoomDragEnd}
-            setCustomizingRoom={roomsState.setCustomizingRoom}
-            triggerBatchAddStations={roomsState.triggerBatchAddStations}
-            handleDeleteRoom={roomsState.handleDeleteRoom}
-            handleDeleteStation={roomsState.handleDeleteStation}
-            brandColor={brandColor}
-          />
+          <Suspense fallback={<div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>GrooveLab Raumplaner wird geladen...</div>}>
+            <AdminGroovelabRoomsView
+              rooms={rooms}
+              stations={stations}
+              draggedRoomId={roomsState.draggedRoomId}
+              dragOverRoomId={roomsState.dragOverRoomId}
+              handleRoomDragStart={roomsState.handleRoomDragStart}
+              handleRoomDragOver={roomsState.handleRoomDragOver}
+              handleRoomDragEnter={roomsState.handleRoomDragEnter}
+              handleRoomDragLeave={roomsState.handleRoomDragLeave}
+              handleRoomDrop={roomsState.handleRoomDrop}
+              handleRoomDragEnd={roomsState.handleRoomDragEnd}
+              setCustomizingRoom={roomsState.setCustomizingRoom}
+              triggerBatchAddStations={roomsState.triggerBatchAddStations}
+              handleDeleteRoom={roomsState.handleDeleteRoom}
+              handleDeleteStation={roomsState.handleDeleteStation}
+              brandColor={brandColor}
+            />
+          </Suspense>
         )
       )}
 
@@ -641,39 +677,43 @@ export function AdminDashboard({
 
       {/* TAB 8: ID GALLERY */}
       {activeTab === 'gallery' && (
-        <IDGallery 
-          users={[...(teachers || []), ...(students || [])]} 
-          brandColor={brandColor} 
-          onShowQR={studentsState.setSelectedQRUser} 
-          activePlatform={activePlatform} 
-        />
+        <Suspense fallback={<div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>Ausweis-Galerie wird geladen...</div>}>
+          <IDGallery 
+            users={[...(teachers || []), ...(students || [])]} 
+            brandColor={brandColor} 
+            onShowQR={studentsState.setSelectedQRUser} 
+            activePlatform={activePlatform} 
+          />
+        </Suspense>
       )}
 
       {/* TAB 9: SETUP / SETTINGS */}
       {activeTab === 'setup' && (
-        activePlatform === 'campus' ? (
-          <CampusSetupScreen 
-            school={schoolObj} 
-            admin={admin} 
-            brandColor={brandColor} 
-            onUpdate={() => fetchData()} 
-          />
-        ) : (
-          <DeviceSetupScreen 
-            rooms={setupRooms} 
-            stations={setupStations} 
-            brandColor={brandColor} 
-            activeSessions={activeSessions}
-            students={students}
-            school={schoolObj}
-            admin={admin}
-            kiosks={kiosks || []}
-            onUpdate={() => fetchData()}
-            onCleanupPlanning={() => {}}
-            onResetPlanning={() => {}}
-            activePlatform={activePlatform}
-          />
-        )
+        <Suspense fallback={<div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>Einstellungen werden geladen...</div>}>
+          {activePlatform === 'campus' ? (
+            <CampusSetupScreen 
+              school={schoolObj} 
+              admin={admin} 
+              brandColor={brandColor} 
+              onUpdate={() => fetchData()} 
+            />
+          ) : (
+            <DeviceSetupScreen 
+              rooms={setupRooms} 
+              stations={setupStations} 
+              brandColor={brandColor} 
+              activeSessions={activeSessions}
+              students={students}
+              school={schoolObj}
+              admin={admin}
+              kiosks={kiosks || []}
+              onUpdate={() => fetchData()}
+              onCleanupPlanning={() => {}}
+              onResetPlanning={() => {}}
+              activePlatform={activePlatform}
+            />
+          )}
+        </Suspense>
       )}
 
       {/* TAB 10: MISSIONS */}
@@ -719,13 +759,9 @@ export function AdminDashboard({
             activePlatform={activePlatform === 'campus' ? 'campus' : activePlatform === 'groovelab' ? 'groovelab' : 'all'}
             onClose={() => studentsState.setDeleteStudentModalData(null)}
             onConfirm={async (studentId) => {
-              const res = await deleteStudentFully(studentId, {
-                activePlatform: activePlatform === 'campus' ? 'campus' : 'groovelab'
-              });
-              if (res.success) {
-                setStudents(prev => prev.filter(s => s.id !== studentId));
-                fetchData(true);
-              }
+              await studentsState.handleSoftDeleteStudent(studentId);
+              setStudents(prev => prev.filter(s => s.id !== studentId));
+              fetchData(true);
             }}
           />
         </Suspense>
@@ -799,6 +835,16 @@ export function AdminDashboard({
         onAddMember={bandsState.handleAddMember}
         brandColor={brandColor}
       />
+
+      {/* Beweissicherer Mandanten-Export Modal (DSGVO Art. 20/28) */}
+      {showCourtProofExportModal && (
+        <CourtProofExportModal
+          isOpen={showCourtProofExportModal}
+          onClose={() => setShowCourtProofExportModal(false)}
+          schoolId={schoolObj?.id || admin?.school_id || ''}
+          schoolName={schoolObj?.name || 'Musikschule'}
+        />
+      )}
     </div>
   );
 }

@@ -4,6 +4,8 @@
  * and malicious DOM inspection while keeping localhost/development 100% open for debugging.
  */
 
+import { initRuntimeIntegrityGuard } from './runtimeIntegrityGuard';
+
 export function initAntiTamperShield(): void {
   if (typeof window === 'undefined') return;
 
@@ -28,6 +30,9 @@ export function initAntiTamperShield(): void {
   }
 
   try {
+    // 0. Continuous Runtime Integrity Guard (Anti-Extension & Prototype Hijacking)
+    initRuntimeIntegrityGuard();
+
     // 1. Silence non-essential console outputs in production
     const noop = () => {};
     console.log = noop;

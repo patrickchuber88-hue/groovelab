@@ -80,35 +80,20 @@ export const getItemWeek = (item: { topic_name: string; updated_at?: string }): 
   return item.updated_at ? getISOWeek(item.updated_at) : '';
 };
 
-export const getLehrwerkColor = (title: string, customLehrwerkeList?: any[]) => {
-  const trimmed = (title || '').trim();
-  const list = customLehrwerkeList || [];
-  const sorted = [...list].sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-  const index = sorted.findIndex(b => (b.title || '').trim() === trimmed);
-  
-  if (index !== -1 && sorted.length > 0) {
-    const position = index % 26;
-    const hue = Math.round((position / 25) * 360);
-    return {
-      from: `hsl(${hue}, 85%, 94%)`,
-      to: `hsl(${hue}, 80%, 84%)`,
-      text: `hsl(${hue}, 90%, 25%)`,
-      shadowFrom: `hsla(${hue}, 85%, 50%, 0.2)`,
-      shadowTo: `hsla(${hue}, 80%, 40%, 0.15)`
-    };
-  }
+export const CANONICAL_LEHRWERK_COLOR = {
+  from: '#ffe4e6',
+  to: '#fecdd3',
+  text: '#e11d48',
+  accent: '#e11d48',
+  border: '#fecdd3',
+  badgeBg: '#fff1f2',
+  badgeText: '#e11d48',
+  shadowFrom: 'rgba(225, 29, 72, 0.18)',
+  shadowTo: 'rgba(225, 29, 72, 0.12)'
+};
 
-  const firstChar = trimmed.charAt(0).toUpperCase();
-  const charCode = firstChar.charCodeAt(0) || 65;
-  const clampedCode = Math.max(65, Math.min(90, charCode));
-  const hue = Math.round(((clampedCode - 65) / 25) * 360);
-  return {
-    from: `hsl(${hue}, 85%, 94%)`,
-    to: `hsl(${hue}, 80%, 84%)`,
-    text: `hsl(${hue}, 90%, 25%)`,
-    shadowFrom: `hsla(${hue}, 85%, 50%, 0.2)`,
-    shadowTo: `hsla(${hue}, 80%, 40%, 0.15)`
-  };
+export const getLehrwerkColor = (_title?: string, _customLehrwerkeList?: any[]) => {
+  return CANONICAL_LEHRWERK_COLOR;
 };
 
 export const getSongColor = (title: string) => {

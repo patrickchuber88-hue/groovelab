@@ -43,7 +43,7 @@ export interface SecretaryUserDetailModalsHubProps {
   showUnassignedWarning: boolean;
   setShowUnassignedWarning: (show: boolean) => void;
   matrixAllocations: any[];
-  handleSaveAndApproveAll: (bypassWarnings?: boolean) => Promise<void>;
+  handleSaveAndApproveAll: (bypassWarnings?: boolean, targetTeacherId?: string) => Promise<void>;
 
   // Floating student context menu (3 dots)
   activeContextMenu: {

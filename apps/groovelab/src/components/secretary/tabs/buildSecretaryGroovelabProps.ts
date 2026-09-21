@@ -17,6 +17,12 @@ export interface BuildSecretaryGroovelabPropsParams {
   studentsHook: any;
   liveLab: any;
   dashboardData: any;
+  currentSchoolProfile?: any;
+
+  // Rooms & State from SecretaryDashboard
+  rooms?: any[];
+  setRooms?: React.Dispatch<React.SetStateAction<any[]>>;
+  activeSubjectsList?: string[];
 
   // Teachers (State from SecretaryDashboard)
   campusTeachers?: any[];
@@ -72,15 +78,15 @@ export function buildSecretaryGroovelabProps(
     handleZoomChange: liveLab.handleZoomChange,
 
     // Rooms & Stations (Live Blueprint)
-    rooms: dashboardData.rooms,
-    stations: dashboardData.stations,
-    selectedRoomId: liveLab.selectedRoomId,
-    setSelectedRoomId: liveLab.setSelectedRoomId,
-    activeSessions: dashboardData.activeSessions,
-    helpRequests: dashboardData.helpRequests,
-    holidayXpActive: liveLab.holidayXpActive,
-    handleToggleHolidayXp: liveLab.handleToggleHolidayXp,
-    handleLogoutStudent: liveLab.handleLogoutStudent,
+    rooms: params.rooms ?? dashboardData?.rooms ?? [],
+    stations: dashboardData?.stations ?? [],
+    selectedRoomId: liveLab?.selectedRoomId ?? '',
+    setSelectedRoomId: liveLab?.setSelectedRoomId ?? (() => {}),
+    activeSessions: liveLab?.activeSessions ?? dashboardData?.activeSessions ?? [],
+    helpRequests: liveLab?.helpRequests ?? dashboardData?.helpRequests ?? [],
+    holidayXpActive: liveLab?.holidayXpActive ?? false,
+    handleToggleHolidayXp: liveLab?.handleToggleHolidayXp ?? (() => {}),
+    handleLogoutStudent: liveLab?.handleLogoutStudent ?? (async () => {}),
 
     // Students & Bands
     students: studentsHook.students,
@@ -139,7 +145,7 @@ export function buildSecretaryGroovelabProps(
     newTeacherContractEndsAt: staff.newTeacherContractEndsAt,
     setNewTeacherContractEndsAt: staff.setNewTeacherContractEndsAt,
     handleCreateCoachForGroovelab: staff.handleCreateCoachForGroovelab,
-    activeSubjectsList: dashboardData.activeSubjectsList,
+    activeSubjectsList: params.activeSubjectsList ?? dashboardData?.activeSubjectsList ?? [],
 
     // Settings & Toggles
     activeGroovelabSettingsModal: extendedSettings.activeGroovelabSettingsModal,

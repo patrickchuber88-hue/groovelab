@@ -1,6 +1,7 @@
 import React from 'react';
 import { StudentBriefingTabProps } from './StudentBriefingTab';
 import { DEFAULT_FOKUS_LEVELS } from '../../../utils/studentProgressEngine';
+import { resolveJuniorWeeklyHomeworkSummary } from '../utils/juniorHomeworkResolver';
 
 export interface BuildStudentBriefingParams {
   studentId: string;
@@ -87,13 +88,14 @@ export function buildStudentBriefingProps(params: BuildStudentBriefingParams): S
     fokusLogs: practice.fokusLogs,
     getDeterministicWeekMetrics: streaks.getDeterministicWeekMetrics,
     getExactLogSeconds: (log: any) => log.duration_seconds || (log.duration_minutes || 0) * 60,
-    getJuniorWeeklyHomeworkSummary: () => ({
-      formattedJuniorBooks: [],
-      otherActiveSongs: [],
-      audioTracks: [],
-      generalNote: null,
-      studentQuestionText: null,
-      hasAnyHomework: false
+    getJuniorWeeklyHomeworkSummary: () => resolveJuniorWeeklyHomeworkSummary({
+      localProgress,
+      lehrwerke,
+      progressItems,
+      activeSongSkills,
+      assignedCampusSongs,
+      studentId,
+      studentUser: profile.studentUser
     }),
     getOccRoomName: (occ: any) => occ?.room_name || occ?.room || 'Musikraum',
     getOccurrenceUnreadCount: () => 0,
@@ -117,8 +119,8 @@ export function buildStudentBriefingProps(params: BuildStudentBriefingParams): S
     isMobile: profile.isMobile,
     isMusicStandMode: profile.isMusicStandMode,
     isRightSidebarCollapsed: profile.isRightSidebarCollapsed,
-    isStudentAbsenceAllowed: true,
-    isStudentRescheduleAllowed: true,
+    isStudentAbsenceAllowed: schedule.isStudentAbsenceAllowed ?? true,
+    isStudentRescheduleAllowed: schedule.isStudentRescheduleAllowed ?? true,
     isTodayHoliday: schedule.isTodayHoliday || false,
     isTtsSpeaking: feed.isTtsSpeaking,
     juniorActivePlayingAudioId: practice.juniorActivePlayingAudioId || null,

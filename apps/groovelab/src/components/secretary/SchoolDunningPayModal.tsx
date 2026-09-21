@@ -242,7 +242,7 @@ export const SchoolDunningPayModal: React.FC<SchoolDunningPayModalProps> = ({
                 </div>
                 {dunningStatus.isDunningFeeApplied && (
                   <div style={{ fontSize: '0.74rem', color: '#b91c1c', fontWeight: 750, marginTop: '2px' }}>
-                    Inkl. {dunningStatus.dunningFee.toFixed(2)} € Verzugspauschale (§ 288 Abs. 5 BGB, Kulanzsatz statt 40,00 €)
+                    Inkl. {dunningStatus.dunningFee.toFixed(2)} € Verzugspauschale (Kulanzsatz statt 40,00 €)
                   </div>
                 )}
                 {dunningStatus.level === 'level_2_warning' && (

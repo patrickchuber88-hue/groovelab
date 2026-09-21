@@ -6,7 +6,6 @@ import {
   School, Users, Award, CheckCircle2
 } from 'lucide-react';
 import { CampusGroovelabText } from '../CampusGroovelabBrand';
-import { generateTariffReceiptPDF } from '../../utils/tariffReceiptPdfGenerator';
 import { StorageTier, DEFAULT_STORAGE_TIERS } from '../../domain/pricingEngine';
 import {
   getSchoolYearEndInfo,
@@ -14,13 +13,9 @@ import {
   downloadUpgradeConfirmationPdf,
   getDynamicAnnualPrice as calcDynamicAnnualPrice
 } from './licenses/licenseUtils';
-import { generateStaffCouncilDeclarationPDF } from '../../utils/staffCouncilDeclarationGenerator';
-import { generateDpoComplianceDossierPDF } from '../../utils/dpoComplianceDossierGenerator';
-import { generateEnterpriseSecurityWhitepaperPDF } from '../../utils/securityWhitepaperGenerator';
-import { generateMessengerSafetyCertificatePDF } from '../../utils/messengerSafetyCertificateGenerator';
-import { generateB2BContractCertificatePDF } from '../../utils/pdfGenerator';
 
 export interface SecretaryLicensesViewProps {
+  loading?: boolean;
   schoolId: string;
   schoolNumericId?: number | string;
   schoolName?: string;
@@ -171,6 +166,7 @@ export interface SecretaryLicensesViewProps {
 
 export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
   const {
+    loading = false,
     schoolId,
     schoolNumericId,
     schoolName,
@@ -181,21 +177,21 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
     currentSchoolProfile,
     setCurrentSchoolProfile,
     supabase,
-    allTeachers,
-    employees,
-    students,
-    activeStudentsCount_global,
-    activeGroovelabStudentsCount_global,
-    passiveStudentsCount_global,
-    billableTeachersCount,
-    teacherServiceFeeTotal_global,
-    moduleCost_global,
-    storageAddonFee_global,
-    baseB2B_global,
-    masterRates,
-    effectiveSchoolRates,
-    masterPricing,
-    isSammelzahler,
+    allTeachers = [],
+    employees = [],
+    students = [],
+    activeStudentsCount_global = 0,
+    activeGroovelabStudentsCount_global = 0,
+    passiveStudentsCount_global = 0,
+    billableTeachersCount = 0,
+    teacherServiceFeeTotal_global = 0,
+    moduleCost_global = 0,
+    storageAddonFee_global = 0,
+    baseB2B_global = 0,
+    masterRates: rawMasterRates,
+    effectiveSchoolRates: rawEffectiveSchoolRates,
+    masterPricing: rawMasterPricing,
+    isSammelzahler = false,
     fetchDashboardData,
     fetchTariffBookings,
     hasCampusSub,
@@ -318,6 +314,22 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
     isSecretaryReadOnly = false,
     onOpenDunningPayModal
   } = props;
+
+  const effectiveSchoolRates = {
+    priceCampus: Number(rawEffectiveSchoolRates?.priceCampus ?? rawMasterRates?.campus ?? 14.9),
+    priceGroovelab: Number(rawEffectiveSchoolRates?.priceGroovelab ?? rawMasterRates?.groovelab ?? 9.9),
+    priceKombi: Number(rawEffectiveSchoolRates?.priceKombi ?? rawMasterRates?.kombi ?? 19.9),
+    priceTeacher: Number(rawEffectiveSchoolRates?.priceTeacher ?? rawMasterRates?.teacher ?? 0.49),
+    priceStudent: Number(rawEffectiveSchoolRates?.priceStudent ?? rawMasterRates?.student ?? 0.49)
+  };
+  const masterRates = {
+    campus: Number(rawMasterRates?.campus ?? 14.9),
+    groovelab: Number(rawMasterRates?.groovelab ?? 9.9),
+    kombi: Number(rawMasterRates?.kombi ?? 19.9),
+    teacher: Number(rawMasterRates?.teacher ?? 0.49),
+    student: Number(rawMasterRates?.student ?? 0.49)
+  };
+  const masterPricing = rawMasterPricing || { billingMonthsPerYear: 12 };
 
   // Local state for active tab inside booked licenses view
   const [activeBillingSubTab, setActiveBillingSubTab] = useState<'overview' | 'matching' | 'history' | 'ledger' | 'compliance'>('overview');
@@ -2152,12 +2164,12 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                 <span style={{ fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>Gesamtrate:</span>
                                 <div style={{ textAlign: 'right' }}>
                                   <span style={{ fontSize: '1.4rem', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.03em' }}>
-                                    {(baseB2B_global).toFixed(2).replace('.', ',')} € / Mo.
+                                    {(Number(baseB2B_global) || 0).toFixed(2).replace('.', ',')} € / Mo.
                                   </span>
                                 </div>
                               </div>
                               <span style={{ fontSize: '0.64rem', color: '#64748b', textAlign: 'right', fontWeight: 500 }}>
-                                Umsatzsteuerbefreit gemäß § 19 UStG
+                                Kleinunternehmerregelung (0% MwSt)
                               </span>
 
                               <div style={{ background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '12px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.68rem', color: '#64748b', marginTop: '6px' }}>
@@ -2963,7 +2975,55 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                   {/* Right Column (40%): Apple Pay Styled Invoice Card */}
                                   <div style={{ position: 'sticky', top: '20px' }}>
                                     {(() => {
-                                      const totalMonthlySim = subscriptionBypass ? 0 : baseB2B_global;
+                                      // 🛡️ 1% Goldstandard Dual-Shield Hydration Architecture:
+                                      // Prevent transient stale-flash of unhydrated 0-student rates (~23 €) during initial mount.
+                                      const snapshotKey = `campus_b2b_snapshot_${schoolId}`;
+                                      const cachedSnapshot = (() => {
+                                        if (typeof window === 'undefined' || !schoolId) return null;
+                                        try {
+                                          const raw = localStorage.getItem(snapshotKey);
+                                          return raw ? JSON.parse(raw) : null;
+                                        } catch { return null; }
+                                      })();
+
+                                      const isInitialUnsettled = (loading || students.length === 0);
+                                      const totalMonthlySim = subscriptionBypass ? 0 : (Number(baseB2B_global) || 0);
+
+                                      // Effective metrics for display
+                                      const effectiveTeachersCount = (isInitialUnsettled && cachedSnapshot)
+                                        ? (cachedSnapshot.billableTeachersCount ?? billableTeachersCount)
+                                        : billableTeachersCount;
+                                      const effectivePassiveCount = (isInitialUnsettled && cachedSnapshot)
+                                        ? (cachedSnapshot.passiveStudentsCount ?? passiveStudentsCount_global)
+                                        : passiveStudentsCount_global;
+                                      const effectiveActiveCampusCount = (isInitialUnsettled && cachedSnapshot)
+                                        ? (cachedSnapshot.activeStudentsCount ?? activeStudentsCount_global)
+                                        : activeStudentsCount_global;
+                                      const effectiveActiveGroovelabCount = (isInitialUnsettled && cachedSnapshot)
+                                        ? (cachedSnapshot.activeGroovelabStudentsCount ?? activeGroovelabStudentsCount_global)
+                                        : activeGroovelabStudentsCount_global;
+
+                                      const displayTotalRate = subscriptionBypass
+                                        ? 0
+                                        : (isInitialUnsettled && cachedSnapshot)
+                                          ? (Number(cachedSnapshot.total) || totalMonthlySim)
+                                          : totalMonthlySim;
+
+                                      // Persist authoritative settled snapshot once data settles
+                                      if (!loading && students.length > 0 && typeof window !== 'undefined' && schoolId) {
+                                        try {
+                                          const freshSnap = JSON.stringify({
+                                            total: totalMonthlySim,
+                                            billableTeachersCount,
+                                            passiveStudentsCount: passiveStudentsCount_global,
+                                            activeStudentsCount: activeStudentsCount_global,
+                                            activeGroovelabStudentsCount: activeGroovelabStudentsCount_global
+                                          });
+                                          if (localStorage.getItem(snapshotKey) !== freshSnap) {
+                                            localStorage.setItem(snapshotKey, freshSnap);
+                                          }
+                                        } catch {}
+                                      }
                                       
                                       return (
                                         <div style={{
@@ -3023,32 +3083,41 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                               </>
                                             )}
                                             <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                              {!subscriptionBypass && billableTeachersCount > 0 && (
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                                  <span>Service- &amp; Administrationspauschale ({billableTeachersCount} Lehrkräfte × {effectiveSchoolRates.priceTeacher.toFixed(2).replace('.', ',')} €):</span>
-                                                  <strong>{(billableTeachersCount * effectiveSchoolRates.priceTeacher).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                              {isInitialUnsettled && !cachedSnapshot ? (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '4px 0' }}>
+                                                  <div className="animate-pulse" style={{ height: '14px', width: '85%', background: '#f1f5f9', borderRadius: '4px' }} />
+                                                  <div className="animate-pulse" style={{ height: '14px', width: '70%', background: '#f1f5f9', borderRadius: '4px' }} />
                                                 </div>
-                                              )}
+                                              ) : (
+                                                <>
+                                                  {!subscriptionBypass && effectiveTeachersCount > 0 && (
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                                                      <span>Service- &amp; Administrationspauschale ({effectiveTeachersCount} Lehrkräfte × {effectiveSchoolRates.priceTeacher.toFixed(2).replace('.', ',')} €):</span>
+                                                      <strong>{(effectiveTeachersCount * effectiveSchoolRates.priceTeacher).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                                    </div>
+                                                  )}
 
-                                              {passiveStudentsCount_global > 0 && (
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                                  <span>Basis-Bereitstellung ({passiveStudentsCount_global} Schüler × 0,09 €):</span>
-                                                  <strong>{subscriptionBypass ? '0,00 € (Freigestellt)' : `${(passiveStudentsCount_global * 0.09).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
-                                                </div>
-                                              )}
+                                                  {effectivePassiveCount > 0 && (
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                                                      <span>Basis-Bereitstellung ({effectivePassiveCount} Schüler × 0,09 €):</span>
+                                                      <strong>{subscriptionBypass ? '0,00 € (Freigestellt)' : `${(effectivePassiveCount * 0.09).toFixed(2).replace('.', ',')} € / Mo.`}</strong>
+                                                    </div>
+                                                  )}
 
-                                              {!subscriptionBypass && activeStudentsCount_global > 0 && isSammelzahler && (
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                                  <span>Cloud- & Modul-Bereitstellung: Campus ({activeStudentsCount_global} Schüler × {effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} €):</span>
-                                                  <strong>{(activeStudentsCount_global * effectiveSchoolRates.priceStudent).toFixed(2).replace('.', ',')} € / Mo.</strong>
-                                                </div>
-                                              )}
+                                                  {!subscriptionBypass && effectiveActiveCampusCount > 0 && isSammelzahler && (
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                                                      <span>Cloud- & Modul-Bereitstellung: Campus ({effectiveActiveCampusCount} Schüler × {effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} €):</span>
+                                                      <strong>{(effectiveActiveCampusCount * effectiveSchoolRates.priceStudent).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                                    </div>
+                                                  )}
 
-                                              {!subscriptionBypass && activeGroovelabStudentsCount_global > 0 && (
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
-                                                  <span>Cloud- & Modul-Bereitstellung: GrooveLab ({activeGroovelabStudentsCount_global} Schüler × {effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} €):</span>
-                                                  <strong>{(activeGroovelabStudentsCount_global * effectiveSchoolRates.priceStudent).toFixed(2).replace('.', ',')} € / Mo.</strong>
-                                                </div>
+                                                  {!subscriptionBypass && effectiveActiveGroovelabCount > 0 && (
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                                                      <span>Cloud- & Modul-Bereitstellung: GrooveLab ({effectiveActiveGroovelabCount} Schüler × {effectiveSchoolRates.priceStudent.toFixed(2).replace('.', ',')} €):</span>
+                                                      <strong>{(effectiveActiveGroovelabCount * effectiveSchoolRates.priceStudent).toFixed(2).replace('.', ',')} € / Mo.</strong>
+                                                    </div>
+                                                  )}
+                                                </>
                                               )}
 
                                               {/* Tresor Storage Add-on Line Item & Mini Progress Bar - Always shown for full transparency */}
@@ -3115,10 +3184,19 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                           <div style={{ borderTop: '1.5px solid #e2e8f0', paddingTop: '16px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                                             <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a' }}>Gesamtrate:</span>
                                             <div style={{ textAlign: 'right' }}>
-                                              <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.03em' }}>
-                                                {totalMonthlySim.toFixed(2).replace('.', ',')} € / Mo.
-                                              </div>
-                                              <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Umsatzsteuerbefreit gemäß § 19 UStG</div>
+                                              {isInitialUnsettled && !cachedSnapshot ? (
+                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                                                  <div className="animate-pulse" style={{ height: '28px', width: '130px', background: 'linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%)', borderRadius: '8px' }} />
+                                                  <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Wird berechnet...</div>
+                                                </div>
+                                              ) : (
+                                                <>
+                                                  <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.03em' }}>
+                                                    {(Number(displayTotalRate) || 0).toFixed(2).replace('.', ',')} € / Mo.
+                                                  </div>
+                                                  <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Kleinunternehmerregelung (0% MwSt)</div>
+                                                </>
+                                              )}
                                             </div>
                                           </div>
 
@@ -4331,7 +4409,8 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
 
                                         <button
                                           type="button"
-                                          onClick={() => {
+                                          onClick={async () => {
+                                            const { generateTariffReceiptPDF } = await import('../../utils/tariffReceiptPdfGenerator');
                                             generateTariffReceiptPDF({
                                               receiptNumber: b.receipt_number,
                                               schoolName: currentSchoolProfile?.name || schoolName || 'Musikschule',
@@ -4466,7 +4545,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                       B2B-SaaS-Vertragszertifikat
                                     </h4>
                                     <span style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 800 }}>
-                                      Mietvertrag § 535 BGB &amp; AVV Art. 28 DSGVO
+                                      Software-Nutzungsvertrag &amp; AVV
                                     </span>
                                   </div>
                                 </div>
@@ -4476,7 +4555,8 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                               </div>
                               <button
                                 type="button"
-                                onClick={() => {
+                                onClick={async () => {
+                                  const { generateB2BContractCertificatePDF } = await import('../../utils/pdfGenerator');
                                   generateB2BContractCertificatePDF({
                                     schoolName: currentSchoolProfile?.name || schoolName || 'Musikschule',
                                     schoolAddress: `${currentSchoolProfile?.street || schoolStreet || ''} ${currentSchoolProfile?.house_number || schoolHouseNumber || ''}`.trim(),
@@ -4552,10 +4632,11 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                               <div style={{ display: 'flex', gap: '8px' }}>
                                 <button
                                   type="button"
-                                  onClick={() => {
+                                  onClick={async () => {
                                     if (setShowAvvModal) {
                                       setShowAvvModal(true);
                                     } else {
+                                      const { generateEnterpriseSecurityWhitepaperPDF } = await import('../../utils/securityWhitepaperGenerator');
                                       generateEnterpriseSecurityWhitepaperPDF();
                                     }
                                   }}
@@ -4582,7 +4663,8 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => {
+                                  onClick={async () => {
+                                    const { generateEnterpriseSecurityWhitepaperPDF } = await import('../../utils/securityWhitepaperGenerator');
                                     generateEnterpriseSecurityWhitepaperPDF();
                                   }}
                                   title="Sicherheits-Whitepaper herunterladen"
@@ -4609,22 +4691,21 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                             {/* Card 2: Personalrats- & Mitbestimmungs-Attest */}
                             <div style={{
                               background: '#ffffff',
-                              borderRadius: '20px',
                               border: '1.5px solid #e2e8f0',
+                              borderRadius: '20px',
                               padding: '22px',
                               display: 'flex',
                               flexDirection: 'column',
                               justifyContent: 'space-between',
-                              boxShadow: '0 2px 8px -2px rgba(0,0,0,0.03)'
+                              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.03)'
                             }}>
                               <div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
                                   <div style={{
-                                    width: '38px',
-                                    height: '38px',
-                                    borderRadius: '10px',
+                                    width: '42px',
+                                    height: '42px',
+                                    borderRadius: '12px',
                                     background: '#eff6ff',
-                                    border: '1px solid #bfdbfe',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
@@ -4634,10 +4715,10 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                   </div>
                                   <div>
                                     <h4 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 800, color: '#0f172a' }}>
-                                      Personalrats- & Mitbestimmungs-Attest
+                                      Personalrats- &amp; Mitbestimmungs-Attest
                                     </h4>
                                     <span style={{ fontSize: '0.72rem', color: '#1e40af', fontWeight: 700 }}>
-                                      § 87 Abs. 1 Nr. 6 BetrVG / LPVG
+                                      Personalrats-Zertifikat (Keine Verhaltenskontrolle)
                                     </span>
                                   </div>
                                 </div>
@@ -4647,7 +4728,8 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                               </div>
                               <button
                                 type="button"
-                                onClick={() => {
+                                onClick={async () => {
+                                  const { generateStaffCouncilDeclarationPDF } = await import('../../utils/staffCouncilDeclarationGenerator');
                                   generateStaffCouncilDeclarationPDF({
                                     schoolName: currentSchoolProfile?.name || schoolName || 'Musikschule'
                                   });
@@ -4705,7 +4787,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                       DSB / DPO Compliance Dossier
                                     </h4>
                                     <span style={{ fontSize: '0.72rem', color: '#92400e', fontWeight: 700 }}>
-                                      VVT Art. 30 & DSFA Art. 35 DSGVO
+                                      Verfahrensverzeichnis &amp; Datenschutz-Folgenabschätzung
                                     </span>
                                   </div>
                                 </div>
@@ -4715,7 +4797,8 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                               </div>
                               <button
                                 type="button"
-                                onClick={() => {
+                                onClick={async () => {
+                                  const { generateDpoComplianceDossierPDF } = await import('../../utils/dpoComplianceDossierGenerator');
                                   generateDpoComplianceDossierPDF({
                                     schoolName: currentSchoolProfile?.name || schoolName || 'Musikschule'
                                   });
@@ -4773,7 +4856,7 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                                       Kinderschutz- & Safe-Space Zertifikat
                                     </h4>
                                     <span style={{ fontSize: '0.72rem', color: '#9d174d', fontWeight: 700 }}>
-                                      § 8a SGB VIII / BKiSchG
+                                      Kinderschutz-Charta &amp; Vier-Augen-Prinzip
                                     </span>
                                   </div>
                                 </div>
@@ -4783,7 +4866,8 @@ export function SecretaryLicensesView(props: SecretaryLicensesViewProps) {
                               </div>
                               <button
                                 type="button"
-                                onClick={() => {
+                                onClick={async () => {
+                                  const { generateMessengerSafetyCertificatePDF } = await import('../../utils/messengerSafetyCertificateGenerator');
                                   generateMessengerSafetyCertificatePDF({
                                     schoolName: currentSchoolProfile?.name || schoolName || 'Musikschule'
                                   });

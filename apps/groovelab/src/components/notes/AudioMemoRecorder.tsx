@@ -206,7 +206,7 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
 
   const handleTogglePlay = () => {
     if (isGhostMode) {
-      alert('🔒 Audio-Wiedergabe im Support-Modus aus Vertraulichkeitsgründen (§ 201 StGB) gesperrt.');
+      alert('🔒 Audio-Wiedergabe im Support-Modus aus Vertraulichkeitsgründen gesperrt.');
       return;
     }
     if (!audioPlayerRef.current) return;
@@ -366,10 +366,10 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
             </div>
             <div style={{ fontSize: '0.70rem', color: isRecording ? '#dc2626' : '#64748b', fontWeight: 600 }}>
               {isRecording 
-                ? `${formatTime(recordSeconds)} / 2:00 • Nur im gegenseitigen Einvernehmen (§ 201 StGB)` 
+                ? `${formatTime(recordSeconds)} / 2:00 • Nur im gegenseitigen Einvernehmen` 
                 : audioUrl 
                   ? `Dauer: ${formatTime(recordSeconds)} (Unterrichts-Memo)` 
-                  : 'Aufnahme nur im Einvernehmen aller Anwesenden (§ 201 StGB)'}
+                  : 'Aufnahme nur im Einvernehmen aller Anwesenden'}
             </div>
             {isRecording && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginTop: '6px' }} title="Mikrofon-Pegel (Hardware VU-Meter)" role="meter" aria-label="Mikrofon-Pegel" aria-valuenow={Math.round(audioLevel * 100)} aria-valuemin={0} aria-valuemax={100}>
@@ -458,7 +458,7 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
               <button
                 onClick={handleTogglePlay}
                 disabled={isGhostMode}
-                title={isGhostMode ? "Audio-Wiedergabe im Support-Modus aus Vertraulichkeitsgründen (§ 201 StGB) gesperrt" : undefined}
+                title={isGhostMode ? "Audio-Wiedergabe im Support-Modus aus Vertraulichkeitsgründen gesperrt" : undefined}
                 style={{
                   background: isGhostMode ? '#f8fafc' : '#f1f5f9',
                   color: isGhostMode ? '#94a3b8' : '#334155',
@@ -474,7 +474,7 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
                 }}
               >
                 {isGhostMode ? <Lock size={14} /> : isPlaying ? <Pause size={14} /> : <Play size={14} />}
-                <span>{isGhostMode ? '🔒 Gesperrt (§ 201 StGB)' : isPlaying ? 'Pause' : 'Anhören'}</span>
+                <span>{isGhostMode ? '🔒 Gesperrt (Vertraulichkeit)' : isPlaying ? 'Pause' : 'Anhören'}</span>
               </button>
 
               <button

@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { 
   BookOpen, Award, Star, Clock, Music, Users, Calendar, 
-  Smartphone, ShieldCheck, Flame, RefreshCw, QrCode, Copy, Check, Info, Lock, Ticket
+  Smartphone, ShieldCheck, Flame, RefreshCw, QrCode, Copy, Check, Info, Lock, Ticket, Sparkles
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { StudentModalHeader } from './shared/StudentModalHeader';
 import { StudentScheduleCard, getFormattedScheduleDayTime } from './shared/StudentScheduleCard';
 import { StudentAccessSection } from './shared/StudentAccessSection';
 import { StudentConsentProtocol } from './shared/StudentConsentProtocol';
-import { MeisterwerkDocumentationModal } from '../../MeisterwerkDocumentationModal';
+const MeisterwerkDocumentationModal = React.lazy(() => import('../../MeisterwerkDocumentationModal'));
+import { LiquidGlassSkeleton } from '../../ui/LiquidGlassSkeleton';
 import { getInstrumentAvatarUrl, getDefaultMusicianAvatarUrl, resolveCampusStudentAvatar } from '../../StudioAvatar';
 import { SkillRadarPentagon } from '../../common/SkillRadarPentagon';
 import { SKILL_TAGS } from '../meisterwerk.types';
@@ -1228,13 +1229,15 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                   gap: '14px'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                   <div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      Pädagogisches Campus-UI-Level
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
+                        Altersstufe (Campus)
+                      </span>
                       <span style={{
-                        background: '#f1f5f9',
-                        color: '#64748b',
+                        background: '#dcfce7',
+                        color: '#15803d',
                         padding: '2px 8px',
                         borderRadius: '100px',
                         fontSize: '0.68rem',
@@ -1243,11 +1246,11 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                         alignItems: 'center',
                         gap: '4px'
                       }}>
-                        <Lock size={11} /> Nur Lesezugriff
+                        <Sparkles size={11} /> Pädagogisch anpassbar
                       </span>
                     </div>
                     <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>
-                      Didaktische Darstellung nach Altersstufe
+                      Didaktische Darstellung nach Altersstufe (1-Klick Anpassung)
                     </div>
                   </div>
                 </div>
@@ -1268,21 +1271,61 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                   ].map((lvl) => {
                     const isActive = studentUiLevel === lvl.key;
                     return (
-                      <div
+                      <button
                         key={lvl.key}
+                        type="button"
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={isActive}
+                        aria-label={`Didaktische Altersstufe auf ${lvl.label} einstellen`}
+                        onClick={() => {
+                          const newLvl = lvl.key as 'junior' | 'teen' | 'pro';
+                          setStudentUiLevel(newLvl);
+                          if (student.id) {
+                            localStorage.setItem(`campus_student_ui_level_${student.id}`, newLvl);
+                            (async () => {
+                              try {
+                                await supabase.from('users').update({ campus_ui_level: newLvl }).eq('id', student.id);
+                                try {
+                                  await supabase.from('students').update({ campus_ui_level: newLvl }).eq('id', student.id);
+                                } catch {}
+                              } catch (e) {
+                                console.warn('Could not update student campus_ui_level:', e);
+                              }
+                            })();
+                            window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: { studentId: student.id, uiLevel: newLvl } }));
+                            window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: newLvl }));
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            const newLvl = lvl.key as 'junior' | 'teen' | 'pro';
+                            setStudentUiLevel(newLvl);
+                            if (student.id) {
+                              localStorage.setItem(`campus_student_ui_level_${student.id}`, newLvl);
+                              window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: { studentId: student.id, uiLevel: newLvl } }));
+                              window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: newLvl }));
+                            }
+                          }
+                        }}
                         style={{
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
                           justifyContent: 'center',
                           padding: '10px 8px',
+                          minHeight: '44px',
                           borderRadius: '12px',
-                          background: isActive ? TEACHER_GREEN : 'transparent',
+                          border: 'none',
+                          background: isActive ? TEACHER_GREEN : '#ffffff',
                           color: isActive ? '#ffffff' : '#64748b',
                           fontWeight: isActive ? 900 : 700,
+                          cursor: 'pointer',
                           transition: 'all 0.2s ease',
-                          boxShadow: isActive ? '0 4px 12px rgba(52, 168, 83, 0.25)' : 'none',
-                          opacity: isActive ? 1 : 0.65
+                          boxShadow: isActive ? '0 4px 12px rgba(52, 168, 83, 0.25)' : '0 1px 3px rgba(0,0,0,0.04)',
+                          opacity: isActive ? 1 : 0.85,
+                          touchAction: 'manipulation'
                         }}
                       >
                         <span style={{ fontSize: '1.2rem', marginBottom: '2px' }}>{lvl.icon}</span>
@@ -1300,12 +1343,11 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                             Aktiv
                           </span>
                         )}
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
 
-                {/* Legal Note: Elterliches Sorgerecht (§ 1626 BGB / Art. 8 DSGVO) */}
                 <div style={{
                   fontSize: '0.7rem',
                   color: '#475569',
@@ -1318,9 +1360,9 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                   gap: '8px',
                   alignItems: 'flex-start'
                 }}>
-                  <Lock size={15} color="#64748b" style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <Sparkles size={15} color="#16a34a" style={{ flexShrink: 0, marginTop: '2px' }} />
                   <div>
-                    <strong style={{ color: '#0f172a' }}>Erziehungsberechtigten-Schutz (§ 1626 BGB / Art. 8 DSGVO):</strong> Das didaktische UI-Level wird ausschließlich im Elternbereich der Schulfamilie verwaltet. Die Lehrkraft besitzt hierfür bewusst reines Leserecht.
+                    <strong style={{ color: '#0f172a' }}>Pädagogische Didaktik:</strong> Die Lehrkraft und Schulleitung können das didaktische UI-Level (Junior, Teen, Pro) direkt anpassen. Änderungen synchronisieren sofort live mit der Schüler-App.
                   </div>
                 </div>
               </section>
@@ -1407,7 +1449,7 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
                   </span>
                 </div>
                 <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '2px' }}>
-                  Wird beim Onboarding durch die Erziehungsberechtigten festgelegt (§ 1626 BGB).
+                  Wird beim Onboarding durch die Erziehungsberechtigten festgelegt.
                 </div>
               </section>
 
@@ -1601,17 +1643,19 @@ export const TeacherStudentDetailModal: React.FC<TeacherStudentDetailModalProps>
 
       {/* Meisterwerk Documentation / Hausaufgabenheft Modal Fallback */}
       {showTageskompassModal && (
-        <MeisterwerkDocumentationModal
-          student={student}
-          teacherId={currentTeacherId || schedulesList?.[0]?.teacher_id || (student as any)?.teacher_id}
-          schoolId={student.school_id || (student as any)?.schoolId}
-          schoolName={(student as any)?.school_name || (student.schools as any)?.name}
-          initialLehrwerke={globalLehrwerke}
-          teacherName={formatTeacherFullName(schedulesList?.[0]?.teacher || (student as any)?.teacher_name || (student as any)?.teacher)}
-          uiLevel={studentUiLevel || (student as any)?.campus_ui_level || undefined}
-          parentPermissions={(student as any)?.parent_permissions}
-          onClose={() => setShowTageskompassModal(false)}
-        />
+        <React.Suspense fallback={<LiquidGlassSkeleton type="modal" />}>
+          <MeisterwerkDocumentationModal
+            student={student}
+            teacherId={currentTeacherId || schedulesList?.[0]?.teacher_id || (student as any)?.teacher_id}
+            schoolId={student.school_id || (student as any)?.schoolId}
+            schoolName={(student as any)?.school_name || (student.schools as any)?.name}
+            initialLehrwerke={globalLehrwerke}
+            teacherName={formatTeacherFullName(schedulesList?.[0]?.teacher || (student as any)?.teacher_name || (student as any)?.teacher)}
+            uiLevel={studentUiLevel || (student as any)?.campus_ui_level || undefined}
+            parentPermissions={(student as any)?.parent_permissions}
+            onClose={() => setShowTageskompassModal(false)}
+          />
+        </React.Suspense>
       )}
 
       {/* 🎟️ Nachhol-Kontingent Modal */}

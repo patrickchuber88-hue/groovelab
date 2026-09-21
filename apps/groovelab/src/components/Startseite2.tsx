@@ -2475,7 +2475,7 @@ export function Startseite2({ onLogin, onRegister }: Startseite2Props) {
                           { title: '6. Kernel-erzwungene PostgreSQL FORCE Row-Level Security (RLS)', desc: 'Datenbankseitig erzwungene Mandantentrennung auf allen relationalen Tabellen mit transaktional isoliertem Mandantenkontext (is_local = true).' },
                           { title: '7. Anti-CSRF Origin Guard & SRI SHA-384', desc: 'Fail-Closed Sec-Fetch-Site Filtering, Host-Header-Schutz und kryptografische Subresource Integrity für alle Frontend-Dateien.' },
                           { title: '8. Brute-Force & Credential-Stuffing Schutz', desc: 'Progressive Sitzungssperren und automatisiertes Throttling nach fehlerhaften Authentifizierungsversuchen.' },
-                          { title: '9. Hardware-Mikrofonschutz & Zero-Tracking', desc: 'Sofortige Freigabe des Mikrofonzugriffs auf Betriebssystemebene beim Beenden von Modulen (§ 201 StGB). 0% Fremd-Tracker, 100% lokale Schriften.' },
+                          { title: '9. Hardware-Mikrofonschutz & Zero-Tracking', desc: 'Sofortige Freigabe des Mikrofonzugriffs auf Betriebssystemebene beim Beenden von Modulen. 0% Fremd-Tracker, 100% lokale Schriften.' },
                           { title: '10. Zero-Trust Session-Leasing & Remote-Logout', desc: 'Sitzungen auf gemeinsam genutzten Schulgeräten können von der Schulleitung mit 1 Klick remote beendet werden; kein Token-Verbleib im Browser.' }
                         ]
                       },

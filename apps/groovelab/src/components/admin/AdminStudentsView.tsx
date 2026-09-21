@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  Calendar, Eye, EyeOff, FileText, Pencil, QrCode, School, Search,
+  Calendar, Eye, EyeOff, FileText, Pencil, QrCode, RotateCcw, School, Search,
   Trash2, Users
 } from "lucide-react";
 import { maskLastName } from "../../utils/nameHelper";
@@ -16,8 +16,8 @@ export interface AdminStudentsViewProps {
   setStudents: React.Dispatch<React.SetStateAction<any[]>>;
   studentSearch: string;
   setStudentSearch: (s: string) => void;
-  listType: "active" | "archive";
-  setListType: (t: "active" | "archive") => void;
+  listType: "active" | "archive" | "trash";
+  setListType: (t: "active" | "archive" | "trash") => void;
   instrumentFilter: string;
   setInstrumentFilter: (f: string) => void;
   showAddStudent: boolean;
@@ -52,6 +52,7 @@ export interface AdminStudentsViewProps {
   handleAddStudent: (e: React.FormEvent) => Promise<void>;
   handleBulkAddSubmit: (e: React.FormEvent) => Promise<void>;
   handleDeleteStudent: (id: string) => void;
+  handleRestoreStudent?: (id: string) => Promise<void> | void;
   handleUpdateStudent: (e: React.FormEvent) => Promise<void>;
   parseBulkInput: (text: string, currentInstrument: string) => void;
   resolveUserAvatar: (u: any, activePlatform?: string) => string;
@@ -102,6 +103,7 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
   handleAddStudent,
   handleBulkAddSubmit,
   handleDeleteStudent,
+  handleRestoreStudent,
   handleUpdateStudent,
   parseBulkInput,
   resolveUserAvatar
@@ -110,7 +112,8 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
     const isSimMobile = typeof document !== 'undefined' && Boolean(document.querySelector('.sim-viewport-mobile, .sim-viewport-portrait, .sim-viewport-tablet, .sim-viewport-landscape, .sim-viewport-iphone14, [class*="sim-viewport-mobile"], [class*="sim-viewport-tablet"]'));
     const isMobileLayout = windowWidth < 768 || isSimMobile;
 
-    const activeStudentsCount = students.filter(s => !(s.contract_ends_at && new Date(s.contract_ends_at).getTime() < Date.now())).length;
+    const activeStudentsCount = students.filter(s => !s.deleted_at && !(s.contract_ends_at && new Date(s.contract_ends_at).getTime() < Date.now())).length;
+    const trashedStudentsCount = students.filter(s => Boolean(s.deleted_at)).length;
 
     return (
       <div style={{ marginTop: '0px' }}>
@@ -342,6 +345,53 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
             </form>
           )}
 
+          {/* List Type Tabs: Aktive Schüler vs. Papierkorb (30 Tage) */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => setListType('active')}
+              style={{
+                padding: '8px 14px',
+                borderRadius: '12px',
+                border: listType === 'active' ? `2px solid ${brandColor}` : '1.5px solid #e2e8f0',
+                background: listType === 'active' ? `${brandColor}15` : '#ffffff',
+                color: listType === 'active' ? brandColor : '#64748b',
+                fontWeight: 800,
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Users size={14} />
+              <span>Aktive Schüler ({activeStudentsCount})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setListType('trash')}
+              style={{
+                padding: '8px 14px',
+                borderRadius: '12px',
+                border: listType === 'trash' ? '2px solid #ef4444' : '1.5px solid #e2e8f0',
+                background: listType === 'trash' ? '#fee2e2' : '#ffffff',
+                color: listType === 'trash' ? '#dc2626' : '#64748b',
+                fontWeight: 800,
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Trash2 size={14} />
+              <span>Papierkorb (30 Tage) ({trashedStudentsCount})</span>
+            </button>
+          </div>
+
           <div style={{ position: 'relative', marginBottom: '4px', width: '100%' }}>
             <Search size={18} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
             <input 
@@ -357,8 +407,14 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
           <div style={{ display: 'grid', gridTemplateColumns: isMobileLayout ? '1fr' : 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px', width: '100%', paddingBottom: isMobileLayout ? '120px' : '0px' }}>
             {(() => {
               const filtered = students.filter(s => {
-                const isArchived = s.contract_ends_at && new Date(s.contract_ends_at).getTime() < Date.now();
-                if (isArchived) return false;
+                const isDeleted = Boolean(s.deleted_at);
+                if (listType === 'trash') {
+                  if (!isDeleted) return false;
+                } else {
+                  if (isDeleted) return false;
+                  const isArchived = s.contract_ends_at && new Date(s.contract_ends_at).getTime() < Date.now();
+                  if (isArchived) return false;
+                }
 
                 const inst = s.instrument?.toLowerCase() || 'gitarre';
                 let normInst = s.instrument || 'Gitarre';
@@ -540,28 +596,60 @@ export const AdminStudentsView: React.FC<AdminStudentsViewProps> = ({
                         >
                           <Pencil size={18} />
                         </button>
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); handleDeleteStudent(s.id); }} 
-                          aria-label={`Schüler ${s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`} löschen`}
-                          style={{ 
-                            background: activePlatform === 'groovelab' ? '#fefce8' : '#fff1f2', 
-                            border: activePlatform === 'groovelab' ? '1px solid #fef08a' : '1px solid #fecaca', 
-                            padding: "10px", 
-                            minHeight: '44px',
-                            borderRadius: "12px", 
-                            cursor: "pointer", 
-                            color: activePlatform === 'groovelab' ? '#eab308' : '#ef4444', 
-                            transition: 'all 0.2s',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: '100%'
-                          }} 
-                          className="hover-scale-mini"
-                          title="Löschen"
-                        >
-                          <Trash2 size={18} />
-                        </button>
+                        {listType === 'trash' ? (
+                          <button 
+                            onClick={(e) => { 
+                              e.stopPropagation(); 
+                              if (handleRestoreStudent) handleRestoreStudent(s.id); 
+                            }} 
+                            aria-label={`Schüler ${s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`} wiederherstellen`}
+                            style={{ 
+                              background: '#f0fdf4', 
+                              border: '1.5px solid #86efac', 
+                              padding: "10px", 
+                              minHeight: '44px',
+                              borderRadius: "12px", 
+                              cursor: "pointer", 
+                              color: '#15803d', 
+                              fontWeight: 800,
+                              fontSize: '0.80rem',
+                              transition: 'all 0.2s',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                              width: '100%'
+                            }} 
+                            className="hover-scale-mini"
+                            title="Schüler wiederherstellen"
+                          >
+                            <RotateCcw size={16} />
+                            <span>Wiederherstellen</span>
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleDeleteStudent(s.id); }} 
+                            aria-label={`Schüler ${s.isGroup ? s.first_name : `${s.first_name} ${maskLastName(s.last_name, showRealNames)}`} löschen`}
+                            style={{ 
+                              background: activePlatform === 'groovelab' ? '#fefce8' : '#fff1f2', 
+                              border: activePlatform === 'groovelab' ? '1px solid #fef08a' : '1px solid #fecaca', 
+                              padding: "10px", 
+                              minHeight: '44px',
+                              borderRadius: "12px", 
+                              cursor: "pointer", 
+                              color: activePlatform === 'groovelab' ? '#eab308' : '#ef4444', 
+                              transition: 'all 0.2s',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '100%'
+                            }} 
+                            className="hover-scale-mini"
+                            title="Löschen"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
                       </>
                     )}
                     {/* Hausaufgabenheft / Schüler-Protokoll Button (ONLY FOR CAMPUS MODULE) */}

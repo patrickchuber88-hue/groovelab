@@ -13,8 +13,17 @@ import { useStudentStreaks } from './student/hooks/useStudentStreaks';
 import { useStudentParentControls } from './student/hooks/useStudentParentControls';
 import { useStudentSchedule } from './student/hooks/useStudentSchedule';
 import { useStudentFeed } from './student/hooks/useStudentFeed';
+import { useStudentSongsData } from './student/hooks/useStudentSongsData';
 import { buildStudentBriefingProps } from './student/tabs/buildStudentBriefingProps';
 import { buildStudentSettingsProps } from './student/tabs/buildStudentSettingsProps';
+import { resolveJuniorMissionDetails, calculateJuniorMissionResult } from './student/utils/juniorMissionDetailsResolver';
+import { 
+  playRocketSputterSound, 
+  playOrbitLaunchSound, 
+  playCelestialVictoryChime, 
+  playHyperspaceWarpSound 
+} from './student/utils/juniorRocketAudio';
+import { toLocalYYYYMMDD, getSimulatedNow } from './student/studentDateUtils';
 import { 
   HomeworkBookErrorBoundary, 
   HomeworkBookLoadingFallback 
@@ -97,18 +106,38 @@ export function StudentAvatarDashboard({
     studentUser: profile.studentUser
   });
 
-  // Local song, mission and details states
-  const [assignedCampusSongs, setAssignedCampusSongs] = useState<any[]>([]);
-  const [lehrwerke, setLehrwerke] = useState<any[]>([]);
-  const [progressItems, setProgressItems] = useState<any[]>([]);
-  const [localProgress, setLocalProgress] = useState<any>({});
-  const [activeSongSkills, setActiveSongSkills] = useState<any[]>([]);
+  // 7. Mediathek, Songs & Lehrwerke Domain Hook
+  const songsData = useStudentSongsData({
+    studentId,
+    studentUser: profile.studentUser
+  });
+  const {
+    assignedCampusSongs,
+    lehrwerke,
+    progressItems,
+    localProgress,
+    activeSongSkills,
+    setActiveSongSkills,
+    isSongMastered,
+    progressLoading
+  } = songsData;
   const [selectedSongForDetail, setSelectedSongForDetail] = useState<any | null>(null);
   const [selectedLehrwerkForDetail, setSelectedLehrwerkForDetail] = useState<any | null>(null);
   const [selectedTopic, setSelectedTopic] = useState('');
-  const [homeworkRetryKey, setHomeworkRetryKey] = useState(0);
   const [homeworkBookTab, setHomeworkBookTab] = useState<'document' | 'logbook' | 'stickeralbum' | 'skillradar' | 'audiobiography'>('document');
   const [homeworkBookViewMode, setHomeworkBookViewMode] = useState<'document' | 'recordings' | 'loopstation' | 'practice'>('document');
+  const [homeworkRetryKey, setHomeworkRetryKey] = useState(0);
+
+  useEffect(() => {
+    const handleReset = () => {
+      setHomeworkBookTab('document');
+      setHomeworkBookViewMode('document');
+    };
+    window.addEventListener('campus_reset_homework_board', handleReset);
+    return () => window.removeEventListener('campus_reset_homework_board', handleReset);
+  }, []);
+  const [songSearch, setSongSearch] = useState('');
+  const [juniorMediathekFilter, setJuniorMediathekFilter] = useState<'all' | 'songs' | 'lehrwerke' | 'homework'>('all');
 
   // Junior sticker states
   const [showJuniorStickerModal, setShowJuniorStickerModal] = useState(false);
@@ -117,6 +146,149 @@ export function StudentAvatarDashboard({
   const [juniorAwardedStickerToCelebrate, setJuniorAwardedStickerToCelebrate] = useState<any | null>(null);
   const [showJuniorPreFlightModal, setShowJuniorPreFlightModal] = useState(false);
   const [juniorSelectedTrackIndex, setJuniorSelectedTrackIndex] = useState(0);
+
+  // 🚀 Junior Space Mission States (Kindgerechte Treibstoff-Physik & Raketen-Starts)
+  const [juniorMissionPhase, setJuniorMissionPhase] = useState<'idle' | 'zen' | 'celebrating'>('idle');
+  const [juniorLaunchStage, setJuniorLaunchStage] = useState<'launching' | 'summary'>('launching');
+  const [juniorMissionTier, setJuniorMissionTier] = useState<1 | 2 | 3>(2);
+  const [juniorCelebrationSummary, setJuniorCelebrationSummary] = useState<{
+    elapsedSecs: number;
+    targetMins: number;
+    bonusMins: number;
+    xpGained: number;
+    flightDurationMs?: number;
+    message: string;
+  } | null>(null);
+  const [isJuniorTabPaused, setIsJuniorTabPaused] = useState(false);
+  const [isJuniorMissionPaused, setIsJuniorMissionPaused] = useState(false);
+  const isJuniorMissionPausedRef = useRef(false);
+  const [showJuniorCheatSheet, setShowJuniorCheatSheet] = useState(false);
+  const [juniorMissionCountdown, setJuniorMissionCountdown] = useState<number | null>(null);
+  const [expandedMonths, setExpandedMonths] = useState<Record<string, boolean>>({});
+
+  // 🚀 Junior Space Mission: Auto-sync juniorMissionPhase mit practice.sessionActive
+  useEffect(() => {
+    if (profile.studentUiLevel === 'junior') {
+      if (practice.sessionActive && juniorMissionPhase === 'idle') {
+        setJuniorMissionPhase('zen');
+      } else if (!practice.sessionActive && juniorMissionPhase === 'zen') {
+        setJuniorMissionPhase('idle');
+      }
+    }
+  }, [profile.studentUiLevel, practice.sessionActive, juniorMissionPhase]);
+
+  const getJuniorMissionDetails = useCallback(() => {
+    return resolveJuniorMissionDetails({
+      localProgress,
+      lehrwerke,
+      progressItems,
+      activeSongSkills,
+      assignedCampusSongs,
+      studentId,
+      studentUser: profile.studentUser
+    });
+  }, [localProgress, lehrwerke, progressItems, activeSongSkills, assignedCampusSongs, studentId, profile.studentUser]);
+
+  const startJuniorMissionImmediately = useCallback(() => {
+    setIsJuniorMissionPaused(false);
+    isJuniorMissionPausedRef.current = false;
+    setShowJuniorCheatSheet(false);
+    practice.setSessionActive(true);
+    setJuniorMissionPhase('zen');
+  }, [practice]);
+
+  const handleFinishJuniorMission = useCallback(() => {
+    setIsJuniorMissionPaused(false);
+    isJuniorMissionPausedRef.current = false;
+    setShowJuniorCheatSheet(false);
+
+    const elapsedSecs = practice.secondsElapsed;
+    const streak = streaks.avatar?.streak_flame || 0;
+    const targetMins = streaks.getTargetMinutes(streak);
+    const missionInfo = getJuniorMissionDetails();
+
+    const simNow = getSimulatedNow();
+    const todayStr = toLocalYYYYMMDD(simNow);
+    const abortBonusKey = `cg_abort_bonus_claimed_${studentId}_${todayStr}`;
+    let alreadyClaimedAbortBonusToday = false;
+    try {
+      alreadyClaimedAbortBonusToday = localStorage.getItem(abortBonusKey) === 'true';
+    } catch (e) {}
+
+    const result = calculateJuniorMissionResult(
+      elapsedSecs,
+      targetMins,
+      missionInfo.shortTitle,
+      alreadyClaimedAbortBonusToday
+    );
+
+    if (result.shouldMarkAbortBonus) {
+      try {
+        localStorage.setItem(abortBonusKey, 'true');
+      } catch (e) {}
+    }
+
+    if (result.tier === 1) {
+      playRocketSputterSound();
+    } else if (result.tier === 2) {
+      playOrbitLaunchSound();
+      playCelestialVictoryChime();
+    } else {
+      playHyperspaceWarpSound();
+    }
+
+    setJuniorMissionTier(result.tier);
+    setJuniorMissionPhase('celebrating');
+    setJuniorLaunchStage('launching');
+    setJuniorCelebrationSummary({
+      elapsedSecs,
+      targetMins,
+      bonusMins: result.bonusMins,
+      xpGained: result.xpBonus,
+      flightDurationMs: result.flightDurationMs,
+      message: result.msg
+    });
+
+    setTimeout(() => {
+      setJuniorLaunchStage('summary');
+      if (result.tier >= 2) {
+        playCelestialVictoryChime();
+      }
+    }, result.flightDurationMs);
+
+    setTimeout(async () => {
+      await practice.finishPracticeSession(result.xpBonus);
+    }, result.flightDurationMs + 1200);
+  }, [streaks, practice, studentId, getJuniorMissionDetails]);
+
+  const handleEmergencyExitJuniorMission = useCallback(() => {
+    setIsJuniorMissionPaused(false);
+    isJuniorMissionPausedRef.current = false;
+    setShowJuniorCheatSheet(false);
+    setJuniorMissionPhase('idle');
+    setJuniorLaunchStage('launching');
+    setJuniorCelebrationSummary(null);
+    practice.setSessionActive(false);
+    practice.setSecondsElapsed(0);
+    try {
+      localStorage.removeItem('groovelab_active_practice_session');
+    } catch (e) {}
+  }, [practice]);
+
+  const handleCloseJuniorCelebration = useCallback(() => {
+    setJuniorMissionPhase('idle');
+    setJuniorLaunchStage('launching');
+    setJuniorCelebrationSummary(null);
+    practice.setSessionActive(false);
+    practice.setSecondsElapsed(0);
+    practice.setShowCelebration(false);
+    setIsJuniorMissionPaused(false);
+    isJuniorMissionPausedRef.current = false;
+    setShowJuniorCheatSheet(false);
+    try {
+      localStorage.removeItem('groovelab_active_practice_session');
+    } catch (e) {}
+  }, [practice]);
 
   // Miscellaneous modal states
   const [showRulesModal, setShowRulesModal] = useState(false);
@@ -138,23 +310,16 @@ export function StudentAvatarDashboard({
     profile.setShowLevelModal(false);
 
     try {
+      await parent.applyAndSaveParentControls({ uiLevel: newLevel });
       await supabase.rpc('save_parent_controls', {
         p_student_id: studentId,
-        p_settings: {
-          campus_ui_level: newLevel,
-          parent_pin: parent.inMemoryParentPinRef.current || undefined
-        }
+        p_settings: { campus_ui_level: newLevel }
       });
       profile.setUiLevelToast(`Alters-UI erfolgreich auf „${newLevel}“ eingestellt 🛡️`);
     } catch (e) {
-      console.warn('save_parent_controls RPC error:', e);
+      console.warn('save_parent_controls error:', e);
     }
   };
-
-  const isSongMastered = useCallback((songId: string) => {
-    const item = progressItems.find(p => String(p.song_id || p.id) === String(songId));
-    return item?.status === 'MASTERED' || item?.status === 'THEORY_DONE';
-  }, [progressItems]);
 
   const handleOpenHomeworkBookWithView = useCallback((
     targetTab: 'document' | 'logbook' | 'stickeralbum' | 'skillradar' | 'audiobiography' = 'document',
@@ -260,27 +425,27 @@ export function StudentAvatarDashboard({
           <StudentPracticeTab
             activeTab={profile.activeTab}
             studentUiLevel={profile.studentUiLevel}
-            juniorMissionPhase="zen"
-            preStartCountdown={null}
+            juniorMissionPhase={juniorMissionPhase}
+            preStartCountdown={juniorMissionCountdown}
             studentId={studentId}
             studentUser={profile.studentUser}
             avatar={streaks.avatar}
             effectivePracticeMinutes={Math.floor(practice.secondsElapsed / 60)}
             secondsElapsedRef={{ current: practice.secondsElapsed }}
-            isJuniorMissionPausedRef={{ current: false }}
-            startJuniorMissionImmediately={() => practice.setSessionActive(true)}
-            handleFinishJuniorMission={() => practice.finishPracticeSession()}
-            handleEmergencyExitJuniorMission={() => practice.setSessionActive(false)}
-            handleCloseJuniorCelebration={() => practice.setShowCelebration(false)}
+            isJuniorMissionPausedRef={isJuniorMissionPausedRef}
+            startJuniorMissionImmediately={startJuniorMissionImmediately}
+            handleFinishJuniorMission={handleFinishJuniorMission}
+            handleEmergencyExitJuniorMission={handleEmergencyExitJuniorMission}
+            handleCloseJuniorCelebration={handleCloseJuniorCelebration}
             handleStartPracticeSession={async () => { practice.setSessionActive(true); }}
             finishPracticeSession={practice.finishPracticeSession}
             logParentGuidedPractice={async () => {}}
             handleOpenHomeworkBookWithView={handleOpenHomeworkBookWithView}
-            playMilestoneSound={() => {}}
-            playStarChimeSound={() => {}}
+            playMilestoneSound={playOrbitLaunchSound}
+            playStarChimeSound={playCelestialVictoryChime}
             getDeterministicWeekMetrics={streaks.getDeterministicWeekMetrics}
             getGroupedLogs={() => []}
-            getJuniorMissionDetails={() => ({})}
+            getJuniorMissionDetails={getJuniorMissionDetails}
             getTargetMinutes={(s?: number) => streaks.getTargetMinutes(s ?? streaks.streakFlamesCount)}
             sessionActive={practice.sessionActive}
             isPhoneFlat={practice.isPhoneFlat}
@@ -300,38 +465,38 @@ export function StudentAvatarDashboard({
             setShowJuniorStickerModal={setShowJuniorStickerModal}
             practiceAnchor={null}
             setPracticeAnchor={() => {}}
-            juniorMissionTier={1}
-            juniorMissionCountdown={null}
-            isJuniorMissionPaused={false}
-            setIsJuniorMissionPaused={() => {}}
-            showJuniorCheatSheet={false}
-            setShowJuniorCheatSheet={() => {}}
+            juniorMissionTier={juniorMissionTier}
+            juniorMissionCountdown={juniorMissionCountdown}
+            isJuniorMissionPaused={isJuniorMissionPaused}
+            setIsJuniorMissionPaused={setIsJuniorMissionPaused}
+            showJuniorCheatSheet={showJuniorCheatSheet}
+            setShowJuniorCheatSheet={setShowJuniorCheatSheet}
             juniorSelectedTrackIndex={juniorSelectedTrackIndex}
-            isJuniorTabPaused={false}
-            juniorCelebrationSummary={null}
-            juniorLaunchStage="launching"
-            expandedMonths={{}}
-            setExpandedMonths={() => {}}
+            isJuniorTabPaused={isJuniorTabPaused}
+            juniorCelebrationSummary={juniorCelebrationSummary}
+            juniorLaunchStage={juniorLaunchStage}
+            expandedMonths={expandedMonths}
+            setExpandedMonths={setExpandedMonths}
           />
         </Suspense>
       )}
 
       {/* 2. Songs Tab */}
-      {profile.visitedTabs.has('songs') && (
+      {(profile.visitedTabs.has('songs') || profile.visitedTabs.has('mediathek')) && (
         <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Lade Songs &amp; Repertoire...</div>}>
           <StudentSongsTab
             activeTab={profile.activeTab}
-            progressLoading={false}
+            progressLoading={progressLoading}
             assignedCampusSongs={assignedCampusSongs}
             lehrwerke={lehrwerke}
             isMobile={profile.isMobile}
             studentUser={profile.studentUser}
             studentId={studentId}
-            juniorMediathekFilter="all"
-            setJuniorMediathekFilter={() => {}}
-            songSearch=""
-            setSongSearch={() => {}}
-            songSearchDebounced=""
+            juniorMediathekFilter={juniorMediathekFilter}
+            setJuniorMediathekFilter={setJuniorMediathekFilter}
+            songSearch={songSearch}
+            setSongSearch={setSongSearch}
+            songSearchDebounced={songSearch}
             progressItems={progressItems}
             setSelectedTopic={setSelectedTopic}
             handleTabChangeLocal={profile.handleTabChangeLocal}
@@ -459,29 +624,29 @@ export function StudentAvatarDashboard({
       {profile.visitedTabs.has('profile') && (
         <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontWeight: 600 }}>Lade Profil...</div>}>
           <StudentProfileTab
+            avatar={streaks.avatar}
             activeTab={profile.activeTab}
             studentUser={profile.studentUser}
             studentId={studentId}
-            avatar={streaks.avatar}
-            editingProfile={false}
-            setEditingProfile={() => {}}
-            showEditProfile={false}
-            setShowEditProfile={() => {}}
-            savingProfile={false}
-            handleSaveProfile={async () => {}}
-            showAvatarSelector={false}
-            setShowAvatarSelector={() => {}}
-            avatarCategoryFilter="Alle"
-            setAvatarCategoryFilter={() => {}}
-            showSecondEmail={false}
-            setShowSecondEmail={() => {}}
+            editingProfile={profile.editingProfile}
+            setEditingProfile={profile.setEditingProfile}
+            showEditProfile={profile.showEditProfile}
+            setShowEditProfile={profile.setShowEditProfile}
+            savingProfile={profile.savingProfile}
+            handleSaveProfile={profile.handleSaveProfile}
+            showAvatarSelector={profile.showAvatarSelector}
+            setShowAvatarSelector={profile.setShowAvatarSelector}
+            avatarCategoryFilter={profile.avatarCategoryFilter}
+            setAvatarCategoryFilter={profile.setAvatarCategoryFilter}
+            showSecondEmail={profile.showSecondEmail}
+            setShowSecondEmail={profile.setShowSecondEmail}
             familyProfiles={parent.familyProfiles}
             handleSwitchFamilyStudent={parent.handleSwitchFamilyStudent}
             setIsAddSiblingModalOpen={parent.setIsAddSiblingModalOpen}
-            showOwnQr={false}
-            setShowOwnQr={() => {}}
-            studentSchedules={[]}
-            monthlyFocusMinutes={0}
+            showOwnQr={profile.showOwnQr}
+            setShowOwnQr={profile.setShowOwnQr}
+            studentSchedules={profile.studentSchedules}
+            monthlyFocusMinutes={practice.monthlyFocusMinutes || 0}
             fokusLogs={practice.fokusLogs}
             sessionActive={practice.sessionActive}
             secondsElapsed={practice.secondsElapsed}
@@ -544,11 +709,11 @@ export function StudentAvatarDashboard({
           setJuniorSelectedPreviewSticker(null);
           setShowJuniorStickerModal(false);
           profile.handleTabChangeLocal('practice_board');
-          practice.setSessionActive(true);
+          startJuniorMissionImmediately();
         }}
         juniorAwardedStickerToCelebrate={juniorAwardedStickerToCelebrate}
         setJuniorAwardedStickerToCelebrate={setJuniorAwardedStickerToCelebrate}
-        showCelebration={practice.showCelebration}
+        showCelebration={profile.studentUiLevel !== 'junior' && practice.showCelebration}
         setShowCelebration={practice.setShowCelebration}
         celebrationDetails={practice.celebrationDetails}
         celebrationRingProgress={practice.celebrationRingProgress}

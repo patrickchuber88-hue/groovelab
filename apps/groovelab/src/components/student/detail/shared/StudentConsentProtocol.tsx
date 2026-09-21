@@ -148,14 +148,14 @@ export const StudentConsentProtocol: React.FC<StudentConsentProtocolProps> = ({
                 <span style={{ color: (student.parent_allow_audio === true && (student as any)?.parent_permissions?.allow_student_audio === true) ? '#22c55e' : '#ef4444', fontWeight: 800 }}>
                   {(student.parent_allow_audio === true && (student as any)?.parent_permissions?.allow_student_audio === true) ? '✓' : '✕'}
                 </span>
-                <span>Eigene Aufnahmen Schüler (Art. 8 DSGVO)</span>
+                <span>Eigene Aufnahmen Schüler (Didaktik-Freigabe)</span>
               </div>
 
               <div style={{ fontSize: '0.72rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px', background: '#ffffff', padding: '4px 8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                 <span style={{ color: ((student as any)?.parent_permissions?.allow_teacher_audio === true) ? '#22c55e' : '#ef4444', fontWeight: 800 }}>
                   {((student as any)?.parent_permissions?.allow_teacher_audio === true) ? '✓' : '✕'}
                 </span>
-                <span>Lehrer-Aufnahmen Schüler (§ 201 StGB)</span>
+                <span>Lehrer-Aufnahmen Schüler (Vertraulichkeit)</span>
               </div>
             </div>
           </div>

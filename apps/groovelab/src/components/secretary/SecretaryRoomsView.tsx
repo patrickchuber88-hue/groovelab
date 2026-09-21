@@ -994,7 +994,7 @@ export function SecretaryRoomsView({
                           ))}
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#e0f2fe', border: '1px solid #7dd3fc', color: '#0369a1', padding: '2px 8px', borderRadius: '6px', fontWeight: 800 }}>
                             <span>Gesamt:</span>
-                            <strong>{avgPct || 68}%</strong>
+                            <strong>{roomEntries.length > 0 ? avgPct : 0}%</strong>
                           </span>
                         </>
                       );

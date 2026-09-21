@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { supabase, deleteUserStorageAssets } from '../../lib/supabase';
 import { getInstrumentAvatarUrl } from '../../components/StudioAvatar';
 import { formatTeacherFullName } from '../../utils/nameHelper';
+import { softDeleteStudent, restoreStudent } from '../../utils/studentDeletionService';
 
 const getInstrumentTypeKey = (instrument: string | null | undefined): string => {
   if (!instrument) return 'guitarist';
@@ -41,7 +42,7 @@ export function useAdminStudents({
   fetchData
 }: UseAdminStudentsParams) {
   const [studentSearch, setStudentSearch] = useState('');
-  const [listType, setListType] = useState<'active' | 'archive'>('active');
+  const [listType, setListType] = useState<'active' | 'archive' | 'trash'>('active');
   const [instrumentFilter, setInstrumentFilter] = useState('ALL');
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [showBulkAddStudents, setShowBulkAddStudents] = useState(false);
@@ -288,6 +289,28 @@ export function useAdminStudents({
     });
   };
 
+  const handleSoftDeleteStudent = async (id: string) => {
+    const res = await softDeleteStudent(id);
+    if (res.success) {
+      setStudents(prev => prev.map(s => s.id === id ? { ...s, deleted_at: new Date().toISOString() } : s));
+      fetchData(true);
+      window.dispatchEvent(new CustomEvent('groovelab_students_updated'));
+    } else {
+      alert(res.error || 'Fehler beim Verschieben in den Papierkorb.');
+    }
+  };
+
+  const handleRestoreStudent = async (id: string) => {
+    const res = await restoreStudent(id);
+    if (res.success) {
+      setStudents(prev => prev.map(s => s.id === id ? { ...s, deleted_at: null } : s));
+      fetchData(true);
+      window.dispatchEvent(new CustomEvent('groovelab_students_updated'));
+    } else {
+      alert(res.error || 'Fehler beim Wiederherstellen.');
+    }
+  };
+
   return {
     studentSearch,
     setStudentSearch,
@@ -329,6 +352,8 @@ export function useAdminStudents({
     parseBulkInput,
     handleBulkAddSubmit,
     handleUpdateStudent,
-    handleDeleteStudent
+    handleDeleteStudent,
+    handleSoftDeleteStudent,
+    handleRestoreStudent
   };
 }

@@ -144,9 +144,34 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
   }, [sessionActive, isPhoneFlat, preStartCountdown]);
 
   return (
-      <div id="tour-student-practice" style={{ display: activeTab === 'practice_board' ? 'flex' : 'none', flexDirection: 'column', gap: '16px', width: '100%' }} className="animation-slide-up practice-board-wrapper">
-        {activeTab === 'practice_board' && (
-          <>
+    <div 
+      id="tour-student-practice" 
+      style={{ 
+        display: activeTab === 'practice_board' ? 'flex' : 'none', 
+        flexDirection: 'column', 
+        gap: isMobile ? '16px' : '20px', 
+        width: '100%',
+        boxSizing: 'border-box'
+      }} 
+      className="animation-slide-up practice-board-wrapper"
+    >
+      {activeTab === 'practice_board' && (
+        <>
+          <style>{`
+            .practice-studio-cockpit-grid {
+              display: grid;
+              grid-template-columns: 1fr;
+              gap: 16px;
+              width: 100%;
+            }
+            @media (min-width: 960px) {
+              .practice-studio-cockpit-grid {
+                grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+                gap: 20px;
+                align-items: stretch;
+              }
+            }
+          `}</style>
             {/* ========================================================================= */}
             {/* 🌟 JUNIOR GOLDSTANDARD: KINDGERECHTER ÜBE-PFAD (7-10 JAHRE)              */}
             {/* ========================================================================= */}
@@ -197,7 +222,16 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
               const minsToNext = Math.max(1, targetMin - effMins);
 
               return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '18px', width: '100%' }} className="animation-fade-in">
+                <div 
+                  style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: isMobile ? '16px' : '18px', 
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  }} 
+                  className="animation-fade-in practice-board-junior"
+                >
                   
                   {/* Cosmic Keyframe Animations & Juicy Styles */}
                   <style>{`
@@ -267,58 +301,59 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    gap: '14px',
+                    gap: '12px',
                     background: '#ffffff',
-                    borderRadius: isMobile ? '20px' : '24px',
-                    padding: isMusicStandMode ? '20px 28px' : (isMobile ? '14px 14px' : '16px 24px'),
+                    borderRadius: isMobile ? '20px' : '20px',
+                    padding: isMusicStandMode ? '16px 24px' : (isMobile ? '14px 14px' : 'clamp(10px, 1.3vh, 14px) clamp(16px, 1.8vw, 24px)'),
                     border: '1.5px solid #e2e8f0',
-                    boxShadow: '0 12px 30px rgba(15, 23, 42, 0.04)',
+                    boxShadow: '0 4px 16px rgba(15, 23, 42, 0.03)',
                     boxSizing: 'border-box',
                     maxWidth: '100%',
-                    flexWrap: 'wrap'
+                    flexWrap: 'wrap',
+                    flexShrink: 0
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(10px, 1.2vw, 14px)' }}>
                       <div style={{
-                        width: isMusicStandMode ? '64px' : '56px',
-                        height: isMusicStandMode ? '64px' : '56px',
-                        borderRadius: '18px',
+                        width: isMusicStandMode ? '56px' : 'clamp(38px, 4.8vh, 50px)',
+                        height: isMusicStandMode ? '56px' : 'clamp(38px, 4.8vh, 50px)',
+                        borderRadius: '14px',
                         background: 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         color: '#4f46e5',
-                        boxShadow: '0 6px 16px rgba(99, 102, 241, 0.22)',
+                        boxShadow: '0 4px 12px rgba(99, 102, 241, 0.22)',
                         flexShrink: 0
                       }}>
-                        <Rocket size={isMusicStandMode ? 32 : 28} color="#4f46e5" />
+                        <Rocket size={isMusicStandMode ? 28 : 22} color="#4f46e5" />
                       </div>
                       <div>
-                        <h3 style={{ margin: 0, fontSize: isMusicStandMode ? '1.55rem' : '1.38rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
+                        <h3 style={{ margin: 0, fontSize: isMusicStandMode ? '1.45rem' : 'clamp(1.15rem, 1.8vh, 1.35rem)', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
                           Mission Musik-Kosmos
                         </h3>
-                        <p style={{ margin: '4px 0 0 0', fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', color: '#64748b', fontWeight: 650, lineHeight: 1.4 }}>
+                        <p style={{ margin: '2px 0 0 0', fontSize: isMusicStandMode ? '0.90rem' : 'clamp(0.72rem, 1vh, 0.82rem)', color: '#64748b', fontWeight: 650, lineHeight: 1.3 }}>
                           Handy flach hinlegen, spielen &amp; Sterne sammeln!
                         </p>
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       {/* Star Streak Pill (Luminous Amber / Solar Gold when active) */}
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px',
+                        gap: '6px',
                         background: streak > 0 ? 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)' : '#f8fafc',
                         border: streak > 0 ? '1.5px solid #fcd34d' : '1.5px solid #e2e8f0',
                         color: streak > 0 ? '#92400e' : '#64748b',
-                        padding: isMusicStandMode ? '8px 16px' : '6px 14px',
+                        padding: isMusicStandMode ? '6px 14px' : 'clamp(4px, 0.7vh, 6px) clamp(10px, 1.2vw, 14px)',
                         borderRadius: '100px',
                         fontWeight: 900,
-                        fontSize: isMusicStandMode ? '0.92rem' : '0.86rem',
+                        fontSize: isMusicStandMode ? '0.88rem' : 'clamp(0.78rem, 1.1vh, 0.86rem)',
                         boxShadow: streak > 0 ? '0 4px 14px rgba(245, 158, 11, 0.25)' : '0 2px 4px rgba(0,0,0,0.03)',
                         transition: 'all 0.3s ease'
                       }}>
-                        <Star size={18} fill={streak > 0 ? '#f59e0b' : '#94a3b8'} color={streak > 0 ? '#d97706' : '#94a3b8'} style={{ filter: streak > 0 ? 'drop-shadow(0 0 6px rgba(245, 158, 11, 0.7))' : 'none' }} />
+                        <Star size={16} fill={streak > 0 ? '#f59e0b' : '#94a3b8'} color={streak > 0 ? '#d97706' : '#94a3b8'} style={{ filter: streak > 0 ? 'drop-shadow(0 0 6px rgba(245, 158, 11, 0.7))' : 'none' }} />
                         <span>{streak} {streak === 1 ? 'Tag' : 'Tage'} Serie</span>
                       </div>
 
@@ -326,325 +361,329 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px',
+                        gap: '6px',
                         background: '#eef2ff',
                         border: '1.5px solid #e0e7ff',
                         color: '#4f46e5',
-                        padding: isMusicStandMode ? '8px 16px' : '6px 14px',
+                        padding: isMusicStandMode ? '6px 14px' : 'clamp(4px, 0.7vh, 6px) clamp(10px, 1.2vw, 14px)',
                         borderRadius: '100px',
                         fontWeight: 900,
-                        fontSize: isMusicStandMode ? '0.92rem' : '0.86rem',
+                        fontSize: isMusicStandMode ? '0.88rem' : 'clamp(0.78rem, 1.1vh, 0.86rem)',
                         boxShadow: '0 2px 6px rgba(79, 70, 229, 0.1)'
                       }}>
-                        <Star size={18} fill="#4f46e5" />
+                        <Star size={15} fill="#4f46e5" />
                         <span>{xpVal} XP</span>
                       </div>
                     </div>
                   </div>
 
-                  {/* 2. Center Stage Hero: Die Magische Weltraum-Startrampe (Cosmic Purple & Indigo Galaxy) */}
-                  <div style={{
-                    width: '100%',
-                    background: 'linear-gradient(160deg, #090514 0%, #1e103a 35%, #2e1065 70%, #150928 100%)',
-                    borderRadius: isMobile ? '24px' : '32px',
-                    border: '2px solid rgba(168, 85, 247, 0.35)',
-                    padding: isMusicStandMode ? '44px 32px' : (isMobile ? '28px 16px' : '40px 28px'),
-                    boxShadow: '0 20px 50px -10px rgba(46, 16, 101, 0.5), 0 0 35px rgba(168, 85, 247, 0.15) inset',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    textAlign: 'center',
-                    position: 'relative',
-                    overflow: 'hidden',
-                    boxSizing: 'border-box'
-                  }}>
-                    {/* Background Cosmic Starfield Elements (Cosmic Purple & Golden Stars) */}
-                    {[
-                      { top: '14%', left: '8%', size: 10, delay: '0s', color: '#fde047' },
-                      { top: '20%', right: '12%', size: 12, delay: '1.2s', color: '#c084fc' },
-                      { top: '48%', left: '7%', size: 8, delay: '0.7s', color: '#818cf8' },
-                      { top: '56%', right: '9%', size: 10, delay: '1.8s', color: '#fde047' },
-                      { top: '78%', left: '12%', size: 11, delay: '2.3s', color: '#e879f9' },
-                      { top: '82%', right: '11%', size: 8, delay: '0.4s', color: '#a78bfa' },
-                      { top: '12%', left: '42%', size: 7, delay: '1.5s', color: '#ffffff' },
-                      { top: '26%', right: '32%', size: 9, delay: '2.0s', color: '#fde047' }
-                    ].map((star, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          position: 'absolute',
-                          top: star.top,
-                          left: star.left,
-                          right: star.right,
-                          width: `${star.size}px`,
-                          height: `${star.size}px`,
-                          animation: `cosmicTwinkle 2.5s ease-in-out infinite ${star.delay}`,
-                          pointerEvents: 'none',
-                          zIndex: 0
-                        }}
-                      >
-                        <svg width={star.size} height={star.size} viewBox="0 0 24 24" fill={star.color}>
-                          <path d="M12 0 L14.5 9.5 L24 12 L14.5 14.5 L12 24 L9.5 14.5 L0 12 L9.5 9.5 Z" />
-                        </svg>
-                      </div>
-                    ))}
-
-                    {/* Ambient Cosmic Purple & Indigo Nebula Glow */}
+                  {/* 2. Studio 2-Column Cockpit Grid (Hero links, Partner-Karten rechts) */}
+                  <div className="practice-studio-cockpit-grid">
+                    {/* Linke Spalte: Center Stage Hero (Die Magische Weltraum-Startrampe) */}
                     <div style={{
-                      position: 'absolute',
-                      top: '-60px',
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      width: '380px',
-                      height: '240px',
-                      background: 'radial-gradient(circle, rgba(168, 85, 247, 0.28) 0%, rgba(99, 102, 241, 0.18) 50%, rgba(0,0,0,0) 75%)',
-                      borderRadius: '50%',
-                      pointerEvents: 'none'
-                    }} />
-
-                    {/* Schwebende Vektor-Rakete Illustration */}
-                    <div style={{
-                      position: 'relative',
-                      width: '78px',
-                      height: '78px',
-                      marginBottom: '10px',
-                      animation: 'rocketHover 4s ease-in-out infinite',
-                      zIndex: 1
-                    }}>
-                      <svg width="78" height="78" viewBox="0 0 68 68" fill="none" style={{ filter: 'drop-shadow(0 8px 16px rgba(0, 0, 0, 0.45))' }}>
-                        {/* Thruster Flame with Pulse Animation */}
-                        <g style={{ transformOrigin: '34px 50px', animation: 'thrusterPulse 0.4s ease-in-out infinite alternate' }}>
-                          <path d="M30 48 Q34 66 34 68 Q34 66 38 48 Z" fill="#f97316" />
-                          <path d="M32 48 Q34 60 34 62 Q34 60 36 48 Z" fill="#fde047" />
-                        </g>
-                        {/* Red Wings */}
-                        <path d="M22 36 L12 48 Q20 48 24 43 Z" fill="#ef4444" />
-                        <path d="M46 36 L56 48 Q48 48 44 43 Z" fill="#ef4444" />
-                        {/* Spaceship Main White Hull */}
-                        <path d="M34 8 C26 18 24 34 24 46 L44 46 C44 34 42 18 34 8 Z" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1.5" />
-                        {/* Red Nose Cone */}
-                        <path d="M34 8 C30 14 27 20 26 23 L42 23 C41 20 38 14 34 8 Z" fill="#ef4444" />
-                        {/* Cyan Cockpit Porthole */}
-                        <circle cx="34" cy="30" r="6" fill="#38bdf8" stroke="#ffffff" strokeWidth="1.5" />
-                        <circle cx="32" cy="28" r="2" fill="#ffffff" />
-                      </svg>
-                    </div>
-
-                    {/* Glowing Target Pill (Indigo/Violet) */}
-                    <div style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      background: 'rgba(129, 140, 248, 0.18)',
-                      border: '1px solid rgba(165, 180, 252, 0.4)',
-                      color: '#c7d2fe',
-                      padding: isMusicStandMode ? '7px 22px' : '6px 18px',
-                      borderRadius: '100px',
-                      fontSize: isMusicStandMode ? '0.92rem' : '0.86rem',
-                      fontWeight: 900,
-                      letterSpacing: '0.04em',
-                      textTransform: 'uppercase',
-                      marginBottom: '20px',
-                      boxShadow: '0 0 15px rgba(99, 102, 241, 0.25)',
-                      zIndex: 1
-                    }}>
-                      <Target size={16} color="#c7d2fe" />
-                      <span>Tages-Fokus: {targetMins} Min. am Stück</span>
-                    </div>
-
-                    {/* Big Reaktor-Dial Ring (195px) with Orbiting Satellite Star (Indigo / Purple) */}
-                    <div style={{
-                      position: 'relative',
-                      width: '195px',
-                      height: '195px',
+                      background: 'linear-gradient(160deg, #090514 0%, #1e103a 35%, #2e1065 70%, #150928 100%)',
+                      borderRadius: '24px',
+                      border: '2px solid rgba(168, 85, 247, 0.35)',
+                      padding: isMusicStandMode ? '32px 24px' : '26px 20px',
+                      boxShadow: '0 20px 50px -10px rgba(46, 16, 101, 0.5), 0 0 35px rgba(168, 85, 247, 0.15) inset',
                       display: 'flex',
+                      flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      borderRadius: '50%',
-                      background: 'radial-gradient(circle, rgba(129, 140, 248, 0.18) 0%, rgba(0,0,0,0) 70%)',
-                      zIndex: 1
+                      textAlign: 'center',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      boxSizing: 'border-box',
+                      minHeight: isMobile ? 'auto' : '410px'
                     }}>
-                      {/* Rotating Dashed Orbit Track */}
+                      {/* Background Cosmic Starfield Elements (Cosmic Purple & Golden Stars) */}
+                      {[
+                        { top: '14%', left: '8%', size: 10, delay: '0s', color: '#fde047' },
+                        { top: '20%', right: '12%', size: 12, delay: '1.2s', color: '#c084fc' },
+                        { top: '48%', left: '7%', size: 8, delay: '0.7s', color: '#818cf8' },
+                        { top: '56%', right: '9%', size: 10, delay: '1.8s', color: '#fde047' },
+                        { top: '78%', left: '12%', size: 11, delay: '2.3s', color: '#e879f9' },
+                        { top: '82%', right: '11%', size: 8, delay: '0.4s', color: '#a78bfa' },
+                        { top: '12%', left: '42%', size: 7, delay: '1.5s', color: '#ffffff' },
+                        { top: '26%', right: '32%', size: 9, delay: '2.0s', color: '#fde047' }
+                      ].map((star, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            position: 'absolute',
+                            top: star.top,
+                            left: star.left,
+                            right: star.right,
+                            width: `${star.size}px`,
+                            height: `${star.size}px`,
+                            animation: `cosmicTwinkle 2.5s ease-in-out infinite ${star.delay}`,
+                            pointerEvents: 'none',
+                            zIndex: 0
+                          }}
+                        >
+                          <svg width={star.size} height={star.size} viewBox="0 0 24 24" fill={star.color}>
+                            <path d="M12 0 L14.5 9.5 L24 12 L14.5 14.5 L12 24 L9.5 14.5 L0 12 L9.5 9.5 Z" />
+                          </svg>
+                        </div>
+                      ))}
+
+                      {/* Ambient Cosmic Purple & Indigo Nebula Glow */}
                       <div style={{
                         position: 'absolute',
-                        inset: '-5px',
+                        top: '-60px',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        width: '380px',
+                        height: '240px',
+                        background: 'radial-gradient(circle, rgba(168, 85, 247, 0.28) 0%, rgba(99, 102, 241, 0.18) 50%, rgba(0,0,0,0) 75%)',
                         borderRadius: '50%',
-                        border: '1.5px dashed rgba(165, 180, 252, 0.45)',
                         pointerEvents: 'none'
                       }} />
 
-                      {/* Orbiting Satellite Star */}
+                      {/* Schwebende Vektor-Rakete Illustration */}
                       <div style={{
-                        position: 'absolute',
-                        width: '195px',
-                        height: '195px',
-                        borderRadius: '50%',
-                        animation: 'spinSlow 14s linear infinite',
-                        pointerEvents: 'none'
+                        position: 'relative',
+                        width: isMusicStandMode ? '72px' : '54px',
+                        height: isMusicStandMode ? '72px' : '54px',
+                        marginBottom: '6px',
+                        animation: 'rocketHover 4s ease-in-out infinite',
+                        zIndex: 1
                       }}>
-                        <div style={{
-                          position: 'absolute',
-                          top: '-10px',
-                          left: '50%',
-                          transform: 'translateX(-50%)',
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '50%',
-                          background: 'linear-gradient(135deg, #e0e7ff 0%, #c084fc 100%)',
-                          boxShadow: '0 0 12px #c084fc, 0 0 24px rgba(168, 85, 247, 0.8)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}>
-                          <Star size={13} fill="#4f46e5" color="#4f46e5" />
-                        </div>
+                        <svg width="100%" height="100%" viewBox="0 0 68 68" fill="none" style={{ filter: 'drop-shadow(0 8px 16px rgba(0, 0, 0, 0.45))' }}>
+                          {/* Thruster Flame with Pulse Animation */}
+                          <g style={{ transformOrigin: '34px 50px', animation: 'thrusterPulse 0.4s ease-in-out infinite alternate' }}>
+                            <path d="M30 48 Q34 66 34 68 Q34 66 38 48 Z" fill="#f97316" />
+                            <path d="M32 48 Q34 60 34 62 Q34 60 36 48 Z" fill="#fde047" />
+                          </g>
+                          {/* Red Wings */}
+                          <path d="M22 36 L12 48 Q20 48 24 43 Z" fill="#ef4444" />
+                          <path d="M46 36 L56 48 Q48 48 44 43 Z" fill="#ef4444" />
+                          {/* Spaceship Main White Hull */}
+                          <path d="M34 8 C26 18 24 34 24 46 L44 46 C44 34 42 18 34 8 Z" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1.5" />
+                          {/* Red Nose Cone */}
+                          <path d="M34 8 C30 14 27 20 26 23 L42 23 C41 20 38 14 34 8 Z" fill="#ef4444" />
+                          {/* Cyan Cockpit Porthole */}
+                          <circle cx="34" cy="30" r="6" fill="#38bdf8" stroke="#ffffff" strokeWidth="1.5" />
+                          <circle cx="32" cy="28" r="2" fill="#ffffff" />
+                        </svg>
                       </div>
 
-                      <svg width="195" height="195" viewBox="0 0 195 195" style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}>
-                        <circle cx="97.5" cy="97.5" r="86" fill="none" stroke="rgba(255, 255, 255, 0.12)" strokeWidth="6.5" />
-                        <circle
-                          cx="97.5"
-                          cy="97.5"
-                          r="86"
-                          fill="none"
-                          stroke="url(#juniorCosmicDial)"
-                          strokeWidth="6.5"
-                          strokeDasharray={2 * Math.PI * 86}
-                          strokeDashoffset={0}
-                          strokeLinecap="round"
-                          style={{ filter: 'drop-shadow(0 0 10px rgba(168, 85, 247, 0.8))' }}
-                        />
-                        <defs>
-                          <linearGradient id="juniorCosmicDial" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stopColor="#818cf8" />
-                            <stop offset="50%" stopColor="#a855f7" />
-                            <stop offset="100%" stopColor="#6366f1" />
-                          </linearGradient>
-                        </defs>
-                      </svg>
-
+                      {/* Glowing Target Pill (Indigo/Violet) */}
                       <div style={{
-                        position: 'absolute',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        textAlign: 'center'
-                      }}>
-                        <span style={{
-                          fontSize: isMusicStandMode ? '3.3rem' : '3.0rem',
-                          fontWeight: 950,
-                          color: '#ffffff',
-                          letterSpacing: '-0.04em',
-                          lineHeight: 1,
-                          fontFamily: "'Urbanist', sans-serif",
-                          textShadow: '0 0 28px rgba(168, 85, 247, 0.7)'
-                        }}>
-                          {String(targetMins).padStart(2, '0')}:00
-                        </span>
-                        <span style={{
-                          fontSize: '0.72rem',
-                          fontWeight: 850,
-                          color: '#c7d2fe',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.08em',
-                          marginTop: '6px',
-                          background: 'rgba(129, 140, 248, 0.22)',
-                          border: '1px solid rgba(165, 180, 252, 0.4)',
-                          padding: '3px 12px',
-                          borderRadius: '100px'
-                        }}>
-                          Zielzeit
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* 🎮 Juicy 3D Arcade Bumper Button with Space Sound (Indigo/Purple Theme) */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        startJuniorMissionImmediately();
-                      }}
-                      className="junior-3d-button"
-                      style={{
-                        color: '#ffffff',
-                        border: 'none',
-                        borderRadius: '20px',
-                        padding: isMusicStandMode ? '18px 44px' : '17px 38px',
-                        minHeight: '52px',
-                        touchAction: 'manipulation',
-                        fontSize: isMusicStandMode ? '1.18rem' : '1.12rem',
-                        fontWeight: 950,
-                        cursor: 'pointer',
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '12px',
-                        marginTop: '24px',
+                        gap: '8px',
+                        background: 'rgba(129, 140, 248, 0.18)',
+                        border: '1px solid rgba(165, 180, 252, 0.4)',
+                        color: '#c7d2fe',
+                        padding: isMusicStandMode ? '7px 22px' : '5px 16px',
+                        borderRadius: '100px',
+                        fontSize: isMusicStandMode ? '0.92rem' : '0.82rem',
+                        fontWeight: 900,
+                        letterSpacing: '0.04em',
+                        textTransform: 'uppercase',
+                        marginBottom: '16px',
+                        boxShadow: '0 0 15px rgba(99, 102, 241, 0.25)',
                         zIndex: 1
-                      }}
-                    >
-                      <Rocket size={26} color="#ffffff" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.25))' }} />
-                      <span style={{ textShadow: '0 2px 4px rgba(0,0,0,0.25)', letterSpacing: '0.01em' }}>
-                        Rakete zünden &amp; Üben starten
-                      </span>
-                    </button>
+                      }}>
+                        <Target size={15} color="#c7d2fe" />
+                        <span>Tages-Fokus: {targetMins} Min. am Stück</span>
+                      </div>
 
-                    {/* Space Microcopy */}
-                    <p style={{
-                      fontSize: isMusicStandMode ? '0.98rem' : '0.90rem',
-                      color: '#c7d2fe',
-                      fontWeight: 650,
-                      margin: '16px 0 0 0',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      flexWrap: 'wrap',
-                      justifyContent: 'center',
-                      zIndex: 1
-                    }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                        <Smartphone size={13} color="#c7d2fe" /> Handy flach hinlegen
-                      </span>
-                      <span>·</span>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                        <Moon size={13} color="#c7d2fe" /> Bildschirm wird dunkel
-                      </span>
-                      <span>·</span>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                        <Bell size={13} color="#c7d2fe" /> Zaubertöne leiten dich
-                      </span>
-                    </p>
-                  </div>
+                      {/* Big Reaktor-Dial Ring with Orbiting Satellite Star (Indigo / Purple) */}
+                      <div style={{
+                        position: 'relative',
+                        width: isMusicStandMode ? '210px' : '185px',
+                        height: isMusicStandMode ? '210px' : '185px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '50%',
+                        background: 'radial-gradient(circle, rgba(129, 140, 248, 0.18) 0%, rgba(0,0,0,0) 70%)',
+                        marginBottom: '18px',
+                        zIndex: 1,
+                        flexShrink: 0
+                      }}>
+                        {/* Rotating Dashed Orbit Track */}
+                        <div style={{
+                          position: 'absolute',
+                          inset: '-5px',
+                          borderRadius: '50%',
+                          border: '1.5px dashed rgba(165, 180, 252, 0.45)',
+                          pointerEvents: 'none'
+                        }} />
 
-                  {/* 3. Bottom Dual Grid: 2 Ruhige, Ausbalancierte Karten (Briefing Board Format) */}
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-                    gap: '24px',
-                    width: '100%'
-                  }}>
-                    {/* Karte A: Deine Woche in Sternen ✨ (3D Münzen & Star Chime Audio) */}
+                        {/* Orbiting Satellite Star */}
+                        <div style={{
+                          position: 'absolute',
+                          inset: 0,
+                          borderRadius: '50%',
+                          animation: 'spinSlow 14s linear infinite',
+                          pointerEvents: 'none'
+                        }}>
+                          <div style={{
+                            position: 'absolute',
+                            top: '-10px',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            width: '22px',
+                            height: '22px',
+                            borderRadius: '50%',
+                            background: 'linear-gradient(135deg, #e0e7ff 0%, #c084fc 100%)',
+                            boxShadow: '0 0 12px #c084fc, 0 0 24px rgba(168, 85, 247, 0.8)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            <Star size={13} fill="#4f46e5" color="#4f46e5" />
+                          </div>
+                        </div>
+
+                        <svg width="100%" height="100%" viewBox="0 0 195 195" style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}>
+                          <circle cx="97.5" cy="97.5" r="86" fill="none" stroke="rgba(255, 255, 255, 0.12)" strokeWidth="6.5" />
+                          <circle
+                            cx="97.5"
+                            cy="97.5"
+                            r="86"
+                            fill="none"
+                            stroke="url(#juniorCosmicDial)"
+                            strokeWidth="6.5"
+                            strokeDasharray={2 * Math.PI * 86}
+                            strokeDashoffset={0}
+                            strokeLinecap="round"
+                            style={{ filter: 'drop-shadow(0 0 10px rgba(168, 85, 247, 0.8))' }}
+                          />
+                          <defs>
+                            <linearGradient id="juniorCosmicDial" x1="0%" y1="0%" x2="100%" y2="100%">
+                              <stop offset="0%" stopColor="#818cf8" />
+                              <stop offset="50%" stopColor="#a855f7" />
+                              <stop offset="100%" stopColor="#6366f1" />
+                            </linearGradient>
+                          </defs>
+                        </svg>
+
+                        <div style={{
+                          position: 'absolute',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          textAlign: 'center'
+                        }}>
+                          <span style={{
+                            fontSize: isMusicStandMode ? '3.4rem' : '2.9rem',
+                            fontWeight: 950,
+                            color: '#ffffff',
+                            letterSpacing: '-0.04em',
+                            lineHeight: 1,
+                            fontFamily: "'Urbanist', sans-serif",
+                            textShadow: '0 0 28px rgba(168, 85, 247, 0.7)'
+                          }}>
+                            {String(targetMins).padStart(2, '0')}:00
+                          </span>
+                          <span style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 850,
+                            color: '#c7d2fe',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.08em',
+                            marginTop: '4px',
+                            background: 'rgba(129, 140, 248, 0.22)',
+                            border: '1px solid rgba(165, 180, 252, 0.4)',
+                            padding: '2px 10px',
+                            borderRadius: '100px'
+                          }}>
+                            Zielzeit
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 🎮 Juicy 3D Arcade Bumper Button with Space Sound (Indigo/Purple Theme) */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          startJuniorMissionImmediately();
+                        }}
+                        className="junior-3d-button"
+                        style={{
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '18px',
+                          padding: isMusicStandMode ? '16px 40px' : '12px 28px',
+                          minHeight: isMusicStandMode ? '58px' : '50px',
+                          touchAction: 'manipulation',
+                          fontSize: isMusicStandMode ? '1.15rem' : '1.05rem',
+                          fontWeight: 950,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          marginTop: '4px',
+                          zIndex: 1
+                        }}
+                      >
+                        <Rocket size={22} color="#ffffff" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.25))' }} />
+                        <span style={{ textShadow: '0 2px 4px rgba(0,0,0,0.25)', letterSpacing: '0.01em' }}>
+                          Rakete zünden &amp; Üben starten
+                        </span>
+                      </button>
+
+                      {/* Space Microcopy */}
+                      <p style={{
+                        fontSize: isMusicStandMode ? '0.90rem' : '0.78rem',
+                        color: '#c7d2fe',
+                        fontWeight: 650,
+                        margin: '12px 0 0 0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        flexWrap: 'wrap',
+                        justifyContent: 'center',
+                        zIndex: 1
+                      }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <Smartphone size={13} color="#c7d2fe" /> Handy flach hinlegen
+                        </span>
+                        <span>·</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <Moon size={13} color="#c7d2fe" /> Bildschirm wird dunkel
+                        </span>
+                        <span>·</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <Bell size={13} color="#c7d2fe" /> Zaubertöne leiten dich
+                        </span>
+                      </p>
+                    </div>
+
+                    {/* Rechte Spalte: Gestapelte Partner-Karten (Woche + Meilenstein) */}
                     <div style={{
-                      background: '#ffffff',
-                      borderRadius: isMobile ? '24px' : '32px',
-                      border: '2px solid #e2e8f0',
-                      padding: isMusicStandMode ? '32px' : (isMobile ? '18px 14px' : '28px'),
-                      boxShadow: '0 12px 30px rgba(15, 23, 42, 0.04)',
-                      boxSizing: 'border-box',
-                      maxWidth: '100%',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '18px'
+                      gap: '14px',
+                      justifyContent: 'space-between',
+                      height: '100%'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                        <div style={{ width: isMusicStandMode ? '64px' : '56px', height: isMusicStandMode ? '64px' : '56px', minWidth: isMusicStandMode ? '64px' : '56px', borderRadius: '18px', background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4f46e5', boxShadow: '0 6px 16px rgba(99, 102, 241, 0.22)' }}>
-                          <Sparkles size={isMusicStandMode ? 32 : 28} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                              <h4 style={{ margin: 0, fontSize: isMusicStandMode ? '1.55rem' : '1.38rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
+                      {/* Karte A: Deine Woche in Sternen ✨ (3D Münzen & Star Chime Audio) */}
+                      <div style={{
+                        background: '#ffffff',
+                        borderRadius: '22px',
+                        border: '2px solid #e2e8f0',
+                        padding: isMusicStandMode ? '22px 24px' : '16px 20px',
+                        boxShadow: '0 8px 24px rgba(15, 23, 42, 0.04)',
+                        boxSizing: 'border-box',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        gap: '10px',
+                        flex: 1
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ width: isMusicStandMode ? '56px' : '42px', height: isMusicStandMode ? '56px' : '42px', minWidth: isMusicStandMode ? '56px' : '42px', borderRadius: '14px', background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4f46e5', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.22)' }}>
+                            <Sparkles size={isMusicStandMode ? 28 : 22} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
+                              <h4 style={{ margin: 0, fontSize: isMusicStandMode ? '1.45rem' : '1.20rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
                                 Deine Woche in Sternen
                               </h4>
                               
@@ -653,17 +692,17 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                 <span 
                                   title={`${availableShields} von 3 Schutzschilden aktiv für diese Woche`}
                                   style={{
-                                    fontSize: isMusicStandMode ? '0.88rem' : '0.80rem',
+                                    fontSize: '0.74rem',
                                     fontWeight: 900,
                                     background: availableShields > 0 ? 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)' : '#f8fafc',
                                     color: availableShields > 0 ? '#6d28d9' : '#64748b',
-                                    padding: isMusicStandMode ? '5px 12px' : '4px 10px',
+                                    padding: '3px 10px',
                                     borderRadius: '100px',
                                     border: availableShields > 0 ? '1.5px solid #c4b5fd' : '1px solid #e2e8f0',
                                     boxShadow: availableShields > 0 ? '0 2px 8px rgba(124, 58, 237, 0.16)' : '0 2px 4px rgba(0,0,0,0.03)',
                                     display: 'inline-flex',
                                     alignItems: 'center',
-                                    gap: '5px',
+                                    gap: '4px',
                                     whiteSpace: 'nowrap'
                                   }}
                                 >
@@ -685,259 +724,255 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                 </span>
 
                                 <span style={{
-                                  fontSize: isMusicStandMode ? '0.90rem' : '0.82rem',
+                                  fontSize: '0.74rem',
                                   fontWeight: 900,
                                   background: weekPracticedCount > 0 ? 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)' : '#f8fafc',
                                   color: weekPracticedCount > 0 ? '#92400e' : '#64748b',
-                                  padding: isMusicStandMode ? '5px 13px' : '4px 11px',
+                                  padding: '3px 10px',
                                   borderRadius: '100px',
                                   border: weekPracticedCount > 0 ? '1px solid #fcd34d' : '1px solid #e2e8f0',
                                   boxShadow: weekPracticedCount > 0 ? '0 2px 8px rgba(245, 158, 11, 0.18)' : '0 2px 4px rgba(0,0,0,0.03)',
                                   display: 'inline-flex',
                                   alignItems: 'center',
-                                  gap: '5px',
+                                  gap: '4px',
                                   whiteSpace: 'nowrap'
                                 }}>
                                   <span>{weekPracticedCount} von 7 Tagen</span>
-                                  <Star size={13} fill={weekPracticedCount > 0 ? '#f59e0b' : '#94a3b8'} color={weekPracticedCount > 0 ? '#d97706' : '#94a3b8'} style={{ filter: weekPracticedCount > 0 ? 'drop-shadow(0 0 4px rgba(245, 158, 11, 0.7))' : 'none' }} />
+                                  <Star size={12} fill={weekPracticedCount > 0 ? '#f59e0b' : '#94a3b8'} color={weekPracticedCount > 0 ? '#d97706' : '#94a3b8'} style={{ filter: weekPracticedCount > 0 ? 'drop-shadow(0 0 4px rgba(245, 158, 11, 0.7))' : 'none' }} />
                                 </span>
                               </div>
                             </div>
-                          </div>
-                          <span style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', color: '#64748b', fontWeight: 650, lineHeight: 1.4, display: 'block', marginTop: '3px' }}>
-                            Tippe auf die Tage für Zaubertöne!
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* 7 Days Grid with 3D Coins */}
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' }}>
-                        {weekDays.map((d: any, idx: number) => {
-                          let bg = '#f8fafc';
-                          let border = '1px solid #e2e8f0';
-                          let textColor = '#64748b';
-                          let boxShadow = '0 3px 0 #cbd5e1';
-                          let iconEl = <span style={{ fontSize: '0.85rem', opacity: 0.4 }}>·</span>;
-                          let subText = d.isFuture ? '·' : 'Pause';
-                          let customAnimation = 'none';
-
-                          if (d.isToday) {
-                            if (d.hasMastered || d.dayState === 'mastered') {
-                              bg = 'linear-gradient(180deg, #fffbeb 0%, #fef3c7 40%, #fde68a 100%)';
-                              border = '1.5px solid #f59e0b';
-                              textColor = '#78350f';
-                              boxShadow = '0 4px 0 #b45309, 0 8px 20px rgba(245, 158, 11, 0.40)';
-                              iconEl = <Star size={19} fill="#f59e0b" color="#b45309" style={{ filter: 'drop-shadow(0 0 6px rgba(245, 158, 11, 0.8))' }} />;
-                              subText = `${d.totalMins || 3}m`;
-                              customAnimation = 'amberStreakGlow 2.4s infinite ease-in-out';
-                            } else {
-                              // TODAY_STANDBY (Option A): Einladender Standby-Modus
-                              bg = 'linear-gradient(180deg, #eef2ff 0%, #e0e7ff 100%)';
-                              border = '1.5px solid #6366f1';
-                              textColor = '#4338ca';
-                              boxShadow = '0 4px 0 #3730a3, 0 8px 16px rgba(99, 102, 241, 0.25)';
-                              iconEl = <Sparkles size={18} color="#4338ca" />;
-                              subText = 'Heute!';
-                              customAnimation = 'pulseRadarBeacon 2.5s infinite';
-                            }
-                          } else if (d.hasMastered || d.dayState === 'mastered') {
-                            // PAST MASTERED: Bernstein/Sonnengold mit leuchtendem Stern
-                            bg = 'linear-gradient(180deg, #fffbeb 0%, #fef3c7 45%, #fde68a 100%)';
-                            border = '1.5px solid #f59e0b';
-                            textColor = '#78350f';
-                            boxShadow = '0 4px 0 #b45309, 0 6px 16px rgba(245, 158, 11, 0.28)';
-                            iconEl = <Star size={18} fill="#f59e0b" color="#b45309" style={{ filter: 'drop-shadow(0 0 5px rgba(245, 158, 11, 0.7))' }} />;
-                            subText = `${d.totalMins}m`;
-                            customAnimation = 'amberStreakGlow 3.5s infinite ease-in-out';
-                          } else if (d.dayState === 'shielded' || d.isJoker) {
-                            // SHIELDED (Schutzschild immer in Lila/Indigo)
-                            bg = 'linear-gradient(180deg, #f5f3ff 0%, #ede9fe 100%)';
-                            border = '1.5px solid #a78bfa';
-                            textColor = '#5b21b6';
-                            boxShadow = '0 4px 0 #6d28d9, 0 6px 16px rgba(124, 58, 237, 0.22)';
-                            iconEl = <Shield size={18} fill="#7c3aed" color="#7c3aed" style={{ filter: 'drop-shadow(0 0 4px rgba(124, 58, 237, 0.6))' }} />;
-                            subText = 'Schild';
-                          } else if (!d.isFuture) {
-                            // PAUSE (Mond in sanftem Schieferblau)
-                            bg = '#f8fafc';
-                            border = '1px solid #e2e8f0';
-                            textColor = '#94a3b8';
-                            boxShadow = '0 2px 0 #cbd5e1';
-                            iconEl = <Moon size={16} color="#94a3b8" />;
-                            subText = 'Pause';
-                          }
-
-                          return (
-                            <div
-                              key={idx}
-                              className="junior-day-coin"
-                              role="button"
-                              tabIndex={0}
-                              onMouseEnter={() => {
-                                if (d.hasMastered || d.isToday || d.dayState === 'shielded' || d.isJoker) playStarChimeSound();
-                              }}
-                              onClick={() => {
-                                playStarChimeSound();
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                  e.preventDefault();
-                                  playStarChimeSound();
-                                }
-                              }}
-                              style={{
-                                background: bg,
-                                border: border,
-                                borderRadius: '18px',
-                                padding: '10px 4px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '4px',
-                                minHeight: '74px',
-                                boxShadow: boxShadow,
-                                animation: customAnimation,
-                                cursor: 'pointer',
-                                touchAction: 'manipulation'
-                              }}
-                            >
-                              <span style={{ fontSize: '0.74rem', fontWeight: 900, color: textColor, textTransform: 'uppercase' }}>
-                                {d.dayName}
-                              </span>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '20px' }}>
-                                {iconEl}
-                              </div>
-                              <span style={{ fontSize: '0.68rem', fontWeight: 850, color: textColor }}>
-                                {subText}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Karte B: Dein nächster Sticker 🐝 (Holographic Card & Laser Bar) */}
-                    <div style={{
-                      background: 'linear-gradient(135deg, #ffffff 0%, #fdf4ff 100%)',
-                      borderRadius: isMobile ? '24px' : '32px',
-                      border: '2px solid rgba(99, 102, 241, 0.25)',
-                      padding: isMusicStandMode ? '32px' : (isMobile ? '18px 14px' : '28px'),
-                      boxShadow: '0 12px 30px rgba(15, 23, 42, 0.04)',
-                      boxSizing: 'border-box',
-                      maxWidth: '100%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      gap: '18px'
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ width: isMusicStandMode ? '64px' : '56px', height: isMusicStandMode ? '64px' : '56px', borderRadius: '18px', background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4f46e5', boxShadow: '0 6px 16px rgba(99, 102, 241, 0.22)' }}>
-                            <Award size={isMusicStandMode ? 32 : 28} />
-                          </div>
-                          <div>
-                            <h4 style={{ margin: 0, fontSize: isMusicStandMode ? '1.55rem' : '1.38rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
-                              Nächster Meilenstein
-                            </h4>
-                            <span style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', color: '#64748b', fontWeight: 650, lineHeight: 1.4 }}>
-                              Sticker-Pfad Belohnung
+                            <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 650, lineHeight: 1.3, display: 'block', marginTop: '2px' }}>
+                              Tippe auf die Tage für Zaubertöne!
                             </span>
                           </div>
                         </div>
 
-                        <button
-                          type="button"
+                        {/* 7 Days Grid with 3D Coins */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: isMobile ? '6px' : '6px' }}>
+                          {weekDays.map((d: any, idx: number) => {
+                            let bg = '#f8fafc';
+                            let border = '1px solid #e2e8f0';
+                            let textColor = '#64748b';
+                            let boxShadow = '0 3px 0 #cbd5e1';
+                            let iconEl = <span style={{ fontSize: '0.85rem', opacity: 0.4 }}>·</span>;
+                            let subText = d.isFuture ? '·' : 'Pause';
+                            let customAnimation = 'none';
+
+                            if (d.isToday) {
+                              if (d.hasMastered || d.dayState === 'mastered') {
+                                bg = 'linear-gradient(180deg, #fffbeb 0%, #fef3c7 40%, #fde68a 100%)';
+                                border = '1.5px solid #f59e0b';
+                                textColor = '#78350f';
+                                boxShadow = '0 4px 0 #b45309, 0 8px 20px rgba(245, 158, 11, 0.40)';
+                                iconEl = <Star size={18} fill="#f59e0b" color="#b45309" style={{ filter: 'drop-shadow(0 0 6px rgba(245, 158, 11, 0.8))' }} />;
+                                subText = `${d.totalMins || 3}m`;
+                                customAnimation = 'amberStreakGlow 2.4s infinite ease-in-out';
+                              } else {
+                                bg = 'linear-gradient(180deg, #eef2ff 0%, #e0e7ff 100%)';
+                                border = '1.5px solid #6366f1';
+                                textColor = '#4338ca';
+                                boxShadow = '0 4px 0 #3730a3, 0 8px 16px rgba(99, 102, 241, 0.25)';
+                                iconEl = <Sparkles size={17} color="#4338ca" />;
+                                subText = 'Heute!';
+                                customAnimation = 'pulseRadarBeacon 2.5s infinite';
+                              }
+                            } else if (d.hasMastered || d.dayState === 'mastered') {
+                              bg = 'linear-gradient(180deg, #fffbeb 0%, #fef3c7 45%, #fde68a 100%)';
+                              border = '1.5px solid #f59e0b';
+                              textColor = '#78350f';
+                              boxShadow = '0 4px 0 #b45309, 0 6px 16px rgba(245, 158, 11, 0.28)';
+                              iconEl = <Star size={17} fill="#f59e0b" color="#b45309" style={{ filter: 'drop-shadow(0 0 5px rgba(245, 158, 11, 0.7))' }} />;
+                              subText = `${d.totalMins}m`;
+                              customAnimation = 'amberStreakGlow 3.5s infinite ease-in-out';
+                            } else if (d.dayState === 'shielded' || d.isJoker) {
+                              bg = 'linear-gradient(180deg, #f5f3ff 0%, #ede9fe 100%)';
+                              border = '1.5px solid #a78bfa';
+                              textColor = '#5b21b6';
+                              boxShadow = '0 4px 0 #6d28d9, 0 6px 16px rgba(124, 58, 237, 0.22)';
+                              iconEl = <Shield size={17} fill="#7c3aed" color="#7c3aed" style={{ filter: 'drop-shadow(0 0 4px rgba(124, 58, 237, 0.6))' }} />;
+                              subText = 'Schild';
+                            } else if (!d.isFuture) {
+                              bg = '#f8fafc';
+                              border = '1px solid #e2e8f0';
+                              textColor = '#94a3b8';
+                              boxShadow = '0 2px 0 #cbd5e1';
+                              iconEl = <Moon size={15} color="#94a3b8" />;
+                              subText = 'Pause';
+                            }
+
+                            return (
+                              <div
+                                key={idx}
+                                className="junior-day-coin"
+                                role="button"
+                                tabIndex={0}
+                                onMouseEnter={() => {
+                                  if (d.hasMastered || d.isToday || d.dayState === 'shielded' || d.isJoker) playStarChimeSound();
+                                }}
+                                onClick={() => {
+                                  playStarChimeSound();
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    playStarChimeSound();
+                                  }
+                                }}
+                                style={{
+                                  background: bg,
+                                  border: border,
+                                  borderRadius: '14px',
+                                  padding: '5px 2px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '2px',
+                                  minHeight: isMusicStandMode ? '70px' : '52px',
+                                  boxShadow: boxShadow,
+                                  animation: customAnimation,
+                                  cursor: 'pointer',
+                                  touchAction: 'manipulation'
+                                }}
+                              >
+                                <span style={{ fontSize: '0.68rem', fontWeight: 900, color: textColor, textTransform: 'uppercase' }}>
+                                  {d.dayName}
+                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '18px' }}>
+                                  {iconEl}
+                                </div>
+                                <span style={{ fontSize: '0.62rem', fontWeight: 850, color: textColor }}>
+                                  {subText}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Karte B: Dein nächster Sticker 🐝 (Holographic Card & Laser Bar) */}
+                      <div style={{
+                        background: 'linear-gradient(135deg, #ffffff 0%, #fdf4ff 100%)',
+                        borderRadius: '22px',
+                        border: '2px solid rgba(99, 102, 241, 0.25)',
+                        padding: isMusicStandMode ? '22px 24px' : '16px 20px',
+                        boxShadow: '0 8px 24px rgba(15, 23, 42, 0.04)',
+                        boxSizing: 'border-box',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        gap: '10px',
+                        flex: 1
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{ width: isMusicStandMode ? '56px' : '42px', height: isMusicStandMode ? '56px' : '42px', borderRadius: '14px', background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4f46e5', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.22)' }}>
+                              <Award size={isMusicStandMode ? 28 : 22} />
+                            </div>
+                            <div>
+                              <h4 style={{ margin: 0, fontSize: isMusicStandMode ? '1.45rem' : '1.20rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>
+                                Nächster Meilenstein
+                              </h4>
+                              <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 650 }}>
+                                Sticker-Pfad Belohnung
+                              </span>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => setShowJuniorStickerModal(true)}
+                            style={{
+                              background: '#ffffff',
+                              border: '1.5px solid #c7d2fe',
+                              borderRadius: '100px',
+                              padding: '4px 12px',
+                              color: '#4f46e5',
+                              fontSize: '0.78rem',
+                              fontWeight: 900,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+                            }}
+                            className="hover-scale"
+                          >
+                            <BookOpen size={13} />
+                            <span>Sticker-Album</span>
+                          </button>
+                        </div>
+
+                        {/* 3D Holographic Sticker Preview Block */}
+                        <div 
                           onClick={() => setShowJuniorStickerModal(true)}
                           style={{
-                            background: '#ffffff',
-                            border: '1.5px solid #c7d2fe',
-                            borderRadius: '100px',
-                            padding: isMusicStandMode ? '6px 14px' : '5px 12px',
-                            color: '#4f46e5',
-                            fontSize: isMusicStandMode ? '0.92rem' : '0.84rem',
-                            fontWeight: 900,
-                            cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '5px',
-                            boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+                            gap: '14px',
+                            background: '#ffffff',
+                            borderRadius: '16px',
+                            padding: '10px 14px',
+                            border: '1.5px solid #e2e8f0',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                            cursor: 'pointer'
                           }}
                           className="hover-scale"
                         >
-                          <BookOpen size={14} />
-                          <span>Sticker-Album</span>
-                        </button>
-                      </div>
-
-                      {/* 3D Holographic Sticker Preview Block */}
-                      <div 
-                        onClick={() => setShowJuniorStickerModal(true)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '16px',
-                          background: '#ffffff',
-                          borderRadius: '20px',
-                          padding: '16px 18px',
-                          border: '1.5px solid #e2e8f0',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-                          cursor: 'pointer'
-                        }}
-                        className="hover-scale"
-                      >
-                        <div style={{
-                          width: isMusicStandMode ? '64px' : '56px',
-                          height: isMusicStandMode ? '64px' : '56px',
-                          borderRadius: '18px',
-                          background: 'linear-gradient(135deg, #eef2ff 0%, #ffffff 100%)',
-                          border: '2.5px solid #818cf8',
-                          boxShadow: '0 6px 16px rgba(99, 102, 241, 0.30), 0 3px 0 #4f46e5',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                          padding: '3px',
-                          overflow: 'hidden'
-                        }}>
-                          <img
-                            src={`/stickers/${stickerId}.png?v=1`}
-                            alt={nextStickerName}
-                            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                              const parent = e.currentTarget.parentElement;
-                              if (parent) {
-                                const span = document.createElement('span');
-                                span.style.fontSize = '1.6rem';
-                                span.innerText = stickerIcon;
-                                parent.appendChild(span);
-                              }
-                            }}
-                          />
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontWeight: 950, fontSize: isMusicStandMode ? '1.20rem' : '1.08rem', color: '#0f172a' }}>{nextStickerName}</span>
-                            <span style={{ fontSize: isMusicStandMode ? '0.92rem' : '0.86rem', fontWeight: 900, color: '#4f46e5' }}>{effMins} / {targetMin} Min</span>
+                          <div style={{
+                            width: isMusicStandMode ? '56px' : '44px',
+                            height: isMusicStandMode ? '56px' : '44px',
+                            borderRadius: '14px',
+                            background: 'linear-gradient(135deg, #eef2ff 0%, #ffffff 100%)',
+                            border: '2px solid #818cf8',
+                            boxShadow: '0 4px 12px rgba(99, 102, 241, 0.25), 0 2px 0 #4f46e5',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                            padding: '2px',
+                            overflow: 'hidden'
+                          }}>
+                            <img
+                              src={`/stickers/${stickerId}.png?v=1`}
+                              alt={nextStickerName}
+                              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                const parent = e.currentTarget.parentElement;
+                                if (parent) {
+                                  const span = document.createElement('span');
+                                  span.style.fontSize = '1.4rem';
+                                  span.innerText = stickerIcon;
+                                  parent.appendChild(span);
+                                }
+                              }}
+                            />
                           </div>
 
-                          {/* Laser Energy Bar (Purple to Lavender) */}
-                          <div style={{ width: '100%', height: '10px', background: '#e2e8f0', borderRadius: '100px', overflow: 'hidden' }}>
-                            <div style={{
-                              width: `${progressPct}%`,
-                              height: '100%',
-                              background: 'linear-gradient(90deg, #818cf8 0%, #a855f7 50%, #c084fc 100%)',
-                              borderRadius: '100px',
-                              boxShadow: '0 0 10px rgba(168, 85, 247, 0.5)',
-                              transition: 'width 0.4s ease'
-                            }} />
-                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontWeight: 950, fontSize: isMusicStandMode ? '1.10rem' : '0.96rem', color: '#0f172a' }}>{nextStickerName}</span>
+                              <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#4f46e5' }}>{effMins} / {targetMin} Min</span>
+                            </div>
 
-                          <span style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: '#64748b', fontWeight: 650 }}>
-                            {isMax ? 'Großmeister-Status erreicht!' : `Noch ${minsToNext} Min. konzentriert üben zum Freischalten!`}
-                          </span>
+                            {/* Laser Energy Bar (Purple to Lavender) */}
+                            <div style={{ width: '100%', height: '8px', background: '#e2e8f0', borderRadius: '100px', overflow: 'hidden' }}>
+                              <div style={{
+                                width: `${progressPct}%`,
+                                height: '100%',
+                                background: 'linear-gradient(90deg, #818cf8 0%, #a855f7 50%, #c084fc 100%)',
+                                borderRadius: '100px',
+                                boxShadow: '0 0 10px rgba(168, 85, 247, 0.5)',
+                                transition: 'width 0.4s ease'
+                              }} />
+                            </div>
+
+                            <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 650 }}>
+                              {isMax ? 'Großmeister-Status erreicht!' : `Noch ${minsToNext} Min. konzentriert üben zum Freischalten!`}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1235,7 +1270,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                       50% { transform: scale(1.05); opacity: 1; }
                     }
                     .junior-zen-bg {
-                      background: #000000;
+                      background: linear-gradient(160deg, #090514 0%, #150a26 40%, #1a0d33 70%, #0d061a 100%);
                       transition: background 2.5s ease;
                     }
                     .junior-orbit-glow-bg {
@@ -1248,7 +1283,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                     }
                   `}</style>
 
-                  {/* Background Cosmic Canvas: Pure Deep Black during Zen Focus Phase (Zero Distraction), Cosmic Awakening upon Goal Reach or Celebration */}
+                  {/* Background Cosmic Canvas: Deep Space Cosmic Awakening during Focus & Celebration */}
                   <div
                     className={juniorMissionPhase === 'zen' ? (isGoalReached ? 'junior-orbit-glow-bg' : 'junior-zen-bg') : 'junior-celebrating-bg'}
                     style={{
@@ -1259,53 +1294,51 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                       overflow: 'hidden'
                     }}
                   >
-                    {/* Nebula Glow & Twinkling Stars ONLY active when goal is reached or in celebration (Zero distraction during focus) */}
-                    {(isGoalReached || juniorMissionPhase === 'celebrating') && (
-                      <>
-                        {/* Centered Cosmic Nebula Glow */}
-                        <div style={{
-                          position: 'absolute',
-                          top: '30%',
-                          left: '50%',
-                          transform: 'translate(-50%, -50%)',
-                          width: '640px',
-                          height: '460px',
-                          background: 'radial-gradient(circle, rgba(168, 85, 247, 0.35) 0%, rgba(99, 102, 241, 0.18) 50%, rgba(0,0,0,0) 75%)',
-                          borderRadius: '50%',
-                          animation: 'zenBreathNebula 6s ease-in-out infinite'
-                        }} />
+                    {/* Centered Cosmic Nebula Glow */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '30%',
+                      left: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      width: isGoalReached ? '720px' : '620px',
+                      height: isGoalReached ? '520px' : '440px',
+                      background: isGoalReached
+                        ? 'radial-gradient(circle, rgba(251, 191, 36, 0.28) 0%, rgba(168, 85, 247, 0.24) 40%, rgba(99, 102, 241, 0.14) 65%, rgba(0,0,0,0) 80%)'
+                        : 'radial-gradient(circle, rgba(168, 85, 247, 0.30) 0%, rgba(99, 102, 241, 0.16) 50%, rgba(0,0,0,0) 75%)',
+                      borderRadius: '50%',
+                      animation: 'zenBreathNebula 6s ease-in-out infinite',
+                      transition: 'all 2s ease'
+                    }} />
 
-                        {/* Twinkling Stars */}
-                        {[
-                          { top: '10%', left: '12%', size: 8, delay: '0s', color: '#fde047' },
-                          { top: '18%', right: '15%', size: 10, delay: '1.2s', color: '#c084fc' },
-                          { top: '35%', left: '8%', size: 9, delay: '0.7s', color: '#818cf8' },
-                          { top: '45%', right: '10%', size: 8, delay: '1.8s', color: '#fde047' },
-                          { top: '70%', left: '14%', size: 10, delay: '2.3s', color: '#e879f9' },
-                          { top: '80%', right: '16%', size: 7, delay: '0.4s', color: '#a78bfa' },
-                          { top: '12%', left: '46%', size: 6, delay: '1.5s', color: '#ffffff' },
-                          { top: '28%', right: '35%', size: 9, delay: '2.0s', color: '#fde047' }
-                        ].map((star, i) => (
-                          <div
-                            key={i}
-                            style={{
-                              position: 'absolute',
-                              top: star.top,
-                              left: star.left,
-                              right: star.right,
-                              width: `${star.size}px`,
-                              height: `${star.size}px`,
-                              animation: `cosmicTwinkle 3s ease-in-out infinite ${star.delay}`,
-                              pointerEvents: 'none'
-                            }}
-                          >
-                            <svg width={star.size} height={star.size} viewBox="0 0 24 24" fill={star.color}>
-                              <path d="M12 0 L14.5 9.5 L24 12 L14.5 14.5 L12 24 L9.5 14.5 L0 12 L9.5 9.5 Z" />
-                            </svg>
-                          </div>
-                        ))}
-                      </>
-                    )}
+                    {/* Twinkling Stars */}
+                    {[
+                      { top: '10%', left: '12%', size: 8, delay: '0s', color: '#fde047' },
+                      { top: '18%', right: '15%', size: 10, delay: '1.2s', color: '#c084fc' },
+                      { top: '35%', left: '8%', size: 9, delay: '0.7s', color: '#818cf8' },
+                      { top: '45%', right: '10%', size: 8, delay: '1.8s', color: '#fde047' },
+                      { top: '70%', left: '14%', size: 10, delay: '2.3s', color: '#e879f9' },
+                      { top: '80%', right: '16%', size: 7, delay: '0.4s', color: '#a78bfa' },
+                      { top: '12%', left: '46%', size: 6, delay: '1.5s', color: '#ffffff' },
+                      { top: '28%', right: '35%', size: 9, delay: '2.0s', color: '#fde047' }
+                    ].map((star, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          position: 'absolute',
+                          top: star.top,
+                          left: star.left,
+                          right: star.right,
+                          width: `${star.size}px`,
+                          height: `${star.size}px`,
+                          animation: `cosmicTwinkle 3s ease-in-out infinite ${star.delay}`,
+                          pointerEvents: 'none'
+                        }}
+                      >
+                        <svg width={star.size} height={star.size} viewBox="0 0 24 24" fill={star.color}>
+                          <path d="M12 0 L14.5 9.5 L24 12 L14.5 14.5 L12 24 L9.5 14.5 L0 12 L9.5 9.5 Z" />
+                        </svg>
+                      </div>
+                    ))}
 
                     {/* Warp Speed Lines during Tier 3 Celebration */}
                     {juniorMissionPhase === 'celebrating' && juniorMissionTier === 3 && (
@@ -1857,24 +1890,24 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                             textAlign: 'center',
                             margin: 'auto 0'
                           }}>
-                            {/* 240px Orbit-Reaktor Ring (Keine Rakete während der Übezeit) */}
+                            {/* 260px / 230px Orbit-Reaktor Ring mit schwebender Vektor-Rakete & Sternenantrieb */}
                             <div style={{
                               position: 'relative',
-                              width: isMusicStandMode ? '260px' : '230px',
-                              height: isMusicStandMode ? '260px' : '230px',
+                              width: isMusicStandMode ? '270px' : '240px',
+                              height: isMusicStandMode ? '270px' : '240px',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               borderRadius: '50%',
                               background: isGoalReached
-                                ? 'radial-gradient(circle, rgba(245, 158, 11, 0.12) 0%, rgba(168, 85, 247, 0.06) 50%, rgba(0,0,0,0) 75%)'
-                                : 'rgba(255, 255, 255, 0.02)',
+                                ? 'radial-gradient(circle, rgba(245, 158, 11, 0.16) 0%, rgba(168, 85, 247, 0.08) 50%, rgba(0,0,0,0) 75%)'
+                                : 'radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, rgba(168, 85, 247, 0.05) 50%, rgba(0,0,0,0) 75%)',
                               transition: 'background 2s ease'
                             }}>
                               {/* SVG Orbit-Reaktor Ring */}
                               <svg
-                                width={isMusicStandMode ? '260' : '230'}
-                                height={isMusicStandMode ? '260' : '230'}
+                                width={isMusicStandMode ? '270' : '240'}
+                                height={isMusicStandMode ? '270' : '240'}
                                 viewBox="0 0 280 280"
                                 style={{ transform: 'rotate(-90deg)', overflow: 'visible', position: 'absolute', inset: 0 }}
                               >
@@ -1919,7 +1952,7 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                 />
                               </svg>
 
-                              {/* Ziffern & Status-Pille im Inneren des Rings */}
+                              {/* Schwebende Vektor-Rakete, Ziffern & Status-Pille im Inneren des Rings */}
                               <div style={{
                                 position: 'absolute',
                                 inset: 0,
@@ -1927,10 +1960,43 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                 flexDirection: 'column',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                gap: '6px'
+                                gap: '3px'
                               }}>
+                                {/* Schwebende Vektor-Rakete mit pulsierendem Plasma-Triebwerk */}
                                 <div style={{
-                                  fontSize: isMusicStandMode ? '4.6rem' : '3.9rem',
+                                  position: 'relative',
+                                  width: isMusicStandMode ? '58px' : '48px',
+                                  height: isMusicStandMode ? '58px' : '48px',
+                                  marginTop: '-4px',
+                                  marginBottom: '2px',
+                                  animation: 'zenRocketHover 3.5s ease-in-out infinite',
+                                  filter: isGoalReached
+                                    ? 'drop-shadow(0 0 18px rgba(251, 191, 36, 0.75))'
+                                    : 'drop-shadow(0 0 14px rgba(168, 85, 247, 0.55))',
+                                  transition: 'filter 1.5s ease'
+                                }}>
+                                  <svg width="100%" height="100%" viewBox="0 0 68 68" fill="none" style={{ overflow: 'visible' }}>
+                                    {/* Animated Thruster Plasma Flame */}
+                                    <g style={{ transformOrigin: '34px 50px', animation: 'thrusterFlamePulse 0.35s ease-in-out infinite alternate' }}>
+                                      <path d="M30 48 Q34 66 34 68 Q34 66 38 48 Z" fill={isGoalReached ? '#f59e0b' : '#f97316'} />
+                                      <path d="M32 48 Q34 60 34 62 Q34 60 36 48 Z" fill={isGoalReached ? '#fef08a' : '#fde047'} />
+                                    </g>
+                                    {/* Red Wings */}
+                                    <path d="M22 36 L12 48 Q20 48 24 43 Z" fill={isGoalReached ? '#f59e0b' : '#ef4444'} />
+                                    <path d="M46 36 L56 48 Q48 48 44 43 Z" fill={isGoalReached ? '#f59e0b' : '#ef4444'} />
+                                    {/* Spaceship Main White Hull */}
+                                    <path d="M34 8 C26 18 24 34 24 46 L44 46 C44 34 42 18 34 8 Z" fill="#f8fafc" stroke="#cbd5e1" strokeWidth="1.5" />
+                                    {/* Red Nose Cone */}
+                                    <path d="M34 8 C30 14 27 20 26 23 L42 23 C41 20 38 14 34 8 Z" fill={isGoalReached ? '#ec4899' : '#ef4444'} />
+                                    {/* Cyan Cockpit Porthole */}
+                                    <circle cx="34" cy="30" r="6" fill="#38bdf8" stroke="#ffffff" strokeWidth="1.5" style={{ filter: 'drop-shadow(0 0 6px #38bdf8)' }} />
+                                    <circle cx="32" cy="28" r="2" fill="#ffffff" />
+                                  </svg>
+                                </div>
+
+                                {/* Timer-Ziffern */}
+                                <div style={{
+                                  fontSize: isMusicStandMode ? '3.5rem' : '2.9rem',
                                   fontWeight: 950,
                                   color: isGoalReached ? '#fbbf24' : '#ffffff',
                                   letterSpacing: '-0.04em',
@@ -1946,12 +2012,12 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
 
                                 {showFlatReminder ? (
                                   <div style={{
-                                    fontSize: isMusicStandMode ? '0.92rem' : '0.82rem',
+                                    fontSize: isMusicStandMode ? '0.86rem' : '0.78rem',
                                     fontWeight: 900,
                                     color: '#fef3c7',
                                     background: 'rgba(245, 158, 11, 0.25)',
                                     border: '1.5px solid rgba(251, 191, 36, 0.65)',
-                                    padding: isMusicStandMode ? '6px 16px' : '4px 14px',
+                                    padding: isMusicStandMode ? '5px 14px' : '3px 12px',
                                     borderRadius: '100px',
                                     backdropFilter: 'blur(12px)',
                                     boxShadow: '0 0 20px rgba(245, 158, 11, 0.45)',
@@ -1960,18 +2026,18 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                                     gap: '6px',
                                     animation: 'flatReminderPulse 2s ease-in-out infinite'
                                   }}>
-                                    <Smartphone size={14} strokeWidth={2.4} color="#fef3c7" style={{ flexShrink: 0 }} />
+                                    <Smartphone size={13} strokeWidth={2.4} color="#fef3c7" style={{ flexShrink: 0 }} />
                                     <span>Handy flach hinlegen</span>
                                   </div>
                                 ) : (
                                   <div style={{
-                                    fontSize: isMusicStandMode ? '0.94rem' : '0.84rem',
+                                    fontSize: isMusicStandMode ? '0.88rem' : '0.80rem',
                                     fontWeight: 900,
                                     color: isGoalReached ? '#fde047' : '#e0e7ff',
                                     letterSpacing: '0.02em',
                                     background: isGoalReached ? 'rgba(245, 158, 11, 0.25)' : 'rgba(255, 255, 255, 0.10)',
                                     border: isGoalReached ? '2px solid rgba(251, 191, 36, 0.6)' : '1.5px solid rgba(255, 255, 255, 0.20)',
-                                    padding: isMusicStandMode ? '6px 16px' : '4px 14px',
+                                    padding: isMusicStandMode ? '5px 14px' : '3px 12px',
                                     borderRadius: '100px',
                                     backdropFilter: 'blur(12px)',
                                     boxShadow: isGoalReached ? '0 0 20px rgba(245, 158, 11, 0.4)' : '0 4px 14px rgba(0,0,0,0.4)',
@@ -3214,59 +3280,68 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
               // 🎸 WENN SESSION IDLE IST -> DAS ERGONOMISCHE DASHBOARD (1:1 JUNIOR PARITÄT)
               // =========================================================================
               return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%' }} className="animation-fade-in practice-board-teen">
+                <div 
+                  style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: isMobile ? '16px' : '18px', 
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  }} 
+                  className="animation-fade-in practice-board-teen"
+                >
                   
                   {/* 1. Header Bar: Einzeilige Überschrift ohne Subtext */}
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    gap: '14px',
-                    background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-                    borderRadius: '24px',
-                    padding: isMusicStandMode ? '20px 28px' : '16px 24px',
-                    border: '1.5px solid rgba(245, 158, 11, 0.25)',
-                    boxShadow: '0 12px 30px rgba(0, 0, 0, 0.25)',
+                    gap: '12px',
+                    background: 'linear-gradient(165deg, #0d1527 0%, #080c16 100%)',
+                    borderRadius: '20px',
+                    padding: isMusicStandMode ? '16px 24px' : '10px 20px',
+                    border: '1.5px solid rgba(245, 158, 11, 0.28)',
+                    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.25)',
                     flexWrap: 'wrap'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <div style={{
-                        width: isMusicStandMode ? '64px' : '56px',
-                        height: isMusicStandMode ? '64px' : '56px',
-                        borderRadius: '18px',
+                        width: isMusicStandMode ? '56px' : '42px',
+                        height: isMusicStandMode ? '56px' : '42px',
+                        borderRadius: '12px',
                         background: 'rgba(245, 158, 11, 0.15)',
                         border: '1.5px solid rgba(245, 158, 11, 0.35)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         color: '#fbbf24',
-                        boxShadow: '0 6px 16px rgba(245, 158, 11, 0.2)',
+                        boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)',
                         flexShrink: 0
                       }}>
-                        <Headphones size={isMusicStandMode ? 32 : 28} color="#fbbf24" />
+                        <Music size={isMusicStandMode ? 28 : 20} color="#fbbf24" />
                       </div>
                       <div>
-                        <h3 style={{ margin: 0, fontSize: isMusicStandMode ? '1.65rem' : '1.45rem', fontWeight: 950, color: '#ffffff', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
+                        <h3 style={{ margin: 0, fontSize: isMusicStandMode ? '1.45rem' : '1.25rem', fontWeight: 950, color: '#ffffff', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
                           Übe-Pfad
                         </h3>
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       {/* Flow Flamme */}
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px',
+                        gap: '6px',
                         background: 'rgba(15, 23, 42, 0.7)',
                         border: '1.5px solid rgba(245, 158, 11, 0.35)',
                         color: '#fbbf24',
-                        padding: isMusicStandMode ? '8px 16px' : '6px 14px',
+                        padding: isMusicStandMode ? '6px 14px' : '5px 12px',
                         borderRadius: '100px',
                         fontWeight: 900,
-                        fontSize: isMusicStandMode ? '0.92rem' : '0.86rem'
+                        fontSize: isMusicStandMode ? '0.88rem' : '0.82rem'
                       }}>
-                        <Flame size={18} fill="#f59e0b" color="#f59e0b" />
+                        <Flame size={16} fill="#f59e0b" color="#f59e0b" />
                         <span>{streak} {streak === 1 ? 'Tag' : 'Tage'} Flow</span>
                       </div>
 
@@ -3274,349 +3349,385 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px',
+                        gap: '6px',
                         background: 'rgba(15, 23, 42, 0.7)',
                         border: '1.5px solid rgba(255, 255, 255, 0.1)',
                         color: '#ffffff',
-                        padding: isMusicStandMode ? '8px 16px' : '6px 14px',
+                        padding: isMusicStandMode ? '6px 14px' : '5px 12px',
                         borderRadius: '100px',
                         fontWeight: 900,
-                        fontSize: isMusicStandMode ? '0.92rem' : '0.86rem'
+                        fontSize: isMusicStandMode ? '0.88rem' : '0.82rem'
                       }}>
-                        <Star size={16} fill="#fbbf24" color="#fbbf24" />
+                        <Star size={15} fill="#fbbf24" color="#fbbf24" />
                         <span>{xpVal} XP</span>
                       </div>
                     </div>
                   </div>
 
-                  {/* 2. Karte A: Center Stage Hero (Der Flow-Timer - OHNE Dropdown!) */}
-                  <div style={{
-                    width: '100%',
-                    background: 'linear-gradient(160deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)',
-                    borderRadius: '32px',
-                    border: '2px solid rgba(245, 158, 11, 0.28)',
-                    padding: isMusicStandMode ? '44px 32px' : '40px 28px',
-                    boxShadow: '0 20px 50px -10px rgba(0, 0, 0, 0.5), 0 0 35px rgba(245, 158, 11, 0.08) inset',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    textAlign: 'center',
-                    position: 'relative',
-                    overflow: 'hidden',
-                    boxSizing: 'border-box'
-                  }}>
-                    {/* Ambient Glow */}
+                  {/* 2. Studio 2-Column Cockpit Grid (Hero links, Partner-Karten rechts) */}
+                  <div className="practice-studio-cockpit-grid">
+                    {/* Linke Spalte: Center Stage Hero (Großer Vinyl-Timer & Start-Button) */}
                     <div style={{
-                      position: 'absolute',
-                      top: '-50px',
-                      right: '-30px',
-                      width: '280px',
-                      height: '280px',
-                      background: 'radial-gradient(circle, rgba(245, 158, 11, 0.12) 0%, rgba(0,0,0,0) 70%)',
-                      borderRadius: '50%',
-                      pointerEvents: 'none'
-                    }} />
-
-                    {/* Target Pill */}
-                    <div style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      background: 'rgba(245, 158, 11, 0.15)',
-                      border: '1px solid rgba(245, 158, 11, 0.4)',
-                      color: '#fbbf24',
-                      padding: isMusicStandMode ? '7px 22px' : '6px 18px',
-                      borderRadius: '100px',
-                      fontSize: isMusicStandMode ? '0.92rem' : '0.86rem',
-                      fontWeight: 900,
-                      letterSpacing: '0.04em',
-                      textTransform: 'uppercase',
-                      marginBottom: '20px',
-                      boxShadow: '0 0 15px rgba(245, 158, 11, 0.15)',
-                      zIndex: 1
-                    }}>
-                      <Target size={16} color="#fbbf24" />
-                      <span>Tagesziel: {targetMins} Min. am Stück</span>
-                    </div>
-
-                    {/* Vinyl Groove Dial Ring (195px) */}
-                    <div style={{
-                      position: 'relative',
-                      width: '195px',
-                      height: '195px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderRadius: '50%',
-                      background: 'radial-gradient(circle, rgba(245, 158, 11, 0.12) 0%, rgba(15, 23, 42, 0.9) 70%)',
-                      border: '3px solid rgba(245, 158, 11, 0.35)',
-                      boxShadow: '0 0 35px rgba(245, 158, 11, 0.12), inset 0 0 20px rgba(0,0,0,0.6)',
-                      marginBottom: '24px',
-                      zIndex: 1
-                    }}>
-                      <div style={{
-                        position: 'absolute',
-                        inset: '-6px',
-                        borderRadius: '50%',
-                        border: '1.5px dashed rgba(245, 158, 11, 0.4)',
-                        pointerEvents: 'none'
-                      }} />
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                        <span style={{
-                          fontSize: isMusicStandMode ? '3.6rem' : '3.2rem',
-                          fontWeight: 950,
-                          color: '#fef3c7',
-                          fontFamily: "'Plus Jakarta Sans', monospace",
-                          letterSpacing: '-0.03em',
-                          lineHeight: 1
-                        }}>
-                          {String(targetMins).padStart(2, '0')}:00
-                        </span>
-                        <span style={{ fontSize: '0.76rem', color: '#cbd5e1', fontWeight: 700, marginTop: '6px' }}>
-                          Fokuszeit
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Primary Action Button */}
-                    <div style={{ width: '100%', maxWidth: '380px', zIndex: 1 }}>
-                      <button
-                        type="button"
-                        onClick={handleStartPracticeSession}
-                        style={{
-                          width: '100%',
-                          minHeight: isMusicStandMode ? '56px' : '50px',
-                          borderRadius: '20px',
-                          background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                          border: '2px solid #fde047',
-                          color: '#ffffff',
-                          fontSize: isMusicStandMode ? '1.18rem' : '1.08rem',
-                          fontWeight: 950,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '10px',
-                          boxShadow: '0 12px 28px rgba(245, 158, 11, 0.4), inset 0 1px 0 rgba(255,255,255,0.4)',
-                          letterSpacing: '-0.01em',
-                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
-                        }}
-                        className="hover-scale"
-                      >
-                        <Play size={20} fill="#ffffff" color="#ffffff" />
-                        <span>Übe-Session starten</span>
-                      </button>
-                    </div>
-
-                    <span style={{ fontSize: '0.80rem', color: '#94a3b8', fontWeight: 650, marginTop: '14px', zIndex: 1, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                      <Headphones size={13} color="#94a3b8" />
-                      <span>Kopfhörer aufsetzen &amp; konzentriert üben</span>
-                    </span>
-                  </div>
-
-                  {/* 3. Bottom Dual Grid: Karte C (Wochen-Konsistenz) + Karte B (Sticker-Meilenstein) */}
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-                    gap: '24px',
-                    width: '100%'
-                  }}>
-                    {/* Karte C: Weekly Beats & Flow-Serie (Exakt 2 Schilde pro Woche) */}
-                    <div style={{
-                      background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-                      borderRadius: '32px',
-                      border: '2px solid rgba(245, 158, 11, 0.25)',
-                      padding: isMusicStandMode ? '32px' : '28px',
-                      boxShadow: '0 12px 30px rgba(0, 0, 0, 0.25)',
+                      background: 'linear-gradient(165deg, #0d1527 0%, #080c16 100%)',
+                      borderRadius: '24px',
+                      border: '1.5px solid rgba(245, 158, 11, 0.28)',
+                      padding: isMusicStandMode ? '32px 24px' : '26px 20px',
+                      boxShadow: '0 20px 50px -10px rgba(0, 0, 0, 0.6), 0 0 35px rgba(245, 158, 11, 0.06) inset',
                       display: 'flex',
                       flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      gap: '18px',
-                      boxSizing: 'border-box'
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      textAlign: 'center',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      boxSizing: 'border-box',
+                      minHeight: isMobile ? 'auto' : '410px'
                     }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ width: isMusicStandMode ? '64px' : '56px', height: isMusicStandMode ? '64px' : '56px', borderRadius: '18px', background: 'rgba(245, 158, 11, 0.15)', border: '1.5px solid rgba(245, 158, 11, 0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fbbf24' }}>
-                            <Flame size={isMusicStandMode ? 32 : 28} fill="#f59e0b" color="#f59e0b" />
-                          </div>
-                          <div>
-                            <h4 style={{ margin: 0, fontSize: isMusicStandMode ? '1.55rem' : '1.38rem', fontWeight: 950, color: '#ffffff', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                              Deine Übe-Woche
-                            </h4>
-                            <span style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', color: '#cbd5e1', fontWeight: 650 }}>
-                              Wochen-Rhythmus &amp; Schilde
-                            </span>
-                          </div>
-                        </div>
+                      {/* Ambient Central Spotlight behind dial */}
+                      <div style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        width: '320px',
+                        height: '320px',
+                        background: 'radial-gradient(circle, rgba(245, 158, 11, 0.09) 0%, rgba(0,0,0,0) 70%)',
+                        borderRadius: '50%',
+                        pointerEvents: 'none'
+                      }} />
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {/* Target Pill */}
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '7px',
+                        background: 'rgba(245, 158, 11, 0.14)',
+                        border: '1px solid rgba(245, 158, 11, 0.45)',
+                        color: '#fbbf24',
+                        padding: isMusicStandMode ? '6px 18px' : '5px 16px',
+                        borderRadius: '100px',
+                        fontSize: isMusicStandMode ? '0.88rem' : '0.82rem',
+                        fontWeight: 900,
+                        letterSpacing: '0.04em',
+                        textTransform: 'uppercase',
+                        marginBottom: '18px',
+                        boxShadow: '0 2px 14px rgba(245, 158, 11, 0.15)',
+                        zIndex: 1
+                      }}>
+                        <Target size={14} color="#fbbf24" />
+                        <span>Tagesziel: {targetMins} Min. am Stück</span>
+                      </div>
+
+                      {/* Vinyl Groove Dial Ring */}
+                      <div style={{
+                        position: 'relative',
+                        width: isMusicStandMode ? '210px' : '185px',
+                        height: isMusicStandMode ? '210px' : '185px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '50%',
+                        background: 'radial-gradient(circle, rgba(245, 158, 11, 0.10) 0%, rgba(8, 12, 22, 0.95) 75%)',
+                        border: '3px solid rgba(245, 158, 11, 0.40)',
+                        boxShadow: '0 0 35px rgba(245, 158, 11, 0.16), inset 0 0 25px rgba(0,0,0,0.7)',
+                        marginBottom: '20px',
+                        zIndex: 1,
+                        flexShrink: 0
+                      }}>
+                        <div style={{
+                          position: 'absolute',
+                          inset: '-5px',
+                          borderRadius: '50%',
+                          border: '1.5px dashed rgba(245, 158, 11, 0.45)',
+                          pointerEvents: 'none'
+                        }} />
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                           <span style={{
-                            fontSize: '0.78rem',
-                            fontWeight: 850,
-                            background: 'rgba(245, 158, 11, 0.15)',
-                            color: '#fbbf24',
-                            border: '1px solid rgba(245, 158, 11, 0.35)',
-                            padding: '4px 10px',
-                            borderRadius: '100px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '5px'
+                            fontSize: isMusicStandMode ? '3.4rem' : '2.9rem',
+                            fontWeight: 950,
+                            color: '#ffffff',
+                            fontFamily: "'Plus Jakarta Sans', monospace",
+                            fontFeatureSettings: '"tnum"',
+                            letterSpacing: '-0.03em',
+                            lineHeight: 1,
+                            textShadow: '0 2px 16px rgba(0, 0, 0, 0.6)'
                           }}>
-                            <Shield size={13} fill="#fbbf24" color="#fbbf24" />
-                            <span>2 Schilde aktiv</span>
+                            {String(targetMins).padStart(2, '0')}:00
+                          </span>
+                          <span style={{ 
+                            fontSize: isMusicStandMode ? '0.80rem' : '0.74rem', 
+                            color: '#94a3b8', 
+                            fontWeight: 800, 
+                            marginTop: '5px',
+                            letterSpacing: '0.10em',
+                            textTransform: 'uppercase'
+                          }}>
+                            Fokuszeit
                           </span>
                         </div>
                       </div>
 
-                      {/* 7-Tage-Grid */}
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' }}>
-                        {weekDays.map((d: any, idx: number) => {
-                          const isDone = d.hasMastered;
-                          const isToday = d.isToday;
-                          return (
-                            <div
-                              key={idx}
-                              style={{
-                                background: isDone ? 'rgba(16, 185, 129, 0.15)' : (isToday ? 'rgba(245, 158, 11, 0.15)' : 'rgba(15, 23, 42, 0.6)'),
-                                border: isDone ? '1.5px solid #10b981' : (isToday ? '1.5px solid #f59e0b' : '1px solid rgba(255, 255, 255, 0.08)'),
-                                borderRadius: '16px',
-                                padding: '10px 4px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '6px',
-                                minHeight: '74px'
-                              }}
-                            >
-                              <span style={{ fontSize: '0.72rem', fontWeight: 900, color: isDone ? '#34d399' : (isToday ? '#fbbf24' : '#94a3b8'), textTransform: 'uppercase' }}>
-                                {d.dayName}
-                              </span>
-                              {isDone ? (
-                                <Zap size={18} color="#34d399" />
-                              ) : isToday ? (
-                                <Flame size={18} fill="#f59e0b" color="#f59e0b" />
-                              ) : (
-                                <span style={{ fontSize: '0.85rem', color: '#64748b' }}>·</span>
-                              )}
-                              <span style={{ fontSize: '0.66rem', fontWeight: 850, color: isDone ? '#34d399' : (isToday ? '#fbbf24' : '#94a3b8') }}>
-                                {isDone ? `${d.totalMins || 3}m` : (isToday ? 'Heute' : 'Pause')}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Karte B: Nächster Meilenstein mit echtem Sticker */}
-                    <div style={{
-                      background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-                      borderRadius: '32px',
-                      border: '2px solid rgba(245, 158, 11, 0.25)',
-                      padding: isMusicStandMode ? '32px' : '28px',
-                      boxShadow: '0 12px 30px rgba(0, 0, 0, 0.25)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      gap: '18px',
-                      boxSizing: 'border-box'
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ width: isMusicStandMode ? '64px' : '56px', height: isMusicStandMode ? '64px' : '56px', borderRadius: '18px', background: 'rgba(245, 158, 11, 0.15)', border: '1.5px solid rgba(245, 158, 11, 0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fbbf24' }}>
-                            <Award size={isMusicStandMode ? 32 : 28} />
-                          </div>
-                          <div>
-                            <h4 style={{ margin: 0, fontSize: isMusicStandMode ? '1.55rem' : '1.38rem', fontWeight: 950, color: '#ffffff', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                              Nächster Meilenstein
-                            </h4>
-                            <span style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', color: '#cbd5e1', fontWeight: 650 }}>
-                              Sticker-Pfad Belohnung
-                            </span>
-                          </div>
-                        </div>
-
+                      {/* Primary Action Button - Monumentale Ergonomie & 11.4:1 AAA Hardware-Kontrast */}
+                      <div style={{ width: '100%', maxWidth: '360px', zIndex: 1 }}>
                         <button
                           type="button"
-                          onClick={() => setShowJuniorStickerModal(true)}
+                          onClick={handleStartPracticeSession}
                           style={{
-                            background: 'rgba(245, 158, 11, 0.15)',
-                            border: '1.5px solid rgba(245, 158, 11, 0.35)',
-                            borderRadius: '100px',
-                            padding: isMusicStandMode ? '6px 14px' : '5px 12px',
-                            color: '#fbbf24',
-                            fontSize: isMusicStandMode ? '0.92rem' : '0.84rem',
-                            fontWeight: 900,
+                            width: '100%',
+                            minHeight: isMusicStandMode ? '58px' : '50px',
+                            borderRadius: '16px',
+                            background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                            border: '2px solid #fde047',
+                            color: '#0f172a',
+                            fontSize: isMusicStandMode ? '1.15rem' : '1.08rem',
+                            fontWeight: 950,
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '6px'
+                            justifyContent: 'center',
+                            gap: '10px',
+                            padding: '12px 28px',
+                            boxShadow: '0 12px 30px -4px rgba(245, 158, 11, 0.45), inset 0 1px 1px rgba(255,255,255,0.6)',
+                            letterSpacing: '-0.015em',
+                            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                            touchAction: 'manipulation'
                           }}
                           className="hover-scale"
                         >
-                          <BookOpen size={14} />
-                          <span>Sticker-Album</span>
+                          <Play size={20} fill="#0f172a" color="#0f172a" />
+                          <span>Übe-Session starten</span>
                         </button>
                       </div>
+                    </div>
 
-                      {/* Echte Sticker Vorschau */}
-                      <div
-                        onClick={() => setShowJuniorStickerModal(true)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '16px',
-                          background: 'rgba(15, 23, 42, 0.7)',
-                          borderRadius: '20px',
-                          padding: '16px 18px',
-                          border: '1.5px solid rgba(255, 255, 255, 0.08)',
-                          cursor: 'pointer'
-                        }}
-                        className="hover-scale"
-                      >
-                        <div style={{
-                          width: isMusicStandMode ? '64px' : '56px',
-                          height: isMusicStandMode ? '64px' : '56px',
-                          borderRadius: '18px',
-                          background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(15, 23, 42, 0.8) 100%)',
-                          border: '2px solid rgba(245, 158, 11, 0.45)',
-                          boxShadow: '0 6px 16px rgba(245, 158, 11, 0.25)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                          padding: '4px',
-                          overflow: 'hidden'
-                        }}>
-                          <img
-                            src={`/stickers/${stickerId}.png?v=1`}
-                            alt={nextStickerName}
-                            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                              const parent = e.currentTarget.parentElement;
-                              if (parent) {
-                                const span = document.createElement('span');
-                                span.style.fontSize = '1.6rem';
-                                span.innerText = stickerIcon;
-                                parent.appendChild(span);
-                              }
-                            }}
-                          />
+                    {/* Rechte Spalte: Gestapelte Partner-Karten (Woche + Meilenstein) */}
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '14px',
+                      justifyContent: 'space-between',
+                      height: '100%'
+                    }}>
+                      {/* Karte C: Weekly Beats & Flow-Serie (Exakt 2 Schilde pro Woche) */}
+                      <div style={{
+                        background: 'linear-gradient(165deg, #0d1527 0%, #080c16 100%)',
+                        borderRadius: '22px',
+                        border: '1.5px solid rgba(245, 158, 11, 0.28)',
+                        padding: isMusicStandMode ? '22px 24px' : '16px 20px',
+                        boxShadow: '0 12px 30px rgba(0, 0, 0, 0.35)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        gap: '10px',
+                        flex: 1,
+                        boxSizing: 'border-box'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{
+                              width: '40px',
+                              height: '40px',
+                              borderRadius: '12px',
+                              background: 'rgba(245, 158, 11, 0.15)',
+                              border: '1.5px solid rgba(245, 158, 11, 0.35)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#fbbf24',
+                              flexShrink: 0
+                            }}>
+                              <Flame size={20} fill="#f59e0b" color="#f59e0b" />
+                            </div>
+                            <div>
+                              <h4 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 950, color: '#ffffff', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.01em' }}>
+                                Deine Übe-Woche
+                              </h4>
+                              <span style={{ fontSize: '0.78rem', color: '#cbd5e1', fontWeight: 650 }}>
+                                Wochen-Rhythmus &amp; Schilde
+                              </span>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{
+                              fontSize: '0.74rem',
+                              fontWeight: 850,
+                              background: 'rgba(245, 158, 11, 0.15)',
+                              color: '#fbbf24',
+                              border: '1px solid rgba(245, 158, 11, 0.35)',
+                              padding: '3px 10px',
+                              borderRadius: '100px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              <Shield size={12} fill="#fbbf24" color="#fbbf24" />
+                              <span>2 Schilde aktiv</span>
+                            </span>
+                          </div>
                         </div>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontWeight: 950, fontSize: isMusicStandMode ? '1.20rem' : '1.08rem', color: '#ffffff' }}>{nextStickerName}</span>
-                            <span style={{ fontSize: isMusicStandMode ? '0.92rem' : '0.86rem', fontWeight: 900, color: '#fbbf24' }}>{effMins} / {targetMin} Min</span>
+                        {/* 7-Tage-Grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
+                          {weekDays.map((d: any, idx: number) => {
+                            const isDone = d.hasMastered;
+                            const isToday = d.isToday;
+                            return (
+                              <div
+                                key={idx}
+                                style={{
+                                  background: isDone ? 'rgba(16, 185, 129, 0.15)' : (isToday ? 'rgba(245, 158, 11, 0.15)' : 'rgba(15, 23, 42, 0.6)'),
+                                  border: isDone ? '1.5px solid #10b981' : (isToday ? '1.5px solid #f59e0b' : '1px solid rgba(255, 255, 255, 0.08)'),
+                                  borderRadius: '12px',
+                                  padding: '6px 2px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '3px',
+                                  minHeight: '54px'
+                                }}
+                              >
+                                <span style={{ fontSize: '0.66rem', fontWeight: 900, color: isDone ? '#34d399' : (isToday ? '#fbbf24' : '#94a3b8'), textTransform: 'uppercase' }}>
+                                  {d.dayName}
+                                </span>
+                                {isDone ? (
+                                  <Zap size={14} color="#34d399" />
+                                ) : isToday ? (
+                                  <Flame size={14} fill="#f59e0b" color="#f59e0b" />
+                                ) : (
+                                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>·</span>
+                                )}
+                                <span style={{ fontSize: '0.62rem', fontWeight: 850, color: isDone ? '#34d399' : (isToday ? '#fbbf24' : '#94a3b8') }}>
+                                  {isDone ? `${d.totalMins || 3}m` : (isToday ? 'Heute' : 'Pause')}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Karte B: Nächster Meilenstein mit echtem Sticker */}
+                      <div style={{
+                        background: 'linear-gradient(165deg, #0d1527 0%, #080c16 100%)',
+                        borderRadius: '22px',
+                        border: '1.5px solid rgba(245, 158, 11, 0.28)',
+                        padding: isMusicStandMode ? '22px 24px' : '16px 20px',
+                        boxShadow: '0 12px 30px rgba(0, 0, 0, 0.35)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        gap: '10px',
+                        flex: 1,
+                        boxSizing: 'border-box'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{
+                              width: '40px',
+                              height: '40px',
+                              borderRadius: '12px',
+                              background: 'rgba(245, 158, 11, 0.15)',
+                              border: '1.5px solid rgba(245, 158, 11, 0.35)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#fbbf24',
+                              flexShrink: 0
+                            }}>
+                              <Award size={20} />
+                            </div>
+                            <div>
+                              <h4 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 950, color: '#ffffff', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.01em' }}>
+                                Nächster Meilenstein
+                              </h4>
+                              <span style={{ fontSize: '0.78rem', color: '#cbd5e1', fontWeight: 650 }}>
+                                Sticker-Pfad Belohnung
+                              </span>
+                            </div>
                           </div>
-                          <div style={{ width: '100%', height: '8px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '10px', overflow: 'hidden' }}>
-                            <div style={{ width: `${progressPct}%`, height: '100%', background: 'linear-gradient(90deg, #f59e0b, #10b981)', borderRadius: '10px' }} />
+
+                          <button
+                            type="button"
+                            onClick={() => setShowJuniorStickerModal(true)}
+                            style={{
+                              background: 'rgba(245, 158, 11, 0.15)',
+                              border: '1.5px solid rgba(245, 158, 11, 0.35)',
+                              borderRadius: '100px',
+                              padding: '4px 12px',
+                              color: '#fbbf24',
+                              fontSize: '0.78rem',
+                              fontWeight: 900,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '5px'
+                            }}
+                            className="hover-scale"
+                          >
+                            <BookOpen size={13} />
+                            <span>Sticker-Album</span>
+                          </button>
+                        </div>
+
+                        {/* Echte Sticker Vorschau */}
+                        <div
+                          onClick={() => setShowJuniorStickerModal(true)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            background: 'rgba(15, 23, 42, 0.7)',
+                            borderRadius: '16px',
+                            padding: '10px 14px',
+                            border: '1.5px solid rgba(255, 255, 255, 0.08)',
+                            cursor: 'pointer'
+                          }}
+                          className="hover-scale"
+                        >
+                          <div style={{
+                            width: '46px',
+                            height: '46px',
+                            borderRadius: '14px',
+                            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(15, 23, 42, 0.8) 100%)',
+                            border: '2px solid rgba(245, 158, 11, 0.45)',
+                            boxShadow: '0 4px 12px rgba(245, 158, 11, 0.25)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                            padding: '3px',
+                            overflow: 'hidden'
+                          }}>
+                            <img
+                              src={`/stickers/${stickerId}.png?v=1`}
+                              alt={nextStickerName}
+                              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                const parent = e.currentTarget.parentElement;
+                                if (parent) {
+                                  const span = document.createElement('span');
+                                  span.style.fontSize = '1.3rem';
+                                  span.innerText = stickerIcon;
+                                  parent.appendChild(span);
+                                }
+                              }}
+                            />
                           </div>
-                          <span style={{ fontSize: isMusicStandMode ? '0.88rem' : '0.80rem', color: '#94a3b8', fontWeight: 650 }}>
-                            {isMax ? 'Maximaler Status erreicht!' : `Noch ${minsToNext} Min. bis zum nächsten Sticker!`}
-                          </span>
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontWeight: 950, fontSize: '0.96rem', color: '#ffffff' }}>{nextStickerName}</span>
+                              <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#fbbf24' }}>{effMins} / {targetMin} Min</span>
+                            </div>
+                            <div style={{ width: '100%', height: '6px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '10px', overflow: 'hidden' }}>
+                              <div style={{ width: `${progressPct}%`, height: '100%', background: 'linear-gradient(90deg, #f59e0b, #10b981)', borderRadius: '10px' }} />
+                            </div>
+                            <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 650 }}>
+                              {isMax ? 'Maximaler Status erreicht!' : `Noch ${minsToNext} Min. bis zum nächsten Sticker!`}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -4196,26 +4307,36 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
               // 🎓 WENN SESSION IDLE IST -> DAS ERGONOMISCHE DASHBOARD (1:1 JUNIOR PARITÄT)
               // =========================================================================
               return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%' }} className="animation-fade-in practice-board-pro">
+                <div 
+                  style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: isMobile ? '16px' : '18px', 
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  }} 
+                  className="animation-fade-in practice-board-pro"
+                >
                   
                   {/* 1. Header Bar: Einzeilige Überschrift ohne Subtext */}
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    gap: '14px',
+                    gap: '12px',
                     background: '#ffffff',
-                    borderRadius: '24px',
-                    padding: isMusicStandMode ? '20px 28px' : '16px 24px',
+                    borderRadius: '20px',
+                    padding: isMusicStandMode ? '16px 24px' : 'clamp(10px, 1.3vh, 14px) clamp(16px, 1.8vw, 24px)',
                     border: '1.5px solid #e2e8f0',
-                    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.04)',
-                    flexWrap: 'wrap'
+                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.03)',
+                    flexWrap: 'wrap',
+                    flexShrink: 0
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(10px, 1.2vw, 14px)' }}>
                       <div style={{
-                        width: isMusicStandMode ? '64px' : '56px',
-                        height: isMusicStandMode ? '64px' : '56px',
-                        borderRadius: '18px',
+                        width: isMusicStandMode ? '56px' : 'clamp(38px, 4.8vh, 50px)',
+                        height: isMusicStandMode ? '56px' : 'clamp(38px, 4.8vh, 50px)',
+                        borderRadius: '14px',
                         background: '#e6f4ea',
                         border: '1.5px solid #86efac',
                         display: 'flex',
@@ -4225,30 +4346,30 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                         boxShadow: '0 4px 12px rgba(22, 163, 74, 0.12)',
                         flexShrink: 0
                       }}>
-                        <Music size={isMusicStandMode ? 32 : 28} color="#16a34a" />
+                        <Music size={isMusicStandMode ? 28 : 22} color="#16a34a" />
                       </div>
                       <div>
-                        <h3 style={{ margin: 0, fontSize: isMusicStandMode ? '1.65rem' : '1.45rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
+                        <h3 style={{ margin: 0, fontSize: isMusicStandMode ? '1.45rem' : 'clamp(1.15rem, 1.8vh, 1.35rem)', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
                           Übe-Pfad
                         </h3>
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       {/* Streak Pill */}
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px',
+                        gap: '6px',
                         background: '#fffbeb',
                         border: '1.5px solid #fde68a',
                         color: '#b45309',
-                        padding: isMusicStandMode ? '8px 16px' : '6px 14px',
+                        padding: isMusicStandMode ? '6px 14px' : 'clamp(4px, 0.7vh, 6px) clamp(10px, 1.2vw, 14px)',
                         borderRadius: '100px',
                         fontWeight: 900,
-                        fontSize: isMusicStandMode ? '0.92rem' : '0.86rem'
+                        fontSize: isMusicStandMode ? '0.88rem' : 'clamp(0.78rem, 1.1vh, 0.86rem)'
                       }}>
-                        <Flame size={18} fill="#f59e0b" color="#f59e0b" />
+                        <Flame size={16} fill="#f59e0b" color="#f59e0b" />
                         <span>{streak} {streak === 1 ? 'Tag' : 'Tage'} Streak</span>
                       </div>
 
@@ -4256,442 +4377,450 @@ export const StudentPracticeTab: React.FC<StudentPracticeTabProps> = ({
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px',
+                        gap: '6px',
                         background: '#e6f4ea',
                         border: '1.5px solid #86efac',
                         color: '#15803d',
-                        padding: isMusicStandMode ? '8px 16px' : '6px 14px',
+                        padding: isMusicStandMode ? '6px 14px' : 'clamp(4px, 0.7vh, 6px) clamp(10px, 1.2vw, 14px)',
                         borderRadius: '100px',
                         fontWeight: 900,
-                        fontSize: isMusicStandMode ? '0.92rem' : '0.86rem'
+                        fontSize: isMusicStandMode ? '0.88rem' : 'clamp(0.78rem, 1.1vh, 0.86rem)'
                       }}>
-                        <Star size={16} fill="#16a34a" color="#16a34a" />
+                        <Star size={15} fill="#16a34a" color="#16a34a" />
                         <span>{xpVal} XP</span>
                       </div>
                     </div>
                   </div>
 
-                  {/* 2. Karte A: Center Stage Hero (Der Apple Precision Timer - OHNE Dropdown!) */}
-                  <div style={{
-                    width: '100%',
-                    background: '#ffffff',
-                    borderRadius: '32px',
-                    border: '2px solid #e2e8f0',
-                    padding: isMusicStandMode ? '44px 32px' : '40px 28px',
-                    boxShadow: '0 20px 50px -10px rgba(0, 0, 0, 0.06), 0 0 35px rgba(22, 163, 74, 0.03) inset',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    textAlign: 'center',
-                    position: 'relative',
-                    overflow: 'hidden',
-                    boxSizing: 'border-box'
-                  }}>
-                    {/* Target Pill */}
-                    <div style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      background: '#e6f4ea',
-                      border: '1.5px solid #86efac',
-                      color: '#15803d',
-                      padding: isMusicStandMode ? '7px 22px' : '6px 18px',
-                      borderRadius: '100px',
-                      fontSize: isMusicStandMode ? '0.92rem' : '0.86rem',
-                      fontWeight: 900,
-                      letterSpacing: '0.04em',
-                      textTransform: 'uppercase',
-                      marginBottom: '20px',
-                      boxShadow: '0 2px 8px rgba(22, 163, 74, 0.08)',
-                      zIndex: 1
-                    }}>
-                      <Target size={16} color="#16a34a" />
-                      <span>Tages-Fokus: {targetMins} Min. am Stück</span>
-                    </div>
-
-                    {/* Apple HIG Precision Dial Ring (195px) */}
-                    <div style={{
-                      position: 'relative',
-                      width: '195px',
-                      height: '195px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderRadius: '50%',
-                      background: '#ffffff',
-                      border: '4px solid #16a34a',
-                      boxShadow: '0 12px 35px rgba(22, 163, 74, 0.15), inset 0 2px 8px rgba(0, 0, 0, 0.03)',
-                      marginBottom: '24px',
-                      zIndex: 1
-                    }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                        <span style={{
-                          fontSize: isMusicStandMode ? '3.6rem' : '3.2rem',
-                          fontWeight: 950,
-                          color: '#0f172a',
-                          fontFamily: "'Plus Jakarta Sans', monospace",
-                          letterSpacing: '-0.03em',
-                          lineHeight: 1
-                        }}>
-                          {String(targetMins).padStart(2, '0')}:00
-                        </span>
-                        <span style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 700, marginTop: '6px' }}>
-                          Fokuszeit
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Primary Action Button */}
-                    <div style={{ width: '100%', maxWidth: '380px', zIndex: 1 }}>
-                      <button
-                        type="button"
-                        onClick={handleStartPracticeSession}
-                        style={{
-                          width: '100%',
-                          background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '20px',
-                          minHeight: '52px',
-                          padding: '14px 24px',
-                          fontSize: isMusicStandMode ? '1.18rem' : '1.05rem',
-                          fontWeight: 950,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '10px',
-                          boxShadow: '0 8px 25px rgba(22, 163, 74, 0.35)',
-                          transition: 'all 0.15s ease',
-                          touchAction: 'manipulation'
-                        }}
-                        className="hover-scale"
-                      >
-                        <Play size={20} fill="#ffffff" />
-                        <span>Fokus-Session starten</span>
-                      </button>
-                    </div>
-
-                    {/* Microcopy underneath */}
-                    <p style={{
-                      fontSize: isMusicStandMode ? '0.98rem' : '0.90rem',
-                      color: '#64748b',
-                      fontWeight: 650,
-                      margin: '16px 0 0 0',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      flexWrap: 'wrap',
-                      justifyContent: 'center',
-                      zIndex: 1
-                    }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                        <Headphones size={13} color="#16a34a" /> Fokus setzen
-                      </span>
-                      <span>·</span>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                        <Target size={13} color="#16a34a" /> Konzentration bündeln
-                      </span>
-                      <span>·</span>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                        <GraduationCap size={13} color="#16a34a" /> Präzision formen
-                      </span>
-                    </p>
-                  </div>
-
-                  {/* 3. Bottom Dual Grid: 2 Ruhige, Ausbalancierte Karten (1:1 Parität mit Junior) */}
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-                    gap: '24px',
-                    width: '100%'
-                  }}>
-                    {/* Karte C: Wochen-Konsistenz & Fokus (7-Tage-Grid mit 2 Ruhetagen) */}
+                  {/* 2. Studio 2-Column Cockpit Grid (Hero links, Partner-Karten rechts) */}
+                  <div className="practice-studio-cockpit-grid">
+                    {/* Linke Spalte: Center Stage Hero (Der Apple Precision Timer) */}
                     <div style={{
                       background: '#ffffff',
-                      borderRadius: '32px',
+                      borderRadius: '24px',
                       border: '2px solid #e2e8f0',
-                      padding: isMusicStandMode ? '32px' : '28px',
-                      boxShadow: '0 12px 30px rgba(15, 23, 42, 0.04)',
+                      padding: isMusicStandMode ? '32px 24px' : '26px 20px',
+                      boxShadow: '0 16px 40px -10px rgba(0, 0, 0, 0.05), 0 0 35px rgba(22, 163, 74, 0.03) inset',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '18px',
-                      boxSizing: 'border-box'
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      textAlign: 'center',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      boxSizing: 'border-box',
+                      minHeight: isMobile ? 'auto' : '410px'
                     }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ width: isMusicStandMode ? '64px' : '56px', height: isMusicStandMode ? '64px' : '56px', borderRadius: '18px', background: '#e6f4ea', border: '1.5px solid #86efac', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
-                            <Activity size={isMusicStandMode ? 32 : 28} color="#16a34a" />
-                          </div>
-                          <div>
-                            <h4 style={{ margin: 0, fontSize: isMusicStandMode ? '1.55rem' : '1.38rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                              Wochen-Konsistenz &amp; Fokus
-                            </h4>
-                            <span style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', color: '#64748b', fontWeight: 650 }}>
-                              {weekPracticedCount} von 7 Tagen • 2 Ruhetage geschützt
-                            </span>
-                          </div>
-                        </div>
+                      {/* Target Pill */}
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '7px',
+                        background: '#e6f4ea',
+                        border: '1.5px solid #86efac',
+                        color: '#15803d',
+                        padding: isMusicStandMode ? '6px 18px' : '5px 16px',
+                        borderRadius: '100px',
+                        fontSize: isMusicStandMode ? '0.88rem' : '0.82rem',
+                        fontWeight: 900,
+                        letterSpacing: '0.04em',
+                        textTransform: 'uppercase',
+                        marginBottom: '18px',
+                        boxShadow: '0 2px 8px rgba(22, 163, 74, 0.08)',
+                        zIndex: 1
+                      }}>
+                        <Target size={14} color="#16a34a" />
+                        <span>Tages-Fokus: {targetMins} Min. am Stück</span>
+                      </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {/* Apple HIG Precision Dial Ring */}
+                      <div style={{
+                        position: 'relative',
+                        width: isMusicStandMode ? '210px' : '185px',
+                        height: isMusicStandMode ? '210px' : '185px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '50%',
+                        background: '#ffffff',
+                        border: '4px solid #16a34a',
+                        boxShadow: '0 10px 30px rgba(22, 163, 74, 0.12), inset 0 2px 8px rgba(0, 0, 0, 0.03)',
+                        marginBottom: '20px',
+                        zIndex: 1,
+                        flexShrink: 0
+                      }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                           <span style={{
-                            fontSize: '0.78rem',
-                            fontWeight: 850,
-                            background: '#e6f4ea',
-                            color: '#15803d',
-                            border: '1px solid #86efac',
-                            padding: '4px 10px',
-                            borderRadius: '100px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '5px'
+                            fontSize: isMusicStandMode ? '3.4rem' : '2.9rem',
+                            fontWeight: 950,
+                            color: '#0f172a',
+                            fontFamily: "'Plus Jakarta Sans', monospace",
+                            letterSpacing: '-0.03em',
+                            lineHeight: 1
                           }}>
-                            <ShieldCheck size={13} color="#16a34a" />
-                            <span>2 Ruhetage aktiv</span>
+                            {String(targetMins).padStart(2, '0')}:00
+                          </span>
+                          <span style={{ fontSize: isMusicStandMode ? '0.80rem' : '0.74rem', color: '#64748b', fontWeight: 700, marginTop: '5px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                            Fokuszeit
                           </span>
                         </div>
                       </div>
 
-                      {/* 7-Tage-Grid */}
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' }}>
-                        {weekDays.map((d: any, idx: number) => {
-                          const isDone = d.hasMastered;
-                          const isToday = d.isToday;
-                          return (
-                            <div
-                              key={idx}
-                              style={{
-                                background: isDone ? '#f0fdf4' : (isToday ? '#e6f4ea' : '#f8fafc'),
-                                border: isDone ? '1.5px solid #86efac' : (isToday ? '1.5px solid #86efac' : '1px solid #e2e8f0'),
-                                borderRadius: '16px',
-                                padding: '10px 4px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '6px',
-                                minHeight: '74px'
-                              }}
-                            >
-                              <span style={{ fontSize: '0.72rem', fontWeight: 900, color: isDone ? '#166534' : (isToday ? '#15803d' : '#64748b'), textTransform: 'uppercase' }}>
-                                {d.dayName}
-                              </span>
-                              {isDone ? (
-                                <CheckCircle size={18} color="#166534" />
-                              ) : isToday ? (
-                                <Sparkles size={16} color="#16a34a" />
-                              ) : (
-                                <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>·</span>
-                              )}
-                              <span style={{ fontSize: '0.66rem', fontWeight: 850, color: isDone ? '#166534' : (isToday ? '#15803d' : '#64748b') }}>
-                                {isDone ? `${d.totalMins || 3}m` : (isToday ? 'Heute' : 'Pause')}
-                              </span>
-                            </div>
-                          );
-                        })}
+                      {/* Primary Action Button */}
+                      <div style={{ width: '100%', maxWidth: '360px', zIndex: 1 }}>
+                        <button
+                          type="button"
+                          onClick={handleStartPracticeSession}
+                          style={{
+                            width: '100%',
+                            background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '16px',
+                            minHeight: isMusicStandMode ? '58px' : '50px',
+                            padding: isMusicStandMode ? '16px 36px' : '12px 28px',
+                            fontSize: isMusicStandMode ? '1.15rem' : '1.08rem',
+                            fontWeight: 950,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '10px',
+                            boxShadow: '0 8px 25px rgba(22, 163, 74, 0.35)',
+                            transition: 'all 0.15s ease',
+                            touchAction: 'manipulation'
+                          }}
+                          className="hover-scale"
+                        >
+                          <Play size={18} fill="#ffffff" />
+                          <span>Fokus-Session starten</span>
+                        </button>
                       </div>
+
+                      {/* Microcopy underneath */}
+                      <p style={{
+                        fontSize: isMusicStandMode ? '0.90rem' : '0.78rem',
+                        color: '#64748b',
+                        fontWeight: 650,
+                        margin: '12px 0 0 0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        flexWrap: 'wrap',
+                        justifyContent: 'center',
+                        zIndex: 1
+                      }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <Headphones size={12} color="#16a34a" /> Fokus setzen
+                        </span>
+                        <span>·</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <Target size={12} color="#16a34a" /> Konzentration bündeln
+                        </span>
+                        <span>·</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <GraduationCap size={12} color="#16a34a" /> Präzision formen
+                        </span>
+                      </p>
                     </div>
 
-                    {/* Karte B: Meisterwerk & Repertoire-Widget (Offene Konzertstücke & Bühnenreife) */}
+                    {/* Rechte Spalte: Gestapelte Partner-Karten (Woche + Meilenstein) */}
                     <div style={{
-                      background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                      borderRadius: '32px',
-                      border: '2px solid #e2e8f0',
-                      padding: isMusicStandMode ? '32px' : '28px',
-                      boxShadow: '0 12px 30px rgba(15, 23, 42, 0.04)',
                       display: 'flex',
                       flexDirection: 'column',
+                      gap: '14px',
                       justifyContent: 'space-between',
-                      gap: '18px',
-                      boxSizing: 'border-box'
+                      height: '100%'
                     }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ width: isMusicStandMode ? '64px' : '56px', height: isMusicStandMode ? '64px' : '56px', borderRadius: '18px', background: '#e6f4ea', border: '1.5px solid #86efac', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
-                            <Trophy size={isMusicStandMode ? 32 : 28} />
+                      {/* Karte C: Wochen-Konsistenz & Fokus (7-Tage-Grid mit 2 Ruhetagen) */}
+                      <div style={{
+                        background: '#ffffff',
+                        borderRadius: '22px',
+                        border: '2px solid #e2e8f0',
+                        padding: isMusicStandMode ? '22px 24px' : '16px 20px',
+                        boxShadow: '0 8px 24px rgba(15, 23, 42, 0.04)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        gap: '10px',
+                        flex: 1,
+                        boxSizing: 'border-box'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{ width: isMusicStandMode ? '48px' : '40px', height: isMusicStandMode ? '48px' : '40px', borderRadius: '12px', background: '#e6f4ea', border: '1.5px solid #86efac', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a', flexShrink: 0 }}>
+                              <Activity size={isMusicStandMode ? 24 : 20} color="#16a34a" />
+                            </div>
+                            <div>
+                              <h4 style={{ margin: 0, fontSize: isMusicStandMode ? '1.30rem' : '1.15rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                Wochen-Konsistenz &amp; Fokus
+                              </h4>
+                              <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 650 }}>
+                                {weekPracticedCount} von 7 Tagen • 2 Ruhetage geschützt
+                              </span>
+                            </div>
                           </div>
-                          <div>
-                            <h4 style={{ margin: 0, fontSize: isMusicStandMode ? '1.55rem' : '1.38rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                              Meisterwerk &amp; Repertoire
-                            </h4>
-                            <span style={{ fontSize: isMusicStandMode ? '1.05rem' : '0.92rem', color: '#64748b', fontWeight: 650 }}>
-                              Bühnenreife &amp; Konzertstücke
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{
+                              fontSize: '0.74rem',
+                              fontWeight: 850,
+                              background: '#e6f4ea',
+                              color: '#15803d',
+                              border: '1px solid #86efac',
+                              padding: '3px 10px',
+                              borderRadius: '100px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              <ShieldCheck size={12} color="#16a34a" />
+                              <span>2 Ruhetage aktiv</span>
                             </span>
                           </div>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => handleOpenHomeworkBookWithView('audiobiography', 'document')}
-                          style={{
-                            background: '#ffffff',
-                            border: '1.5px solid #86efac',
-                            borderRadius: '100px',
-                            padding: isMusicStandMode ? '6px 14px' : '5px 12px',
-                            color: '#15803d',
-                            fontSize: isMusicStandMode ? '0.92rem' : '0.84rem',
-                            fontWeight: 900,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            boxShadow: '0 2px 6px rgba(22, 163, 74, 0.08)'
-                          }}
-                          className="hover-scale"
-                        >
-                          <FileText size={14} />
-                          <span>Protokoll öffnen</span>
-                        </button>
-                      </div>
-
-                      {/* Repertoire Stücke Preview (Maximal 2 unvollständige Stücke im Arbeits-Fokus) */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {activeSongsList.length > 0 ? (
-                          <>
-                            {activeSongsList.slice(0, 2).map((song, sIdx) => (
+                        {/* 7-Tage-Grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
+                          {weekDays.map((d: any, idx: number) => {
+                            const isDone = d.hasMastered;
+                            const isToday = d.isToday;
+                            return (
                               <div
-                                key={`pro-song-${sIdx}`}
-                                onClick={() => handleOpenHomeworkBookWithView('audiobiography', 'document')}
+                                key={idx}
                                 style={{
+                                  background: isDone ? '#f0fdf4' : (isToday ? '#e6f4ea' : '#f8fafc'),
+                                  border: isDone ? '1.5px solid #86efac' : (isToday ? '1.5px solid #86efac' : '1px solid #e2e8f0'),
+                                  borderRadius: '12px',
+                                  padding: '5px 2px',
                                   display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '14px',
-                                  background: '#ffffff',
-                                  borderRadius: '20px',
-                                  padding: '12px 16px',
-                                  border: song.isCurrentHomework ? '1.5px solid #86efac' : '1.5px solid #e2e8f0',
-                                  boxShadow: song.isCurrentHomework ? '0 4px 14px rgba(22, 163, 74, 0.08)' : '0 2px 8px rgba(0,0,0,0.03)',
-                                  cursor: 'pointer'
-                                }}
-                                className="hover-scale"
-                              >
-                                <div style={{
-                                  width: '42px',
-                                  height: '42px',
-                                  borderRadius: '14px',
-                                  background: song.isCurrentHomework ? '#e6f4ea' : '#f8fafc',
-                                  border: song.isCurrentHomework ? '1.5px solid #86efac' : '1.5px solid #e2e8f0',
-                                  display: 'flex',
+                                  flexDirection: 'column',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  color: '#16a34a',
-                                  flexShrink: 0
-                                }}>
-                                  <Disc size={22} />
-                                </div>
-
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: 1, minWidth: 0 }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                                      <span style={{ fontWeight: 950, fontSize: isMusicStandMode ? '1.05rem' : '0.96rem', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {song.title}
-                                      </span>
-                                      {song.isCurrentHomework && (
-                                        <span style={{
-                                          background: '#e6f4ea',
-                                          color: '#15803d',
-                                          border: '1px solid #86efac',
-                                          fontSize: '0.70rem',
-                                          fontWeight: 850,
-                                          padding: '1px 6px',
-                                          borderRadius: '6px',
-                                          flexShrink: 0
-                                        }}>
-                                          Hausaufgabe
-                                        </span>
-                                      )}
-                                    </div>
-                                    <span style={{ fontSize: '0.80rem', fontWeight: 900, color: '#15803d', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
-                                      {song.progress}% Bühnenreif
-                                    </span>
-                                  </div>
-                                  <div style={{ width: '100%', height: '7px', background: '#e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
-                                    <div style={{ width: `${Math.min(99, Math.max(5, song.progress))}%`, height: '100%', background: 'linear-gradient(90deg, #16a34a, #22c55e)', borderRadius: '10px' }} />
-                                  </div>
-                                </div>
+                                  gap: '2px',
+                                  minHeight: '48px'
+                                }}
+                              >
+                                <span style={{ fontSize: '0.66rem', fontWeight: 900, color: isDone ? '#166534' : (isToday ? '#15803d' : '#64748b'), textTransform: 'uppercase' }}>
+                                  {d.dayName}
+                                </span>
+                                {isDone ? (
+                                  <CheckCircle size={14} color="#166534" />
+                                ) : isToday ? (
+                                  <Sparkles size={14} color="#16a34a" />
+                                ) : (
+                                  <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>·</span>
+                                )}
+                                <span style={{ fontSize: '0.62rem', fontWeight: 850, color: isDone ? '#166534' : (isToday ? '#15803d' : '#64748b') }}>
+                                  {isDone ? `${d.totalMins || 3}m` : (isToday ? 'Heute' : 'Pause')}
+                                </span>
                               </div>
-                            ))}
+                            );
+                          })}
+                        </div>
+                      </div>
 
-                            {/* Dezente Fußzeile bei mehr als 2 offenen Stücken */}
-                            {activeSongsList.length > 2 && (
-                              <div style={{ textAlign: 'center', paddingTop: '2px' }}>
-                                <button
-                                  type="button"
+                      {/* Karte B: Meisterwerk & Repertoire-Widget (Offene Konzertstücke & Bühnenreife) */}
+                      <div style={{
+                        background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                        borderRadius: '22px',
+                        border: '2px solid #e2e8f0',
+                        padding: isMusicStandMode ? '22px 24px' : '16px 20px',
+                        boxShadow: '0 8px 24px rgba(15, 23, 42, 0.04)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        gap: '10px',
+                        flex: 1,
+                        boxSizing: 'border-box'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{ width: isMusicStandMode ? '48px' : '40px', height: isMusicStandMode ? '48px' : '40px', borderRadius: '12px', background: '#e6f4ea', border: '1.5px solid #86efac', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a', flexShrink: 0 }}>
+                              <Trophy size={isMusicStandMode ? 24 : 20} />
+                            </div>
+                            <div>
+                              <h4 style={{ margin: 0, fontSize: isMusicStandMode ? '1.30rem' : '1.15rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                Meisterwerk &amp; Repertoire
+                              </h4>
+                              <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 650 }}>
+                                Bühnenreife &amp; Konzertstücke
+                              </span>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenHomeworkBookWithView('audiobiography', 'document')}
+                            style={{
+                              background: '#ffffff',
+                              border: '1.5px solid #86efac',
+                              borderRadius: '100px',
+                              padding: '4px 12px',
+                              color: '#15803d',
+                              fontSize: '0.78rem',
+                              fontWeight: 900,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              boxShadow: '0 2px 6px rgba(22, 163, 74, 0.08)'
+                            }}
+                            className="hover-scale"
+                          >
+                            <FileText size={13} />
+                            <span>Protokoll öffnen</span>
+                          </button>
+                        </div>
+
+                        {/* Repertoire Stücke Preview (Maximal 2 unvollständige Stücke im Arbeits-Fokus) */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {activeSongsList.length > 0 ? (
+                            <>
+                              {activeSongsList.slice(0, 2).map((song, sIdx) => (
+                                <div
+                                  key={`pro-song-${sIdx}`}
                                   onClick={() => handleOpenHomeworkBookWithView('audiobiography', 'document')}
                                   style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: '#15803d',
-                                    fontSize: '0.80rem',
-                                    fontWeight: 850,
-                                    cursor: 'pointer',
-                                    padding: '2px 8px'
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '12px',
+                                    background: '#ffffff',
+                                    borderRadius: '14px',
+                                    padding: '8px 12px',
+                                    border: song.isCurrentHomework ? '1.5px solid #86efac' : '1.5px solid #e2e8f0',
+                                    boxShadow: song.isCurrentHomework ? '0 4px 14px rgba(22, 163, 74, 0.08)' : '0 2px 8px rgba(0,0,0,0.03)',
+                                    cursor: 'pointer'
                                   }}
                                   className="hover-scale"
                                 >
-                                  + {activeSongsList.length - 2} weitere {activeSongsList.length - 2 === 1 ? 'Stück' : 'Stücke'} in Arbeit • Alle im Protokoll öffnen →
-                                </button>
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <div style={{
-                            background: '#ffffff',
-                            borderRadius: '20px',
-                            padding: '18px 16px',
-                            textAlign: 'center',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '8px',
-                            border: '1.5px dashed #86efac'
-                          }}>
+                                  <div style={{
+                                    width: '36px',
+                                    height: '36px',
+                                    borderRadius: '10px',
+                                    background: song.isCurrentHomework ? '#e6f4ea' : '#f8fafc',
+                                    border: song.isCurrentHomework ? '1.5px solid #86efac' : '1.5px solid #e2e8f0',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: '#16a34a',
+                                    flexShrink: 0
+                                  }}>
+                                    <Disc size={16} />
+                                  </div>
+
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', flex: 1, minWidth: 0 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                                        <span style={{ fontWeight: 950, fontSize: isMusicStandMode ? '1.02rem' : '0.92rem', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {song.title}
+                                        </span>
+                                        {song.isCurrentHomework && (
+                                          <span style={{
+                                            background: '#e6f4ea',
+                                            color: '#15803d',
+                                            border: '1px solid #86efac',
+                                            fontSize: '0.66rem',
+                                            fontWeight: 850,
+                                            padding: '1px 5px',
+                                            borderRadius: '6px',
+                                            flexShrink: 0
+                                          }}>
+                                            Hausaufgabe
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span style={{ fontSize: '0.74rem', fontWeight: 900, color: '#15803d', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+                                        {song.progress}% Bühnenreif
+                                      </span>
+                                    </div>
+                                    <div style={{ width: '100%', height: '6px', background: '#e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
+                                      <div style={{ width: `${Math.min(99, Math.max(5, song.progress))}%`, height: '100%', background: 'linear-gradient(90deg, #16a34a, #22c55e)', borderRadius: '10px' }} />
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+
+                              {/* Dezente Fußzeile bei mehr als 2 offenen Stücken */}
+                              {activeSongsList.length > 2 && (
+                                <div style={{ textAlign: 'center', paddingTop: '2px' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenHomeworkBookWithView('audiobiography', 'document')}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: '#15803d',
+                                      fontSize: '0.74rem',
+                                      fontWeight: 850,
+                                      cursor: 'pointer',
+                                      padding: '2px 8px'
+                                    }}
+                                    className="hover-scale"
+                                  >
+                                    + {activeSongsList.length - 2} weitere {activeSongsList.length - 2 === 1 ? 'Stück' : 'Stücke'} in Arbeit • Alle im Protokoll öffnen →
+                                  </button>
+                                </div>
+                              )}
+                            </>
+                          ) : (
                             <div style={{
-                              width: '40px',
-                              height: '40px',
-                              borderRadius: '50%',
-                              background: '#e6f4ea',
-                              border: '1.5px solid #86efac',
+                              background: '#ffffff',
+                              borderRadius: '16px',
+                              padding: '12px 14px',
+                              textAlign: 'center',
                               display: 'flex',
+                              flexDirection: 'column',
                               alignItems: 'center',
-                              justifyContent: 'center',
-                              color: '#16a34a'
+                              gap: '6px',
+                              border: '1.5px dashed #86efac'
                             }}>
-                              <Trophy size={20} />
-                            </div>
-                            <span style={{ fontWeight: 950, fontSize: '0.94rem', color: '#0f172a' }}>
-                              Alle Konzertstücke meisterhaft abgeschlossen
-                            </span>
-                            <span style={{ fontSize: '0.80rem', color: '#64748b', maxWidth: '320px', lineHeight: 1.35 }}>
-                              Hervorragende Leistung! Wähle im Meisterwerk-Protokoll ein neues Stück oder sprich deine Lehrkraft an.
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenHomeworkBookWithView('audiobiography', 'document')}
-                              style={{
-                                marginTop: '4px',
+                              <div style={{
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '50%',
                                 background: '#e6f4ea',
                                 border: '1.5px solid #86efac',
-                                borderRadius: '100px',
-                                padding: '5px 14px',
-                                color: '#15803d',
-                                fontSize: '0.80rem',
-                                fontWeight: 900,
-                                cursor: 'pointer',
-                                boxShadow: '0 2px 6px rgba(22, 163, 74, 0.08)'
-                              }}
-                              className="hover-scale"
-                            >
-                              Neues Stück im Protokoll wählen →
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#16a34a'
+                              }}>
+                                <Trophy size={18} />
+                              </div>
+                              <span style={{ fontWeight: 950, fontSize: '0.88rem', color: '#0f172a' }}>
+                                Alle Konzertstücke meisterhaft abgeschlossen
+                              </span>
+                              <span style={{ fontSize: '0.74rem', color: '#64748b', maxWidth: '320px', lineHeight: 1.35 }}>
+                                Wähle im Meisterwerk-Protokoll ein neues Stück oder sprich deine Lehrkraft an.
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenHomeworkBookWithView('audiobiography', 'document')}
+                                style={{
+                                  marginTop: '2px',
+                                  background: '#e6f4ea',
+                                  border: '1.5px solid #86efac',
+                                  borderRadius: '100px',
+                                  padding: '4px 12px',
+                                  color: '#15803d',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 900,
+                                  cursor: 'pointer',
+                                  boxShadow: '0 2px 6px rgba(22, 163, 74, 0.08)'
+                                }}
+                                className="hover-scale"
+                              >
+                                Neues Stück im Protokoll wählen →
+                              </button>
+                            </div>
+                          )}
+                        </div>
 
-                      <span style={{ fontSize: '0.68rem', color: '#94a3b8', textAlign: 'center', display: 'block' }}>
-                        Geschütztes didaktisches Übeprotokoll deiner Musikschule
-                      </span>
+                        <span style={{ fontSize: '0.66rem', color: '#94a3b8', textAlign: 'center', display: 'block' }}>
+                          Geschütztes didaktisches Übeprotokoll deiner Musikschule
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>

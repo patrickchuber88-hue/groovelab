@@ -59,7 +59,13 @@ export function useStudentProfile({
     ? 'campus' 
     : (parentActiveTab === 'groovelab' 
       ? 'groovelab' 
-      : ((typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'campus') === 'groovelab' ? 'groovelab' : 'campus'));
+      : (() => {
+          try {
+            return (typeof window !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'campus') === 'groovelab' ? 'groovelab' : 'campus';
+          } catch (e) {
+            return 'campus';
+          }
+        })());
 
   // 👨‍🏫 Determine if current session belongs to a teacher or administrator
   const isTeacherSession = typeof window !== 'undefined' && (() => {
@@ -86,24 +92,70 @@ export function useStudentProfile({
     if (typeof window === 'undefined') return 'junior';
     const effectiveId = studentId || (initialUser as any)?.id;
     if (effectiveId) {
-      const namespacedSaved = localStorage.getItem(`campus_student_ui_level_${effectiveId}`);
-      if (namespacedSaved === 'junior' || namespacedSaved === 'teen' || namespacedSaved === 'pro') {
-        return namespacedSaved as CampusUiLevel;
-      }
+      try {
+        const namespacedSaved = localStorage.getItem(`campus_student_ui_level_${effectiveId}`);
+        if (namespacedSaved === 'junior' || namespacedSaved === 'teen' || namespacedSaved === 'pro') {
+          return namespacedSaved as CampusUiLevel;
+        }
+      } catch (e) {}
     }
     return 'junior';
   });
   const [showLevelModal, setShowLevelModal] = useState<boolean>(false);
 
+  // 🛡️ Revisionssichere Echtzeit-Synchronisation des didaktischen UI-Levels
+  useEffect(() => {
+    const handleLevelChangeEvt = (e: any) => {
+      const raw = e?.detail;
+      const targetId = typeof raw === 'object' && raw?.studentId ? raw.studentId : null;
+      const lvl = typeof raw === 'object' && raw?.uiLevel ? raw.uiLevel : raw;
+      const myId = studentId || (initialUser as any)?.id || (studentUser as any)?.id;
+      if (targetId && myId && targetId !== myId) return; // Event gilt für anderen Schüler
+      if (lvl === 'junior' || lvl === 'teen' || lvl === 'pro') {
+        setStudentUiLevel(lvl as CampusUiLevel);
+      }
+    };
+
+    const handleStorageChange = (e: StorageEvent) => {
+      const myId = studentId || (initialUser as any)?.id || (studentUser as any)?.id;
+      if (e.key === 'campus_student_ui_level' || (myId && e.key === `campus_student_ui_level_${myId}`)) {
+        if (e.newValue === 'junior' || e.newValue === 'teen' || e.newValue === 'pro') {
+          setStudentUiLevel(e.newValue as CampusUiLevel);
+        }
+      }
+    };
+
+    window.addEventListener('campus_ui_level_changed', handleLevelChangeEvt);
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('campus_ui_level_changed', handleLevelChangeEvt);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [studentId, initialUser, studentUser]);
+
+  // 🛡️ Autoritativer DB-Sync (SSOT): Supabase-Nutzer-Aktualisierungen sofort übernehmen
+  useEffect(() => {
+    const dbLevel = (studentUser as any)?.campus_ui_level || (initialUser as any)?.campus_ui_level;
+    if (dbLevel === 'junior' || dbLevel === 'teen' || dbLevel === 'pro') {
+      setStudentUiLevel(dbLevel as CampusUiLevel);
+    }
+  }, [(studentUser as any)?.campus_ui_level, (initialUser as any)?.campus_ui_level]);
+
   // 🎼 Notenständer-Modus (Großschrift & Glanceability für 60–90 cm Distanz am Instrument)
   const [isMusicStandMode, setIsMusicStandMode] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
-    return localStorage.getItem('campus_music_stand_mode') === 'true';
+    try {
+      return localStorage.getItem('campus_music_stand_mode') === 'true';
+    } catch (e) {
+      return false;
+    }
   });
 
   useEffect(() => {
     const handleSync = () => {
-      setIsMusicStandMode(localStorage.getItem('campus_music_stand_mode') === 'true');
+      try {
+        setIsMusicStandMode(localStorage.getItem('campus_music_stand_mode') === 'true');
+      } catch (e) {}
     };
     window.addEventListener('campus_music_stand_mode_changed', handleSync);
     window.addEventListener('storage', handleSync);
@@ -116,8 +168,10 @@ export function useStudentProfile({
   const toggleMusicStandMode = () => {
     setIsMusicStandMode(prev => {
       const next = !prev;
-      localStorage.setItem('campus_music_stand_mode', String(next));
-      window.dispatchEvent(new Event('campus_music_stand_mode_changed'));
+      try {
+        localStorage.setItem('campus_music_stand_mode', String(next));
+        window.dispatchEvent(new Event('campus_music_stand_mode_changed'));
+      } catch (e) {}
       return next;
     });
   };
@@ -127,7 +181,10 @@ export function useStudentProfile({
   const activeScreenTimeSecondsRef = useRef<number>(0);
 
   useEffect(() => {
-    const parentMaxMinutes = Number(localStorage.getItem(`cg_parent_max_screen_minutes_${studentId}`) || 45);
+    let parentMaxMinutes = 45;
+    try {
+      parentMaxMinutes = Number(localStorage.getItem(`cg_parent_max_screen_minutes_${studentId}`) || 45);
+    } catch (e) {}
 
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') {
@@ -144,7 +201,13 @@ export function useStudentProfile({
 
   const [certificateSong, setCertificateSong] = useState<any | null>(null);
   const [resolvedSchoolName, setResolvedSchoolName] = useState<string>(() => {
-    return (initialUser as any)?.schools?.name || (initialUser as any)?.school_name || (typeof window !== 'undefined' ? (localStorage.getItem('groovelab_school_name') || localStorage.getItem('campus_school_name')) : '') || 'Campus-Groovelab Musikschule';
+    let storedName = '';
+    try {
+      if (typeof window !== 'undefined') {
+        storedName = localStorage.getItem('groovelab_school_name') || localStorage.getItem('campus_school_name') || '';
+      }
+    } catch (e) {}
+    return (initialUser as any)?.schools?.name || (initialUser as any)?.school_name || storedName || 'Campus-Groovelab Musikschule';
   });
 
   const modalStudentUser = useMemo(() => {
@@ -170,7 +233,12 @@ export function useStudentProfile({
   }, [studentUser, studentId, studentUiLevel, resolvedSchoolName]);
 
   useEffect(() => {
-    const sId = studentUser?.school_id || (typeof window !== 'undefined' ? (localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id')) : null);
+    let sId = studentUser?.school_id;
+    if (!sId && typeof window !== 'undefined') {
+      try {
+        sId = localStorage.getItem('groovelab_school_id') || localStorage.getItem('campus_school_id');
+      } catch (e) {}
+    }
     if (sId) {
       supabase
         .from('schools')
@@ -204,13 +272,19 @@ export function useStudentProfile({
   // Collapsible Right Sidebar State for Student Briefing Dashboard
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
-    const saved = localStorage.getItem('campus_student_briefing_sidebar_collapsed');
-    return saved !== null ? saved === 'true' : true;
+    try {
+      const saved = localStorage.getItem('campus_student_briefing_sidebar_collapsed');
+      return saved !== null ? saved === 'true' : true;
+    } catch (e) {
+      return true;
+    }
   });
 
   const handleToggleRightSidebar = async (collapsed: boolean) => {
     setIsRightSidebarCollapsed(collapsed);
-    localStorage.setItem('campus_student_briefing_sidebar_collapsed', String(collapsed));
+    try {
+      localStorage.setItem('campus_student_briefing_sidebar_collapsed', String(collapsed));
+    } catch (e) {}
     try {
       if (studentUser?.id || studentId) {
         await supabase.from('users').update({ briefing_sidebar_collapsed: collapsed }).eq('id', studentUser?.id || studentId);
@@ -252,11 +326,13 @@ export function useStudentProfile({
     }
     setActiveTab(tab);
     if (tab !== 'settings' && tab !== 'parent_controls' && !isAdultStudent) {
-      sessionStorage.removeItem('groovelab_parent_unlocked_global');
-      if (studentId) {
-        sessionStorage.removeItem(`groovelab_parent_session_${studentId}`);
-        sessionStorage.removeItem(`groovelab_parent_unlocked_${studentId}`);
-      }
+      try {
+        sessionStorage.removeItem('groovelab_parent_unlocked_global');
+        if (studentId) {
+          sessionStorage.removeItem(`groovelab_parent_session_${studentId}`);
+          sessionStorage.removeItem(`groovelab_parent_unlocked_${studentId}`);
+        }
+      } catch (e) {}
       window.dispatchEvent(new CustomEvent('groovelab_parent_mode_changed', { detail: false }));
     }
     if (onTabChange) {
@@ -299,6 +375,102 @@ export function useStudentProfile({
     return () => clearTimeout(timer);
   }, [parentErrorToast]);
 
+  // Profile Editing & Avatars
+  const [editingProfile, setEditingProfile] = useState<any>(() => studentUser || null);
+  const [showEditProfile, setShowEditProfile] = useState<boolean>(false);
+  const [savingProfile, setSavingProfile] = useState<boolean>(false);
+  const [showAvatarSelector, setShowAvatarSelector] = useState<boolean>(false);
+  const [avatarCategoryFilter, setAvatarCategoryFilter] = useState<string>('Alle');
+  const [showSecondEmail, setShowSecondEmail] = useState<boolean>(false);
+  const [showOwnQr, setShowOwnQr] = useState<boolean>(false);
+  const [studentSchedules, setStudentSchedules] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (studentUser) {
+      setEditingProfile((prev: any) => prev ? { ...studentUser, ...prev } : studentUser);
+    }
+  }, [studentUser]);
+
+  useEffect(() => {
+    if (activeTab === 'profile' && studentId) {
+      const fetchStudentSchedules = async () => {
+        try {
+          const { data } = await supabase
+            .from('schedules')
+            .select('*, teacher:users!schedules_teacher_id_fkey(first_name, last_name), rooms(name)')
+            .eq('student_id', studentId);
+          if (data) setStudentSchedules(data);
+        } catch (err) {
+          console.error('Error fetching student schedules:', err);
+        }
+      };
+      fetchStudentSchedules();
+    }
+  }, [activeTab, studentId]);
+
+  const handleSaveProfile = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProfile) return;
+    setSavingProfile(true);
+    try {
+      const sanitize = (val?: string) => (val || '').trim();
+      const cleanFirstName = sanitize(editingProfile.first_name);
+      const cleanNickname = sanitize(editingProfile.nickname);
+      const cleanPhone = sanitize(editingProfile.phone);
+      const cleanInstrument = sanitize(editingProfile.instrument);
+      const photoUrl = editingProfile.photo_url || null;
+
+      const { error } = await supabase
+        .from('users')
+        .update({
+          first_name: cleanFirstName,
+          nickname: cleanNickname,
+          phone: cleanPhone,
+          instrument: cleanInstrument,
+          photo_url: photoUrl,
+          avatar_url: photoUrl
+        })
+        .eq('id', studentId);
+      
+      if (error) throw error;
+
+      const updatedProfile = {
+        ...editingProfile,
+        first_name: cleanFirstName,
+        nickname: cleanNickname,
+        phone: cleanPhone,
+        instrument: cleanInstrument,
+        photo_url: photoUrl,
+        avatar_url: photoUrl
+      };
+      setStudentUser((prev: any) => prev ? { ...prev, ...updatedProfile } : null);
+
+      try {
+        const rawFamily = localStorage.getItem('campus_family_profiles') || '[]';
+        const familyList = JSON.parse(rawFamily);
+        if (Array.isArray(familyList)) {
+          const idx = familyList.findIndex((p: any) => p.id === studentId);
+          if (idx !== -1) {
+            familyList[idx] = { ...familyList[idx], ...updatedProfile };
+            localStorage.setItem('campus_family_profiles', JSON.stringify(familyList));
+          }
+        }
+      } catch (cacheErr) {}
+
+      if (onProfileUpdate) {
+        onProfileUpdate(updatedProfile);
+      }
+      
+      setShowEditProfile(false);
+      setUiLevelToast('Profil erfolgreich gespeichert!');
+    } catch (err: any) {
+      console.error('Error updating student profile:', err);
+      setParentErrorToast('Fehler beim Speichern: ' + (err.message || 'Unbekannter Fehler'));
+    } finally {
+      setSavingProfile(false);
+    }
+  }, [editingProfile, studentId, onProfileUpdate]);
+
   return {
     studentUser,
     setStudentUser,
@@ -332,6 +504,21 @@ export function useStudentProfile({
     uiLevelToast,
     setUiLevelToast,
     parentErrorToast,
-    setParentErrorToast
+    setParentErrorToast,
+    editingProfile,
+    setEditingProfile,
+    showEditProfile,
+    setShowEditProfile,
+    savingProfile,
+    handleSaveProfile,
+    showAvatarSelector,
+    setShowAvatarSelector,
+    avatarCategoryFilter,
+    setAvatarCategoryFilter,
+    showSecondEmail,
+    setShowSecondEmail,
+    showOwnQr,
+    setShowOwnQr,
+    studentSchedules
   };
 }

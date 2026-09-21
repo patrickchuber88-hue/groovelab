@@ -25,6 +25,7 @@ export function useAdminDashboardData({
   forceTab
 }: UseAdminDashboardDataParams) {
   const [activeTab, setActiveTab] = useState<string>(() => {
+    if (forceTab) return forceTab;
     if (typeof window !== 'undefined') {
       const savedTab = localStorage.getItem('groovelab_admin_active_tab');
       if (savedTab) return savedTab;
@@ -207,80 +208,68 @@ export function useAdminDashboardData({
       }
 
       if (adminData.school_id) {
-        // Fetch teachers
-        const { data: tData } = await supabase
-          .from('users')
-          .select('*')
-          .eq('school_id', adminData.school_id)
-          .in('role', ['teacher', 'admin', 'secretary'])
-          .order('first_name');
-        if (tData) {
-          setTeachers(tData);
-        }
+        const effectiveTab = forceTab || activeTab;
+        const isRoomsOnly = effectiveTab === 'rooms';
 
-        // Fetch rooms & stations
-        const [{ data: rData }, { data: stData }] = await Promise.all([
+        // Parallel fetch core data: teachers, rooms, stations, schoolRoster, schedules
+        const [tRes, rRes, stRes, schoolRoster, schedRes] = await Promise.all([
+          supabase
+            .from('users')
+            .select('*')
+            .eq('school_id', adminData.school_id)
+            .in('role', ['teacher', 'admin', 'secretary'])
+            .order('first_name'),
           supabase.from('rooms').select('*').eq('school_id', adminData.school_id).order('sort_order', { ascending: true }),
-          supabase.from('stations').select('*, rooms(*)').order('name')
+          supabase.from('stations').select('*, rooms(*)').order('name'),
+          fetchSchoolRoster(adminData.school_id, supabase),
+          supabase.from('schedules').select('*, rooms(*)').eq('school_id', adminData.school_id)
         ]);
-        if (rData) {
-          setRooms(rData);
-          setSetupRooms(rData);
+
+        if (tRes.data) setTeachers(tRes.data);
+        if (rRes.data) {
+          setRooms(rRes.data);
+          setSetupRooms(rRes.data);
         }
-        if (stData) {
-          setStations(stData);
-          setSetupStations(stData);
+        if (stRes.data) {
+          setStations(stRes.data);
+          setSetupStations(stRes.data);
         }
+        if (schoolRoster) {
+          const activeStudents = activePlatform === 'groovelab' 
+            ? schoolRoster.filter(s => s.is_groovelab_active) 
+            : schoolRoster;
+          setStudents(activeStudents);
+        }
+        if (schedRes.data) setSchedules(schedRes.data);
 
-        // Fetch students roster
-        const schoolRoster = await fetchSchoolRoster(adminData.school_id, supabase);
-        const activeStudents = activePlatform === 'groovelab' 
-          ? schoolRoster.filter(s => s.is_groovelab_active) 
-          : schoolRoster;
-        setStudents(activeStudents);
+        // Fetch heavy sub-view data only when needed (skip completely if rooms-only view)
+        if (!isRoomsOnly) {
+          const [bRes, sngRes, sessRes, subRes] = await Promise.all([
+            effectiveTab === 'bands' || effectiveTab === 'live'
+              ? supabase.from('bands').select('*, band_members(*, users(*))').eq('school_id', adminData.school_id)
+              : Promise.resolve({ data: null }),
+            effectiveTab === 'songs' || effectiveTab === 'live'
+              ? supabase.from('songs').select('*').eq('school_id', adminData.school_id).order('title')
+              : Promise.resolve({ data: null }),
+            activePlatform === 'groovelab' && (effectiveTab === 'live' || effectiveTab === 'setup')
+              ? supabase.from('sessions').select('*, profiles:users!inner(*), stations(*)').eq('profiles.school_id', adminData.school_id).is('check_out_time', null)
+              : Promise.resolve({ data: null }),
+            activePlatform === 'groovelab' && (effectiveTab === 'missions' || effectiveTab === 'live')
+              ? supabase.from('user_song_skills').select('*, users!inner(*), songs!inner(*)').eq('is_pending_approval', true)
+              : Promise.resolve({ data: null })
+          ]);
 
-        // Fetch bands
-        const { data: bData } = await supabase
-          .from('bands')
-          .select('*, band_members(*, users(*))')
-          .eq('school_id', adminData.school_id);
-        if (bData) setAllBands(bData);
-
-        // Fetch songs
-        const { data: sngData } = await supabase
-          .from('songs')
-          .select('*')
-          .eq('school_id', adminData.school_id)
-          .order('title');
-        if (sngData) setSongs(sngData);
-
-        // Fetch schedules
-        const { data: schedData } = await supabase
-          .from('schedules')
-          .select('*, rooms(*)')
-          .eq('school_id', adminData.school_id);
-        if (schedData) setSchedules(schedData);
-
-        // Fetch active sessions
-        const { data: sessData } = await supabase
-          .from('sessions')
-          .select('*, profiles:users!inner(*), stations(*)')
-          .eq('profiles.school_id', adminData.school_id)
-          .is('check_out_time', null);
-        if (sessData) setActiveSessions(sessData);
-
-        // Fetch submissions
-        const { data: subData } = await supabase
-          .from('user_song_skills')
-          .select('*, users!inner(*), songs!inner(*)')
-          .eq('is_pending_approval', true);
-        if (subData) {
-          const mapped = subData.map((s: any) => ({
-            ...s,
-            users: Array.isArray(s.users) ? s.users[0] : s.users,
-            songs: Array.isArray(s.songs) ? s.songs[0] : s.songs
-          }));
-          setSubmissions(mapped);
+          if (bRes.data) setAllBands(bRes.data);
+          if (sngRes.data) setSongs(sngRes.data);
+          if (sessRes.data) setActiveSessions(sessRes.data);
+          if (subRes.data) {
+            const mapped = subRes.data.map((s: any) => ({
+              ...s,
+              users: Array.isArray(s.users) ? s.users[0] : s.users,
+              songs: Array.isArray(s.songs) ? s.songs[0] : s.songs
+            }));
+            setSubmissions(mapped);
+          }
         }
       }
     } catch (e) {

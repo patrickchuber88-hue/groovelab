@@ -6,6 +6,7 @@ import {
   getAlphabeticalColor,
   getAlphabeticalUniColor
 } from '../utils/secretaryFormatters';
+import { computeB2BPricingMetrics } from '../hooks/useSecretaryLicenses';
 
 export interface BuildSecretaryVerwaltungPropsParams {
   // Identity & Core Infrastructure
@@ -118,6 +119,34 @@ export function buildSecretaryVerwaltungProps(
     formatInstrumentName,
     checkTimeOverlap
   } = params;
+
+  const pricingMetrics = computeB2BPricingMetrics({
+    isBillingBooked: !!licenses?.isBillingBooked,
+    hasCampusSub: !!licenses?.hasCampusSub,
+    campusActivatedThisMonth: !!licenses?.campusActivatedThisMonth,
+    hasGroovelabSub: !!licenses?.hasGroovelabSub,
+    groovelabActivatedThisMonth: !!licenses?.groovelabActivatedThisMonth,
+    effectiveSchoolRates: effectiveSchoolRates || masterRates || {
+      priceCampus: 14.9,
+      priceGroovelab: 9.9,
+      priceKombi: 19.9,
+      priceTeacher: 0.49,
+      priceStudent: 0.49
+    },
+    students: studentsHook?.students || [],
+    campusTeachers: params.campusTeachers || [],
+    bypassTeachers: params.bypassTeachers || [],
+    coaches: params.coaches || [],
+    allTeachers: params.allTeachers || [],
+    billingPayer: licenses?.billingPayer || 'school',
+    studentBillingOption: licenses?.studentBillingOption || 'option2',
+    selectedStorageAddonGb: licenses?.selectedStorageAddonGb || 0,
+    selectedStorageAddonFee: licenses?.selectedStorageAddonFee || 0,
+    currentSchoolProfile: currentSchoolProfile || {},
+    subscriptionBypass: !!licenses?.subscriptionBypass,
+    extraBillingOption: licenses?.extraBillingOption || 'option1',
+    bookedExtraUsers: licenses?.bookedExtraUsers || 0
+  });
 
   return {
     secretarySubTab: navigation.secretarySubTab,
@@ -245,12 +274,12 @@ export function buildSecretaryVerwaltungProps(
     setSelectedInvoice: licenses?.setSelectedInvoice ?? dashboardData?.setSelectedInvoice ?? (() => {}),
     contractStartDate: licenses?.contractStartDate ?? dashboardData?.contractStartDate ?? null,
     simulatedToday: params.simulatedToday ?? dashboardData?.simulatedToday ?? '',
-    studentLevyMonthly_global: licenses.studentLevyMonthly_global,
-    extraLevyMonthly_global: licenses.extraLevyMonthly_global,
-    studentSharePreview_global: licenses.studentSharePreview_global,
-    schoolShareBookedExtra_global: licenses.schoolShareBookedExtra_global,
-    currentTotalB2B_global: licenses.currentTotalB2B_global,
-    mixedTotal_global: licenses.mixedTotal_global,
+    studentLevyMonthly_global: licenses?.studentLevyMonthly_global ?? pricingMetrics.studentLevyMonthly_global,
+    extraLevyMonthly_global: licenses?.extraLevyMonthly_global ?? pricingMetrics.extraLevyMonthly_global,
+    studentSharePreview_global: licenses?.studentSharePreview_global ?? pricingMetrics.studentSharePreview_global,
+    schoolShareBookedExtra_global: licenses?.schoolShareBookedExtra_global ?? pricingMetrics.schoolShareBookedExtra_global,
+    currentTotalB2B_global: licenses?.currentTotalB2B_global ?? pricingMetrics.currentTotalB2B_global,
+    mixedTotal_global: licenses?.mixedTotal_global ?? pricingMetrics.mixedTotal_global,
     fetchLogbookBookings: bookings.fetchLogbookBookings,
     getEffectiveStorageUsedBytes,
 
@@ -271,18 +300,19 @@ export function buildSecretaryVerwaltungProps(
     setSelectedArchiveLog: crisis.setSelectedArchiveLog,
 
     // Licenses & Billing
-    activeStudentsCount_global: licenses.activeStudentsCount_global,
-    activeGroovelabStudentsCount_global: licenses.activeGroovelabStudentsCount_global,
-    passiveStudentsCount_global: licenses.passiveStudentsCount_global,
-    billableTeachersCount: licenses.billableTeachersCount,
-    teacherServiceFeeTotal_global: licenses.teacherServiceFeeTotal_global,
-    moduleCost_global: licenses.moduleCost_global,
-    storageAddonFee_global: licenses.storageAddonFee_global,
-    baseB2B_global: licenses.baseB2B_global,
+    loading: dashboardData?.loading ?? false,
+    activeStudentsCount_global: licenses?.activeStudentsCount_global ?? pricingMetrics.activeStudentsCount_global,
+    activeGroovelabStudentsCount_global: licenses?.activeGroovelabStudentsCount_global ?? pricingMetrics.activeGroovelabStudentsCount_global,
+    passiveStudentsCount_global: licenses?.passiveStudentsCount_global ?? pricingMetrics.passiveStudentsCount_global,
+    billableTeachersCount: licenses?.billableTeachersCount ?? pricingMetrics.billableTeachersCount,
+    teacherServiceFeeTotal_global: licenses?.teacherServiceFeeTotal_global ?? pricingMetrics.teacherServiceFeeTotal_global,
+    moduleCost_global: licenses?.moduleCost_global ?? pricingMetrics.moduleCost_global,
+    storageAddonFee_global: licenses?.storageAddonFee_global ?? pricingMetrics.storageAddonFee_global,
+    baseB2B_global: licenses?.baseB2B_global ?? pricingMetrics.baseB2B_global,
     masterRates,
     effectiveSchoolRates,
     masterPricing,
-    isSammelzahler: licenses.isSammelzahler,
+    isSammelzahler: licenses?.isSammelzahler ?? pricingMetrics.isSammelzahler,
     fetchTariffBookings: licenses.fetchTariffBookings,
     hasCampusSub: licenses.hasCampusSub,
     setHasCampusSub: licenses.setHasCampusSub,

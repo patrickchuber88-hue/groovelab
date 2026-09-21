@@ -8,6 +8,7 @@ import { initAppleAlert } from './utils/appleAlert';
 import { initKioskUrlBootstrap } from './utils/kioskBootstrap';
 
 import { LegalConsentGate } from './components/LegalConsentGate';
+import { SecurityHoneyTrap } from './components/ui/SecurityHoneyTrap';
 import { CampusSystemBannersOverlay } from './components/layout/CampusSystemBannersOverlay';
 import { CampusAppLayout } from './components/layout/CampusAppLayout';
 import { CampusAppModalsHub } from './components/layout/CampusAppModalsHub';
@@ -37,6 +38,7 @@ function App() {
   return (
     <LegalConsentGate user={orchestrator.user}>
       <Suspense fallback={null}>
+        <SecurityHoneyTrap />
         <DeviceSimulator>
           <CampusSystemBannersOverlay {...orchestrator.bannersOverlayProps} />
           <CampusAppLayout {...orchestrator.layoutProps} />

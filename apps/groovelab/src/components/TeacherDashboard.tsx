@@ -1,14 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
-import { 
-  Users, Star, TrendingUp, Sparkles, BookOpen, MessageSquare, 
-  Settings, LayoutDashboard, Radio, GraduationCap, Eye, EyeOff, Search 
-} from 'lucide-react';
 
 import { AvatarImage } from './common/AvatarImage';
-import { CampusGroovelabBrand } from './CampusGroovelabBrand';
 import { usePremiumOnboardingTour, TourStep } from './PremiumOnboardingTour';
 import { formatTeacherFullName } from '../utils/nameHelper';
 import { resolveCampusStudentAvatar, resolveGrooveLabTeacherAvatar } from './common/AvatarImage';
+
+// Header
+import { TeacherDashboardHeader } from './teacher/TeacherDashboardHeader';
 
 // Domain Hooks
 import { useTeacherData } from './teacher/hooks/useTeacherData';
@@ -17,6 +15,9 @@ import { useTeacherAbsence } from './teacher/hooks/useTeacherAbsence';
 import { useTeacherStudents } from './teacher/hooks/useTeacherStudents';
 import { useTeacherFeed } from './teacher/hooks/useTeacherFeed';
 import { useTeacherLiveLab } from './teacher/hooks/useTeacherLiveLab';
+import { useTeacherBookings } from './teacher/hooks/useTeacherBookings';
+import { useTeacherStudentPrep } from './teacher/hooks/useTeacherStudentPrep';
+import { useTeacherModalStates } from './teacher/hooks/useTeacherModalStates';
 
 // Tabs
 import { TeacherBriefingTab } from './teacher/tabs/TeacherBriefingTab';
@@ -31,10 +32,12 @@ const TeacherBandWorkspace = lazy(() => import('./teacher/TeacherBandWorkspace')
 const TeacherStudioBoardView = lazy(() => import('./teacher/TeacherStudioBoardView').then(m => ({ default: m.TeacherStudioBoardView })));
 const TeacherStudentsView = lazy(() => import('./teacher/TeacherStudentsView').then(m => ({ default: m.TeacherStudentsView })));
 const TeacherSettingsView = lazy(() => import('./teacher/TeacherSettingsView').then(m => ({ default: m.TeacherSettingsView })));
+const AdminDashboard = lazy(() => import('./AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 
 // Pure utilities re-export for backwards compatibility
 export * from './teacher/utils/teacherDashboardUtils';
-import { cleanRoomName, getSimulatedNow } from './teacher/utils/teacherDashboardUtils';
+import { cleanRoomName } from './teacher/utils/teacherDashboardUtils';
+import { useSimulatedTime } from '../hooks/useSimulatedTime';
 
 export interface TeacherDashboardProps {
   userId: string;
@@ -76,7 +79,8 @@ export function TeacherDashboard({
   isSidebarCollapsed: propsIsSidebarCollapsed,
   setIsSidebarCollapsed: propsSetIsSidebarCollapsed,
   onSidebarNotificationsChange,
-  activePlatform: propsActivePlatform
+  activePlatform: propsActivePlatform,
+  onSwitchPlatform
 }: TeacherDashboardProps) {
   const activePlatform: 'campus' | 'groovelab' = (propsActivePlatform === 'groovelab' || (typeof window !== 'undefined' && localStorage.getItem('groovelab_active_platform') === 'groovelab')) ? 'groovelab' : 'campus';
   
@@ -107,7 +111,10 @@ export function TeacherDashboard({
       sessionStorage.setItem('campus_teacher_active_tab', tab);
       localStorage.setItem('campus_teacher_active_tab', tab);
     }
-    if (onTabChange) onTabChange(tab);
+    // Only forward tab to outer parent router if it's not internal studio sub-view
+    if (tab !== 'studio' && onTabChange) {
+      onTabChange(tab);
+    }
   }, [onTabChange]);
 
   useEffect(() => {
@@ -154,6 +161,22 @@ export function TeacherDashboard({
     onToast: showToast
   });
 
+  // Global unified refresh handler (declared after students & tagesplan to prevent TDZ error)
+  const handleTeacherRefresh = useCallback(async () => {
+    await data.fetchData();
+    if (students?.loadStudents) await students.loadStudents();
+    if (tagesplan?.loadBriefingTimeline) await tagesplan.loadBriefingTimeline();
+  }, [data.fetchData, students.loadStudents, tagesplan.loadBriefingTimeline]);
+
+  // 🛡️ Realtime & Cross-Component Sync: Refresh briefing when bookings/schedules change
+  useEffect(() => {
+    const handleRefreshBookings = () => {
+      handleTeacherRefresh();
+    };
+    window.addEventListener('refresh-bookings', handleRefreshBookings);
+    return () => window.removeEventListener('refresh-bookings', handleRefreshBookings);
+  }, [handleTeacherRefresh]);
+
   // 4. Absence Domain Hook
   const absence = useTeacherAbsence({
     userId,
@@ -164,7 +187,7 @@ export function TeacherDashboard({
     briefingData: tagesplan.briefingData,
     crisisNotifications: data.crisisNotifications,
     showRealNames: students.showRealNames,
-    onRefresh: data.fetchData
+    onRefresh: handleTeacherRefresh
   });
 
   // 5. Feed Domain Hook
@@ -184,7 +207,28 @@ export function TeacherDashboard({
     setActiveSessions: data.setActiveSessions,
     onSessionChange,
     onLocationModeChange,
-    fetchData: data.fetchData
+    fetchData: data.fetchData,
+    unreadShouts: data.unreadShouts,
+    setUnreadShouts: data.setUnreadShouts,
+    setHelpRequests: data.setHelpRequests
+  });
+
+  // 7. Bookings & Schedule Changes Domain Hook
+  const bookings = useTeacherBookings({
+    userId,
+    teacher: data.teacher,
+    activePlatform,
+    rooms: data.rooms,
+    showRealNames: students.showRealNames,
+    adminFeedbackRequests: feed.adminFeedbackRequests,
+    adminFeedbackResponses: feed.adminFeedbackResponses,
+    campusFeedAnnouncements: feed.campusFeedAnnouncements,
+    classFeedPosts: feed.classFeedPosts,
+    feedInteractions: feed.feedInteractions,
+    activePlanningEvents: [],
+    mySubmittedProgramPoints: [],
+    isTeacherBriefingSidebarCollapsed: data.isTeacherBriefingSidebarCollapsed,
+    onTabChange
   });
 
   // Guided Tour
@@ -214,20 +258,57 @@ export function TeacherDashboard({
     platformTheme: activePlatform === 'campus' ? 'campus' : 'groovelab'
   });
 
-  // Auxiliary UI states
-  const [showStageToolbox, setShowStageToolbox] = useState<any>(null);
-  const [editingBand, setEditingBand] = useState<any>(null);
-  const [showCommandPalette, setShowCommandPalette] = useState(false);
-  const [showNotesDrawer, setShowNotesDrawer] = useState(false);
-  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
-  const [isHelpCenterOpen, setIsHelpCenterOpen] = useState(false);
-  const [activeTeacherSettingsModal, setActiveTeacherSettingsModal] = useState<any>(null);
-  const [leftColumnTab, setLeftColumnTab] = useState<'briefing' | 'notes' | 'toolbox'>('briefing');
-  const [bypassAbsenceView, setBypassAbsenceView] = useState(false);
-  const [dismissedBanners, setDismissedBanners] = useState<Record<string, boolean>>({});
-  const [selectedGroupStudentId, setSelectedGroupStudentId] = useState<string | null>(null);
-  const [dynamicPrepMirror, setDynamicPrepMirror] = useState<any>(null);
-  const [loadingPrepMirror, setLoadingPrepMirror] = useState(false);
+  // Auxiliary UI & Modal States Hook
+  const modalStates = useTeacherModalStates();
+  const {
+    showStageToolbox,
+    setShowStageToolbox,
+    editingBand,
+    setEditingBand,
+    showCommandPalette,
+    setShowCommandPalette,
+    showNotesDrawer,
+    setShowNotesDrawer,
+    isFeedbackModalOpen,
+    setIsFeedbackModalOpen,
+    isHelpCenterOpen,
+    setIsHelpCenterOpen,
+    activeTeacherSettingsModal,
+    setActiveTeacherSettingsModal,
+    leftColumnTab,
+    setLeftColumnTab,
+    bypassAbsenceView,
+    setBypassAbsenceView,
+    dismissedBanners,
+    setDismissedBanners
+  } = modalStates;
+
+  // 🏛️ Dynamic Date & Schedule Invariants
+  const { now } = useSimulatedTime();
+
+  // 🏛️ Student Prep & Lesson Compass Engine Hook
+  const prep = useTeacherStudentPrep({
+    activeTimelineSlot: tagesplan.activeTimelineSlot,
+    timeline: tagesplan.briefingData?.timeline,
+    isTodayHoliday: Boolean(bookings.isTodayHoliday),
+    showRealNames: students.showRealNames,
+    now
+  });
+  const {
+    widgetState,
+    currentTimeStr,
+    isFreeDay,
+    isWeekend,
+    firstSlotStartStr,
+    activeGroupStudents,
+    activeStudent,
+    dynamicPrepMirror,
+    setDynamicPrepMirror,
+    loadingPrepMirror,
+    setLoadingPrepMirror,
+    selectedGroupStudentId,
+    setSelectedGroupStudentId
+  } = prep;
 
   const resolvedTeacherFullName = useMemo(() => {
     if (!data.teacher) return 'Lehrkraft';
@@ -262,159 +343,16 @@ export function TeacherDashboard({
     }}>
       {/* Dashboard Top Header Navigation */}
       {!hideHeader && (
-        <header style={{
-          background: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(16px)',
-          borderBottom: '1px solid #e2e8f0',
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
-          padding: '12px 24px'
-        }}>
-          <div style={{
-            maxWidth: '1600px',
-            margin: '0 auto',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '16px'
-          }}>
-            {/* Logo & Brand */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <CampusGroovelabBrand />
-              <div style={{
-                height: '24px',
-                width: '1px',
-                background: '#cbd5e1'
-              }} />
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{
-                  fontSize: '0.75rem',
-                  fontWeight: 900,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  padding: '4px 10px',
-                  borderRadius: '8px',
-                  background: activePlatform === 'campus' ? '#e6f4ea' : '#fef9c3',
-                  color: activePlatform === 'campus' ? '#34a853' : '#854d0e'
-                }}>
-                  {activePlatform === 'campus' ? 'Campus Lehrkraft' : 'GrooveLab Studio'}
-                </span>
-                {data.schoolData?.name && (
-                  <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>
-                    {data.schoolData.name}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Navigation Tabs */}
-            <nav style={{
-              display: 'flex',
-              alignItems: 'center',
-              background: '#f1f5f9',
-              padding: '4px',
-              borderRadius: '16px',
-              gap: '4px'
-            }}>
-              {[
-                { id: 'briefing', label: 'Briefing', icon: LayoutDashboard },
-                { id: 'live', label: 'Live Lab', icon: Radio },
-                { id: 'students', label: 'Schüler', icon: Users },
-                { id: 'bands', label: 'Bands', icon: Sparkles },
-                { id: 'coaches', label: 'Kollegium', icon: GraduationCap },
-                { id: 'settings', label: 'Einstellungen', icon: Settings }
-              ].map(tab => {
-                const isSelected = activeTab === tab.id;
-                const Icon = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    style={{
-                      background: isSelected ? '#ffffff' : 'transparent',
-                      color: isSelected ? '#0f172a' : '#64748b',
-                      border: 'none',
-                      padding: '8px 16px',
-                      borderRadius: '12px',
-                      fontWeight: isSelected ? 900 : 700,
-                      fontSize: '0.85rem',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      boxShadow: isSelected ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    <Icon size={16} color={isSelected ? (activePlatform === 'campus' ? '#34a853' : '#ca8a04') : '#64748b'} />
-                    <span>{tab.label}</span>
-                  </button>
-                );
-              })}
-            </nav>
-
-            {/* Quick Actions & Privacy Eye */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <button
-                onClick={() => students.toggleRealNames()}
-                title={students.showRealNames ? 'Datenschutz-Modus aktivieren (Vorname N.)' : 'Vollständige Schülernamen anzeigen'}
-                style={{
-                  background: '#ffffff',
-                  border: '1.5px solid #e2e8f0',
-                  borderRadius: '12px',
-                  padding: '8px 12px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  color: '#475569',
-                  fontSize: '0.8rem',
-                  fontWeight: 800
-                }}
-              >
-                {students.showRealNames ? <Eye size={16} color="#34a853" /> : <EyeOff size={16} color="#64748b" />}
-                <span>{students.showRealNames ? 'Klartext' : 'Anonym'}</span>
-              </button>
-
-              <button
-                onClick={() => setShowCommandPalette(true)}
-                title="Spotlight Suche (⌘K)"
-                style={{
-                  background: '#ffffff',
-                  border: '1.5px solid #e2e8f0',
-                  borderRadius: '12px',
-                  padding: '8px 14px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  color: '#94a3b8',
-                  fontSize: '0.8rem',
-                  fontWeight: 700
-                }}
-              >
-                <Search size={14} />
-                <span>Suche...</span>
-                <kbd style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: '6px', fontSize: '0.7rem' }}>⌘K</kbd>
-              </button>
-
-              {data.teacher && (
-                <div style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '14px',
-                  overflow: 'hidden',
-                  border: '2px solid white',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                }}>
-                  <AvatarImage src={data.teacher.photo_url} user={{ ...data.teacher, isTeacherContext: true }} activePlatform={activePlatform} />
-                </div>
-              )}
-            </div>
-          </div>
-        </header>
+        <TeacherDashboardHeader
+          activePlatform={activePlatform}
+          schoolName={data.schoolData?.name}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          showRealNames={students.showRealNames}
+          toggleRealNames={students.toggleRealNames}
+          onOpenCommandPalette={() => setShowCommandPalette(true)}
+          teacher={data.teacher}
+        />
       )}
 
       {/* Main Content Viewport */}
@@ -436,15 +374,15 @@ export function TeacherDashboard({
             windowWidth={windowWidth}
             isTeacherBriefingSidebarCollapsed={data.isTeacherBriefingSidebarCollapsed}
             handleToggleTeacherBriefingSidebar={handleToggleTeacherBriefingSidebar}
-            hasTeacherAppointmentAlerts={false}
-            hasTeacherFeedAlerts={false}
-            teacherSidebarTotalAlertsCount={0}
+            hasTeacherAppointmentAlerts={bookings.hasTeacherAppointmentAlerts}
+            hasTeacherFeedAlerts={bookings.hasTeacherFeedAlerts}
+            teacherSidebarTotalAlertsCount={bookings.teacherSidebarTotalAlertsCount}
             briefingLoading={false}
             briefingData={tagesplan.briefingData}
             activePlanningEvents={[]}
             dismissedBanners={dismissedBanners}
             setDismissedBanners={setDismissedBanners}
-            isTodayHoliday={null}
+            isTodayHoliday={bookings.isTodayHoliday}
             isTeacherCurrentlyAbsent={absence.activeAbsenceCancellations.length > 0}
             bypassAbsenceView={bypassAbsenceView}
             setBypassAbsenceView={setBypassAbsenceView}
@@ -475,15 +413,15 @@ export function TeacherDashboard({
             absenceUntilDate={absence.absenceUntilDate}
             setAbsenceUntilDate={absence.setAbsenceUntilDate}
             setQuickAbsencePreset={absence.setQuickAbsencePreset}
-            currentTimeStr={new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+            currentTimeStr={currentTimeStr}
             quickAudioStudent={tagesplan.quickAudioStudent}
             setQuickAudioStudent={tagesplan.setQuickAudioStudent}
             loadingPrepMirror={loadingPrepMirror}
             activeTimelineSlotRef={{ current: null }}
             relevantRoomIssuesToday={tagesplan.tagesplanRoomIssues}
             teacherTodayRooms={tagesplan.teacherTodayRooms}
-            isFreeDay={false}
-            isWeekend={false}
+            isFreeDay={isFreeDay}
+            isWeekend={isWeekend}
             isTourDemoScheduleActive={false}
             urgentCancellations={absence.urgentCancellations}
             setIsUrgentModalOpen={absence.setIsUrgentModalOpen}
@@ -491,9 +429,9 @@ export function TeacherDashboard({
             handleUpdateIssueRoomInTagesplan={tagesplan.handleUpdateIssueRoomInTagesplan}
             leftColumnTab={leftColumnTab}
             setLeftColumnTab={setLeftColumnTab}
-            onTabChange={onTabChange}
-            activeStudent={null}
-            activeGroupStudents={[]}
+            onTabChange={setActiveTab}
+            activeStudent={activeStudent}
+            activeGroupStudents={activeGroupStudents}
             selectedGroupStudentId={selectedGroupStudentId}
             setSelectedGroupStudentId={setSelectedGroupStudentId}
             selectedStudentProfile={students.selectedStudentProfile}
@@ -501,17 +439,17 @@ export function TeacherDashboard({
             dynamicPrepMirror={dynamicPrepMirror}
             setDynamicPrepMirror={setDynamicPrepMirror}
             setLoadingPrepMirror={setLoadingPrepMirror}
-            firstSlotStartStr="14:00"
-            widgetState={{}}
+            firstSlotStartStr={firstSlotStartStr}
+            widgetState={widgetState}
             startTour={startTour}
             rooms={data.rooms}
-            holidays={[]}
-            myBookings={[]}
-            myChangedAppointments={[]}
-            showAllChangedAppointments={false}
-            setShowAllChangedAppointments={() => {}}
-            showAllBookings={false}
-            setShowAllBookings={() => {}}
+            holidays={bookings.holidays}
+            myBookings={bookings.myBookings}
+            myChangedAppointments={bookings.myChangedAppointments}
+            showAllChangedAppointments={bookings.showAllChangedAppointments}
+            setShowAllChangedAppointments={bookings.setShowAllChangedAppointments}
+            showAllBookings={bookings.showAllBookings}
+            setShowAllBookings={bookings.setShowAllBookings}
             adminFeedbackRequests={feed.adminFeedbackRequests}
             adminFeedbackResponses={feed.adminFeedbackResponses}
             campusFeedAnnouncements={feed.campusFeedAnnouncements}
@@ -529,14 +467,14 @@ export function TeacherDashboard({
             setAdminFeedbackTab={feed.setAdminFeedbackTab}
             planningEvents={[]}
             mySubmittedProgramPoints={[]}
-            visibleChangedAppointments={[]}
-            handleBookingClick={() => {}}
-            handleDeleteMyBooking={async () => {}}
+            visibleChangedAppointments={bookings.visibleChangedAppointments}
+            handleBookingClick={bookings.handleBookingClick}
+            handleDeleteMyBooking={bookings.handleDeleteMyBooking}
             handleMarkRequestAsDone={feed.handleMarkRequestAsDone}
             handleReactToPost={feed.handleReactToPost}
             handleSubmitFeedbackResponse={feed.handleSubmitFeedbackResponse}
-            getCountdownString={() => ''}
-            setMyChangedAppointments={() => {}}
+            getCountdownString={bookings.getCountdownString}
+            setMyChangedAppointments={bookings.setMyChangedAppointments}
             todayTagesplanStudents={tagesplan.todayTagesplanStudents}
             activeTimelineSlot={tagesplan.activeTimelineSlot}
             setShowNotesDrawer={setShowNotesDrawer}
@@ -599,9 +537,9 @@ export function TeacherDashboard({
               handleTeacherSelfCheckout={livelab.handleTeacherSelfCheckout}
               handleTeacherCheckout={livelab.handleTeacherCheckout}
               handleLogoutStudent={livelab.handleLogoutStudent}
-              handleResolveHelp={() => {}}
-              handleMarkAsRead={() => {}}
-              handleMarkAllAsRead={() => {}}
+              handleResolveHelp={livelab.handleResolveHelp}
+              handleMarkAsRead={livelab.handleMarkAsRead}
+              handleMarkAllAsRead={livelab.handleMarkAllAsRead}
               handleApproveSubmission={feed.handleApproveSubmission}
               handleRejectSubmission={feed.handleRejectSubmission}
               fetchData={data.fetchData}
@@ -662,6 +600,17 @@ export function TeacherDashboard({
           </Suspense>
         ) : activeTab === 'coaches' ? (
           <TeacherCoachesTab coaches={data.coaches} activePlatform={activePlatform} />
+        ) : activeTab === 'rooms' ? (
+          <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Räume werden geladen...</div>}>
+            <AdminDashboard
+              userId={userId}
+              onLogout={onLogout || (() => {})}
+              forceTab="rooms"
+              activePlatform="campus"
+              hideHeader={true}
+              onSwitchPlatform={onSwitchPlatform}
+            />
+          </Suspense>
         ) : activeTab === 'settings' ? (
           <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Einstellungen werden geladen...</div>}>
             <TeacherSettingsView
@@ -792,6 +741,7 @@ export function TeacherDashboard({
         toggleAllAbsenceDates={absence.toggleAllAbsenceDates}
         areAllAbsenceDatesCollapsed={absence.areAllAbsenceDatesCollapsed}
         handleEmergencyShoutbox={() => {}}
+        handleMarkStudentContacted={absence.handleMarkStudentContacted}
         isUrgentModalOpen={absence.isUrgentModalOpen}
         urgentCancellations={absence.urgentCancellations}
         setIsUrgentModalOpen={absence.setIsUrgentModalOpen}

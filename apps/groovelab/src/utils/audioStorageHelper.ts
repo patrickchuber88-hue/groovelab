@@ -13,7 +13,7 @@ const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 export async function getSecureAudioUrl(
   filePath: string,
   bucket: string = 'campus-assets',
-  expiresInSeconds: number = 300 // 5 minutes TTL for JIT signed audio streaming (UrhG § 19a compliance)
+  expiresInSeconds: number = 1800 // 30 minutes TTL for JIT signed audio streaming (Forensic Goldstandard & UrhG § 19a)
 ): Promise<string> {
   if (!filePath) return '';
 
@@ -596,3 +596,71 @@ export function generateAnonymizedStoragePath(
 
   return `${schoolPrefix}${cleanContext}/${cleanId}.${cleanExt}`;
 }
+
+export interface StorageQuotaCheckResult {
+  isAllowed: boolean;
+  inGracePeriod: boolean;
+  graceExpiresAt: string | null;
+  usedBytes: number;
+  limitBytes: number;
+  pctUsed: number;
+  warningLevel: number;
+  schoolId: string;
+}
+
+/**
+ * Validates whether an audio upload is permissible under the school's storage quota
+ * factoring in the 7-day didactic grace period.
+ */
+export async function verifySchoolStorageQuotaGrace(
+  schoolId: string,
+  incomingBytes: number = 0
+): Promise<StorageQuotaCheckResult> {
+  if (!schoolId) {
+    return {
+      isAllowed: true,
+      inGracePeriod: false,
+      graceExpiresAt: null,
+      usedBytes: 0,
+      limitBytes: 25 * 1024 * 1024 * 1024,
+      pctUsed: 0,
+      warningLevel: 0,
+      schoolId: ''
+    };
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('check_school_storage_quota', {
+      p_school_id: schoolId,
+      p_incoming_bytes: incomingBytes
+    });
+
+    if (error) throw error;
+    if (data) {
+      return {
+        isAllowed: data.is_allowed ?? true,
+        inGracePeriod: data.in_grace_period ?? false,
+        graceExpiresAt: data.grace_expires_at ?? null,
+        usedBytes: Number(data.used_bytes || 0),
+        limitBytes: Number(data.limit_bytes || 0),
+        pctUsed: Number(data.pct_used || 0),
+        warningLevel: Number(data.warning_level || 0),
+        schoolId: data.school_id || schoolId
+      };
+    }
+  } catch (err) {
+    console.warn('[AudioStorageHelper] Storage quota grace RPC fallback notice:', err);
+  }
+
+  return {
+    isAllowed: true,
+    inGracePeriod: false,
+    graceExpiresAt: null,
+    usedBytes: 0,
+    limitBytes: 25 * 1024 * 1024 * 1024,
+    pctUsed: 0,
+    warningLevel: 0,
+    schoolId
+  };
+}
+

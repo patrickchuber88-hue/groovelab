@@ -1,5 +1,5 @@
 import { Pool, PoolClient } from 'pg';
-import { SecurityContext, SecurityContextSchema } from '../types/security-context';
+import { SecurityContext, SecurityContextSchema } from '../types/security-context.js';
 
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,

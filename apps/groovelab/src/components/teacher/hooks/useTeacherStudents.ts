@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase, queryCache } from '../../../lib/supabase';
 import { useRealNamesVisibility, formatTeacherFullName } from '../../../utils/nameHelper';
 import { StudentToDelete } from '../../ConfirmDeleteStudentModal';
+import { fetchSchoolRoster, getTeacherRoster } from '../../../services/studentRosterService';
 
 export interface UseTeacherStudentsProps {
   userId: string;
@@ -34,6 +35,62 @@ export function useTeacherStudents({
   const [selectedStudentProfile, setSelectedStudentProfile] = useState<any | null>(null);
   const [deleteStudentModalData, setDeleteStudentModalData] = useState<StudentToDelete | null>(null);
   const [modalDocStudent, setDocStudent] = useState<any | null>(null);
+
+  // 🏛️ Authoritative Supabase Student Hydration for Teacher Dashboard
+  const loadStudents = useCallback(async () => {
+    const effectiveSchoolId = schoolData?.id || teacher?.school_id || (Array.isArray(teacher?.schools) ? teacher?.schools[0]?.id : teacher?.schools?.id);
+    const effectiveTeacherId = userId || teacher?.id;
+    if (!effectiveSchoolId || !effectiveTeacherId) return;
+
+    try {
+      // 1. Fetch assigned student IDs across schedules, schedule_occurrences, and bands
+      let assignedStudentIds: string[] = [];
+      const [{ data: schedData }, { data: occData }, { data: groupData }] = await Promise.all([
+        supabase.from('schedules').select('student_id').eq('teacher_id', effectiveTeacherId),
+        supabase.from('schedule_occurrences').select('student_id').eq('teacher_id', effectiveTeacherId),
+        supabase.from('bands').select('id').eq('coach_id', effectiveTeacherId)
+      ]);
+
+      const schedStudentIds = (schedData || []).map((s: any) => s.student_id).filter(Boolean);
+      const occStudentIds = (occData || []).map((s: any) => s.student_id).filter(Boolean);
+
+      let groupStudentIds: string[] = [];
+      if (groupData && groupData.length > 0) {
+        const groupIds = groupData.map((g: any) => g.id);
+        const { data: gsData } = await supabase.from('band_members').select('user_id').in('band_id', groupIds);
+        groupStudentIds = (gsData || []).map((gs: any) => gs.user_id).filter(Boolean);
+      }
+
+      let stStudentIds: string[] = [];
+      try {
+        const { data: stData } = await supabase.from('student_teachers').select('student_id').eq('teacher_id', effectiveTeacherId);
+        stStudentIds = (stData || []).map((s: any) => s.student_id).filter(Boolean);
+      } catch (e) {}
+
+      assignedStudentIds = Array.from(new Set([...schedStudentIds, ...occStudentIds, ...groupStudentIds, ...stStudentIds]));
+
+      // 2. Fetch authoritative school roster and filter for this teacher
+      const schoolRoster = await fetchSchoolRoster(effectiveSchoolId, supabase);
+      let teacherStudents = getTeacherRoster(effectiveTeacherId, schoolRoster, assignedStudentIds);
+
+      // In GrooveLab mode, show students who have GrooveLab active
+      if (activePlatform !== 'campus') {
+        const glStudents = teacherStudents.filter((s: any) => s.is_groovelab_active);
+        // Resilient fallback: if filter returns 0 but teacher has students, show them
+        if (glStudents.length > 0) {
+          teacherStudents = glStudents;
+        }
+      }
+
+      setAllStudents(teacherStudents);
+    } catch (err) {
+      console.error('[useTeacherStudents] Failed to load students from Supabase:', err);
+    }
+  }, [schoolData?.id, teacher?.school_id, teacher?.schools, userId, teacher?.id, activePlatform]);
+
+  useEffect(() => {
+    loadStudents();
+  }, [loadStudents]);
 
   const [showInviteStudent, setShowInviteStudent] = useState(false);
   const [inviteFirstName, setInviteFirstName] = useState('');
@@ -174,6 +231,7 @@ export function useTeacherStudents({
     teachersManageStudents,
     handleUpdateStudent,
     handleDeleteStudent,
-    handleInviteStudent
+    handleInviteStudent,
+    loadStudents
   };
 }

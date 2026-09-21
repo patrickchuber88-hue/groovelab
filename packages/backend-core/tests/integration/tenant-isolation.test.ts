@@ -2,9 +2,9 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { eq, sql } from 'drizzle-orm';
-import { tenants, tenantUsers, documents } from '../../src/db/schema';
-import { withDrizzleTenant } from '../../src/db/drizzle-tenant';
-import { SecurityContext } from '../../src/types/security-context';
+import { tenants, tenantUsers, documents } from '../../src/db/schema.js';
+import { withDrizzleTenant } from '../../src/db/drizzle-tenant.js';
+import { SecurityContext } from '../../src/types/security-context.js';
 
 describe('Tier-1 Multi-Tenant Isolation & IDOR Security Gates', () => {
   let pool: Pool;
@@ -53,7 +53,7 @@ describe('Tier-1 Multi-Tenant Isolation & IDOR Security Gates', () => {
 
     await pool.query('COMMIT');
 
-    const [createdDoc] = await withDrizzleTenant(contextTenantA, async (tx) => {
+    const [createdDoc] = await withDrizzleTenant(contextTenantA, async (tx: any) => {
       return await tx
         .insert(documents)
         .values({
@@ -79,19 +79,19 @@ describe('Tier-1 Multi-Tenant Isolation & IDOR Security Gates', () => {
   it('prevents Tenant B from listing documents owned by Tenant A', async () => {
     if (!process.env.TEST_DATABASE_URL) return; // Skip if no DB
 
-    const docsFoundByTenantB = await withDrizzleTenant(contextTenantB, async (tx) => {
+    const docsFoundByTenantB = await withDrizzleTenant(contextTenantB, async (tx: any) => {
       return await tx.select().from(documents);
     });
 
     expect(docsFoundByTenantB).toHaveLength(0);
-    const leaked = docsFoundByTenantB.some((doc) => doc.id === docTenantAId);
+    const leaked = docsFoundByTenantB.some((doc: any) => doc.id === docTenantAId);
     expect(leaked).toBe(false);
   });
 
   it('blocks IDOR read attempt when Tenant B queries Tenant A document directly by ID', async () => {
     if (!process.env.TEST_DATABASE_URL) return; // Skip if no DB
 
-    const docFound = await withDrizzleTenant(contextTenantB, async (tx) => {
+    const docFound = await withDrizzleTenant(contextTenantB, async (tx: any) => {
       const results = await tx.select().from(documents).where(eq(documents.id, docTenantAId));
       return results[0] ?? null;
     });
@@ -102,7 +102,7 @@ describe('Tier-1 Multi-Tenant Isolation & IDOR Security Gates', () => {
   it('blocks IDOR mutation: Tenant B cannot update Tenant A document', async () => {
     if (!process.env.TEST_DATABASE_URL) return; // Skip if no DB
 
-    const updateResult = await withDrizzleTenant(contextTenantB, async (tx) => {
+    const updateResult = await withDrizzleTenant(contextTenantB, async (tx: any) => {
       return await tx
         .update(documents)
         .set({ title: 'HACKED BY TENANT B', content: 'Manipulated' })
@@ -117,7 +117,7 @@ describe('Tier-1 Multi-Tenant Isolation & IDOR Security Gates', () => {
     if (!process.env.TEST_DATABASE_URL) return; // Skip if no DB
 
     const action = () =>
-      withDrizzleTenant(contextTenantB, async (tx) => {
+      withDrizzleTenant(contextTenantB, async (tx: any) => {
         return await tx.insert(documents).values({
           tenantId: tenantAId, // Mismatch
           ownerId: userBId,

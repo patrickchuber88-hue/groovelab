@@ -1,7 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Printer, Award, Sparkles, Music, ShieldCheck, Download, Loader2, Share2, Check, Eye } from 'lucide-react';
-import { toPng } from 'html-to-image';
 import { formatStudentPureFirstName } from '../../utils/nameHelper';
 import { PdfPreviewModal } from './PdfPreviewModal';
 

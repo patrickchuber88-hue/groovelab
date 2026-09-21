@@ -54,26 +54,38 @@ export function useMasterAdminIdleLock({ currentUser, adminUsername, adminUserId
 
       const pinOrPass = idlePinInput.trim();
       if (!pinOrPass) {
-        throw new Error('Bitte Passkey, Master-Passwort oder PIN eingeben.');
+        throw new Error('Bitte Touch ID oder 6-stelligen Google Authenticator Code eingeben.');
       }
 
       const currentUserId = currentUser?.id || adminUserId;
       let isVerified = false;
 
-      // Check Master Admin credentials via login_master_admin RPC
-      const { data: authData, error: authErr } = await supabase.rpc('login_master_admin', {
-        p_username: adminUsername || 'admin',
-        p_password: pinOrPass
-      });
-
-      if (!authErr && authData && (authData.id || authData.requires_2fa || authData.is_master_admin)) {
-        isVerified = true;
-      } else if (currentUserId) {
-        const { data: pinValid, error: pinErr } = await supabase.rpc('verify_personal_pin', {
-          user_uuid: currentUserId,
-          input_pin: pinOrPass
+      // 1. If 6-digit number, verify as Google Authenticator TOTP
+      if (/^[0-9]{6}$/.test(pinOrPass)) {
+        const { data: stepUpData, error: stepUpErr } = await supabase.rpc('verify_master_admin_step_up', {
+          p_totp_code: pinOrPass
         });
-        if (!pinErr && pinValid === true) {
+        if (!stepUpErr && stepUpData?.success === true) {
+          isVerified = true;
+        } else {
+          // Fallback to login_master_admin with TOTP
+          const { data: authTotp, error: authTotpErr } = await supabase.rpc('login_master_admin', {
+            p_username: adminUsername || 'admin',
+            p_password: ' ',
+            p_totp_code: pinOrPass
+          });
+          if (!authTotpErr && authTotp && (authTotp.id || authTotp.is_master_admin)) {
+            isVerified = true;
+          }
+        }
+      } else {
+        // 2. Otherwise verify as Master Admin Password via login_master_admin
+        const { data: authData, error: authErr } = await supabase.rpc('login_master_admin', {
+          p_username: adminUsername || 'admin',
+          p_password: pinOrPass
+        });
+
+        if (!authErr && authData && (authData.id || authData.requires_2fa || authData.is_master_admin)) {
           isVerified = true;
         }
       }

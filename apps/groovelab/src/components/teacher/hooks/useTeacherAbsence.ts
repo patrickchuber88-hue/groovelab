@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
+import { getSimulatedNow } from '../../../hooks/useSimulatedTime';
 import { 
   isTeacherCurrentlyAbsent, 
   ABSENCE_RESET_SENTINEL 
@@ -8,6 +9,7 @@ import { maskLastName, formatTeacherFullName } from '../../../utils/nameHelper';
 import { UrgentCancellationItem } from '../TeacherUrgentCancellationsModal';
 import { ActiveMakeupTokenItem } from '../TeacherMakeupRadarWidget';
 import { AbsenceNotifData } from '../TeacherAbsenceNotifModal';
+import { TEACHER_WITH_SCHOOL_SELECT } from './useTeacherData';
 
 export interface UseTeacherAbsenceProps {
   userId: string;
@@ -33,13 +35,25 @@ export function useTeacherAbsence({
   onRefresh
 }: UseTeacherAbsenceProps) {
   const [quickAbsencePreset, setQuickAbsencePreset] = useState<'today' | 'tomorrow' | 'week' | 'custom'>('today');
-  const [absenceStartDate, setAbsenceStartDate] = useState(() => new Date().toISOString().substring(0, 10));
-  const [absenceUntilDate, setAbsenceUntilDate] = useState(() => new Date().toISOString().substring(0, 10));
+  const [absenceStartDate, setAbsenceStartDate] = useState(() => getSimulatedNow().toLocaleDateString('sv-SE'));
+  const [absenceUntilDate, setAbsenceUntilDate] = useState(() => getSimulatedNow().toLocaleDateString('sv-SE'));
   const [showCustomStart, setShowCustomStart] = useState(false);
   const [absenceHandlingOwner, setAbsenceHandlingOwner] = useState<'secretariat' | 'teacher'>('secretariat');
   const [absenceOfficialNote, setAbsenceOfficialNote] = useState('');
   const [submittingAbsence, setSubmittingAbsence] = useState(false);
   const [cancellationsCount, setCancellationsCount] = useState(0);
+
+  // 🏛️ Synchronize absence date defaults whenever the simulation date changes
+  useEffect(() => {
+    const handleSimDateSync = () => {
+      const simNow = getSimulatedNow();
+      const simTodayStr = simNow.toLocaleDateString('sv-SE');
+      setAbsenceStartDate(simTodayStr);
+      setAbsenceUntilDate(simTodayStr);
+    };
+    window.addEventListener('groovelab_simulated_date_changed', handleSimDateSync);
+    return () => window.removeEventListener('groovelab_simulated_date_changed', handleSimDateSync);
+  }, []);
 
   const [showAbsenceModal, setShowAbsenceModal] = useState(false);
   const [absenceNotifModal, setAbsenceNotifModal] = useState<AbsenceNotifData | null>(null);
@@ -50,6 +64,9 @@ export function useTeacherAbsence({
   const [urgentCancellations, setUrgentCancellations] = useState<UrgentCancellationItem[]>([]);
   const [isUrgentModalOpen, setIsUrgentModalOpen] = useState(false);
   const [urgentSnoozeUntil, setUrgentSnoozeUntil] = useState<number | null>(null);
+
+  // 📞 Optimistic teacher-contacted state for 0ms instant feedback
+  const [optimisticContacted, setOptimisticContacted] = useState<Record<string, { status: string; at: string }>>({});
 
   const fetchUrgentCancellations = useCallback(async () => {
     if (!userId) return;
@@ -152,7 +169,7 @@ export function useTeacherAbsence({
         startDateTime = new Date(rawStart);
       } else {
         const [stYear, stMonth, stDay] = rawStart.substring(0, 10).split('-').map(Number);
-        const today = new Date();
+        const today = getSimulatedNow();
         const isTodayStart = today.getFullYear() === stYear && today.getMonth() === (stMonth - 1) && today.getDate() === stDay;
         if (isTodayStart) {
           startDateTime = teacher.updated_at ? new Date(teacher.updated_at) : today;
@@ -163,7 +180,7 @@ export function useTeacherAbsence({
     } else {
       const rawUntil = String(teacherAusfallUntil).trim();
       const [uYear, uMonth, uDay] = rawUntil.substring(0, 10).split('-').map(Number);
-      const today = new Date();
+      const today = getSimulatedNow();
       if (today.getFullYear() === uYear && today.getMonth() === (uMonth - 1) && today.getDate() === uDay) {
         startDateTime = teacher.updated_at ? new Date(teacher.updated_at) : today;
       } else {
@@ -193,12 +210,20 @@ export function useTeacherAbsence({
       const timeKey = `${String(slotDate.getHours()).padStart(2, '0')}:${String(slotDate.getMinutes()).padStart(2, '0')}`;
       const uniqueKey = `${dateKey}_${timeKey}_${n.student_id}`;
 
+      const opt = (n.id && optimisticContacted[n.id]) || optimisticContacted[uniqueKey];
+      const teacherContactStatus = opt?.status || n.teacher_contact_status || null;
+      const teacherContactedAt = opt?.at || n.teacher_contacted_at || null;
+
       resultMap.set(uniqueKey, {
         id: n.id,
         slot_start_datetime: n.slot_start_datetime,
         student_id: n.student_id,
         status: n.status || 'UNREAD',
+        read_at: n.read_at,
+        acknowledged_at: n.acknowledged_at,
         is_reinstated: n.is_reinstated,
+        teacher_contact_status: teacherContactStatus,
+        teacher_contacted_at: teacherContactedAt,
         student,
         studentName: student ? `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim() : (n.student_name || 'Schüler'),
         instrument: student?.instrument || n.instrument || 'Unterricht'
@@ -206,30 +231,43 @@ export function useTeacherAbsence({
     });
 
     if (briefingData?.timeline) {
-      const todayStr = new Date().toLocaleDateString('sv-SE');
+      const simNow = getSimulatedNow();
+      const simTodayStr = simNow.toLocaleDateString('sv-SE');
       briefingData.timeline.forEach((s: any) => {
         const isCancelled = s.status === 'canceled_by_teacher_ausfall' || 
           s.status === 'teacher_ausfall' || 
           s.status === 'cancelled';
         if (!isCancelled) return;
 
+        // 🏛️ 1% Goldstandard: Der Slot behält sein originäres Datum (s.date) oder das simuliertes Datum.
+        // Keine willkürliche Projektion auf das unsimulierte physische Datum der Systemuhr!
+        const slotDateStr = s.date || (briefingData as any)?.selectedDate || simTodayStr;
         const timeSlot = s.start_time || s.time_slot || '14:00';
         const [slotH, slotM] = timeSlot.substring(0, 5).split(':').map(Number);
-        const [sYear, sMonth, sDay] = todayStr.split('-').map(Number);
+        const [sYear, sMonth, sDay] = slotDateStr.split('-').map(Number);
         const slotDateTime = new Date(sYear, sMonth - 1, sDay, slotH || 0, slotM || 0, 0, 0);
 
         if (slotDateTime.getTime() < startDateTime.getTime() || slotDateTime.getTime() > endDateTime.getTime()) return;
 
         const student = s.student || allStudents.find((st: any) => st.id === s.student_id);
         const timeKey = `${String(slotH || 0).padStart(2, '0')}:${String(slotM || 0).padStart(2, '0')}`;
-        const uniqueKey = `${todayStr}_${timeKey}_${s.student_id || student?.id}`;
+        const uniqueKey = `${slotDateStr}_${timeKey}_${s.student_id || student?.id}`;
+
+        const itemId = s.id || `timeline-${s.schedule_id || 'slot'}`;
+        const opt = (s.id && optimisticContacted[s.id]) || optimisticContacted[uniqueKey];
+        const teacherContactStatus = opt?.status || s.teacher_contact_status || null;
+        const teacherContactedAt = opt?.at || s.teacher_contacted_at || null;
 
         if (!resultMap.has(uniqueKey)) {
           resultMap.set(uniqueKey, {
-            id: s.id || `timeline-${s.schedule_id || 'slot'}`,
-            slot_start_datetime: `${todayStr}T${timeSlot.length === 5 ? `${timeSlot}:00` : timeSlot}`,
+            id: itemId,
+            slot_start_datetime: `${slotDateStr}T${timeSlot.length === 5 ? `${timeSlot}:00` : timeSlot}`,
             student_id: s.student_id || student?.id,
             status: s.student_acknowledged === true ? 'READ' : 'UNREAD',
+            read_at: s.read_at || null,
+            acknowledged_at: s.acknowledged_at || null,
+            teacher_contact_status: teacherContactStatus,
+            teacher_contacted_at: teacherContactedAt,
             student,
             studentName: student ? `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim() : (s.title || 'Schüler'),
             instrument: s.instrument || student?.instrument || 'Unterricht'
@@ -241,7 +279,7 @@ export function useTeacherAbsence({
     return Array.from(resultMap.values()).sort((a, b) => {
       return new Date(a.slot_start_datetime).getTime() - new Date(b.slot_start_datetime).getTime();
     });
-  }, [teacher?.ausfall_until, (teacher as any)?.ausfallUntil, teacher?.ausfall_start, (teacher as any)?.ausfallStart, teacher?.updated_at, crisisNotifications, briefingData?.timeline, allStudents, showRealNames]);
+  }, [teacher?.ausfall_until, (teacher as any)?.ausfallUntil, teacher?.ausfall_start, (teacher as any)?.ausfallStart, teacher?.updated_at, crisisNotifications, briefingData?.timeline, allStudents, showRealNames, optimisticContacted]);
 
   // Grouped absence cancellations by date
   const groupedAbsenceCancellations = useMemo(() => {
@@ -255,7 +293,8 @@ export function useTeacherAbsence({
       unreadCount: number;
     }> = {};
 
-    const todayStr = new Date().toLocaleDateString('sv-SE');
+    const simNow = getSimulatedNow();
+    const todayStr = simNow.toLocaleDateString('sv-SE');
 
     activeAbsenceCancellations.forEach((item: any) => {
       const dt = new Date(item.slot_start_datetime);
@@ -267,14 +306,16 @@ export function useTeacherAbsence({
         const isToday = dateKey === todayStr;
         const weekdayLong = dt.toLocaleDateString('de-DE', { weekday: 'long' });
         const shortDateStr = dt.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const weekdayShort = dt.toLocaleDateString('de-DE', { weekday: 'short' }).replace(/\.+$/, '');
+        const dayMonth = dt.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
         const formattedDate = isToday 
-          ? `Heute, ${dt.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}.`
+          ? `Heute, ${weekdayShort}. ${dayMonth}`
           : `${weekdayLong}, ${shortDateStr}`;
 
         groups[dateKey] = {
           dateStr: dateKey,
           formattedDate,
-          dayOfWeek: dt.toLocaleDateString('de-DE', { weekday: 'short' }),
+          dayOfWeek: weekdayShort,
           dayNum: String(dt.getDate()).padStart(2, '0'),
           items: [],
           readCount: 0,
@@ -283,7 +324,8 @@ export function useTeacherAbsence({
       }
 
       groups[dateKey].items.push(item);
-      if (item.status === 'READ') {
+      const isHandled = item.status === 'READ' || item.teacher_contact_status === 'reached';
+      if (isHandled) {
         groups[dateKey].readCount += 1;
       } else {
         groups[dateKey].unreadCount += 1;
@@ -320,8 +362,39 @@ export function useTeacherAbsence({
   }, [areAllAbsenceDatesCollapsed, groupedAbsenceCancellations]);
 
   const totalAbsenceCancellationsCount = activeAbsenceCancellations.length || cancellationsCount;
-  const readCancellationsCount = activeAbsenceCancellations.filter((c: any) => c.status === 'READ').length;
-  const unreadCancellationsCount = activeAbsenceCancellations.filter((c: any) => c.status !== 'READ').length;
+  const readCancellationsCount = activeAbsenceCancellations.filter((c: any) => c.status === 'READ' || c.teacher_contact_status === 'reached').length;
+  const unreadCancellationsCount = activeAbsenceCancellations.filter((c: any) => c.status !== 'READ' && c.teacher_contact_status !== 'reached').length;
+
+  // 📞 1-Tap Handler: Schüler als telefonisch / persönlich erreicht markieren (aktuelle Uhrzeit als Stempel)
+  const handleMarkStudentContacted = useCallback(async (targetId: string, contactType: 'reached' | 'voicemail' = 'reached') => {
+    if (!targetId) return;
+    const nowIso = getSimulatedNow().toISOString();
+
+    // 1. 0ms Optimistic UI Update (keine UI-Verzögerung)
+    setOptimisticContacted(prev => ({
+      ...prev,
+      [targetId]: { status: contactType, at: nowIso }
+    }));
+
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetId);
+      if (isUuid) {
+        const { error } = await supabase.rpc('mark_cancellation_teacher_contacted', {
+          p_notification_id: targetId,
+          p_contact_status: contactType
+        });
+        if (error) {
+          console.error('Error marking cancellation teacher contacted:', error);
+        }
+      }
+      fetchUrgentCancellations();
+      if (onRefresh) {
+        await onRefresh();
+      }
+    } catch (err) {
+      console.error('Exception in handleMarkStudentContacted:', err);
+    }
+  }, [fetchUrgentCancellations, onRefresh]);
 
   // MAX_SELF_REPORT_DAYS = 28 (4 weeks)
   const MAX_SELF_REPORT_DAYS = 28;
@@ -357,7 +430,7 @@ export function useTeacherAbsence({
 
     try {
       setSubmittingAbsence(true);
-      const todayD = new Date();
+      const todayD = getSimulatedNow();
       const localTodayStr = `${todayD.getFullYear()}-${String(todayD.getMonth() + 1).padStart(2, '0')}-${String(todayD.getDate()).padStart(2, '0')}`;
       const absenceStartVal = (absenceStartDate === localTodayStr) 
         ? todayD.toISOString() 
@@ -365,197 +438,26 @@ export function useTeacherAbsence({
       
       const absenceUntilVal = absenceUntilDate.includes('T') ? absenceUntilDate : `${absenceUntilDate}T23:59:59.999Z`;
 
-      let rpcSuccess = false;
       let affectedSlots: any[] = [];
       let teacherDisplayName = '';
 
-      try {
-        const { data: rpcRes, error: rpcErr } = await supabase.rpc('report_teacher_absence', {
-          p_teacher_id: userId,
-          p_start_date: absenceStartVal,
-          p_until_date: absenceUntilVal,
-          p_handling_owner: absenceHandlingOwner || 'secretariat'
-        });
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('report_teacher_absence', {
+        p_teacher_id: userId,
+        p_start_date: absenceStartVal,
+        p_until_date: absenceUntilVal,
+        p_handling_owner: absenceHandlingOwner || 'secretariat'
+      });
 
-        if (!rpcErr && rpcRes && rpcRes.success) {
-          rpcSuccess = true;
-          affectedSlots = rpcRes.affected_slots || [];
-          teacherDisplayName = rpcRes.teacher_name || '';
-        }
-      } catch (e) {
-        console.warn('RPC report_teacher_absence not available, falling back to client-side:', e);
+      if (rpcErr) {
+        console.error('[report_teacher_absence RPC failed]:', rpcErr);
+        throw new Error(rpcErr.message || 'Fehler bei der Übermittlung der Terminabsage.');
       }
 
-      if (!rpcSuccess) {
-        const { data: profile, error: profileErr } = await supabase
-          .from('users')
-          .select('school_id, first_name, last_name, ausfall_start, ausfall_until')
-          .eq('id', userId)
-          .single();
-
-        if (profileErr || !profile) {
-          throw new Error('Teacher profile not found.');
-        }
-
-        teacherDisplayName = formatTeacherFullName(profile);
-
-        const { error: userErr } = await supabase
-          .from('users')
-          .update({ 
-            ausfall_until: absenceUntilVal,
-            ausfall_start: absenceStartVal
-          })
-          .eq('id', userId);
-
-        if (userErr) throw userErr;
-
-        const [{ data: schedules }, { data: occurrences }, { data: existingNotifs }] = await Promise.all([
-          supabase.from('schedules').select('*, student:users!schedules_student_id_fkey(id, first_name, last_name)').eq('teacher_id', userId),
-          supabase.from('schedule_occurrences').select('*, student:users!schedule_occurrences_student_id_fkey(id, first_name, last_name)').eq('teacher_id', userId),
-          supabase.from('crisis_notifications').select('slot_start_datetime, student_id').eq('teacher_id', userId)
-        ]);
-
-        const now = new Date();
-        const todayStart = new Date(now);
-        todayStart.setHours(0, 0, 0, 0);
-        const absenceUntil = new Date(absenceUntilDate);
-        const maxDate = new Date(now);
-        maxDate.setDate(maxDate.getDate() + 30);
-
-        const currentDate = new Date(todayStart);
-        const notificationsToInsert: any[] = [];
-        const shoutboxMessagesToInsert: any[] = [];
-        const scheduleIdsToCancel = new Set<string>();
-        const scheduleIdsToRestore = new Set<string>();
-        const datesToDeleteNotifs: string[] = [];
-
-        const existingNotifsSet = new Set(
-          (existingNotifs || []).map(n => `${new Date(n.slot_start_datetime).toISOString()}-${n.student_id}`)
-        );
-
-        while (currentDate <= maxDate) {
-          const rawDay = currentDate.getDay();
-          const currentDayOfWeek = rawDay === 0 ? 7 : rawDay;
-          const daySchedules = (schedules || []).filter(s => s.day_of_week === currentDayOfWeek);
-
-          daySchedules.forEach(sched => {
-            const [hours, minutes] = (sched.time_slot || '00:00').split(':').map(Number);
-            const startDateTime = new Date(currentDate);
-            startDateTime.setHours(hours, minutes, 0, 0);
-
-            if (startDateTime >= now) {
-              const isCurrentlyAbsent = startDateTime <= new Date(absenceUntil.getTime() + 24 * 60 * 60 * 1000 - 1);
-              
-              if (isCurrentlyAbsent) {
-                scheduleIdsToCancel.add(sched.id);
-                if (sched.student_id) {
-                  const notifKey = `${startDateTime.toISOString()}-${sched.student_id}`;
-                  const student = sched.student || allStudents.find(s => s.id === sched.student_id);
-                  const studentName = student ? `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim() : null;
-                  const dateStr = startDateTime.toISOString().substring(0, 10);
-                  const timeStr = (sched.time_slot || '00:00').substring(0, 5);
-
-                  if (!existingNotifsSet.has(notifKey)) {
-                    notificationsToInsert.push({
-                      teacher_id: userId,
-                      student_id: sched.student_id,
-                      slot_start_datetime: startDateTime.toISOString(),
-                      status: 'UNREAD',
-                      duration: sched.duration || 30,
-                      student_name: studentName,
-                      handling_owner: absenceHandlingOwner || 'secretariat'
-                    });
-                  }
-
-                  const formattedDateDe = startDateTime.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-                  shoutboxMessagesToInsert.push({
-                    sender_id: userId,
-                    recipient_id: sched.student_id,
-                    content: `❌ Terminabsage: Lehrkraft ${teacherDisplayName} ist am ${formattedDateDe} um ${timeStr} Uhr verhindert. Dieser Unterrichtstermin entfällt.`,
-                    occurrence_id: `virtual-${sched.id}-${dateStr}`,
-                    is_system: true,
-                    message_type: 'cancellation'
-                  });
-
-                  affectedSlots.push({
-                    student_id: sched.student_id,
-                    student_name: studentName,
-                    date_str: dateStr,
-                    time_str: timeStr,
-                    teacher_name: teacherDisplayName
-                  });
-                }
-              } else {
-                scheduleIdsToRestore.add(sched.id);
-                datesToDeleteNotifs.push(startDateTime.toISOString());
-              }
-            }
-          });
-
-          currentDate.setDate(currentDate.getDate() + 1);
-        }
-
-        const occurrenceIdsToCancel = new Set<string>();
-        (occurrences || []).forEach(occ => {
-          const startDateTime = new Date(`${occ.date}T${occ.start_time}`);
-          if (startDateTime >= now) {
-            const isCurrentlyAbsent = startDateTime <= new Date(absenceUntil.getTime() + 24 * 60 * 60 * 1000 - 1);
-            if (isCurrentlyAbsent) {
-              occurrenceIdsToCancel.add(occ.id);
-              if (occ.student_id) {
-                const notifKey = `${startDateTime.toISOString()}-${occ.student_id}`;
-                const student = occ.student || allStudents.find(s => s.id === occ.student_id);
-                const studentName = student ? `${student.first_name} ${maskLastName(student.last_name, showRealNames)}`.trim() : null;
-                const timeStr = (occ.start_time || '00:00').substring(0, 5);
-
-                if (!existingNotifsSet.has(notifKey)) {
-                  notificationsToInsert.push({
-                    teacher_id: userId,
-                    student_id: occ.student_id,
-                    slot_start_datetime: startDateTime.toISOString(),
-                    status: 'UNREAD',
-                    duration: occ.duration || 30,
-                    student_name: studentName,
-                    handling_owner: absenceHandlingOwner || 'secretariat'
-                  });
-                }
-
-                const formattedDateDe = new Date(occ.date + 'T00:00:00').toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-                shoutboxMessagesToInsert.push({
-                  sender_id: userId,
-                  recipient_id: occ.student_id,
-                  content: `❌ Terminabsage: Lehrkraft ${teacherDisplayName} ist am ${formattedDateDe} um ${timeStr} Uhr verhindert. Dieser Unterrichtstermin entfällt.`,
-                  occurrence_id: String(occ.id),
-                  is_system: true,
-                  message_type: 'cancellation'
-                });
-
-                affectedSlots.push({
-                  student_id: occ.student_id,
-                  student_name: studentName,
-                  date_str: occ.date,
-                  time_str: timeStr,
-                  teacher_name: teacherDisplayName
-                });
-              }
-            }
-          }
-        });
-
-        await Promise.all([
-          scheduleIdsToCancel.size > 0 ? supabase.from('schedules').update({ status: 'canceled_by_teacher_ausfall' }).in('id', Array.from(scheduleIdsToCancel)) : Promise.resolve(),
-          occurrenceIdsToCancel.size > 0 ? supabase.from('schedule_occurrences').update({ status: 'cancelled', canceled_by_role: 'teacher', teacher_acknowledged: true, handling_owner: absenceHandlingOwner || 'secretariat' }).in('id', Array.from(occurrenceIdsToCancel)) : Promise.resolve(),
-          notificationsToInsert.length > 0 ? supabase.from('crisis_notifications').insert(notificationsToInsert) : Promise.resolve(),
-          shoutboxMessagesToInsert.length > 0 ? supabase.from('campus_direct_messages').insert(shoutboxMessagesToInsert) : Promise.resolve(),
-          datesToDeleteNotifs.length > 0 ? supabase.from('crisis_notifications').delete().eq('teacher_id', userId).in('slot_start_datetime', datesToDeleteNotifs) : Promise.resolve(),
-          supabase.from('system_alerts').insert({
-            school_id: profile.school_id,
-            teacher_id: userId,
-            type: 'Teacher Absence Alert',
-            message: `TERMINABSAGE: Lehrkraft ${teacherDisplayName} hat Termine bis zum ${new Date(absenceUntilDate + 'T00:00:00').toLocaleDateString('de-DE')} abgesagt.`,
-            resolved: false
-          })
-        ]);
+      if (rpcRes && rpcRes.success) {
+        affectedSlots = rpcRes.affected_slots || [];
+        teacherDisplayName = rpcRes.teacher_name || formatTeacherFullName(teacher) || '';
+      } else {
+        throw new Error((rpcRes as any)?.error || 'Die Terminabsage konnte nicht verarbeitet werden.');
       }
 
       const pushTeacherName = teacherDisplayName || formatTeacherFullName(teacher) || 'deiner Lehrkraft';
@@ -595,9 +497,9 @@ export function useTeacherAbsence({
       });
 
       if (onRefresh) onRefresh();
-    } catch (err) {
-      console.error(err);
-      alert('Fehler bei der Terminabsage.');
+    } catch (err: any) {
+      console.error('Fehler bei handleReportAbsence:', err);
+      alert(err?.message || 'Fehler bei der Terminabsage.');
     } finally {
       setSubmittingAbsence(false);
     }
@@ -609,8 +511,8 @@ export function useTeacherAbsence({
     try {
       setSubmittingAbsence(true);
       setAbsenceUntilDate('');
-      const today = new Date();
-      setAbsenceStartDate(today.toISOString().substring(0, 10));
+      const today = getSimulatedNow();
+      setAbsenceStartDate(today.toLocaleDateString('sv-SE'));
       setTeacher((prev: any) => prev ? { ...prev, ausfall_until: null, ausfall_start: null } : prev);
 
       const { data: profile } = await supabase
@@ -673,7 +575,7 @@ export function useTeacherAbsence({
           .select('*')
           .eq('teacher_id', userId);
 
-        const now = new Date();
+        const now = getSimulatedNow();
         const todayStart = new Date(now);
         todayStart.setHours(0, 0, 0, 0);
 
@@ -785,7 +687,7 @@ export function useTeacherAbsence({
 
       const { data: updatedTeacher } = await supabase
         .from('users')
-        .select('*, schools(*)')
+        .select(TEACHER_WITH_SCHOOL_SELECT)
         .eq('id', userId)
         .maybeSingle();
 
@@ -860,6 +762,7 @@ export function useTeacherAbsence({
     totalAbsenceCancellationsCount,
     readCancellationsCount,
     unreadCancellationsCount,
+    handleMarkStudentContacted,
     handleReportAbsence,
     handleEndAbsence
   };

@@ -190,7 +190,7 @@ export function useCampusSecurityGuards({
       // 3. Await authoritative database role update via RPC (Fail-Closed, no client table update)
       try {
         const activeLeaseId = typeof window !== 'undefined' 
-          ? sessionStorage.getItem('gl_active_session_lease_id')
+          ? (sessionStorage.getItem('gl_active_session_lease_id') || localStorage.getItem('gl_active_session_lease_id'))
           : null;
         
         let rpcErr: any = null;

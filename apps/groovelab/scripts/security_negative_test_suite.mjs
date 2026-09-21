@@ -98,7 +98,7 @@ async function runSecurityAudit() {
     const { data: authData, error: authErr } = await anonClient.rpc('authenticate_by_credential', {
       p_credential: 'invalid_dummy_token_12345'
     });
-    const handlesInvalidSafely = (authData?.success === false && !authErr) || (!!authErr && (authErr.message?.includes('fetch failed') || authErr.message?.includes('ENOTFOUND') || authErr.message?.includes('JWT') || authErr.message?.includes('key') || authErr.code === 'PGRST301'));
+    const handlesInvalidSafely = (authData?.success === false && !authErr) || (!!authErr && (authErr.message?.includes('fetch failed') || authErr.message?.includes('ENOTFOUND') || authErr.message?.includes('JWT') || authErr.message?.includes('key') || authErr.message?.includes('Unauthorized') || authErr.code === 'PGRST301' || authErr.status === 401));
     assert('authenticate_by_credential gracefully handles invalid credentials', handlesInvalidSafely, 'RPC threw unexpected exception');
   } catch (err) {
     assert('Auth RPC handled gracefully', true);

@@ -139,12 +139,12 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
   const effectiveNetFee = +(effectiveAnnualFee / 1.19).toFixed(2);
   const effectiveVatAmount = +(effectiveAnnualFee - effectiveNetFee).toFixed(2);
   const taxDisclaimer = isChf 
-    ? 'Endpreis (Leistungsort Schweiz, gem. Art. 21 Abs. 2 Ziff. 11 MWSTG / Art. 8 Abs. 1 MWSTG)' 
+    ? 'Endpreis (Leistungsort Schweiz, kein gesonderter Steuerausweis)' 
     : platformTaxMode === 'vat_exempt_4_21'
-      ? 'Endpreis (Umsatzsteuerfreie Bildungsleistung gem. § 4 Nr. 21 UStG)'
+      ? 'Endpreis (Umsatzsteuerfreie Bildungsleistung)'
       : platformTaxMode === 'standard_vat'
         ? `Endpreis inkl. 19% MwSt. (Netto: ${effectiveNetFee.toFixed(2).replace('.', ',')} € + ${effectiveVatAmount.toFixed(2).replace('.', ',')} € MwSt.)`
-        : 'Endpreis gem. § 19 UStG (kein gesonderter Steuerausweis)';
+        : 'Endpreis (Kleinunternehmerregelung, kein gesonderter Steuerausweis)';
 
   // Generate stable GoBD Reference Code: CG-[HASH8]-[YYMM]
   const referenceCode = generateStudentGoBdCode(student.id || 'TEMP-ID');
@@ -1180,7 +1180,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                     : 'Überweisung registriert! Ihr 14-tägiger Vertrauenszugang ist ab sofort aktiv. Sobald der Zahlungseingang verbucht ist, wird die Freischaltung für das gesamte Schuljahr dauerhaft bestätigt.'}
                 </div>
                 <div style={{ fontSize: '0.74rem', color: '#047857', fontWeight: 600, marginTop: '2px' }}>
-                  ✓ Ihr offizieller Vertrags- &amp; Überweisungsbeleg (PDF gem. § 312f BGB) wurde automatisch heruntergeladen.
+                  ✓ Ihr offizieller Vertrags- &amp; Überweisungsbeleg (PDF) wurde automatisch heruntergeladen.
                 </div>
               </div>
             </div>
@@ -1189,83 +1189,84 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
           {/* Action CTAs */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
             
-            {/* § 312j Abs. 2 BGB Wesentliche Vertragsmerkmale & Preistransparenz */}
+            {/* Wesentliche Vertragsmerkmale & Preistransparenz */}
             {!isThirdOrMoreChild && (
               <div style={{
                 background: '#f8fafc',
                 border: '1px solid #e2e8f0',
                 borderRadius: '12px',
-                padding: '12px 14px',
-                fontSize: '0.78rem',
-                color: '#334155',
+                padding: '10px 14px',
                 display: 'flex',
-                flexDirection: 'column',
-                gap: '4px'
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '8px'
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 700, color: '#0f172a' }}>
-                    1. Schnuppermonat ({schoolYearCalc.freeMonthName}):
-                  </span>
-                  <span style={{ fontWeight: 800, color: '#10b981' }}>{freeMonthDisplay} (Inklusive)</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 700, color: '#0f172a' }}>
-                    Gesamtpreis ({periodDescription}):
-                  </span>
-                  <div style={{ textAlign: 'right' }}>
-                    <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.86rem' }}>
-                      {isChf ? `CHF ${totalAmountStr}` : `${totalAmountStr} €`} einmalig
-                    </span>
-                    <span style={{ fontSize: '0.64rem', color: '#64748b', fontWeight: 600, display: 'block' }}>
-                      {taxDisclaimer}
-                    </span>
+                <div>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>
+                    Gesamtpreis für das Schuljahr
+                  </div>
+                  <div style={{ fontSize: '0.70rem', color: '#64748b' }}>
+                    {taxDisclaimer}
                   </div>
                 </div>
-                <div style={{ fontSize: '0.70rem', color: '#64748b', marginTop: '2px', lineHeight: '1.4' }}>
-                  <strong>Transparenz-Garantie:</strong> Feste Schuljahresnutzung • Kein Abonnement • Keine automatische Verlängerung • Sofort-Widerruf jederzeit im Elternbereich • Endet automatisch zum Schuljahresende
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 900, color: '#0f172a' }}>
+                    {isChf ? `CHF ${totalAmountStr}` : `${totalAmountStr} €`}
+                  </div>
+                  <div style={{ fontSize: '0.66rem', color: '#059669', fontWeight: 700 }}>
+                    {schoolYearCalc.isCurrentTrialPeriod ? '1. Monat kostenfrei inklusive' : 'Einmaliger Jahresbeitrag'}
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* Legal Consent Checkbox for B2C (§§ 312j, 356 Abs. 5 BGB & Minderjährigenrecht §§ 106-108 BGB) */}
+            {/* Legal Consent Checkbox for B2C */}
             <label style={{
               display: 'flex',
               alignItems: 'flex-start',
               gap: '10px',
-              fontSize: '0.74rem',
-              color: '#475569',
               cursor: 'pointer',
-              lineHeight: '1.4',
-              padding: '2px 4px'
+              background: '#f8fafc',
+              padding: '10px 12px',
+              borderRadius: '12px',
+              border: agreeWithdrawalWaiver ? '1px solid #cbd5e1' : '1.5px dashed #f59e0b',
+              transition: 'all 0.15s'
             }}>
               <input
                 type="checkbox"
                 checked={agreeWithdrawalWaiver}
                 onChange={(e) => setAgreeWithdrawalWaiver(e.target.checked)}
-                style={{ accentColor: '#10b981', marginTop: '2px', cursor: 'pointer' }}
+                style={{
+                  width: '18px',
+                  height: '18px',
+                  marginTop: '2px',
+                  accentColor: '#10b981',
+                  cursor: 'pointer'
+                }}
               />
-              <span>
-                Ich bestätige als <strong>gesetzlicher Vertreter (Elternteil)</strong> meine Volljährigkeit und Geschäftsfähigkeit für die Autorisierung dieses Schuljahres-Beitrags. Ich stimme den{' '}
+              <span style={{ fontSize: '0.74rem', color: '#334155', lineHeight: '1.45' }}>
+                Ich stimme den{' '}
                 <button
                   type="button"
-                  onClick={(e) => { e.preventDefault(); setLegalModalTab('terms'); }}
+                  onClick={() => setLegalModalTab('terms')}
                   style={{ background: 'none', border: 'none', padding: 0, color: '#0f172a', fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}
                 >
-                  AGB
+                  Nutzungsbedingungen (AGB Teil B)
                 </button>
                 {' '}und der{' '}
                 <button
                   type="button"
-                  onClick={(e) => { e.preventDefault(); setLegalModalTab('privacy'); }}
+                  onClick={() => setLegalModalTab('privacy')}
                   style={{ background: 'none', border: 'none', padding: 0, color: '#0f172a', fontWeight: 800, textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit' }}
                 >
                   Datenschutzerklärung
                 </button>
-                {' '}zu. Ich verlange ausdrücklich, dass mit der Bereitstellung der Plattform vor Ablauf der 14-tägigen Widerrufsfrist begonnen wird. Mir ist bekannt, dass mein Widerrufsrecht bei vollständiger Bereitstellung erlischt (§ 356 Abs. 5 BGB).
+                {' '}zu. Ich verlange ausdrücklich, dass mit der Bereitstellung der Plattform vor Ablauf der 14-tägigen Widerrufsfrist begonnen wird. Mir ist bekannt, dass mein Widerrufsrecht bei vollständiger Bereitstellung vorzeitig erlischt.
               </span>
             </label>
 
-            {/* Statutory 14-day Right of Withdrawal notice (§ 312d BGB / Art. 246a § 1 Abs. 2 EGBGB) */}
+            {/* Gesetzliche Widerrufsinformation */}
             <div style={{
               fontSize: '0.72rem',
               color: '#475569',
@@ -1281,7 +1282,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontWeight: 800, color: '#0f172a' }}>🛡️ Gesetzliches Widerrufsrecht</span>
                 <span style={{ fontSize: '0.66rem', color: '#059669', background: '#ecfdf5', padding: '1px 6px', borderRadius: '6px', fontWeight: 700 }}>
-                  § 312g • § 355 BGB • Art. 246a EGBGB
+                  Verbraucherschutz &amp; Widerrufsbelehrung
                 </span>
               </div>
               <div>
@@ -1305,7 +1306,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               </div>
             </div>
 
-            {/* 🛡️ Gesetzliche Vertragszusammenfassung unmittelbar vor der Bestellung (§ 312j Abs. 2 BGB / Art. 246a § 1 EGBGB) */}
+            {/* Gesetzliche Vertragszusammenfassung unmittelbar vor der Bestellung */}
             <div style={{
               background: '#ffffff',
               border: '1px solid #cbd5e1',
@@ -1319,7 +1320,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               gap: '3px'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '4px' }}>
-                <span style={{ fontWeight: 800, color: '#0f172a' }}>📋 Vertragsübersicht (§ 312j Abs. 2 BGB)</span>
+                <span style={{ fontWeight: 800, color: '#0f172a' }}>📋 Vertragsübersicht</span>
                 <span style={{ fontWeight: 700, color: '#059669' }}>
                   {isThirdOrMoreChild 
                     ? '0,00 € (3. Kind Befreiung)' 
@@ -1340,7 +1341,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
               </div>
             </div>
 
-            {/* Primary confirmation CTA with strict § 312j BGB Compliance */}
+            {/* Primary confirmation CTA with strict Compliance */}
             <button
               type="button"
               disabled={!agreeWithdrawalWaiver}
@@ -1351,6 +1352,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                   ? `Kostenfreien Schnuppermonat jetzt starten (${freeMonthDisplay})` 
                   : 'Zahlungspflichtig bestellen'}
               style={{
+                width: '100%',
                 background: !agreeWithdrawalWaiver 
                   ? '#94a3b8' 
                   : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
@@ -1402,7 +1404,7 @@ export const ParentCampusActivationModal: React.FC<ParentCampusActivationModalPr
                 }}
                 onMouseOver={(e) => { e.currentTarget.style.borderColor = '#0f172a'; }}
                 onMouseOut={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; }}
-                title="Vertragsbestätigung gem. § 312f Abs. 2 BGB mit Zahlungsanweisung als PDF speichern"
+                title="Offizielle Vertragsbestätigung mit Zahlungsanweisung als PDF speichern"
               >
                 <Download size={14} />
                 <span>Vertragsbeleg &amp; PDF</span>

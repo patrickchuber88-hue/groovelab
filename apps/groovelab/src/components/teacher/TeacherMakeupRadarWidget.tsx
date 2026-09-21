@@ -81,7 +81,7 @@ export const TeacherMakeupRadarWidget: React.FC<TeacherMakeupRadarWidgetProps> =
               Nachhol-Radar
             </h3>
             <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
-              Revisionssichere Unterrichtskompensation (§ 275 BGB)
+              Revisionssichere Unterrichtskompensation
             </span>
           </div>
         </div>

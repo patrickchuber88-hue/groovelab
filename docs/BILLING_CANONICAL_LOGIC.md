@@ -70,8 +70,34 @@ Für das Basishosting der Musikschule (feste Server-Hosting-Pauschale pro Musiks
 2. **Teilweise Direktabrechnung (Schule bezuschusst):**
    - Einmaliger Jahresbeitrag von **maximal 4,40 € / Schuljahr** (DE/AT: 1 Monat kostenlos + bis zu 11 Monate × 0,40 €) bzw. **maximal CHF 8.80 / Schuljahr** (CH: 1 Monat kostenlos + bis zu 11 Monate × CHF 0.80).
    - Die Schule deckt den verbleibenden Beitrag (0,09 € / CHF 0.20 / Mo.).
-3. **Härtefall- & Geschwisterausnahmen:**
-   - Einzelne Schüler können in der Schülerverwaltung jederzeit manuell als Härtefall oder Geschwisterkind markiert werden. In diesem Fall verbleiben die Kosten bei der Musikschule, und von den Eltern wird kein Beitrag erhoben.
+3. **Automatische Beendigung zum Schuljahresende (Keine Abofalle / § 309 Nr. 9 BGB):**
+   - Die Beitragsperiode endet verbindlich und automatisch mit dem Ablauf des jeweiligen Schuljahres (31. Juli bzw. 31. August). Es findet **keine** stillschweigende Vertragsverlängerung und kein automatischer Einzug im Folgejahr statt.
+4. **Jährlicher Probemonat (Reset zum Schuljahresbeginn):**
+   - Zu Beginn eines jeden neuen Schuljahres (z. B. 1. September) wird der erste Nutzungsmonat für **alle Schüler erneut vollumfänglich kostenfrei** (Probemonat) bereitgestellt.
+5. **Sanfter Rückfall in den Basistarif (0,09 € / Mo. - Keine Aussperrung):**
+   - Entscheiden sich Eltern im neuen Schuljahr gegen die Zahlung des Bereitstellungsbeitrags (5,39 € / CHF 11.00), wird das Schülerprofil **zu keinem Zeitpunkt gelöscht oder der Unterricht unterbrochen**.
+   - Das Profil wird automatisch in den Basistarif überführt (Basis-Unterrichtskanal zu 0,09 € / Monat), für den die Musikschule im Rahmen der Grundinfrastruktur aufkommt. Sämtliche Unterrichtstermine, Raumzuordnungen und Kontaktdaten bleiben unangetastet.
+6. **Härtefall- & Geschwisterausnahmen (Einzelübernahme durch Schule):**
+   - Einzelne Schüler können in der Schülerverwaltung jederzeit manuell als Härtefall oder Geschwisterkind markiert werden (`exempt_from_direct_billing = true`).
+   - In diesem Fall entfällt der Zahlungsdialog bei den Eltern vollständig; das Profil wird unmittelbar für das gesamte Schuljahr freigeschaltet.
+7. **Verbraucherschutz & Widerruf (§ 356 Abs. 5 BGB):**
+   - Mit Beginn der digitalen Nutzung vor Ablauf der gesetzlichen 14-tägigen Widerrufsfrist stimmt der Erziehungsberechtigte der sofortigen Ausführung zu und nimmt zur Kenntnis, dass das Widerrufsrecht bei vollständiger Bereitstellung digitaler Inhalte erlischt. Keine Rückforderungs- oder Mahnschleifen.
+8. **Härtefall-Stufenstaffel & Freikontingent (Sozial-Governance):**
+   - **Mathematische Formel:** $\text{Freikontingent} = \left\lfloor \frac{n_{\text{Vollzahler}}}{20} \right\rfloor$
+   - Es müssen mindestens 20 aktivierte Vollzahler-Schülerprofile vorliegen, bevor der erste kostenfreie Härtefallplatz gewährt wird.
+   - Jede weitere volle 20 aktivierte Schüler schaltet genau einen weiteren Freiplatz frei (strikte kaufmännische Abrundung / Floor-Logik):
+     - **0 bis 19 Vollzahler:** 0 Freiplätze (Einstiegsschwelle nicht erreicht)
+     - **20 bis 39 Vollzahler:** 1 Freiplatz (100 % beitragsfrei für Schule & Eltern)
+     - **40 bis 59 Vollzahler:** 2 Freiplätze (100 % beitragsfrei für Schule & Eltern)
+     - **60 bis 79 Vollzahler:** 3 Freiplätze (100 % beitragsfrei für Schule & Eltern)
+     - **80 bis 99 Vollzahler:** 4 Freiplätze (100 % beitragsfrei für Schule & Eltern)
+     - **100 bis 119 Vollzahler:** 5 Freiplätze (100 % beitragsfrei für Schule & Eltern)
+   - **Stichtags-Prinzip zum 1. Oktober:**
+     - Da der September für alle Schüler und Eltern der kostenlose Probemonat ist, wird das Freikontingent erst am **1. Oktober** (nach Abschluss aller Nachzügler-Anmeldungen) final festgestellt.
+   - **Überhang-Kaskade bei Schülerrückgang (Verbot pädagogischer Willkür / § 242 BGB, Art. 3 GG):**
+     - Sinkt die Zahl der Vollzahler im Folgejahr (z. B. von 100 auf 70), verbleiben die bisherigen Härtefall-Kinder zu 100 % aktiv und ungesperrt.
+     - Für die über das Kontingent hinausgehenden Schüler (Überhang) übernimmt die Musikschule den regulären Jahresbereitstellungsbeitrag (5,39 € / Schuljahr bzw. 0,49 € / Mo.) auf ihrer B2B-Rechnung.
+     - Die Schule kann Überhang-Profile vor dem 1. Oktober aktiv auf den Basistarif (0,09 € / Mo.) zurückstufen, falls ein Schüler die Schule verlassen hat. Ein willkürlicher Schülerausschluss durch das System findet zu keinem Zeitpunkt statt.
 
 ---
 
@@ -136,3 +162,20 @@ Für alle Gebührenaufstellungen, Vorschau-Modals, PDF-Rechnungen und Onboarding
    - Schüler und Lehrkräfte werden bei Zahlungsverzug niemals gesperrt (didaktische Immunität).
    - Erst ab Tag 44 greift ein administrativer Schreibschutz im Sekretariat, der per 48h-Vertrauenspass oder Master-Kulanzjoker jederzeit entsperrt werden kann.
 
+---
+
+## 9. 1% Goldstandard B2B-Rechnungsversand & GoBD-Zustellungs-Engine
+
+1. **Hermetischer B2C Air-Gap vs. B2B-Souveränität:**
+   - Schüler, Eltern und Lehrkräfte verbleiben ausnahmslos in der **Zero-Mail-Architektur** (DSGVO Art. 25/32).
+   - Plattformrechnungen von Campus-Groovelab werden ausschließlich an die offizielle, behördliche/institutionelle E-Mail-Adresse der Musikschule (`public.schools.billing_email`) zugestellt.
+2. **Kryptografischer Hash-Nachweis (SHA-256):**
+   - Jede Rechnung wird vor dem Versand als PDF gerendert und mit einem kryptografischen SHA-256 Hash signiert.
+   - Der SHA-256 Hash wird im unveränderbaren Zustellbuch `public.school_invoice_dispatches` festgeschrieben.
+3. **WORM-Zustellungsbuch (`public.school_invoice_dispatches`):**
+   - Jede Rechnungsübermittlung wird mit `invoice_id`, `school_id`, `recipient_email`, `dispatched_at`, `status` (`delivered`, `simulated`, `failed`), `smtp_message_id` und `pdf_sha256` protokolliert.
+   - Per Trigger `trg_protect_school_invoice_dispatches` sind Löschungen (`DELETE`) und Manipulationen (`UPDATE`) gesetzlich verboten gem. § 147 AO.
+4. **Sovereign Hetzner SMTP & Dualer Zustellungs-Modus:**
+   - Primärer Versandweg: Autoritatives deutsches SMTP-Relay über Hetzner Mailhost (`mail.your-server.de`, Port 587/465, TLS 1.3) via Supabase Edge Function `dispatch-school-invoice`.
+   - Bei fehlenden Secrets oder im Dev-Modus: Automatischer, deterministischer Testlauf-Modus (`status: 'simulated'`).
+   - Sekundärer Notfall-Rettungsschirm: Der manuelle Download inklusive Zwischenablage-Text und `mailto:`-Workflow bleibt zu 100 % erhalten.

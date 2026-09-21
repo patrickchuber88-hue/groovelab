@@ -16,6 +16,7 @@ export interface PendingSchedule {
 
 export interface UseSecretarySchedulesProps {
   schoolId: string;
+  userId?: string;
   rooms: any[];
   setRooms: React.Dispatch<React.SetStateAction<any[]>>;
   openingHours: any;
@@ -27,6 +28,7 @@ export interface UseSecretarySchedulesProps {
 
 export function useSecretarySchedules({
   schoolId,
+  userId,
   rooms,
   setRooms,
   openingHours,
@@ -50,6 +52,14 @@ export function useSecretarySchedules({
   const approvalDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isApprovingAllSchedules, setIsApprovingAllSchedules] = useState<boolean>(false);
   const [showOnlyPendingReviews, setShowOnlyPendingReviews] = useState<boolean>(false);
+  const [approvalSummaryModal, setApprovalSummaryModal] = useState<{
+    isOpen: boolean;
+    totalSlots: number;
+    totalDays: number;
+    teachersCount: number;
+    teacherNames: string[];
+    roomsUsedCount: number;
+  } | null>(null);
 
   const [hoveredUnassignedDayNum, setHoveredUnassignedDayNum] = useState<number | null>(null);
   const [clickedUnassignedDayNum, setClickedUnassignedDayNum] = useState<number | null>(null);
@@ -63,7 +73,15 @@ export function useSecretarySchedules({
     if (pendingSchedules.length === 0) return;
     setIsApprovingAllSchedules(true);
     try {
+      // If any pending schedule originates from a teacher draft (fallback_), execute the comprehensive matrix save & approve flow
+      const hasFallbackPlans = pendingSchedules.some(s => s.id.startsWith('fallback_'));
+      if (hasFallbackPlans) {
+        await handleSaveAndApproveAll(true);
+        return;
+      }
+
       const pendingIds = pendingSchedules.map(s => s.id);
+      const affectedTeacherIds = Array.from(new Set(pendingSchedules.map(s => s.teacher_id).filter(Boolean)));
 
       // Targeted notifications to affected students
       const dayNamesMap: Record<number, string> = { 1: 'Montag', 2: 'Dienstag', 3: 'Mittwoch', 4: 'Donnerstag', 5: 'Freitag', 6: 'Samstag', 7: 'Sonntag' };
@@ -98,6 +116,43 @@ export function useSecretarySchedules({
 
       if (error) throw error;
 
+      if (affectedTeacherIds.length > 0) {
+        try {
+          await supabase
+            .from('system_alerts')
+            .update({ resolved: true })
+            .eq('school_id', schoolId)
+            .in('teacher_id', affectedTeacherIds)
+            .in('type', ['Stundenplan Freigabe', 'schedule_submission']);
+        } catch (alertErr) {
+          console.warn('[useSecretarySchedules] Alert resolution notice:', alertErr);
+        }
+
+        // 🛡️ Enterprise+ Revisionssicheres Audit-Logging (OWASP ASVS / DSGVO Art. 30)
+        try {
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          const auditEntries = affectedTeacherIds.map(tId => ({
+            school_id: schoolId,
+            table_name: 'schedules',
+            action: 'SCHEDULES_APPROVED',
+            record_id: uuidRegex.test(tId) ? tId : null,
+            actor_id: (userId && uuidRegex.test(userId)) ? userId : null,
+            user_id: (userId && uuidRegex.test(userId)) ? userId : null,
+            changed_by: (userId && uuidRegex.test(userId)) ? userId : null,
+            details: {
+              action_type: 'SCHEDULES_APPROVED_BULK',
+              teacher_id: tId,
+              pending_slots_approved: pendingIds.length,
+              approved_at: new Date().toISOString(),
+              approved_by: userId || 'Schulsekretariat'
+            }
+          }));
+          await supabase.from('audit_logs').insert(auditEntries);
+        } catch (auditErr) {
+          console.warn('[useSecretarySchedules] Bulk audit logging notice:', auditErr);
+        }
+      }
+
       setPendingSchedules([]);
       setShowOnlyPendingReviews(false);
       setApprovalToast({
@@ -105,6 +160,7 @@ export function useSecretarySchedules({
         type: 'success'
       });
       setTimeout(() => setApprovalToast(null), 4000);
+      fetchDashboardData();
     } catch (err) {
       console.error('Error approving all pending schedules:', err);
       setApprovalToast({
@@ -467,8 +523,17 @@ export function useSecretarySchedules({
   };
 
   // Bulk save and approve to database
-  const handleSaveAndApproveAll = async (skipUnassignedWarning = false) => {
-    const unassignedPlans = matrixAllocations.filter(p => !p.roomId);
+  // Bulk or targeted save and approve to database
+  const handleSaveAndApproveAll = async (skipUnassignedWarning = false, targetTeacherId?: string) => {
+    const cleanTargetId = targetTeacherId ? targetTeacherId.replace(/^teacher-/i, '') : null;
+    const scopedAllocations = cleanTargetId
+      ? matrixAllocations.filter(p => {
+          const cleanPTeacher = p.teacherId ? p.teacherId.replace(/^teacher-/i, '') : '';
+          return cleanPTeacher === cleanTargetId;
+        })
+      : matrixAllocations;
+
+    const unassignedPlans = scopedAllocations.filter(p => !p.roomId);
     if (!skipUnassignedWarning && unassignedPlans.length > 0) {
       setShowUnassignedWarning(true);
       return;
@@ -476,12 +541,23 @@ export function useSecretarySchedules({
 
     setIsSavingApproval(true);
     try {
-      const assignedPlans = matrixAllocations.filter(p => p.roomId);
+      // If skipUnassignedWarning or direct target approval, process all scoped allocations; otherwise only assigned plans
+      const plansToProcess = (skipUnassignedWarning || !!cleanTargetId)
+        ? scopedAllocations
+        : scopedAllocations.filter(p => p.roomId);
+      const assignedPlans = scopedAllocations.filter(p => p.roomId);
       const approvedDraftMap: Record<string, string | null> = {};
+      try {
+        const existingLocalDraft = JSON.parse(localStorage.getItem(`groovelab_matrix_allocations_draft_${schoolId}`) || '{}');
+        Object.assign(approvedDraftMap, existingLocalDraft);
+      } catch (_) {}
+
       assignedPlans.forEach(p => {
         approvedDraftMap[p.id] = p.roomId;
         if (p.teacherId && p.dayOfWeek) {
           approvedDraftMap[`${p.teacherId}_${p.dayOfWeek}`] = p.roomId;
+          const cleanT = p.teacherId.replace(/^teacher-/i, '');
+          approvedDraftMap[`${cleanT}_${p.dayOfWeek}`] = p.roomId;
         }
       });
 
@@ -490,17 +566,23 @@ export function useSecretarySchedules({
       const slotsToInsert: any[] = [];
       const teacherRoomMap: Record<string, Record<number, string | null>> = {};
 
-      for (const plan of assignedPlans) {
+      const isValidUuid = (val: any): boolean => {
+        if (typeof val !== 'string') return false;
+        return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+      };
+
+      for (const plan of plansToProcess) {
         if (!plan) continue;
-        const targetRoomId = plan.roomId;
+        const targetRoomId = isValidUuid(plan.roomId) ? plan.roomId : null;
 
         if (plan.teacherId && plan.teacherId !== 'groovelab') {
+          const cleanTeacherId = plan.teacherId.replace(/^teacher-/i, '');
           scheduleUpdatePromises.push(
             supabase
               .from('schedules')
               .delete()
               .eq('school_id', schoolId)
-              .eq('teacher_id', plan.teacherId)
+              .eq('teacher_id', cleanTeacherId)
               .eq('day_of_week', plan.dayOfWeek)
           );
 
@@ -511,35 +593,35 @@ export function useSecretarySchedules({
                   slot.groupStudents.forEach((gs: any) => {
                     slotsToInsert.push({
                       school_id: schoolId,
-                      teacher_id: plan.teacherId,
-                      student_id: gs.id,
+                      teacher_id: cleanTeacherId,
+                      student_id: isValidUuid(gs.id) ? gs.id : null,
                       day_of_week: plan.dayOfWeek,
                       time_slot: slot.time_slot || slot.startTime || '14:00',
                       room_id: targetRoomId,
-                      duration: slot.duration || 30,
-                      status: 'approved',
-                      instrument: gs.instrument || slot.instrument || plan.instrument || 'Musiker'
+                      duration: slot.duration ? (parseInt(String(slot.duration), 10) || 30) : 30,
+                      status: 'approved'
                     });
                   });
                 } else if (slot.student_id) {
                   slotsToInsert.push({
                     school_id: schoolId,
-                    teacher_id: plan.teacherId,
-                    student_id: slot.student_id,
+                    teacher_id: cleanTeacherId,
+                    student_id: isValidUuid(slot.student_id) ? slot.student_id : null,
                     day_of_week: plan.dayOfWeek,
                     time_slot: slot.time_slot || slot.startTime || '14:00',
                     room_id: targetRoomId,
-                    duration: slot.duration || 30,
-                    status: 'approved',
-                    instrument: slot.instrument || plan.instrument || 'Musiker'
+                    duration: slot.duration ? (parseInt(String(slot.duration), 10) || 30) : 30,
+                    status: 'approved'
                   });
                 }
               }
             }
           }
 
+          if (!teacherRoomMap[cleanTeacherId]) teacherRoomMap[cleanTeacherId] = {};
+          teacherRoomMap[cleanTeacherId][plan.dayOfWeek] = targetRoomId;
           if (!teacherRoomMap[plan.teacherId]) teacherRoomMap[plan.teacherId] = {};
-          teacherRoomMap[plan.teacherId][plan.dayOfWeek] = plan.roomId || null;
+          teacherRoomMap[plan.teacherId][plan.dayOfWeek] = targetRoomId;
         }
       }
 
@@ -563,42 +645,76 @@ export function useSecretarySchedules({
         await Promise.all(scheduleUpdatePromises);
       }
 
+      if (slotsToInsert.length > 0) {
+        const { error: insertErr } = await supabase.from('schedules').insert(slotsToInsert);
+        if (insertErr) {
+          console.error('[useSecretarySchedules] Error inserting clean schedules:', insertErr);
+          throw new Error(`Fehler beim Speichern der Stundenplandaten: ${insertErr.message}`);
+        }
+      }
+
       const [, teacherUsersResult] = await Promise.all([
-        slotsToInsert.length > 0
-          ? supabase.from('schedules').insert(slotsToInsert).then(({ error }) => {
-              if (error) console.error('[SecretaryDashboard] Error inserting clean schedules:', error);
-            })
-          : Promise.resolve(),
-        supabase.from('users').select('*').eq('school_id', schoolId),
         opHoursChanged
           ? supabase.from('schools').update({ opening_hours: updatedOpHours }).eq('id', schoolId)
-          : Promise.resolve()
+          : Promise.resolve(),
+        supabase.from('users').select('id, planned_boards, campus_räume, groovelab_räume').eq('school_id', schoolId)
       ]);
 
       const teacherUsers = (teacherUsersResult as any)?.data || [];
 
       const userUpdatePromises: any[] = [];
       for (const tu of teacherUsers) {
-        const roomMap = teacherRoomMap[tu.id];
-        if (!roomMap) continue;
+        const cleanTuId = tu.id ? tu.id.replace(/^teacher-/i, '') : '';
+        const roomMap = teacherRoomMap[cleanTuId] || teacherRoomMap[tu.id] || {};
+        const isTargeted = cleanTargetId ? cleanTuId === cleanTargetId : false;
+        const hasPlansInScope = scopedAllocations.some(p => {
+          const pTId = p.teacherId ? p.teacherId.replace(/^teacher-/i, '') : '';
+          return pTId === cleanTuId;
+        });
+
+        if (!cleanTargetId && !hasPlansInScope && Object.keys(roomMap).length === 0) continue;
+        if (cleanTargetId && !isTargeted) continue;
+
         const rawPlanned = tu.planned_boards || (tu as any).campus_räume || (tu as any).groovelab_räume;
         if (rawPlanned && typeof rawPlanned === 'object') {
-          const updatedPlanned = { ...rawPlanned, status: 'approved' };
+          const updatedPlanned = {
+            ...rawPlanned,
+            status: 'approved',
+            approvedAt: new Date().toISOString()
+          };
           if (Array.isArray((rawPlanned as any).drafts)) {
             updatedPlanned.drafts = (rawPlanned as any).drafts.map((d: any) => ({
               ...d,
               status: 'approved',
+              approvedAt: d.approvedAt || new Date().toISOString(),
               boards: (d.boards || []).map((b: any) => ({
                 ...b,
                 roomId: roomMap[b.dayOfWeek] !== undefined ? roomMap[b.dayOfWeek] : (b.roomId || null)
               }))
             }));
-          } else if (Array.isArray((rawPlanned as any).boards)) {
+          } else if (rawPlanned.drafts && typeof rawPlanned.drafts === 'object') {
+            const newDrafts: Record<string, any> = {};
+            for (const [k, d] of Object.entries((rawPlanned as any).drafts)) {
+              newDrafts[k] = {
+                ...(d as any),
+                status: 'approved',
+                approvedAt: (d as any).approvedAt || new Date().toISOString(),
+                boards: ((d as any).boards || []).map((b: any) => ({
+                  ...b,
+                  roomId: roomMap[b.dayOfWeek] !== undefined ? roomMap[b.dayOfWeek] : (b.roomId || null)
+                }))
+              };
+            }
+            updatedPlanned.drafts = newDrafts;
+          }
+
+          if (Array.isArray((rawPlanned as any).boards)) {
             updatedPlanned.boards = (rawPlanned as any).boards.map((b: any) => ({
               ...b,
               roomId: roomMap[b.dayOfWeek] !== undefined ? roomMap[b.dayOfWeek] : (b.roomId || null)
             }));
           }
+
           userUpdatePromises.push(
             supabase.from('users').update({
               planned_boards: updatedPlanned,
@@ -609,14 +725,27 @@ export function useSecretarySchedules({
         }
       }
 
-      const [, allApprovedSchedulesResult] = await Promise.all([
-        Promise.all(userUpdatePromises),
-        supabase.from('schedules').select('*').eq('school_id', schoolId).eq('status', 'approved')
-      ]);
+      if (userUpdatePromises.length > 0) {
+        const updateResults = await Promise.all(userUpdatePromises);
+        const updateErr = updateResults.find((r: any) => r?.error);
+        if (updateErr) {
+          console.warn('[useSecretarySchedules] Notice updating planned_boards:', updateErr.error);
+        }
+      }
 
-      const allApprovedSchedules = (allApprovedSchedulesResult as any)?.data || [];
+      let schedQuery = supabase
+        .from('schedules')
+        .select('*')
+        .eq('school_id', schoolId)
+        .eq('status', 'approved');
 
-      if (allApprovedSchedules.length > 0) {
+      if (cleanTargetId) {
+        schedQuery = schedQuery.eq('teacher_id', cleanTargetId);
+      }
+
+      const { data: allApprovedSchedules } = await schedQuery;
+
+      if (allApprovedSchedules && allApprovedSchedules.length > 0) {
         const today = new Date();
         const y = today.getFullYear();
         const m = String(today.getMonth() + 1).padStart(2, '0');
@@ -628,7 +757,7 @@ export function useSecretarySchedules({
 
         const occurrences: any[] = [];
         allApprovedSchedules.forEach((sch: any) => {
-          const { id: scheduleId, student_id, teacher_id, day_of_week, time_slot, duration, school_id: schSchoolId } = sch;
+          const { id: scheduleId, student_id, teacher_id, day_of_week, time_slot, duration, school_id: schSchoolId, room_id: schRoomId } = sch;
           if (!student_id || !day_of_week || !time_slot) return;
           const dayNum = typeof day_of_week === 'number' ? day_of_week : (parseInt(day_of_week, 10) || 1);
 
@@ -654,6 +783,7 @@ export function useSecretarySchedules({
             occurrences.push({
               school_id: schSchoolId || schoolId,
               schedule_id: scheduleId,
+              template_room_id: schRoomId || sch.room_id || null,
               student_id,
               teacher_id,
               date: dateStr,
@@ -674,15 +804,108 @@ export function useSecretarySchedules({
         ]);
 
         if (occurrences.length > 0) {
-          await supabase.from('schedule_occurrences').insert(occurrences);
+          const chunkSize = 250;
+          for (let i = 0; i < occurrences.length; i += chunkSize) {
+            const chunk = occurrences.slice(i, i + chunkSize);
+            await supabase.from('schedule_occurrences').insert(chunk);
+          }
+        }
+      }
+
+      // Resolve any pending schedule submission alerts for affected teachers
+      const rawTeacherIds = plansToProcess
+        .map(p => p.teacherId ? p.teacherId.replace(/^teacher-/i, '') : '')
+        .filter(Boolean);
+      if (cleanTargetId) rawTeacherIds.push(cleanTargetId);
+      const approvedTeacherIds = Array.from(new Set(rawTeacherIds)) as string[];
+
+      if (approvedTeacherIds.length > 0) {
+        try {
+          await supabase
+            .from('system_alerts')
+            .update({ resolved: true })
+            .eq('school_id', schoolId)
+            .in('teacher_id', approvedTeacherIds)
+            .in('type', ['Stundenplan Freigabe', 'schedule_submission']);
+        } catch (alertErr) {
+          console.warn('[useSecretarySchedules] Alert resolution notice:', alertErr);
+        }
+
+        // 🛡️ Enterprise+ Revisionssicheres Audit-Logging (OWASP ASVS / DSGVO Art. 30)
+        try {
+          const auditEntries = approvedTeacherIds.map(tId => ({
+            school_id: schoolId,
+            table_name: 'schedules',
+            action: 'SCHEDULES_APPROVED',
+            record_id: isValidUuid(tId) ? tId : null,
+            actor_id: isValidUuid(userId) ? userId : null,
+            user_id: isValidUuid(userId) ? userId : null,
+            changed_by: isValidUuid(userId) ? userId : null,
+            details: {
+              action_type: 'SCHEDULES_APPROVED',
+              teacher_id: tId,
+              slots_count: slotsToInsert.filter(s => s.teacher_id === tId).length,
+              approved_at: new Date().toISOString(),
+              approved_by: userId || 'Schulsekretariat'
+            }
+          }));
+
+          await supabase.from('audit_logs').insert(auditEntries);
+        } catch (auditErr) {
+          console.warn('[useSecretarySchedules] Audit log notice:', auditErr);
         }
       }
 
       localStorage.setItem(`groovelab_matrix_allocations_draft_${schoolId}`, JSON.stringify(approvedDraftMap));
-      setApprovalToast({ message: `✅ Raumplan freigegeben! ${assignedPlans.length} Einheiten wurden gespeichert.`, type: 'success' });
+
+      // Update local matrix allocations so their status transforms from 'pending' to 'approved'
+      setMatrixAllocations(prev => prev.map(p => {
+        if (cleanTargetId) {
+          const cleanP = p.teacherId ? p.teacherId.replace(/^teacher-/i, '') : '';
+          if (cleanP === cleanTargetId) {
+            return { ...p, status: 'approved' };
+          }
+          return p;
+        }
+        return { ...p, status: 'approved' };
+      }));
+
+      setPendingSchedules(prev => {
+        if (cleanTargetId) {
+          return prev.filter(s => {
+            const cleanSTeacher = s.teacher_id ? s.teacher_id.replace(/^teacher-/i, '') : '';
+            return cleanSTeacher !== cleanTargetId;
+          });
+        }
+        return [];
+      });
+
+      if (!cleanTargetId) {
+        setShowOnlyPendingReviews(false);
+      }
+
+      // Compute statistics for 1% Goldstandard Success Audit Modal
+      const teacherNamesSet = new Set<string>();
+      assignedPlans.forEach(p => { if (p.teacherName) teacherNamesSet.add(p.teacherName); });
+      const roomsUsedSet = new Set<string>();
+      assignedPlans.forEach(p => { if (p.roomId) roomsUsedSet.add(p.roomId); });
+      const calculatedTotalSlots = slotsToInsert.length > 0 
+        ? slotsToInsert.length 
+        : assignedPlans.reduce((sum, p) => sum + (p.slots?.filter((s: any) => !s.isBreak)?.length || 0), 0);
+
+      setApprovalSummaryModal({
+        isOpen: true,
+        totalSlots: calculatedTotalSlots,
+        totalDays: assignedPlans.length,
+        teachersCount: teacherNamesSet.size,
+        teacherNames: Array.from(teacherNamesSet),
+        roomsUsedCount: roomsUsedSet.size
+      });
+
+      setApprovalToast({ message: `✅ Stundenplan erfolgreich freigegeben! ${calculatedTotalSlots} Termine live geschaltet.`, type: 'success' });
       setTimeout(() => setApprovalToast(null), 4000);
 
-      fetchDashboardData();
+      await fetchDashboardData();
 
       const teacherUsersData = teacherUsers;
       const notificationPromises: any[] = [];
@@ -738,12 +961,31 @@ export function useSecretarySchedules({
       const slotIds = plan.slots.map((s: any) => s.id);
       if (slotIds.length === 0) return;
 
-      const { error } = await supabase
-        .from('schedules')
-        .update({ status: 'draft' })
-        .in('id', slotIds);
+      const dbSlotIds = slotIds.filter((id: string) => !id.startsWith('fallback_'));
+      if (dbSlotIds.length > 0) {
+        const { error } = await supabase
+          .from('schedules')
+          .update({ status: 'draft' })
+          .in('id', dbSlotIds);
+        if (error) throw error;
+      }
 
-      if (error) throw error;
+      if (plan.teacherId) {
+        try {
+          const { data: uData } = await supabase.from('users').select('planned_boards').eq('id', plan.teacherId).single();
+          if (uData?.planned_boards) {
+            const rawP = uData.planned_boards;
+            if (Array.isArray(rawP.drafts)) {
+              rawP.drafts = rawP.drafts.map((d: any) => d.id === (rawP.submittedDraftId || rawP.activeDraftId) ? { ...d, status: 'needs_revision' } : d);
+              rawP.status = 'needs_revision';
+              await supabase.from('users').update({ planned_boards: rawP, campus_räume: rawP, groovelab_räume: rawP }).eq('id', plan.teacherId);
+            }
+          }
+        } catch (uErr) {
+          console.warn('[handleRejectTeacherDayPlan] Note updating teacher planned_boards:', uErr);
+        }
+      }
+
       setSelectedDayPlan(null);
       alert('Stundenplan erfolgreich zur Überarbeitung zurückgewiesen.');
       fetchDashboardData();
@@ -902,6 +1144,29 @@ export function useSecretarySchedules({
         .eq('id', scheduleId);
 
       if (error) throw error;
+
+      // 🛡️ Enterprise+ Revisionssicheres Audit-Logging
+      try {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        await supabase.from('audit_logs').insert([{
+          school_id: schoolId,
+          table_name: 'schedules',
+          action: 'SCHEDULE_SLOT_APPROVED',
+          record_id: uuidRegex.test(scheduleId) ? scheduleId : null,
+          actor_id: (userId && uuidRegex.test(userId)) ? userId : null,
+          user_id: (userId && uuidRegex.test(userId)) ? userId : null,
+          changed_by: (userId && uuidRegex.test(userId)) ? userId : null,
+          details: {
+            action_type: 'SCHEDULE_SLOT_APPROVED',
+            schedule_id: scheduleId,
+            approved_at: new Date().toISOString(),
+            approved_by: userId || 'Schulsekretariat'
+          }
+        }]);
+      } catch (auditErr) {
+        console.warn('[useSecretarySchedules] Single slot audit log notice:', auditErr);
+      }
+
       alert('Stundenplan-Eintrag erfolgreich genehmigt.');
       fetchDashboardData();
     } catch (err: any) {
@@ -1027,6 +1292,17 @@ export function useSecretarySchedules({
       return updated;
     });
 
+    const targetRoom = targetRoomId ? rooms.find(r => r.id === targetRoomId) : null;
+    const targetRoomName = targetRoom ? targetRoom.name : 'Kein Raum (Offene Zuteilung)';
+    const dayNamesList = ['', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+    const dayName = dayNamesList[targetDay] || `Tag ${targetDay}`;
+
+    setApprovalToast({
+      message: `📍 ${dayName} (${plan?.teacherName || 'Lehrkraft'}) zugeteilt an: ${targetRoomName}`,
+      type: 'success'
+    });
+    setTimeout(() => setApprovalToast(null), 3500);
+
     // Auto-sync room assignment to database schedules so teacher dashboard receives realtime update
     if (plan && plan.teacherId && plan.teacherId !== 'groovelab' && schoolId) {
       supabase
@@ -1037,6 +1313,46 @@ export function useSecretarySchedules({
         .eq('day_of_week', targetDay)
         .then(({ error }) => {
           if (error) console.error('Error auto-syncing room_id to schedules:', error);
+        });
+
+      // Also persist to users.planned_boards so server draft remains in sync across devices
+      supabase
+        .from('users')
+        .select('id, planned_boards')
+        .eq('id', plan.teacherId)
+        .single()
+        .then(({ data: uData }) => {
+          if (uData?.planned_boards) {
+            const raw = uData.planned_boards;
+            let modified = false;
+            if (raw.drafts && typeof raw.drafts === 'object') {
+              for (const d of Object.values(raw.drafts)) {
+                if ((d as any)?.boards) {
+                  (d as any).boards.forEach((b: any) => {
+                    if (b.dayOfWeek === targetDay) {
+                      b.roomId = targetRoomId;
+                      modified = true;
+                    }
+                  });
+                }
+              }
+            }
+            if (Array.isArray(raw.boards)) {
+              raw.boards.forEach((b: any) => {
+                if (b.dayOfWeek === targetDay) {
+                  b.roomId = targetRoomId;
+                  modified = true;
+                }
+              });
+            }
+            if (modified) {
+              supabase
+                .from('users')
+                .update({ planned_boards: raw })
+                .eq('id', plan.teacherId)
+                .then(() => {});
+            }
+          }
         });
     }
 
@@ -1146,6 +1462,8 @@ export function useSecretarySchedules({
     setIsApprovingAllSchedules,
     showOnlyPendingReviews,
     setShowOnlyPendingReviews,
+    approvalSummaryModal,
+    setApprovalSummaryModal,
     hoveredUnassignedDayNum,
     setHoveredUnassignedDayNum,
     clickedUnassignedDayNum,

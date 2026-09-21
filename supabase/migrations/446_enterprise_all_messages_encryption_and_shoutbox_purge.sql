@@ -218,5 +218,5 @@ BEGIN
     END LOOP;
 END $$;
 
-COMMENT ON MIGRATION "446_enterprise_all_messages_encryption_and_shoutbox_purge" IS 
+COMMENT ON FUNCTION public.purge_expired_shoutbox_messages() IS 
 'Implements AES-256 cryptographic vault at rest for all direct messages and 60-day auto-purge for term-coupled shoutboxes per DIN 66398.';

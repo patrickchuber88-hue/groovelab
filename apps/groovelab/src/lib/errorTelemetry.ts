@@ -12,10 +12,13 @@ export interface ClientErrorLog {
   osName: string;
   deviceType: 'Mobile' | 'Tablet' | 'Desktop';
   severity: 'CRITICAL' | 'WARNING' | 'INFO';
+  tag?: string;
   schoolId?: string | number;
   schoolName?: string;
   userId?: string;
   userRole?: string;
+  uiLevel?: string;
+  module?: 'campus' | 'groovelab';
   resolved: boolean;
   resolvedAt?: string;
 }
@@ -56,6 +59,7 @@ const getClientEnvironment = () => {
 
 // Local storage backup buffer
 const getLocalLogs = (): ClientErrorLog[] => {
+  if (typeof localStorage === 'undefined') return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
@@ -65,6 +69,7 @@ const getLocalLogs = (): ClientErrorLog[] => {
 };
 
 const saveLocalLogs = (logs: ClientErrorLog[]) => {
+  if (typeof localStorage === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(logs.slice(0, MAX_LOCAL_ENTRIES)));
   } catch {
@@ -84,6 +89,9 @@ export const reportClientError = async (
     componentStack?: string;
     severity?: 'CRITICAL' | 'WARNING' | 'INFO';
     context?: string;
+    tag?: string;
+    uiLevel?: string;
+    module?: 'campus' | 'groovelab';
     schoolId?: string | number;
     schoolName?: string;
   } = {}
@@ -96,9 +104,10 @@ export const reportClientError = async (
     const stack = error?.stack || '';
     const componentStack = options.componentStack || '';
     const severity = options.severity || 'CRITICAL';
+    const tag = options.tag || (options.context ? options.context.toUpperCase() : 'UNHANDLED');
 
     // Simple deduplication hash
-    const errorHash = `${message}:${componentStack.slice(0, 80)}`;
+    const errorHash = `${tag}:${message}:${componentStack.slice(0, 80)}`;
     if (recentErrorHashes.has(errorHash)) {
       return null;
     }
@@ -108,6 +117,13 @@ export const reportClientError = async (
     const { browserName, osName, deviceType } = getClientEnvironment();
     const route = typeof window !== 'undefined' ? window.location.pathname : '/';
     
+    const detectedUiLevel = options.uiLevel || 
+      (typeof localStorage !== 'undefined' ? localStorage.getItem('campus_ui_level') : null) || 
+      undefined;
+
+    const detectedModule = options.module || 
+      (typeof localStorage !== 'undefined' && localStorage.getItem('groovelab_active_tab') === 'groovelab' ? 'groovelab' : 'campus');
+
     const logEntry: ClientErrorLog = {
       id: `ERR-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`,
       timestamp: new Date().toISOString(),
@@ -120,10 +136,13 @@ export const reportClientError = async (
       osName,
       deviceType,
       severity,
-      schoolId: options.schoolId || sessionStorage.getItem('groovelab_school_id') || undefined,
+      tag,
+      schoolId: options.schoolId || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('groovelab_school_id') : null) || undefined,
       schoolName: options.schoolName || undefined,
-      userId: sessionStorage.getItem('groovelab_user_id') || undefined,
-      userRole: sessionStorage.getItem('groovelab_role') || undefined,
+      userId: (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null) || undefined,
+      userRole: (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('groovelab_role') : null) || undefined,
+      uiLevel: detectedUiLevel,
+      module: detectedModule,
       resolved: false
     };
 
@@ -149,8 +168,12 @@ export const reportClientError = async (
         os_name: logEntry.osName,
         device_type: logEntry.deviceType,
         severity: logEntry.severity,
+        tag: logEntry.tag,
         school_id: logEntry.schoolId,
         user_role: logEntry.userRole,
+        ui_level: logEntry.uiLevel,
+        module: logEntry.module,
+        user_agent: logEntry.userAgent,
         is_resolved: false
       }]);
     } catch {
@@ -162,6 +185,40 @@ export const reportClientError = async (
     console.warn('[Telemetry] Error logging failed silently:', loggingErr);
     return null;
   }
+};
+
+/**
+ * Specialized helper for Web Audio API and hardware issues
+ */
+export const reportAudioError = (
+  error: any,
+  context: string,
+  extra: { tag?: string; severity?: 'CRITICAL' | 'WARNING'; schoolId?: string | number } = {}
+) => {
+  return reportClientError(error, {
+    context: `audio:${context}`,
+    tag: extra.tag || 'AUDIO_ENGINE',
+    severity: extra.severity || 'CRITICAL',
+    schoolId: extra.schoolId,
+    module: 'campus'
+  });
+};
+
+/**
+ * Specialized helper for RPC and database network timeouts
+ */
+export const reportRpcError = (
+  rpcName: string,
+  error: any,
+  extra: { schoolId?: string | number; params?: any } = {}
+) => {
+  const errMsg = error?.message || error?.error_description || String(error);
+  return reportClientError(`RPC Error [${rpcName}]: ${errMsg}`, {
+    context: `rpc:${rpcName}`,
+    tag: 'RPC_FAILURE',
+    severity: 'CRITICAL',
+    schoolId: extra.schoolId
+  });
 };
 
 /**
@@ -190,8 +247,11 @@ export const fetchErrorLogs = async (): Promise<ClientErrorLog[]> => {
         osName: row.os_name || 'OS',
         deviceType: row.device_type || 'Desktop',
         severity: row.severity || 'CRITICAL',
+        tag: row.tag || 'UNHANDLED',
         schoolId: row.school_id,
         userRole: row.user_role,
+        uiLevel: row.ui_level,
+        module: row.module,
         resolved: Boolean(row.is_resolved),
         resolvedAt: row.resolved_at
       }));

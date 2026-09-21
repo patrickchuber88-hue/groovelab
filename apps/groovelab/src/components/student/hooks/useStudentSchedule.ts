@@ -53,7 +53,7 @@ export function useStudentSchedule({
     try {
       const { data, error } = await supabase
         .from('schedule_occurrences')
-        .select('*, teacher:users!schedule_occurrences_teacher_id_fkey(*)')
+        .select('*, teacher:users!schedule_occurrences_teacher_id_fkey(id, first_name, last_name, nickname, photo_url, avatar_url, instrument, role, email)')
         .eq('student_id', studentId)
         .order('date', { ascending: true });
 
@@ -65,19 +65,23 @@ export function useStudentSchedule({
         } catch (e) {}
       } else {
         // Fallback to cache
+        try {
+          const cached = localStorage.getItem(`campus_schedule_cache_${studentId}`);
+          if (cached) {
+            setScheduleOccurrences(JSON.parse(cached));
+            setIsOfflineScheduleActive(true);
+          }
+        } catch (e) {}
+      }
+    } catch (err) {
+      console.warn('Schedule fetch exception:', err);
+      try {
         const cached = localStorage.getItem(`campus_schedule_cache_${studentId}`);
         if (cached) {
           setScheduleOccurrences(JSON.parse(cached));
           setIsOfflineScheduleActive(true);
         }
-      }
-    } catch (err) {
-      console.warn('Schedule fetch exception:', err);
-      const cached = localStorage.getItem(`campus_schedule_cache_${studentId}`);
-      if (cached) {
-        setScheduleOccurrences(JSON.parse(cached));
-        setIsOfflineScheduleActive(true);
-      }
+      } catch (e) {}
     } finally {
       setScheduleLoading(false);
     }
@@ -110,6 +114,20 @@ export function useStudentSchedule({
   };
 
   const handleCancelOccurrence = async (occ: any, skipPinCheck = false) => {
+    // Fail-Closed Vergangenheits-Sperre
+    const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
+    const d = simStr ? new Date(simStr + 'T14:00:00') : new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+    const nowTimeStr = simStr ? '14:00:00' : d.toTimeString().substring(0, 8);
+    const isPastOcc = occ.date < todayStr || (occ.date === todayStr && (occ.start_time || '00:00') < nowTimeStr);
+    if (isPastOcc) {
+      alert('Vergangene Termine können nicht mehr abgesagt werden.');
+      return;
+    }
+
     if (!skipPinCheck && !isStudentAbsenceAllowed) {
       setGlobalPinPendingAction(() => () => handleCancelOccurrence(occ, true));
       setGlobalPinInput('');
@@ -120,19 +138,60 @@ export function useStudentSchedule({
 
     try {
       const targetId = occ.id;
-      await supabase
-        .from('schedule_occurrences')
-        .update({
-          status: 'canceled_by_student',
-          canceled_by_role: 'student',
-          student_acknowledged: true,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', targetId);
+      const { data, error } = await supabase.rpc('cancel_student_schedule_occurrence', {
+        p_student_id: studentId,
+        p_occurrence_id: targetId ? String(targetId) : null,
+        p_date: occ.date,
+        p_start_time: occ.start_time ? occ.start_time.substring(0, 5) : '15:00',
+        p_duration: Number(occ.duration) || 45,
+        p_teacher_id: occ.teacher_id || null,
+        p_schedule_id: occ.schedule_id || null,
+        p_notes: 'canceled_by_student'
+      });
 
-      setScheduleOccurrences(prev => prev.map(o => o.id === targetId ? { ...o, status: 'canceled_by_student' } : o));
+      if (error) {
+        console.error('Error calling cancel_student_schedule_occurrence:', error);
+        throw error;
+      }
+
+      const newOccId = (data as any)?.occurrence_id || targetId;
+
+      setScheduleOccurrences(prev => prev.map(o => {
+        if (o.id === targetId || (o.date === occ.date && o.start_time === occ.start_time)) {
+          return {
+            ...o,
+            id: newOccId,
+            status: 'canceled_by_student',
+            canceled_by_role: 'student',
+            student_acknowledged: true
+          };
+        }
+        return o;
+      }));
+
+      if (onRefreshData) {
+        await onRefreshData();
+      } else {
+        await fetchSchedule();
+      }
     } catch (e) {
-      console.error('Error cancelling occurrence:', e);
+      console.error('Error cancelling occurrence via RPC, applying fallback:', e);
+      try {
+        const targetId = occ.id;
+        await supabase
+          .from('schedule_occurrences')
+          .update({
+            status: 'canceled_by_student',
+            canceled_by_role: 'student',
+            student_acknowledged: true,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', targetId);
+
+        setScheduleOccurrences(prev => prev.map(o => o.id === targetId ? { ...o, status: 'canceled_by_student' } : o));
+      } catch (fallbackErr) {
+        console.error('Fallback cancellation failed:', fallbackErr);
+      }
     }
   };
 
@@ -147,19 +206,59 @@ export function useStudentSchedule({
 
     try {
       const targetId = occ.id;
-      await supabase
-        .from('schedule_occurrences')
-        .update({
-          status: 'scheduled',
-          canceled_by_role: null,
-          student_acknowledged: true,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', targetId);
+      const { data, error } = await supabase.rpc('undo_cancel_student_schedule_occurrence', {
+        p_student_id: studentId,
+        p_occurrence_id: targetId ? String(targetId) : null,
+        p_date: occ.date,
+        p_start_time: occ.start_time ? occ.start_time.substring(0, 5) : '15:00',
+        p_duration: Number(occ.duration) || 45,
+        p_teacher_id: occ.teacher_id || null,
+        p_schedule_id: occ.schedule_id || null
+      });
 
-      setScheduleOccurrences(prev => prev.map(o => o.id === targetId ? { ...o, status: 'scheduled' } : o));
+      if (error) {
+        console.error('Error calling undo_cancel_student_schedule_occurrence:', error);
+        throw error;
+      }
+
+      const restoredOccId = (data as any)?.occurrence_id || targetId;
+
+      setScheduleOccurrences(prev => prev.map(o => {
+        if (o.id === targetId || (o.date === occ.date && o.start_time === occ.start_time)) {
+          return {
+            ...o,
+            id: restoredOccId,
+            status: 'scheduled',
+            canceled_by_role: null,
+            student_acknowledged: true
+          };
+        }
+        return o;
+      }));
+
+      if (onRefreshData) {
+        await onRefreshData();
+      } else {
+        await fetchSchedule();
+      }
     } catch (e) {
-      console.error('Error un-cancelling occurrence:', e);
+      console.error('Error un-cancelling occurrence via RPC, applying fallback:', e);
+      try {
+        const targetId = occ.id;
+        await supabase
+          .from('schedule_occurrences')
+          .update({
+            status: 'scheduled',
+            canceled_by_role: null,
+            student_acknowledged: true,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', targetId);
+
+        setScheduleOccurrences(prev => prev.map(o => o.id === targetId ? { ...o, status: 'scheduled' } : o));
+      } catch (fallbackErr) {
+        console.error('Fallback undo failed:', fallbackErr);
+      }
     }
   };
 
@@ -296,6 +395,8 @@ export function useStudentSchedule({
     setGlobalPinPendingAction,
     handleVerifyGlobalParentPin,
     handleVerifyGlobalParentPinAsync,
-    handleBiometricUnlockForGlobalPin
+    handleBiometricUnlockForGlobalPin,
+    isStudentAbsenceAllowed,
+    isStudentRescheduleAllowed
   };
 }

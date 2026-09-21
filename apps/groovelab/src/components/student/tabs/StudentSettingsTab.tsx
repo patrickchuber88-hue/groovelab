@@ -2176,7 +2176,11 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                                     onClick={async () => {
                                       const nextVal = !row.val;
                                       row.setter(nextVal);
-                                      await supabase.from('users').update({ [row.dbKey]: nextVal }).eq('id', studentId);
+                                      try {
+                                        await supabase.from('users').update({ [row.dbKey]: nextVal }).eq('id', studentId);
+                                      } catch (err) {
+                                        console.warn('[NotificationSettings] Failed to save push preference:', err);
+                                      }
                                     }}
                                     className={`app-binary-switch ${row.val ? 'active' : ''}`}
                                     style={{ backgroundColor: row.val ? '#34a853' : undefined }}
@@ -3195,7 +3199,7 @@ export function StudentSettingsTab(props: StudentSettingsTabProps) {
                             <ShieldCheck size={20} color="#15803d" style={{ flexShrink: 0 }} />
                             <div>
                               <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0f172a' }}>
-                                Gesetzliche Vertragsbestätigung &amp; Widerrufsbelehrung (§ 312f BGB)
+                                Gesetzliche Vertragsbestätigung &amp; Widerrufsbelehrung
                               </div>
                               <div style={{ fontSize: '0.72rem', color: '#166534', fontWeight: 500, marginTop: '2px' }}>
                                 2-seitiger amtlicher Beleg auf dauerhaftem Datenträger inkl. Widerrufsbelehrung &amp; GoBD-Siegel.

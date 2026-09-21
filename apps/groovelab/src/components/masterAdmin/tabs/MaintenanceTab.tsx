@@ -4227,7 +4227,7 @@ export const MaintenanceTab: React.FC<MaintenanceTabProps> = ({
                   Rollen-differenzierte Zugriffskontrolle: Schüler &amp; Lehrkräfte sind weltweit autorisiert (100% Urlaubs-Resilienz für Ferienreisen in der EU &amp; weltweit). Der MasterAdmin-Leitstand ist strikt auf den DACH-Raum (DE/AT/CH) begrenzt mit verpflichtender TOTP-2FA.
                 </p>
                 <div style={{ marginTop: '12px', borderTop: '1px solid #f1f5f9', paddingTop: '10px', fontSize: '0.72rem', color: '#0284c7', fontWeight: 700 }}>
-                  ✓ Lautlose WAF-Filterung &amp; AGB-Exportcompliance (§ 8 AGB)
+                  ✓ Lautlose WAF-Filterung &amp; Revisionskonformität
                 </div>
               </div>
 

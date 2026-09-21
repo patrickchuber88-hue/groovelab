@@ -1354,8 +1354,8 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.90rem', fontWeight: 900, color: totalArr >= 25000 ? '#991b1b' : '#92400e' }}>
                 {totalArr >= 25000
-                  ? '🚨 Steuer-Warnung: Schwellenwert § 19 UStG überschritten (> 25.000 €)'
-                  : '⚠️ Steuer-Frühwarnsystem: Annäherung an Kleinunternehmergrenze (§ 19 UStG)'}
+                  ? '🚨 Steuer-Warnung: Schwellenwert Kleinunternehmer überschritten (> 25.000 €)'
+                  : '⚠️ Steuer-Frühwarnsystem: Annäherung an Kleinunternehmergrenze'}
               </span>
               <span style={{
                 fontSize: '0.74rem',
@@ -1371,8 +1371,8 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
             </div>
             <p style={{ margin: '6px 0 0 0', fontSize: '0.80rem', lineHeight: 1.45, color: totalArr >= 25000 ? '#7f1d1d' : '#78350f' }}>
               {totalArr >= 25000
-                ? 'Ihre jährliche Run-Rate hat die gesetzliche Kleinunternehmergrenze von 25.000 € überschritten. Die Inanspruchnahme der Steuerbefreiung nach § 19 UStG erlischt mit Ablauf des laufenden Kalenderjahres. Bitte stimmen Sie mit Ihrem Steuerberater umgehend den Wechsel zur Regelbesteuerung (19 % USt.-Ausweis auf B2B-Rechnungen & Vorsteuerabzugsberechtigung) ab.'
-                : 'Ihre jährliche Run-Rate liegt bei über 20.000 € und nähert sich der gesetzlichen Kleinunternehmergrenze von 25.000 € (§ 19 UStG). Wir empfehlen, frühzeitig Ihren Steuerberater bzgl. der Vorbereitung auf die Regelbesteuerung (19 % MwSt.-Ausweis auf Musikschul-Rechnungen) zu konsultieren.'}
+                ? 'Ihre jährliche Run-Rate hat die gesetzliche Kleinunternehmergrenze von 25.000 € überschritten. Die Inanspruchnahme der Steuerbefreiung erlischt mit Ablauf des laufenden Kalenderjahres. Bitte stimmen Sie mit Ihrem Steuerberater umgehend den Wechsel zur Regelbesteuerung (19 % USt.-Ausweis auf B2B-Rechnungen & Vorsteuerabzugsberechtigung) ab.'
+                : 'Ihre jährliche Run-Rate liegt bei über 20.000 € und nähert sich der gesetzlichen Kleinunternehmergrenze von 25.000 €. Wir empfehlen, frühzeitig Ihren Steuerberater bzgl. der Vorbereitung auf die Regelbesteuerung (19 % MwSt.-Ausweis auf Musikschul-Rechnungen) zu konsultieren.'}
             </p>
           </div>
         </div>
@@ -1529,7 +1529,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
               gap: '4px'
             }}>
               {totalArr >= 20000 && <AlertTriangle size={11} />}
-              § 19 UStG: {totalArr >= 25000 ? 'Regelbesteuerung (> 25k €)' : totalArr >= 20000 ? 'Frühwarnung (< 5k bis Limit)' : 'Kleinunternehmer (< 25k €)'}
+              Status: {totalArr >= 25000 ? 'Regelbesteuerung (> 25k €)' : totalArr >= 20000 ? 'Frühwarnung (< 5k bis Limit)' : 'Kleinunternehmer (< 25k €)'}
             </span>
             <span style={{ fontSize: '0.64rem', fontWeight: 700, color: totalArr >= 20000 ? '#92400e' : '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>
               {Math.min(100, Math.round((totalArr / 25000) * 100))}%
@@ -2921,9 +2921,9 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
                 }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <ShieldCheck size={14} color="#475569" />
-                    Revisionssicher (§ 371a ZPO / SHA-256 Audit Trail)
+                    Revisionssicher (SHA-256 Audit Trail)
                   </span>
-                  <span>DSGVO Art. 32/33 Konform</span>
+                  <span>DSGVO-konform</span>
                 </div>
               </div>
             )}
@@ -3424,7 +3424,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
                     </div>
                     <div>
                       <div style={{ fontSize: '0.86rem', fontWeight: 850, color: '#0f172a' }}>SLA-Zertifikat (PDF)</div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Monatsnachweis inkl. SHA-256 Siegel (§ 371a ZPO).</div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Monatsnachweis inkl. kryptografischem SHA-256 Siegel.</div>
                     </div>
                   </button>
 
@@ -3653,7 +3653,7 @@ export const ExecutiveTab: React.FC<ExecutiveTabProps> = ({
                     Manipulationssicheres Revisions-Logbuch (SHA-256 Audit Trail):
                   </span>
                   <span style={{ fontSize: '0.70rem', color: '#475569', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <ShieldCheck size={14} color="#475569" /> § 371a ZPO Konform
+                    <ShieldCheck size={14} color="#475569" /> Revisionssicher versiegelt
                   </span>
                 </div>
 

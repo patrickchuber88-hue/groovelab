@@ -61,12 +61,20 @@ export function computeB2BPricingMetrics({
   extraBillingOption,
   bookedExtraUsers
 }: B2BPricingParams) {
+  const rates = {
+    priceCampus: Number(effectiveSchoolRates?.priceCampus) || 14.9,
+    priceGroovelab: Number(effectiveSchoolRates?.priceGroovelab) || 9.9,
+    priceKombi: Number(effectiveSchoolRates?.priceKombi) || 19.9,
+    priceTeacher: Number(effectiveSchoolRates?.priceTeacher) || 0.49,
+    priceStudent: Number(effectiveSchoolRates?.priceStudent) || 0.49,
+  };
+
   const billedCampus_global = isBillingBooked ? (hasCampusSub || campusActivatedThisMonth) : hasCampusSub;
   const billedGroovelab_global = isBillingBooked ? (hasGroovelabSub || groovelabActivatedThisMonth) : hasGroovelabSub;
   const activeModulesCount_global = (billedCampus_global ? 1 : 0) + (billedGroovelab_global ? 1 : 0);
   const moduleCost_global = (billedCampus_global && billedGroovelab_global)
-    ? effectiveSchoolRates.priceKombi
-    : ((billedCampus_global ? effectiveSchoolRates.priceCampus : 0) + (billedGroovelab_global ? effectiveSchoolRates.priceGroovelab : 0));
+    ? rates.priceKombi
+    : ((billedCampus_global ? rates.priceCampus : 0) + (billedGroovelab_global ? rates.priceGroovelab : 0));
   
   const activeStudentsCount_global = (students || []).filter((s: any) => s.isCampusActive || s.is_campus_active).length;
   const activeGroovelabStudentsCount_global = (students || []).filter((s: any) => s.isGroovelabActive || s.is_groovelab_active).length;
@@ -101,17 +109,17 @@ export function computeB2BPricingMetrics({
   }).length;
 
   const isSammelzahler = billingPayer === 'school' || studentBillingOption === 'option2' || studentBillingOption === 'option1';
-  const campusActivationFeeTotal_global = isSammelzahler ? activeStudentsCount_global * effectiveSchoolRates.priceStudent : 0;
-  const groovelabActivationFeeTotal_global = activeGroovelabStudentsCount_global * effectiveSchoolRates.priceStudent;
+  const campusActivationFeeTotal_global = isSammelzahler ? activeStudentsCount_global * rates.priceStudent : 0;
+  const groovelabActivationFeeTotal_global = activeGroovelabStudentsCount_global * rates.priceStudent;
   const passiveStudentFeeTotal_global = passiveStudentsCount_global * 0.09;
-  const teacherServiceFeeTotal_global = billableTeachersCount * effectiveSchoolRates.priceTeacher;
+  const teacherServiceFeeTotal_global = billableTeachersCount * rates.priceTeacher;
   const storageAddonFee_global = selectedStorageAddonGb > 0 ? (selectedStorageAddonFee || Number(currentSchoolProfile?.storage_addon_monthly_fee || 0)) : 0;
 
   const baseB2B_global = subscriptionBypass
     ? 0
     : (moduleCost_global + teacherServiceFeeTotal_global + passiveStudentFeeTotal_global + groovelabActivationFeeTotal_global + campusActivationFeeTotal_global + storageAddonFee_global);
   const studentLevyMonthly_global = campusActivationFeeTotal_global;
-  const extraLevyMonthly_global = extraBillingOption === 'option2' ? bookedExtraUsers * effectiveSchoolRates.priceTeacher : 0;
+  const extraLevyMonthly_global = extraBillingOption === 'option2' ? bookedExtraUsers * rates.priceTeacher : 0;
   const studentSharePreview_global = 0;
   const schoolShareBookedExtra_global = 0;
   const currentTotalB2B_global = baseB2B_global;
@@ -365,11 +373,6 @@ export const useSecretaryLicenses = ({
           };
 
           setTariffBookings([initialBaselineReceipt]);
-
-          // Attempt async persistence
-          try {
-            await supabase.from('school_tariff_bookings').insert([initialBaselineReceipt]);
-          } catch (e) {}
         } else {
           setTariffBookings([]);
         }

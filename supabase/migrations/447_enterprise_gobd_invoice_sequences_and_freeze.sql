@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS public.invoice_sequences (
 ALTER TABLE public.invoice_sequences ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invoice_sequences FORCE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "invoice_sequences_school_admin_select" ON public.invoice_sequences;
 CREATE POLICY "invoice_sequences_school_admin_select"
     ON public.invoice_sequences FOR SELECT
     USING (school_id = public.get_current_user_school_id() OR public.is_master_admin());
@@ -277,5 +278,5 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.issue_cancellation_invoice(VARCHAR, TEXT) TO authenticated, service_role;
 
-COMMENT ON MIGRATION "447_enterprise_gobd_invoice_sequences_and_freeze" IS 
-'Enforces GoBD-compliant sequential invoice numbers, WORM immutable freeze triggers, and offsetting credit note storno engine.';
+COMMENT ON TABLE public.invoice_sequences IS 
+'Enterprise GoBD-compliant sequential gapless invoice sequence ledger per school and fiscal year.';

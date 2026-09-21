@@ -1,6 +1,6 @@
 import { Kysely, PostgresDialect, sql } from 'kysely';
 import { Pool } from 'pg';
-import { SecurityContext, SecurityContextSchema } from '../types/security-context';
+import { SecurityContext, SecurityContextSchema } from '../types/security-context.js';
 
 export interface DocumentsTable {
   id: string;

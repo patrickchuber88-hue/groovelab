@@ -168,6 +168,7 @@ export interface SecretaryVerwaltungTabProps {
   mixedTotal_global: number;
   fetchLogbookBookings: () => Promise<void>;
   getEffectiveStorageUsedBytes: (profile: any) => number;
+  loading?: boolean;
 
   // Crisis Management Props
   crisisNotifications: any[];
@@ -624,18 +625,19 @@ export function SecretaryVerwaltungTab(props: SecretaryVerwaltungTabProps) {
     setSelectedArchiveLog,
 
     // Licenses
-    activeStudentsCount_global,
-    activeGroovelabStudentsCount_global,
-    passiveStudentsCount_global,
-    billableTeachersCount,
-    teacherServiceFeeTotal_global,
-    moduleCost_global,
-    storageAddonFee_global,
-    baseB2B_global,
+    loading = false,
+    activeStudentsCount_global = 0,
+    activeGroovelabStudentsCount_global = 0,
+    passiveStudentsCount_global = 0,
+    billableTeachersCount = 0,
+    teacherServiceFeeTotal_global = 0,
+    moduleCost_global = 0,
+    storageAddonFee_global = 0,
+    baseB2B_global = 0,
     masterRates,
     effectiveSchoolRates,
     masterPricing,
-    isSammelzahler,
+    isSammelzahler = false,
     fetchTariffBookings,
     hasCampusSub,
     setHasCampusSub,
@@ -990,19 +992,19 @@ export function SecretaryVerwaltungTab(props: SecretaryVerwaltungTabProps) {
             setExpandedSidebarTeacherId={setExpandedSidebarTeacherId}
             selectedFilterTeacherId={selectedFilterTeacherId}
             setSelectedFilterTeacherId={setSelectedFilterTeacherId}
-            pendingBookings={pendingBookings}
+            pendingBookings={pendingBookings || []}
             setPendingBookings={setPendingBookings}
-            roomIssues={roomIssues}
+            roomIssues={roomIssues || []}
             setRoomIssues={setRoomIssues as any}
-            rooms={rooms}
-            students={students}
-            campusTeachers={campusTeachers}
-            bypassTeachers={bypassTeachers}
-            coaches={coaches}
+            rooms={rooms || []}
+            students={students || []}
+            campusTeachers={campusTeachers || []}
+            bypassTeachers={bypassTeachers || []}
+            coaches={coaches || []}
             matrixAllocations={matrixAllocations || []}
             pendingSchedules={pendingSchedules || []}
-            userMap={userMap}
-            roomMap={roomMap}
+            userMap={userMap || {}}
+            roomMap={roomMap || {}}
             isAvvSigned={isAvvSigned}
             setShowAvvModal={setShowAvvModal}
             showLogbookModal={showLogbookModal}
@@ -1106,6 +1108,7 @@ export function SecretaryVerwaltungTab(props: SecretaryVerwaltungTabProps) {
       {secretarySubTab === 'licenses' && (
         <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Abrechnung &amp; Infrastruktur...</div>}>
           <SecretaryLicensesView
+            loading={loading}
             schoolId={schoolId}
             schoolNumericId={schoolNumericId}
             schoolName={schoolName}
@@ -1126,7 +1129,7 @@ export function SecretaryVerwaltungTab(props: SecretaryVerwaltungTabProps) {
             teacherServiceFeeTotal_global={teacherServiceFeeTotal_global}
             moduleCost_global={moduleCost_global}
             storageAddonFee_global={storageAddonFee_global}
-            baseB2B_global={baseB2B_global}
+            baseB2B_global={Number(baseB2B_global) || 0}
             masterRates={masterRates}
             effectiveSchoolRates={effectiveSchoolRates}
             masterPricing={masterPricing}

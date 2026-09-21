@@ -36,7 +36,8 @@ import {
   Sparkles,
   MapPin,
   Star,
-  Plus
+  Plus,
+  Loader2
 } from 'lucide-react';
 import { 
   useRealNamesVisibility, 
@@ -51,7 +52,8 @@ import {
   extractStudentTokensFromName,
   resolveCanonicalStudentFromList
 } from '../utils/nameHelper';
-import { MeisterwerkDocumentationModal, checkIsAudioTresorActive } from './MeisterwerkDocumentationModal';
+import { checkIsAudioTresorActive } from './MeisterwerkDocumentationModal';
+const MeisterwerkDocumentationModal = React.lazy(() => import('./MeisterwerkDocumentationModal'));
 import { LiquidGlassSkeleton } from './ui/LiquidGlassSkeleton';
 import { validateChatMessageContent } from '../utils/chatRespectGuard';
 import { isSlotCancelledByAbsence } from '../utils/teacherAbsenceHelper';
@@ -59,7 +61,11 @@ import { isSlotCancelledByAbsence } from '../utils/teacherAbsenceHelper';
 const getStudentNameParts = (s: any) => {
   let fn = (s?.first_name || s?.firstName || '').trim();
   let ln = (s?.last_name || s?.lastName || '').trim();
-  if (!fn) {
+  if (fn && !ln && fn.includes(' ')) {
+    const parts = fn.split(/\s+/);
+    fn = parts[0] || '';
+    ln = parts.slice(1).join(' ') || '';
+  } else if (!fn) {
     const full = (s?.name || s?.studentName || s?.fullName || '').trim();
     if (full) {
       const parts = full.split(' ');
@@ -132,6 +138,27 @@ const matchesTemplateStudent = (occ: any, s: any) => {
   }
 
   return false;
+};
+
+export const getTemplateGroupForOcc = (targetOcc: any, dayNum: number, boardsList?: any[]): any | null => {
+  if (!boardsList || !Array.isArray(boardsList) || !targetOcc) return null;
+  const board = boardsList.find((b: any) => b.dayOfWeek === dayNum);
+  if (!board || !board.students) return null;
+  const timeShort = (targetOcc.start_time || targetOcc.time_slot || '').substring(0, 5);
+  for (const s of board.students) {
+    if (!s.isGroup && !(s.first_name && (s.first_name.includes('&') || s.first_name.includes(',')))) continue;
+    const sTimeShort = (s.assignedTime || s.time || s.customStartTime || '').substring(0, 5);
+    if (sTimeShort && timeShort && sTimeShort !== timeShort) continue;
+    
+    // Check if targetOcc matches this group or any member of groupStudents
+    if (matchesTemplateStudent(targetOcc, s)) return s;
+    if (s.groupStudents && Array.isArray(s.groupStudents)) {
+      if (s.groupStudents.some((gs: any) => matchesTemplateStudent(targetOcc, gs))) {
+        return s;
+      }
+    }
+  }
+  return null;
 };
 
 interface ScheduleOccurrence {
@@ -223,6 +250,90 @@ export const minutesToTime = (m: number): string => {
   return `${String(h).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
 };
 
+const getWeekStartSafe = (date: Date) => {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = d.getDay() || 7; // Get current day number, converting Sun. to 7
+  if (day !== 1) d.setDate(d.getDate() - (day - 1)); // Set to previous Monday (DST safe)
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+const getWeekNumberSafe = (date: Date) => {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+};
+
+export const getScheduleWeekCacheKey = (uId: string, sId?: string, d?: Date): string => {
+  if (!uId) return '';
+  const targetDate = d || new Date();
+  const ws = getWeekStartSafe(targetDate);
+  const wn = getWeekNumberSafe(targetDate);
+  const yyyy = ws.getFullYear();
+  return `cg_sched_${sId || 'global'}_${uId}_${yyyy}_KW${wn}`;
+};
+
+// 🏛️ Tier-1 L1-Cache Hydration: Sofortige 0ms-Sichtbarkeit aktiver Termine (Wochen-gescopt)
+const readInitialScheduleCache = (uId: string, sId?: string, targetDate?: Date): ScheduleOccurrence[] => {
+  if (typeof window === 'undefined' || !uId) return [];
+  try {
+    const tDate = targetDate || new Date();
+    // 1. Wochen-gescoper Primär-Cache
+    const weekKey = getScheduleWeekCacheKey(uId, sId, tDate);
+    const rawWeek = localStorage.getItem(weekKey);
+    if (rawWeek) {
+      const parsedWeek = JSON.parse(rawWeek);
+      if (Array.isArray(parsedWeek) && parsedWeek.length > 0) return parsedWeek;
+    }
+
+    const ws = getWeekStartSafe(tDate);
+    const we = new Date(ws);
+    we.setDate(we.getDate() + 6);
+    const sStr = `${ws.getFullYear()}-${String(ws.getMonth() + 1).padStart(2, '0')}-${String(ws.getDate()).padStart(2, '0')}`;
+    const eStr = `${we.getFullYear()}-${String(we.getMonth() + 1).padStart(2, '0')}-${String(we.getDate()).padStart(2, '0')}`;
+
+    // 2. Sekundäre Caches prüfen - NUR wenn Termine tatsächlich in die Zielwoche fallen!
+    const directKeys = [
+      `groovelab_calendar_active_occurrences_${uId}`,
+      'groovelab_calendar_active_occurrences_latest'
+    ];
+    for (const k of directKeys) {
+      const raw = localStorage.getItem(k);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const matchingThisWeek = parsed.filter((o: any) => {
+            const od = o.date || o.original_date;
+            return od && od >= sStr && od <= eStr;
+          });
+          if (matchingThisWeek.length > 0) return matchingThisWeek;
+        }
+      }
+    }
+
+    const crossKeys = [
+      `cg_events_swr_${sId || 'global'}_${uId}`,
+      `cg_events_swr_global_${uId}`
+    ];
+    for (const k of crossKeys) {
+      const raw = localStorage.getItem(k);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.lessons) && parsed.lessons.length > 0) {
+          const matchingThisWeek = parsed.lessons.filter((o: any) => {
+            const od = o.date || o.original_date;
+            return od && od >= sStr && od <= eStr;
+          });
+          if (matchingThisWeek.length > 0) return matchingThisWeek;
+        }
+      }
+    }
+  } catch (e) {}
+  return [];
+};
+
 export function ScheduleCalendarView({ 
   schoolId, 
   userId, 
@@ -265,6 +376,73 @@ export function ScheduleCalendarView({
   const [quickCreateState, setQuickCreateState] = useState<{ isOpen: boolean; date: string; start_time: string } | null>(null);
   const [eventPopoverState, setEventPopoverState] = useState<{ isOpen: boolean; occ: ScheduleOccurrence; anchorRect?: DOMRect } | null>(null);
 
+  // 🏛️ Tier-1 Deterministischer Student Lookup Index aus Designer-Boards & SWR-Catalog
+  const templateStudentMap = useMemo(() => {
+    const map = new Map<string, { id: string; first_name: string; last_name: string; instrument?: string; isGroup?: boolean; groupStudents?: any[] }>();
+    
+    if (boards && Array.isArray(boards)) {
+      boards.forEach((b: any) => {
+        (b.students || []).forEach((s: any) => {
+          if (!s) return;
+          const sFn = s.first_name || (s.name ? s.name.split(' ')[0] : '') || '';
+          const sLn = s.last_name || (s.name ? s.name.split(' ').slice(1).join(' ') : '') || '';
+          const studentEntry = {
+            id: s.id,
+            first_name: sFn,
+            last_name: sLn,
+            instrument: s.instrument || 'Musiker',
+            isGroup: Boolean(s.isGroup),
+            groupStudents: s.groupStudents
+          };
+          if (s.id) map.set(s.id, studentEntry);
+          if (s.studentId) map.set(s.studentId, studentEntry);
+          if (s.student_id) map.set(s.student_id, studentEntry);
+          if (s.user_id) map.set(s.user_id, studentEntry);
+          if (s.db_id) map.set(s.db_id, studentEntry);
+
+          if (s.isGroup && Array.isArray(s.groupStudents)) {
+            s.groupStudents.forEach((gs: any) => {
+              if (!gs) return;
+              const gsFn = gs.first_name || (gs.name ? gs.name.split(' ')[0] : '') || '';
+              const gsLn = gs.last_name || (gs.name ? gs.name.split(' ').slice(1).join(' ') : '') || '';
+              const gsEntry = {
+                id: gs.id,
+                first_name: gsFn,
+                last_name: gsLn,
+                instrument: gs.instrument || s.instrument || 'Musiker',
+                isGroup: false,
+                parentGroupId: s.id
+              };
+              if (gs.id) map.set(gs.id, gsEntry);
+              if (gs.studentId) map.set(gs.studentId, gsEntry);
+              if (gs.student_id) map.set(gs.student_id, gsEntry);
+              if (gs.user_id) map.set(gs.user_id, gsEntry);
+              if (gs.db_id) map.set(gs.db_id, gsEntry);
+            });
+          }
+        });
+      });
+    }
+
+    try {
+      const cachedUsers = queryCache.get<any[]>(`student_users_${schoolId}`);
+      if (Array.isArray(cachedUsers)) {
+        cachedUsers.forEach((u: any) => {
+          if (u.id && !map.has(u.id)) {
+            map.set(u.id, {
+              id: u.id,
+              first_name: u.first_name || '',
+              last_name: u.last_name || '',
+              instrument: u.instrument || 'Musiker'
+            });
+          }
+        });
+      }
+    } catch (_) {}
+
+    return map;
+  }, [boards, schoolId]);
+
   const toLocalYYYYMMDD = (d: Date) => {
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -305,6 +483,17 @@ export function ScheduleCalendarView({
     weekStudentCount: 0,
     schoolYearCount: 0,
     schoolYearStudentCount: 0
+  });
+  const [resetProgress, setResetProgress] = useState<{
+    percent: number;
+    stage: string;
+    current: number;
+    total: number;
+  }>({
+    percent: 0,
+    stage: '',
+    current: 0,
+    total: 0
   });
 
   useEffect(() => {
@@ -466,7 +655,8 @@ export function ScheduleCalendarView({
   const schoolStartYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
   const schoolYearStart = new Date(schoolStartYear, 8, 1);  // Sept 1
   const schoolYearEnd   = new Date(schoolStartYear + 2, 6, 31); // July 31 of next school year
-  const [baseOccurrences, setBaseOccurrences] = useState<ScheduleOccurrence[]>([]);
+  const initialScheduleCache = useMemo(() => readInitialScheduleCache(userId, schoolId, currentDate), [userId, schoolId, currentDate]);
+  const [baseOccurrences, setBaseOccurrences] = useState<ScheduleOccurrence[]>(() => initialScheduleCache);
   const [pendingChanges, setPendingChanges] = useState<Record<string, ScheduleOccurrence>>(() => {
     try {
       const saved = localStorage.getItem('groovelab_pending_schedule_changes');
@@ -486,7 +676,7 @@ export function ScheduleCalendarView({
       window.dispatchEvent(new Event('groovelab_schedule_changed'));
     } catch (e) {}
   }, [pendingChanges]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(() => initialScheduleCache.length === 0);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const grabOffsetRef = useRef<number>(0);
   const [currentRescheduleIndex, setCurrentRescheduleIndex] = useState(0);
@@ -1803,6 +1993,10 @@ export function ScheduleCalendarView({
 
         const origDateStr = change.original_date || (originalOcc ? (originalOcc.original_date || originalOcc.date) : change.date);
         const targetScheduleId = change.schedule_id || (change as any).schedules?.id || originalOcc?.schedule_id || (originalOcc as any)?.schedules?.id || null;
+        const targetTemplateRoomId = change.template_room_id || (change as any).schedules?.room_id || originalOcc?.template_room_id || (originalOcc as any)?.schedules?.room_id || null;
+        const targetRoomOverrideId = (change as any).room_override_id !== undefined
+          ? (change as any).room_override_id
+          : ((originalOcc as any)?.room_override_id || null);
 
         const payload: any = {
           date: change.date,
@@ -1814,7 +2008,9 @@ export function ScheduleCalendarView({
           status: change.status || 'pending_reschedule',
           student_acknowledged: false,
           notes: change.notes !== undefined ? change.notes : (originalOcc?.notes ?? null),
-          ...(targetScheduleId ? { schedule_id: targetScheduleId } : {})
+          ...(targetScheduleId ? { schedule_id: targetScheduleId } : {}),
+          ...(targetTemplateRoomId ? { template_room_id: targetTemplateRoomId } : {}),
+          ...(targetRoomOverrideId ? { room_override_id: targetRoomOverrideId } : {})
         };
 
         const isGroupBlock = (change as any).isGroupBlock || ((change as any).groupOccurrences && (change as any).groupOccurrences.length > 0);
@@ -2141,25 +2337,13 @@ export function ScheduleCalendarView({
     });
   };
 
-  // Helper to get week start (Monday)
-  const getWeekStart = (date: Date) => {
-    const d = new Date(date);
-    const day = d.getDay() || 7; // Get current day number, converting Sun. to 7
-    if (day !== 1) d.setHours(-24 * (day - 1)); // Set to previous Monday
-    d.setHours(0, 0, 0, 0);
-    return d;
-  };
+  // Helper to get week start (Monday) - 1% Goldstandard DST-Safe
+  const getWeekStart = (date: Date) => getWeekStartSafe(date);
 
   const weekStart = getWeekStart(currentDate);
 
   // Formatting helpers
-  const getWeekNumber = (date: Date) => {
-    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-    const dayNum = d.getUTCDay() || 7;
-    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
-    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1)/7);
-  };
+  const getWeekNumber = (date: Date) => getWeekNumberSafe(date);
 
   const weekNumber = getWeekNumber(currentDate);
 
@@ -2265,9 +2449,62 @@ export function ScheduleCalendarView({
     return boards.map((b: any) => `${b.id || b.dayOfWeek}_${b.students?.length || 0}_${b.room_id || b.roomId || ''}`).join('|');
   }, [boards]);
 
+  const holidaysFingerprint = useMemo(() => {
+    if (!Array.isArray(holidays)) return '';
+    return holidays.map((h: any) => `${h.id || ''}_${h.date || h.startDate || ''}_${h.endDate || ''}`).join('|');
+  }, [holidays]);
+
   useEffect(() => {
+    // 🏛️ Tier-1 SWR Instant Paint: Vor dem Netzwerk-Lauf die Zielwoche optimistisch aus Cache oder Boards projizieren
+    const cachedForWeek = readInitialScheduleCache(userId, schoolId, currentDate);
+    if (cachedForWeek && cachedForWeek.length > 0) {
+      setBaseOccurrences(cachedForWeek);
+    } else if (boards && boards.length > 0) {
+      const optimisticProjected: ScheduleOccurrence[] = [];
+      const ws = getWeekStartSafe(currentDate);
+      boards.forEach(board => {
+        const offset = board.dayOfWeek - 1;
+        const dayDate = new Date(ws);
+        dayDate.setDate(dayDate.getDate() + offset);
+        const dateStr = toLocalYYYYMMDD(dayDate);
+        (board.students || []).forEach((student: any) => {
+          const formattedTime = student.assignedTime ? `${student.assignedTime}:00` : '00:00:00';
+          optimisticProjected.push({
+            id: `opt-${board.id}-${student.id}-${dateStr}`,
+            student_id: student.id,
+            teacher_id: userId,
+            date: dateStr,
+            original_date: dateStr,
+            original_start_time: formattedTime,
+            start_time: formattedTime,
+            duration: student.duration || 30,
+            status: 'scheduled',
+            isBreak: Boolean(student.isBreak),
+            isGroupBlock: student.isGroup || false,
+            groupOccurrences: student.groupStudents || [],
+            student: {
+              id: student.id,
+              school_id: schoolId,
+              teacher_id: userId,
+              first_name: student.first_name || (student.isBreak ? 'Pause' : 'Schüler'),
+              last_name: student.last_name || '',
+              instrument: student.instrument || ''
+            },
+            schedules: {
+              room_id: board.roomId || null,
+              room: {
+                name: rooms.find(r => r.id === board.roomId)?.name || ''
+              }
+            }
+          });
+        });
+      });
+      if (optimisticProjected.length > 0) {
+        setBaseOccurrences(optimisticProjected);
+      }
+    }
     loadOccurrencesRef.current();
-  }, [weekStart.getTime(), userId, boardsFingerprint, holidays]);
+  }, [weekStart.getTime(), userId, boardsFingerprint, holidaysFingerprint]);
 
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -2369,7 +2606,9 @@ export function ScheduleCalendarView({
   }, [userId]);
 
   async function loadOccurrences() {
-    setLoading(true);
+    if (baseOccurrencesRef.current.length === 0) {
+      setLoading(true);
+    }
     setSwapLinks([]); 
     try {
       const weekEnd = new Date(weekStart);
@@ -2380,6 +2619,7 @@ export function ScheduleCalendarView({
 
       let fetchedData: any[] = [];
       let roomBookings: any[] = [];
+      let mergedSchedules: any[] = [];
       const studentTeacherMap = new Map<string, string | null>();
 
       try {
@@ -2415,7 +2655,7 @@ export function ScheduleCalendarView({
 
           // 4. Main Occurrences (single query with full fields and joins)
           supabase.from('schedule_occurrences')
-            .select('id, date, start_time, original_date, duration, status, teacher_id, student_id, schedule_id, notes, student:users!schedule_occurrences_student_id_fkey(id, school_id, teacher_id, first_name, last_name, instrument, is_campus_active, is_groovelab_active, group_id, campus_ui_level, parent_permissions), schedules:schedules(room_id, room:rooms(name))')
+            .select('id, date, start_time, original_date, duration, status, teacher_id, student_id, schedule_id, template_room_id, room_override_id, notes, student:users!schedule_occurrences_student_id_fkey(id, school_id, teacher_id, first_name, last_name, instrument, is_campus_active, is_groovelab_active, group_id, campus_ui_level, parent_permissions), schedules:schedules(room_id, room:rooms(name))')
             .eq('teacher_id', userId)
             .or(`and(date.gte.${startDateStr},date.lte.${endDateStr}),and(original_date.gte.${startDateStr},original_date.lte.${endDateStr})`)
             .order('date')
@@ -2468,7 +2708,7 @@ export function ScheduleCalendarView({
           setCachedWeekRoomBookings(rbDataResult.data);
         }
         
-        const mergedSchedules = (schedResult.data || []).map((s: any) => ({
+        mergedSchedules = (schedResult.data || []).map((s: any) => ({
           ...s,
           _ownSlot: s.teacher_id === userId
         }));
@@ -2496,23 +2736,32 @@ export function ScheduleCalendarView({
         });
 
         if (!mainOccsResult.error && mainOccsResult.data) {
-
-          // If occurrence student is NOT explicitly assigned to userId, convert to vacant slot (empty gap)
-          const filteredMainData = mainOccsResult.data.map((occ: any) => {
-            if (!occ.student_id || occ.student_id === 'vacant') return occ;
-            const assignedTeacherId = studentTeacherMap.get(occ.student_id) || occ.student?.teacher_id;
-            if (assignedTeacherId && assignedTeacherId !== userId) {
-              return {
-                ...occ,
-                student_id: 'vacant',
-                student: null,
-                vacant_student_id: occ.student_id
-              };
-            }
-            return occ;
-          });
+          let filteredMainData = mainOccsResult.data;
 
           fetchedData = filteredMainData.map((occ: any) => {
+            let studentObj = occ.student;
+            if (!studentObj || !studentObj.first_name) {
+              const matchedUser = usersList.find((u: any) => u.id === occ.student_id);
+              if (matchedUser && matchedUser.first_name) {
+                studentObj = {
+                  ...(studentObj || {}),
+                  id: matchedUser.id,
+                  first_name: matchedUser.first_name,
+                  last_name: matchedUser.last_name || '',
+                  instrument: matchedUser.instrument || (studentObj ? studentObj.instrument : 'Musiker')
+                };
+              } else if (templateStudentMap.has(occ.student_id)) {
+                const tmplStudent = templateStudentMap.get(occ.student_id)!;
+                studentObj = {
+                  ...(studentObj || {}),
+                  id: tmplStudent.id,
+                  first_name: tmplStudent.first_name,
+                  last_name: tmplStudent.last_name || '',
+                  instrument: tmplStudent.instrument || (studentObj ? studentObj.instrument : 'Musiker')
+                };
+              }
+            }
+
             const booking = roomBookings.find(b => 
               b.date === occ.date && 
               b.start_time.substring(0, 5) === occ.start_time.substring(0, 5)
@@ -2520,6 +2769,7 @@ export function ScheduleCalendarView({
             if (booking) {
               return {
                 ...occ,
+                student: studentObj || occ.student,
                 template_room_id: null,
                 schedules: {
                   room_id: booking.room_id,
@@ -2527,7 +2777,7 @@ export function ScheduleCalendarView({
                 }
               };
             }
-            // Fallback: Resolve room from the teacher's recurring schedule matching day of week & time slot
+            // Resolve room from multi-tier hierarchy: room_override -> matchingSlot -> template_room -> DB schedule join -> schedule_id match
             const occDate = new Date(occ.date + 'T00:00:00');
             const occDayOfWeek = occDate.getDay() || 7;
             const matchingSlot = mergedSchedules.find((s: any) => 
@@ -2535,21 +2785,57 @@ export function ScheduleCalendarView({
               s.day_of_week === occDayOfWeek &&
               s.time_slot?.substring(0, 5) === occ.start_time.substring(0, 5)
             );
-            if (matchingSlot && matchingSlot.room_id) {
-              const roomObj = rooms.find(r => r.id === matchingSlot.room_id);
-              return {
-                ...occ,
-                template_room_id: null,
-                schedules: {
-                  room_id: matchingSlot.room_id,
-                  room: roomObj ? { name: roomObj.name } : null
-                }
-              };
+
+            let resolvedRoomId = occ.room_override_id || (matchingSlot && matchingSlot.room_id) || occ.template_room_id || occ.schedules?.room_id;
+            if (!resolvedRoomId && occ.schedule_id) {
+              const schedMatch = mergedSchedules.find((s: any) => s.id === occ.schedule_id);
+              if (schedMatch?.room_id) resolvedRoomId = schedMatch.room_id;
+            }
+
+            const roomObj = resolvedRoomId ? rooms.find(r => r.id === resolvedRoomId) : null;
+            const roomName = roomObj?.name || occ.schedules?.room?.name || null;
+
+            return {
+              ...occ,
+              student: studentObj || occ.student,
+              template_room_id: occ.template_room_id || (matchingSlot && matchingSlot.room_id) || null,
+              room_override_id: occ.room_override_id || null,
+              schedules: resolvedRoomId ? {
+                room_id: resolvedRoomId,
+                room: roomName ? { name: roomName } : null
+              } : (occ.schedules || null)
+            };
+          });
+        }
+
+        // Fallback L1-Cache Hydration if network returned empty or failed
+        if (fetchedData.length === 0 && baseOccurrencesRef.current.length > 0) {
+          fetchedData = baseOccurrencesRef.current.map((occ: any) => {
+            let studentObj = occ.student;
+            if (!studentObj || !studentObj.first_name) {
+              const matchedUser = usersList.find((u: any) => u.id === occ.student_id);
+              if (matchedUser && matchedUser.first_name) {
+                studentObj = {
+                  ...(studentObj || {}),
+                  id: matchedUser.id,
+                  first_name: matchedUser.first_name,
+                  last_name: matchedUser.last_name || '',
+                  instrument: matchedUser.instrument || (studentObj ? studentObj.instrument : 'Musiker')
+                };
+              } else if (templateStudentMap.has(occ.student_id)) {
+                const tmplStudent = templateStudentMap.get(occ.student_id)!;
+                studentObj = {
+                  ...(studentObj || {}),
+                  id: tmplStudent.id,
+                  first_name: tmplStudent.first_name,
+                  last_name: tmplStudent.last_name || '',
+                  instrument: tmplStudent.instrument || (studentObj ? studentObj.instrument : 'Musiker')
+                };
+              }
             }
             return {
               ...occ,
-              template_room_id: null,
-              schedules: null
+              student: studentObj || occ.student
             };
           });
         }
@@ -2560,7 +2846,11 @@ export function ScheduleCalendarView({
       const getStudentNameParts = (s: any) => {
         let fn = (s.first_name || s.firstName || '').trim();
         let ln = (s.last_name || s.lastName || '').trim();
-        if (!fn) {
+        if (fn && !ln && fn.includes(' ')) {
+          const parts = fn.split(/\s+/);
+          fn = parts[0] || '';
+          ln = parts.slice(1).join(' ') || '';
+        } else if (!fn) {
           const full = (s.name || s.studentName || s.fullName || '').trim();
           if (full) {
             const parts = full.split(' ');
@@ -2690,29 +2980,6 @@ export function ScheduleCalendarView({
                 });
               }
             } else {
-              // Strictly exclude students without an explicit assignment to current teacher
-              const fn = (student.first_name || student.firstName || '').trim().toLowerCase();
-              const ln = (student.last_name || student.lastName || '').trim().toLowerCase();
-              const nameKey = `${fn}_${ln}`;
-
-              let assignedTeacherId: string | null | undefined = undefined;
-              if (student.id && studentTeacherMap.has(student.id)) {
-                assignedTeacherId = studentTeacherMap.get(student.id);
-              } else if (nameKey !== '_' && studentTeacherMap.has(nameKey)) {
-                assignedTeacherId = studentTeacherMap.get(nameKey);
-              } else if (fn && studentTeacherMap.has(fn)) {
-                assignedTeacherId = studentTeacherMap.get(fn);
-              }
-
-              const isMappedInSchool = (student.id && studentTeacherMap.has(student.id)) ||
-                                       (nameKey !== '_' && studentTeacherMap.has(nameKey)) ||
-                                       (fn && studentTeacherMap.has(fn));
-
-              if (isMappedInSchool) {
-                if (!assignedTeacherId || assignedTeacherId !== userId) {
-                  return; // Skip projection, leaving empty space (leere Lücke) in schedule
-                }
-              }
 
               // Check if a saved database record already covers this student at THIS SPECIFIC SLOT TIME
               const formattedTimeShort = formattedTime.substring(0, 5);
@@ -2725,19 +2992,31 @@ export function ScheduleCalendarView({
               };
 
               let hasDbRecordForThisSlot = false;
-              if (student.isGroup && student.groupStudents && student.groupStudents.length > 0) {
+              const isGroupOrComposite = Boolean(
+                student.isGroup ||
+                (student.id && String(student.id).startsWith('group-')) ||
+                (student.groupStudents && student.groupStudents.length > 0) ||
+                (student.first_name && (student.first_name.includes('&') || student.first_name.includes(',') || /\b(and|und)\b/i.test(student.first_name)))
+              );
+
+              if (isGroupOrComposite) {
+                const groupMembers = student.groupStudents && Array.isArray(student.groupStudents) ? student.groupStudents : [];
                 hasDbRecordForThisSlot = fetchedData.some(o => 
                   (o.date === dateStr || o.original_date === dateStr) && 
                   isRecordMatchingSlotTime(o) &&
-                  student.groupStudents.some((gs: any) => matchesTemplateStudent(o, gs))
+                  (
+                    matchesTemplateStudent(o, student) ||
+                    (groupMembers.length > 0 && groupMembers.some((gs: any) => matchesTemplateStudent(o, gs)))
+                  )
                 );
-              } else if (student.first_name && (student.first_name.includes('&') || student.first_name.includes(',') || /\b(and|und)\b/i.test(student.first_name))) {
-                const tokens = extractStudentTokensFromName(student.first_name);
-                hasDbRecordForThisSlot = fetchedData.some(o =>
-                  (o.date === dateStr || o.original_date === dateStr) &&
-                  isRecordMatchingSlotTime(o) &&
-                  tokens.some(tok => matchesTemplateStudent(o, { first_name: tok, last_name: '' }))
-                );
+                if (!hasDbRecordForThisSlot && student.first_name && (student.first_name.includes('&') || student.first_name.includes(',') || /\b(and|und)\b/i.test(student.first_name))) {
+                  const tokens = extractStudentTokensFromName(student.first_name);
+                  hasDbRecordForThisSlot = fetchedData.some(o =>
+                    (o.date === dateStr || o.original_date === dateStr) &&
+                    isRecordMatchingSlotTime(o) &&
+                    tokens.some(tok => matchesTemplateStudent(o, { name: tok }))
+                  );
+                }
               } else {
                 hasDbRecordForThisSlot = fetchedData.some(o => 
                   (o.date === dateStr || o.original_date === dateStr) && 
@@ -2781,10 +3060,10 @@ export function ScheduleCalendarView({
         });
       }
 
-      // Fallback projection from database recurring schedules table (`schedules`) ONLY if no occurrence or board exists yet
-      const schedList = (cachedWeekSchedules || []).filter((s: any) => s.teacher_id === userId);
-      if ((!boards || boards.length === 0) && schedList.length > 0 && fetchedData.length === 0) {
-        schedList.forEach((slot: any) => {
+      // 🏛️ Tier-1 Deterministische Folgewochen-Projektion aus autoritativen Master-Schedules
+      const freshSchedList = (mergedSchedules.length > 0 ? mergedSchedules : (cachedWeekSchedules || [])).filter((s: any) => s.teacher_id === userId);
+      if (freshSchedList.length > 0) {
+        freshSchedList.forEach((slot: any) => {
           if (!slot.day_of_week) return;
           const offset = slot.day_of_week - 1;
           const slotDate = new Date(weekStart);
@@ -2810,8 +3089,10 @@ export function ScheduleCalendarView({
               student_id: slot.student_id || '',
               teacher_id: slot.teacher_id || userId,
               date: dateStr,
+              original_date: dateStr,
+              original_start_time: formattedTime,
               start_time: formattedTime,
-              duration: slot.duration || 30,
+              duration: slot.duration || slot.duration_minutes || 30,
               status: slot.status === 'approved' ? 'scheduled' : (slot.status || 'scheduled'),
               student: {
                 id: slot.student_id || (studentObj ? studentObj.id : ''),
@@ -2838,16 +3119,36 @@ export function ScheduleCalendarView({
 
       fetchedData = [...fetchedData, ...projectedData];
 
-      // Helper to check if a student has an assigned master slot in boards for a given date
+      // Helper to check if a student has an assigned master slot in boards or in database schedules
+      const getMasterScheduleSlotForStudent = (occ: any): { dayOfWeek: number; timeSlot: string } | null => {
+        // 1. Check current Stundenplan-Designer boards template FIRST (primary UI master)
+        if (boards && boards.length > 0) {
+          for (const b of boards) {
+            const foundStudent = (b.students || []).find((s: any) => matchesTemplateStudent(occ, s));
+            if (foundStudent && foundStudent.assignedTime) {
+              return { dayOfWeek: b.dayOfWeek, timeSlot: foundStudent.assignedTime.substring(0, 5) };
+            }
+          }
+        }
+        // 2. Check mergedSchedules / cachedWeekSchedules (master recurring schedule in DB)
+        const schedList = (mergedSchedules && mergedSchedules.length > 0) ? mergedSchedules : (cachedWeekSchedules || []);
+        const schedMatch = schedList.find((s: any) => s.teacher_id === occ.teacher_id && s.student_id && (
+          s.student_id === occ.student_id ||
+          matchesTemplateStudent(occ, s.student) ||
+          matchesTemplateStudent(occ, { id: s.student_id, first_name: s.student?.first_name, last_name: s.student?.last_name })
+        ));
+        if (schedMatch && schedMatch.day_of_week && schedMatch.time_slot) {
+          return { dayOfWeek: schedMatch.day_of_week, timeSlot: schedMatch.time_slot.substring(0, 5) };
+        }
+        return null;
+      };
+
       const getDesignerSlotTimeForStudent = (occ: any): string | null => {
-        if (!boards || boards.length === 0) return null;
+        const slot = getMasterScheduleSlotForStudent(occ);
+        if (!slot) return null;
         const occDateObj = new Date(occ.date + 'T00:00:00');
         const occDayOfWeek = occDateObj.getDay() || 7;
-        const boardForDay = boards.find((b: any) => b.dayOfWeek === occDayOfWeek);
-        if (!boardForDay || !boardForDay.students) return null;
-
-        const foundStudent = boardForDay.students.find((s: any) => matchesTemplateStudent(occ, s));
-        return foundStudent ? (foundStudent.assignedTime ? foundStudent.assignedTime.substring(0, 5) : null) : null;
+        return slot.dayOfWeek === occDayOfWeek ? slot.timeSlot : null;
       };
 
       // Strict Deduplication: DB occurrences take precedence unless they are unconfirmed phantoms at a non-matching time
@@ -2871,18 +3172,19 @@ export function ScheduleCalendarView({
           }
 
           // Master Template Reconciliation (Self-Healing Orphan Guard):
-          // If this DB occurrence is an unmodified regular lesson (status === 'scheduled', no original_date deviation)
-          // but does NOT match the approved designer template slot for this day and time:
-          const isRescheduled = occ.original_date && occ.original_date !== occ.date;
-          if (!isRescheduled && occ.status === 'scheduled' && boards && boards.length > 0) {
-            const designerTime = getDesignerSlotTimeForStudent(occ);
-            const occTime = (occ.start_time || '').substring(0, 5);
-            if (!designerTime || designerTime !== occTime) {
-              const isStudentInTemplateElsewhere = boards.some((b: any) => 
-                b.students && b.students.some((s: any) => matchesTemplateStudent(occ, s))
-              );
-              if (isStudentInTemplateElsewhere) {
-                // Stale legacy occurrence from an older schedule version; suppress it so approved template governs
+          // Check if this DB occurrence is an unmodified lesson (no deliberate one-off reschedule)
+          const isRescheduled = Boolean(occ.original_date && occ.original_date !== occ.date);
+          if (!isRescheduled) {
+            const masterSlot = getMasterScheduleSlotForStudent(occ);
+            if (masterSlot) {
+              const occDateObj = new Date(occ.date + 'T00:00:00');
+              const occDayOfWeek = occDateObj.getDay() || 7;
+              const occTime = (occ.start_time || '').substring(0, 5);
+
+              // If the student has an authoritative regular master slot on another day or at another time in the active timetable:
+              if (masterSlot.dayOfWeek !== occDayOfWeek || masterSlot.timeSlot !== occTime) {
+                // Stale legacy occurrence from an older schedule version (whether scheduled or cancelled);
+                // suppress it so the current master schedule governs and no false collisions appear!
                 continue;
               }
             }
@@ -2919,6 +3221,31 @@ export function ScheduleCalendarView({
                 }
               });
             }
+
+            // 🏛️ Template Group Registration: If this DB occurrence belongs to a designer template group, register group to suppress projected mock group card
+            const occDateObj = new Date(occ.date + 'T00:00:00');
+            const occDayNum = occDateObj.getDay() || 7;
+            const occTmplGroup = getTemplateGroupForOcc(occ, occDayNum, boards);
+            if (occTmplGroup) {
+              if (occTmplGroup.id) {
+                seenKeys.add(`tmpl_group_${occTmplGroup.id}_${occ.date}_${slotTime}`);
+                seenKeys.add(`stud_date_${occTmplGroup.id}_${occ.date}`);
+              }
+              if (occTmplGroup.groupStudents && Array.isArray(occTmplGroup.groupStudents)) {
+                occTmplGroup.groupStudents.forEach((gs: any) => {
+                  const gsId = gs.id || gs.student_id;
+                  if (gsId) {
+                    seenKeys.add(`slot_${gsId}_${occ.date}_${slotTime}`);
+                    seenKeys.add(`stud_date_${gsId}_${occ.date}`);
+                  }
+                  const gsFirst = (gs.first_name || '').trim();
+                  if (gsFirst) {
+                    seenKeys.add(`slot_tok_${gsFirst.toLowerCase()}_${occ.date}_${slotTime}`);
+                  }
+                });
+              }
+            }
+
             if (sFirst && (sFirst.includes('&') || sFirst.includes(',') || /\b(and|und)\b/i.test(sFirst))) {
               const tokens = extractStudentTokensFromName(sFirst);
               tokens.forEach(tok => {
@@ -2933,6 +3260,25 @@ export function ScheduleCalendarView({
           const slotTime = (occ.start_time || '').substring(0, 5);
           const studDateKey = `stud_date_${studId}_${occ.date}`;
           const slotKey = `slot_${studId}_${occ.date}_${slotTime}`;
+
+          // Check if this projected group card's members are already covered by real DB occurrences
+          if (occ.isGroupBlock || (occ as any).groupOccurrences?.length > 0 || String(occ.student_id).startsWith('group-')) {
+            const members = (occ as any).groupOccurrences || [];
+            const anyMemberPresent = 
+              seenKeys.has(`tmpl_group_${occ.student_id}_${occ.date}_${slotTime}`) ||
+              seenKeys.has(`stud_date_${occ.student_id}_${occ.date}`) ||
+              members.some((m: any) => {
+                const mId = m.id || m.student_id;
+                const mFirst = (m.first_name || '').trim();
+                return (mId && (
+                  seenKeys.has(`slot_${mId}_${occ.date}_${slotTime}`) ||
+                  seenKeys.has(`stud_date_${mId}_${occ.date}`)
+                )) || (mFirst && seenKeys.has(`slot_tok_${mFirst.toLowerCase()}_${occ.date}_${slotTime}`));
+              });
+            if (anyMemberPresent) {
+              continue; // DB occurrences already cover this group! Discard duplicate projected card.
+            }
+          }
 
           // Check redundant member in projected cards
           const sFirst = (occ.student?.first_name || '').trim();
@@ -2989,6 +3335,12 @@ export function ScheduleCalendarView({
       });
 
       setBaseOccurrences(filteredFromHolidays);
+      try {
+        const weekKey = getScheduleWeekCacheKey(userId, schoolId, weekStart);
+        if (weekKey && filteredFromHolidays.length > 0) {
+          localStorage.setItem(weekKey, JSON.stringify(filteredFromHolidays));
+        }
+      } catch (e) {}
     } catch (err) {
       console.error('Error loading occurrences:', err);
     } finally {
@@ -3337,7 +3689,54 @@ export function ScheduleCalendarView({
     return masterDayOfWeek === occDayOfWeek && masterAssignedTime.substring(0, 5) === occStartTimeSafe;
   };
 
-  // Enterprise+ Goldstandard: Live Dry-Run Preview of reset impact
+  // Enterprise+ Goldstandard: Helper to paginate and fetch all occurrences in date range without 1000-row cap
+  const fetchAllTeacherOccurrencesInRange = async (
+    teacherId: string,
+    startDate: string,
+    endDate: string
+  ) => {
+    const allRows: any[] = [];
+    const pageSize = 1000;
+
+    // 1. By date
+    let fromDate = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from('schedule_occurrences')
+        .select('id, student_id, date, start_time, status, canceled_by_role, original_date, original_start_time, student:users!schedule_occurrences_student_id_fkey(first_name, last_name)')
+        .eq('teacher_id', teacherId)
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .range(fromDate, fromDate + pageSize - 1);
+
+      if (error || !data || data.length === 0) break;
+      allRows.push(...data);
+      if (data.length < pageSize) break;
+      fromDate += pageSize;
+    }
+
+    // 2. By original_date
+    let fromOrig = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from('schedule_occurrences')
+        .select('id, student_id, date, start_time, status, canceled_by_role, original_date, original_start_time, student:users!schedule_occurrences_student_id_fkey(first_name, last_name)')
+        .eq('teacher_id', teacherId)
+        .gte('original_date', startDate)
+        .lte('original_date', endDate)
+        .range(fromOrig, fromOrig + pageSize - 1);
+
+      if (error || !data || data.length === 0) break;
+      allRows.push(...data);
+      if (data.length < pageSize) break;
+      fromOrig += pageSize;
+    }
+
+    // Deduplicate by ID
+    return Array.from(new Map(allRows.map(o => [o.id, o])).values());
+  };
+
+  // Enterprise+ Goldstandard: Live Dry-Run Preview of reset impact (without 1,000-row cutoff)
   const fetchResetImpactPreview = async () => {
     setResetImpact(prev => ({ ...prev, loading: true }));
     try {
@@ -3349,46 +3748,22 @@ export function ScheduleCalendarView({
       
       const schoolYearEndStr = getSchoolYearEndStr(getSimulatedNow());
 
-      // 1. Fetch DB occurrences for visible week
+      // 1. Fetch DB occurrences for visible week (excluding student cancellations to protect them)
       let weekOccs: any[] = [];
       if (weekEndStr >= todayStr) {
-        const [wByDate, wByOrig] = await Promise.all([
-          supabase.from('schedule_occurrences')
-            .select('id, student_id, date, start_time, status, original_date, original_start_time')
-            .eq('teacher_id', userId)
-            .gte('date', weekStartStr)
-            .lte('date', weekEndStr),
-          supabase.from('schedule_occurrences')
-            .select('id, student_id, date, start_time, status, original_date, original_start_time')
-            .eq('teacher_id', userId)
-            .gte('original_date', weekStartStr)
-            .lte('original_date', weekEndStr)
-        ]);
-        const merged = [...(wByDate.data || []), ...(wByOrig.data || [])];
-        weekOccs = Array.from(new Map(merged.map(o => [o.id, o])).values());
+        const rawWeekOccs = await fetchAllTeacherOccurrencesInRange(userId, weekStartStr, weekEndStr);
+        weekOccs = rawWeekOccs.filter(o => o.status !== 'canceled_by_student' && o.canceled_by_role !== 'student');
       }
 
       // 2. Fetch for rest of school year (>= todayStr && <= schoolYearEndStr)
-      const [syByDate, syByOrig] = await Promise.all([
-        supabase.from('schedule_occurrences')
-          .select('id, student_id, date, start_time, status, original_date, original_start_time')
-          .eq('teacher_id', userId)
-          .gte('date', todayStr)
-          .lte('date', schoolYearEndStr),
-        supabase.from('schedule_occurrences')
-          .select('id, student_id, date, start_time, status, original_date, original_start_time')
-          .eq('teacher_id', userId)
-          .gte('original_date', todayStr)
-          .lte('original_date', schoolYearEndStr)
-      ]);
-      const syMerged = [...(syByDate.data || []), ...(syByOrig.data || [])];
-      const syUnique = Array.from(new Map(syMerged.map(o => [o.id, o])).values())
-        .filter(o => !o.date || o.date >= todayStr);
+      const rawSyOccs = await fetchAllTeacherOccurrencesInRange(userId, todayStr, schoolYearEndStr);
+      const syUnique = rawSyOccs.filter(o => (!o.date || o.date >= todayStr) && o.status !== 'canceled_by_student' && o.canceled_by_role !== 'student');
 
       // 3. Inspect visible occurrences for deviations from designer master template, swaps, or pending state
       const localDeviations: any[] = [];
       (occurrences || []).forEach((occ: any) => {
         if (!occ.student_id || occ.student_id === 'vacant') return;
+        if (occ.status === 'canceled_by_student' || occ.canceled_by_role === 'student') return; // Student cancellations are kept untouched!
         const occDate = occ.date;
         if (occDate < weekStartStr || occDate > weekEndStr) return;
 
@@ -3401,7 +3776,7 @@ export function ScheduleCalendarView({
           occ.notes?.includes('Getauscht mit') ||
           (swapLinks && swapLinks.some((link: any) => link.id1 === occ.id || link.id2 === occ.id))
         );
-        const isStatusAltered = Boolean(occ.status && ['cancelled', 'canceled_by_student', 'teacher_ausfall', 'canceled_by_teacher_ausfall', 'open_reschedule', 'pending_reschedule', 'rescheduled_confirmed'].includes(occ.status));
+        const isStatusAltered = Boolean(occ.status && ['cancelled', 'teacher_ausfall', 'open_reschedule', 'pending_reschedule', 'rescheduled_confirmed'].includes(occ.status));
         const isDateMoved = Boolean(occ.original_date && occ.original_date !== occ.date);
         const isTimeMoved = Boolean(occ.original_start_time && occ.start_time && occ.original_start_time.substring(0, 5) !== occ.start_time.substring(0, 5));
         const isAtMaster = checkIsOccurrenceAtMasterSlot(occ);
@@ -3435,18 +3810,20 @@ export function ScheduleCalendarView({
     }
   };
 
-  // Enterprise+ Goldstandard: Consolidated, positive re-activation notifications (1 message per affected student)
+  // Enterprise+ Goldstandard: Consolidated, positive re-activation notifications (Bulk-optimized)
   const notifyReactivatedStudents = async (occurrences: any[]) => {
     try {
       const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 
-      // Filter only occurrences that were actually altered or cancelled
+      // Filter only occurrences that were actually altered or cancelled by teacher
       const alteredOccurrences = occurrences.filter(occ => 
         occ.student_id && 
         occ.student_id !== 'vacant' && 
         !String(occ.id).startsWith('mock-') && 
+        occ.status !== 'canceled_by_student' &&
+        occ.canceled_by_role !== 'student' &&
         (
-          ['cancelled', 'canceled_by_student', 'teacher_ausfall', 'canceled_by_teacher_ausfall', 'open_reschedule', 'pending_reschedule'].includes(occ.status) ||
+          ['cancelled', 'teacher_ausfall', 'canceled_by_teacher_ausfall', 'open_reschedule', 'pending_reschedule'].includes(occ.status) ||
           (occ.original_date && (occ.original_date !== occ.date || occ.original_start_time !== occ.start_time)) ||
           occ.rescheduled
         )
@@ -3454,54 +3831,58 @@ export function ScheduleCalendarView({
 
       // Distinct student IDs
       const uniqueStudentIds = Array.from(new Set(alteredOccurrences.map(o => o.student_id)));
+      const messagesToInsert: Array<{ sender_id: string; recipient_id: string; content: string }> = [];
 
       for (const studentId of uniqueStudentIds) {
-        try {
-          let studentFirstName = '';
-          let regularDayName = '';
-          let regularTime = '';
+        let studentFirstName = '';
+        let regularDayName = '';
+        let regularTime = '';
 
-          // Look up in designer boards (single source of truth)
-          if (boards && boards.length > 0) {
-            for (const board of boards) {
-              const st = board.students?.find((s: any) => 
-                s.id === studentId || 
-                s.student_id === studentId || 
-                s.user_id === studentId
-              );
-              if (st) {
-                studentFirstName = (st.first_name || st.firstName || '').trim();
-                const dayIdx = board.dayOfWeek === 7 ? 0 : board.dayOfWeek;
-                regularDayName = DAYS_DE[dayIdx];
-                regularTime = (st.assignedTime || '').substring(0, 5);
-                break;
-              }
+        // Look up in designer boards (single source of truth)
+        if (boards && boards.length > 0) {
+          for (const board of boards) {
+            const st = board.students?.find((s: any) => 
+              s.id === studentId || 
+              s.student_id === studentId || 
+              s.user_id === studentId
+            );
+            if (st) {
+              studentFirstName = (st.first_name || st.firstName || '').trim();
+              const dayIdx = board.dayOfWeek === 7 ? 0 : board.dayOfWeek;
+              regularDayName = DAYS_DE[dayIdx];
+              regularTime = (st.assignedTime || '').substring(0, 5);
+              break;
             }
           }
+        }
 
-          // Fallback first name lookup from occurrences
-          if (!studentFirstName) {
-            const occWithStudent = alteredOccurrences.find(o => o.student_id === studentId && o.student?.first_name);
-            if (occWithStudent) {
-              studentFirstName = occWithStudent.student.first_name;
-            }
+        // Fallback first name lookup from occurrences
+        if (!studentFirstName) {
+          const occWithStudent = alteredOccurrences.find(o => o.student_id === studentId && o.student?.first_name);
+          if (occWithStudent) {
+            studentFirstName = occWithStudent.student.first_name;
           }
+        }
 
-          const greeting = studentFirstName ? `Liebe/r ${studentFirstName}` : 'Hallo';
-          let notificationContent = '';
-          if (regularDayName && regularTime) {
-            notificationContent = `${greeting}, dein regulärer wöchentlicher Unterrichtstermin (${regularDayName} um ${regularTime} Uhr) wurde reaktiviert und findet wie im Stundenplan vereinbart statt.`;
-          } else {
-            notificationContent = `${greeting}, deine regulären Unterrichtstermine wurden reaktiviert und finden wie im Stundenplan vereinbart statt.`;
-          }
+        const greeting = studentFirstName ? `Liebe/r ${studentFirstName}` : 'Hallo';
+        let notificationContent = '';
+        if (regularDayName && regularTime) {
+          notificationContent = `${greeting}, dein regulärer wöchentlicher Unterrichtstermin (${regularDayName} um ${regularTime} Uhr) wurde reaktiviert und findet wie im Stundenplan vereinbart statt.`;
+        } else {
+          notificationContent = `${greeting}, deine regulären Unterrichtstermine wurden reaktiviert und finden wie im Stundenplan vereinbart statt.`;
+        }
 
-          await supabase.from('campus_direct_messages').insert({
-            sender_id: userId,
-            recipient_id: studentId,
-            content: notificationContent
-          });
-        } catch (msgErr) {
-          console.warn(`Could not send re-activation direct message to student ${studentId}:`, msgErr);
+        messagesToInsert.push({
+          sender_id: userId,
+          recipient_id: studentId,
+          content: notificationContent
+        });
+      }
+
+      // Fast bulk insert in safe batches of 50
+      if (messagesToInsert.length > 0) {
+        for (let i = 0; i < messagesToInsert.length; i += 50) {
+          await supabase.from('campus_direct_messages').insert(messagesToInsert.slice(i, i + 50));
         }
       }
     } catch (err) {
@@ -3509,10 +3890,21 @@ export function ScheduleCalendarView({
     }
   };
 
-  // Enterprise+ Goldstandard: Execute reset with strict history protection
+  // Enterprise+ Goldstandard: Execute reset with strict history protection and real-time progress bar
   // (Designer master schedule remains 100% untouched)
   const executeScheduleReset = async (scope: 'week' | 'school_year') => {
+    const confirmMessage = scope === 'week'
+      ? `Sicherheitsprüfung: Möchtest du wirklich alle Termine dieser Kalenderwoche (KW ${getWeekNumber(weekStart)}) verbindlich auf die Stammdaten des Stundenplan-Designers zurücksetzen? Alle individuellen Verschiebungen dieser Woche werden verworfen.`
+      : 'Sicherheitsprüfung: Möchtest du wirklich alle manuellen Terminverschiebungen für das GESAMTE RESTLICHE SCHULJAHR verbindlich auf den Designer-Stand zurücksetzen? Diese Aktion setzt alle Folgetermine zurück.';
+    
+    const isDoubleConfirmed = await showConfirm(confirmMessage);
+    if (!isDoubleConfirmed) {
+      return;
+    }
+
     setIsExecutingReset(true);
+    setResetProgress({ percent: 5, stage: 'Vorbereitung...', current: 0, total: 0 });
+
     try {
       const todayStr = toLocalYYYYMMDD(getSimulatedNow());
       const schoolYearEndStr = getSchoolYearEndStr(getSimulatedNow());
@@ -3529,6 +3921,7 @@ export function ScheduleCalendarView({
         if (weekEndStr < todayStr) {
           await showAlert('Historien-Schutz: Vergangene Kalenderwochen können nicht zurückgesetzt werden, um die Unterrichtshistorie revisionssicher zu schützen.');
           setIsExecutingReset(false);
+          setResetProgress({ percent: 0, stage: '', current: 0, total: 0 });
           return;
         }
         startDateStr = weekStartStr;
@@ -3553,38 +3946,25 @@ export function ScheduleCalendarView({
       setSwapLinks([]);
       setSwapSourceOcc(null);
 
-      // 2. Fetch occurrences to delete
-      const [resByDate, resByOrigDate] = await Promise.all([
-        supabase.from('schedule_occurrences')
-          .select('id, date, start_time, student_id, status, original_date, original_start_time, student:users!schedule_occurrences_student_id_fkey(first_name, last_name)')
-          .eq('teacher_id', userId)
-          .gte('date', startDateStr)
-          .lte('date', endDateStr),
-        supabase.from('schedule_occurrences')
-          .select('id, date, start_time, student_id, status, original_date, original_start_time, student:users!schedule_occurrences_student_id_fkey(first_name, last_name)')
-          .eq('teacher_id', userId)
-          .gte('original_date', startDateStr)
-          .lte('original_date', endDateStr)
-      ]);
-
-      const occurrencesToDelete = [
-        ...(resByDate.data || []),
-        ...(resByOrigDate.data || [])
-      ];
+      // 2. Fetch occurrences to delete (complete pagination, no 1000-row cutoff)
+      setResetProgress({ percent: 12, stage: 'Termine analysieren...', current: 0, total: 0 });
+      const rawOccurrences = await fetchAllTeacherOccurrencesInRange(userId, startDateStr, endDateStr);
 
       // History protection: only delete records within the target reset range
-      const validOccurrencesToDelete = occurrencesToDelete.filter(occ => {
+      // AND KEEP student cancellations (canceled_by_student / student) strictly untouched!
+      const validOccurrencesToDelete = rawOccurrences.filter(occ => {
+        const isStudentCancel = occ.status === 'canceled_by_student' || occ.canceled_by_role === 'student';
+        if (isStudentCancel) return false;
         const occDate = occ.date || occ.original_date;
         return occDate && occDate >= startDateStr && occDate <= endDateStr;
       });
       const idsToDelete = Array.from(new Set(validOccurrencesToDelete.map(o => o.id)));
 
       if (idsToDelete.length > 0) {
-        // 3. Notify affected students with consolidated re-activation messages
-        await notifyReactivatedStudents(validOccurrencesToDelete);
-
-        // 4. Delete occurrences from DB in safe batches of 50 (prevents HTTP 414 URI Too Large)
-        for (let i = 0; i < idsToDelete.length; i += 50) {
+        // 3. Delete occurrences from DB in safe batches with real-time progress
+        const totalOccs = idsToDelete.length;
+        let deletedOccs = 0;
+        for (let i = 0; i < totalOccs; i += 50) {
           const batch = idsToDelete.slice(i, i + 50);
           const { error } = await supabase
             .from('schedule_occurrences')
@@ -3592,25 +3972,51 @@ export function ScheduleCalendarView({
             .in('id', batch);
 
           if (error) throw error;
+          deletedOccs += batch.length;
+          const currentPct = Math.min(75, 15 + Math.round((deletedOccs / totalOccs) * 60));
+          setResetProgress({
+            percent: currentPct,
+            stage: `Termine bereinigen (${deletedOccs} / ${totalOccs})...`,
+            current: deletedOccs,
+            total: totalOccs
+          });
         }
 
-        // 5. Clean up corresponding room bookings in safe batches
+        // 4. Clean up corresponding teaching room bookings efficiently
+        setResetProgress(prev => ({ ...prev, percent: 78, stage: 'Raumbelegungen aktualisieren...' }));
         try {
-          const bookingDeletions = validOccurrencesToDelete.map(occ => {
-            const timeNoSec = (occ.start_time || '').substring(0, 5);
-            return supabase.from('room_bookings')
-              .delete()
-              .eq('booked_by', userId)
-              .eq('date', occ.date)
-              .or(`start_time.eq.${occ.start_time},start_time.eq.${timeNoSec}:00`);
-          });
-          for (let i = 0; i < bookingDeletions.length; i += 20) {
-            await Promise.all(bookingDeletions.slice(i, i + 20));
+          const { data: teacherBookings } = await supabase
+            .from('room_bookings')
+            .select('id')
+            .eq('booked_by', userId)
+            .gte('date', startDateStr)
+            .lte('date', endDateStr)
+            .ilike('title', 'Unterricht:%');
+
+          if (teacherBookings && teacherBookings.length > 0) {
+            const bookingIds = teacherBookings.map((b: any) => b.id);
+            for (let i = 0; i < bookingIds.length; i += 50) {
+              await supabase
+                .from('room_bookings')
+                .delete()
+                .in('id', bookingIds.slice(i, i + 50));
+            }
           }
         } catch (roomErr) {
           console.warn('Error deleting room bookings on schedule reset:', roomErr);
         }
+        setResetProgress(prev => ({ ...prev, percent: 86, stage: 'Raumbelegungen aktualisiert.' }));
+
+        // 5. Notify affected students with consolidated re-activation messages (Bulk-optimized)
+        setResetProgress(prev => ({ ...prev, percent: 89, stage: 'Schüler benachrichtigen...' }));
+        await notifyReactivatedStudents(validOccurrencesToDelete);
+        setResetProgress(prev => ({ ...prev, percent: 96, stage: 'Benachrichtigungen übermittelt.' }));
       }
+
+      setResetProgress({ percent: 100, stage: 'Erfolgreich abgeschlossen!', current: idsToDelete.length, total: idsToDelete.length });
+      
+      // Short visual pause so user sees 100% completion
+      await new Promise(r => setTimeout(r, 600));
 
       setBaseOccurrences([]);
       setIsResetModalOpen(false);
@@ -3629,6 +4035,7 @@ export function ScheduleCalendarView({
       await showAlert('Fehler beim Zurücksetzen der gespeicherten Termine');
     } finally {
       setIsExecutingReset(false);
+      setResetProgress({ percent: 0, stage: '', current: 0, total: 0 });
     }
   };
 
@@ -5005,13 +5412,13 @@ export function ScheduleCalendarView({
     } catch {}
 
     // 5. Tier-1 Enterprise+ Fallback for Peter Pan / Default teaching room:
-    // If teacher is Peter Pan (or if no rooms have been assigned yet), ensure 'Raum 4' from the rooms catalog is included
+    // If teacher is explicitly Peter Pan, ensure 'Raum 4' from the rooms catalog is included
     const targetTeacher = teachers?.find((t: any) => t.id === userId);
     const isPeter = targetTeacher 
       ? (targetTeacher.first_name || '').toLowerCase().includes('peter') || (targetTeacher.name || '').toLowerCase().includes('peter')
-      : true; // Peter Pan is default seed teacher in Musäk Bad Säckingen
+      : false;
 
-    if (isPeter || ids.size === 0) {
+    if (isPeter) {
       const raum4 = (rooms || []).find((r: any) => (r.name || '').trim().toLowerCase() === 'raum 4' || (r.name || '').toLowerCase().includes('raum 4'));
       if (raum4) {
         ids.add(raum4.id);
@@ -6823,7 +7230,7 @@ export function ScheduleCalendarView({
                     </div>
                   );
                 })()}
-              {loading ? (
+              {loading && dayOccurrences.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '20px', color: '#94a3b8', fontSize: '0.75rem' }}>Lade...</div>
               ) : dayOccurrences.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '20px', color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 500 }}>Keine Termine</div>
@@ -6851,7 +7258,10 @@ export function ScheduleCalendarView({
                       occ.notes?.includes('Getauscht mit') ||
                       swapLinks.some(link => link.id1 === occ.id || link.id2 === occ.id)
                     );
+                    const occDayNum = offset + 1;
+                    const occTemplateGroup = !isSwapOcc ? getTemplateGroupForOcc(occ, occDayNum, boards) : null;
                     const isExplicitGroupOcc = !isSwapOcc && Boolean(
+                      occTemplateGroup ||
                       occ.isGroupBlock || 
                       (occ.groupOccurrences && occ.groupOccurrences.length > 0) || 
                       (occ as any).isExplicitMerged ||
@@ -6863,11 +7273,31 @@ export function ScheduleCalendarView({
                     const existing = renderedGroups.find(g => {
                       if (!g.mainOcc.student_id || g.mainOcc.student_id === 'vacant') return false;
                       if (g.mainOcc.start_time !== occ.start_time) return false;
-                      if ((g.mainOcc.schedules?.room_id || null) !== room_id) return false;
                       if (g.mainOcc.id === occ.id) return false;
+
+                      const gTemplateGroup = !isSwapOcc ? getTemplateGroupForOcc(g.mainOcc, occDayNum, boards) : null;
+
+                      // 1. Template Group Reconciliation: If both occurrences match the same designer template group, merge them!
+                      if (occTemplateGroup && gTemplateGroup && (occTemplateGroup.id === gTemplateGroup.id || occTemplateGroup.first_name === gTemplateGroup.first_name)) {
+                        return true;
+                      }
+
+                      // Check if occ belongs to g's template group, or g belongs to occ's template group
+                      if (occTemplateGroup) {
+                        if (occTemplateGroup.id === g.mainOcc.student_id || occTemplateGroup.id === g.mainOcc.id) return true;
+                        if (occTemplateGroup.groupStudents?.some((gs: any) => matchesTemplateStudent(g.mainOcc, gs))) return true;
+                      }
+                      if (gTemplateGroup) {
+                        if (gTemplateGroup.id === occ.student_id || gTemplateGroup.id === occ.id) return true;
+                        if (gTemplateGroup.groupStudents?.some((gs: any) => matchesTemplateStudent(occ, gs))) return true;
+                      }
+
+                      // Room check for non-template groups
+                      if ((g.mainOcc.schedules?.room_id || null) !== room_id && (!occTemplateGroup || !gTemplateGroup)) return false;
 
                       // Check if g is an explicit group OR occ is an explicit group
                       const gIsGroup = Boolean(
+                        gTemplateGroup ||
                         g.mainOcc.isGroupBlock || 
                         (g.mainOcc.groupOccurrences && g.mainOcc.groupOccurrences.length > 0) || 
                         (g.mainOcc as any).isExplicitMerged || 
@@ -6893,11 +7323,11 @@ export function ScheduleCalendarView({
                       // Check composite name token matching
                       if (g.mainOcc.student?.first_name && (g.mainOcc.student.first_name.includes('&') || g.mainOcc.student.first_name.includes(','))) {
                         const tokens = extractStudentTokensFromName(g.mainOcc.student.first_name);
-                        if (tokens.some(tok => matchesTemplateStudent(occ, { first_name: tok, last_name: '' }))) return true;
+                        if (tokens.some(tok => matchesTemplateStudent(occ, { name: tok }))) return true;
                       }
                       if (occ.student?.first_name && (occ.student.first_name.includes('&') || occ.student.first_name.includes(','))) {
                         const tokens = extractStudentTokensFromName(occ.student.first_name);
-                        if (tokens.some(tok => matchesTemplateStudent(g.mainOcc, { first_name: tok, last_name: '' }))) return true;
+                        if (tokens.some(tok => matchesTemplateStudent(g.mainOcc, { name: tok }))) return true;
                       }
 
                       return false;
@@ -6907,9 +7337,21 @@ export function ScheduleCalendarView({
                       if (!existing.occurrences.some(o => o.id === occ.id)) {
                         existing.occurrences.push(occ);
                       }
+                      // If existing had a mock occurrence and occ is a real DB occurrence, remove mock and promote real occ
+                      if (existing.mainOcc.id?.startsWith('mock-') && !occ.id?.startsWith('mock-')) {
+                        existing.occurrences = existing.occurrences.filter(o => !o.id?.startsWith('mock-'));
+                        existing.mainOcc = occ;
+                      }
+                      existing.mainOcc.isGroupBlock = true;
+                      const resolvedTmplGroup = occTemplateGroup || (!isSwapOcc ? getTemplateGroupForOcc(existing.mainOcc, occDayNum, boards) : null);
+                      if (resolvedTmplGroup) {
+                        if (!existing.mainOcc.groupOccurrences || existing.mainOcc.groupOccurrences.length === 0) {
+                          existing.mainOcc.groupOccurrences = resolvedTmplGroup.groupStudents || [];
+                        }
+                      }
                     } else {
                       renderedGroups.push({
-                        key: `${occ.date}_${occ.start_time}_${room_id || 'noroom'}_${occ.id}`,
+                        key: occ.id || `${occ.date}_${occ.start_time}_${room_id || 'noroom'}`,
                         occurrences: [occ],
                         mainOcc: occ
                       });
@@ -7016,8 +7458,10 @@ export function ScheduleCalendarView({
                 return renderedGroups.map(group => {
                   const layout = groupLayouts.get(group.key);
                   const occurrencesInGroup = group.occurrences;
-                  const isGroup = occurrencesInGroup.length > 1;
                   const occ = group.mainOcc;
+                  const occDayNum = offset + 1;
+                  const occTemplateGroup = getTemplateGroupForOcc(occ, occDayNum, boards);
+                  const isGroup = occurrencesInGroup.length > 1 || occ.isGroupBlock || Boolean(occ.groupOccurrences && occ.groupOccurrences.length > 0) || Boolean(occTemplateGroup);
                   
                   const isBreak = isBreakOccurrence(occ);
                   const isVacant = occ.student_id === 'vacant';
@@ -7158,11 +7602,149 @@ export function ScheduleCalendarView({
 
                   const isCancelledAck = (isCancelled || isAbsentSlot) && (occ.student_acknowledged === true || occ.teacher_acknowledged === true || occ.status === 'cancelled_acknowledged');
 
-                  const fn = occ.student?.first_name || occ.student_first_name || occ.first_name || '';
-                  const ln = occ.student?.last_name || occ.student_last_name || occ.last_name || '';
+                  let resolvedFn = occ.student?.first_name || occ.student_first_name || occ.first_name || '';
+                  let resolvedLn = occ.student?.last_name || occ.student_last_name || occ.last_name || '';
+
+                  if (!resolvedFn && occ.student_id && templateStudentMap.has(occ.student_id)) {
+                    const tmplStudent = templateStudentMap.get(occ.student_id)!;
+                    resolvedFn = tmplStudent.first_name || '';
+                    resolvedLn = tmplStudent.last_name || '';
+                  }
+
+                  const sanitizeFormattedGroupNames = (rawGroupText: string): string => {
+                    if (!rawGroupText) return 'Schüler';
+                    const parts = rawGroupText.split(/&|,|\bund\b/i).map(p => p.trim()).filter(Boolean);
+                    if (parts.length >= 2) {
+                      const p1 = parts[0];
+                      const p2 = parts[1];
+                      const p1Tokens = p1.split(/\s+/).filter(Boolean);
+                      const p2Tokens = p2.split(/\s+/).filter(Boolean);
+                      const p1Fn = p1Tokens[0] || 'Schüler 1';
+                      const p1Ln = p1Tokens.slice(1).join(' ');
+                      const p2Fn = p2Tokens[0] || 'Schüler 2';
+                      const p2Ln = p2Tokens.slice(1).join(' ');
+                      const p1Formatted = `${p1Fn} ${maskLastName(p1Ln, showRealNames)}`.trim();
+                      const p2Formatted = `${p2Fn} ${maskLastName(p2Ln, showRealNames)}`.trim();
+                      if (parts.length > 2) {
+                        return `${p1Formatted} & ${parts.length - 1} weitere`;
+                      }
+                      return `${p1Formatted} & ${p2Formatted}`;
+                    }
+                    const tokens = rawGroupText.split(/\s+/).filter(Boolean);
+                    const singleFn = tokens[0] || 'Schüler';
+                    const singleLn = tokens.slice(1).join(' ');
+                    return `${singleFn} ${maskLastName(singleLn, showRealNames)}`.trim();
+                  };
+
+                  // 🏛️ Tier-1 Enterprise Group Member Aggregation & Reconciliation Engine
+                  const groupMembersList: { id?: string; first_name: string; last_name: string }[] = [];
+
+                  const registerGroupMember = (mId?: string | null, mFn?: string | null, mLn?: string | null) => {
+                    let fn = (mFn || '').trim();
+                    let ln = (mLn || '').trim();
+                    if (!fn && mId && templateStudentMap.has(mId)) {
+                      const tmpl = templateStudentMap.get(mId)!;
+                      fn = tmpl.first_name || '';
+                      ln = tmpl.last_name || '';
+                    }
+                    if (!fn && !ln) return;
+                    if (fn.includes('&') || fn.includes(',') || /\b(und|and)\b/i.test(fn)) {
+                      const tokens = extractStudentTokensFromName(fn);
+                      tokens.forEach(tok => {
+                        const parts = tok.split(/\s+/).filter(Boolean);
+                        const subFn = parts[0] || '';
+                        const subLn = parts.slice(1).join(' ') || ln;
+                        registerGroupMember(null, subFn, subLn);
+                      });
+                      return;
+                    }
+
+                    const fnLower = fn.toLowerCase();
+                    const lnInitial = ln ? ln.toLowerCase().slice(0, 1) : '';
+
+                    // Check if member already exists in groupMembersList by ID or by First Name matching
+                    const existingIndex = groupMembersList.findIndex(m => {
+                      if (mId && m.id && m.id === mId) return true;
+                      const mFnLower = m.first_name.toLowerCase();
+                      if (mFnLower === fnLower) {
+                        const mLnInitial = m.last_name ? m.last_name.toLowerCase().slice(0, 1) : '';
+                        if (!m.last_name || !ln || mLnInitial === lnInitial) return true;
+                      }
+                      return false;
+                    });
+
+                    if (existingIndex !== -1) {
+                      // Member already in list: upgrade with ID or more complete last name if available
+                      const existing = groupMembersList[existingIndex];
+                      if (!existing.id && mId) existing.id = mId;
+                      if ((!existing.last_name || existing.last_name.length < ln.length) && ln) {
+                        existing.last_name = ln;
+                      }
+                      return;
+                    }
+
+                    groupMembersList.push({ id: mId || undefined, first_name: fn, last_name: ln });
+                  };
+
+                  if (isGroup) {
+                    // 1. Members from merged database occurrences
+                    occurrencesInGroup.forEach(o => {
+                      registerGroupMember(
+                        o.student_id || o.student?.id,
+                        o.student?.first_name || o.student_first_name || o.first_name,
+                        o.student?.last_name || o.student_last_name || o.last_name
+                      );
+                    });
+
+                    // 2. Members from groupOccurrences attached to the main occurrence
+                    const attachedGroupOccs = (occ as any).groupOccurrences || (group.mainOcc as any).groupOccurrences;
+                    if (Array.isArray(attachedGroupOccs)) {
+                      attachedGroupOccs.forEach((go: any) => {
+                        registerGroupMember(
+                          go.id || go.student_id || go.studentId,
+                          go.first_name || (go.name ? go.name.split(' ')[0] : ''),
+                          go.last_name || (go.name ? go.name.split(' ').slice(1).join(' ') : '')
+                        );
+                      });
+                    }
+
+                    // 3. Members from Designer Template Group (Stundenplan-Designer Boards)
+                    const occDayNum = offset + 1;
+                    const matchedTmplGroup = getTemplateGroupForOcc(occ, occDayNum, boards);
+                    if (matchedTmplGroup) {
+                      if (Array.isArray(matchedTmplGroup.groupStudents)) {
+                        matchedTmplGroup.groupStudents.forEach((gs: any) => {
+                          registerGroupMember(
+                            gs.id || gs.student_id || gs.studentId,
+                            gs.first_name || (gs.name ? gs.name.split(' ')[0] : ''),
+                            gs.last_name || (gs.name ? gs.name.split(' ').slice(1).join(' ') : '')
+                          );
+                        });
+                      } else if (matchedTmplGroup.first_name) {
+                        registerGroupMember(null, matchedTmplGroup.first_name, matchedTmplGroup.last_name);
+                      }
+                    }
+                  }
+
                   const displayNames = isGroup 
-                    ? formatGroupStudentsAnonymized(occurrencesInGroup, !showRealNames)
-                    : (occ.student_id === 'vacant' ? 'Freier Platz' : (formatSingleStudentAnonymized(fn, ln, occ.id, !showRealNames) || occ.name || occ.student_name || 'Unbekannt'));
+                    ? (groupMembersList.length > 0
+                        ? groupMembersList.map(m => `${m.first_name} ${maskLastName(m.last_name, showRealNames)}`.trim()).filter(Boolean).join(' & ')
+                        : sanitizeFormattedGroupNames(occ.name || occ.student_name || 'Gruppe'))
+                    : (occ.student_id === 'vacant' 
+                        ? 'Freier Platz' 
+                        : (() => {
+                            const singleFormatted = `${resolvedFn} ${maskLastName(resolvedLn, showRealNames)}`.trim();
+                            if (singleFormatted) return singleFormatted;
+                            if (occ.name) return occ.name;
+                            if (occ.student_name) return occ.student_name;
+                            return 'Schüler'; // 🏛️ NEVER fall back to 'Gruppe' for single appointments!
+                          })());
+
+                  const groupTooltipText = isGroup
+                    ? (groupMembersList.length > 0
+                        ? groupMembersList.map(m => `${m.first_name} ${maskLastName(m.last_name, showRealNames)}`.trim()).filter(Boolean).join('\n')
+                        : displayNames)
+                    : (isBreak ? undefined : displayNames);
 
                   const isSwap = !isAtMasterSlot && !hasPendingEdit ? false : Boolean(
                     occ.is_swap || 
@@ -7381,9 +7963,7 @@ export function ScheduleCalendarView({
                         onTouchEnd={handleTouchEndCard}
                         onTouchCancel={handleTouchEndCard}
                         onMouseEnter={(e) => {
-                          const text = isGroup 
-                            ? occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${maskLastName(o.student?.last_name, showRealNames)}`.trim()).join('\n')
-                            : (isBreak ? undefined : displayNames);
+                          const text = groupTooltipText;
                           if (text) {
                             setHoveredTooltip({
                               text,
@@ -7394,9 +7974,7 @@ export function ScheduleCalendarView({
                           }
                         }}
                         onMouseMove={(e) => {
-                          const text = isGroup 
-                            ? occurrencesInGroup.map(o => `${o.student?.first_name || ''} ${maskLastName(o.student?.last_name, showRealNames)}`.trim()).join('\n')
-                            : (isBreak ? undefined : displayNames);
+                          const text = groupTooltipText;
                           if (text) {
                             setHoveredTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
                           }
@@ -10308,31 +10886,47 @@ return (
             bottom: isMobilePortrait ? 'max(16px, env(safe-area-inset-bottom))' : '24px',
             left: '50%',
             transform: 'translateX(-50%)',
-            background: 'rgba(255, 255, 255, 0.95)',
+            background: 'rgba(255, 255, 255, 0.96)',
             backdropFilter: 'blur(20px) saturate(190%)',
-            border: '1px solid rgba(0, 0, 0, 0.08)',
+            WebkitBackdropFilter: 'blur(20px) saturate(190%)',
+            border: '1.2px solid rgba(52, 168, 83, 0.25)',
             borderRadius: isMobilePortrait ? '20px' : '100px',
-            padding: isMobilePortrait ? '12px 16px' : '10px 18px 10px 24px',
-            boxShadow: '0 12px 40px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.02)',
+            padding: isMobilePortrait ? '12px 16px' : '8px 14px 8px 18px',
+            boxShadow: '0 14px 40px -6px rgba(0, 0, 0, 0.14), 0 2px 10px rgba(0, 0, 0, 0.04)',
             display: 'flex',
             flexDirection: isMobilePortrait ? 'column' : 'row',
             alignItems: 'center',
-            gap: isMobilePortrait ? '12px' : '24px',
-            zIndex: 999,
-            animation: 'floating-slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+            gap: isMobilePortrait ? '12px' : '18px',
+            zIndex: 9999,
+            animation: 'floating-slide-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards',
             boxSizing: 'border-box',
             width: isMobilePortrait ? 'calc(100% - 24px)' : 'auto',
             maxWidth: isMobilePortrait ? '440px' : 'none'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-              <AlertCircle size={18} color="#f59e0b" strokeWidth={2.4} style={{ flexShrink: 0 }} />
-              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1d1d1f', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto', overflowWrap: 'break-word', minWidth: 0 }}>
-                Du hast {Object.keys(pendingChanges).length} ungespeicherte {Object.keys(pendingChanges).length === 1 ? 'Änderung' : 'Änderungen'} in diesem Stundenplan.
+              <div style={{
+                background: '#fef3c7',
+                border: '1px solid #fde68a',
+                borderRadius: '8px',
+                padding: '2px 7px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                flexShrink: 0
+              }}>
+                <AlertCircle size={13} color="#b45309" strokeWidth={2.4} style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#92400e' }}>
+                  {Object.keys(pendingChanges).length}
+                </span>
+              </div>
+              <span style={{ fontSize: '0.82rem', fontWeight: 750, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', -apple-system, sans-serif", overflowWrap: 'break-word', minWidth: 0 }}>
+                {Object.keys(pendingChanges).length === 1 ? 'Ungespeicherte Änderung' : 'Ungespeicherte Änderungen'}
               </span>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: isMobilePortrait ? '100%' : 'auto', justifyContent: isMobilePortrait ? 'flex-end' : 'flex-start' }}>
               <button
+                type="button"
                 onClick={() => {
                   setPendingChanges({});
                   setSwapLinks([]);
@@ -10340,58 +10934,65 @@ return (
                 style={{
                   background: 'transparent',
                   border: 'none',
-                  color: '#ff3b30',
-                  padding: isMobilePortrait ? '10px 16px' : '8px 16px',
+                  color: '#94a3b8',
+                  padding: isMobilePortrait ? '10px 16px' : '7px 11px',
                   minHeight: isMobilePortrait ? '44px' : 'auto',
                   borderRadius: '100px',
-                  fontSize: '0.78rem',
-                  fontWeight: 600,
+                  fontSize: '0.76rem',
+                  fontWeight: 700,
                   cursor: 'pointer',
-                  transition: 'background 0.2s',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '4px'
+                  transition: 'all 0.18s ease'
                 }}
-                onMouseOver={e => e.currentTarget.style.background = 'rgba(255, 59, 48, 0.08)'}
-                onMouseOut={e => e.currentTarget.style.background = 'transparent'}
-                title="Änderungen rückgängig machen"
+                onMouseOver={e => {
+                  e.currentTarget.style.background = '#fef2f2';
+                  e.currentTarget.style.color = '#dc2626';
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = '#94a3b8';
+                }}
+                title="Alle ungespeicherten Änderungen verwerfen"
+                aria-label="Alle ungespeicherten Änderungen verwerfen"
               >
-                <RotateCcw size={12} strokeWidth={2.4} />
-                <span>Rückgängig</span>
+                Verwerfen
               </button>
 
               <button
+                type="button"
                 onClick={savePendingChanges}
                 style={{
-                  background: brandColor,
+                  background: '#34a853',
                   border: 'none',
                   color: 'white',
-                  padding: isMobilePortrait ? '10px 20px' : '8px 20px',
+                  padding: isMobilePortrait ? '10px 20px' : '8px 18px',
                   minHeight: isMobilePortrait ? '44px' : 'auto',
                   borderRadius: '100px',
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
+                  fontSize: '0.80rem',
+                  fontWeight: 800,
                   cursor: 'pointer',
-                  boxShadow: `0 4px 12px ${brandColor}50`,
-                  transition: 'all 0.2s',
+                  boxShadow: '0 4px 14px rgba(52, 168, 83, 0.35)',
+                  transition: 'all 0.18s ease',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px'
                 }}
                 onMouseOver={e => {
-                  e.currentTarget.style.background = brandColor;
-                  e.currentTarget.style.boxShadow = `0 6px 16px ${brandColor}70`;
+                  e.currentTarget.style.background = '#2e9549';
+                  e.currentTarget.style.boxShadow = '0 6px 18px rgba(52, 168, 83, 0.45)';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
                 }}
                 onMouseOut={e => {
-                  e.currentTarget.style.background = brandColor;
-                  e.currentTarget.style.boxShadow = `0 4px 12px ${brandColor}50`;
+                  e.currentTarget.style.background = '#34a853';
+                  e.currentTarget.style.boxShadow = '0 4px 14px rgba(52, 168, 83, 0.35)';
+                  e.currentTarget.style.transform = 'translateY(0)';
                 }}
+                title="Änderungen speichern und Schüler per Push informieren"
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
                   <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
                 </svg>
-                Speichern & Schüler informieren
+                <span>Speichern & Schüler informieren ({Object.keys(pendingChanges).length})</span>
               </button>
             </div>
           </div>
@@ -10414,7 +11015,7 @@ return (
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 99999,
+            zIndex: 200000,
             animation: 'fadeIn 0.2s ease-out'
           }}
         >
@@ -10880,12 +11481,66 @@ return (
             </div>
           </div>
 
+          {/* Active Reset Progress Bar (Ladebalken) */}
+          {isExecutingReset && (
+            <div
+              style={{
+                background: '#fef2f2',
+                border: '1.5px solid #fecaca',
+                borderRadius: '18px',
+                padding: '16px 20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                animation: 'fadeIn 0.2s ease-out'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Loader2 size={18} style={{ color: '#dc2626', animation: 'spin 1s linear infinite' }} />
+                  <span style={{ fontSize: '0.86rem', fontWeight: 800, color: '#991b1b' }}>
+                    {resetProgress.stage || 'Bereinigung läuft...'}
+                  </span>
+                </div>
+                <span style={{ fontSize: '0.90rem', fontWeight: 900, color: '#dc2626', fontVariantNumeric: 'tabular-nums' }}>
+                  {resetProgress.percent}%
+                </span>
+              </div>
+              <div
+                role="progressbar"
+                aria-valuenow={resetProgress.percent}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label="Fortschritt der Stundenplan-Bereinigung"
+                style={{
+                  height: '10px',
+                  width: '100%',
+                  background: '#fee2e2',
+                  borderRadius: '9999px',
+                  overflow: 'hidden',
+                  position: 'relative'
+                }}
+              >
+                <div
+                  style={{
+                    height: '100%',
+                    width: `${resetProgress.percent}%`,
+                    background: 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)',
+                    borderRadius: '9999px',
+                    transition: 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                    boxShadow: '0 1px 3px rgba(220, 38, 38, 0.4)'
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Options */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', opacity: isExecutingReset ? 0.55 : 1, pointerEvents: isExecutingReset ? 'none' : 'auto' }}>
             {/* Option 1: Diese Woche */}
             <div
               role="button"
-              tabIndex={0}
+              tabIndex={isExecutingReset ? -1 : 0}
               onClick={() => !isExecutingReset && executeScheduleReset('week')}
               onKeyDown={e => {
                 if ((e.key === 'Enter' || e.key === ' ') && !isExecutingReset) {
@@ -10950,7 +11605,7 @@ return (
             {/* Option 2: Restliches Schuljahr */}
             <div
               role="button"
-              tabIndex={0}
+              tabIndex={isExecutingReset ? -1 : 0}
               onClick={() => !isExecutingReset && executeScheduleReset('school_year')}
               onKeyDown={e => {
                 if ((e.key === 'Enter' || e.key === ' ') && !isExecutingReset) {
@@ -11020,10 +11675,12 @@ return (
                   color: '#ffffff',
                   cursor: isExecutingReset ? 'not-allowed' : 'pointer',
                   boxShadow: '0 2px 6px rgba(220, 38, 38, 0.25)',
-                  whiteSpace: 'nowrap'
+                  whiteSpace: 'nowrap',
+                  minWidth: '80px',
+                  textAlign: 'center'
                 }}
               >
-                {isExecutingReset ? 'Wird bereinigt...' : 'Schuljahr bereinigen'}
+                {isExecutingReset ? `${resetProgress.percent}%` : 'Schuljahr bereinigen'}
               </button>
             </div>
           </div>

@@ -174,6 +174,17 @@ export interface PendingUser {
   school_id: string;
   created_at: string;
   is_activated?: boolean;
+  ausweis_nummer?: string;
+  is_campus_active?: boolean;
+  is_groovelab_active?: boolean;
+  is_trial?: boolean;
+  is_hardship_exempt?: boolean;
+  student_billing_payment_method?: string;
+  student_billing_cash_paid?: boolean;
+  payment_status?: string;
+  last_seen?: string;
+  operator_notes?: string;
+  [key: string]: any;
 }
 
 export interface PricingAuditLog {
@@ -226,3 +237,16 @@ export function getSubdomainOrigin(schoolName: string): string {
     return `${protocol}//${subdomain}.${baseDomain}`;
   }
 }
+
+export type MasterAdminPortalTab = 
+  | 'executive' 
+  | 'schools' 
+  | 'briefing' 
+  | 'billing' 
+  | 'telemetry' 
+  | 'pricing' 
+  | 'trust_safety' 
+  | 'operator' 
+  | 'maintenance' 
+  | 'backup' 
+  | 'feedback';

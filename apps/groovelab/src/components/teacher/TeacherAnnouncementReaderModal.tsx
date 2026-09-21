@@ -203,9 +203,9 @@ export const TeacherAnnouncementReaderModal: React.FC<TeacherAnnouncementReaderM
           </div>
         ) : null}
 
-        {/* Legal Notice § 130 BGB */}
+        {/* Legal Notice */}
         <div style={{ fontSize: '0.72rem', color: '#64748b', fontStyle: 'italic', lineHeight: '1.4', background: '#f8fafc', padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-          ℹ️ Mit deiner Bestätigung wird der Zugang der Mitteilung nach § 130 BGB für die Schulleitung revisionssicher dokumentiert.
+          ℹ️ Mit deiner Bestätigung wird der Zugang der Mitteilung für die Schulleitung revisionssicher dokumentiert.
         </div>
 
         {/* Action Buttons */}

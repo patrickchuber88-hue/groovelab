@@ -165,3 +165,88 @@ Das Datenmodell und die Eltern-Komponente bleiben im Fundament vollständig erha
   3. Sekretariats-Inbox für `gdpr_deletion_requests` fertigstellen.
   4. In `StudentSettingsTab.tsx`: Kachel `consents` im Einstellungs-Array wieder aktivieren.
 
+---
+
+## 🪪 Modul: Physisches Musiker-Pass & Koffer-Badge Set (On-Demand Lettershop, Apple/Google Wallet & D2C-Monetarisierung)
+
+* **Status:** 🟡 **AUF DER ROADMAP (Konzeption & Sicherheitsarchitektur abgeschlossen / Ready for Pilot)**
+* **Bereich:** Elternbereich (`ParentCampusActivationModal.tsx` / `StudentSettingsTab.tsx`), Schulsekretariat (`AdminIDGalleryView.tsx`), Backend Print-Cron & SFTP-Dispatch
+* **Zielgruppe:** Schülerinnen & Schüler (Campus & GrooveLab), Erziehungsberechtigte, Musikschulleitungen & Fördervereine
+
+### 1. Fachliche & didaktische Motivation
+Klassische Musikschulausweise werden bislang im Schulsekretariat auf normalem DIN-A4-Papier gedruckt, händisch mit der Schere zugeschnitten und ggf. provisorisch laminiert. Das führt zu verknickten Zetteln, unleserlichen QR-Codes und erheblichem Zeitaufwand im Sekretariat.
+Das physische Musiker-Pass & Koffer-Badge Set ersetzt diesen Prozess durch einen schlüsselfertigen Premium-Standard:
+1. **Das Musiker-Set (Dual-Carrier):**
+   * **1× CR80 Plastikkarte (0,76 mm Bio-rPVC):** Robust wie eine Bankkarte, seidenmatt, abgerundete Ecken, mit Schullogo und Schülernummer.
+   * **1× Koffer-Badge (Instrumenten-Schlüsselanhänger):** Wetterfester Mini-Key-Tag mit Metallring für den Reißverschluss des Gitarren-Gigbags oder Geigenkoffers.
+2. **100 % DSGVO-Anonymisierung (Art. 25 Privacy by Design):**
+   * Auf dem Ausweis steht ausnahmslos **„Vorname + N.“** (z. B. *„Amelia H.“*) und das Instrument (*„Schlagzeug“*).
+   * Der aufgedruckte QR-Code enthält ausschließlich eine pseudonyme 128-Bit UUID (`https://campus-groovelab.de/qr/<token>`). Zero Klardaten auf dem Trägermedium.
+3. **Didaktischer Check-in & Alltags-Präsenz:**
+   * Der Schlüsselanhänger ist fest mit dem Instrument verbunden; das Kind vergisst den Ausweis nie. Im Unterricht checkt die Lehrkraft oder das Schüler-Terminal das Kind mit einem 1-Sekunden-Scan direkt am Instrumentenkoffer ein.
+
+### 2. Das B2B2C-Geschäftsmodell & Fördervereins-Kickback
+Das Ausweis-Set wird im Elternbereich als optionales Premium-Upgrade für **5,50 € (brutto)** angeboten:
+* **Herstellungskosten (COGS):** ca. **1,35 €** (Karte, Key-Tag, Anschreiben, Kuvertierung, anteiliger Sammelversand).
+* **1,00 € Fördervereins-Kickback:** Die Musikschule bzw. deren Förderverein erhält **1,00 € pro verkauftem Ausweis** gutgeschrieben (z. B. für neue Instrumente oder Noten). Schulleitungen und Lehrkräfte empfehlen den Pass dadurch aktiv am Elternabend.
+* **Deckungsbeitrag Plattform:** **~3,15 € Reingewinn pro Schüler (> 60 % Nettomarge)**. Bei 100.000 Schülern und 35 % Conversion erzielt dies rund **110.000 € jährlichen Zusatzgewinn**.
+
+### 3. Die 3-Säulen-Fulfillment-Architektur (Losgröße 1 im laufenden Schuljahr)
+```
+                  ┌────────────────────────────────────────────────────────┐
+                  │          ELTERN BESTELLEN IM CAMPUS-ELTERN-PORTAL      │
+                  └──────────────────────────┬─────────────────────────────┘
+                                             │
+                 ┌───────────────────────────┴───────────────────────────┐
+                 ▼                                                       ▼
+    ┌─────────────────────────┐                             ┌─────────────────────────┐
+    │  SOFORTIGE VERFÜGBARKEIT│                             │  PHYSISCHE PRODUKTION   │
+    │  (0 Sekunden Wartezeit) │                             │  (Wöchentlicher Takt)   │
+    ├─────────────────────────┤                             ├─────────────────────────┤
+    │ • Apple Wallet Pass     │                             │ • Sunday-Midnight Batch │
+    │ • Google Wallet Pass    │                             │ • Sammel-PDF / CSV      │
+    │ • Digital-Pass in PWA   │                             │ • Full-Service-Letter-  │
+    │ • Sofort einsatzbereit  │                             │   shop (All About Cards)│
+    └─────────────────────────┘                             └─────────────────────────┘
+```
+1. **Säule 1 (Zero-Day Gratification):** Apple Wallet Pass (`.pkpass`) und Google Wallet Pass stehen unmittelbar nach dem Kauf in der App bereit.
+2. **Säule 2 (Sunday-Midnight Batch):** Ein wöchentlicher Backend-Cronjob fasst alle Einzelbestellungen zusammen. Keine Mindestmengenprobleme, planbare Lieferzeiten von 4–7 Werktagen.
+3. **Säule 3 (Sammelversand an Schule):** Lieferungen erfolgen gebündelt als DHL-Paket an das Schulsekretariat; die Lehrkraft übergibt das Set feierlich im Unterricht.
+
+### 4. Cyber-Security & Anti-Insider Schutzarchitektur (OWASP ASVS Level 3)
+* **Status `printed_in_transit`:** Während des Drucks und Versands sperrt die Datenbank den QR-Code gegen Erstaktivierungen.
+* **Erst-Setup nur Out-of-Band:** Die Vergabe der persönlichen Eltern-PIN ist an den verifizierten Schul-Einladungslink gebunden oder wird erst im Unterricht durch den Scan einer autorisierten Lehrkraft („Lehrer-Handshake“) entsperrt.
+* **Brute-Force-Sperre:** Server-seitiges IP-Hash Rate-Limiting (`qr_login_rate_limits`) verhindert das Erraten von PINs bei abfotografierten Karten zuverlässig.
+
+### 5. Konkrete Implementierungs-Schritte zum Rollout
+1. **Bestell-Widget im Elternportal:** Integration einer 1-Klick-Bestelloption in `StudentSettingsTab.tsx` / `ParentCampusActivationModal.tsx` mit Apple Pay / SEPA.
+2. **Backend-Job `export_weekly_print_batch`:** Supabase Edge Function zur Aggregation druckfertiger 300-DPI-Vektor-PDFs und Adress-CSVs.
+3. **Lettershop-Anbindung:** Anbindung an *All About Cards* (Passau) oder *karte1.de* (München) via SFTP-Hotfolder mit AVV nach Art. 28 DSGVO.
+4. **Pilot-Testlauf:** Bemusterung von 100 Sets an zwei Pilotschulen zur Prüfung von Scangeschwindigkeit und Koffer-Befestigung.
+
+---
+
+## 📈 Strategisches Partnerschaftsmodell & DACH-Marktpotenzial (Pädagogischer Fachbeirat)
+
+* **Status:** 🟢 **KONZEPTION & TERM-SHEET ABGESCHLOSSEN (Pilotierung: Musikschule Bad Säckingen)**
+* **Bereich:** Unternehmensstrategie, B2B-Vertrieb & Pädagogischer Fachbeirat
+* **Artefakt / Unterlage:** `docs/partnerschaft_factsheet_bad_saeckingen.html`
+
+### 1. Offizielle Marktdaten DACH-Raum (Verbandsdaten VdM, KOMU, VMS)
+| Land / Verband | Musikschulen (Institutionen) | Schülerinnen & Schüler | Fachlehrkräfte |
+| :--- | :---: | :---: | :---: |
+| **Deutschland (VdM & Freie)** | ca. **1.400** *(930 VdM)* | **1.550.000** | ca. **45.000** *(36.000 VdM)* |
+| **Österreich (KOMU)** | ca. **380** | **220.000** | ca. **7.200** |
+| **Schweiz (VMS)** | ca. **365** | **180.000** | ca. **14.000** |
+| **GESAMT DACH-RAUM** | **> 2.100 Schulen** | **> 1,95 Mio. Schüler** | **ca. 66.000 Lehrkräfte** |
+
+### 2. Kern-Eckpunkte des Partnermodells (1% Goldstandard)
+1. **Referenzschule Bad Säckingen:** 100 % kostenfreie Dauernutzung als Reallabor und Vorzeigeschule.
+2. **Sofortige Umsatzbeteiligung (Ab Tag 1):** 20 % an den monatlichen Gesamteinnahmen aller Schulen der Plattform (bei Ø 200 € / Schule = 40 € pro Schule).
+3. **Erfolgsleiter durch Eigenakquise:** Steigerung des Gesamtsatzes bei aktiver Schulaquise:
+   * 10 Schulen: **25 %** | 25 Schulen: **30 %** | 50 Schulen: **40 %** | 100 Schulen: **49 %** (bis zu ~10.000 € / Monat).
+4. **Das 90-Minuten Jour-Fixe Prinzip:** Monatliches Strategietreffen als feste Voraussetzung. Keine Stundenzettel. Ausfall ohne Entschuldigung = ersatzloser Wegfall der Monatsauszahlung.
+5. **Schutz des Geistigen Eigentums (IP):** Quellcode, Datenbanken, Systemrechte und Marken verbleiben dauerhaft zu 100 % bei Patrick Huber. Option auf gemeinsame Betriebsgesellschaft (UG/GmbH) ab 25 Schulen.
+
+
+

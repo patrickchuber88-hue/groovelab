@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { ExternalLink, RefreshCw, Download, X } from 'lucide-react';
 import { IDBadgeCard, inlineAllImagesInElement } from '../../IDBadgeCard';
 import { revokeStudentToken } from '../../../utils/tokenSigner';
-import { maskLastName } from '../../../utils/nameHelper';
+import { maskLastName, formatSingleStudentAnonymized } from '../../../utils/nameHelper';
 import { getCanonicalQrLandingUrl } from '../../../utils/tenantUrlHelper';
 
 export interface AdminQRModalProps {
@@ -142,10 +142,16 @@ export const AdminQRModal: React.FC<AdminQRModalProps> = ({
           cacheBust: false,
           pixelRatio: 2,
         });
+        const isStudent = selectedQRUser.role === 'student';
+        const safeStudentName = isStudent
+          ? formatSingleStudentAnonymized(selectedQRUser.first_name, selectedQRUser.last_name, selectedQRUser.id, true)
+          : `${selectedQRUser.first_name || 'user'}`;
+        const sanitizedFileSlug = safeStudentName.toLowerCase().replace(/[^a-z0-9äöüß]+/gi, '-');
+
         const link = document.createElement('a');
-        link.download = (activePlatform === 'campus' && (selectedQRUser.role === 'student' || isQRAdminOrSecretary)) 
-          ? `Campus_Pass_${selectedQRUser.first_name}.jpg` 
-          : `Groovelab_Pass_${selectedQRUser.first_name}.jpg`;
+        link.download = (activePlatform === 'campus' && (isStudent || isQRAdminOrSecretary)) 
+          ? `Campus_Pass_${sanitizedFileSlug}.jpg` 
+          : `Groovelab_Pass_${sanitizedFileSlug}.jpg`;
         link.href = dataUrl;
         link.click();
       } catch (err) {
@@ -154,6 +160,14 @@ export const AdminQRModal: React.FC<AdminQRModalProps> = ({
     };
 
     const downloadWalletPass = () => {
+      const isStudent = selectedQRUser.role === 'student';
+      const formattedStudentName = isStudent
+        ? formatSingleStudentAnonymized(selectedQRUser.first_name, selectedQRUser.last_name, selectedQRUser.id, true)
+        : `${selectedQRUser.first_name} ${maskLastName(selectedQRUser.last_name, showRealNames)}`;
+      const safeFileSlug = (isStudent
+        ? formattedStudentName
+        : (selectedQRUser.first_name || 'user')).toLowerCase().replace(/[^a-z0-9äöüß]+/gi, '-');
+
       const passContent = JSON.stringify({
         passTypeIdentifier: selectedQRUser.role === 'admin' ? 'pass.de.groovelab.admin' : (selectedQRUser.role === 'teacher' ? 'pass.de.groovelab.teacher' : 'pass.de.groovelab.student'),
         serialNumber: selectedQRUser.qr_token || selectedQRUser.teacher_qr_token || selectedQRUser.id,
@@ -164,7 +178,7 @@ export const AdminQRModal: React.FC<AdminQRModalProps> = ({
         foregroundColor: "rgb(255, 255, 255)",
         backgroundColor: activePlatform === 'campus' ? "rgb(10, 54, 28)" : "rgb(30, 41, 59)",
         labelColor: "rgb(230, 244, 234)",
-        studentName: `${selectedQRUser.first_name} ${maskLastName(selectedQRUser.last_name, showRealNames)}`,
+        studentName: formattedStudentName,
         instrument: selectedQRUser.instrument || (selectedQRUser.role === 'admin' ? 'Administrator' : (selectedQRUser.role === 'secretary' ? 'Sekretariat' : 'Lehrkraft')),
         qrToken: selectedQRUser.qr_token || selectedQRUser.teacher_qr_token
       }, null, 2);
@@ -173,7 +187,7 @@ export const AdminQRModal: React.FC<AdminQRModalProps> = ({
       const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.download = `campus-pass-${selectedQRUser.first_name || 'user'}.pkpass`;
+      link.download = `campus-pass-${safeFileSlug}.pkpass`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -181,6 +195,14 @@ export const AdminQRModal: React.FC<AdminQRModalProps> = ({
     };
 
     const downloadGoogleWalletPass = () => {
+      const isStudent = selectedQRUser.role === 'student';
+      const formattedStudentName = isStudent
+        ? formatSingleStudentAnonymized(selectedQRUser.first_name, selectedQRUser.last_name, selectedQRUser.id, true)
+        : `${selectedQRUser.first_name} ${maskLastName(selectedQRUser.last_name, showRealNames)}`;
+      const safeFileSlug = (isStudent
+        ? formattedStudentName
+        : (selectedQRUser.first_name || 'user')).toLowerCase().replace(/[^a-z0-9äöüß]+/gi, '-');
+
       const passContent = JSON.stringify({
         classId: `groovelab.${selectedQRUser.role || 'student'}`,
         id: selectedQRUser.qr_token || selectedQRUser.teacher_qr_token || selectedQRUser.id,
@@ -204,7 +226,7 @@ export const AdminQRModal: React.FC<AdminQRModalProps> = ({
         header: {
           defaultValue: {
             language: "de-DE",
-            value: `${selectedQRUser.first_name} ${maskLastName(selectedQRUser.last_name, showRealNames)}`
+            value: formattedStudentName
           }
         }
       }, null, 2);
@@ -213,7 +235,7 @@ export const AdminQRModal: React.FC<AdminQRModalProps> = ({
       const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.download = `google-wallet-pass-${selectedQRUser.first_name || 'user'}.json`;
+      link.download = `google-wallet-pass-${safeFileSlug}.json`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

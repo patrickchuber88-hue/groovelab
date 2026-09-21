@@ -15,12 +15,21 @@ const ACTIVE_LEASE_STORAGE = 'gl_active_session_lease_id';
  */
 export function getOrCreateDeviceKey(): string {
   if (typeof window === 'undefined') return 'unknown-device';
-  let key = localStorage.getItem(DEVICE_KEY_STORAGE);
-  if (!key) {
-    key = crypto.randomUUID();
-    localStorage.setItem(DEVICE_KEY_STORAGE, key);
+  try {
+    let key = localStorage.getItem(DEVICE_KEY_STORAGE);
+    if (!key) {
+      key = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `dev_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      try {
+        localStorage.setItem(DEVICE_KEY_STORAGE, key);
+      } catch (storageErr) {
+        console.warn('[SessionLease] Failed to persist device key to localStorage:', storageErr);
+      }
+    }
+    return key;
+  } catch (err) {
+    console.warn('[SessionLease] localStorage unavailable, using volatile fallback:', err);
+    return 'volatile-device-key';
   }
-  return key;
 }
 
 /**
@@ -80,7 +89,11 @@ export async function registerClientSessionLease(user: { id: string; role?: stri
     }
 
     if (data?.lease_id) {
-      sessionStorage.setItem(ACTIVE_LEASE_STORAGE, data.lease_id);
+      try {
+        sessionStorage.setItem(ACTIVE_LEASE_STORAGE, data.lease_id);
+      } catch (sessErr) {
+        console.warn('[SessionLease] Failed to write active lease ID to sessionStorage:', sessErr);
+      }
       return { success: true, leaseId: data.lease_id };
     }
 
@@ -156,5 +169,46 @@ export async function revokeAndRegenerateQRToken(targetUserId: string): Promise<
   } catch (err) {
     console.error('[SessionLease] Error regenerating QR token:', err);
     return null;
+  }
+}
+
+export interface UserSessionLease {
+  id: string;
+  device_name: string;
+  device_key: string;
+  role: string;
+  last_active_at: string;
+  created_at: string;
+  is_current: boolean;
+}
+
+/**
+ * Fetches active sessions for a specific user to allow remote logout.
+ */
+export async function fetchActiveUserSessionLeases(userId: string): Promise<UserSessionLease[]> {
+  try {
+    const { data, error } = await supabase.rpc('get_user_session_leases', {
+      p_user_id: userId
+    });
+    if (error) {
+      // Fallback direct query on session_leases
+      const { data: directData, error: directErr } = await supabase
+        .from('session_leases')
+        .select('id, device_name, device_key, role, last_active_at, created_at')
+        .eq('user_id', userId)
+        .eq('is_revoked', false)
+        .order('last_active_at', { ascending: false });
+
+      if (directErr) throw directErr;
+      const currentKey = getOrCreateDeviceKey();
+      return (directData || []).map((d: any) => ({
+        ...d,
+        is_current: d.device_key === currentKey
+      }));
+    }
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    console.error('[SessionLease] Error fetching user session leases:', err);
+    return [];
   }
 }

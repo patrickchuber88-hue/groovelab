@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Compass, Sliders, Volume2, Zap, Mic, Headphones, Calendar, RotateCcw,
-  Mail, Trophy, Sparkles, Check, ShieldCheck, AlertTriangle, Star, Target, BookOpen, Lock
+  Mail, Trophy, Sparkles, Check, ShieldCheck, AlertTriangle, Star, Target, BookOpen, Lock, Crown
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { CAMPUS_AGE_STANDARDS } from '../studentAgeStandards';
@@ -51,7 +51,16 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
   onLockSession,
   parentSessionSecondsRemaining,
 }) => {
-  const currentLvlKey = ((draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') : null)) || 'junior') as 'junior' | 'teen' | 'pro';
+  const [optimisticLevel, setOptimisticLevel] = useState<'junior' | 'teen' | 'pro' | null>(null);
+  const baseLvlKey = ((draftUiLevel ?? (studentUser as any)?.campus_ui_level ?? (typeof window !== 'undefined' ? localStorage.getItem('campus_student_ui_level') : null)) || 'junior') as 'junior' | 'teen' | 'pro';
+  const currentLvlKey = (optimisticLevel || baseLvlKey);
+
+  useEffect(() => {
+    if (optimisticLevel && baseLvlKey === optimisticLevel) {
+      setOptimisticLevel(null);
+    }
+  }, [baseLvlKey, optimisticLevel]);
+
   const standard = CAMPUS_AGE_STANDARDS[currentLvlKey] || CAMPUS_AGE_STANDARDS.junior;
 
   const curAbsences = currentLvlKey === 'junior' 
@@ -123,6 +132,7 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
 
   const handleSwitchAgeLevelWithStandard = async (targetLevelId: 'junior' | 'teen' | 'pro') => {
     if (targetLevelId === currentLvlKey || isSwitchingLevel) return;
+    setOptimisticLevel(targetLevelId);
     setIsSwitchingLevel(true);
     try {
       const targetStandard = CAMPUS_AGE_STANDARDS[targetLevelId] || CAMPUS_AGE_STANDARDS.junior;
@@ -196,6 +206,9 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
         bedtimeStart: targetStandard.bedtimeStart,
         bedtimeEnd: targetStandard.bedtimeEnd,
       });
+    } catch (err) {
+      setOptimisticLevel(null);
+      console.error('Error switching age level:', err);
     } finally {
       setIsSwitchingLevel(false);
     }
@@ -485,7 +498,7 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <ShieldCheck size={18} color="#15803d" />
               <span style={{ fontWeight: 800, fontSize: '0.88rem', color: '#15803d' }}>
-                Volljährigkeit (§ 2 BGB): Privatsphäre &amp; Eltern-Einblick
+                Volljährigkeit: Privatsphäre &amp; Eltern-Einblick
               </span>
             </div>
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.80rem', fontWeight: 700, color: '#15803d' }}>
@@ -533,49 +546,102 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
           </div>
         </div>
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: '8px',
-          background: '#e2e8f0',
-          padding: '5px',
-          borderRadius: '14px'
-        }}>
+        <div 
+          role="tablist"
+          aria-label="Didaktische Altersstufe"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: '6px',
+            background: '#f1f5f9',
+            padding: '4px',
+            borderRadius: '16px',
+            border: '1px solid #e2e8f0',
+            boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.04)'
+          }}
+        >
           {[
-            { id: 'junior', label: 'Junior', age: '6–10 J.' },
-            { id: 'teen', label: 'Teen', age: '11–15 J.' },
-            { id: 'pro', label: '+16 / Pro', age: 'Ab 16 J.' }
+            { 
+              id: 'junior' as const, 
+              label: 'Junior', 
+              age: '6–10 J.', 
+              icon: Sparkles, 
+              color: '#16a34a',
+              activeBorder: 'rgba(22, 163, 74, 0.4)',
+              desc: 'Spielerisch & einfach'
+            },
+            { 
+              id: 'teen' as const, 
+              label: 'Teen', 
+              age: '11–15 J.', 
+              icon: Zap, 
+              color: '#0284c7',
+              activeBorder: 'rgba(2, 132, 199, 0.4)',
+              desc: 'Fokus & Flow'
+            },
+            { 
+              id: 'pro' as const, 
+              label: '+16 / Pro', 
+              age: 'Ab 16 J.', 
+              icon: Crown, 
+              color: '#6366f1',
+              activeBorder: 'rgba(99, 102, 241, 0.4)',
+              desc: 'Volles Studio & Tools'
+            }
           ].map((lvl) => {
-            const currentLevel = currentLvlKey;
-            const active = currentLevel === lvl.id;
+            const active = currentLvlKey === lvl.id;
+            const IconComp = lvl.icon;
             return (
               <button
                 key={lvl.id}
                 type="button"
-                disabled={isSwitchingLevel}
+                role="tab"
+                aria-selected={active}
+                tabIndex={active ? 0 : -1}
+                aria-label={`Altersstufe ${lvl.label} (${lvl.age}): ${lvl.desc}`}
                 onClick={() => {
-                  handleSwitchAgeLevelWithStandard(lvl.id as any);
+                  handleSwitchAgeLevelWithStandard(lvl.id);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleSwitchAgeLevelWithStandard(lvl.id);
+                  }
                 }}
                 style={{
                   padding: '10px 6px',
-                  borderRadius: '11px',
-                  border: 'none',
+                  minHeight: '48px',
+                  borderRadius: '12px',
+                  border: active ? `1.5px solid ${lvl.activeBorder}` : '1px solid transparent',
                   background: active ? '#ffffff' : 'transparent',
-                  color: active ? '#0284c7' : '#64748b',
+                  color: active ? lvl.color : '#64748b',
                   fontWeight: active ? 850 : 650,
                   fontSize: '0.82rem',
                   cursor: isSwitchingLevel ? 'wait' : 'pointer',
-                  opacity: isSwitchingLevel && !active ? 0.5 : 1,
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  gap: '2px',
-                  boxShadow: active ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
-                  transition: 'all 0.15s ease'
+                  justifyContent: 'center',
+                  gap: '3px',
+                  boxShadow: active ? '0 4px 12px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04)' : 'none',
+                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent',
+                  userSelect: 'none'
                 }}
               >
-                <span>{lvl.label}</span>
-                <span style={{ fontSize: '0.66rem', opacity: active ? 0.9 : 0.7 }}>{lvl.age}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <IconComp size={14} color={active ? lvl.color : '#94a3b8'} />
+                  <span style={{ fontWeight: 850 }}>{lvl.label}</span>
+                </div>
+                <span style={{ 
+                  fontSize: '0.66rem', 
+                  color: active ? lvl.color : '#64748b',
+                  fontWeight: active ? 700 : 500,
+                  opacity: active ? 1 : 0.75 
+                }}>
+                  {lvl.age}
+                </span>
               </button>
             );
           })}
@@ -765,7 +831,7 @@ export const ParentProtectionSettingsView: React.FC<ParentProtectionSettingsView
               <Headphones size={16} color="#16a34a" style={{ flexShrink: 0 }} />
               <span>Didaktische Tonaufnahmen der Lehrkraft im Unterricht</span>
               <span style={{ fontSize: '0.66rem', fontWeight: 800, padding: '2px 7px', borderRadius: '6px', background: '#dcfce7', color: '#15803d' }}>
-                Freiwillige Didaktik-Freigabe (§ 201 StGB / § 73 UrhG)
+                Freiwillige Didaktik-Freigabe (Vertraulichkeit)
               </span>
               {hlTeacherAudio.badge}
             </div>

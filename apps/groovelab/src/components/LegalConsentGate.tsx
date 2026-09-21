@@ -844,7 +844,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
                 marginBottom: '10px'
               }}>
                 <Scale size={16} />
-                <span>Was ist neu in Version {ACTIVE_LEGAL_VERSION}? (Art. 12 DSGVO / § 307 BGB):</span>
+                <span>Was ist neu in Version {ACTIVE_LEGAL_VERSION}? (Wesentliche Änderungen):</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {activeChangelog.highlights.map((pt, idx) => (
@@ -864,7 +864,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
               padding: '16px 18px'
             }}>
               <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
-                Wichtigste Kernpunkte im Überblick (Transparenzgebot gem. § 307 BGB &amp; Art. 12 DSGVO):
+                Wichtigste Kernpunkte im Überblick (Transparenz-Zusammenfassung):
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {primaryDoc.summaryPoints.map((pt, idx) => (
@@ -960,7 +960,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
             <div style={{ flex: 1, fontSize: '0.82rem', fontWeight: 650, color: '#0f172a', lineHeight: 1.4 }}>
               <span style={{ color: themeColor, fontWeight: 800 }}>[Pflicht] </span>
               {isMajorUpdateFlow ? (
-                `Ich erkenne die aktualisierten Vertragsbedingungen (Version ${ACTIVE_LEGAL_VERSION}) sowie den Didaktik-Kodex an und nehme ausdrücklich zur Kenntnis, dass die gesetzliche Aufsichtspflicht (§ 1631 BGB) personell bei der Lehrkraft verbleibt.`
+                `Ich erkenne die aktualisierten Vertragsbedingungen (Version ${ACTIVE_LEGAL_VERSION}) sowie den Didaktik-Kodex an und nehme ausdrücklich zur Kenntnis, dass die gesetzliche Aufsichtspflicht personell bei der Lehrkraft verbleibt.`
               ) : (
                 primaryDoc.checkboxLabel
               )}

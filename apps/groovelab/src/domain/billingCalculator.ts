@@ -51,6 +51,8 @@ export interface BillingCalculationResult {
   schoolContributionTotal: number;
   parentContributionTotal: number;
   totalMonthlySchoolInvoice: number;
+  freeHardshipQuota?: number;
+  payableExemptCount?: number;
 }
 
 export function calculateCampusGroovelabBilling(input: BillingCalculationInput): BillingCalculationResult {
@@ -133,16 +135,22 @@ export function calculateCampusGroovelabBilling(input: BillingCalculationInput):
   let schoolContributionTotal = 0;
   let parentContributionTotal = 0;
 
+  // 🏛️ 1% Goldstandard Hardship Floor-Quota:
+  // For each full 20 active billable students, 1 hardship profile is 100% free (floor rounding).
+  // First free slot requires at least 20 active profiles.
+  const freeHardshipQuota = Math.floor(billableCampusCount / 20);
+  const payableExemptStudents = Math.max(0, exemptStudentCount - freeHardshipQuota);
+
   if (directBillingMode === 'full' && hasCampusModule) {
     parentContributionTotal = Number((billableCampusCount * rateStudent).toFixed(2));
-    schoolContributionTotal = Number(((exemptStudentCount * rateStudent) + groovelabStudentActivationFeeTotal).toFixed(2));
+    schoolContributionTotal = Number(((payableExemptStudents * rateStudent) + groovelabStudentActivationFeeTotal).toFixed(2));
   } else if (directBillingMode === 'partial' && hasCampusModule) {
     const parentPortion = Number((rateStudent * 0.816).toFixed(2));
     const schoolPortion = Number((rateStudent - parentPortion).toFixed(2));
     parentContributionTotal = Number((billableCampusCount * parentPortion).toFixed(2));
-    schoolContributionTotal = Number(((billableCampusCount * schoolPortion) + (exemptStudentCount * rateStudent) + groovelabStudentActivationFeeTotal).toFixed(2));
+    schoolContributionTotal = Number(((billableCampusCount * schoolPortion) + (payableExemptStudents * rateStudent) + groovelabStudentActivationFeeTotal).toFixed(2));
   } else {
-    schoolContributionTotal = Number((studentActivationFeeTotal + (exemptStudentCount * effectiveStudentRate)).toFixed(2));
+    schoolContributionTotal = Number((studentActivationFeeTotal + (payableExemptStudents * effectiveStudentRate)).toFixed(2));
   }
 
   // 6. Audio-Tresor Storage Add-on Fee
@@ -163,6 +171,8 @@ export function calculateCampusGroovelabBilling(input: BillingCalculationInput):
     schoolContributionTotal,
     parentContributionTotal,
     totalMonthlySchoolInvoice,
+    freeHardshipQuota,
+    payableExemptCount: payableExemptStudents,
   };
 }
 

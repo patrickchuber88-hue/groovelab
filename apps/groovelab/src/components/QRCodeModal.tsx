@@ -8,6 +8,7 @@ import { IDBadgeCard, inlineAllImagesInElement } from './IDBadgeCard';
 import { isDevEnvironment, getCanonicalQrLandingUrl } from '../utils/tenantUrlHelper';
 import { getSchoolProfileDTO } from '../api/bffClient';
 import { formatUserDisplayName } from '../utils/userDisplayName';
+import { formatSingleStudentAnonymized } from '../utils/nameHelper';
 
 interface QRCodeModalProps {
   user: {
@@ -39,7 +40,6 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
   const isAdminOrSecretary = roleLower === 'admin' || roleLower === 'secretary';
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [showScheduleModal, setShowScheduleModal] = useState<boolean>(false);
-  const [usageMode, setUsageMode] = useState<'student' | 'hybrid'>('student');
   const [copied, setCopied] = useState<boolean>(false);
   const [scheduleCompleted, setScheduleCompleted] = useState<boolean>(false);
 
@@ -310,7 +310,11 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
         pixelRatio: 2
       });
       const link = document.createElement('a');
-      link.download = activePlatform === 'campus' ? `Campus_Pass_${user.first_name}.jpg` : `Groovelab_ID_${user.first_name}.jpg`;
+      const isStudent = (user.role || '').toLowerCase() === 'student';
+      const safeName = isStudent
+        ? formatSingleStudentAnonymized(user.first_name, user.last_name, user.id, true).toLowerCase().replace(/[^a-z0-9äöüß]+/gi, '-')
+        : (user.first_name || 'user').toLowerCase().replace(/[^a-z0-9äöüß]+/gi, '-');
+      link.download = activePlatform === 'campus' ? `Campus_Pass_${safeName}.jpg` : `Groovelab_ID_${safeName}.jpg`;
       link.href = dataUrl;
       link.click();
     } catch (err) {
@@ -463,9 +467,12 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
             ? (localQrToken || user.qr_token || user.ausweis_nummer || '')
             : (localTeacherQrToken || user.teacher_qr_token || localQrToken || user.qr_token || '');
           const canonicalQrLandingUrl = getCanonicalQrLandingUrl(effectiveToken);
+          const loggedInUserId = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null;
+          const isSelfView = Boolean(loggedInUserId && user.id && loggedInUserId === user.id);
+          const isStaffUser = currentUserRole === 'admin' || currentUserRole === 'teacher' || currentUserRole === 'secretary';
 
           return (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', gap: '20px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', gap: '16px' }}>
               {/* Standalone Reusable Ausweis Card */}
               <IDBadgeCard 
                 user={user} 
@@ -479,120 +486,110 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                 maxWidth: '440px',
                 width: '100%',
                 background: '#ffffff',
-                borderRadius: '28px',
+                borderRadius: '24px',
                 border: '1px solid rgba(0,0,0,0.06)',
                 boxShadow: '0 10px 30px rgba(0,0,0,0.04)',
-                padding: '20px',
+                padding: '16px 18px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '14px',
+                gap: '12px',
                 boxSizing: 'border-box'
               }}>
-                {/* 1. Hero Action: Stundenplan Wunschzeiten (Students only) */}
+                {/* 1. Smart Context Action: Stundenplan Wunschzeiten (Students only) */}
                 {isStudentUser && (
                   <button 
                     onClick={() => setShowScheduleModal(true)} 
                     style={{ 
                       width: '100%', 
-                      background: scheduleCompleted ? '#ffffff' : (isCampus ? '#34a853' : '#eab308'), 
-                      color: scheduleCompleted ? '#0f172a' : '#ffffff', 
-                      border: scheduleCompleted ? '1.5px solid #cbd5e1' : 'none', 
+                      background: scheduleCompleted ? '#f8fafc' : (isCampus ? 'rgba(52, 168, 83, 0.08)' : 'rgba(234, 179, 8, 0.08)'), 
+                      color: scheduleCompleted ? '#334155' : (isCampus ? '#166534' : '#854d0e'), 
+                      border: scheduleCompleted ? '1.5px solid #e2e8f0' : `1.5px solid ${isCampus ? 'rgba(52, 168, 83, 0.28)' : 'rgba(234, 179, 8, 0.38)'}`, 
                       borderRadius: '16px', 
-                      padding: '14px', 
-                      fontSize: '0.88rem', 
-                      fontWeight: 900, 
+                      padding: '12px 14px', 
+                      fontSize: '0.82rem', 
+                      fontWeight: 800, 
                       cursor: 'pointer', 
                       display: 'flex', 
                       alignItems: 'center', 
-                      justifyContent: 'center', 
-                      gap: '10px', 
-                      boxShadow: scheduleCompleted ? '0 2px 6px rgba(0,0,0,0.03)' : `0 6px 20px ${isCampus ? 'rgba(52, 168, 83, 0.27)' : 'rgba(234, 179, 8, 0.27)'}`,
-                      transition: 'all 0.15s' 
+                      justifyContent: 'space-between', 
+                      gap: '8px', 
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+                      transition: 'all 0.15s ease',
+                      touchAction: 'manipulation'
                     }} 
                     className="hover-scale"
+                    aria-label={scheduleCompleted ? 'Stundenplan-Wunschzeiten bearbeiten' : 'Wunschzeiten für Stundenplan eintragen'}
                   >
-                    {scheduleCompleted ? <CheckCircle2 size={18} color="#22c55e" /> : <Calendar size={18} />}
-                    {scheduleCompleted ? 'Stundenplan-Zeiten übermittelt (bearbeiten)' : 'Wunschzeiten für Stundenplan eintragen'}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {scheduleCompleted ? <CheckCircle2 size={16} color="#16a34a" /> : <Calendar size={16} color={isCampus ? '#16a34a' : '#ca8a04'} />}
+                      <span>{scheduleCompleted ? 'Wunschzeiten übermittelt' : 'Wunschzeiten für Stundenplan eintragen'}</span>
+                    </div>
+                    <span style={{ fontSize: '0.74rem', opacity: 0.8, fontWeight: 700 }}>
+                      {scheduleCompleted ? 'Bearbeiten ✎' : 'Öffnen →'}
+                    </span>
                   </button>
                 )}
 
-                {/* 2. Wer nutzt diesen Zugang? (Segmented Control - Students only) */}
-                {isStudentUser && (
-                  <div style={{ 
-                    background: '#f8fafc', 
-                    borderRadius: '16px', 
-                    padding: '4px', 
-                    border: '1px solid #e2e8f0', 
-                    display: 'grid', 
-                    gridTemplateColumns: '1fr 1fr', 
-                    gap: '4px' 
-                  }}>
-                    <button 
-                      onClick={() => setUsageMode('student')} 
-                      style={{ 
-                        padding: '10px', 
-                        borderRadius: '12px', 
-                        border: 'none', 
-                        background: usageMode === 'student' ? '#ffffff' : 'transparent', 
-                        color: usageMode === 'student' ? '#0f172a' : '#64748b', 
-                        fontWeight: usageMode === 'student' ? 900 : 700, 
-                        fontSize: '0.78rem', 
-                        cursor: 'pointer', 
-                        boxShadow: usageMode === 'student' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center', 
-                        gap: '6px' 
-                      }}
-                    >
-                      🎓 Schüler
-                    </button>
-                    <button 
-                      onClick={() => setUsageMode('hybrid')} 
-                      style={{ 
-                        padding: '10px', 
-                        borderRadius: '12px', 
-                        border: 'none', 
-                        background: usageMode === 'hybrid' ? '#ffffff' : 'transparent', 
-                        color: usageMode === 'hybrid' ? '#0f172a' : '#64748b', 
-                        fontWeight: usageMode === 'hybrid' ? 900 : 700, 
-                        fontSize: '0.78rem', 
-                        cursor: 'pointer', 
-                        boxShadow: usageMode === 'hybrid' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center', 
-                        gap: '6px' 
-                      }}
-                    >
-                      👨‍👩‍👧‍👦 Eltern (Hybrid)
-                    </button>
-                  </div>
-                )}
-
-                {/* 3. Export Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: isStudentUser ? '1fr 1fr' : '1fr', gap: '10px' }}>
+                {/* 2. Primary Wallet Row */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <button 
-                    onClick={downloadImage}
+                    onClick={downloadWalletPass} 
+                    aria-label="Zu Apple Wallet hinzufügen"
                     style={{ 
+                      minHeight: '44px',
                       padding: '12px', 
                       borderRadius: '14px', 
-                      border: '1.5px solid #e2e8f0', 
-                      background: '#ffffff', 
-                      color: '#0f172a', 
+                      background: '#0f172a', 
+                      color: '#ffffff', 
+                      border: 'none', 
                       fontWeight: 800, 
-                      fontSize: '0.78rem', 
+                      fontSize: '0.82rem', 
                       cursor: 'pointer', 
                       display: 'flex', 
                       alignItems: 'center', 
                       justifyContent: 'center', 
                       gap: '6px',
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.02)' 
+                      boxShadow: '0 4px 14px rgba(15,23,42,0.15)',
+                      touchAction: 'manipulation'
                     }}
+                    className="hover-scale"
                   >
-                    <Download size={15} /> Ausweis (JPEG)
+                    <span style={{ fontSize: '1.05rem', lineHeight: 1 }}></span> Apple Wallet
                   </button>
+                  <button 
+                    onClick={downloadGoogleWalletPass} 
+                    aria-label="Zu Google Wallet hinzufügen"
+                    style={{ 
+                      minHeight: '44px',
+                      padding: '12px', 
+                      borderRadius: '14px', 
+                      background: '#0f172a', 
+                      color: '#ffffff', 
+                      border: 'none', 
+                      fontWeight: 800, 
+                      fontSize: '0.82rem', 
+                      cursor: 'pointer', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      gap: '8px',
+                      boxShadow: '0 4px 14px rgba(15,23,42,0.15)',
+                      touchAction: 'manipulation'
+                    }}
+                    className="hover-scale"
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
+                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
+                    </svg>
+                    Google Wallet
+                  </button>
+                </div>
 
+                {/* 3. Physical & Offline Export Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: isStudentUser ? '1fr 1fr' : '1fr', gap: '10px' }}>
                   {isStudentUser && (
                     <button 
                       onClick={() => {
@@ -631,11 +628,13 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                         };
                         img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
                       }}
+                      aria-label="QR-Sticker für Notenheft und Koffer herunterladen"
                       style={{ 
-                        padding: '12px', 
+                        minHeight: '44px',
+                        padding: '11px', 
                         borderRadius: '14px', 
                         border: '1.5px solid #e2e8f0', 
-                        background: '#ffffff', 
+                        background: '#f8fafc', 
                         color: '#0f172a', 
                         fontWeight: 800, 
                         fontSize: '0.78rem', 
@@ -644,24 +643,24 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                         alignItems: 'center', 
                         justifyContent: 'center', 
                         gap: '6px',
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.02)' 
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                        touchAction: 'manipulation'
                       }}
+                      className="hover-scale"
                     >
                       🏷️ Noten-Sticker
                     </button>
                   )}
-                </div>
-
-                {/* 4. Wallet Row */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <button 
-                    onClick={downloadWalletPass} 
+                    onClick={downloadImage}
+                    aria-label="Ausweis als JPEG Bild herunterladen"
                     style={{ 
-                      padding: '12px', 
+                      minHeight: '44px',
+                      padding: '11px', 
                       borderRadius: '14px', 
-                      background: '#0f172a', 
-                      color: '#ffffff', 
-                      border: 'none', 
+                      border: '1.5px solid #e2e8f0', 
+                      background: '#f8fafc', 
+                      color: '#0f172a', 
                       fontWeight: 800, 
                       fontSize: '0.78rem', 
                       cursor: 'pointer', 
@@ -669,124 +668,101 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                       alignItems: 'center', 
                       justifyContent: 'center', 
                       gap: '6px',
-                      boxShadow: '0 4px 12px rgba(15,23,42,0.15)' 
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+                      touchAction: 'manipulation'
                     }}
+                    className="hover-scale"
                   >
-                     Apple Wallet
-                  </button>
-                  <button 
-                    onClick={downloadGoogleWalletPass} 
-                    style={{ 
-                      padding: '12px', 
-                      borderRadius: '14px', 
-                      background: '#0f172a', 
-                      color: '#ffffff', 
-                      border: 'none', 
-                      fontWeight: 800, 
-                      fontSize: '0.78rem', 
-                      cursor: 'pointer', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center', 
-                      gap: '6px',
-                      boxShadow: '0 4px 12px rgba(15,23,42,0.15)' 
-                    }}
-                  >
-                    Google Wallet
+                    <Download size={14} /> Ausweis (JPEG)
                   </button>
                 </div>
 
-                {/* 5. Share Button */}
-                <button 
-                  onClick={() => {
-                    const formattedText = `Hallo ${user.first_name}! 🎶
-
-Hier ist dein persönlicher Campus-Groovelab Zugang:
-${canonicalQrLandingUrl}`;
-
-                    navigator.clipboard.writeText(formattedText);
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 2500);
-                  }} 
-                  style={{ 
-                    width: '100%', 
-                    padding: '12px', 
-                    borderRadius: '14px', 
-                    border: '1px solid #e2e8f0', 
-                    background: '#f8fafc', 
-                    color: '#475569', 
-                    fontWeight: 700, 
-                    fontSize: '0.78rem', 
-                    cursor: 'pointer', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center', 
-                    gap: '6px' 
-                  }} 
-                >
-                  {copied ? <Check size={14} color="#22c55e" /> : <Copy size={14} />}
-                  {copied ? 'Zugangs-Link in Zwischenablage kopiert!' : 'Zugangs-Link kopieren'}
-                </button>
-
-                {/* Entwickler Button: QR-Landingpage testen (Dev Mode Only) */}
-                {isDevEnvironment() && (
-                  <button
+                {/* 4. Staff Only: Share Invitation Link with Parents / Students */}
+                {isStaffUser && !isSelfView && (
+                  <button 
                     onClick={() => {
-                      window.open(canonicalQrLandingUrl, '_blank');
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '11px',
-                      borderRadius: '14px',
-                      border: '1px dashed #cbd5e1',
-                      background: '#f1f5f9',
-                      color: '#0f172a',
-                      fontWeight: 750,
-                      fontSize: '0.76rem',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
+                      const formattedText = `Hallo ${user.first_name}! 🎶\n\nHier ist dein persönlicher Campus-Groovelab Zugang:\n${canonicalQrLandingUrl}`;
+                      navigator.clipboard.writeText(formattedText);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2500);
+                    }} 
+                    aria-label="Zugangs-Link kopieren"
+                    style={{ 
+                      minHeight: '44px',
+                      width: '100%', 
+                      padding: '11px', 
+                      borderRadius: '14px', 
+                      border: '1px solid #e2e8f0', 
+                      background: '#ffffff', 
+                      color: '#475569', 
+                      fontWeight: 750, 
+                      fontSize: '0.78rem', 
+                      cursor: 'pointer', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
                       gap: '6px',
-                      transition: 'all 0.2s ease'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = '#e2e8f0';
-                      e.currentTarget.style.borderColor = '#94a3b8';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = '#f1f5f9';
-                      e.currentTarget.style.borderColor = '#cbd5e1';
-                    }}
+                      touchAction: 'manipulation'
+                    }} 
                   >
-                    <ExternalLink size={14} color="#0f172a" />
-                    🛠️ QR-Landingpage testen ↗
+                    {copied ? <Check size={14} color="#22c55e" /> : <Copy size={14} />}
+                    {copied ? 'Zugangs-Link in Zwischenablage kopiert!' : 'Zugangs-Link für Schüler kopieren'}
                   </button>
                 )}
 
-
-                {/* 6. Navigation: Direkt zur App / Login */}
-                <button 
-                  onClick={onClose} 
-                  style={{ 
-                    width: '100%', 
-                    padding: '14px', 
-                    borderRadius: '16px', 
-                    background: '#0f172a', 
-                    color: '#ffffff', 
-                    border: 'none', 
-                    fontWeight: 900, 
-                    fontSize: '0.86rem', 
-                    cursor: 'pointer', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center', 
-                    gap: '8px',
-                    boxShadow: '0 6px 20px rgba(15,23,42,0.2)' 
-                  }} 
-                >
-                  Direkt zur App / Login ➔
-                </button>
+                {/* 5. Entwickler Simulation: QR-Landingpage testen (Dev Mode / Localhost Only) */}
+                {isDevEnvironment() && (
+                  <div style={{
+                    marginTop: '2px',
+                    paddingTop: '8px',
+                    borderTop: '1px dashed #e2e8f0',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <button
+                      onClick={() => {
+                        window.open(canonicalQrLandingUrl, '_blank');
+                      }}
+                      aria-label="QR-Landingpage im Browser simulieren"
+                      style={{
+                        minHeight: '40px',
+                        width: '100%',
+                        padding: '10px',
+                        borderRadius: '12px',
+                        border: '1px dashed #cbd5e1',
+                        background: '#f8fafc',
+                        color: '#475569',
+                        fontWeight: 750,
+                        fontSize: '0.74rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        transition: 'all 0.2s ease',
+                        touchAction: 'manipulation'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = '#f1f5f9';
+                        e.currentTarget.style.borderColor = '#94a3b8';
+                        e.currentTarget.style.color = '#0f172a';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = '#f8fafc';
+                        e.currentTarget.style.borderColor = '#cbd5e1';
+                        e.currentTarget.style.color = '#475569';
+                      }}
+                    >
+                      <ExternalLink size={13} />
+                      🛠️ QR-Landingpage testen (Dev-Simulation) ↗
+                    </button>
+                    <span style={{ fontSize: '0.66rem', color: '#94a3b8', fontWeight: 600 }}>
+                      Localhost Simulation • In Produktion automatisch unsichtbar
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           );

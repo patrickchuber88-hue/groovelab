@@ -24,10 +24,12 @@ import {
   EyeOff,
   Loader2,
   RefreshCw,
-  Lock
+  Lock,
+  Shield
 } from 'lucide-react';
 import { generateConsentPDF, generateDSBCompliancePDF } from '../utils/pdfGenerator';
 import { isWebAuthnSupported, registerBiometrics } from '../utils/webauthn';
+import { CourtProofExportModal } from './admin/CourtProofExportModal';
 
 const FeedbackHubModal = React.lazy(() => import('./feedback/FeedbackHubModal').then(m => ({ default: m.FeedbackHubModal })));
 const HelpCenterModal = React.lazy(() => import('./help/HelpCenterModal').then(m => ({ default: m.HelpCenterModal })));
@@ -56,6 +58,7 @@ export function CampusSetupScreen({
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState<boolean>(false);
   const [isHelpCenterOpen, setIsHelpCenterOpen] = useState<boolean>(false);
   const [initialConfig, setInitialConfig] = useState<any>(null);
+  const [showCourtProofExportModal, setShowCourtProofExportModal] = useState<boolean>(false);
 
   // Security, PIN & Passkey management state
   const [securityOverview, setSecurityOverview] = useState<{
@@ -940,6 +943,59 @@ export function CampusSetupScreen({
                         PDF Laden
                       </button>
                     </div>
+
+                    {/* Gerichtsverwertbarer Mandanten-Export Card (DSGVO Art. 20 / SHA-256) */}
+                    <div style={{ 
+                      background: '#f8fafc', 
+                      border: '1.5px solid #cbd5e1', 
+                      borderRadius: '16px', 
+                      padding: '16px', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between',
+                      gap: '12px',
+                      marginTop: '8px',
+                      flexWrap: 'wrap'
+                    }}>
+                      <div style={{ flex: '1 1 300px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                          <Shield size={16} color="#2563eb" />
+                          <strong style={{ fontSize: '0.84rem', color: '#1e293b' }}>
+                            Gerichtsverwertbarer Mandanten-Export (SHA-256)
+                          </strong>
+                          <span style={{ fontSize: '0.65rem', background: '#dbeafe', color: '#1e40af', padding: '1px 6px', borderRadius: '6px', fontWeight: 800 }}>
+                            DSGVO Art. 20 / 28
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', lineHeight: '1.4' }}>
+                          Revisionssicher signiertes JSON-Dossier aller Schulstammdaten, Räume, Schüler und Terminhistorien mit kryptografischem Prüfsummen-Siegel für DPOs, Schulbehörden &amp; Gerichte.
+                        </span>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => setShowCourtProofExportModal(true)}
+                        style={{ 
+                          padding: '10px 18px',
+                          background: '#1e293b',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '10px',
+                          fontSize: '0.78rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 6px rgba(30, 41, 59, 0.2)',
+                          transition: 'transform 0.15s',
+                          whiteSpace: 'nowrap',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                        className="hover-scale"
+                      >
+                        <Shield size={14} />
+                        <span>Dossier exportieren</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1584,6 +1640,16 @@ export function CampusSetupScreen({
           />
         )}
       </React.Suspense>
+
+      {/* Gerichtsverwertbarer Mandanten-Export Modal (DSGVO Art. 20 / 28) */}
+      {showCourtProofExportModal && (
+        <CourtProofExportModal
+          isOpen={showCourtProofExportModal}
+          onClose={() => setShowCourtProofExportModal(false)}
+          schoolId={effectiveSchool?.id || sId || ''}
+          schoolName={effectiveSchool?.name || schoolName || 'Musikschule'}
+        />
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
-import type { School, SchoolStat } from '../MasterAdminTypes';
+import type { School, SchoolStat, PendingUser } from '../MasterAdminTypes';
 
 interface UseMasterAdminSchoolsOptions {
   onNotify?: (msg: string) => void;
@@ -366,6 +366,23 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
         console.warn('[Ghost] activate_support_ghost_session exception:', e);
       }
 
+      // Transparent audit logging for the target school (DSGVO Art. 28)
+      try {
+        await supabase.from('audit_logs').insert({
+          school_id: school.id,
+          action: 'SUPPORT_GHOST_SESSION_STARTED',
+          user_id: targetUserId || null,
+          details: {
+            reason: reasonStr,
+            initiated_by: 'Platform Master Admin Leitstand',
+            auth_method: 'GOOGLE_AUTHENTICATOR_TOTP',
+            timestamp: new Date().toISOString()
+          }
+        });
+      } catch (e) {
+        console.warn('[Ghost] School transparency audit log insert error:', e);
+      }
+
       const userParam = targetUserId ? `&ghost_user_id=${targetUserId}` : '';
       const tokenParam = ghostToken ? `&ghost_lease_token=${ghostToken}` : '';
       localStorage.setItem('groovelab_ghost_auth_token', Date.now().toString());
@@ -446,6 +463,108 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
     notify(`Mandant „${updatedSchoolObj.name}“ erfolgreich aktualisiert.`);
   }, [selectedSchool, fetchSchoolsAndStats, notify]);
 
+  const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
+  const [loadingPending, setLoadingPending] = useState<boolean>(false);
+
+  const fetchPendingUsers = useCallback(async () => {
+    try {
+      setLoadingPending(true);
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, first_name, last_name, role, ausweis_nummer, student_billing_payment_method, student_billing_cash_paid, is_campus_active, is_groovelab_active, is_trial, is_hardship_exempt, created_at, school_id, last_seen')
+        .eq('role', 'student')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      const directBillingSchoolIds = new Set(
+        schools
+          .filter(s => ['option2', 'student_full', 'student_partial'].includes((s as any).student_billing_option))
+          .map(s => s.id)
+      );
+
+      const filtered = (data || []).filter((u: any) => {
+        const isFromDirectBillingSchool = directBillingSchoolIds.has(u.school_id);
+        const hasPaymentMethod = Boolean(u.student_billing_payment_method);
+        const isPendingActivation = !u.is_campus_active;
+        const isExempt = Boolean(u.is_hardship_exempt);
+
+        if (directBillingSchoolIds.size > 0) {
+          return isFromDirectBillingSchool || hasPaymentMethod || isPendingActivation || isExempt;
+        }
+        return true;
+      });
+
+      setPendingUsers(filtered);
+    } catch (err: any) {
+      console.error('Error loading pending users:', err);
+    } finally {
+      setLoadingPending(false);
+    }
+  }, [schools]);
+
+  const handleActivateUser = useCallback(async (userId: string) => {
+    try {
+      const user = pendingUsers.find(u => u.id === userId);
+      if (!user) return;
+
+      const updates: any = {
+        is_campus_active: true,
+        student_billing_cash_paid: true,
+        payment_status: 'paid'
+      };
+      if (!user.is_groovelab_active) {
+        updates.is_groovelab_active = true;
+      }
+
+      const { error } = await supabase
+        .from('users')
+        .update(updates)
+        .eq('id', userId);
+      if (error) throw error;
+      
+      setPendingUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updates } : u));
+      fetchSchoolsAndStats();
+      notify('Schüler wurde erfolgreich aktiviert.');
+    } catch (err: any) {
+      alert('Fehler bei der Freischaltung/Zahlungsbestätigung: ' + (err?.message || String(err)));
+    }
+  }, [pendingUsers, fetchSchoolsAndStats, notify]);
+
+  const handleBatchActivateUsers = useCallback(async (userIds: string[]) => {
+    if (userIds.length === 0) return;
+    try {
+      setLoadingPending(true);
+      const updates = { 
+        is_campus_active: true,
+        is_groovelab_active: true,
+        student_billing_cash_paid: true,
+        payment_status: 'paid'
+      };
+      const { error } = await supabase
+        .from('users')
+        .update(updates)
+        .in('id', userIds);
+      if (error) throw error;
+
+      setPendingUsers(prev => prev.map(u => userIds.includes(u.id) ? { ...u, ...updates } : u));
+      fetchSchoolsAndStats();
+      notify(`${userIds.length} Schüler erfolgreich aktiviert.`);
+    } catch (err: any) {
+      alert('Fehler beim Massen-Freischalten: ' + (err?.message || String(err)));
+    } finally {
+      setLoadingPending(false);
+    }
+  }, [fetchSchoolsAndStats, notify]);
+
+  useEffect(() => {
+    fetchSchoolsAndStats();
+  }, [fetchSchoolsAndStats]);
+
+  useEffect(() => {
+    fetchPendingUsers();
+  }, [fetchPendingUsers]);
+
   return {
     schools,
     setSchools,
@@ -477,7 +596,13 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
     handleArchiveSchool,
     handleDeleteSchool,
     handleStartGhostMode,
-    handleStopGhostMode
+    handleStopGhostMode,
+    pendingUsers,
+    setPendingUsers,
+    loadingPending,
+    fetchPendingUsers,
+    handleActivateUser,
+    handleBatchActivateUsers
   };
 }
 

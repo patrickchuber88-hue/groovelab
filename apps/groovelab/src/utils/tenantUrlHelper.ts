@@ -126,7 +126,8 @@ export function isLocalhostEnvironment(): boolean {
  * Eliminates all URL parameter bypasses in production builds.
  */
 export function isDevEnvironment(): boolean {
-  return Boolean(import.meta.env.DEV && isLocalhostEnvironment());
+  const isViteDev = typeof import.meta !== 'undefined' && Boolean((import.meta as any)?.env?.DEV);
+  return Boolean(isViteDev && isLocalhostEnvironment());
 }
 
 /**

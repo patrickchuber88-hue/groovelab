@@ -291,3 +291,33 @@ export const parseSongArtistAndTitle = (raw: string | undefined): { title: strin
   }
   return { title: trimmed };
 };
+
+export const DIDACTIC_QUICK_TAGS = [
+  { tag: '#Technik', desc: 'Motorik & Handhaltung', color: '#1e40af', bg: '#eff6ff', border: '#bfdbfe', skillKey: 'technik' },
+  { tag: '#Rhythmus', desc: 'Metronom & Timing', color: '#4338ca', bg: '#e0e7ff', border: '#c7d2fe', skillKey: 'rhythmus' },
+  { tag: '#Klang', desc: 'Tonkultur & Sauberkeit', color: '#166534', bg: '#e6f4ea', border: '#bbf7d0', skillKey: 'intonation' },
+  { tag: '#Ausdruck', desc: 'Dynamik & Phrasierung', color: '#6b21a8', bg: '#f3e8ff', border: '#e9d5ff', skillKey: 'ausdruck' },
+  { tag: '#Repertoire', desc: 'Songs & Stücke', color: '#854d0e', bg: '#fef9c3', border: '#fef08a', skillKey: 'repertoire' },
+  { tag: '#Theorie', desc: 'Noten & Harmonielehre', color: '#b45309', bg: '#fef3c7', border: '#fde68a', skillKey: 'theorie' },
+  { tag: '#Wichtig', desc: 'Wichtiger Hinweis', color: '#9f1239', bg: '#ffe4e6', border: '#fecdd3' },
+  { tag: '#Konzert', desc: 'Vorspiel & Bühne', color: '#9a3412', bg: '#ffedd5', border: '#fed7aa' }
+];
+
+export const PRESET_CHIPS: { label: string; text: string; isBpm?: boolean }[] = [
+  { label: 'Tempo halten', text: 'Achte auf ein gleichmäßiges Tempo und übe gezielt mit dem Metronom.', isBpm: false },
+  { label: 'Sauber spielen', text: 'Spiele diese Stelle besonders sauber, achte auf saubere Töne und klaren Klang.', isBpm: false },
+  { label: 'Rhythmus (60 BPM)', text: 'Übe diesen Rhythmus präzise auf den Klick (60 BPM).', isBpm: true },
+  { label: 'Fingersatz üben', text: 'Halte dich exakt an den notierten Fingersatz und achte auf eine entspannte Handhaltung.', isBpm: false },
+  { label: 'Ausdruck & Dynamik', text: 'Gestalte die Dynamik bewusst (p/f) und bringe Emotion und Gefühl in deinen Ausdruck.', isBpm: false },
+  { label: 'Auswendig spielen', text: 'Präge dir diesen Abschnitt auswendig ein und spiele frei ohne Notenblatt.', isBpm: false },
+  { label: 'Kontinuität üben', text: 'Übe diese Stelle täglich 10 Minuten für eine hohe Kontinuität und Sicherheit.', isBpm: false },
+  { label: 'Selbstständig üben', text: 'Erarbeite dir die nächsten Takte selbstständig und achte auf eigene Fehlerkorrektur.', isBpm: false }
+];
+
+export const getHomeworkNoteItems = (notesText: string): string[] => {
+  if (!notesText || !notesText.trim()) return [];
+  return notesText
+    .split('\n')
+    .map(s => s.replace(/^[•\-\*\s]+/, '').trim())
+    .filter(s => s.length > 0 && !isInternalMetadataNote(s));
+};

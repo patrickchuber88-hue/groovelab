@@ -5,6 +5,7 @@ import {
   XCircle, Calendar, Info, Check
 } from 'lucide-react';
 import type { GdprDeletionRequest } from './hooks/useSecretaryAudit';
+import { downloadIncidentForensicDossier } from '../../services/incidentForensicDossierService';
 
 export interface AuditLogItem {
   id: string;
@@ -39,6 +40,8 @@ export interface SecretaryAuditViewProps {
   gdprLoading?: boolean;
   completeGdprRequest?: (requestId: string, studentId: string, notes?: string) => Promise<{ success: boolean; error?: string }>;
   rejectGdprRequest?: (requestId: string, reason: string) => Promise<{ success: boolean; error?: string }>;
+  schoolId?: string;
+  schoolName?: string;
 }
 
 export const SecretaryAuditView: React.FC<SecretaryAuditViewProps> = ({
@@ -58,10 +61,30 @@ export const SecretaryAuditView: React.FC<SecretaryAuditViewProps> = ({
   gdprLoading = false,
   completeGdprRequest,
   rejectGdprRequest,
+  schoolId,
+  schoolName,
 }) => {
   const [auditSubSection, setAuditSubSection] = useState<'audit_trail' | 'gdpr_inbox'>('audit_trail');
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [gdprFilter, setGdprFilter] = useState<'all' | 'pending' | 'completed' | 'rejected'>('all');
+  const [isExportingDossier, setIsExportingDossier] = useState<boolean>(false);
+
+  const handleExportIncidentDossier = async () => {
+    try {
+      setIsExportingDossier(true);
+      const sId = schoolId || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('groovelab_school_id') : null) || 'schule';
+      const sName = schoolName || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('groovelab_school_name') : null) || 'Musikschule';
+      await downloadIncidentForensicDossier({
+        schoolId: sId,
+        schoolName: sName,
+        auditLogs: filteredLogs
+      });
+    } catch (err) {
+      console.error('[SecretaryAuditView] Error exporting incident dossier:', err);
+    } finally {
+      setIsExportingDossier(false);
+    }
+  };
 
   const pendingGdprCount = useMemo(() => {
     return (gdprRequests || []).filter(r => r.status === 'pending').length;
@@ -96,7 +119,7 @@ export const SecretaryAuditView: React.FC<SecretaryAuditViewProps> = ({
 
   const handleRejectGdpr = async (req: GdprDeletionRequest) => {
     const reason = window.prompt(
-      'Begründung für die Ablehnung des Löschantrags eingeben (z. B. gesetzliche Aufbewahrungspflichten nach § 257 HGB / § 147 AO):',
+      'Begründung für die Ablehnung des Löschantrags eingeben (z. B. gesetzliche Aufbewahrungsfristen):',
       'Gesetzliche Aufbewahrungsfrist für steuerlich relevante Vertragsdaten'
     );
     if (!reason || !reason.trim()) return;
@@ -357,6 +380,30 @@ export const SecretaryAuditView: React.FC<SecretaryAuditViewProps> = ({
               </p>
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={handleExportIncidentDossier}
+                className="google-btn-secondary"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '0.78rem',
+                  padding: '8px 14px',
+                  borderRadius: '10px',
+                  background: '#fff1f2',
+                  border: '1px solid #fecdd3',
+                  color: '#be123c',
+                  cursor: 'pointer',
+                  fontWeight: 750
+                }}
+                disabled={filteredLogs.length === 0 || isExportingDossier}
+                title="Generiert ein behördenfertiges Vorfalls-Dossier mit digitalem SHA-256 Siegel nach ISO/IEC 27037"
+                aria-label="Sicherheits-Vorfalls-Dossier exportieren"
+              >
+                <ShieldAlert size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                {isExportingDossier ? 'Generiere Dossier...' : 'Vorfalls-Dossier (Art. 33)'}
+              </button>
               <button
                 onClick={exportAuditLogsToCsv}
                 className="google-btn-secondary"
@@ -678,7 +725,7 @@ export const SecretaryAuditView: React.FC<SecretaryAuditViewProps> = ({
                             }}
                             className="hover-scale"
                           >
-                            Ablehnen (z. B. § 257 HGB)
+                            Ablehnen (Aufbewahrung)
                           </button>
 
                           <button

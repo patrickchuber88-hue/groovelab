@@ -48,7 +48,8 @@ export const StudentLehrwerkDetailModal: React.FC<StudentLehrwerkDetailModalProp
         });
 
         // Supplement with localProgress (localStorage)
-        const assignment = localProgress.find((p: any) => String(p.studentId) === String(studentId) && String(p.lehrwerkId) === String(book.id));
+        const safeProgressList = Array.isArray(localProgress) ? localProgress : [];
+        const assignment = safeProgressList.find((p: any) => String(p.studentId) === String(studentId) && String(p.lehrwerkId) === String(book.id));
         if (assignment && assignment.pageStates) {
           Object.entries(assignment.pageStates).forEach(([pageNumStr, stateObj]: [string, any]) => {
             const pageNum = parseInt(pageNumStr, 10);
@@ -116,11 +117,11 @@ return (
                     width: '36px',
                     height: '36px',
                     borderRadius: '10px',
-                    background: `${gradient.from}18`,
+                    background: `linear-gradient(135deg, ${gradient.from}, ${gradient.to})`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: gradient.from
+                    color: gradient.text
                   }}>
                     <BookOpen size={18} />
                   </div>

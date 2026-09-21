@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { getOrCreateActiveTrace } from '../utils/w3cTraceContext';
 
 export interface AuditLogPayload {
   action: string;
@@ -41,9 +42,17 @@ export async function logSecurityEvent({
     const cleanMetadata = sanitizeMetadata(metadata);
     const timestamp = new Date().toISOString();
 
-    console.info(`[AUDIT LOG] ${timestamp} | Action: ${action} | School: ${schoolId || 'N/A'} | User: ${userId || 'N/A'}`);
+    const correlationId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+    const activeTrace = getOrCreateActiveTrace();
 
     const details = {
+      request_id: correlationId,
+      correlation_nonce: correlationId,
+      trace_id: activeTrace.traceId,
+      traceparent: activeTrace.traceparent,
       school_id: schoolId || null,
       target_id: targetId || null,
       ...cleanMetadata,

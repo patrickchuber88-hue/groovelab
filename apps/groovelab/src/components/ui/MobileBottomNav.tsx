@@ -93,7 +93,12 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 
   React.useEffect(() => {
     const handleLevelChangeEvt = (e: any) => {
-      if (e?.detail) setCampusStudentUiLevel(e.detail);
+      if (!e?.detail) return;
+      const raw = e.detail;
+      const levelStr = typeof raw === 'object' && raw?.uiLevel ? raw.uiLevel : raw;
+      if (levelStr === 'junior' || levelStr === 'teen' || levelStr === 'pro') {
+        setCampusStudentUiLevel(levelStr);
+      }
     };
     const handleParentModeChange = (e: any) => {
       if (typeof e?.detail === 'boolean') setParentUnlocked(e.detail);
@@ -122,6 +127,18 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       });
     }
   }, [activeTab]);
+
+  React.useEffect(() => {
+    if (!drawerOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setDrawerOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [drawerOpen]);
 
   const getActiveThemeClass = () => {
     switch (activePlatform) {
@@ -300,6 +317,9 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           onClick={() => setDrawerOpen(false)}
         >
           <div 
+            role="dialog"
+            aria-modal="true"
+            aria-label="Hauptmenü"
             style={{
               width: '88%',
               maxWidth: '380px',
@@ -345,22 +365,23 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               <button 
                 type="button"
                 onClick={() => setDrawerOpen(false)}
+                aria-label="Menü schließen"
+                title="Menü schließen"
                 style={{ 
                   background: '#f1f5f9', 
                   border: 'none', 
                   borderRadius: '50%', 
-                  width: '38px', 
-                  height: '38px', 
-                  minWidth: '38px',
-                  minHeight: '38px',
+                  width: '44px', 
+                  height: '44px', 
+                  minWidth: '44px', 
+                  minHeight: '44px', 
                   display: 'flex', 
                   alignItems: 'center', 
                   justifyContent: 'center', 
-                  color: '#64748b', 
+                  color: '#475569', 
                   cursor: 'pointer',
                   touchAction: 'manipulation'
                 }}
-                title="Menü schließen"
               >
                 <X size={18} />
               </button>
@@ -369,7 +390,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             {/* Instagram Swipecard Segmented Platform Switcher - Rendered ONLY when both modules are eligible */}
             {showDualModuleSwitcher && (
               <div style={{ background: '#f8fafc', borderRadius: '18px', padding: '6px', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', textAlign: 'center' }}>
+                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', textAlign: 'center' }}>
                   Modul wechseln
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
@@ -434,9 +455,9 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 
             {/* 1:1 Navigation Items Swipecard List */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px', flex: 1 }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>Menüpunkte ({activePlatform === 'campus' ? 'Campus' : 'GrooveLab'})</span>
-                <span style={{ fontSize: '0.65rem', color: '#64748b' }}>Wischen zum Wechseln</span>
+                <span style={{ fontSize: '0.65rem', color: '#475569' }}>Wischen zum Wechseln</span>
               </div>
               {menuItems.map(item => {
                 const ItemIcon = item.icon;
@@ -487,41 +508,73 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               display: 'flex',
               justifyContent: 'center',
               alignItems: 'center',
-              gap: '8px',
+              gap: '12px',
               paddingTop: '10px',
               borderTop: '1px solid #f1f5f9',
               marginTop: 'auto'
             }}>
-              <div
+              <button
+                type="button"
                 onClick={() => {
                   setActivePlatform('campus');
                   setDrawerOpen(false);
                 }}
+                aria-label="Campus Modul anzeigen"
+                title="Campus Modul"
                 style={{
-                  width: activePlatform === 'campus' ? '22px' : '8px',
-                  height: '8px',
-                  borderRadius: '4px',
-                  background: activePlatform === 'campus' ? '#34a853' : '#cbd5e1',
+                  background: 'none',
+                  border: 'none',
+                  padding: '16px 8px',
+                  margin: '-12px 0',
                   cursor: 'pointer',
-                  transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  touchAction: 'manipulation'
                 }}
-                title="Karte 1: Campus Modul"
-              />
-              <div
+              >
+                <span
+                  style={{
+                    display: 'block',
+                    width: activePlatform === 'campus' ? '22px' : '8px',
+                    height: '8px',
+                    borderRadius: '4px',
+                    background: activePlatform === 'campus' ? '#34a853' : '#cbd5e1',
+                    transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+                  }}
+                />
+              </button>
+              <button
+                type="button"
                 onClick={() => {
                   setActivePlatform('groovelab');
                   setDrawerOpen(false);
                 }}
+                aria-label="GrooveLab Modul anzeigen"
+                title="GrooveLab Modul"
                 style={{
-                  width: activePlatform === 'groovelab' ? '22px' : '8px',
-                  height: '8px',
-                  borderRadius: '4px',
-                  background: activePlatform === 'groovelab' ? '#eab308' : '#cbd5e1',
+                  background: 'none',
+                  border: 'none',
+                  padding: '16px 8px',
+                  margin: '-12px 0',
                   cursor: 'pointer',
-                  transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  touchAction: 'manipulation'
                 }}
-                title="Karte 2: GrooveLab Modul"
-              />
+              >
+                <span
+                  style={{
+                    display: 'block',
+                    width: activePlatform === 'groovelab' ? '22px' : '8px',
+                    height: '8px',
+                    borderRadius: '4px',
+                    background: activePlatform === 'groovelab' ? '#eab308' : '#cbd5e1',
+                    transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+                  }}
+                />
+              </button>
             </div>
           </div>
         </div>

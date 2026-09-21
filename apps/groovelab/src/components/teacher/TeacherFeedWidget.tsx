@@ -706,12 +706,35 @@ export const TeacherFeedWidget: React.FC<TeacherFeedWidgetProps> = ({
             boxShadow: '0 2px 12px rgba(0,0,0,0.03)',
             border: '1px solid #e2e8f0'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Bell size={16} color="#34a853" style={{ strokeWidth: 2.2 }} />
-                <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', margin: 0, letterSpacing: '-0.01em' }}>Infos der Verwaltung</h3>
-              </div>
-            </div>
+            {(() => {
+              const feedbackCount = adminFeedbackRequests.filter(r => !adminFeedbackResponses.find(res => res.request_id === r.id)).length;
+              const pendingFeedbackPoints = mySubmittedProgramPoints.filter(pp => 
+                pp.additional_feedback_responses?.questions?.some((_: any, idx: number) => !pp.additional_feedback_responses.answers?.[idx])
+              );
+              const totalOpenCount = feedbackCount + activePlanningEvents.length + pendingFeedbackPoints.length;
+              
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Bell size={16} color={totalOpenCount > 0 ? "#ea580c" : "#34a853"} style={{ strokeWidth: 2.2 }} />
+                    <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e293b', margin: 0, letterSpacing: '-0.01em' }}>Infos der Verwaltung</h3>
+                  </div>
+                  {totalOpenCount > 0 && (
+                    <span style={{
+                      fontSize: '0.66rem',
+                      fontWeight: 900,
+                      color: '#ffffff',
+                      background: '#ea580c',
+                      padding: '2px 8px',
+                      borderRadius: '100px',
+                      boxShadow: '0 2px 6px rgba(234, 88, 12, 0.3)'
+                    }}>
+                      {totalOpenCount} offen
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
 
             <div style={{
               display: 'inline-flex',

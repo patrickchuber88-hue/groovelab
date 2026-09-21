@@ -15,6 +15,7 @@ interface UseStudentPracticeSessionProps {
   isTeacherSession: boolean;
   onRefreshData?: () => Promise<void>;
   getTargetMinutes: (streak: number) => number;
+  progressItems?: any[];
 }
 
 export function useStudentPracticeSession({
@@ -24,7 +25,8 @@ export function useStudentPracticeSession({
   studentUiLevel,
   isTeacherSession,
   onRefreshData,
-  getTargetMinutes
+  getTargetMinutes,
+  progressItems = []
 }: UseStudentPracticeSessionProps) {
   // Practice session timer states
   const [sessionActive, setSessionActive] = useState(false);
@@ -115,7 +117,7 @@ export function useStudentPracticeSession({
   }, [fetchFokusLogs]);
 
   // Finish Practice Session
-  const finishPracticeSession = async () => {
+  const finishPracticeSession = async (customXp?: number) => {
     const elapsed = secondsElapsedRef.current;
     if (elapsed <= 0) {
       setSessionActive(false);
@@ -125,7 +127,7 @@ export function useStudentPracticeSession({
 
     setSessionActive(false);
     const durationMinutes = Math.max(1, Math.floor(elapsed / 60));
-    const xpGained = durationMinutes * 10;
+    const xpGained = typeof customXp === 'number' ? customXp : durationMinutes * 10;
 
     try {
       const simNow = getSimulatedNow();
@@ -321,10 +323,94 @@ export function useStudentPracticeSession({
     return Array.from(recsMap.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [juniorLocalRecordings]);
 
-  // Junior Teacher Recordings
+  // Junior Teacher Recordings (All historical recordings created by the teacher across all weeks/progressItems)
   const juniorTeacherRecordings = useMemo(() => {
-    return [];
-  }, []);
+    const recsMap = new Map<string, { id: string; title: string; url: string; duration?: number; date: string; topic?: string; week?: string; blobKey?: string }>();
+
+    const processAudioString = (str: string, fallbackTopic: string, fallbackDate: string, defaultIdx: number) => {
+      if (!str || typeof str !== 'string' || !str.includes('AUDIO:')) return;
+      const cleanStr = str.startsWith('[') ? str.replace(/[\[\]"]/g, '') : str;
+      const audioIndex = cleanStr.indexOf('AUDIO:');
+      if (audioIndex === -1) return;
+      const parts = cleanStr.substring(audioIndex + 6).split('|');
+      const audioUrl = parts[0]?.trim() || '';
+      const duration = parseFloat(parts[1]) || 0;
+      const audioDate = parts[2] || fallbackDate || new Date().toISOString();
+      const label = parts[3] || fallbackTopic || `Aufnahme #${defaultIdx + 1}`;
+      const author = parts[4] || 'teacher';
+      const uniqueKey = parts[6] || (audioUrl && audioUrl !== '#' ? audioUrl : null) || `audio_${defaultIdx}_${label}_${audioDate}`;
+
+      if (!recsMap.has(uniqueKey) && author !== 'student') {
+        recsMap.set(uniqueKey, {
+          id: uniqueKey,
+          title: label,
+          url: audioUrl,
+          duration,
+          date: audioDate,
+          topic: fallbackTopic,
+          blobKey: parts[6] ? `campus_audio_${parts[6]}_raw` : undefined
+        });
+      }
+    };
+
+    (progressItems || []).forEach((item: any, itemIdx: number) => {
+      if (!item) return;
+      const itemDate = item.created_at || item.updated_at || new Date().toISOString();
+      const itemTopic = item.topic_name || 'Unterrichts-Übung';
+
+      if (item.homework_notes) {
+        try {
+          const parsed = JSON.parse(item.homework_notes);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((n: any, idx: number) => processAudioString(n, itemTopic, itemDate, idx));
+          } else if (typeof parsed === 'string') {
+            processAudioString(parsed, itemTopic, itemDate, itemIdx);
+          }
+        } catch {
+          processAudioString(item.homework_notes, itemTopic, itemDate, itemIdx);
+        }
+      }
+
+      if (item.audio_url) {
+        const uniqueKey = item.audio_url;
+        if (!recsMap.has(uniqueKey)) {
+          recsMap.set(uniqueKey, {
+            id: uniqueKey,
+            title: itemTopic,
+            url: item.audio_url,
+            duration: item.duration || 0,
+            date: itemDate,
+            topic: itemTopic
+          });
+        }
+      }
+    });
+
+    try {
+      const localGenNotes = typeof window !== 'undefined' && studentId ? localStorage.getItem(`campus_homework_notes_${studentId}`) : null;
+      if (localGenNotes && localGenNotes.trim()) {
+        try {
+          const parsed = JSON.parse(localGenNotes);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((n: any, idx: number) => processAudioString(n, 'Hausaufgabe', new Date().toISOString(), idx));
+          } else if (typeof parsed === 'string') {
+            processAudioString(parsed, 'Hausaufgabe', new Date().toISOString(), 0);
+          }
+        } catch {
+          processAudioString(localGenNotes, 'Hausaufgabe', new Date().toISOString(), 0);
+        }
+      }
+    } catch (e) {}
+
+    return Array.from(recsMap.values()).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [progressItems, studentId]);
+
+  const monthlyFocusMinutes = useMemo(() => {
+    const currentYearMonth = new Date().toISOString().slice(0, 7);
+    return (fokusLogs || [])
+      .filter((l: any) => (l.date || l.created_at || '').startsWith(currentYearMonth))
+      .reduce((sum: number, l: any) => sum + (l.duration_minutes || Math.floor((l.duration_seconds || 0) / 60)), 0);
+  }, [fokusLogs]);
 
   return {
     sessionActive,
@@ -336,6 +422,7 @@ export function useStudentPracticeSession({
     graceSecondsLeft,
     fokusLogs,
     setFokusLogs,
+    monthlyFocusMinutes,
     fetchFokusLogs,
     finishPracticeSession,
     showCelebration,

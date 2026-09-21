@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   ArrowUpRight, BookOpen, Calendar, CalendarX, Check, CheckCircle, ChevronDown,
   ChevronRight, ChevronUp, ClipboardList, Clock, DoorOpen, HardDrive, Music,
@@ -97,19 +97,19 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
   setExpandedSidebarTeacherId,
   selectedFilterTeacherId,
   setSelectedFilterTeacherId,
-  pendingBookings,
+  pendingBookings = [],
   setPendingBookings,
-  roomIssues,
+  roomIssues = [],
   setRoomIssues,
-  rooms,
-  students,
-  campusTeachers,
-  bypassTeachers,
-  coaches,
-  matrixAllocations,
-  pendingSchedules,
-  userMap,
-  roomMap,
+  rooms = [],
+  students = [],
+  campusTeachers = [],
+  bypassTeachers = [],
+  coaches = [],
+  matrixAllocations = [],
+  pendingSchedules = [],
+  userMap = {},
+  roomMap = {},
   isAvvSigned,
   setShowAvvModal,
   showLogbookModal,
@@ -146,35 +146,57 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
 }) => {
             const [showIntegrityDetails, setShowIntegrityDetails] = useState<boolean>(false);
             const [roomIssuesTab, setRoomIssuesTab] = useState<'open' | 'resolved' | 'all'>('open');
-            const todayDayNum = new Date().getDay() === 0 ? 7 : new Date().getDay();
-            const todayDateStr = new Date().toISOString().split('T')[0];
+            const simDate = simulatedToday ? new Date(simulatedToday + 'T12:00:00') : new Date();
+            const todayDayNum = simDate.getDay() === 0 ? 7 : simDate.getDay();
+            const todayDateStr = simulatedToday || new Date().toISOString().split('T')[0];
 
-            // 1. Raumauslastung Heute
-            const todayAllocations = matrixAllocations.filter(p => p.dayOfWeek === todayDayNum && p.roomId);
-            const totalSlotsCount = rooms.length * 8; // standard 8 slots per room per day
-            const roomOccupancyRate = totalSlotsCount > 0 ? Math.round((todayAllocations.length / totalSlotsCount) * 100) : 0;
-            const todayTeacherIds = Array.from(new Set(todayAllocations.map((p: any) => p.teacherId).filter(Boolean)));
-            const todayTeachersCount = todayTeacherIds.length;
+            const safeRooms = rooms || [];
+            const safeStudents = students || [];
+            const safeAllocations = matrixAllocations || [];
 
-            // 2. Heutige Abwesenheiten
-            const activeAusfallTeachers = [...(campusTeachers || []), ...(bypassTeachers || []), ...(coaches || [])].filter(t => {
-              const untilVal = t.ausfall_until;
-              if (!untilVal) return false;
-              return String(untilVal).substring(0, 10) >= todayDateStr;
-            }).reduce((acc: any[], current) => {
-              if (!acc.some(item => item.id === current.id)) {
-                acc.push(current);
-              }
-              return acc;
-            }, []);
+            // 1. Raumauslastung Heute (Memoized)
+            const { todayAllocations, roomOccupancyRate, todayTeachersCount } = useMemo(() => {
+              const safeAllocs = matrixAllocations || [];
+              const safeRms = rooms || [];
+              const todayAllocs = safeAllocs.filter((p: any) => p && p.dayOfWeek === todayDayNum && p.roomId);
+              const totalSlots = safeRms.length * 8; // standard 8 slots per room per day
+              const occRate = totalSlots > 0 ? Math.round((todayAllocs.length / totalSlots) * 100) : 0;
+              const teacherIds = Array.from(new Set(todayAllocs.map((p: any) => p.teacherId).filter(Boolean)));
+              return {
+                todayAllocations: todayAllocs,
+                roomOccupancyRate: occRate,
+                todayTeachersCount: teacherIds.length
+              };
+            }, [rooms, matrixAllocations, todayDayNum]);
 
-            // 3. Schüler-Aktivierungsquote
-            const totalStudentsCount = students.length;
-            const activeStudentsCount = students.filter(s => s.is_pin_activated).length;
-            const activationRate = totalStudentsCount > 0 ? Math.round((activeStudentsCount / totalStudentsCount) * 100) : 0;
+            // 2. Heutige Abwesenheiten (Memoized)
+            const activeAusfallTeachers = useMemo(() => {
+              return [...(campusTeachers || []), ...(bypassTeachers || []), ...(coaches || [])].filter(t => {
+                const untilVal = t?.ausfall_until;
+                if (!untilVal) return false;
+                return String(untilVal).substring(0, 10) >= todayDateStr;
+              }).reduce((acc: any[], current) => {
+                if (current && !acc.some(item => item.id === current.id)) {
+                  acc.push(current);
+                }
+                return acc;
+              }, []);
+            }, [campusTeachers, bypassTeachers, coaches, todayDateStr]);
 
-            // 4. Systemische Termin-Konflikte (Overlap checkers - Refined & Human-Friendly)
-            const scheduleConflicts = (() => {
+            // 3. Schüler-Aktivierungsquote (Memoized)
+            const { totalStudentsCount, activeStudentsCount, activationRate } = useMemo(() => {
+              const safeStuds = students || [];
+              const total = safeStuds.length;
+              const active = safeStuds.filter((s: any) => s?.is_pin_activated).length;
+              return {
+                totalStudentsCount: total,
+                activeStudentsCount: active,
+                activationRate: total > 0 ? Math.round((active / total) * 100) : 0
+              };
+            }, [students]);
+
+            // 4. Systemische Termin-Konflikte (Memoized Overlap checkers)
+            const scheduleConflicts = useMemo(() => {
               interface ScheduleConflictItem {
                 id: string;
                 title?: string;
@@ -196,6 +218,8 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                 timeB: string;
               }
 
+              const safeAllocs = matrixAllocations || [];
+
               const getStudentNames = (block: any) => {
                 if (!block || !Array.isArray(block.slots) || block.slots.length === 0) {
                   return '';
@@ -214,23 +238,23 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
               const isRealBlock = (block: any) => {
                 if (!block) return false;
                 if (block.teacherId === 'groovelab' || block.id?.startsWith('groovelab_')) return false;
-                const students = getStudentNames(block);
-                return students.length > 0;
+                const studentNames = getStudentNames(block);
+                return studentNames.length > 0;
               };
 
               const list: ScheduleConflictItem[] = [];
               
               // Room conflicts
               const byRoomDay: Record<string, any[]> = {};
-              matrixAllocations
-                .filter(p => p.roomId && isRealBlock(p))
-                .forEach(p => {
+              safeAllocs
+                .filter((p: any) => p.roomId && isRealBlock(p))
+                .forEach((p: any) => {
                   const k = `${p.roomId}_${p.dayOfWeek}`;
                   if (!byRoomDay[k]) byRoomDay[k] = [];
                   byRoomDay[k].push(p);
                 });
 
-              Object.entries(byRoomDay).forEach(([k, group]) => {
+              Object.entries(byRoomDay).forEach(([, group]) => {
                 if (group.length > 1) {
                   group.forEach((p, i) => {
                     group.forEach((q, j) => {
@@ -270,9 +294,9 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
 
               // Teacher conflicts
               const byTeacherDay: Record<string, any[]> = {};
-              matrixAllocations
-                .filter(p => isRealBlock(p))
-                .forEach(p => {
+              safeAllocs
+                .filter((p: any) => isRealBlock(p))
+                .forEach((p: any) => {
                   if (p.teacherId && p.teacherId !== 'groovelab') {
                     const k = `${p.teacherId}_${p.dayOfWeek}`;
                     if (!byTeacherDay[k]) byTeacherDay[k] = [];
@@ -280,7 +304,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                   }
                 });
 
-              Object.entries(byTeacherDay).forEach(([k, group]) => {
+              Object.entries(byTeacherDay).forEach(([, group]) => {
                 if (group.length > 1) {
                   group.forEach((p, i) => {
                     group.forEach((q, j) => {
@@ -318,7 +342,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
               });
               
               return list;
-            })();
+            }, [matrixAllocations, userMap, roomMap]);
 
             const allIssues = (roomIssues || []);
             const openIssues = allIssues.filter((i: any) => !i.is_completed && !i.is_acknowledged);
@@ -704,7 +728,7 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                               Monatsrechnung ${currentInvoiceId} versendet
                             </h4>
                             <p style={{ margin: '4px 0 0 0', fontSize: '0.76rem', color: '#1e40af', lineHeight: '1.4', fontWeight: 500 }}>
-                              Die Rechnung für den Leistungszeitraum ${monthName} ${y} über <strong>{mixedTotal_global.toFixed(2).replace('.', ',')} €</strong> wurde am ${invoiceDateStr} per E-Mail an <strong>{currentUserProfile?.email || 'buchhaltung@musikschule.de'}</strong> gesendet.
+                              Die Rechnung für den Leistungszeitraum ${monthName} ${y} über <strong>{(Number(mixedTotal_global) || 0).toFixed(2).replace('.', ',')} €</strong> wurde am ${invoiceDateStr} per E-Mail an <strong>{currentUserProfile?.email || 'buchhaltung@musikschule.de'}</strong> gesendet.
                             </p>
                           </div>
                         </div>
@@ -803,7 +827,9 @@ export const SecretaryBriefingView: React.FC<SecretaryBriefingViewProps> = ({
                       </div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '8px' }}>
                         <span style={{ fontSize: '1.5rem', fontWeight: 950, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.02em' }}>{roomOccupancyRate}</span>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>% ({todayAllocations.length} Slots)</span>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.9 }}>
+                          {todayDayNum === 7 ? '% (Sonntagsruhe)' : todayDayNum === 6 ? '% (Samstag)' : `% (${todayAllocations.length} Slots)`}
+                        </span>
                       </div>
                     </div>
 

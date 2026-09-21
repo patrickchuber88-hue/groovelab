@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Users,
   X,
@@ -9,7 +9,9 @@ import {
   Clock,
   CheckCheck,
   User,
-  MessageSquare
+  MessageSquare,
+  PhoneCall,
+  Info
 } from 'lucide-react';
 
 export interface AbsenceCancellationGroup {
@@ -18,11 +20,16 @@ export interface AbsenceCancellationGroup {
   dayOfWeek: string;
   dayNum: string;
   unreadCount: number;
+  readCount?: number;
   items: Array<{
     id?: string;
     student_id?: string;
     slot_start_datetime: string;
     status: string;
+    read_at?: string | null;
+    acknowledged_at?: string | null;
+    teacher_contact_status?: string | null;
+    teacher_contacted_at?: string | null;
     studentName: string;
     instrument?: string;
     student?: any;
@@ -49,6 +56,7 @@ interface TeacherAbsenceOverviewModalProps {
     student?: any;
     studentName: string;
   }) => void;
+  handleMarkStudentContacted?: (notificationId: string, contactType?: 'reached' | 'voicemail') => Promise<void> | void;
 }
 
 export const TeacherAbsenceOverviewModal: React.FC<TeacherAbsenceOverviewModalProps> = ({
@@ -62,9 +70,32 @@ export const TeacherAbsenceOverviewModal: React.FC<TeacherAbsenceOverviewModalPr
   toggleAbsenceDateCollapse,
   toggleAllAbsenceDates,
   areAllAbsenceDatesCollapsed,
-  handleEmergencyShoutbox
+  handleEmergencyShoutbox,
+  handleMarkStudentContacted
 }) => {
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // WAI-ARIA Dialog Escape-Key Listener
+  useEffect(() => {
+    if (!showAbsenceOverviewModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowAbsenceOverviewModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showAbsenceOverviewModal, setShowAbsenceOverviewModal]);
+
   if (!showAbsenceOverviewModal) return null;
+
+  const isMobile = windowWidth <= 768;
 
   return (
     <div
@@ -73,11 +104,13 @@ export const TeacherAbsenceOverviewModal: React.FC<TeacherAbsenceOverviewModalPr
         inset: 0,
         zIndex: 9999,
         background: 'rgba(15, 23, 42, 0.65)',
-        backdropFilter: 'blur(8px)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: isMobile ? 'flex-end' : 'center',
         justifyContent: 'center',
-        padding: '20px'
+        padding: isMobile ? '0px' : '20px',
+        animation: 'fadeIn 0.2s ease-out'
       }}
       onClick={() => setShowAbsenceOverviewModal(false)}
     >
@@ -88,46 +121,47 @@ export const TeacherAbsenceOverviewModal: React.FC<TeacherAbsenceOverviewModalPr
         onClick={(e) => e.stopPropagation()}
         style={{
           background: '#ffffff',
-          borderRadius: '28px',
+          borderRadius: isMobile ? '24px 24px 0 0' : '24px',
           maxWidth: '680px',
           width: '100%',
-          maxHeight: '90vh',
+          maxHeight: isMobile ? '92vh' : '88vh',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.3)',
-          border: '1px solid #fca5a5',
+          boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.25)',
+          border: '1px solid #e2e8f0',
           overflow: 'hidden'
         }}
       >
         {/* Modal Header */}
         <div style={{
-          padding: '24px 28px',
+          padding: isMobile ? '18px 20px' : '22px 28px',
           borderBottom: '1px solid #f1f5f9',
-          background: 'linear-gradient(135deg, #fff5f5 0%, #ffffff 100%)',
+          background: '#ffffff',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '16px'
+          gap: '16px',
+          flexShrink: 0
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0 }}>
             <div style={{
-              width: '46px',
-              height: '46px',
-              borderRadius: '14px',
-              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+              width: '44px',
+              height: '44px',
+              borderRadius: '13px',
+              background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
               color: '#ffffff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
-              boxShadow: '0 4px 14px rgba(239, 68, 68, 0.3)'
+              boxShadow: '0 4px 12px rgba(15, 23, 42, 0.15)'
             }}>
-              <Users size={24} />
+              <Users size={22} />
             </div>
             <div>
               <h2 style={{
                 margin: 0,
-                fontSize: '1.2rem',
+                fontSize: isMobile ? '1.05rem' : '1.18rem',
                 fontWeight: 900,
                 color: '#0f172a',
                 letterSpacing: '-0.02em',
@@ -136,12 +170,12 @@ export const TeacherAbsenceOverviewModal: React.FC<TeacherAbsenceOverviewModalPr
                 Ausfall-Status & Kenntnisnahmen
               </h2>
               <p style={{
-                margin: '3px 0 0 0',
-                fontSize: '0.78rem',
+                margin: '2px 0 0 0',
+                fontSize: '0.76rem',
                 color: '#64748b',
                 fontWeight: 600
               }}>
-                Volljuristischer Nachweis nach § 130 BGB • Abwesenheitszeitraum aktiv
+                Revisionssichere Lesebestätigungen • Abwesenheitszeitraum aktiv
               </p>
             </div>
           </div>
@@ -160,7 +194,8 @@ export const TeacherAbsenceOverviewModal: React.FC<TeacherAbsenceOverviewModalPr
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              transition: 'all 0.15s'
+              transition: 'all 0.15s',
+              touchAction: 'manipulation'
             }}
           >
             <X size={18} />
@@ -169,58 +204,67 @@ export const TeacherAbsenceOverviewModal: React.FC<TeacherAbsenceOverviewModalPr
 
         {/* KPI Summary Banner */}
         <div style={{
-          padding: '16px 28px',
+          padding: isMobile ? '14px 20px' : '16px 28px',
           background: '#f8fafc',
           borderBottom: '1px solid #e2e8f0',
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: '12px'
+          gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(3, 1fr)',
+          gap: isMobile ? '8px' : '12px',
+          flexShrink: 0
         }}>
+          {/* Card 1: Total */}
           <div style={{
             background: '#ffffff',
-            border: '1px solid #fca5a5',
-            borderRadius: '16px',
-            padding: '12px 14px',
+            border: '1px solid #e2e8f0',
+            borderRadius: '14px',
+            padding: isMobile ? '10px 10px' : '12px 14px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '2px'
+            gap: '2px',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)'
           }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#991b1b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            <span style={{ fontSize: isMobile ? '0.62rem' : '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               Ausfälle Gesamt
             </span>
-            <span style={{ fontSize: '1.4rem', fontWeight: 950, color: '#991b1b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+            <span style={{ fontSize: isMobile ? '1.25rem' : '1.4rem', fontWeight: 950, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
               {totalAbsenceCancellationsCount}
             </span>
           </div>
+
+          {/* Card 2: Read / Acknowledged */}
           <div style={{
-            background: '#ffffff',
-            border: '1px solid #86efac',
-            borderRadius: '16px',
-            padding: '12px 14px',
+            background: '#f0fdf4',
+            border: '1px solid #bbf7d0',
+            borderRadius: '14px',
+            padding: isMobile ? '10px 10px' : '12px 14px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '2px'
+            gap: '2px',
+            boxShadow: '0 1px 3px rgba(16, 185, 129, 0.05)'
           }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Gelesen (Zugang ✓)
+            <span style={{ fontSize: isMobile ? '0.62rem' : '0.68rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Bestätigt / Erreicht
             </span>
-            <span style={{ fontSize: '1.4rem', fontWeight: 950, color: '#166534', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+            <span style={{ fontSize: isMobile ? '1.25rem' : '1.4rem', fontWeight: 950, color: '#166534', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
               {readCancellationsCount}
             </span>
           </div>
+
+          {/* Card 3: Unread */}
           <div style={{
-            background: '#ffffff',
+            background: unreadCancellationsCount > 0 ? '#fffbeb' : '#ffffff',
             border: unreadCancellationsCount > 0 ? '1px solid #fde047' : '1px solid #e2e8f0',
-            borderRadius: '16px',
-            padding: '12px 14px',
+            borderRadius: '14px',
+            padding: isMobile ? '10px 10px' : '12px 14px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '2px'
+            gap: '2px',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)'
           }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: unreadCancellationsCount > 0 ? '#854d0e' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Noch Ungelesen
+            <span style={{ fontSize: isMobile ? '0.62rem' : '0.68rem', fontWeight: 800, color: unreadCancellationsCount > 0 ? '#854d0e' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Offen (Ungelesen)
             </span>
-            <span style={{ fontSize: '1.4rem', fontWeight: 950, color: unreadCancellationsCount > 0 ? '#854d0e' : '#64748b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+            <span style={{ fontSize: isMobile ? '1.25rem' : '1.4rem', fontWeight: 950, color: unreadCancellationsCount > 0 ? '#854d0e' : '#64748b', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
               {unreadCancellationsCount}
             </span>
           </div>
@@ -230,21 +274,22 @@ export const TeacherAbsenceOverviewModal: React.FC<TeacherAbsenceOverviewModalPr
         <div style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '20px 28px',
+          padding: isMobile ? '16px' : '20px 28px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '14px'
+          gap: '12px',
+          WebkitOverflowScrolling: 'touch'
         }}>
           {groupedAbsenceCancellations.length === 0 ? (
             <div style={{
-              padding: '40px 20px',
+              padding: '44px 20px',
               textAlign: 'center',
               background: '#f8fafc',
-              borderRadius: '20px',
+              borderRadius: '18px',
               border: '1px dashed #cbd5e1'
             }}>
               <CheckCircle size={36} color="#34a853" style={{ margin: '0 auto 10px auto' }} />
-              <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>
+              <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 850, color: '#0f172a' }}>
                 Keine betroffenen Unterrichtseinheiten
               </h4>
               <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#64748b' }}>
@@ -258,9 +303,10 @@ export const TeacherAbsenceOverviewModal: React.FC<TeacherAbsenceOverviewModalPr
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '2px 4px'
+                padding: '2px 4px',
+                flexShrink: 0
               }}>
-                <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   Ausfälle nach Unterrichtstagen ({groupedAbsenceCancellations.length} {groupedAbsenceCancellations.length === 1 ? 'Tag' : 'Tage'})
                 </span>
                 <button
@@ -271,14 +317,15 @@ export const TeacherAbsenceOverviewModal: React.FC<TeacherAbsenceOverviewModalPr
                     border: '1px solid #cbd5e1',
                     borderRadius: '10px',
                     padding: '5px 12px',
-                    fontSize: '0.74rem',
+                    fontSize: '0.72rem',
                     fontWeight: 800,
                     color: '#334155',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
-                    transition: 'all 0.15s'
+                    transition: 'all 0.15s',
+                    touchAction: 'manipulation'
                   }}
                 >
                   <ChevronsUpDown size={13} />
@@ -293,12 +340,15 @@ export const TeacherAbsenceOverviewModal: React.FC<TeacherAbsenceOverviewModalPr
                   <div
                     key={group.dateStr}
                     style={{
-                      borderRadius: '20px',
+                      flexShrink: 0,
+                      width: '100%',
+                      minHeight: 'min-content',
+                      borderRadius: '18px',
                       border: '1.5px solid #e2e8f0',
                       background: '#ffffff',
                       overflow: 'hidden',
-                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
-                      transition: 'border-color 0.2s'
+                      boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)',
+                      transition: 'border-color 0.15s'
                     }}
                   >
                     {/* Accordion Day Header */}
@@ -315,60 +365,61 @@ export const TeacherAbsenceOverviewModal: React.FC<TeacherAbsenceOverviewModalPr
                       aria-expanded={!isCollapsed}
                       aria-label={`Tag ${group.formattedDate} ${isCollapsed ? 'ausklappen' : 'einklappen'}`}
                       style={{
-                        padding: '14px 18px',
-                        background: isCollapsed ? '#ffffff' : 'linear-gradient(135deg, #fff5f5 0%, #ffffff 100%)',
-                        borderBottom: isCollapsed ? 'none' : '1px solid #f1f5f9',
+                        padding: isMobile ? '12px 14px' : '14px 18px',
+                        background: isCollapsed ? '#ffffff' : '#f8fafc',
+                        borderBottom: isCollapsed ? 'none' : '1px solid #e2e8f0',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         gap: '12px',
                         cursor: 'pointer',
                         userSelect: 'none',
-                        transition: 'all 0.15s'
+                        transition: 'background-color 0.15s'
                       }}
                     >
                       {/* Left: Day Badge & Label */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
                         <div style={{
-                          width: '42px',
-                          height: '42px',
-                          borderRadius: '12px',
-                          background: '#fee2e2',
-                          border: '1.5px solid #fca5a5',
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '11px',
+                          background: '#ffffff',
+                          border: '1.5px solid #cbd5e1',
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          flexShrink: 0
+                          flexShrink: 0,
+                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)'
                         }}>
-                          <span style={{ fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', color: '#dc2626' }}>
+                          <span style={{ fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', color: '#64748b' }}>
                             {group.dayOfWeek}
                           </span>
-                          <span style={{ fontSize: '14px', fontWeight: 900, color: '#991b1b', lineHeight: 1 }}>
+                          <span style={{ fontSize: '14px', fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>
                             {group.dayNum}
                           </span>
                         </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                          <span style={{ fontSize: '0.94rem', fontWeight: 850, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                          <span style={{ fontSize: isMobile ? '0.88rem' : '0.94rem', fontWeight: 850, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                             {group.formattedDate}
                           </span>
-                          <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
                             {group.items.length} {group.items.length === 1 ? 'Unterrichtseinheit' : 'Unterrichtseinheiten'}
                           </span>
                         </div>
                       </div>
 
                       {/* Right: KPI Pill + Chevron Toggle */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '10px', flexShrink: 0 }}>
                         <div style={{
-                          padding: '5px 11px',
+                          padding: isMobile ? '4px 8px' : '5px 11px',
                           borderRadius: '100px',
-                          fontSize: '0.72rem',
+                          fontSize: isMobile ? '0.68rem' : '0.72rem',
                           fontWeight: 800,
-                          background: group.unreadCount > 0 ? '#fef3c7' : '#dcfce7',
-                          color: group.unreadCount > 0 ? '#92400e' : '#166534',
-                          border: group.unreadCount > 0 ? '1px solid #fde047' : '1px solid #86efac',
+                          background: group.unreadCount > 0 ? '#fffbeb' : '#f0fdf4',
+                          color: group.unreadCount > 0 ? '#854d0e' : '#166534',
+                          border: group.unreadCount > 0 ? '1px solid #fef08a' : '1px solid #bbf7d0',
                           display: 'flex',
                           alignItems: 'center',
                           gap: '5px'
@@ -387,29 +438,30 @@ export const TeacherAbsenceOverviewModal: React.FC<TeacherAbsenceOverviewModalPr
                         </div>
 
                         <div style={{
-                          width: '30px',
-                          height: '30px',
+                          width: '28px',
+                          height: '28px',
                           borderRadius: '8px',
-                          background: '#f8fafc',
+                          background: '#ffffff',
                           border: '1px solid #e2e8f0',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           color: '#64748b'
                         }}>
-                          {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                          {isCollapsed ? <ChevronDown size={15} /> : <ChevronUp size={15} />}
                         </div>
                       </div>
                     </div>
 
-                    {/* Collapsible Student Cards */}
+                    {/* Collapsible Student Cards (Safari-safe, flexShrink: 0) */}
                     {!isCollapsed && (
                       <div style={{
-                        padding: '12px 14px',
+                        padding: isMobile ? '10px' : '12px 14px',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '10px',
-                        background: '#f8fafc'
+                        gap: '8px',
+                        background: '#f8fafc',
+                        minHeight: 'min-content'
                       }}>
                         {group.items.map((item: any, idx: number) => {
                           const dt = new Date(item.slot_start_datetime);
@@ -417,84 +469,162 @@ export const TeacherAbsenceOverviewModal: React.FC<TeacherAbsenceOverviewModalPr
                             ? dt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
                             : '14:00';
                           const isRead = item.status === 'READ';
+                          const isTeacherReached = item.teacher_contact_status === 'reached';
+
+                          // Formatiere Lesebestätigungs-Zeitstempel falls vorhanden
+                          let readTimeStr: string | null = null;
+                          if (isRead && (item.read_at || item.acknowledged_at)) {
+                            const readDt = new Date(item.read_at || item.acknowledged_at);
+                            if (!isNaN(readDt.getTime())) {
+                              readTimeStr = readDt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                            }
+                          }
+
+                          // Formatiere Lehrer-Kontaktiert-Zeitstempel falls vorhanden
+                          let contactTimeStr: string | null = null;
+                          if (isTeacherReached && item.teacher_contacted_at) {
+                            const contactDt = new Date(item.teacher_contacted_at);
+                            if (!isNaN(contactDt.getTime())) {
+                              contactTimeStr = contactDt.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                            }
+                          }
 
                           return (
                             <div
                               key={item.id || idx}
                               style={{
-                                padding: '12px 16px',
-                                borderRadius: '16px',
-                                background: isRead ? '#ffffff' : 'repeating-linear-gradient(-45deg, #fef2f2 0px, #fef2f2 8px, #ffffff 8px, #ffffff 16px)',
-                                border: isRead ? '1.5px solid #e2e8f0' : '1.5px solid #fca5a5',
+                                padding: isMobile ? '10px 12px' : '12px 16px',
+                                borderRadius: '14px',
+                                background: '#ffffff',
+                                border: isRead ? '1px solid #e2e8f0' : isTeacherReached ? '1px solid #bfdbfe' : '1px solid #fde68a',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'space-between',
                                 gap: '12px',
-                                boxShadow: '0 1px 4px rgba(0, 0, 0, 0.02)'
+                                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
+                                transition: 'all 0.15s'
                               }}
                             >
                               {/* Left: Student Info */}
                               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
                                 <div style={{
-                                  width: '38px',
-                                  height: '38px',
-                                  borderRadius: '11px',
-                                  background: isRead ? '#f1f5f9' : '#fee2e2',
-                                  border: isRead ? '1px solid #e2e8f0' : '1.5px solid #fca5a5',
+                                  width: '36px',
+                                  height: '36px',
+                                  borderRadius: '10px',
+                                  background: isRead ? '#f1f5f9' : isTeacherReached ? '#eff6ff' : '#fffbeb',
+                                  border: isRead ? '1px solid #e2e8f0' : isTeacherReached ? '1px solid #bfdbfe' : '1px solid #fef08a',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  color: isRead ? '#64748b' : '#dc2626',
+                                  color: isRead ? '#64748b' : isTeacherReached ? '#2563eb' : '#b45309',
                                   flexShrink: 0
                                 }}>
-                                  <User size={18} />
+                                  <User size={17} />
                                 </div>
 
                                 <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                                  <span style={{ fontSize: '0.90rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  <span style={{ fontSize: isMobile ? '0.86rem' : '0.90rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     {item.studentName}
                                   </span>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px', fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px', fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
                                     <span>{item.instrument}</span>
                                     <span>•</span>
                                     <span style={{ fontWeight: 750, color: '#0f172a' }}>{timeStr} Uhr</span>
+                                    {readTimeStr && (
+                                      <>
+                                        <span>•</span>
+                                        <span style={{ color: '#166534', fontWeight: 700 }}>gelesen {readTimeStr} Uhr</span>
+                                      </>
+                                    )}
+                                    {!readTimeStr && contactTimeStr && (
+                                      <>
+                                        <span>•</span>
+                                        <span style={{ color: '#1d4ed8', fontWeight: 700 }}>erreicht {contactTimeStr} Uhr</span>
+                                      </>
+                                    )}
                                   </div>
                                 </div>
                               </div>
 
                               {/* Right: Status Pill & Action */}
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '8px', flexShrink: 0 }}>
                                 {isRead ? (
                                   <div style={{
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '5px',
                                     background: '#f0fdf4',
-                                    border: '1px solid #86efac',
-                                    padding: '5px 10px',
-                                    borderRadius: '9px',
+                                    border: '1px solid #bbf7d0',
+                                    padding: '5px 9px',
+                                    borderRadius: '8px',
                                     color: '#166534',
-                                    fontSize: '0.70rem',
+                                    fontSize: '0.68rem',
                                     fontWeight: 800
                                   }}>
                                     <CheckCheck size={13} color="#16a34a" />
-                                    <span>Bestätigt</span>
+                                    <span style={{ display: isMobile ? 'none' : 'inline' }}>Bestätigt</span>
                                   </div>
-                                ) : (
+                                ) : isTeacherReached ? (
                                   <div style={{
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '4px',
-                                    background: '#fffbeb',
-                                    border: '1px solid #fde047',
-                                    padding: '5px 10px',
-                                    borderRadius: '9px',
-                                    color: '#854d0e',
-                                    fontSize: '0.70rem',
+                                    gap: '5px',
+                                    background: '#eff6ff',
+                                    border: '1px solid #bfdbfe',
+                                    padding: '5px 9px',
+                                    borderRadius: '8px',
+                                    color: '#1d4ed8',
+                                    fontSize: '0.68rem',
                                     fontWeight: 800
-                                  }} title="Zugang nach § 130 BGB noch nicht bestätigt">
-                                    <Clock size={12} color="#ca8a04" />
-                                    <span>Ungelesen</span>
+                                  }} title={contactTimeStr ? `Vom Lehrer als kontaktiert dokumentiert (${contactTimeStr} Uhr)` : 'Vom Lehrer als kontaktiert dokumentiert'}>
+                                    <PhoneCall size={12} color="#2563eb" />
+                                    <span style={{ display: isMobile ? 'none' : 'inline' }}>Erreicht</span>
+                                  </div>
+                                ) : (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <div style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      background: '#fffbeb',
+                                      border: '1px solid #fef08a',
+                                      padding: '5px 9px',
+                                      borderRadius: '8px',
+                                      color: '#854d0e',
+                                      fontSize: '0.68rem',
+                                      fontWeight: 800
+                                    }} title="Nachricht von Schüler noch nicht geöffnet">
+                                      <Clock size={12} color="#ca8a04" />
+                                      <span>Ungelesen</span>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleMarkStudentContacted?.(item.id, 'reached');
+                                      }}
+                                      style={{
+                                        background: '#eff6ff',
+                                        border: '1px solid #bfdbfe',
+                                        color: '#1d4ed8',
+                                        padding: '5px 9px',
+                                        borderRadius: '8px',
+                                        fontSize: '0.68rem',
+                                        fontWeight: 800,
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        transition: 'all 0.15s',
+                                        touchAction: 'manipulation'
+                                      }}
+                                      title="Als telefonisch / persönlich erreicht markieren (automatische Uhrzeit)"
+                                      aria-label={`${item.studentName} als erreicht markieren`}
+                                    >
+                                      <PhoneCall size={11} color="#2563eb" />
+                                      <span>Erreicht</span>
+                                    </button>
                                   </div>
                                 )}
 
@@ -512,23 +642,24 @@ export const TeacherAbsenceOverviewModal: React.FC<TeacherAbsenceOverviewModalPr
                                     });
                                   }}
                                   style={{
-                                    background: '#ffffff',
-                                    border: '1px solid #cbd5e1',
-                                    color: '#334155',
-                                    padding: '6px 10px',
-                                    borderRadius: '9px',
+                                    background: '#0f172a',
+                                    border: 'none',
+                                    color: '#ffffff',
+                                    padding: '6px 11px',
+                                    borderRadius: '8px',
                                     fontSize: '0.72rem',
                                     fontWeight: 800,
                                     cursor: 'pointer',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '4px',
-                                    transition: 'all 0.15s'
+                                    gap: '5px',
+                                    transition: 'opacity 0.15s',
+                                    touchAction: 'manipulation'
                                   }}
                                   title="Shoutbox mit Schüler öffnen"
                                 >
                                   <MessageSquare size={12} />
-                                  <span>Nachricht</span>
+                                  <span style={{ display: isMobile ? 'none' : 'inline' }}>Nachricht</span>
                                 </button>
                               </div>
                             </div>
@@ -545,16 +676,20 @@ export const TeacherAbsenceOverviewModal: React.FC<TeacherAbsenceOverviewModalPr
 
         {/* Modal Footer */}
         <div style={{
-          padding: '16px 28px',
+          padding: isMobile ? '14px 20px calc(14px + env(safe-area-inset-bottom)) 20px' : '16px 28px',
           borderTop: '1px solid #f1f5f9',
           background: '#ffffff',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: '12px'
+          gap: '12px',
+          flexShrink: 0
         }}>
-          <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
-            💡 Schüler ohne Kenntnisnahme bei Bedarf bitte telefonisch oder per Notfall-Nachricht erinnern.
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>
+            <Info size={15} color="#64748b" style={{ flexShrink: 0 }} />
+            <span style={{ lineHeight: 1.3 }}>
+              Schüler ohne Kenntnisnahme bei Bedarf telefonisch oder per Sofort-Nachricht erinnern.
+            </span>
           </div>
           <button
             type="button"
@@ -563,12 +698,14 @@ export const TeacherAbsenceOverviewModal: React.FC<TeacherAbsenceOverviewModalPr
               background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
               color: '#ffffff',
               border: 'none',
-              borderRadius: '14px',
+              borderRadius: '12px',
               padding: '10px 22px',
               fontSize: '0.82rem',
               fontWeight: 800,
               cursor: 'pointer',
-              boxShadow: '0 2px 8px rgba(15, 23, 42, 0.2)'
+              boxShadow: '0 2px 8px rgba(15, 23, 42, 0.2)',
+              flexShrink: 0,
+              touchAction: 'manipulation'
             }}
           >
             Schließen

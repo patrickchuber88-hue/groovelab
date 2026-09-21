@@ -214,6 +214,18 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
   handleAddSongToRepertoire,
   setSelectedTeacher,
 }) => {
+  // 🚀 Performance Optimization: Lazy-mount student Live Lab (TeacherDashboard) on first navigation
+  // Keeps it mounted afterwards for instantaneous tab switching without initial login query storm
+  const isStudent = user?.role?.toLowerCase() === 'student';
+  const isLiveLabActive = activePlatform === 'groovelab' || (activePlatform !== 'ensembles' && activePlatform !== 'campus' && activeStudentTab === 'live');
+  const [hasVisitedLiveLab, setHasVisitedLiveLab] = React.useState(isLiveLabActive);
+
+  React.useEffect(() => {
+    if (isLiveLabActive && !hasVisitedLiveLab) {
+      setHasVisitedLiveLab(true);
+    }
+  }, [isLiveLabActive, hasVisitedLiveLab]);
+
   return (
     <main id="main-content" tabIndex={-1} className="main-content" style={{ 
       overflow: (windowWidth <= 768 || activeStudentTab !== 'live') ? 'auto' : 'hidden', 
@@ -392,10 +404,10 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
         </ErrorBoundary>
       )}
 
-      {/* Live Lab Tab for Students (Kept mounted for instant platform switching) */}
-      {user.role?.toLowerCase() === 'student' && (
+      {/* Live Lab Tab for Students (Lazy-mounted on first navigation, kept mounted for instant switching) */}
+      {isStudent && hasVisitedLiveLab && (
         <div style={{ 
-          display: (activePlatform === 'groovelab' || (activePlatform !== 'ensembles' && activePlatform !== 'campus' && activeStudentTab === 'live')) ? 'flex' : 'none', 
+          display: isLiveLabActive ? 'flex' : 'none', 
           flexDirection: 'column', 
           flex: 1, 
           minHeight: 0,

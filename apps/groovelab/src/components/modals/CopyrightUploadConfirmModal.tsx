@@ -105,7 +105,7 @@ export const CopyrightUploadConfirmModal: React.FC<CopyrightUploadConfirmModalPr
                 Urheberrechts- &amp; Freistellungs-Check
               </h3>
               <p style={{ margin: '2px 0 0 0', fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>
-                Didaktischer Schutz gem. § 60a UrhG &amp; Art. 6 Digital Services Act (DSA)
+                Didaktischer Schutz für Unterricht &amp; Lehre
               </p>
             </div>
           </div>
@@ -157,7 +157,7 @@ export const CopyrightUploadConfirmModal: React.FC<CopyrightUploadConfirmModalPr
                 <strong>Von Ihnen selbst komponiert/eingespielt</strong> wurde (volles eigenes Urheberrecht), oder
               </li>
               <li>
-                Ausschließlich im Rahmen der <strong>gesetzlichen Schranke für Unterricht und Lehre (§ 60a UrhG)</strong> dem eng abgegrenzten Schüler- oder Ensemblekreis zur Verfügung gestellt wird.
+                Ausschließlich im Rahmen der <strong>gesetzlichen Freigabe für Unterricht und Lehre</strong> dem eng abgegrenzten Schüler- oder Ensemblekreis zur Verfügung gestellt wird.
               </li>
             </ul>
           </div>

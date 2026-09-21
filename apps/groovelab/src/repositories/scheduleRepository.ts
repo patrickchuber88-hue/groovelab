@@ -22,6 +22,8 @@ export interface CrisisNotification {
   school_id?: string;
   slot_start_datetime: string;
   status: string;
+  teacher_contact_status?: string;
+  teacher_contacted_at?: string;
   student?: {
     id: string;
     first_name: string;

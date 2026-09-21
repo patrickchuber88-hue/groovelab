@@ -396,6 +396,8 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
             </div>
           )}
 
+
+
           {/* Right Actions */}
           <div
             style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}

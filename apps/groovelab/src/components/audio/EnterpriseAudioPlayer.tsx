@@ -141,6 +141,29 @@ export const EnterpriseAudioPlayer: React.FC<EnterpriseAudioPlayerProps> = ({
     engineRef.current.seek(newTime);
   }, []);
 
+  const handleKeyDownTimeline = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!engineRef.current || isLoading) return;
+    const dur = playbackState.durationSec || 100;
+    const cur = playbackState.currentTimeSec;
+    const jump = e.shiftKey ? 15 : 5;
+
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const nextTime = Math.max(0, cur - jump);
+      engineRef.current.seek(nextTime);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      const nextTime = Math.min(dur, cur + jump);
+      engineRef.current.seek(nextTime);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      engineRef.current.seek(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      engineRef.current.seek(dur);
+    }
+  }, [isLoading, playbackState.durationSec, playbackState.currentTimeSec]);
+
   const handleVolumeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (!engineRef.current) return;
     const newVol = parseFloat(e.target.value);
@@ -245,6 +268,7 @@ export const EnterpriseAudioPlayer: React.FC<EnterpriseAudioPlayerProps> = ({
             step={0.01}
             value={playbackState.currentTimeSec}
             onChange={handleSeek}
+            onKeyDown={handleKeyDownTimeline}
             disabled={isLoading || !!errorMessage}
             aria-label="Audio Timeline Slider"
             aria-valuemin={0}
@@ -272,7 +296,7 @@ export const EnterpriseAudioPlayer: React.FC<EnterpriseAudioPlayerProps> = ({
         </div>
 
         {/* Timecode labels */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>
           <span>{formatTime(playbackState.currentTimeSec)}</span>
           {isLoading && downloadProgress > 0 && downloadProgress < 100 ? (
             <span style={{ color: '#ca8a04' }}>Puffert {downloadProgress}%...</span>
@@ -390,7 +414,7 @@ export const EnterpriseAudioPlayer: React.FC<EnterpriseAudioPlayerProps> = ({
           padding: '3px',
           borderRadius: '12px'
         }} role="group" aria-label="Übegeschwindigkeit">
-          <Gauge size={15} style={{ margin: '0 6px', color: '#64748b' }} aria-hidden="true" />
+          <Gauge size={15} style={{ margin: '0 6px', color: '#475569' }} aria-hidden="true" />
           {speeds.map((s) => {
             const isSelected = playbackState.playbackRate === s;
             return (
@@ -406,7 +430,7 @@ export const EnterpriseAudioPlayer: React.FC<EnterpriseAudioPlayerProps> = ({
                   borderRadius: '9px',
                   border: 'none',
                   background: isSelected ? '#ffffff' : 'transparent',
-                  color: isSelected ? '#0f172a' : '#64748b',
+                  color: isSelected ? '#0f172a' : '#475569',
                   fontSize: '0.74rem',
                   fontWeight: isSelected ? 800 : 600,
                   boxShadow: isSelected ? '0 1px 4px rgba(0, 0, 0, 0.08)' : 'none',

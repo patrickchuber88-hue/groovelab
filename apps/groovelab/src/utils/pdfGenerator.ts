@@ -1797,7 +1797,7 @@ export interface InvoicePDFParams {
   storageAddonMonthlyFee?: number;
 }
 
-export const generateInvoicePDF = async (params: InvoicePDFParams) => {
+export const buildInvoicePDFDoc = async (params: InvoicePDFParams) => {
   const { default: jsPDF } = await import('jspdf');
   const doc = new jsPDF('p', 'mm', 'a4');
 
@@ -1859,6 +1859,7 @@ export const generateInvoicePDF = async (params: InvoicePDFParams) => {
     doc.setFontSize(9);
     doc.text(params.schoolStreet, 20, y);
   }
+
   if (params.schoolZipCode || params.schoolCity) {
     y += 5;
     doc.setFont('helvetica', 'normal');
@@ -1866,20 +1867,10 @@ export const generateInvoicePDF = async (params: InvoicePDFParams) => {
     doc.text(`${params.schoolZipCode || ''} ${params.schoolCity || ''}`.trim(), 20, y);
   }
 
-  // Invoice Meta Box (Right aligned)
+  // Invoice Meta Box (Right Side)
   const metaY = 45;
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(borderLight[0], borderLight[1], borderLight[2]);
-  doc.roundedRect(125, metaY, 65, 28, 2, 2, 'FD');
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-  doc.text('RECHNUNG', 130, metaY + 6);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
   doc.text('Rechnungs-Nr.:', 130, metaY + 12);
   doc.text('Datum:', 130, metaY + 17);
   doc.text('Zahlbar bis:', 130, metaY + 22);
@@ -2075,9 +2066,47 @@ export const generateInvoicePDF = async (params: InvoicePDFParams) => {
   doc.text('Campus-Groovelab • DSGVO-konformes Cloud-Hosting • www.campus-groovelab.de', 20, 285);
   doc.text('Seite 1 von 1', 185, 285, { align: 'right' });
 
-  // Trigger Instant Browser Download
+  return doc;
+};
+
+export const generateInvoicePDF = async (params: InvoicePDFParams) => {
+  const doc = await buildInvoicePDFDoc(params);
+  const cleanInvoiceId = params.invoiceId.startsWith('INV-') ? params.invoiceId.replace('INV-', 'RE-') : params.invoiceId;
   const sanitizedSchool = (params.schoolName || 'Musikschule').replace(/[^a-zA-Z0-9_-]/g, '_');
   doc.save(`${cleanInvoiceId}_${sanitizedSchool}.pdf`);
+};
+
+export interface InvoicePDFBinaryResult {
+  doc: any;
+  base64: string;
+  sha256: string;
+  filename: string;
+  cleanInvoiceId: string;
+}
+
+export const generateInvoicePDFBinary = async (params: InvoicePDFParams): Promise<InvoicePDFBinaryResult> => {
+  const doc = await buildInvoicePDFDoc(params);
+  const cleanInvoiceId = params.invoiceId.startsWith('INV-') ? params.invoiceId.replace('INV-', 'RE-') : params.invoiceId;
+  const sanitizedSchool = (params.schoolName || 'Musikschule').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const filename = `${cleanInvoiceId}_${sanitizedSchool}.pdf`;
+
+  // Extract base64 string
+  const dataUri: string = doc.output('datauristring');
+  const base64 = dataUri.includes(',') ? dataUri.split(',')[1] : dataUri;
+
+  // Compute SHA-256 hash using Web Crypto API
+  const arrayBuffer: ArrayBuffer = doc.output('arraybuffer');
+  const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const sha256 = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+  return {
+    doc,
+    base64,
+    sha256,
+    filename,
+    cleanInvoiceId,
+  };
 };
 
 export interface HomeworkItemPDF {

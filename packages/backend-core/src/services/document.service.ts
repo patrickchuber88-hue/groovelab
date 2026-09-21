@@ -1,8 +1,8 @@
-import { withKyselyTenant } from '../db/kysely-tenant';
-import { SecurityContext } from '../types/security-context';
+import { withKyselyTenant } from '../db/kysely-tenant.js';
+import { SecurityContext } from '../types/security-context.js';
 
 export async function getTenantDocuments(context: SecurityContext) {
-  return await withKyselyTenant(context, async (trx) => {
+  return await withKyselyTenant(context, async (trx: any) => {
     return await trx
       .selectFrom('documents')
       .selectAll()
@@ -15,7 +15,7 @@ export async function createTenantDocument(
   context: SecurityContext,
   input: { title: string; content: string; isConfidential?: boolean }
 ) {
-  return await withKyselyTenant(context, async (trx) => {
+  return await withKyselyTenant(context, async (trx: any) => {
     return await trx
       .insertInto('documents')
       .values({

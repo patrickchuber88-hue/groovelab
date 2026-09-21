@@ -46,7 +46,7 @@ export function StudentBillingInvoicesSection({ studentUser, studentId }: { stud
         <div style={{ marginTop: '4px', paddingTop: '12px', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
           <div>
             <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#0f172a' }}>
-              Gesetzliche Vertragsbestätigung (§ 312f Abs. 2 BGB)
+              Gesetzliche Vertragsbestätigung
             </div>
             <div style={{ fontSize: '0.70rem', color: '#64748b' }}>
               2-seitiges Dokument mit Bereitstellungsnachweis, GoBD-Siegel &amp; gesetzlicher Widerrufsbelehrung.

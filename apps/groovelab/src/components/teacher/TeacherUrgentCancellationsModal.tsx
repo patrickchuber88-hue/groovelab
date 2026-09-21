@@ -295,7 +295,7 @@ export const TeacherUrgentCancellationsModal: React.FC<TeacherUrgentCancellation
           >
             <Info size={16} color="#dc2626" style={{ flexShrink: 0, marginTop: '2px' }} />
             <p style={{ margin: 0, fontSize: '0.82rem', color: '#475569', lineHeight: 1.45 }}>
-              <strong style={{ color: '#0f172a' }}>Schulrecht & Fürsorgepflicht (§ 832 BGB):</strong> Die folgenden Schüler haben die Ausfallnachricht noch nicht geöffnet. Da Campus-Groovelab nach dem Zero-Knowledge-Prinzip zum Schutz von Minderjährigen <strong>keine Telefonnummern in der Cloud</strong> speichert, kontaktiere die Eltern bitte über deine privaten Kontakte/Schülerkartei oder übergebe den Fall mit 1 Klick an das Schulsekretariat.
+              <strong style={{ color: '#0f172a' }}>Schulrecht & Fürsorgepflicht:</strong> Die folgenden Schüler haben die Ausfallnachricht noch nicht geöffnet. Da Campus-Groovelab nach dem Zero-Knowledge-Prinzip zum Schutz von Minderjährigen <strong>keine Telefonnummern in der Cloud</strong> speichert, kontaktiere die Eltern bitte über deine privaten Kontakte/Schülerkartei oder übergebe den Fall mit 1 Klick an das Schulsekretariat.
             </p>
           </div>
         </div>

@@ -1,8 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 import { dbCircuitBreaker } from '../utils/circuitBreaker';
+import { startChildSpan } from '../utils/w3cTraceContext';
+import { isCanaryPath, handleCanaryProbe, applyTarpitDelay } from '../utils/honeyTrapHandler';
 
-export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://supabase.campus-groovelab.de';
-export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+export const supabaseUrl = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_SUPABASE_URL) || (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_URL) || 'https://supabase.campus-groovelab.de';
+export const supabaseAnonKey = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_SUPABASE_ANON_KEY) || (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_ANON_KEY) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy_anon_key_for_testing';
 
 console.log('[Supabase] Initializing with URL:', supabaseUrl ? `${supabaseUrl.substring(0, 15)}...` : 'MISSING');
 
@@ -14,9 +16,21 @@ if (!supabaseUrl || !supabaseAnonKey) {
 const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   if (!init) init = {};
   
+  // 🍯 Autonomous Canary & AI Scraper Tarpit Defense
+  const requestUrl = typeof input === 'string' ? input : (input instanceof URL ? input.toString() : (input as Request)?.url || '');
+  if (isCanaryPath(requestUrl)) {
+    handleCanaryProbe({ source: 'NETWORK_CANARY_FETCH', path: requestUrl });
+    await applyTarpitDelay(1500);
+    return new Response(JSON.stringify({ error: 'Not Found', status: 404 }), {
+      status: 404,
+      statusText: 'Not Found',
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
   // Only include credentials on same-origin requests (e.g. production BFF /api/db)
   // to prevent browser CORS errors with Access-Control-Allow-Origin: * on localhost.
-  const isSameOrigin = typeof window !== 'undefined' && (
+  const isSameOrigin = typeof window !== 'undefined' && Boolean(window.location?.origin) && (
     (typeof input === 'string' && (input.startsWith('/') || input.startsWith(window.location.origin))) ||
     (input instanceof URL && input.origin === window.location.origin)
   );
@@ -48,23 +62,22 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
   let clientInfo = rawHeaders['x-client-info'] || 'supabase-js/2.39.3';
   
   // Dynamically inject security session tokens into x-client-info to avoid CORS preflight (OPTIONS) blocks
-  // 🛡️ Strict Tab Session Isolation: Each browser tab uses its own tab-scoped session from sessionStorage
-  const sessionToken = typeof window !== 'undefined' 
-    ? (sessionStorage.getItem('gl_active_session_lease_id') || localStorage.getItem('gl_global_device_key'))
-    : null;
+  // 🛡️ Strict Tab Session Isolation with Persistent Multi-Tab / Safari Coldstart Fallback
+  const sessionToken = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('gl_active_session_lease_id') : null)
+    || (typeof localStorage !== 'undefined' ? (localStorage.getItem('gl_active_session_lease_id') || localStorage.getItem('gl_global_device_key')) : null);
   if (sessionToken) {
     clientInfo += `;session_token=${sessionToken}`;
   }
 
-  const activeUserId = typeof window !== 'undefined' 
+  const activeUserId = typeof sessionStorage !== 'undefined' 
     ? sessionStorage.getItem('groovelab_user_id')
     : null;
   if (activeUserId) {
     clientInfo += `;user_id=${activeUserId}`;
   }
   
-  let qrToken = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_qr_token') : null;
-  if (!qrToken && typeof window !== 'undefined' && (window.location.pathname.startsWith('/onboarding') || window.location.pathname.startsWith('/qr'))) {
+  let qrToken = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('groovelab_qr_token') : null;
+  if (!qrToken && typeof window !== 'undefined' && window.location?.pathname && (window.location.pathname.startsWith('/onboarding') || window.location.pathname.startsWith('/qr'))) {
     const onboardingMatch = window.location.pathname.match(/^\/onboarding\/([^/?#]+)/);
     const qrMatch = window.location.pathname.match(/^\/qr\/([^/?#]+)/);
     if (onboardingMatch) {
@@ -77,8 +90,8 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
     clientInfo += `;qr_token=${qrToken}`;
   }
 
-  let kioskToken = typeof window !== 'undefined' ? localStorage.getItem('groovelab_kiosk_token') : null;
-  if (!kioskToken && typeof window !== 'undefined' && window.location.pathname.startsWith('/device-onboarding')) {
+  let kioskToken = typeof localStorage !== 'undefined' ? localStorage.getItem('groovelab_kiosk_token') : null;
+  if (!kioskToken && typeof window !== 'undefined' && window.location?.pathname && window.location.pathname.startsWith('/device-onboarding')) {
     const deviceMatch = window.location.pathname.match(/^\/device-onboarding\/([^/?#]+)/);
     if (deviceMatch) {
       kioskToken = deviceMatch[1];
@@ -102,6 +115,11 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
   if (inviteToken) {
     clientInfo += `;invite_token=${inviteToken}`;
   }
+
+  // 🛡️ W3C Distributed Tracing (ISO/IEC 27037 Causality Chain)
+  const trace = startChildSpan();
+  clientInfo += `;trace_id=${trace.traceId};traceparent=${trace.traceparent}`;
+  rawHeaders['traceparent'] = trace.traceparent;
 
   // Set the modified client info header
   rawHeaders['x-client-info'] = clientInfo;
@@ -237,12 +255,13 @@ if (typeof window !== 'undefined') {
     }, 350);
   };
 
-  window.addEventListener('online', triggerHealthRecovery);
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      triggerHealthRecovery();
-    }
-  });
+  if (typeof document !== 'undefined' && document.addEventListener) {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        triggerHealthRecovery();
+      }
+    });
+  }
 }
 
 /**

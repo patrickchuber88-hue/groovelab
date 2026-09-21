@@ -132,6 +132,7 @@ export interface TeacherModalsHubProps {
   toggleAllAbsenceDates: () => void;
   areAllAbsenceDatesCollapsed: boolean;
   handleEmergencyShoutbox?: (occ: any) => void;
+  handleMarkStudentContacted?: (targetId: string, contactType?: 'reached' | 'voicemail') => Promise<void> | void;
 
   // Urgent cancellations & Makeup
   isUrgentModalOpen: boolean;
@@ -267,6 +268,7 @@ export const TeacherModalsHub: React.FC<TeacherModalsHubProps> = ({
   toggleAllAbsenceDates,
   areAllAbsenceDatesCollapsed,
   handleEmergencyShoutbox,
+  handleMarkStudentContacted,
   isUrgentModalOpen,
   urgentCancellations,
   setIsUrgentModalOpen,
@@ -702,6 +704,7 @@ export const TeacherModalsHub: React.FC<TeacherModalsHubProps> = ({
         toggleAllAbsenceDates={toggleAllAbsenceDates}
         areAllAbsenceDatesCollapsed={areAllAbsenceDatesCollapsed}
         handleEmergencyShoutbox={handleEmergencyShoutbox || (() => {})}
+        handleMarkStudentContacted={handleMarkStudentContacted}
       />
 
       {/* 1:1 Shoutbox Overlay */}
@@ -820,7 +823,7 @@ export const TeacherModalsHub: React.FC<TeacherModalsHubProps> = ({
         allStudents={allStudents}
         todayStudents={todayTagesplanStudents}
         rooms={rooms}
-        currentRoom={activeTimelineSlot?.room || activeTimelineSlot?.rooms?.name || teacherTodayRooms[0] || 'Raum 4'}
+        currentRoom={activeTimelineSlot?.room || activeTimelineSlot?.rooms?.name || teacherTodayRooms[0] || ''}
         teacherTodayRooms={teacherTodayRooms}
         onOpenHomeworkModal={(stud) => {
           const sId = stud.id || stud.user_id;

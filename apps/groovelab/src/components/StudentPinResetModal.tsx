@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import QRCode from 'react-qr-code';
 import { X, Check, Copy, Share2, QrCode as QrCodeIcon, ShieldCheck, Sparkles, MessageCircle, ExternalLink, Calendar } from 'lucide-react';
 import { formatSingleStudentAnonymized, useRealNamesVisibility } from '../utils/nameHelper';
@@ -27,6 +27,17 @@ export function StudentPinResetModal({
   const { visible: isPrivacyMode } = useRealNamesVisibility();
   const [copied, setCopied] = useState(false);
   const [showQrCode, setShowQrCode] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const studentDisplayName = formatSingleStudentAnonymized(
     student.first_name || student.name?.split(' ')[0],
@@ -90,6 +101,9 @@ export function StudentPinResetModal({
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Neuer Onboarding-Link"
         style={{
           background: '#ffffff',
           borderRadius: '24px',
@@ -108,24 +122,29 @@ export function StudentPinResetModal({
       >
         {/* Close button */}
         <button
+          type="button"
           onClick={onClose}
+          aria-label="Schließen"
+          title="Schließen"
           style={{
             position: 'absolute',
-            top: '18px',
-            right: '18px',
+            top: '14px',
+            right: '14px',
             background: '#f1f5f9',
             border: 'none',
             borderRadius: '50%',
-            width: '32px',
-            height: '32px',
+            width: '44px',
+            height: '44px',
+            minWidth: '44px',
+            minHeight: '44px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
             color: '#64748b',
+            touchAction: 'manipulation',
             transition: 'background 0.15s'
           }}
-          title="Schließen"
         >
           <X size={18} />
         </button>

@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Campus-Groovelab | Executive Briefing & Management Exposé</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 10mm 12mm 10mm 12mm;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Plus Jakarta Sans", "Segoe UI", Roboto, sans-serif;
+      color: #0f172a;
+      background: #ffffff;
+      line-height: 1.38;
+      font-size: 10.8px;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .sheet {
+      width: 100%;
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 8px 6px;
+    }
+
+    /* Executive Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #0f172a;
+      margin-bottom: 10px;
+    }
+
+    .brand-title {
+      font-size: 19px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-pills {
+      display: flex;
+      gap: 4px;
+    }
+
+    .pill {
+      font-size: 8px;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 4px;
+      letter-spacing: 0.04em;
+    }
+
+    .pill-campus { background: #34a853; color: #ffffff; }
+    .pill-groovelab { background: #facc15; color: #0f172a; }
+    .pill-admin { background: #ea4335; color: #ffffff; }
+
+    .doc-subtitle {
+      font-size: 10.5px;
+      color: #64748b;
+      font-weight: 600;
+      margin-top: 1px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+    }
+
+    .header-print-btn {
+      background: #0f172a;
+      color: #ffffff;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 10.5px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+      transition: all 0.15s ease;
+    }
+
+    .header-print-btn:hover {
+      background: #334155;
+      transform: translateY(-1px);
+    }
+
+    .header-meta {
+      text-align: right;
+      font-size: 9px;
+      color: #64748b;
+      line-height: 1.35;
+    }
+
+    .header-meta strong {
+      color: #0f172a;
+    }
+
+    /* Lead Statement */
+    .lead-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-left: 4px solid #0f172a;
+      border-radius: 8px;
+      padding: 8px 12px;
+      margin-bottom: 9px;
+      font-size: 10.5px;
+      color: #1e293b;
+      font-weight: 600;
+      line-height: 1.35;
+    }
+
+    /* Section Headers */
+    .section-header {
+      font-size: 8.8px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #64748b;
+      margin-bottom: 5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .section-header::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: #e2e8f0;
+    }
+
+    /* Executive Matrix (4 Blocks) */
+    .exec-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+      margin-bottom: 9px;
+    }
+
+    .exec-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 7px 9px;
+    }
+
+    .exec-card-title {
+      font-size: 9.8px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 2px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .exec-card-desc {
+      font-size: 9.1px;
+      color: #475569;
+      line-height: 1.32;
+    }
+
+    .exec-card-desc strong {
+      color: #0f172a;
+    }
+
+    /* Deal Highlight Banner */
+    .deal-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 11px;
+      margin-bottom: 8px;
+      display: grid;
+      grid-template-columns: 1.5fr 1fr;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .deal-text h4 {
+      font-size: 10.5px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 2px;
+    }
+
+    .deal-text p {
+      font-size: 9.2px;
+      color: #475569;
+      line-height: 1.34;
+    }
+
+    .deal-metrics {
+      display: flex;
+      gap: 6px;
+    }
+
+    .deal-metric-box {
+      flex: 1;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 5px 6px;
+      text-align: center;
+    }
+
+    .deal-metric-box .val {
+      font-size: 13px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+
+    .deal-metric-box .lbl {
+      font-size: 8px;
+      color: #64748b;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    /* Summary Card */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 8px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 7px 10px;
+      margin-bottom: 8px;
+      align-items: center;
+    }
+
+    .summary-card {
+      font-size: 9.2px;
+      color: #334155;
+      line-height: 1.34;
+    }
+
+    .summary-card strong {
+      color: #0f172a;
+    }
+
+    .highlight-banner {
+      background: #0f172a;
+      border-radius: 6px;
+      padding: 6px 10px;
+      text-align: center;
+      color: #ffffff;
+    }
+
+    .highlight-banner .val {
+      font-size: 15px;
+      font-weight: 800;
+      color: #34d399;
+    }
+
+    .highlight-banner .lbl {
+      font-size: 8px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #94a3b8;
+    }
+
+    /* Footer */
+    .footer {
+      border-top: 1px solid #e2e8f0;
+      padding-top: 5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 8.6px;
+      color: #64748b;
+    }
+
+    .footer strong {
+      color: #0f172a;
+    }
+
+    .floating-print-btn {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #0f172a;
+      color: #ffffff;
+      padding: 10px 18px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 12px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .floating-print-btn:hover {
+      transform: scale(1.03);
+    }
+
+    @media print {
+      body {
+        width: 100% !important;
+        background: #ffffff !important;
+      }
+      .sheet {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 2px !important;
+      }
+      .floating-print-btn, .header-print-btn {
+        display: none !important;
+      }
+      .lead-box, .exec-card, .deal-card, .summary-grid {
+        break-inside: avoid;
+        page-break-inside: avoid;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+    }
+  </style>
+  <script>
+    document.addEventListener('keydown', function(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
+        e.preventDefault();
+        window.print();
+      }
+    });
+  </script>
+</head>
+<body>
+
+  <div class="sheet">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <div class="brand-title">
+          Campus-Groovelab
+          <div class="brand-pills">
+            <span class="pill pill-campus">Campus</span>
+            <span class="pill pill-groovelab">GrooveLab</span>
+            <span class="pill pill-admin">Verwaltung</span>
+          </div>
+        </div>
+        <div class="doc-subtitle">Executive Management Briefing: Partnerschaft & Plattform-Architektur</div>
+      </div>
+      <div class="header-actions">
+        <button type="button" class="header-print-btn" onclick="window.print()">
+          🖨️ PDF drucken / speichern
+        </button>
+        <div class="header-meta">
+          <div><strong>Geschäftsführung:</strong> Patrick Huber Einzelunternehmer</div>
+          <div><strong>Status:</strong> Vertrauliches Strategie-Briefing</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lead Box -->
+    <div class="lead-box">
+      Campus-Groovelab verbindet modernes Schüler-Engagement mit rechtssicherer Schulleitung: 0,00 € Software-Lizenz, Hosting-Only Pauschale, 100 % DSGVO- & Herrenberg-Schutz und über 98 % Nettomarge bei Skalierung.
+    </div>
+
+    <!-- 4 Dimensionen -->
+    <div class="section-header">Die 4 Pfeiler des Plattform-Erfolgs im DACH-Markt</div>
+    <div class="exec-grid">
+      <div class="exec-card">
+        <div class="exec-card-title">⚖️ 1. Herrenberg-Schutz & Kreidetafel-Doktrin</div>
+        <div class="exec-card-desc">
+          Keine Zeiterfassung gem. ArbZG, keine Verhaltenskontrolle (§ 87 BetrVG), zweiseitiges Ressourcenmodell und RLS-Notizenschutz. Vollautomatisches Negativattest für Personalrat und Schulträger.
+        </div>
+      </div>
+
+      <div class="exec-card">
+        <div class="exec-card-title">🔒 2. Zero-Photo DSGVO-Kosmos (§ 22 KUG)</div>
+        <div class="exec-card-desc">
+          Vollständiger Verzicht auf Schülerfotos verhindert Deepfakes und KUG-Abmahnungen. Stilisierte Musiker-Avatare im geschlossenen Kommunikationsraum; keine WhatsApp-Grauzone.
+        </div>
+      </div>
+
+      <div class="exec-card">
+        <div class="exec-card-title">💶 3. Reale Tariflogik (183,99 € / Mo.)</div>
+        <div class="exec-card-desc">
+          Kombi-Hosting (19,90 €) + Team (0,49 €) + 20 GrooveLab (0,49 €) + 250 Campus (0,49 €) + 200 Basis-Schüler (0,09 €) + Audio-Tresor 25 GB (3,99 €) = <strong>exakt 183,99 € / Mo.</strong> (Ø 185 €).
+        </div>
+      </div>
+
+      <div class="exec-card">
+        <div class="exec-card-title">📈 4. Reale Netto-Marge > 98 %</div>
+        <div class="exec-card-desc">
+          Hocheffiziente Hetzner-Server (Nürnberg/Falkenstein), Google AI Ultra (99,99 €) und Hiscox/exali IT-Haftpflicht. Monatskosten bei 100 Schulen: <strong>nur 353 €</strong> bei 18.500 € MRR.
+        </div>
+      </div>
+    </div>
+
+    <!-- Partnerschaft Bad Säckingen -->
+    <div class="section-header">Das Partnerschaftsmodell: Bad Säckingen als Innovations-Reallabor</div>
+    <div class="deal-card">
+      <div class="deal-text">
+        <h4>Referenzschule & Fachbeirat</h4>
+        <p>
+          Dauerhaft <strong>100 % kostenfreier Vollzugriff (0 €)</strong> auf alle Module für alle Lehrer und Schüler der Musikschule Bad Säckingen.
+          Als Gegenleistung berät die Schulleitung 1× monatlich (ca. 90 Min. Jour-Fixe) als Pädagogischer Fachbeirat.
+        </p>
+      </div>
+      <div class="deal-metrics">
+        <div class="deal-metric-box">
+          <div class="val">0 €</div>
+          <div class="lbl">Software & Hosting</div>
+        </div>
+        <div class="deal-metric-box">
+          <div class="val">20 – 49 %</div>
+          <div class="lbl">Revenue Share</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary Box -->
+    <div class="summary-grid">
+      <div class="summary-card">
+        <strong>Strategisches Resümee:</strong><br>
+        Mit über 2.100 Musikschulen im DACH-Raum (> 1,95 Mio. Schüler) erfordert die Erreichung von nur 5 % Marktanteil (100 Schulen) einen ARR von <strong>> 220.000 €</strong> bei minimalen Fixkosten. Bad Säckingen profitiert ab Tag 1 von 20 % bis 49 % an allen generierten Plattformumsätzen.
+      </div>
+      <div class="highlight-banner">
+        <div class="val">> 2.100</div>
+        <div class="lbl">Musikschulen DACH</div>
+        <div style="font-size: 8.5px; color: #94a3b8; margin-top: 2px;">VdM, KOMU & VMS Markt</div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div>Campus-Groovelab | Executive Briefing & Management Exposé</div>
+      <div><strong>Patrick Huber</strong> | Vertrauliche Entscheidungsgrundlage</div>
+    </div>
+  </div>
+
+  <button class="floating-print-btn" onclick="window.print()">
+    🖨️ Als PDF drucken / speichern
+  </button>
+
+</body>
+</html>

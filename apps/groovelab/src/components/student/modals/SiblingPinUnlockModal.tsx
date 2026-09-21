@@ -418,7 +418,7 @@ export const SiblingPinUnlockModal: React.FC<SiblingPinUnlockModalProps> = ({
           }}
         >
           <ShieldCheck size={14} color="#0284c7" />
-          <span>Geschützter Geschwister-Bereich (§ 1626 BGB / DSGVO)</span>
+          <span>Geschützter Geschwister-Bereich (Elternfreigabe)</span>
         </div>
       </div>
     </div>

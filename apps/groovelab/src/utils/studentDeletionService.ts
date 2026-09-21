@@ -296,3 +296,43 @@ export async function deleteStudentFully(
     return { success: false, error: err.message || 'Fehler beim Löschen des Schülers.' };
   }
 }
+
+/**
+ * Moves a student to the 30-Day Recycle Bin (reversible soft-delete).
+ */
+export async function softDeleteStudent(studentId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data, error } = await supabase.rpc('soft_delete_student', {
+      p_student_id: studentId
+    });
+
+    if (error) throw error;
+    if (data && data.success === false) {
+      return { success: false, error: data.error };
+    }
+    return { success: true };
+  } catch (err: any) {
+    console.error('[studentDeletionService] Error during soft delete:', err);
+    return { success: false, error: err?.message || 'Fehler beim Verschieben in den Papierkorb.' };
+  }
+}
+
+/**
+ * Restores a student from the 30-Day Recycle Bin back to active status.
+ */
+export async function restoreStudent(studentId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data, error } = await supabase.rpc('restore_student', {
+      p_student_id: studentId
+    });
+
+    if (error) throw error;
+    if (data && data.success === false) {
+      return { success: false, error: data.error };
+    }
+    return { success: true };
+  } catch (err: any) {
+    console.error('[studentDeletionService] Error during restore:', err);
+    return { success: false, error: err?.message || 'Fehler beim Wiederherstellen des Schülers.' };
+  }
+}

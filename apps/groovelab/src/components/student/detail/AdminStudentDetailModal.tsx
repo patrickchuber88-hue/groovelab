@@ -94,6 +94,30 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
   const [schoolSubjects, setSchoolSubjects] = useState<string[]>([]);
   const [isCampusActive, setIsCampusActive] = useState<boolean>(student.is_campus_active ?? student.isCampusActive ?? false);
   const [isGroovelabActive, setIsGroovelabActive] = useState<boolean>(student.is_groovelab_active ?? student.isGroovelabActive ?? false);
+  const [studentUiLevel, setStudentUiLevel] = useState<'junior' | 'teen' | 'pro'>(() => {
+    const localLevel = typeof window !== 'undefined' && student.id ? localStorage.getItem(`campus_student_ui_level_${student.id}`) : null;
+    return (localLevel || student.campus_ui_level || 'junior') as any;
+  });
+
+  const handleUpdateStudentUiLevel = async (newLevel: 'junior' | 'teen' | 'pro') => {
+    if (newLevel === studentUiLevel) return;
+    setStudentUiLevel(newLevel);
+    const targetId = activeStudent?.id || student?.id;
+    if (targetId) {
+      localStorage.setItem(`campus_student_ui_level_${targetId}`, newLevel);
+      try {
+        await supabase.from('users').update({ campus_ui_level: newLevel }).eq('id', targetId);
+        try {
+          await supabase.from('students').update({ campus_ui_level: newLevel }).eq('id', targetId);
+        } catch {}
+      } catch (e) {
+        console.warn('Could not update student campus_ui_level:', e);
+      }
+      window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: { studentId: targetId, uiLevel: newLevel } }));
+      window.dispatchEvent(new CustomEvent('campus_ui_level_changed', { detail: newLevel }));
+    }
+  };
+
   const [exemptFromDirectBilling, setExemptFromDirectBilling] = useState<boolean>(student.exempt_from_direct_billing ?? false);
   const [lockedStudentPrice, setLockedStudentPrice] = useState<number | null>(student.locked_student_price ?? null);
   const [lessonDuration, setLessonDuration] = useState<number>(student.lesson_duration || 30);
@@ -356,7 +380,11 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
 
   const handleSwitchActiveStudent = async (targetStudent: any) => {
     try {
-      const { data } = await supabase.from('users').select('*').eq('id', targetStudent.id).maybeSingle();
+      const { data } = await supabase
+        .from('users')
+        .select('id, first_name, last_name, name, instrument, is_campus_active, is_groovelab_active, exempt_from_direct_billing, locked_student_price, lesson_duration, is_adult, qr_token, group_id, direct_debit_consent, birth_date, day_of_birth, role, school_id')
+        .eq('id', targetStudent.id)
+        .maybeSingle();
       const chosen = data || targetStudent;
       setActiveStudent(chosen);
       setFirstName(chosen.first_name || (chosen.name ? chosen.name.split(' ')[0] : ''));
@@ -1280,6 +1308,57 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
                     </button>
                   </div>
                 </div>
+
+                {/* Didaktische Altersstufe (Campus-Dashboard) */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0 2px 0', borderTop: '1px solid #f1f5f9' }}>
+                  <div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>🎨 Altersstufe (Campus-Dashboard)</span>
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                      Legt die Benutzeroberfläche fest (Junior 6–10 J., Teen 11–15 J., Pro 16+ J.)
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', background: '#f1f5f9', padding: '3px', borderRadius: '12px', gap: '3px' }}>
+                    {[
+                      { key: 'junior', label: 'Junior', icon: '🐣' },
+                      { key: 'teen', label: 'Teen', icon: '🚀' },
+                      { key: 'pro', label: 'Pro', icon: '👑' }
+                    ].map((lvl) => {
+                      const isActive = studentUiLevel === lvl.key;
+                      return (
+                        <button
+                          key={lvl.key}
+                          type="button"
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`Altersstufe auf ${lvl.label} setzen`}
+                          aria-pressed={isActive}
+                          onClick={() => handleUpdateStudentUiLevel(lvl.key as any)}
+                          style={{
+                            background: isActive ? '#34a853' : 'transparent',
+                            color: isActive ? '#ffffff' : '#64748b',
+                            border: 'none',
+                            borderRadius: '9px',
+                            padding: '6px 10px',
+                            fontSize: '0.74rem',
+                            fontWeight: isActive ? 850 : 650,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            minHeight: '36px',
+                            transition: 'all 0.15s ease',
+                            touchAction: 'manipulation'
+                          }}
+                        >
+                          <span>{lvl.icon}</span>
+                          <span>{lvl.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </section>
             </div>
 
@@ -1778,8 +1857,8 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
                   </div>
                   <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>
                     {isAdult
-                      ? 'Schüler ist volljährig (§ 2 BGB). Elterlicher PIN-Zugriff ist deaktiviert.'
-                      : 'Minderjährig. Gesetzliche Vertretung durch Erziehungsberechtigte.'}
+                      ? 'Schüler ist volljährig. Elterlicher PIN-Zugriff ist deaktiviert.'
+                      : 'Minderjährig. Vertretung durch Erziehungsberechtigte.'}
                   </div>
                 </div>
 

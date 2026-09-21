@@ -6,19 +6,8 @@ export const cleanRoomName = (name: string | null | undefined): string => {
   return name.replace(/^#\d+\s*[-:]*\s*/, '').trim();
 };
 
-export const getSimulatedNow = (): Date => {
-  const simStr = typeof window !== 'undefined' ? localStorage.getItem('groovelab_simulated_date') : null;
-  if (!simStr) return new Date();
-  
-  const parts = simStr.split('-').map(Number);
-  if (parts.length !== 3 || isNaN(parts[0])) return new Date();
-
-  const baseSim = new Date(parts[0], parts[1] - 1, parts[2], 14, 0, 0);
-  const simStartTime = Number(localStorage.getItem('groovelab_simulated_start_timestamp') || Date.now());
-  const elapsedMinutes = Math.floor((Date.now() - simStartTime) / 60000);
-
-  return new Date(baseSim.getTime() + elapsedMinutes * 60000);
-};
+import { getSimulatedNow } from '../../../hooks/useSimulatedTime';
+export { getSimulatedNow };
 
 export const parseDayNumber = (dayInput: any): number => {
   if (typeof dayInput === 'number') return dayInput;

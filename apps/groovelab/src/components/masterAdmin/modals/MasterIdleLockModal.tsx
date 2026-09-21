@@ -107,77 +107,98 @@ export const MasterIdleLockModal: React.FC<MasterIdleLockModalProps> = ({
         )}
 
         <form onSubmit={onIdleUnlock} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {masterPasskeyActive ? (
-            <button
-              type="button"
-              onClick={() => onIdleUnlock()}
-              disabled={idleUnlockLoading}
+          {/* 1. Primär: Biometrischer Fingerabdruck / Touch ID Button */}
+          <button
+            type="button"
+            onClick={() => onIdleUnlock()}
+            disabled={idleUnlockLoading}
+            style={{
+              width: '100%',
+              padding: '14px',
+              borderRadius: '14px',
+              background: '#0f172a',
+              color: '#ffffff',
+              fontWeight: 800,
+              fontSize: '0.92rem',
+              border: 'none',
+              cursor: idleUnlockLoading ? 'wait' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              boxShadow: '0 4px 12px rgba(15, 23, 42, 0.25)',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <Fingerprint size={22} color="#10b981" />
+            <span>{idleUnlockLoading ? 'Verifiziere...' : 'Mit Touch ID / Fingerabdruck entsperren'}</span>
+          </button>
+
+          {/* Trennlinie */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '4px 0' }}>
+            <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+            <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase' }}>ODER</span>
+            <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+          </div>
+
+          {/* 2. Sekundär: 6-stelliger Google Authenticator Code */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={6}
+              placeholder="Google Authenticator (6 Ziffern)"
+              value={idlePinInput}
+              onChange={(e) => setIdlePinInput(e.target.value.replace(/[^0-9]/g, ''))}
               style={{
                 width: '100%',
-                padding: '14px',
-                borderRadius: '14px',
-                background: '#0f172a',
+                padding: '12px 16px',
+                borderRadius: '12px',
+                border: '1.5px solid #cbd5e1',
+                fontSize: '1.05rem',
+                fontWeight: 800,
+                letterSpacing: '0.15em',
+                textAlign: 'center',
+                outline: 'none',
+                boxSizing: 'border-box',
+                fontFamily: 'monospace',
+                background: '#f8fafc',
+              }}
+            />
+            <button
+              type="submit"
+              disabled={idleUnlockLoading || idlePinInput.trim().length !== 6}
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: '12px',
+                background: idlePinInput.trim().length === 6 ? '#059669' : '#94a3b8',
                 color: '#ffffff',
                 fontWeight: 800,
-                fontSize: '0.92rem',
+                fontSize: '0.88rem',
                 border: 'none',
-                cursor: idleUnlockLoading ? 'wait' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px',
-                boxShadow: '0 4px 12px rgba(15, 23, 42, 0.25)',
+                cursor: idlePinInput.trim().length === 6 ? 'pointer' : 'not-allowed',
+                transition: 'background 0.2s ease',
               }}
             >
-              <Fingerprint size={20} />
-              {idleUnlockLoading ? 'Verifiziere...' : 'Mit Touch ID / Passkey entsperren'}
+              Code bestätigen &amp; entsperren
             </button>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <input
-                type="password"
-                placeholder="Master-Passwort / PIN eingeben"
-                value={idlePinInput}
-                onChange={(e) => setIdlePinInput(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '12px 16px',
-                  borderRadius: '12px',
-                  border: '1.5px solid #cbd5e1',
-                  fontSize: '0.9rem',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                }}
-              />
-              <button
-                type="submit"
-                disabled={idleUnlockLoading || !idlePinInput.trim()}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  borderRadius: '12px',
-                  background: '#0f172a',
-                  color: '#ffffff',
-                  fontWeight: 800,
-                  fontSize: '0.88rem',
-                  border: 'none',
-                  cursor: 'pointer',
-                }}
-              >
-                Entsperren
-              </button>
-            </div>
-          )}
+          </div>
 
           <button
             type="button"
             onClick={() => {
-              sessionStorage.removeItem('groovelab_is_master_admin');
-              localStorage.removeItem('groovelab_is_master_admin');
-              sessionStorage.setItem('groovelab_active_workspace', 'secretary');
-              localStorage.setItem('groovelab_active_workspace', 'secretary');
-              sessionStorage.setItem('groovelab_active_platform', 'campus');
-              sessionStorage.setItem('campus_active_tab', 'briefing');
+              try {
+                sessionStorage.removeItem('groovelab_is_master_admin');
+                localStorage.removeItem('groovelab_is_master_admin');
+                sessionStorage.setItem('groovelab_active_workspace', 'secretary');
+                localStorage.setItem('groovelab_active_workspace', 'secretary');
+                sessionStorage.setItem('groovelab_active_platform', 'campus');
+                sessionStorage.setItem('campus_active_tab', 'briefing');
+              } catch (e) {
+                console.warn('Storage operation failed in MasterIdleLockModal:', e);
+              }
               window.location.reload();
             }}
             style={{

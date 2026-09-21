@@ -49,7 +49,8 @@ export function useMasterAdminOperator({ currentUser, onNotify }: UseMasterAdmin
 
   const fetchAdminUser = useCallback(async () => {
     try {
-      let query = supabase.from('users').select('*');
+      // 🛡️ OWASP ASVS Level 3: Strict explicit column whitelist (Zero Secret Leakage)
+      let query = supabase.from('users').select('id, school_id, first_name, last_name, role, master_admin_username, username, is_master_admin, is_2fa_enabled, email');
       if (currentUser?.id && currentUser.id !== 'master_admin') {
         query = query.eq('id', currentUser.id);
       } else {

@@ -1,6 +1,23 @@
 import React, { useState } from 'react';
-import { X, Calendar, AlertTriangle, Clock, CalendarX, Check } from 'lucide-react';
+import { 
+  X, 
+  Calendar, 
+  AlertTriangle, 
+  Clock, 
+  CalendarX, 
+  Check, 
+  Info, 
+  Zap, 
+  CalendarDays, 
+  Pencil, 
+  Building2, 
+  User, 
+  CheckCircle2, 
+  AlertCircle, 
+  ArrowRight 
+} from 'lucide-react';
 import { isTeacherCurrentlyAbsent as defaultIsTeacherCurrentlyAbsent } from '../../utils/teacherAbsenceHelper';
+import { getSimulatedNow } from '../../hooks/useSimulatedTime';
 
 export interface TeacherAbsenceModalProps {
   showAbsenceModal: boolean;
@@ -18,8 +35,8 @@ export interface TeacherAbsenceModalProps {
   setShowCustomStart?: (show: boolean) => void;
   absenceHandlingOwner: 'secretariat' | 'teacher' | '' | null;
   setAbsenceHandlingOwner: React.Dispatch<React.SetStateAction<'secretariat' | 'teacher' | null>> | ((owner: 'secretariat' | 'teacher') => void);
-  absenceOfficialNote: string;
-  setAbsenceOfficialNote: (note: string) => void;
+  absenceOfficialNote?: string;
+  setAbsenceOfficialNote?: (note: string) => void;
   handleEndAbsence: () => Promise<void>;
   handleReportAbsence: () => Promise<void>;
   submittingAbsence: boolean;
@@ -165,7 +182,7 @@ export const TeacherAbsenceModal: React.FC<TeacherAbsenceModalProps> = ({
               gap: '8px',
               boxShadow: '0 2px 6px rgba(34, 197, 94, 0.06)'
             }}>
-              <span style={{ fontSize: '1rem', lineHeight: 1 }}>🟢</span>
+              <CheckCircle2 size={16} color="#166534" style={{ flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <strong style={{ fontSize: '0.78rem', color: '#166534', display: 'block', fontWeight: 800 }}>
                   Aktuell als abwesend gemeldet
@@ -185,7 +202,7 @@ export const TeacherAbsenceModal: React.FC<TeacherAbsenceModalProps> = ({
               alignItems: 'center',
               gap: '8px'
             }}>
-              <span style={{ fontSize: '1rem', lineHeight: 1 }}>ℹ️</span>
+              <Info size={16} color="#991b1b" style={{ flexShrink: 0 }} />
               <span style={{ fontSize: '0.72rem', color: '#991b1b', lineHeight: 1.35, fontWeight: 550 }}>
                 Alle betroffenen Stundenplandaten im Zeitraum werden storniert. Das Sekretariat erhält ein Ticket zur Betreuung der Schüler.
               </span>
@@ -201,7 +218,7 @@ export const TeacherAbsenceModal: React.FC<TeacherAbsenceModalProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  const today = new Date().toLocaleDateString('sv-SE');
+                  const today = getSimulatedNow().toLocaleDateString('sv-SE');
                   setAbsenceStartDate(today);
                   setAbsenceUntilDate(today);
                   setQuickAbsencePreset('today');
@@ -222,16 +239,17 @@ export const TeacherAbsenceModal: React.FC<TeacherAbsenceModalProps> = ({
                   transition: 'all 0.15s'
                 }}
               >
-                <span>⚡</span>
+                <Zap size={14} color={quickAbsencePreset === 'today' ? '#b91c1c' : '#64748b'} />
                 <span>Nur Heute</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => {
-                  const today = new Date().toLocaleDateString('sv-SE');
+                  const simNow = getSimulatedNow();
+                  const today = simNow.toLocaleDateString('sv-SE');
                   const fri = (() => {
-                    const d = new Date();
+                    const d = new Date(simNow);
                     const day = d.getDay();
                     const diffToFri = (5 - day + 7) % 7;
                     d.setDate(d.getDate() + diffToFri);
@@ -257,16 +275,17 @@ export const TeacherAbsenceModal: React.FC<TeacherAbsenceModalProps> = ({
                   transition: 'all 0.15s'
                 }}
               >
-                <span>📅</span>
+                <Calendar size={14} color={quickAbsencePreset === 'friday' ? '#b91c1c' : '#64748b'} />
                 <span>Bis Freitag</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => {
-                  const today = new Date().toLocaleDateString('sv-SE');
+                  const simNow = getSimulatedNow();
+                  const today = simNow.toLocaleDateString('sv-SE');
                   const nextFri = (() => {
-                    const d = new Date();
+                    const d = new Date(simNow);
                     const day = d.getDay();
                     const diffToFri = (5 - day + 7) % 7;
                     d.setDate(d.getDate() + diffToFri + 7);
@@ -292,7 +311,7 @@ export const TeacherAbsenceModal: React.FC<TeacherAbsenceModalProps> = ({
                   transition: 'all 0.15s'
                 }}
               >
-                <span>🗓️</span>
+                <CalendarDays size={14} color={quickAbsencePreset === 'next_friday' ? '#b91c1c' : '#64748b'} />
                 <span>Nächste Woche Fr</span>
               </button>
 
@@ -317,7 +336,7 @@ export const TeacherAbsenceModal: React.FC<TeacherAbsenceModalProps> = ({
                   transition: 'all 0.15s'
                 }}
               >
-                <span>✏️</span>
+                <Pencil size={14} color={quickAbsencePreset === 'custom' ? '#b91c1c' : '#64748b'} />
                 <span>Individuell</span>
               </button>
             </div>
@@ -357,7 +376,7 @@ export const TeacherAbsenceModal: React.FC<TeacherAbsenceModalProps> = ({
                   {absenceStartDate ? new Date(absenceStartDate + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Sofort'}
                 </strong>
               </div>
-              <div style={{ color: '#cbd5e1', fontSize: '0.82rem' }}>➔</div>
+              <ArrowRight size={14} color="#94a3b8" />
               <div style={{ display: 'flex', flexDirection: 'column', textAlign: 'right' }}>
                 <span style={{ fontSize: '0.64rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Bis einschließlich</span>
                 <strong style={{ fontSize: '0.84rem', color: '#b91c1c', fontWeight: 800 }}>
@@ -448,9 +467,19 @@ export const TeacherAbsenceModal: React.FC<TeacherAbsenceModalProps> = ({
                 background: absenceHandlingOwner ? '#dcfce7' : '#fee2e2',
                 padding: '2px 8px',
                 borderRadius: '100px',
-                border: `1px solid ${absenceHandlingOwner ? '#bbf7d0' : '#fecaca'}`
+                border: `1px solid ${absenceHandlingOwner ? '#bbf7d0' : '#fecaca'}`,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px'
               }}>
-                {absenceHandlingOwner ? '✓ Ausgewählt' : 'Pflichtfeld'}
+                {absenceHandlingOwner ? (
+                  <>
+                    <Check size={11} strokeWidth={3} />
+                    <span>Ausgewählt</span>
+                  </>
+                ) : (
+                  'Pflichtfeld'
+                )}
               </span>
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
@@ -480,7 +509,7 @@ export const TeacherAbsenceModal: React.FC<TeacherAbsenceModalProps> = ({
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '1.05rem' }}>🏢</span>
+                  <Building2 size={18} color={absenceHandlingOwner === 'secretariat' ? '#ef4444' : '#64748b'} />
                   <div style={{
                     width: '16px',
                     height: '16px',
@@ -525,7 +554,7 @@ export const TeacherAbsenceModal: React.FC<TeacherAbsenceModalProps> = ({
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '1.05rem' }}>👤</span>
+                  <User size={18} color={absenceHandlingOwner === 'teacher' ? '#ef4444' : '#64748b'} />
                   <div style={{
                     width: '16px',
                     height: '16px',
@@ -559,38 +588,10 @@ export const TeacherAbsenceModal: React.FC<TeacherAbsenceModalProps> = ({
                 color: '#e11d48',
                 fontWeight: 700
               }}>
-                <span>⚠️</span>
+                <AlertCircle size={14} color="#e11d48" style={{ flexShrink: 0 }} />
                 <span>Bitte triff eine Auswahl, wer die Schüler kontaktiert.</span>
               </div>
             )}
-          </div>
-
-          {/* ── FLÜCHTIGE ANMERKUNG FÜR DIE E-MAIL AN DIE SCHULLEITUNG (ZERO-STORAGE PRIVACY) ── */}
-          <div>
-            <label style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <span>Anmerkung / Grund (optional für E-Mail)</span>
-              <span style={{ fontSize: '0.64rem', fontWeight: 600, color: '#94a3b8' }}>🔒 Flüchtig / Nicht gespeichert</span>
-            </label>
-            <input
-              type="text"
-              placeholder="z.B. Konzertreise / Tournee (abgesprochen), Notizen für Vertretung..."
-              value={absenceOfficialNote}
-              onChange={(e) => setAbsenceOfficialNote(e.target.value)}
-              style={{
-                width: '100%',
-                boxSizing: 'border-box',
-                padding: '7px 11px',
-                borderRadius: '10px',
-                border: '1.5px solid #cbd5e1',
-                background: '#ffffff',
-                fontSize: '0.78rem',
-                color: '#0f172a',
-                outline: 'none'
-              }}
-            />
-            <span style={{ fontSize: '0.64rem', color: '#94a3b8', display: 'block', marginTop: '3px', lineHeight: 1.25 }}>
-              Wird ausschließlich lokal für deinen E-Mail-Entwurf an die Schulleitung verwendet und nicht auf dem Server gespeichert.
-            </span>
           </div>
         </div>
 

@@ -621,16 +621,40 @@ export function matchStudentNameOrInitial(
   }
 
   // 2. Extract first and last names
-  const cFirst = (candidate.first_name || candidate.name?.split(' ')[0] || '').trim().toLowerCase();
-  const tFirst = (target.first_name || target.name?.split(' ')[0] || '').trim().toLowerCase();
+  let cFirstRaw = (candidate.first_name || '').trim();
+  let cLastRaw = (candidate.last_name || '').trim();
+  if (!cFirstRaw && candidate.name) {
+    const parts = candidate.name.trim().split(/\s+/);
+    cFirstRaw = parts[0] || '';
+    cLastRaw = parts.slice(1).join(' ') || '';
+  } else if (cFirstRaw && !cLastRaw && cFirstRaw.includes(' ')) {
+    const parts = cFirstRaw.split(/\s+/);
+    cFirstRaw = parts[0] || '';
+    cLastRaw = parts.slice(1).join(' ') || '';
+  }
+
+  let tFirstRaw = (target.first_name || '').trim();
+  let tLastRaw = (target.last_name || '').trim();
+  if (!tFirstRaw && target.name) {
+    const parts = target.name.trim().split(/\s+/);
+    tFirstRaw = parts[0] || '';
+    tLastRaw = parts.slice(1).join(' ') || '';
+  } else if (tFirstRaw && !tLastRaw && tFirstRaw.includes(' ')) {
+    const parts = tFirstRaw.split(/\s+/);
+    tFirstRaw = parts[0] || '';
+    tLastRaw = parts.slice(1).join(' ') || '';
+  }
+
+  const cFirst = cFirstRaw.toLowerCase();
+  const tFirst = tFirstRaw.toLowerCase();
 
   if (!cFirst || !tFirst || cFirst !== tFirst) {
     return false;
   }
 
   // First names match! Now compare last names
-  const cLast = (candidate.last_name || candidate.name?.split(' ').slice(1).join(' ') || '').trim().toLowerCase();
-  const tLast = (target.last_name || target.name?.split(' ').slice(1).join(' ') || '').trim().toLowerCase();
+  const cLast = cLastRaw.toLowerCase();
+  const tLast = tLastRaw.toLowerCase();
 
   // If either has no last name, first name match is accepted only if unique
   if (!cLast || !tLast) {

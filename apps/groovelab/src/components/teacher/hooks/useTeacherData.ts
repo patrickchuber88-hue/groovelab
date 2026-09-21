@@ -13,6 +13,11 @@ import {
 import { computeSchoolDunningStatus, SchoolDunningStatus } from '../../../domain/schoolDunningEngine';
 import { getSimulatedNow } from '../utils/teacherDashboardUtils';
 
+// 🛡️ OWASP ASVS Level 3: Strict explicit column whitelists for teacher profiles (Zero Wildcards & Zero Secret Leakage)
+export const TEACHER_SELECT_COLUMNS = 'id, school_id, first_name, last_name, nickname, role, roles, email, photo_url, avatar_url, instrument, is_active, ausweis_nummer, teacher_qr_token, qr_token, is_campus_active, is_groovelab_active, is_premium_user, contract_ends_at, lesson_duration, is_pin_activated, ausfall_until, ausfall_start, created_at, preferred_room_ids, planned_boards, student_billing_payment_method, activated_at, student_billing_cash_paid, is_trial, trial_ends_at, exempt_from_direct_billing, quiet_hours';
+
+export const TEACHER_WITH_SCHOOL_SELECT = `${TEACHER_SELECT_COLUMNS}, schools(id, name, subdomain, logo_url, primary_color, calendar_url, status, opening_hours, is_trial, trial_ends_at, subscription_bypass, has_campus_subscription, has_groovelab_subscription, allow_messages_global)`;
+
 export interface UseTeacherDataProps {
   userId: string;
   initialTeacher?: any;
@@ -141,11 +146,11 @@ export function useTeacherData({
           let effectiveTeacherId = sessionStorage.getItem('groovelab_ghost_shadowed_teacher_id');
           let realTeacher: any = null;
           if (effectiveTeacherId) {
-            const { data: tp } = await supabase.from('users').select('*, schools(*)').eq('id', effectiveTeacherId).maybeSingle();
+            const { data: tp } = await supabase.from('users').select(TEACHER_WITH_SCHOOL_SELECT).eq('id', effectiveTeacherId).maybeSingle();
             realTeacher = tp;
           }
           if (!realTeacher) {
-            const { data: tp } = await supabase.from('users').select('*, schools(*)').eq('school_id', ghostSchoolId).eq('role', 'teacher').limit(1).maybeSingle();
+            const { data: tp } = await supabase.from('users').select(TEACHER_WITH_SCHOOL_SELECT).eq('school_id', ghostSchoolId).eq('role', 'teacher').limit(1).maybeSingle();
             realTeacher = tp;
             if (realTeacher?.id) {
               sessionStorage.setItem('groovelab_ghost_shadowed_teacher_id', realTeacher.id);
@@ -184,13 +189,13 @@ export function useTeacherData({
         } else {
           const [fetchedBandIds, tDataRes] = await Promise.all([
             fetchUserBandIds(userId),
-            supabase.from('users').select('*, schools(*)').eq('id', userId).maybeSingle()
+            supabase.from('users').select(TEACHER_WITH_SCHOOL_SELECT).eq('id', userId).maybeSingle()
           ]);
           bIds = fetchedBandIds;
           tData = tDataRes.data;
 
           if (!tData && userId) {
-            const { data: fallbackUser } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
+            const { data: fallbackUser } = await supabase.from('users').select(TEACHER_SELECT_COLUMNS).eq('id', userId).maybeSingle();
             if (fallbackUser) {
               tData = fallbackUser;
             }

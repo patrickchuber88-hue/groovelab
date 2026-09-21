@@ -362,7 +362,7 @@ export const BackupResetTab: React.FC<BackupResetTabProps> = ({
     setExporting(true);
     try {
       const [usersRes, roomsRes, stationsRes, kiosksRes] = await Promise.all([
-        supabase.from('users').select('*').eq('school_id', selectedSchoolObj.id),
+        supabase.from('users').select('id, school_id, first_name, last_name, nickname, role, roles, email, photo_url, avatar_url, instrument, is_active, ausweis_nummer, created_at, birth_date, day_of_birth').eq('school_id', selectedSchoolObj.id),
         supabase.from('rooms').select('*').eq('school_id', selectedSchoolObj.id),
         supabase.from('stations').select('*'),
         supabase.from('kiosks').select('*').eq('school_id', selectedSchoolObj.id)

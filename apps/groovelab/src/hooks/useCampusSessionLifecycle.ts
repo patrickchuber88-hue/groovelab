@@ -279,9 +279,10 @@ export function useCampusSessionLifecycle({
       }, 500);
     };
 
-    // Realtime subscription for sessions (Active Student Count)
+    // Realtime subscription for sessions (Active Student Count - Partitioned by school_id)
+    const schoolScope = user?.school_id || 'unscoped';
     const sessionsChannel = supabase
-      .channel('public:sessions_count')
+      .channel(`realtime_sessions_count_${schoolScope}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, () => {
         if (user?.school_id) {
           debouncedFetchActiveStudentCount(user.school_id);

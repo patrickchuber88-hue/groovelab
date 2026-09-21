@@ -2,7 +2,7 @@ import { formatCleanNoteContent } from '../notes/notesConstants';
 import React, { useState, useRef } from 'react';
 import {
   CalendarX, Check, ChevronDown, Clock, Coffee, DoorOpen, Eye, EyeOff,
-  HelpCircle, MessageSquare, Mic, Sparkles, Users
+  Headphones, HelpCircle, MessageSquare, Mic, Music, Sparkles, Sun, Users
 } from 'lucide-react';
 import { maskLastName, formatSingleStudentAnonymized } from '../../utils/nameHelper';
 import { isTeacherCurrentlyAbsent } from '../../utils/teacherAbsenceHelper';
@@ -710,6 +710,8 @@ export interface TeacherTagesplanWidgetProps {
   urgentCancellations?: any[];
   onOpenUrgentModal?: () => void;
   onOpenMakeupModal?: (params: { mode: 'create' | 'redeem', slot: any }) => void;
+  rooms?: any[];
+  handleUpdateIssueRoom?: (issueId: string, newRoom: string) => Promise<void> | void;
 }
 
 export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
@@ -752,14 +754,15 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
   userId,
   onOpenUrgentModal,
   onOpenMakeupModal,
+  rooms = [],
+  handleUpdateIssueRoom,
 }) => {
   const [scrollTop, setScrollTop] = useState(0);
 
   return (
     isTourDemoScheduleActive ? (
       <TeacherTourDemoSchedule isFreeDay={isFreeDay} getSimulatedNow={getSimulatedNow} windowWidth={windowWidth} showRealNames={showRealNames} toggleRealNames={toggleRealNames} />
-    ) : !(isWeekend || isFreeDay) ? (
-      isTeacherCurrentlyAbsent(teacher) && !bypassAbsenceView ? (
+    ) : isTeacherCurrentlyAbsent(teacher) && !bypassAbsenceView ? (
         <div style={{
           flex: '1.2 1 450px',
           minWidth: '300px',
@@ -794,20 +797,36 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
         }}>
           <div id="tour-teacher-schedule" className="google-card" style={{ 
             width: '100%', 
-            padding: (windowWidth < 768 || isMobileDevice) ? '16px 14px' : '20px 24px', 
-            borderRadius: '20px', 
-            border: '1px solid #f1f5f9', 
-            boxShadow: '0 2px 12px rgba(0,0,0,0.04)', 
-            background: 'white', 
+            padding: (windowWidth < 768 || isMobileDevice) ? '18px 16px' : '22px 26px', 
+            borderRadius: '24px', 
+            border: isWeekend ? '1px solid rgba(168, 85, 247, 0.22)' : isFreeDay ? '1px solid rgba(34, 197, 94, 0.2)' : '1px solid #f1f5f9', 
+            boxShadow: isWeekend 
+              ? '0 16px 36px -10px rgba(147, 51, 234, 0.08), 0 2px 12px rgba(0,0,0,0.03)' 
+              : isFreeDay 
+                ? '0 16px 36px -10px rgba(34, 197, 94, 0.08), 0 2px 12px rgba(0,0,0,0.03)' 
+                : '0 2px 12px rgba(0,0,0,0.04)', 
+            background: isWeekend 
+              ? 'linear-gradient(155deg, #fdf4ff 0%, #faf5ff 40%, #f3e8ff 100%)' 
+              : isFreeDay 
+                ? 'linear-gradient(155deg, #f0fdf4 0%, #dcfce7 40%, #f0fdf4 100%)' 
+                : 'white', 
             boxSizing: 'border-box',
             display: 'flex',
             flexDirection: 'column',
-            maxHeight: windowWidth >= 768 ? '700px' : undefined
+            maxHeight: windowWidth >= 768 ? '700px' : undefined,
+            position: 'relative',
+            overflow: 'hidden'
           }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: (isWeekend || isFreeDay) ? '8px' : '20px', position: 'relative', zIndex: 3 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#1f2937' }}>
-              <Clock size={20} color="#0b57d0" />
-              <strong style={{ fontSize: '1.05rem', fontWeight: 800, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Tagesplan – {getSimulatedNow().toLocaleDateString('de-DE')} (Unterrichte Heute)</strong>
+              <Clock size={20} color={isWeekend ? '#7c3aed' : isFreeDay ? '#15803d' : '#0b57d0'} />
+              <strong style={{ fontSize: '1.05rem', fontWeight: 800, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                {isWeekend 
+                  ? `Tagesplan – ${getSimulatedNow().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`
+                  : isFreeDay
+                    ? `Tagesplan – ${getSimulatedNow().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`
+                    : `Tagesplan – ${getSimulatedNow().toLocaleDateString('de-DE')} (Unterrichte Heute)`}
+              </strong>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{
@@ -815,35 +834,44 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                 fontWeight: 800,
                 padding: '4px 12px',
                 borderRadius: '100px',
-                background: '#e8f0fe',
-                color: '#0b57d0',
-                fontFamily: 'Inter'
+                background: isWeekend ? '#ede9fe' : isFreeDay ? '#dcfce7' : '#e8f0fe',
+                color: isWeekend ? '#6d28d9' : isFreeDay ? '#15803d' : '#0b57d0',
+                border: isWeekend ? '1px solid #ddd6fe' : isFreeDay ? '1px solid rgba(34, 197, 94, 0.2)' : '1px solid rgba(11, 87, 208, 0.15)',
+                fontFamily: 'Inter',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                boxShadow: isWeekend ? '0 1px 4px rgba(109, 40, 217, 0.08)' : 'none'
               }}>
-                LIVE
+                {isWeekend && <Sparkles size={11} color="#6d28d9" />}
+                {isFreeDay && <Sparkles size={11} color="#15803d" />}
+                {isWeekend ? 'WOCHENENDE' : isFreeDay ? 'FREI' : 'LIVE'}
               </span>
-              <button
-                type="button"
-                onClick={() => toggleRealNames()}
-                title={showRealNames ? "Auge an: Datenschutz aktiv (Vorname N.)" : "Auge aus: Klarnamen aktiv (Vorname Nachname)"}
-                style={{
-                  border: 'none',
-                  background: showRealNames ? '#e6f4ea' : '#f1f5f9',
-                  color: showRealNames ? '#34a853' : '#64748b',
-                  width: (isMobileDevice || windowWidth < 768) ? '36px' : '28px',
-                  height: (isMobileDevice || windowWidth < 768) ? '36px' : '28px',
-                  minWidth: (isMobileDevice || windowWidth < 768) ? '36px' : '28px',
-                  minHeight: (isMobileDevice || windowWidth < 768) ? '36px' : '28px',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  touchAction: 'manipulation'
-                }}
-              >
-                {showRealNames ? <Eye size={14} /> : <EyeOff size={14} />}
-              </button>
+              {!isWeekend && !isFreeDay && (
+                <button
+                  type="button"
+                  onClick={() => toggleRealNames()}
+                  title={showRealNames ? "Auge an: Datenschutz aktiv (Vorname N.)" : "Auge aus: Klarnamen aktiv (Vorname Nachname)"}
+                  style={{
+                    border: 'none',
+                    background: showRealNames ? '#e6f4ea' : '#f1f5f9',
+                    color: showRealNames ? '#34a853' : '#64748b',
+                    width: (isMobileDevice || windowWidth < 768) ? '36px' : '28px',
+                    height: (isMobileDevice || windowWidth < 768) ? '36px' : '28px',
+                    minWidth: (isMobileDevice || windowWidth < 768) ? '36px' : '28px',
+                    minHeight: (isMobileDevice || windowWidth < 768) ? '36px' : '28px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    touchAction: 'manipulation'
+                  }}
+                >
+                  {showRealNames ? <Eye size={14} /> : <EyeOff size={14} />}
+                </button>
+              )}
             </div>
           </div>
 
@@ -863,7 +891,9 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
             flex: 1,
             minHeight: 0
           }}>
-            <div style={{ position: 'absolute', top: '16px', bottom: '16px', left: '9px', width: '2px', background: '#e2e8f0' }} />
+            {Boolean(briefingData?.timeline && briefingData.timeline.length > 0) && (
+              <div style={{ position: 'absolute', top: '16px', bottom: '16px', left: '9px', width: '2px', background: '#e2e8f0' }} />
+            )}
             {briefingData ? (
               <div>
                 {briefingData.timeline && briefingData.timeline.length > 0 ? (() => {
@@ -1294,207 +1324,453 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                            }}
                            className="hover-scale google-timeline-card"
                          >
-                            {/* Top Row: Name on Mobile (full width) or Time + Name on Desktop */}
+                            {/* Unified Row Architecture: Single unified row on Desktop, 2-row layout on Mobile */}
                             <div style={{
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'space-between',
                               width: '100%',
-                              gap: '8px',
+                              gap: isMobileDevice || windowWidth < 768 ? '8px' : '14px',
                               minWidth: 0
                             }}>
-                                 <div style={{
-                                   display: 'flex',
-                                   alignItems: 'center',
-                                   gap: '8px',
-                                   position: 'relative',
-                                   minWidth: 0,
-                                   flex: 1
-                                 }}>
-                                   {/* Uhrzeit (Desktop Only in Top Row) */}
-                                   {!isMobileDevice && windowWidth >= 768 && (
-                                     <>
-                                       <div style={{
-                                         fontSize: '0.78rem',
-                                         fontWeight: 900,
-                                         color: isCurrentSlot && !isFinished && (slot.student || slot.isGroup) ? '#34a853' : '#0f172a',
-                                         fontFamily: "'Plus Jakarta Sans', sans-serif",
-                                         whiteSpace: 'nowrap',
-                                         flexShrink: 0,
-                                         background: isCurrentSlot && !isFinished && (slot.student || slot.isGroup) ? '#ffffff' : 'transparent',
-                                         padding: '2px 6px',
-                                         borderRadius: '6px',
-                                         border: isCurrentSlot && !isFinished && (slot.student || slot.isGroup) ? '1.5px solid #34a853' : 'none',
-                                         boxShadow: isCurrentSlot && !isFinished && (slot.student || slot.isGroup) ? '0 1px 3px rgba(19,115,51,0.08)' : 'none',
-                                         display: 'inline-flex',
-                                         alignItems: 'center',
-                                         justifyContent: 'center',
-                                         gap: '4px'
-                                       }}>
-                                         {isCurrentSlot && !isFinished && (slot.student || slot.isGroup) && (
-                                           <span className="pulse" style={{
-                                             width: '6px',
-                                             height: '6px',
-                                             borderRadius: '50%',
-                                             background: '#34a853',
-                                             display: 'inline-block'
-                                           }} />
-                                         )}
-                                         {slot.timeSlot} Uhr
-                                       </div>
-
-                                       {isWrapUp && (
-                                        <span style={{
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '4px',
-                                          background: '#fef08a',
-                                          border: '1px solid #fde047',
-                                          borderRadius: '6px',
-                                          padding: '2px 8px',
-                                          fontWeight: 800,
-                                          fontSize: '0.68rem',
-                                          color: '#854d0e',
-                                          flexShrink: 0,
-                                          boxShadow: '0 1px 3px rgba(234, 179, 8, 0.15)'
-                                        }}>
-                                          <Clock size={10} color="#854d0e" />
-                                          Wrap-Up ({minutesToSlotEnd} Min.)
-                                        </span>
+                              {/* Left Section: Time (Desktop) + Name + Metadata (Desktop) + Badges */}
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                position: 'relative',
+                                minWidth: 0,
+                                flex: 1,
+                                overflow: 'hidden'
+                              }}>
+                                {/* Desktop Time Badge */}
+                                {!isMobileDevice && windowWidth >= 768 && (
+                                  <>
+                                    <div style={{
+                                      fontSize: '0.78rem',
+                                      fontWeight: 900,
+                                      color: isCurrentSlot && !isFinished && (slot.student || slot.isGroup) ? '#34a853' : '#0f172a',
+                                      fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                      whiteSpace: 'nowrap',
+                                      flexShrink: 0,
+                                      background: isCurrentSlot && !isFinished && (slot.student || slot.isGroup) ? '#ffffff' : 'transparent',
+                                      padding: '2px 6px',
+                                      borderRadius: '6px',
+                                      border: isCurrentSlot && !isFinished && (slot.student || slot.isGroup) ? '1.5px solid #34a853' : 'none',
+                                      boxShadow: isCurrentSlot && !isFinished && (slot.student || slot.isGroup) ? '0 1px 3px rgba(19,115,51,0.08)' : 'none',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      gap: '4px'
+                                    }}>
+                                      {isCurrentSlot && !isFinished && (slot.student || slot.isGroup) && (
+                                        <span className="pulse" style={{
+                                          width: '6px',
+                                          height: '6px',
+                                          borderRadius: '50%',
+                                          background: '#34a853',
+                                          display: 'inline-block'
+                                        }} />
                                       )}
-                                       <div style={{ width: '1.5px', height: '14px', background: '#e2e8f0', flexShrink: 0 }} />
-                                     </>
-                                   )}
+                                      {slot.timeSlot} Uhr
+                                    </div>
 
-                                   {/* Student Name */}
-                                   {slot.isGroup ? (
-                                     <span style={{ 
-                                       fontWeight: 900, 
-                                       color: (isCanceled || isRescheduledAway) ? '#8e8e93' : (isFinished ? '#34a853' : '#0f172a'), 
-                                       fontSize: isMobileDevice || windowWidth < 768 ? '0.94rem' : '0.86rem', 
-                                       whiteSpace: 'nowrap',
-                                       overflow: 'hidden',
-                                       textOverflow: 'ellipsis'
-                                     }}>
-                                       {(() => {
-                                         if (slot.students && slot.students.length > 0) {
-                                           const names = slot.students.map((stud: any) => {
-                                             const found = allStudents?.find((s: any) => s.id === stud.id);
-                                             const rawFn = stud.first_name || found?.first_name || (stud.name ? stud.name.split(' ')[0] : '');
-                                             const cleanFn = rawFn.replace(/&.*/, '').trim() || 'Schüler';
-                                             const rawLn = stud.last_name || found?.last_name || (stud.name ? stud.name.split(' ').slice(1).join(' ') : '');
-                                             const cleanLn = rawLn.replace(/&.*/, '').trim();
-                                             if (cleanFn || cleanLn) {
-                                               return `${cleanFn} ${maskLastName(cleanLn, showRealNames)}`.trim();
-                                             }
-                                             return stud.name || 'Schüler';
-                                           });
-                                           return Array.from(new Set(names)).join(' & ');
-                                         }
-                                         return slot.student?.name || 'Gruppentermin';
-                                       })()}
-                                     </span>
-                                   ) : slot.student ? (
-                                     <span style={{ 
-                                       fontWeight: 900, 
-                                       color: (isCanceled || isRescheduledAway) ? '#8e8e93' : (isFinished ? '#34a853' : '#0f172a'), 
-                                       fontSize: isMobileDevice || windowWidth < 768 ? '0.94rem' : '0.86rem', 
-                                       whiteSpace: 'nowrap',
-                                       overflow: 'hidden',
-                                       textOverflow: 'ellipsis'
-                                     }}>
-                                       {isBirthday && (
-                                         <span title="Hat heute Geburtstag!" style={{ display: 'inline-flex', alignItems: 'center', marginRight: '4px', verticalAlign: 'middle' }}>
-                                           <Sparkles size={13} color="#eab308" />
-                                         </span>
-                                       )}{(() => {
-                                         const found = allStudents?.find((s: any) => s.id === slot.student?.id);
-                                         const fn = slot.student?.first_name || found?.first_name || (slot.student?.name ? slot.student.name.split(' ')[0] : '');
-                                         const ln = slot.student?.last_name || found?.last_name || (slot.student?.name ? slot.student.name.split(' ').slice(1).join(' ') : '');
-                                         if (fn || ln) {
-                                           return `${fn} ${maskLastName(ln, showRealNames)}`.trim();
-                                         }
-                                         return slot.student?.name || 'Schüler';
-                                       })()}
-                                     </span>
-                                   ) : isBreak ? (
-                                     <span style={{ fontWeight: 700, color: '#b45309', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                       <Coffee size={13} color="#b45309" />
-                                       <span>Freies Zeitfenster</span>
-                                       <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#d97706' }}>({slot.duration || 30} Min.)</span>
-                                     </span>
-                                   ) : (
-                                     <span style={{ fontWeight: 700, color: '#78350f', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                       <Coffee size={13} color="#78350f" />
-                                       <span>Pause ({slot.duration || 30} Min.)</span>
-                                     </span>
-                                   )}
+                                    {isWrapUp && (
+                                      <span style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        background: '#fef08a',
+                                        border: '1px solid #fde047',
+                                        borderRadius: '6px',
+                                        padding: '2px 8px',
+                                        fontWeight: 800,
+                                        fontSize: '0.68rem',
+                                        color: '#854d0e',
+                                        flexShrink: 0,
+                                        boxShadow: '0 1px 3px rgba(234, 179, 8, 0.15)'
+                                      }}>
+                                        <Clock size={10} color="#854d0e" />
+                                        Abschluss ({minutesToSlotEnd} Min.)
+                                      </span>
+                                    )}
+                                    <div style={{ width: '1.5px', height: '14px', background: '#e2e8f0', flexShrink: 0 }} />
+                                  </>
+                                )}
 
-                                    {/* ❓ Schülerfrage Badge (Mobile/Shared) */}
-                                    {(slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway && (() => {
-                                      const targetStudentId = slot.isGroup ? slot.students?.[0]?.id : slot.student?.id;
-                                      const hasQuestion = targetStudentId ? checkHasStudentQuestion(targetStudentId) : false;
-                                      if (!hasQuestion) return null;
-                                      return (
-                                        <span
-                                          title="Schüler hat eine Frage für den Unterricht notiert"
-                                          style={{
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: '3px',
-                                            padding: '2px 7px',
-                                            borderRadius: '100px',
-                                            background: '#fef3c7',
-                                            border: '1px solid #fde68a',
-                                            color: '#b45309',
-                                            fontSize: '0.68rem',
-                                            fontWeight: 850,
-                                            fontFamily: "'Plus Jakarta Sans', sans-serif",
-                                            flexShrink: 0,
-                                            marginLeft: '6px'
-                                          }}
-                                        >
-                                          <HelpCircle size={10} strokeWidth={2.8} />
-                                          <span>1 Frage</span>
-                                        </span>
-                                      );
+                                {/* Student Name */}
+                                {slot.isGroup ? (
+                                  <span style={{ 
+                                    fontWeight: 900, 
+                                    color: (isCanceled || isRescheduledAway) ? '#8e8e93' : (isFinished ? '#34a853' : '#0f172a'), 
+                                    fontSize: isMobileDevice || windowWidth < 768 ? '0.94rem' : '0.86rem', 
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis'
+                                  }}>
+                                    {(() => {
+                                      if (slot.students && slot.students.length > 0) {
+                                        const names = slot.students.map((stud: any) => {
+                                          const found = allStudents?.find((s: any) => s.id === stud.id);
+                                          const rawFn = stud.first_name || found?.first_name || (stud.name ? stud.name.split(' ')[0] : '');
+                                          const cleanFn = rawFn.replace(/&.*/, '').trim() || 'Schüler';
+                                          const rawLn = stud.last_name || found?.last_name || (stud.name ? stud.name.split(' ').slice(1).join(' ') : '');
+                                          const cleanLn = rawLn.replace(/&.*/, '').trim();
+                                          if (cleanFn || cleanLn) {
+                                            return `${cleanFn} ${maskLastName(cleanLn, showRealNames)}`.trim();
+                                          }
+                                          return stud.name || 'Schüler';
+                                        });
+                                        return Array.from(new Set(names)).join(' & ');
+                                      }
+                                      return slot.student?.name || 'Gruppentermin';
                                     })()}
+                                  </span>
+                                ) : slot.student ? (
+                                  <span style={{ 
+                                    fontWeight: 900, 
+                                    color: (isCanceled || isRescheduledAway) ? '#8e8e93' : (isFinished ? '#34a853' : '#0f172a'), 
+                                    fontSize: isMobileDevice || windowWidth < 768 ? '0.94rem' : '0.86rem', 
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis'
+                                  }}>
+                                    {isBirthday && (
+                                      <span title="Hat heute Geburtstag!" style={{ display: 'inline-flex', alignItems: 'center', marginRight: '4px', verticalAlign: 'middle' }}>
+                                        <Sparkles size={13} color="#eab308" />
+                                      </span>
+                                    )}{(() => {
+                                      const found = allStudents?.find((s: any) => s.id === slot.student?.id);
+                                      const fn = slot.student?.first_name || found?.first_name || (slot.student?.name ? slot.student.name.split(' ')[0] : '');
+                                      const ln = slot.student?.last_name || found?.last_name || (slot.student?.name ? slot.student.name.split(' ').slice(1).join(' ') : '');
+                                      if (fn || ln) {
+                                        return `${fn} ${maskLastName(ln, showRealNames)}`.trim();
+                                      }
+                                      return slot.student?.name || 'Schüler';
+                                    })()}
+                                  </span>
+                                ) : isBreak ? (
+                                  <span style={{ fontWeight: 700, color: '#b45309', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                    <Coffee size={13} color="#b45309" />
+                                    <span>Freies Zeitfenster</span>
+                                    <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#d97706' }}>({slot.duration || 30} Min.)</span>
+                                  </span>
+                                ) : (
+                                  <span style={{ fontWeight: 700, color: '#78350f', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                    <Coffee size={13} color="#78350f" />
+                                    <span>Pause ({slot.duration || 30} Min.)</span>
+                                  </span>
+                                )}
 
-                                   {(slot.student || slot.isGroup) && (isRescheduledAway || isCanceled) && (
-                                     <div style={{
-                                       position: 'absolute',
-                                       left: '-6px',
-                                       right: '-10px',
-                                       height: '2px',
-                                       background: isRescheduledAway ? '#fbbc05' : '#ef4444',
-                                       top: '50%',
-                                       transform: 'translateY(-50%)',
-                                       pointerEvents: 'none',
-                                       zIndex: 10
-                                     }} />
-                                   )}
-                                 </div>
+                                {/* Question Badge */}
+                                {(slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway && (() => {
+                                  const targetStudentId = slot.isGroup ? slot.students?.[0]?.id : slot.student?.id;
+                                  const hasQuestion = targetStudentId ? checkHasStudentQuestion(targetStudentId) : false;
+                                  if (!hasQuestion) return null;
+                                  return (
+                                    <span
+                                      title="Schüler hat eine Frage für den Unterricht notiert"
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '3px',
+                                        padding: '2px 7px',
+                                        borderRadius: '100px',
+                                        background: '#fef3c7',
+                                        border: '1px solid #fde68a',
+                                        color: '#b45309',
+                                        fontSize: '0.68rem',
+                                        fontWeight: 850,
+                                        fontFamily: "'Plus Jakarta Sans', sans-serif",
+                                        flexShrink: 0,
+                                        marginLeft: '4px'
+                                      }}
+                                    >
+                                      <HelpCircle size={10} strokeWidth={2.8} />
+                                      <span>1 Frage</span>
+                                    </span>
+                                  );
+                                })()}
 
-                                 {/* Monochrome Group Icon before Shoutbox */}
-                                 {slot.isGroup && !isCanceled && !isRescheduledAway && (
-                                   <span 
-                                     title={`Gruppentermin (${slot.students?.length || 2} Schüler)`}
-                                     style={{
-                                       display: 'inline-flex',
-                                       alignItems: 'center',
-                                       justifyContent: 'center',
-                                       color: '#64748b',
-                                       marginLeft: 'auto',
-                                       marginRight: '2px',
-                                       flexShrink: 0
-                                     }}
-                                   >
-                                     <Users size={14} color="#64748b" />
-                                   </span>
-                                 )}
+                                {/* Strike-through line when Canceled or Rescheduled Away */}
+                                {(slot.student || slot.isGroup) && (isRescheduledAway || isCanceled) && (
+                                  <div style={{
+                                    position: 'absolute',
+                                    left: '-6px',
+                                    right: '-10px',
+                                    height: '2px',
+                                    background: isRescheduledAway ? '#fbbc05' : '#ef4444',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    pointerEvents: 'none',
+                                    zIndex: 10
+                                  }} />
+                                )}
 
-                                  {/* 1-Click Audio-Hausaufgabe Button on Top Row Right */}
-                                  {(slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway && (() => {
+                                {/* Metadata & Badges on Desktop: Placed directly in the left reading flow */}
+                                {!isMobileDevice && windowWidth >= 768 && (slot.student || slot.isGroup) && (
+                                  <div style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    fontSize: '0.80rem',
+                                    color: '#64748b',
+                                    fontWeight: 700,
+                                    flexShrink: 0
+                                  }}>
+                                    {isCanceled || isRescheduledAway ? (() => {
+                                      const isAcked = activeSlots.every((s: any) => s.student_acknowledged === true || s.teacher_acknowledged === true || s.status === 'cancelled_acknowledged' || s.status === 'rescheduled_confirmed');
+                                      const urgentItem = (urgentCancellations || []).find((u: any) => 
+                                        activeSlots.some((s: any) => 
+                                          (u.occurrence_id && (u.occurrence_id === s.id || u.occurrence_id === s.occurrenceId)) ||
+                                          (u.student_id && (u.student_id === s.student?.id || u.student_id === s.studentId) && u.start_time?.startsWith(slot.timeSlot))
+                                        )
+                                      );
+                                      return (
+                                        <>
+                                          {isRescheduledAway ? (
+                                            <span style={{ 
+                                              color: '#000000', 
+                                              fontWeight: 850, 
+                                              fontSize: '0.68rem', 
+                                              background: '#facc15', 
+                                              border: '1px solid #000000',
+                                              padding: '2px 8px', 
+                                              borderRadius: '6px', 
+                                              fontFamily: 'Inter',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '4px'
+                                            }}>
+                                              Termin verschoben
+                                              {isAcked && <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853', display: 'inline-block' }} />}
+                                            </span>
+                                          ) : urgentItem?.teacher_contact_status === 'reached' ? (
+                                            <span style={{ 
+                                              color: '#15803d', 
+                                              fontWeight: 800, 
+                                              fontSize: '0.68rem', 
+                                              background: '#dcfce7', 
+                                              border: '1px solid #bbf7d0',
+                                              padding: '2px 8px', 
+                                              borderRadius: '6px', 
+                                              fontFamily: 'Inter',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '4px'
+                                            }}>
+                                              📞 Telefonisch informiert
+                                            </span>
+                                          ) : urgentItem?.teacher_contact_status === 'voicemail' ? (
+                                            <span style={{ 
+                                              color: '#b45309', 
+                                              fontWeight: 800, 
+                                              fontSize: '0.68rem', 
+                                              background: '#fef3c7', 
+                                              border: '1px solid #fde68a',
+                                              padding: '2px 8px', 
+                                              borderRadius: '6px', 
+                                              fontFamily: 'Inter',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '4px'
+                                            }}>
+                                              📼 Mailbox besprochen
+                                            </span>
+                                          ) : urgentItem?.teacher_contact_status === 'delegated_to_secretariat' ? (
+                                            <span style={{ 
+                                              color: '#1d4ed8', 
+                                              fontWeight: 800, 
+                                              fontSize: '0.68rem', 
+                                              background: '#dbeafe', 
+                                              border: '1px solid #bfdbfe',
+                                              padding: '2px 8px', 
+                                              borderRadius: '6px', 
+                                              fontFamily: 'Inter',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '4px'
+                                            }}>
+                                              🏢 An Sekretariat übergeben
+                                            </span>
+                                          ) : urgentItem && !urgentItem.student_acknowledged ? (
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                onOpenUrgentModal?.();
+                                              }}
+                                              title="Kurzfristiger Ausfall noch digital unbestätigt – Bitte telefonisch kontaktieren"
+                                              style={{ 
+                                                color: '#dc2626', 
+                                                fontWeight: 850, 
+                                                fontSize: '0.68rem', 
+                                                background: '#fee2e2', 
+                                                border: '1px solid #fca5a5',
+                                                padding: '2px 8px', 
+                                                borderRadius: '6px', 
+                                                fontFamily: 'Inter',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '4px',
+                                                cursor: 'pointer',
+                                                animation: 'pulse 1.8s infinite'
+                                              }}
+                                            >
+                                              ⚠️ Ungelesen – Bitte kontaktieren
+                                            </button>
+                                          ) : (
+                                            <span style={{ 
+                                              color: '#ef4444', 
+                                              fontWeight: 700, 
+                                              fontSize: '0.68rem', 
+                                              background: 'rgba(239, 68, 68, 0.08)', 
+                                              padding: '2px 8px', 
+                                              borderRadius: '6px', 
+                                              fontFamily: 'Inter',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '4px'
+                                            }}>
+                                              Heute abgesagt
+                                              {isAcked && <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853', display: 'inline-block' }} />}
+                                            </span>
+                                          )}
+                                          {!isRescheduledAway && onOpenMakeupModal && (
+                                            slot.makeup_token_id ? (
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  onOpenMakeupModal({ mode: 'redeem', slot });
+                                                }}
+                                                title="Gutschrift / Nachhol-Kontingent für diesen Termin einlösen"
+                                                style={{
+                                                  color: '#15803d',
+                                                  fontWeight: 850,
+                                                  fontSize: '0.68rem',
+                                                  background: '#dcfce7',
+                                                  border: '1px solid #86efac',
+                                                  padding: '2px 8px',
+                                                  borderRadius: '6px',
+                                                  fontFamily: 'Inter',
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  gap: '4px',
+                                                  cursor: 'pointer'
+                                                }}
+                                              >
+                                                🎟️ Nachhol-Gutschrift
+                                              </button>
+                                            ) : (
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  onOpenMakeupModal({ mode: 'create', slot });
+                                                }}
+                                                title="Diesen Ausfall in ein Nachhol-Kontingent (Gutschrift) umwandeln"
+                                                style={{
+                                                  color: '#1d4ed8',
+                                                  fontWeight: 850,
+                                                  fontSize: '0.68rem',
+                                                  background: '#eff6ff',
+                                                  border: '1px solid #bfdbfe',
+                                                  padding: '2px 8px',
+                                                  borderRadius: '6px',
+                                                  fontFamily: 'Inter',
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  gap: '4px',
+                                                  cursor: 'pointer'
+                                                }}
+                                              >
+                                                🎟️ Nachhol-Kontingent
+                                              </button>
+                                            )
+                                          )}
+                                        </>
+                                      );
+                                    })() : (
+                                      <>
+                                        {resolveStudentInstrument(slot.instrument, slot.students?.[0]?.instrument || slot.student?.instrument, teacher?.instrument) && (
+                                          <span style={{ color: '#334155', fontWeight: 600 }}>• {resolveStudentInstrument(slot.instrument, slot.students?.[0]?.instrument || slot.student?.instrument, teacher?.instrument)}</span>
+                                        )}
+                                        {slot.room && <span style={{ color: '#334155', fontWeight: 600 }}>• {cleanRoomName(slot.room)}</span>}
+                                        {slot.makeup_extension_minutes > 0 && (
+                                          <span 
+                                            title={`Dieser Termin wurde um +${slot.makeup_extension_minutes} Min. aus einem Nachhol-Kontingent verlängert`}
+                                            style={{
+                                              color: '#15803d',
+                                              background: '#dcfce7',
+                                              border: '1px solid #86efac',
+                                              padding: '2px 8px',
+                                              borderRadius: '6px',
+                                              fontSize: '0.68rem',
+                                              fontWeight: 850,
+                                              fontFamily: 'Inter',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '4px'
+                                            }}
+                                          >
+                                            ⏱️ +{slot.makeup_extension_minutes} Min. Nachholung
+                                          </span>
+                                        )}
+                                        {slot.is_makeup_lesson && (
+                                          <span 
+                                            title="Revisionssicherer Ersatztermin aus einem Nachhol-Kontingent"
+                                            style={{
+                                              color: '#1d4ed8',
+                                              background: '#eff6ff',
+                                              border: '1px solid #bfdbfe',
+                                              padding: '2px 8px',
+                                              borderRadius: '6px',
+                                              fontSize: '0.68rem',
+                                              fontWeight: 850,
+                                              fontFamily: 'Inter',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '4px'
+                                            }}
+                                          >
+                                            🎟️ Nachholtermin
+                                          </span>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Trailing Action Group: Fixed on the far right edge */}
+                              {(slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway && (
+                                <div style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  marginLeft: 'auto',
+                                  flexShrink: 0
+                                }}>
+                                  {/* Monochrome Group Icon */}
+                                  {slot.isGroup && (
+                                    <span 
+                                      title={`Gruppentermin (${slot.students?.length || 2} Schüler)`}
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#64748b',
+                                        marginRight: '2px',
+                                        flexShrink: 0
+                                      }}
+                                    >
+                                      <Users size={14} color="#64748b" />
+                                    </span>
+                                  )}
+
+                                  {/* 1-Click Audio-Hausaufgabe Button */}
+                                  {(() => {
                                     const resolved = resolveSlotStudent(slot, allStudents);
                                     if (!resolved) return null;
                                     const { targetStudent, matchedFromAll, canonicalId, resolvedStudent } = resolved;
@@ -1517,29 +1793,27 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                           justifyContent: 'center',
                                           background: hasAudioToday ? '#e6f4ea' : '#ffffff',
                                           color: hasAudioToday ? '#15803d' : '#64748b',
-                                          width: (isMobileDevice || windowWidth < 768) ? '44px' : '36px',
-                                          height: (isMobileDevice || windowWidth < 768) ? '44px' : '36px',
-                                          minWidth: (isMobileDevice || windowWidth < 768) ? '44px' : '36px',
-                                          minHeight: (isMobileDevice || windowWidth < 768) ? '44px' : '36px',
-                                          borderRadius: '10px',
-                                          border: hasAudioToday ? '1px solid rgba(52, 168, 83, 0.3)' : '1px solid rgba(0,0,0,0.06)',
+                                          width: (isMobileDevice || windowWidth < 768) ? '44px' : '34px',
+                                          height: (isMobileDevice || windowWidth < 768) ? '44px' : '34px',
+                                          minWidth: (isMobileDevice || windowWidth < 768) ? '44px' : '34px',
+                                          minHeight: (isMobileDevice || windowWidth < 768) ? '44px' : '34px',
+                                          borderRadius: '8px',
+                                          border: hasAudioToday ? '1px solid rgba(52, 168, 83, 0.3)' : '1px solid #e2e8f0',
                                           cursor: 'pointer',
-                                          transition: 'all 0.2s',
+                                          transition: 'all 0.18s ease',
                                           flexShrink: 0,
-                                          boxShadow: hasAudioToday ? '0 2px 4px rgba(21, 128, 61, 0.15)' : '0 1px 2px rgba(0,0,0,0.04)',
-                                          marginLeft: slot.isGroup ? '4px' : 'auto',
-                                          marginRight: '2px',
+                                          boxShadow: hasAudioToday ? '0 1px 3px rgba(21, 128, 61, 0.15)' : '0 1px 2px rgba(0,0,0,0.03)',
                                           position: 'relative',
                                           touchAction: 'manipulation'
                                         }}
                                         className="hover-scale-mini"
                                       >
-                                        <Mic size={16} color={hasAudioToday ? '#15803d' : '#64748b'} />
+                                        <Mic size={(isMobileDevice || windowWidth < 768) ? 16 : 15} color={hasAudioToday ? '#15803d' : '#64748b'} />
                                         {hasAudioToday && (
                                           <span style={{
                                             position: 'absolute',
-                                            top: '3px',
-                                            right: '3px',
+                                            top: '2px',
+                                            right: '2px',
                                             width: '6px',
                                             height: '6px',
                                             borderRadius: '50%',
@@ -1550,350 +1824,626 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
                                     );
                                   })()}
 
-                                  {/* 1:1 Shoutbox Icon Button on Top Row Right */}
-                                  {(slot.student || slot.isGroup) && !isCanceled && !isRescheduledAway && (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        const targetSlot = slot.isGroup ? slot.slots[0] : slot;
-                                        const resolved = resolveSlotStudent(slot, allStudents);
-                                        if (targetSlot && resolved) {
-                                          setActiveChatOcc({
-                                            id: targetSlot.id,
-                                            student_id: resolved.canonicalId,
-                                            teacher_id: targetSlot.teacher_id || userId,
-                                            date: targetSlot.date,
-                                            start_time: targetSlot.timeSlot,
-                                            student: {
-                                              first_name: slot.isGroup ? slot.students?.map((st: any) => st.name.split(' ')[0]).join(', ') : (resolved.resolvedStudent.first_name || 'Schüler')
-                                            }
-                                          });
-                                        }
-                                      }}
-                                     title="Termingekoppelte Shoutbox öffnen"
-                                     style={{
-                                       display: 'flex',
-                                       alignItems: 'center',
-                                       justifyContent: 'center',
-                                       background: '#ffffff',
-                                       color: '#34a853',
-                                       width: (isMobileDevice || windowWidth < 768) ? '44px' : '36px',
-                                       height: (isMobileDevice || windowWidth < 768) ? '44px' : '36px',
-                                       minWidth: (isMobileDevice || windowWidth < 768) ? '44px' : '36px',
-                                       minHeight: (isMobileDevice || windowWidth < 768) ? '44px' : '36px',
-                                       borderRadius: '10px',
-                                       border: '1px solid rgba(0,0,0,0.06)',
-                                       cursor: 'pointer',
-                                       transition: 'all 0.2s',
-                                       flexShrink: 0,
-                                       boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                                       marginLeft: '4px',
-                                       touchAction: 'manipulation'
-                                     }}
-                                   >
-                                     <MessageSquare size={16} />
-                                   </button>
-                                 )}
-                               </div>
+                                  {/* 1:1 Shoutbox Icon Button */}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const targetSlot = slot.isGroup ? slot.slots[0] : slot;
+                                      const resolved = resolveSlotStudent(slot, allStudents);
+                                      if (targetSlot && resolved) {
+                                        setActiveChatOcc({
+                                          id: targetSlot.id,
+                                          student_id: resolved.canonicalId,
+                                          teacher_id: targetSlot.teacher_id || userId,
+                                          date: targetSlot.date,
+                                          start_time: targetSlot.timeSlot,
+                                          student: {
+                                            first_name: slot.isGroup ? slot.students?.map((st: any) => st.name.split(' ')[0]).join(', ') : (resolved.resolvedStudent.first_name || 'Schüler')
+                                          }
+                                        });
+                                      }
+                                    }}
+                                    title="Termingekoppelte Shoutbox öffnen"
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      background: '#ffffff',
+                                      color: '#34a853',
+                                      width: (isMobileDevice || windowWidth < 768) ? '44px' : '34px',
+                                      height: (isMobileDevice || windowWidth < 768) ? '44px' : '34px',
+                                      minWidth: (isMobileDevice || windowWidth < 768) ? '44px' : '34px',
+                                      minHeight: (isMobileDevice || windowWidth < 768) ? '44px' : '34px',
+                                      borderRadius: '8px',
+                                      border: '1px solid #e2e8f0',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.18s ease',
+                                      flexShrink: 0,
+                                      boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                                      touchAction: 'manipulation'
+                                    }}
+                                    className="hover-scale-mini"
+                                  >
+                                    <MessageSquare size={(isMobileDevice || windowWidth < 768) ? 16 : 15} />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
 
-                               {/* Bottom Sub-Line: Time (on Mobile) + Metadata & Status Badges */}
-                               <div style={{ 
-                                 display: 'flex', 
-                                 alignItems: 'center', 
-                                 gap: '6px',
-                                 width: '100%', 
-                                 minWidth: 0, 
-                                 fontSize: '0.80rem', 
-                                 color: '#64748b', 
-                                 fontWeight: 700,
-                                 flexWrap: 'wrap',
-                                 paddingLeft: '0'
-                               }}>
-                                 {(slot.student || slot.isGroup) && (
-                                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', width: '100%' }}>
-                                     {/* Mobile Time Badge in Bottom Line */}
-                                     {(isMobileDevice || windowWidth < 768) && (
-                                       <span style={{
-                                         display: 'inline-flex',
-                                         alignItems: 'center',
-                                         gap: '4px',
-                                         background: isCurrentSlot && !isFinished ? '#ffffff' : '#f8fafc',
-                                         border: isCurrentSlot && !isFinished ? '1px solid #34a853' : '1px solid #e2e8f0',
-                                         borderRadius: '6px',
-                                         padding: '2px 6px',
-                                         fontWeight: 800,
-                                         fontSize: '0.74rem',
-                                         color: isCurrentSlot && !isFinished ? '#166534' : '#0f172a',
-                                         fontFamily: 'monospace',
-                                         flexShrink: 0
-                                       }}>
-                                         {isCurrentSlot && !isFinished && (
-                                           <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853' }} />
-                                         )}
-                                         {slot.timeSlot} Uhr
-                                       </span>
-                                     )}
+                            {/* Mobile Only: Bottom Sub-Line for Time + Metadata & Status Badges */}
+                            {(isMobileDevice || windowWidth < 768) && (slot.student || slot.isGroup) && (
+                              <div style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '6px',
+                                width: '100%', 
+                                minWidth: 0, 
+                                fontSize: '0.80rem', 
+                                color: '#64748b', 
+                                fontWeight: 700,
+                                flexWrap: 'wrap',
+                                paddingLeft: '0',
+                                marginTop: '4px'
+                              }}>
+                                {/* Mobile Time Badge */}
+                                <span style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  background: isCurrentSlot && !isFinished ? '#ffffff' : '#f8fafc',
+                                  border: isCurrentSlot && !isFinished ? '1px solid #34a853' : '1px solid #e2e8f0',
+                                  borderRadius: '6px',
+                                  padding: '2px 6px',
+                                  fontWeight: 800,
+                                  fontSize: '0.74rem',
+                                  color: isCurrentSlot && !isFinished ? '#166534' : '#0f172a',
+                                  fontFamily: 'monospace',
+                                  flexShrink: 0
+                                }}>
+                                  {isCurrentSlot && !isFinished && (
+                                    <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853' }} />
+                                  )}
+                                  {slot.timeSlot} Uhr
+                                </span>
 
-                                      {isCanceled || isRescheduledAway ? (() => {
-                                        const isAcked = activeSlots.every((s: any) => s.student_acknowledged === true || s.teacher_acknowledged === true || s.status === 'cancelled_acknowledged' || s.status === 'rescheduled_confirmed');
-
-                                        // Matching urgent radar item
-                                        const urgentItem = (urgentCancellations || []).find((u: any) => 
-                                          activeSlots.some((s: any) => 
-                                            (u.occurrence_id && (u.occurrence_id === s.id || u.occurrence_id === s.occurrenceId)) ||
-                                            (u.student_id && (u.student_id === s.student?.id || u.student_id === s.studentId) && u.start_time?.startsWith(slot.timeSlot))
-                                          )
-                                        );
-
-                                        return (
-                                          <>
-                                            {isRescheduledAway ? (
-                                              <span style={{ 
-                                                color: '#000000', 
-                                                fontWeight: 850, 
-                                                fontSize: '0.68rem', 
-                                                background: '#facc15', 
-                                                border: '1px solid #000000',
-                                                padding: '2px 8px', 
-                                                borderRadius: '6px', 
-                                                fontFamily: 'Inter',
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: '4px'
-                                              }}>
-                                                Termin verschoben
-                                                {isAcked && <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853', display: 'inline-block' }} />}
-                                              </span>
-                                            ) : urgentItem?.teacher_contact_status === 'reached' ? (
-                                              <span style={{ 
-                                                color: '#15803d', 
-                                                fontWeight: 800, 
-                                                fontSize: '0.68rem', 
-                                                background: '#dcfce7', 
-                                                border: '1px solid #bbf7d0',
-                                                padding: '2px 8px', 
-                                                borderRadius: '6px', 
-                                                fontFamily: 'Inter',
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: '4px'
-                                              }}>
-                                                📞 Telefonisch informiert
-                                              </span>
-                                            ) : urgentItem?.teacher_contact_status === 'voicemail' ? (
-                                              <span style={{ 
-                                                color: '#b45309', 
-                                                fontWeight: 800, 
-                                                fontSize: '0.68rem', 
-                                                background: '#fef3c7', 
-                                                border: '1px solid #fde68a',
-                                                padding: '2px 8px', 
-                                                borderRadius: '6px', 
-                                                fontFamily: 'Inter',
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: '4px'
-                                              }}>
-                                                📼 Mailbox besprochen
-                                              </span>
-                                            ) : urgentItem?.teacher_contact_status === 'delegated_to_secretariat' ? (
-                                              <span style={{ 
-                                                color: '#1d4ed8', 
-                                                fontWeight: 800, 
-                                                fontSize: '0.68rem', 
-                                                background: '#dbeafe', 
-                                                border: '1px solid #bfdbfe',
-                                                padding: '2px 8px', 
-                                                borderRadius: '6px', 
-                                                fontFamily: 'Inter',
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: '4px'
-                                              }}>
-                                                🏢 An Sekretariat übergeben
-                                              </span>
-                                            ) : urgentItem && !urgentItem.student_acknowledged ? (
-                                              <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  onOpenUrgentModal?.();
-                                                }}
-                                                title="Kurzfristiger Ausfall noch digital unbestätigt – Bitte telefonisch kontaktieren"
-                                                style={{ 
-                                                  color: '#dc2626', 
-                                                  fontWeight: 850, 
-                                                  fontSize: '0.68rem', 
-                                                  background: '#fee2e2', 
-                                                  border: '1px solid #fca5a5',
-                                                  padding: '2px 8px', 
-                                                  borderRadius: '6px', 
-                                                  fontFamily: 'Inter',
-                                                  display: 'inline-flex',
-                                                  alignItems: 'center',
-                                                  gap: '4px',
-                                                  cursor: 'pointer',
-                                                  animation: 'pulse 1.8s infinite'
-                                                }}
-                                              >
-                                                ⚠️ Ungelesen – Bitte kontaktieren
-                                              </button>
-                                            ) : (
-                                              <span style={{ 
-                                                color: '#ef4444', 
-                                                fontWeight: 700, 
-                                                fontSize: '0.68rem', 
-                                                background: 'rgba(239, 68, 68, 0.08)', 
-                                                padding: '2px 8px', 
-                                                borderRadius: '6px', 
-                                                fontFamily: 'Inter',
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: '4px'
-                                              }}>
-                                                Heute abgesagt
-                                                {isAcked && <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853', display: 'inline-block' }} />}
-                                              </span>
-                                            )}
-
-                                            {/* 🎟️ Nachhol-Kontingent Button / Badge (100% Lehrkraft-Souveränität) */}
-                                            {!isRescheduledAway && onOpenMakeupModal && (
-                                              slot.makeup_token_id ? (
-                                                <button
-                                                  type="button"
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onOpenMakeupModal({ mode: 'redeem', slot });
-                                                  }}
-                                                  title="Nachhol-Kontingent verwalten & einlösen"
-                                                  style={{
-                                                    background: '#eff6ff',
-                                                    color: '#1d4ed8',
-                                                    border: '1px solid #bfdbfe',
-                                                    borderRadius: '6px',
-                                                    padding: '2px 8px',
-                                                    fontSize: '0.68rem',
-                                                    fontWeight: 850,
-                                                    fontFamily: 'Inter',
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '4px',
-                                                    cursor: 'pointer'
-                                                  }}
-                                                >
-                                                  🎟️ Nachhol-Kontingent aktiv
-                                                </button>
-                                              ) : (
-                                                <button
-                                                  type="button"
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onOpenMakeupModal({ mode: 'create', slot });
-                                                  }}
-                                                  title="100% Lehrkraft-Souveränität: Nachhol-Kontingent für diesen Ausfall anlegen"
-                                                  style={{
-                                                    background: '#f8fafc',
-                                                    color: '#0f172a',
-                                                    border: '1px solid #cbd5e1',
-                                                    borderRadius: '6px',
-                                                    padding: '2px 8px',
-                                                    fontSize: '0.68rem',
-                                                    fontWeight: 850,
-                                                    fontFamily: 'Inter',
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '4px',
-                                                    cursor: 'pointer'
-                                                  }}
-                                                >
-                                                  🎟️ Nachhol-Kontingent
-                                                </button>
-                                              )
-                                            )}
-                                          </>
-                                        );
-                                      })() : (
-                                       <>
-                                         {resolveStudentInstrument(slot.instrument, slot.students?.[0]?.instrument || slot.student?.instrument, teacher?.instrument) && (
-                                           <span style={{ color: '#334155', fontWeight: 600 }}>• {resolveStudentInstrument(slot.instrument, slot.students?.[0]?.instrument || slot.student?.instrument, teacher?.instrument)}</span>
-                                         )}
-                                         {slot.room && <span style={{ color: '#334155', fontWeight: 600 }}>• {cleanRoomName(slot.room)}</span>}
-                                         {slot.makeup_extension_minutes > 0 && (
-                                           <span 
-                                             title={`Dieser Termin wurde um +${slot.makeup_extension_minutes} Min. aus einem Nachhol-Kontingent verlängert`}
-                                             style={{
-                                               color: '#15803d',
-                                               background: '#dcfce7',
-                                               border: '1px solid #86efac',
-                                               padding: '2px 8px',
-                                               borderRadius: '6px',
-                                               fontSize: '0.68rem',
-                                               fontWeight: 850,
-                                               fontFamily: 'Inter',
-                                               display: 'inline-flex',
-                                               alignItems: 'center',
-                                               gap: '4px'
-                                             }}
-                                           >
-                                             ⏱️ +{slot.makeup_extension_minutes} Min. Nachholung
-                                           </span>
-                                         )}
-                                         {slot.is_makeup_lesson && (
-                                           <span 
-                                             title="Revisionssicherer Ersatztermin aus einem Nachhol-Kontingent"
-                                             style={{
-                                               color: '#1d4ed8',
-                                               background: '#eff6ff',
-                                               border: '1px solid #bfdbfe',
-                                               padding: '2px 8px',
-                                               borderRadius: '6px',
-                                               fontSize: '0.68rem',
-                                               fontWeight: 850,
-                                               fontFamily: 'Inter',
-                                               display: 'inline-flex',
-                                               alignItems: 'center',
-                                               gap: '4px'
-                                             }}
-                                           >
-                                             🎟️ Nachholtermin
-                                           </span>
-                                         )}
-                                       </>
-                                     )}
-                                     {!slot.isGroup && isRescheduledPending && (
-                                       <span 
-                                         title="Terminverschiebung ausstehend (noch nicht bestätigt)"
-                                         style={{
-                                           background: '#fef3c7',
-                                           color: '#b45309',
-                                           border: '1px solid #fde68a',
-                                           padding: '2px 8px',
-                                           borderRadius: '100px',
-                                           fontSize: '0.68rem',
-                                           fontWeight: 750,
-                                           fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif",
-                                           display: 'inline-flex',
-                                           alignItems: 'center',
-                                           gap: '4px',
-                                           marginLeft: 'auto',
-                                           boxShadow: '0 1px 2px rgba(180, 83, 9, 0.05)',
-                                           letterSpacing: '0.01em'
-                                         }}
-                                       >
-                                         <Clock size={11} strokeWidth={2.5} color="#b45309" />
-                                         <span>Unbestätigt</span>
-                                       </span>
-                                     )}
-                                   </div>
-                                 )}
-                               </div>
-                         </div>
-                       </div>
-                    );
+                                {isCanceled || isRescheduledAway ? (() => {
+                                  const isAcked = activeSlots.every((s: any) => s.student_acknowledged === true || s.teacher_acknowledged === true || s.status === 'cancelled_acknowledged' || s.status === 'rescheduled_confirmed');
+                                  const urgentItem = (urgentCancellations || []).find((u: any) => 
+                                    activeSlots.some((s: any) => 
+                                      (u.occurrence_id && (u.occurrence_id === s.id || u.occurrence_id === s.occurrenceId)) ||
+                                      (u.student_id && (u.student_id === s.student?.id || u.student_id === s.studentId) && u.start_time?.startsWith(slot.timeSlot))
+                                    )
+                                  );
+                                  return (
+                                    <>
+                                      {isRescheduledAway ? (
+                                        <span style={{ 
+                                          color: '#000000', 
+                                          fontWeight: 850, 
+                                          fontSize: '0.68rem', 
+                                          background: '#facc15', 
+                                          border: '1px solid #000000',
+                                          padding: '2px 8px', 
+                                          borderRadius: '6px', 
+                                          fontFamily: 'Inter',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px'
+                                        }}>
+                                          Termin verschoben
+                                          {isAcked && <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853', display: 'inline-block' }} />}
+                                        </span>
+                                      ) : urgentItem?.teacher_contact_status === 'reached' ? (
+                                        <span style={{ 
+                                          color: '#15803d', 
+                                          fontWeight: 800, 
+                                          fontSize: '0.68rem', 
+                                          background: '#dcfce7', 
+                                          border: '1px solid #bbf7d0',
+                                          padding: '2px 8px', 
+                                          borderRadius: '6px', 
+                                          fontFamily: 'Inter',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px'
+                                        }}>
+                                          📞 Telefonisch informiert
+                                        </span>
+                                      ) : urgentItem?.teacher_contact_status === 'voicemail' ? (
+                                        <span style={{ 
+                                          color: '#b45309', 
+                                          fontWeight: 800, 
+                                          fontSize: '0.68rem', 
+                                          background: '#fef3c7', 
+                                          border: '1px solid #fde68a',
+                                          padding: '2px 8px', 
+                                          borderRadius: '6px', 
+                                          fontFamily: 'Inter',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px'
+                                        }}>
+                                          📼 Mailbox besprochen
+                                        </span>
+                                      ) : urgentItem?.teacher_contact_status === 'delegated_to_secretariat' ? (
+                                        <span style={{ 
+                                          color: '#1d4ed8', 
+                                          fontWeight: 800, 
+                                          fontSize: '0.68rem', 
+                                          background: '#dbeafe', 
+                                          border: '1px solid #bfdbfe',
+                                          padding: '2px 8px', 
+                                          borderRadius: '6px', 
+                                          fontFamily: 'Inter',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px'
+                                        }}>
+                                          🏢 An Sekretariat übergeben
+                                        </span>
+                                      ) : urgentItem && !urgentItem.student_acknowledged ? (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            onOpenUrgentModal?.();
+                                          }}
+                                          title="Kurzfristiger Ausfall noch digital unbestätigt – Bitte telefonisch kontaktieren"
+                                          style={{ 
+                                            color: '#dc2626', 
+                                            fontWeight: 850, 
+                                            fontSize: '0.68rem', 
+                                            background: '#fee2e2', 
+                                            border: '1px solid #fca5a5',
+                                            padding: '2px 8px', 
+                                            borderRadius: '6px', 
+                                            fontFamily: 'Inter',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            cursor: 'pointer',
+                                            animation: 'pulse 1.8s infinite'
+                                          }}
+                                        >
+                                          ⚠️ Ungelesen – Bitte kontaktieren
+                                        </button>
+                                      ) : (
+                                        <span style={{ 
+                                          color: '#ef4444', 
+                                          fontWeight: 700, 
+                                          fontSize: '0.68rem', 
+                                          background: 'rgba(239, 68, 68, 0.08)', 
+                                          padding: '2px 8px', 
+                                          borderRadius: '6px', 
+                                          fontFamily: 'Inter',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px'
+                                        }}>
+                                          Heute abgesagt
+                                          {isAcked && <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#34a853', display: 'inline-block' }} />}
+                                        </span>
+                                      )}
+                                      {!isRescheduledAway && onOpenMakeupModal && (
+                                        slot.makeup_token_id ? (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              onOpenMakeupModal({ mode: 'redeem', slot });
+                                            }}
+                                            title="Gutschrift / Nachhol-Kontingent für diesen Termin einlösen"
+                                            style={{
+                                              color: '#15803d',
+                                              fontWeight: 850,
+                                              fontSize: '0.68rem',
+                                              background: '#dcfce7',
+                                              border: '1px solid #86efac',
+                                              padding: '2px 8px',
+                                              borderRadius: '6px',
+                                              fontFamily: 'Inter',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '4px',
+                                              cursor: 'pointer'
+                                            }}
+                                          >
+                                            🎟️ Nachhol-Gutschrift
+                                          </button>
+                                        ) : (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              onOpenMakeupModal({ mode: 'create', slot });
+                                            }}
+                                            title="Diesen Ausfall in ein Nachhol-Kontingent (Gutschrift) umwandeln"
+                                            style={{
+                                              color: '#1d4ed8',
+                                              fontWeight: 850,
+                                              fontSize: '0.68rem',
+                                              background: '#eff6ff',
+                                              border: '1px solid #bfdbfe',
+                                              padding: '2px 8px',
+                                              borderRadius: '6px',
+                                              fontFamily: 'Inter',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '4px',
+                                              cursor: 'pointer'
+                                            }}
+                                          >
+                                            🎟️ Nachhol-Kontingent
+                                          </button>
+                                        )
+                                      )}
+                                    </>
+                                  );
+                                })() : (
+                                  <>
+                                    {resolveStudentInstrument(slot.instrument, slot.students?.[0]?.instrument || slot.student?.instrument, teacher?.instrument) && (
+                                      <span style={{ color: '#334155', fontWeight: 600 }}>• {resolveStudentInstrument(slot.instrument, slot.students?.[0]?.instrument || slot.student?.instrument, teacher?.instrument)}</span>
+                                    )}
+                                    {slot.room && <span style={{ color: '#334155', fontWeight: 600 }}>• {cleanRoomName(slot.room)}</span>}
+                                    {slot.makeup_extension_minutes > 0 && (
+                                      <span 
+                                        title={`Dieser Termin wurde um +${slot.makeup_extension_minutes} Min. aus einem Nachhol-Kontingent verlängert`}
+                                        style={{
+                                          color: '#15803d',
+                                          background: '#dcfce7',
+                                          border: '1px solid #86efac',
+                                          padding: '2px 8px',
+                                          borderRadius: '6px',
+                                          fontSize: '0.68rem',
+                                          fontWeight: 850,
+                                          fontFamily: 'Inter',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px'
+                                        }}
+                                      >
+                                        ⏱️ +{slot.makeup_extension_minutes} Min. Nachholung
+                                      </span>
+                                    )}
+                                    {slot.is_makeup_lesson && (
+                                      <span 
+                                        title="Revisionssicherer Ersatztermin aus einem Nachhol-Kontingent"
+                                        style={{
+                                          color: '#1d4ed8',
+                                          background: '#eff6ff',
+                                          border: '1px solid #bfdbfe',
+                                          padding: '2px 8px',
+                                          borderRadius: '6px',
+                                          fontSize: '0.68rem',
+                                          fontWeight: 850,
+                                          fontFamily: 'Inter',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '4px'
+                                        }}
+                                      >
+                                        🎟️ Nachholtermin
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                                {!slot.isGroup && isRescheduledPending && (
+                                  <span 
+                                    title="Terminverschiebung ausstehend (noch nicht bestätigt)"
+                                    style={{
+                                      background: '#fef3c7',
+                                      color: '#b45309',
+                                      border: '1px solid #fde68a',
+                                      padding: '2px 8px',
+                                      borderRadius: '100px',
+                                      fontSize: '0.68rem',
+                                      fontWeight: 750,
+                                      fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif",
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      marginLeft: 'auto',
+                                      boxShadow: '0 1px 2px rgba(180, 83, 9, 0.05)',
+                                      letterSpacing: '0.01em'
+                                    }}
+                                  >
+                                    <Clock size={11} strokeWidth={2.5} color="#b45309" />
+                                    <span>Unbestätigt</span>
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                     );
                   })
                 })() : (
-                  <div style={{ padding: '30px', textAlign: 'center', color: '#64748b' }}>Keine Termine für heute eingetragen.</div>
+                  <div 
+                    style={{
+                      background: (isWeekend || isFreeDay)
+                        ? 'transparent'
+                        : 'linear-gradient(145deg, #f0f9ff 0%, #e0f2fe 45%, #eff6ff 100%)',
+                      borderRadius: (isWeekend || isFreeDay) ? '0px' : '24px',
+                      padding: (windowWidth < 768 || isMobileDevice) ? '24px 12px 16px' : '36px 20px 24px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '22px',
+                      border: (isWeekend || isFreeDay)
+                        ? 'none'
+                        : '1px solid rgba(59, 130, 246, 0.2)',
+                      boxShadow: (isWeekend || isFreeDay)
+                        ? 'none'
+                        : '0 20px 40px -15px rgba(59, 130, 246, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
+                      textAlign: 'center',
+                      marginTop: '0px',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                    }}
+                  >
+                    {/* Decorative ambient background glows */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '-20%',
+                      right: '-20%',
+                      width: '65%',
+                      height: '65%',
+                      background: isWeekend
+                        ? 'radial-gradient(circle, rgba(192, 132, 252, 0.28) 0%, transparent 65%)'
+                        : isFreeDay
+                          ? 'radial-gradient(circle, rgba(74, 222, 128, 0.22) 0%, transparent 65%)'
+                          : 'radial-gradient(circle, rgba(96, 165, 250, 0.2) 0%, transparent 65%)',
+                      pointerEvents: 'none',
+                      zIndex: 0
+                    }} />
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '-20%',
+                      left: '-20%',
+                      width: '65%',
+                      height: '65%',
+                      background: isWeekend
+                        ? 'radial-gradient(circle, rgba(129, 140, 248, 0.22) 0%, transparent 65%)'
+                        : isFreeDay
+                          ? 'radial-gradient(circle, rgba(34, 197, 94, 0.15) 0%, transparent 65%)'
+                          : 'radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 65%)',
+                      pointerEvents: 'none',
+                      zIndex: 0
+                    }} />
+
+                    {/* Top Status Pill */}
+                    <div style={{
+                      position: 'relative',
+                      zIndex: 2,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: 'rgba(255, 255, 255, 0.88)',
+                      backdropFilter: 'blur(12px)',
+                      border: isWeekend 
+                        ? '1px solid rgba(168, 85, 247, 0.3)' 
+                        : isFreeDay 
+                          ? '1px solid rgba(34, 197, 94, 0.3)' 
+                          : '1px solid rgba(59, 130, 246, 0.3)',
+                      borderRadius: '100px',
+                      padding: '5px 14px',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
+                    }}>
+                      {isWeekend ? (
+                        <Music size={13} color="#7c3aed" />
+                      ) : isFreeDay ? (
+                        <Sparkles size={13} color="#15803d" />
+                      ) : (
+                        <Coffee size={13} color="#2563eb" />
+                      )}
+                      <span style={{
+                        fontSize: '0.74rem',
+                        fontWeight: 850,
+                        letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                        color: isWeekend ? '#6d28d9' : isFreeDay ? '#15803d' : '#2563eb',
+                        fontFamily: 'Inter, sans-serif'
+                      }}>
+                        {isWeekend ? 'Wochenend-Pause • Zeit zum Durchatmen' : isFreeDay ? 'Unterrichtsfreier Tag' : 'Heute keine Termine'}
+                      </span>
+                    </div>
+                    
+                    {/* 3D Floating Apple-Style Specular Squircle with Ambient Reflection */}
+                    <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                      <style>{`
+                        @keyframes specularGlareSweep {
+                          0% { transform: translateX(-150%) rotate(25deg); opacity: 0; }
+                          20% { opacity: 0.65; }
+                          60% { transform: translateX(250%) rotate(25deg); opacity: 0; }
+                          100% { transform: translateX(250%) rotate(25deg); opacity: 0; }
+                        }
+                        @keyframes floatingSway {
+                          0%, 100% { transform: translateY(0px) rotate(-3deg); }
+                          50% { transform: translateY(-5px) rotate(-1deg); }
+                        }
+                      `}</style>
+                      
+                      <div 
+                        style={{ 
+                          width: '76px', 
+                          height: '76px', 
+                          background: isWeekend
+                            ? 'linear-gradient(135deg, #a855f7 0%, #7c3aed 45%, #4f46e5 100%)'
+                            : isFreeDay
+                              ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 50%, #15803d 100%)'
+                              : 'linear-gradient(135deg, #60a5fa 0%, #3b82f6 50%, #1d4ed8 100%)', 
+                          borderRadius: '24px', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          boxShadow: isWeekend
+                            ? '0 20px 38px -10px rgba(124, 58, 237, 0.42), inset 0 1px 1px rgba(255, 255, 255, 0.7), inset 0 -2px 4px rgba(0, 0, 0, 0.15)'
+                            : isFreeDay
+                              ? '0 20px 38px -10px rgba(22, 163, 74, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.65), inset 0 -2px 4px rgba(0, 0, 0, 0.15)'
+                              : '0 20px 38px -10px rgba(37, 99, 235, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.65), inset 0 -2px 4px rgba(0, 0, 0, 0.15)',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          animation: 'floatingSway 6s ease-in-out infinite',
+                          cursor: 'default'
+                        }}
+                      >
+                        {/* Specular Glare Sweep Beam */}
+                        <div style={{
+                          position: 'absolute',
+                          top: '-50%',
+                          left: '-50%',
+                          width: '70px',
+                          height: '200%',
+                          background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent)',
+                          transform: 'rotate(25deg)',
+                          pointerEvents: 'none',
+                          animation: 'specularGlareSweep 5s ease-in-out infinite'
+                        }} />
+
+                        {isWeekend ? (
+                          <>
+                            <Music size={38} color="#ffffff" strokeWidth={2.4} style={{ filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.2))' }} />
+                            <Sparkles size={14} color="#fef08a" style={{ position: 'absolute', top: '12px', right: '12px', animation: 'pulse 2s infinite' }} />
+                          </>
+                        ) : isFreeDay ? (
+                          <Sparkles size={36} color="#ffffff" strokeWidth={2.2} />
+                        ) : (
+                          <Coffee size={36} color="#ffffff" strokeWidth={2.2} />
+                        )}
+                      </div>
+
+                      {/* 3D Spatial Floor Shadow & Reflection */}
+                      <div style={{
+                        width: '56px',
+                        height: '14px',
+                        borderRadius: '50%',
+                        background: isWeekend
+                          ? 'radial-gradient(ellipse, rgba(124, 58, 237, 0.35) 0%, rgba(79, 70, 229, 0.15) 50%, transparent 80%)'
+                          : 'radial-gradient(ellipse, rgba(0, 0, 0, 0.15) 0%, transparent 70%)',
+                        filter: 'blur(5px)',
+                        marginTop: '-4px',
+                        opacity: 0.85
+                      }} />
+                    </div>
+                    
+                    <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                      <h4 style={{ 
+                        margin: 0, 
+                        fontSize: (windowWidth < 768 || isMobileDevice) ? '1.5rem' : '1.85rem', 
+                        fontWeight: 950, 
+                        color: '#0f172a',
+                        fontFamily: "'Plus Jakarta Sans', sans-serif", 
+                        letterSpacing: '-0.02em',
+                        lineHeight: 1.2
+                      }}>
+                        {isWeekend
+                          ? 'Klang & Erholung'
+                          : isFreeDay
+                            ? 'Heute hast du frei!'
+                            : 'Unterrichtsfrei'}
+                      </h4>
+                      <p style={{ 
+                        margin: 0, 
+                        fontSize: '0.94rem', 
+                        color: '#475569', 
+                        fontWeight: 600, 
+                        maxWidth: '420px', 
+                        lineHeight: 1.5 
+                      }}>
+                        {isWeekend
+                          ? 'Heute ruht der Unterricht. Zeit für frische Inspiration, eigene Musik und neue Grooves.'
+                          : isFreeDay
+                            ? 'Für den heutigen Tag stehen keine Unterrichtsstunden im Stundenplan.'
+                            : 'Aktuell sind für diesen Tag keine aktiven Unterrichtsstunden hinterlegt.'}
+                      </p>
+                    </div>
+
+                    {/* Peaceful Music Mood Chips */}
+                    <div style={{
+                      position: 'relative',
+                      zIndex: 2,
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      marginTop: '6px'
+                    }}>
+                      {(isWeekend ? [
+                        { icon: '☕', label: 'Ausgeschlafen' },
+                        { icon: '🎶', label: 'Eigene Songs & Grooves' },
+                        { icon: '🎧', label: 'Lieblings-Musik' }
+                      ] : isFreeDay ? [
+                        { icon: '☕', label: 'Freier Vormittag' },
+                        { icon: '💡', label: 'Kreativzeit' },
+                        { icon: '🍃', label: 'Kraft tanken' }
+                      ] : [
+                        { icon: '☕', label: 'Unterrichtsfrei' },
+                        { icon: '📁', label: 'Vorbereitung' },
+                        { icon: '✨', label: 'Ruhe' }
+                      ]).map(chip => (
+                        <span
+                          key={chip.label}
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.78)',
+                            backdropFilter: 'blur(10px)',
+                            border: '1px solid rgba(255, 255, 255, 0.95)',
+                            borderRadius: '100px',
+                            padding: '6px 14px',
+                            fontSize: '0.78rem',
+                            fontWeight: 750,
+                            color: '#334155',
+                            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px'
+                          }}
+                        >
+                          <span>{chip.icon}</span>
+                          <span>{chip.label}</span>
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* Inspiring Musical Quote Box */}
+                    <div style={{
+                      position: 'relative',
+                      zIndex: 2,
+                      background: 'rgba(255, 255, 255, 0.7)',
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(255, 255, 255, 0.9)',
+                      borderRadius: '16px',
+                      padding: '12px 20px',
+                      maxWidth: '420px',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.02)',
+                      marginTop: '8px'
+                    }}>
+                      <div style={{
+                        fontSize: '0.82rem',
+                        fontStyle: 'italic',
+                        color: '#475569',
+                        lineHeight: 1.45
+                      }}>
+                        {isWeekend 
+                          ? '„Wo die Sprache aufhört, fängt die Musik an.“'
+                          : isFreeDay
+                            ? '„Musik wäscht die Seele vom Staub des Alltags rein.“'
+                            : '„Ohne Musik wäre das Leben ein Irrtum.“'}
+                      </div>
+                      <div style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 800,
+                        color: '#64748b',
+                        marginTop: '4px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em'
+                      }}>
+                        {isWeekend ? '— E.T.A. Hoffmann' : isFreeDay ? '— Berthold Auerbach' : '— Friedrich Nietzsche'}
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
             ) : (
@@ -1901,9 +2451,18 @@ export const TeacherTagesplanWidget: React.FC<TeacherTagesplanWidgetProps> = ({
             )}
           </div>
         </div>
-        <TeacherTagesplanRoomIssuesBanner isDesktop={!isMobileDevice && windowWidth >= 768} relevantRoomIssuesToday={relevantRoomIssuesToday} teacherTodayRooms={teacherTodayRooms} handleResolveRoomIssueInTagesplan={handleResolveRoomIssueInTagesplan} getIssueRoomLabel={getIssueRoomLabel} teacher={teacher} userId={userId} />
+        <TeacherTagesplanRoomIssuesBanner
+          isDesktop={!isMobileDevice && windowWidth >= 768}
+          relevantRoomIssuesToday={relevantRoomIssuesToday}
+          teacherTodayRooms={teacherTodayRooms}
+          handleResolveRoomIssueInTagesplan={handleResolveRoomIssueInTagesplan}
+          getIssueRoomLabel={getIssueRoomLabel}
+          teacher={teacher}
+          userId={userId}
+          rooms={rooms}
+          handleUpdateIssueRoom={handleUpdateIssueRoom}
+        />
       </div>
     )
-  ) : null
   );
 };

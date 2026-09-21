@@ -264,11 +264,13 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
           <button
             type="button"
             onClick={() => window.dispatchEvent(new CustomEvent('campus_open_messages_tab'))}
+            aria-label={unreadCount > 0 ? `${unreadCount} ungelesene Benachrichtigungen` : 'Benachrichtigungen & Nachrichten'}
+            title="Benachrichtigungen & Nachrichten"
             style={{
-              width: '38px',
-              height: '38px',
-              minWidth: '38px',
-              minHeight: '38px',
+              width: '44px',
+              height: '44px',
+              minWidth: '44px',
+              minHeight: '44px',
               borderRadius: '50%',
               background: 'rgba(241, 245, 249, 0.9)',
               border: 'none',
@@ -279,9 +281,8 @@ export const MobileTopHeader: React.FC<MobileTopHeaderProps> = ({
               cursor: 'pointer',
               touchAction: 'manipulation'
             }}
-            title="Benachrichtigungen & Nachrichten"
           >
-            <Bell size={17} />
+            <Bell size={18} />
           </button>
           {unreadCount > 0 && (
             <span

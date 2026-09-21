@@ -22,6 +22,15 @@ export interface BuildSecretaryCampusPropsParams {
   studentsHook: any;
   schedules: any;
   dashboardData: any;
+  bookings?: any;
+
+  // Rooms & Subjects (State from SecretaryDashboard)
+  rooms?: any[];
+  setRooms?: React.Dispatch<React.SetStateAction<any[]>>;
+  subjects?: any[];
+  setSubjects?: React.Dispatch<React.SetStateAction<any[]>>;
+  activeSubjectsList?: string[];
+  fetchDashboardData?: () => Promise<void> | void;
 
   // Teachers (State from SecretaryDashboard)
   campusTeachers?: any[];
@@ -160,7 +169,7 @@ export function buildSecretaryCampusProps(
     onLogout,
     schoolName: settings.schoolName,
     currentSchoolProfile,
-    fetchDashboardData: dashboardData.fetchDashboardData,
+    fetchDashboardData: params.fetchDashboardData ?? dashboardData?.fetchDashboardData ?? (() => {}),
 
     // Modals & Navigation triggers
     showAddTeacherModal: staff.showAddTeacherModal,
@@ -183,7 +192,6 @@ export function buildSecretaryCampusProps(
     selectedStudentForDetail: studentsHook.selectedStudentForDetail,
     setSelectedStudentForDetail: studentsHook.setSelectedStudentForDetail,
     setSettingsTab: settings.setSettingsTab,
-    setApprovalToast,
 
     // Feature Toggles (Campus)
     enabledCampusSubjects,
@@ -297,7 +305,7 @@ export function buildSecretaryCampusProps(
 
     // Schedules (Matrix & Allocation)
     pendingSchedules: schedules.pendingSchedules,
-    rooms: dashboardData.rooms,
+    rooms: params.rooms ?? dashboardData?.rooms ?? [],
     matrixAllocations: schedules.matrixAllocations,
     setMatrixAllocations: schedules.setMatrixAllocations,
     selectedFilterTeacherId: schedules.selectedFilterTeacherId,
@@ -308,6 +316,10 @@ export function buildSecretaryCampusProps(
     setShowOnlyPendingReviews: schedules.setShowOnlyPendingReviews,
     isSavingApproval: schedules.isSavingApproval,
     isApprovingAllSchedules: schedules.isApprovingAllSchedules,
+    approvalToast: schedules.approvalToast,
+    setApprovalToast: setApprovalToast || schedules.setApprovalToast,
+    approvalSummaryModal: schedules.approvalSummaryModal,
+    setApprovalSummaryModal: schedules.setApprovalSummaryModal,
     draggedPlanId: schedules.draggedPlanId,
     setDraggedPlanId: schedules.setDraggedPlanId,
     draggedPlanDay: schedules.draggedPlanDay,
@@ -354,9 +366,9 @@ export function buildSecretaryCampusProps(
     setAdHocStudentName,
 
     // Settings & Status
-    subjects: dashboardData.subjects,
-    activeSubjectsList: dashboardData.activeSubjectsList,
-    schoolEvents: dashboardData.schoolEvents,
+    subjects: params.subjects ?? dashboardData?.subjects ?? [],
+    activeSubjectsList: params.activeSubjectsList ?? dashboardData?.activeSubjectsList ?? [],
+    schoolEvents: dashboardData?.schoolEvents ?? [],
     activeCampusSettingsModal: extendedSettings.activeCampusSettingsModal,
     setActiveCampusSettingsModal: extendedSettings.setActiveCampusSettingsModal,
     campusScheduleSlotMinutes: extendedSettings.campusScheduleSlotMinutes,
@@ -378,7 +390,7 @@ export function buildSecretaryCampusProps(
     campusFocusTimerDefaultMin: extendedSettings.campusFocusTimerDefaultMin,
     campusKioskPinLength: extendedSettings.campusKioskPinLength,
     openingHours: settings.openingHours,
-    simulatedToday: dashboardData.simulatedToday,
+    simulatedToday: dashboardData?.simulatedToday ?? '',
     billingPayer: licenses.billingPayer,
     studentBillingOption: licenses.studentBillingOption,
     hasCampusSub: licenses.hasCampusSub,

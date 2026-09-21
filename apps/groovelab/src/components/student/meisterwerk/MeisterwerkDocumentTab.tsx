@@ -635,6 +635,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
     }
   }, [props.parentPermissions, (student as any)?.parent_permissions]);
 
+  // 🎵 Song Selection & Creation Modal State (Self-Contained 1% Goldstandard)
+  const [localShowCreateSongModal, setLocalShowCreateSongModal] = useState(false);
+  const [localSongModalTab, setLocalSongModalTab] = useState<'catalog' | 'create'>('catalog');
+  const [localSongSearch, setLocalSongSearch] = useState('');
+  const [localNewSongTitle, setLocalNewSongTitle] = useState('');
+  const [localNewSongArtist, setLocalNewSongArtist] = useState('');
+
   // 🎛️ STUDIO MODULES CUSTOM DRAG & DROP + JIGGLE MODE STATE
   // 🛡️ Goldstandard Separation: UI-Layout-Personalisierung ist entkoppelt vom didaktischen readOnly-Inhaltsschutz
   const canCustomizeLayout = true;
@@ -3896,10 +3903,10 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       </h3>
                     </div>
 
-                    {(!readOnly && isTeacherTools) && (
+                    {!readOnly && (
                       <button
                         type="button"
-                        onClick={() => setShowCreateSongModal(!showCreateSongModal)}
+                        onClick={() => setLocalShowCreateSongModal(true)}
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
@@ -3915,9 +3922,10 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           transition: 'all 0.15s ease'
                         }}
                         className="hover-scale"
+                        aria-label="Song aus Mediathek wählen oder anlegen"
                       >
                         <Plus size={12} strokeWidth={3} />
-                        <span>Song anlegen</span>
+                        <span>Song hinzufügen</span>
                       </button>
                     )}
                   </div>
@@ -3948,20 +3956,21 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                       });
 
                       if (activeSongs.length === 0) {
-                        const canCreate = !readOnly && isTeacherTools;
+                        const canCreate = !readOnly;
                         return (
                           <div
                             onClick={() => {
-                              if (canCreate) setShowCreateSongModal(true);
+                              if (canCreate) setLocalShowCreateSongModal(true);
                             }}
                             role={canCreate ? 'button' : undefined}
                             tabIndex={canCreate ? 0 : undefined}
                             onKeyDown={canCreate ? (e) => {
                               if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault();
-                                setShowCreateSongModal(true);
+                                setLocalShowCreateSongModal(true);
                               }
                             } : undefined}
+                            aria-label={canCreate ? "Ersten Song aus Mediathek wählen oder anlegen" : "Noch kein aktives Song-Projekt"}
                             style={{
                               background: 'rgba(248, 250, 252, 0.7)',
                               borderRadius: '16px',
@@ -3996,7 +4005,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             <div>
                               <div style={{ fontSize: '0.80rem', fontWeight: 900, color: '#0f172a' }}>Noch kein aktives Song-Projekt</div>
                               <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', marginTop: '2px' }}>
-                                {canCreate ? '+ Klicke hier, um deinen ersten Song anzulegen' : 'Noch kein Song-Projekt von deiner Lehrkraft zugewiesen.'}
+                                {canCreate ? '+ Klicke hier, um deinen ersten Song aus der Mediathek zu wählen oder anzulegen' : 'Noch kein aktives Song-Projekt vorhanden.'}
                               </div>
                             </div>
                           </div>
@@ -4139,7 +4148,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     <span>{progress}%</span>
                                   </div>
 
-                                  {!readOnly && (skill.songs?.teacher_id || skill.created_by_teacher) && (
+                                  {!readOnly && (
                                     <button
                                       type="button"
                                       onClick={(e) => {
@@ -4158,7 +4167,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         borderRadius: '50%'
                                       }}
                                       className="hover-scale"
-                                      title="Song entfernen"
+                                      title="Song aus aktiven Projekten entfernen"
+                                      aria-label={`${songTitle} aus aktiven Projekten entfernen`}
                                     >
                                       <X size={13} />
                                     </button>
@@ -4172,8 +4182,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                     })()}
                 </div>
 
-                {/* SaaS Enterprise+ Song Selection & Creation Modal */}
-                {showCreateSongModal && (
+                {/* SaaS Enterprise+ Song Selection & Creation Modal (1% Goldstandard) */}
+                {localShowCreateSongModal && (
                   <div style={{
                     position: 'fixed',
                     top: 0, left: 0, right: 0, bottom: 0,
@@ -4184,7 +4194,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     padding: '20px'
-                  }} onClick={() => setShowCreateSongModal(false)}>
+                  }} onClick={() => setLocalShowCreateSongModal(false)}>
                     <div style={{
                       background: '#ffffff',
                       borderRadius: '24px',
@@ -4221,13 +4231,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                           </div>
                           <div>
                             <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#0f172a' }}>Song hinzufügen</h3>
-                            <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Aus Schulkatalog wählen oder eigenen Song anlegen</p>
+                            <p style={{ margin: 0, fontSize: '0.72rem', color: '#64748b', fontWeight: 650 }}>Aus der Mediathek wählen oder eigenen Song anlegen</p>
                           </div>
                         </div>
 
                         <button
                           type="button"
-                          onClick={() => setShowCreateSongModal(false)}
+                          onClick={() => setLocalShowCreateSongModal(false)}
                           style={{
                             background: '#f1f5f9',
                             border: 'none',
@@ -4240,6 +4250,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             cursor: 'pointer',
                             color: '#64748b'
                           }}
+                          aria-label="Dialog schließen"
                         >
                           <X size={16} />
                         </button>
@@ -4257,7 +4268,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         }}>
                           <button
                             type="button"
-                            onClick={() => setSongModalTab('catalog')}
+                            onClick={() => setLocalSongModalTab('catalog')}
                             style={{
                               border: 'none',
                               padding: '8px 12px',
@@ -4265,17 +4276,17 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               fontSize: '0.78rem',
                               fontWeight: 850,
                               cursor: 'pointer',
-                              background: songModalTab === 'catalog' ? '#ffffff' : 'transparent',
-                              color: songModalTab === 'catalog' ? '#0f172a' : '#64748b',
-                              boxShadow: songModalTab === 'catalog' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                              background: localSongModalTab === 'catalog' ? '#ffffff' : 'transparent',
+                              color: localSongModalTab === 'catalog' ? '#0f172a' : '#64748b',
+                              boxShadow: localSongModalTab === 'catalog' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
                               transition: 'all 0.15s ease'
                             }}
                           >
-                            📚 Schulkatalog
+                            📚 Mediathek
                           </button>
                           <button
                             type="button"
-                            onClick={() => setSongModalTab('create')}
+                            onClick={() => setLocalSongModalTab('create')}
                             style={{
                               border: 'none',
                               padding: '8px 12px',
@@ -4283,9 +4294,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               fontSize: '0.78rem',
                               fontWeight: 850,
                               cursor: 'pointer',
-                              background: songModalTab === 'create' ? '#ffffff' : 'transparent',
-                              color: songModalTab === 'create' ? '#0f172a' : '#64748b',
-                              boxShadow: songModalTab === 'create' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                              background: localSongModalTab === 'create' ? '#ffffff' : 'transparent',
+                              color: localSongModalTab === 'create' ? '#0f172a' : '#64748b',
+                              boxShadow: localSongModalTab === 'create' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
                               transition: 'all 0.15s ease'
                             }}
                           >
@@ -4296,15 +4307,15 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
 
                       {/* Modal Body */}
                       <div style={{ padding: '12px 24px 24px 24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                        {songModalTab === 'catalog' ? (
+                        {localSongModalTab === 'catalog' ? (
                           <>
                             <div style={{ position: 'relative' }}>
                               <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '12px' }} />
                               <input
                                 type="text"
                                 placeholder="Song oder Künstler suchen..."
-                                value={songSearch}
-                                onChange={(e) => setSongSearch(e.target.value)}
+                                value={localSongSearch}
+                                onChange={(e) => setLocalSongSearch(e.target.value)}
                                 style={{
                                   width: '100%',
                                   padding: '10px 14px 10px 36px',
@@ -4329,48 +4340,50 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               paddingRight: '4px'
                             }}>
                               {(() => {
-                                const filtered = songs.filter(s => {
+                                const filtered = (songs || []).filter((s: any) => {
                                   const t = (s.title || '').toLowerCase().trim();
                                   if (t === 'test' || t === 'test - test' || t === 'test-test') return false;
-                                  if (!songSearch.trim()) return true;
-                                  return (s.title || '').toLowerCase().includes(songSearch.toLowerCase()) || 
-                                         (s.artist || '').toLowerCase().includes(songSearch.toLowerCase());
+                                  if (!localSongSearch.trim()) return true;
+                                  return (s.title || '').toLowerCase().includes(localSongSearch.toLowerCase()) || 
+                                         (s.artist || '').toLowerCase().includes(localSongSearch.toLowerCase());
                                 });
 
                                 if (filtered.length === 0) {
                                   return (
                                     <div style={{ padding: '30px 16px', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                                      <span>Kein passender Song im Katalog gefunden.</span>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setNewSongTitle(songSearch);
-                                          setSongModalTab('create');
-                                        }}
-                                        style={{
-                                          background: '#e6f4ea',
-                                          color: '#34a853',
-                                          border: 'none',
-                                          padding: '6px 14px',
-                                          borderRadius: '10px',
-                                          fontSize: '0.75rem',
-                                          fontWeight: 850,
-                                          cursor: 'pointer'
-                                        }}
-                                      >
-                                        ✨ "{songSearch}" als neuen Song anlegen
-                                      </button>
+                                      <span>Kein passender Song in der Mediathek gefunden.</span>
+                                      {localSongSearch.trim() && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setLocalNewSongTitle(localSongSearch.trim());
+                                            setLocalSongModalTab('create');
+                                          }}
+                                          style={{
+                                            background: '#e6f4ea',
+                                            color: '#34a853',
+                                            border: 'none',
+                                            padding: '6px 14px',
+                                            borderRadius: '10px',
+                                            fontSize: '0.75rem',
+                                            fontWeight: 850,
+                                            cursor: 'pointer'
+                                          }}
+                                        >
+                                          ✨ "{localSongSearch.trim()}" als neuen Song anlegen
+                                        </button>
+                                      )}
                                     </div>
                                   );
                                 }
 
-                                return filtered.map((song) => (
+                                return filtered.map((song: any) => (
                                   <div
                                     key={song.id}
-                                    onClick={() => {
-                                      handleAssignSongFromCatalog(song.id);
-                                      setShowCreateSongModal(false);
-                                      setSongSearch('');
+                                    onClick={async () => {
+                                      await handleAssignSongFromCatalog(song.id);
+                                      setLocalShowCreateSongModal(false);
+                                      setLocalSongSearch('');
                                     }}
                                     style={{
                                       padding: '10px 14px',
@@ -4400,7 +4413,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                       </div>
                                       <div>
                                         <div style={{ fontWeight: 900, fontSize: '0.85rem', color: '#0f172a' }}>{song.title}</div>
-                                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 650 }}>{song.artist || 'Unbekannter Künstler'}</div>
+                                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 650 }}>{song.artist || 'Traditionell / Unbekannt'}</div>
                                       </div>
                                     </div>
 
@@ -4425,17 +4438,21 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                             </div>
                           </>
                         ) : (
-                          <form onSubmit={(e) => {
-                            handleCreateAndAssignSong(e);
-                            setShowCreateSongModal(false);
+                          <form onSubmit={async (e) => {
+                            e.preventDefault();
+                            if (!localNewSongTitle.trim()) return;
+                            await handleCreateAndAssignSong(localNewSongTitle, localNewSongArtist);
+                            setLocalShowCreateSongModal(false);
+                            setLocalNewSongTitle('');
+                            setLocalNewSongArtist('');
                           }} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                               <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#334155' }}>Songtitel</label>
                               <input
                                 type="text"
                                 placeholder="z. B. Wonderwall..."
-                                value={newSongTitle}
-                                onChange={(e) => setNewSongTitle(e.target.value)}
+                                value={localNewSongTitle}
+                                onChange={(e) => setLocalNewSongTitle(e.target.value)}
                                 style={{
                                   width: '100%',
                                   padding: '10px 14px',
@@ -4457,8 +4474,8 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               <input
                                 type="text"
                                 placeholder="z. B. Oasis..."
-                                value={newSongArtist}
-                                onChange={(e) => setNewSongArtist(e.target.value)}
+                                value={localNewSongArtist}
+                                onChange={(e) => setLocalNewSongArtist(e.target.value)}
                                 style={{
                                   width: '100%',
                                   padding: '10px 14px',
@@ -4470,14 +4487,13 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   background: '#f8fafc',
                                   boxSizing: 'border-box'
                                 }}
-                                required
                               />
                             </div>
 
                             <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
                               <button
                                 type="button"
-                                onClick={() => setShowCreateSongModal(false)}
+                                onClick={() => setLocalShowCreateSongModal(false)}
                                 style={{
                                   flex: 1,
                                   background: '#f1f5f9',
@@ -4526,9 +4542,12 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                   display: 'flex',
                   gap: isMobileOrSim ? '6px' : '10px',
                   borderTop: '1px solid #f1f5f9',
-                  background: '#ffffff',
+                  background: 'rgba(255, 255, 255, 0.95)',
+                  backdropFilter: 'blur(10px)',
+                  WebkitBackdropFilter: 'blur(10px)',
                   boxSizing: 'border-box',
-                  width: '100%'
+                  width: '100%',
+                  flexShrink: 0
                 }}>
                   <button
                     type="button"
@@ -4536,17 +4555,18 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                     style={{
                       flex: 1,
                       minWidth: 0,
-                      minHeight: isMobileOrSim ? '46px' : '52px',
-                      padding: isMobileOrSim ? '10px 6px' : '13px 10px',
-                      borderRadius: '16px',
+                      minHeight: isMobileOrSim ? '42px' : '44px',
+                      padding: isMobileOrSim ? '8px 6px' : '10px 12px',
+                      borderRadius: '14px',
                       border: 'none',
                       background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
                       color: 'white',
-                      fontWeight: 900,
-                      fontSize: isMobileOrSim ? '0.80rem' : '0.86rem',
+                      fontWeight: 800,
+                      fontSize: isMobileOrSim ? '0.78rem' : '0.82rem',
+                      letterSpacing: '-0.01em',
                       cursor: 'pointer',
-                      boxShadow: '0 4px 12px rgba(99, 102, 241, 0.28)',
-                      transition: 'all 0.15s ease',
+                      boxShadow: '0 2px 8px rgba(99, 102, 241, 0.20)',
+                      transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -4555,7 +4575,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                     className="hover-scale"
                     title={isMobileOrSim ? 'Deine Meisterwerke' : undefined}
                   >
-                    <Award size={isMobileOrSim ? 16 : 17} strokeWidth={2.4} />
+                    <Award size={isMobileOrSim ? 15 : 16} strokeWidth={2.4} />
                     <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {isMobileOrSim ? 'Meisterwerke' : 'Deine Meisterwerke'}
                     </span>
@@ -4566,17 +4586,18 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                     style={{
                       flex: 1,
                       minWidth: 0,
-                      minHeight: isMobileOrSim ? '46px' : '52px',
-                      padding: isMobileOrSim ? '10px 6px' : '13px 10px',
-                      borderRadius: '16px',
+                      minHeight: isMobileOrSim ? '42px' : '44px',
+                      padding: isMobileOrSim ? '8px 6px' : '10px 12px',
+                      borderRadius: '14px',
                       border: 'none',
-                      background: 'linear-gradient(135deg, #d97706 0%, #b45309 100%)',
+                      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                       color: 'white',
-                      fontWeight: 900,
-                      fontSize: isMobileOrSim ? '0.80rem' : '0.86rem',
+                      fontWeight: 800,
+                      fontSize: isMobileOrSim ? '0.78rem' : '0.82rem',
+                      letterSpacing: '-0.01em',
                       cursor: 'pointer',
-                      boxShadow: '0 4px 12px rgba(217, 119, 6, 0.28)',
-                      transition: 'all 0.15s ease',
+                      boxShadow: '0 2px 8px rgba(217, 119, 6, 0.20)',
+                      transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -4585,7 +4606,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                     className="hover-scale"
                     title={isMobileOrSim ? (uiLevel === 'junior' ? 'Sticker-Album' : uiLevel === 'teen' ? 'Badges & Trophäen' : 'Meilensteine') : undefined}
                   >
-                    <Star size={isMobileOrSim ? 16 : 17} fill="#fff" />
+                    <Star size={isMobileOrSim ? 15 : 16} fill="#fff" />
                     <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {isMobileOrSim 
                         ? (uiLevel === 'junior' ? 'Sticker' : uiLevel === 'teen' ? 'Trophäen' : 'Meilensteine')
@@ -4598,17 +4619,18 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                     style={{
                       flex: 1,
                       minWidth: 0,
-                      minHeight: isMobileOrSim ? '46px' : '52px',
-                      padding: isMobileOrSim ? '10px 6px' : '13px 10px',
-                      borderRadius: '16px',
+                      minHeight: isMobileOrSim ? '42px' : '44px',
+                      padding: isMobileOrSim ? '8px 6px' : '10px 12px',
+                      borderRadius: '14px',
                       border: 'none',
-                      background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                       color: 'white',
-                      fontWeight: 900,
-                      fontSize: isMobileOrSim ? '0.80rem' : '0.86rem',
+                      fontWeight: 800,
+                      fontSize: isMobileOrSim ? '0.78rem' : '0.82rem',
+                      letterSpacing: '-0.01em',
                       cursor: 'pointer',
-                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.28)',
-                      transition: 'all 0.15s ease',
+                      boxShadow: '0 2px 8px rgba(16, 185, 129, 0.20)',
+                      transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -4617,7 +4639,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                     className="hover-scale"
                     title={isMobileOrSim ? 'Audio-Biografie (Tresor)' : undefined}
                   >
-                    <Disc size={isMobileOrSim ? 16 : 17} strokeWidth={2.4} />
+                    <Disc size={isMobileOrSim ? 15 : 16} strokeWidth={2.4} />
                     <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {isMobileOrSim ? 'Biografie' : 'Audio-Biografie'}
                     </span>
@@ -4669,15 +4691,15 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
             height: isMobileView ? 'auto' : '100%',
             minHeight: '0',
             maxHeight: isMobileView ? 'none' : '100%',
-            padding: useNotebookLayout ? (isMobileView ? '8px 4px var(--mobile-scroll-clearance-bottom, calc(96px + env(safe-area-inset-bottom, 20px))) 4px' : '24px 24px 24px 60px') : (isMobileView ? '8px 4px var(--mobile-scroll-clearance-bottom, calc(96px + env(safe-area-inset-bottom, 20px))) 4px' : '24px'),
-            overflowY: isMobileView ? 'visible' : 'auto',
+            padding: isMobileView ? '8px 4px var(--mobile-scroll-clearance-bottom, calc(96px + env(safe-area-inset-bottom, 20px))) 4px' : '0px',
+            overflowY: isMobileView ? 'visible' : 'hidden',
             display: isMobileView ? (mobileProtokollTab === 'homework' ? 'flex' : 'none') : 'flex',
             flexDirection: 'column',
             justifyContent: 'flex-start',
-            gap: '20px',
-            background: useNotebookLayout ? 'white' : '#f8fafc',
+            gap: 0,
+            background: '#ffffff',
             backgroundImage: useNotebookLayout ? 'repeating-linear-gradient(white, white 27px, #e5e0d4 27px, #e5e0d4 28px)' : 'none',
-            borderLeft: useNotebookLayout ? 'none' : '1px solid #e4e4e7',
+            borderLeft: useNotebookLayout ? 'none' : '1px solid #f1f5f9',
             borderRadius: '0',
             boxShadow: 'none',
             position: 'relative',
@@ -4716,6 +4738,19 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                 ))}
               </div>
             )}
+
+            {/* Inner scrollable area for Column 3 */}
+            <div style={{
+              flex: 1,
+              minHeight: 0,
+              height: isMobileView ? 'auto' : '100%',
+              overflowY: isMobileView ? 'visible' : (activeSubView === 'hub' ? 'hidden' : 'auto'),
+              padding: isMobileView ? '0' : (useNotebookLayout ? '20px 20px 20px 60px' : '16px 20px 16px 20px'),
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              boxSizing: 'border-box'
+            }}>
 
             {activeSubView === 'history' ? (
               (() => {
@@ -6528,10 +6563,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                 )}
 
                 {/* The Main Input Form Card */}
-                <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, gap: readOnly ? '0px' : '20px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: isMobileView ? 'auto' : '100%', gap: readOnly ? '0px' : '20px' }}>
                   <div style={{
                     flex: 1,
                     minHeight: 0,
+                    height: isMobileView ? 'auto' : '100%',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '20px'
@@ -6539,6 +6575,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                     <div style={{
                       flex: 1,
                       minHeight: 0,
+                      height: isMobileView ? 'auto' : '100%',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '20px'
@@ -7297,7 +7334,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                         const currentHour = getSimulatedNow().getHours();
                         const isSilentTime = currentHour >= 20 || currentHour < 7;
 
-                        const effectiveViewingQuestion = isCurrentWeek 
+                        const effectiveViewingQuestion = (isCurrentWeek 
                           ? (parsedStudentQuestion?.hasQuestion ? parsedStudentQuestion : (pastBridgedQuestion?.hasQuestion ? pastBridgedQuestion : parsedStudentQuestion))
                           : (histWeekItem && histWeekItem.homework_notes
                               ? (() => {
@@ -7310,30 +7347,30 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     return { hasQuestion: false, rawEntry: null, text: '', timestamp: null };
                                   }
                                 })()
-                              : { hasQuestion: false, rawEntry: null, text: '', timestamp: null });
+                              : { hasQuestion: false, rawEntry: null, text: '', timestamp: null })) || { hasQuestion: false, rawEntry: null, text: '', timestamp: null };
 
                         const isCarriedOverPlan = isCurrentWeek && (isAudioCarriedOver || isNotesCarriedOver || isBooksCarriedOver || isSongsCarriedOver) && !isCarriedOverDismissed;
 
                         return (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: 1, minHeight: 0 }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', flex: 1, minHeight: 0, height: isMobileView ? 'auto' : '100%' }}>
                             {/* ========================================================================= */}
                             {/* KÖRPER 1: DAS NOTENHEFT (Schüler-Bühne / Das fertige Ergebnis)            */}
                             {/* ========================================================================= */}
                             <div style={{
                               background: '#ffffff',
-                              border: '1px solid rgba(0, 0, 0, 0.08)',
+                              border: '1px solid #eef2f6',
                               borderRadius: isMobileView ? '20px' : '24px',
                               padding: isMobileView ? '14px 12px' : '20px 22px',
                               display: 'flex',
                               flexDirection: 'column',
                               gap: isMobileView ? '12px' : '16px',
-                              boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.04), 0 2px 6px -1px rgba(0, 0, 0, 0.02)',
+                              boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.02)',
                               maxWidth: '100%',
                               boxSizing: 'border-box',
                               overflow: 'hidden',
-                              flex: '0 0 auto',
-                              flexShrink: 0,
-                              minHeight: 'auto'
+                              flex: isMobileView ? '0 0 auto' : '1 1 0%',
+                              height: isMobileView ? 'auto' : '100%',
+                              minHeight: 0
                             }}>
                               {/* 1. Responsive Header Bar (Desktop: 1-Line, Mobile: Adaptive Wrap) */}
                             <div style={{ 
@@ -7540,14 +7577,14 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               >
                                 {/* ❓ 1. Student Question Button */}
                                 {readOnly ? (
-                                  effectiveViewingQuestion.hasQuestion ? (
+                                  effectiveViewingQuestion?.hasQuestion ? (
                                     <button
                                       type="button"
                                       role="button"
                                       tabIndex={0}
                                       onClick={() => {
-                                        if (!isQuestionEditorOpen && effectiveViewingQuestion.hasQuestion) {
-                                          setQuestionDraftText(effectiveViewingQuestion.text);
+                                        if (!isQuestionEditorOpen && effectiveViewingQuestion?.hasQuestion) {
+                                          setQuestionDraftText(effectiveViewingQuestion?.text);
                                         }
                                         setIsQuestionEditorOpen(prev => !prev);
                                       }}
@@ -7866,8 +7903,9 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                               className="custom-scrollbar"
                               style={{
                                 flex: 1,
-                                minHeight: !hasActiveItems ? (isMobileView ? '160px' : '180px') : (isMobileView ? '120px' : '160px'),
-                                maxHeight: isMobileView ? 'none' : 'calc(100vh - 280px)',
+                                minHeight: isMobileView ? (!hasActiveItems ? '160px' : '120px') : 0,
+                                height: isMobileView ? 'auto' : '100%',
+                                maxHeight: 'none',
                                 overflowY: 'auto',
                                 overflowX: 'hidden',
                                 WebkitOverflowScrolling: 'touch',
@@ -8207,7 +8245,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     </div>
                                   )}
 
-                                   {readOnly && !isQuestionEditorOpen && effectiveViewingQuestion.hasQuestion && (
+                                    {readOnly && !isQuestionEditorOpen && effectiveViewingQuestion?.hasQuestion && (
                                      <div style={{
                                        background: '#fefce8',
                                        border: '1px solid #fef08a',
@@ -8401,7 +8439,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                    )}
 
                                   {/* 🍎 LEHRKRAFT-BANNER: Prominenter Schülerfrage-Hinweis */}
-                                  {!readOnly && effectiveViewingQuestion.hasQuestion && (
+                                  {!readOnly && effectiveViewingQuestion?.hasQuestion && (
                                     <div style={{
                                       background: '#fffbeb',
                                       border: '1.5px solid #fcd34d',
@@ -9400,10 +9438,10 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                         alignItems: 'center',
                                         gap: '3px'
                                       }}
-                                      title="Didaktisches Hörbeispiel gem. § 60a UrhG: Dient ausschließlich dem persönlichen 1:1-Übungsgebrauch dieses Schülers."
+                                      title="Didaktisches Hörbeispiel: Dient ausschließlich dem persönlichen 1:1-Übungsgebrauch dieses Schülers."
                                     >
                                       <Lock size={9} color="#64748b" />
-                                      <span>§ 60a UrhG</span>
+                                      <span>Unterrichtsgebrauch</span>
                                     </span>
                                     <span style={{ fontSize: '0.66rem', color: '#64748b', fontWeight: 650 }}>
                                       {hasTresorStorage ? 'Tresor (7 Min.)' : 'Direkt (60s)'}
@@ -9411,7 +9449,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                   </div>
                                 </div>
 
-                                {/* 🎙️ Didaktisches Hörbeispiel & 1:1-Übungs-Track (§ 60a Abs. 1 UrhG) Micro-Disclosure */}
+                                {/* 🎙️ Didaktisches Hörbeispiel & 1:1-Übungs-Track Micro-Disclosure */}
                                 <div style={{
                                   fontSize: '0.63rem',
                                   color: '#64748b',
@@ -9423,11 +9461,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                 }}>
                                   <span style={{ fontSize: '0.65rem' }}>🔒</span>
                                   <span>
-                                    <strong>Didaktischer Audio-Tresor (§ 60a UrhG):</strong> Nur für den 1:1-Übungsgebrauch. Keine öffentliche Weitergabe.
+                                    <strong>Didaktischer Audio-Tresor:</strong> Nur für den 1:1-Übungsgebrauch. Keine öffentliche Weitergabe.
                                   </span>
                                 </div>
 
-                                {/* 🛡️ Eltern-Veto Schranke & Exkulpations-Banner (§ 201 StGB / Art. 8 DSGVO) */}
+                                {/* 🛡️ Eltern-Veto Schranke & Exkulpations-Banner */}
                                 {isTeacherTools && isStudentAudioForbiddenForTeacher && (
                                   <div style={{
                                     background: '#fffbeb',
@@ -9443,7 +9481,7 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: '200px' }}>
                                       <span style={{ fontSize: '0.85rem' }}>⚠️</span>
                                       <div style={{ fontSize: '0.68rem', color: '#92400e', lineHeight: 1.25 }}>
-                                        <strong>Eltern-Veto:</strong> Keine Schüleraufnahmen erlaubt. Nur <strong>Lehrkraft-Vorspiel</strong> aufnehmen (§ 201 StGB).
+                                        <strong>Eltern-Veto:</strong> Keine Schüleraufnahmen erlaubt. Nur <strong>Lehrkraft-Vorspiel</strong> aufnehmen (Vertraulichkeit).
                                       </div>
                                     </div>
                                     <button
@@ -10326,10 +10364,11 @@ export function MeisterwerkDocumentTab(props: MeisterwerkDocumentTabProps) {
                     </div>
                   </div>
                   {/* Clean Bottom Spacing */}
-                  <div style={{ paddingBottom: (isMobileView || isInsideSim || isFullscreen) ? '24px' : '8px' }} />
+                  <div style={{ paddingBottom: (isMobileView || isInsideSim || isFullscreen) ? '24px' : '0px' }} />
                 </div>
               </>
             )}
+            </div>{/* Close inner scrollable area */}
           </div>
 
         {/* 🔒 ELTERN-PIN MODAL FÜR MODUL-FREISCHALTUNG */}

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 
 export interface UseAdminCampusRoomsParams {
@@ -8,6 +8,7 @@ export interface UseAdminCampusRoomsParams {
   stations: any[];
   setStations: React.Dispatch<React.SetStateAction<any[]>>;
   fetchData: (force?: boolean) => void;
+  teachers?: any[];
 }
 
 export function useAdminCampusRooms({
@@ -16,16 +17,162 @@ export function useAdminCampusRooms({
   setRooms,
   stations,
   setStations,
-  fetchData
+  fetchData,
+  teachers = []
 }: UseAdminCampusRoomsParams) {
-  const [campusBookings, setCampusBookings] = useState<any[]>([]);
+  const [campusBookings, setCampusBookings] = useState<any[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const sId = admin?.school_id;
+      const key = sId ? `groovelab_campus_bookings_${sId}` : 'groovelab_campus_bookings';
+      const stored = localStorage.getItem(key) || localStorage.getItem('groovelab_campus_bookings');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
   const [dbRoomBookings, setDbRoomBookings] = useState<any[]>([]);
   const [scheduleOccurrences, setScheduleOccurrences] = useState<any[]>([]);
   const [holidays, setHolidays] = useState<any[]>([]);
+
+  const fetchDbRoomBookings = useCallback(async () => {
+    const schoolId = admin?.school_id || (rooms.length > 0 ? rooms[0].school_id : null);
+    if (!schoolId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('room_bookings')
+        .select(`
+          id,
+          school_id,
+          room_id,
+          booked_by,
+          date,
+          start_time,
+          end_time,
+          title,
+          status,
+          rooms (
+            id,
+            name
+          )
+        `)
+        .eq('school_id', schoolId);
+
+      if (error) throw error;
+
+      const mapped = (data || []).map((row: any) => {
+        const startTime = row.start_time ? row.start_time.substring(0, 5) : '00:00';
+        const endTime = row.end_time ? row.end_time.substring(0, 5) : '00:00';
+        const purpose = row.title || 'Raumbuchung';
+        const teacher = (teachers || []).find((t: any) => t.id === row.booked_by) || (admin && admin.id === row.booked_by ? admin : null);
+        const teacherName = teacher ? `${teacher.first_name || ''} ${teacher.last_name || ''}`.trim() : 'Lehrer';
+
+        return {
+          id: row.id,
+          roomId: row.room_id,
+          roomName: row.rooms?.name || 'Raum',
+          date: row.date,
+          startTime,
+          endTime,
+          purpose,
+          title: purpose,
+          teacherId: row.booked_by,
+          teacherName: teacherName || 'Lehrer',
+          status: row.status || 'approved',
+          isApproved: row.status === 'approved',
+          isSchedule: false
+        };
+      });
+
+      setDbRoomBookings(mapped);
+    } catch (err) {
+      console.error('[useAdminCampusRooms] Error fetching dbRoomBookings:', err);
+    }
+  }, [admin, rooms, teachers]);
+
+  const fetchScheduleOccurrences = useCallback(async () => {
+    const schoolId = admin?.school_id || (rooms.length > 0 ? rooms[0].school_id : null);
+    if (!schoolId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('schedule_occurrences')
+        .select(`
+          id,
+          student_id,
+          teacher_id,
+          date,
+          start_time,
+          duration,
+          status,
+          notes,
+          schedule_id
+        `)
+        .eq('school_id', schoolId);
+
+      if (error) throw error;
+      setScheduleOccurrences(data || []);
+    } catch (err) {
+      console.error('[useAdminCampusRooms] Error fetching scheduleOccurrences:', err);
+    }
+  }, [admin?.school_id, rooms]);
+
+  const reloadCampusBookingsFromStorage = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const sId = admin?.school_id || (rooms.length > 0 ? rooms[0].school_id : null);
+      const stored = (sId ? localStorage.getItem(`groovelab_campus_bookings_${sId}`) : null) || localStorage.getItem('groovelab_campus_bookings');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          setCampusBookings(parsed);
+        }
+      }
+    } catch (e) {
+      console.error('[useAdminCampusRooms] Error parsing stored campus bookings:', e);
+    }
+  }, [admin?.school_id, rooms]);
+
+  useEffect(() => {
+    fetchDbRoomBookings();
+    fetchScheduleOccurrences();
+    reloadCampusBookingsFromStorage();
+
+    const handleRefresh = () => {
+      fetchDbRoomBookings();
+      fetchScheduleOccurrences();
+      reloadCampusBookingsFromStorage();
+    };
+
+    window.addEventListener('refresh-bookings', handleRefresh);
+
+    const schoolId = admin?.school_id || (rooms.length > 0 ? rooms[0].school_id : null);
+    let channel: any = null;
+    if (schoolId) {
+      channel = supabase
+        .channel(`room_bookings_campus_rooms_${schoolId}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'room_bookings', filter: `school_id=eq.${schoolId}` },
+          () => {
+            fetchDbRoomBookings();
+          }
+        )
+        .subscribe();
+    }
+
+    return () => {
+      window.removeEventListener('refresh-bookings', handleRefresh);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [fetchDbRoomBookings, fetchScheduleOccurrences, reloadCampusBookingsFromStorage, admin?.school_id, rooms]);
   const [roomSearchQuery, setRoomSearchQuery] = useState('');
   const [selectedCampusRoomId, setSelectedCampusRoomId] = useState<string>('');
-  const [selectedFloor, setSelectedFloor] = useState<string>('all');
-  const [selectedEquipmentFilter, setSelectedEquipmentFilter] = useState('ALL');
+  const [selectedFloor, setSelectedFloor] = useState<string>('Alle');
+  const [selectedEquipmentFilter, setSelectedEquipmentFilter] = useState('Alle');
   const [showOnlyFreeNow, setShowOnlyFreeNow] = useState(false);
   const [showMyBookingsOnly, setShowMyBookingsOnly] = useState(false);
   const [isDateFilterActive, setIsDateFilterActive] = useState(false);
@@ -300,6 +447,8 @@ export function useAdminCampusRooms({
     handleDeleteRoom,
     handleDeleteStation,
     triggerBatchAddStations,
-    executeBatchAddStations
+    executeBatchAddStations,
+    fetchDbRoomBookings,
+    fetchScheduleOccurrences
   };
 }

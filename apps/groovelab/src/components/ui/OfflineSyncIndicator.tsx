@@ -37,8 +37,8 @@ export const OfflineSyncIndicator: React.FC = () => {
     };
   }, []);
 
-  // Do not render anything when perfectly online and not recently recovered
-  if (isOnline && !isSyncing && !syncSuccess) {
+  // On desktop with header, OfflineStatusBadge in CampusDesktopHeader handles sync indicators
+  if (typeof window !== 'undefined' && window.innerWidth > 768) {
     return null;
   }
 
@@ -46,7 +46,7 @@ export const OfflineSyncIndicator: React.FC = () => {
     <div
       style={{
         position: 'fixed',
-        bottom: '24px',
+        top: '20px',
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 99999,
@@ -55,39 +55,36 @@ export const OfflineSyncIndicator: React.FC = () => {
         gap: '8px',
         padding: '8px 16px',
         borderRadius: '100px',
-        fontSize: '0.82rem',
-        fontWeight: 700,
-        boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.3)',
+        fontSize: '0.80rem',
+        fontWeight: 750,
+        boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.12)',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
         transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-        background: !isOnline
-          ? 'rgba(15, 23, 42, 0.92)'
-          : syncSuccess
-          ? 'rgba(6, 78, 59, 0.95)'
-          : 'rgba(30, 58, 138, 0.95)',
+        background: 'rgba(255, 255, 255, 0.96)',
         border: !isOnline
-          ? '1px solid rgba(239, 68, 68, 0.3)'
+          ? '1.2px solid rgba(239, 68, 68, 0.3)'
           : syncSuccess
-          ? '1px solid rgba(52, 211, 153, 0.4)'
-          : '1px solid rgba(96, 165, 250, 0.4)',
-        color: !isOnline ? '#fca5a5' : syncSuccess ? '#a7f3d0' : '#bfdbfe'
+          ? '1.2px solid rgba(52, 168, 83, 0.3)'
+          : '1.2px solid rgba(59, 130, 246, 0.3)',
+        color: !isOnline ? '#dc2626' : syncSuccess ? '#166534' : '#1d4ed8',
+        fontFamily: "'Plus Jakarta Sans', -apple-system, sans-serif"
       }}
     >
       {!isOnline ? (
         <>
           <WifiOff size={15} style={{ color: '#ef4444' }} />
-          <span>Offline-Modus aktiv • Änderungen werden lokal gesichert</span>
+          <span>Offline-Modus aktiv • Änderungen lokal gesichert</span>
         </>
       ) : isSyncing ? (
         <>
-          <RefreshCw size={15} className="animate-spin" style={{ color: '#60a5fa' }} />
-          <span>Verbindung wiederhergestellt • Synchronisiere Daten...</span>
+          <RefreshCw size={15} className="animate-spin" style={{ color: '#3b82f6' }} />
+          <span>Verbindung wiederhergestellt • Synchronisiere...</span>
         </>
       ) : (
         <>
-          <CheckCircle2 size={15} style={{ color: '#34d399' }} />
-          <span>100% synchronisiert mit Cloud-Server</span>
+          <CheckCircle2 size={15} style={{ color: '#34a853' }} />
+          <span>100% synchronisiert mit Cloud</span>
         </>
       )}
     </div>

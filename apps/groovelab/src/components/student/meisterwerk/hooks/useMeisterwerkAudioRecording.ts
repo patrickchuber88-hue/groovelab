@@ -32,6 +32,7 @@ export interface UseMeisterwerkAudioRecordingProps {
   isRecordingPadActive?: boolean;
   setIsRecordingPadActive?: (active: boolean) => void;
   isCountInEnabled?: boolean;
+  setIsCountInEnabled?: React.Dispatch<React.SetStateAction<boolean>> | ((enabled: boolean) => void);
   topicName?: string;
   activeSubView?: string;
   activeLehrwerkId?: string | null;
@@ -59,7 +60,8 @@ export function useMeisterwerkAudioRecording({
   setIsRecordingMetronomeActive: passedSetIsRecordingMetronomeActive,
   isRecordingPadActive: passedIsRecordingPadActive,
   setIsRecordingPadActive: passedSetIsRecordingPadActive,
-  isCountInEnabled: passedIsCountInEnabled
+  isCountInEnabled: passedIsCountInEnabled,
+  setIsCountInEnabled: passedSetIsCountInEnabled
 }: UseMeisterwerkAudioRecordingProps) {
   const [internalAudioLabel, setInternalAudioLabel] = useState<string>('');
   const [internalRecordingBpm, setInternalRecordingBpm] = useState<number>(100);
@@ -76,6 +78,7 @@ export function useMeisterwerkAudioRecording({
   const isRecordingPadActive = passedIsRecordingPadActive !== undefined ? passedIsRecordingPadActive : internalIsRecordingPadActive;
   const setIsRecordingPadActive = passedSetIsRecordingPadActive || setInternalIsRecordingPadActive;
   const isCountInEnabled = passedIsCountInEnabled !== undefined ? passedIsCountInEnabled : internalIsCountInEnabled;
+  const setIsCountInEnabled: React.Dispatch<React.SetStateAction<boolean>> = (passedSetIsCountInEnabled as React.Dispatch<React.SetStateAction<boolean>>) || setInternalIsCountInEnabled;
 
   const [isRecordingAudio, setIsRecordingAudio] = useState<boolean>(false);
   const [audioDuration, setAudioDuration] = useState<number>(0);
@@ -465,6 +468,7 @@ export function useMeisterwerkAudioRecording({
     isRecordingPadActive,
     setIsRecordingPadActive,
     isCountInEnabled,
+    setIsCountInEnabled,
     formatRecordTime,
     handleRenameStudentAudio,
     handleDeleteStudentAudio

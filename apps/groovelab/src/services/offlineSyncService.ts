@@ -428,15 +428,28 @@ export const flushAllOfflineData = async (forceAudioUpload: boolean = false): Pr
   notifyListeners();
 
   try {
-    const [mutationsResult, audioResult] = await Promise.all([
+    const syncPromise = Promise.all([
       flushOfflineSyncQueue(),
       flushOfflineAudioQueue(forceAudioUpload)
+    ]);
+    
+    // 1% Goldstandard Timeout Protection: Never lock the UI in syncing state longer than 10s
+    const timeoutPromise = new Promise<[{ success: number }, { success: number }]>((resolve) =>
+      setTimeout(() => {
+        console.warn('[OfflineSync] Sync timeout reached (10s). Releasing lock to avoid UI blocking.');
+        resolve([{ success: 0 }, { success: 0 }]);
+      }, 10000)
+    );
+
+    const [mutationsResult, audioResult] = await Promise.race([
+      syncPromise,
+      timeoutPromise
     ]);
 
     lastSuccessfulSyncTime = Date.now();
     return {
-      mutationsSynced: mutationsResult.success,
-      audioSynced: audioResult.success
+      mutationsSynced: mutationsResult?.success || 0,
+      audioSynced: audioResult?.success || 0
     };
   } finally {
     isCurrentlySyncing = false;

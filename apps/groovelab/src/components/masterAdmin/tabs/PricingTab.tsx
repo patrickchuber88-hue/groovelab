@@ -310,7 +310,7 @@ export const PricingTab: React.FC<PricingTabProps> = ({
               boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
             }}
           >
-            <FileText size={15} color="#475569" /> § 308 BGB Vorlage
+            <FileText size={15} color="#475569" /> Klausel-Vorlage Sonderkündigung
           </button>
 
           <div style={{

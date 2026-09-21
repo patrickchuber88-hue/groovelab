@@ -74,13 +74,21 @@ export function useSecretaryStudents({
   const [newStudentIsCampusActive, setNewStudentIsCampusActive] = useState<boolean>(true);
   const [newStudentIsGroovelabActive, setNewStudentIsGroovelabActive] = useState<boolean>(false);
 
-  // ── Memoized Student Filtering ──
+  // ── Memoized Pre-sorted Students & Instant Filtering ──
+  const sortedStudents = useMemo(() => {
+    return [...students].sort((a: any, b: any) => {
+      const nameA = `${a.first_name || ''} ${a.last_name || ''}`.toLowerCase().trim();
+      const nameB = `${b.first_name || ''} ${b.last_name || ''}`.toLowerCase().trim();
+      return nameA.localeCompare(nameB, 'de');
+    });
+  }, [students]);
+
   const filteredStudents = useMemo(() => {
-    return students.filter((s: any) => {
+    const query = studentSearchQuery.toLowerCase().trim();
+    return sortedStudents.filter((s: any) => {
       const firstName = (s.first_name || '').toLowerCase();
       const lastName = (s.last_name || '').toLowerCase();
       const nickname = (s.nickname || '').toLowerCase();
-      const query = studentSearchQuery.toLowerCase().trim();
       
       const matchesSearch = !query || firstName.includes(query) || lastName.includes(query) || nickname.includes(query);
       const matchesInstrument = studentFilterInstrument === 'All' || (s.instrument || 'Nicht festgelegt') === studentFilterInstrument;
@@ -93,12 +101,8 @@ export function useSecretaryStudents({
       else if (studentFilterStatus === 'inactive') matchesStatus = !s.is_campus_active && !s.is_groovelab_active;
 
       return matchesSearch && matchesInstrument && matchesTeacher && matchesStatus;
-    }).sort((a: any, b: any) => {
-      const nameA = `${a.first_name || ''} ${a.last_name || ''}`.toLowerCase().trim();
-      const nameB = `${b.first_name || ''} ${b.last_name || ''}`.toLowerCase().trim();
-      return nameA.localeCompare(nameB, 'de');
     });
-  }, [students, studentSearchQuery, studentFilterInstrument, studentFilterTeacher, studentFilterStatus]);
+  }, [sortedStudents, studentSearchQuery, studentFilterInstrument, studentFilterTeacher, studentFilterStatus]);
 
   const handleCreateStudentCampus = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -84,28 +84,28 @@ const GUARD_PATTERNS: readonly GuardPattern[] = [
   // 1. Extremismus, Rassismus & Verfassungsfeindlichkeit (§§ 86a, 130 StGB)
   {
     category: 'extremism',
-    reason: 'Verfassungsfeindliche oder rassistische Hassrede ist im Schul-Chat streng verboten (§§ 86a, 130 StGB).',
+    reason: 'Verfassungsfeindliche oder rassistische Hassrede ist im Schul-Chat streng verboten.',
     regex: /\b(sieg\s*heil|heil\s*hitler|hakenkreuz|judensau|kanak[en]*|nigg[aer]*|neger|scheiss\s*(ausl[aä]nder|jude[n]*|t[uü]rk[en]*))\b/i
   },
 
   // 2. Schwere personale Ehrverletzung & Schmähkritik (§ 185 StGB)
   {
     category: 'insult',
-    reason: 'Beleidigungen und herabwürdigende Ausdrücke verletzen die Regeln eines wertschätzenden Unterrichtsumfelds (§ 185 StGB).',
+    reason: 'Beleidigungen und herabwürdigende Ausdrücke verletzen die Regeln eines wertschätzenden Unterrichtsumfelds.',
     regex: /\b(arschloch|hurensohn|hur[en]*|fotz[en]*|wichser|wichs|bastard|missgeburt|spast[i]*|behindi|halt\s*die\s*fresse|fick\s*dich|verpiss\s*dich|mistst[uü]ck|scheisskerl|depp[en]*|vollidiot)\b/i
   },
 
   // 3. Sexuelle Belästigung & Obszönitäten (JuSchG / § 184 StGB)
   {
     category: 'harassment',
-    reason: 'Sexuelle Belästigung und vulgäre Obszönitäten sind zum Schutz Minderjähriger untersagt (JuSchG).',
+    reason: 'Sexuelle Belästigung und vulgäre Obszönitäten sind zum Schutz Minderjähriger streng untersagt.',
     regex: /\b(schwanzlutscher|pimmel|penis|vagina|titten|nutte[n]*|schlampe[n]*|nacktbild[er]*|zieh\s*dich\s*aus|sex\s*chat|blowjob)\b/i
   },
 
   // 4. Schwere Gewaltandrohung & Selbstgefährdung (§ 241 StGB / § 8a SGB VIII)
   {
     category: 'threat',
-    reason: 'Gewaltdrohungen und Aufforderungen zur Selbstgefährdung sind strafbar (§ 241 StGB).',
+    reason: 'Gewaltdrohungen und Aufforderungen zur Selbstgefährdung sind streng verboten.',
     regex: /\b(ich\s*(bring|schlag|stech|knall)\s*dich\s*(um|tot|ab)|bring\s*dich\s*um|krepier[en]*|t[oö]te\s*dich|ich\s*bring\s*mich\s*um|ich\s*will\s*sterben)\b/i,
     isCrisis: true
   }
@@ -122,7 +122,9 @@ function normalizeForGuard(text: string): string {
     .replace(/3/g, 'e')
     .replace(/0/g, 'o')
     .replace(/\$/g, 's')
-    .replace(/!/g, 'i');
+    // Leetspeak ! -> i only when part of a word (e.g. !diot or f!ck), not trailing sentence punctuation
+    .replace(/!(?=[a-z0-9])/g, 'i')
+    .replace(/([a-z0-9])!(?=[a-z0-9])/g, '$1i');
 }
 
 /**

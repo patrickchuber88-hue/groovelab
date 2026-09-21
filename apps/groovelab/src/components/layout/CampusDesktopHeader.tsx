@@ -12,9 +12,11 @@ import {
   Tablet, 
   RefreshCw, 
   ArrowLeftRight, 
-  LogOut 
+  LogOut,
+  Calendar
 } from 'lucide-react';
 import { StudioAvatar } from '../StudioAvatar';
+import { OfflineStatusBadge } from '../ui/OfflineStatusBadge';
 import { formatTeacherFullName } from '../../utils/nameHelper';
 import { isDevEnvironment } from '../../utils/tenantUrlHelper';
 
@@ -637,6 +639,9 @@ export const CampusDesktopHeader: React.FC<CampusDesktopHeaderProps> = ({
               </div>
             )}
 
+            {/* System Sync & Offline Status Indicator in Header */}
+            <OfflineStatusBadge floating={false} variant="header" />
+
             {/* Elegant Refresh / Reload Button */}
             <button 
               type="button"
@@ -724,8 +729,9 @@ export const CampusDesktopHeader: React.FC<CampusDesktopHeaderProps> = ({
                 transition: 'all 0.2s',
                 flexShrink: 0
               }} title="Datum-Simulation für alle Dashboards">
-                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: simulatedDate ? '#854d0e' : '#64748b', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                  📅 Simu:
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: simulatedDate ? '#854d0e' : '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Calendar size={13} strokeWidth={2.4} color={simulatedDate ? '#854d0e' : '#64748b'} />
+                  <span>Simu:</span>
                 </span>
                 <input 
                   type="date"

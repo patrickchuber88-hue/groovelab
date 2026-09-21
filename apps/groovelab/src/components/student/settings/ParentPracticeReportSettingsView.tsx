@@ -32,19 +32,22 @@ export const ParentPracticeReportSettingsView: React.FC<ParentPracticeReportSett
     setParentMaxMinutes(mins);
     if (studentId) {
       try {
-        const existingPermissions = studentUser?.parent_permissions || {};
-        await supabase
-          .from('users')
-          .update({
-            parent_permissions: {
-              ...existingPermissions,
-              max_screen_minutes: mins,
-              updated_at: new Date().toISOString()
-            }
-          })
-          .eq('id', studentId);
+        const nextPermissions = {
+          ...(studentUser?.parent_permissions || {}),
+          max_screen_minutes: mins,
+          updated_at: new Date().toISOString()
+        };
+        await supabase.rpc('save_parent_controls', {
+          p_student_id: studentId,
+          p_settings: {
+            parent_permissions: nextPermissions
+          }
+        });
+        if (studentUser) {
+          studentUser.parent_permissions = nextPermissions;
+        }
       } catch (e) {
-        console.warn('Fehler beim Speichern der maximalen Übezeit:', e);
+        console.warn('Fehler beim Speichern der maximalen Übezeit via save_parent_controls:', e);
       }
     }
   };

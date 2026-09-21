@@ -67,15 +67,16 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
   setCertificateSong,
   setSelectedLehrwerkForDetail,
   isSongMastered,
-  localProgress,
+  localProgress = [],
   activeSongSkills,
   isMusicStandMode = false,
 }) => {
   const brandColor = studentUser?.schools?.brand_color || "#34a853";
+  const safeLocalProgress = Array.isArray(localProgress) ? localProgress : [];
 
   return (
-      <div id="tour-student-songs" style={{ display: activeTab === 'songs' ? 'flex' : 'none', flexDirection: 'column', gap: '20px' }}>
-        {activeTab === 'songs' && (
+      <div id="tour-student-songs" style={{ display: (activeTab === 'songs' || activeTab === 'mediathek') ? 'flex' : 'none', flexDirection: 'column', gap: '20px' }}>
+        {(activeTab === 'songs' || activeTab === 'mediathek') && (
           (progressLoading && assignedCampusSongs.length === 0 && lehrwerke.length === 0) ? (
             <div style={{
               display: 'grid',
@@ -195,7 +196,7 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                   
                   // Helper to resolve homework pages for a textbook
                   const getLehrwerkHomeworkPages = (lehrwerkId: string | number, lehrwerkTitle: string): string[] => {
-                    const assignment = localProgress.find((p: any) => 
+                    const assignment = safeLocalProgress.find((p: any) => 
                       String(p.studentId) === String(studentId) && 
                       (String(p.lehrwerkId) === String(lehrwerkId) || (p.title && String(p.title).toLowerCase() === String(lehrwerkTitle).toLowerCase()))
                     );
@@ -211,7 +212,7 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                       if (pi.is_current_homework) {
                         const topic = (pi.topic_name || '').toLowerCase();
                         if (topic.includes(String(lehrwerkTitle).toLowerCase())) {
-                          const match = topic.match(/seite\s*(\d+)/i) || topic.match(/s\.\s*(\d+)/i);
+                           const match = topic.match(/seite\s*(\d+)/i) || topic.match(/s\.\s*(\d+)/i);
                           if (match && match[1] && !pages.includes(match[1])) {
                             pages.push(match[1]);
                           } else if (pages.length === 0) {
@@ -231,7 +232,7 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
 
                   const uniqueAssignedLehrwerke = deduplicateBy(
                     lehrwerke.filter(item => 
-                      localProgress.some((p: any) => 
+                      safeLocalProgress.some((p: any) => 
                         String(p.studentId) === String(studentId) && 
                         (String(p.lehrwerkId) === String(item.id) || (p.title && String(p.title).toLowerCase() === String(item.title).toLowerCase()))
                       )
@@ -395,7 +396,7 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
 
                   // Helper to resolve homework pages for a textbook
                   const getLehrwerkHomeworkPages = (lehrwerkId: string | number, lehrwerkTitle: string): string[] => {
-                    const assignment = localProgress.find((p: any) => 
+                    const assignment = safeLocalProgress.find((p: any) => 
                       String(p.studentId) === String(studentId) && 
                       (String(p.lehrwerkId) === String(lehrwerkId) || (p.title && String(p.title).toLowerCase() === String(lehrwerkTitle).toLowerCase()))
                     );
@@ -431,7 +432,7 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
 
                   const uniqueAssignedLehrwerke = deduplicateBy(
                     lehrwerke.filter(item => 
-                      localProgress.some((p: any) => 
+                      safeLocalProgress.some((p: any) => 
                         String(p.studentId) === String(studentId) && 
                         (String(p.lehrwerkId) === String(item.id) || (p.title && String(p.title).toLowerCase() === String(item.title).toLowerCase()))
                       )
@@ -810,7 +811,7 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                                 const hasHomework = hwPages.length > 0;
                                 
                                 // Check textbook progress
-                                const assignment = localProgress.find((p: any) => 
+                                const assignment = safeLocalProgress.find((p: any) => 
                                   String(p.studentId) === String(studentId) && 
                                   (String(p.lehrwerkId) === String(item.id) || (p.title && String(p.title).toLowerCase() === String(item.title).toLowerCase()))
                                 );
@@ -1146,7 +1147,7 @@ export const StudentSongsTab: React.FC<StudentSongsTabProps> = ({
                       📚 Gemeisterte Lehrwerke
                     </h5>
                     {(() => {
-                      const studentAssignments = localProgress.filter((p: any) => String(p.studentId) === String(studentId));
+                      const studentAssignments = safeLocalProgress.filter((p: any) => String(p.studentId) === String(studentId));
                       const assignedLehrwerke = deduplicateBy(
                         lehrwerke.filter(book => studentAssignments.some((p: any) => 
                           String(p.lehrwerkId) === String(book.id) || 

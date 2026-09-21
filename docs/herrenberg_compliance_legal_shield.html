@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Campus-Groovelab | Herrenberg-Compliance & Legal Shield</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 10mm 12mm 10mm 12mm;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Plus Jakarta Sans", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #0f172a;
+      background: #ffffff;
+      line-height: 1.38;
+      font-size: 10.8px;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .sheet {
+      width: 100%;
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 8px 6px;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #0f172a;
+      margin-bottom: 10px;
+    }
+
+    .brand-title {
+      font-size: 19px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .apple-badge {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      color: #334155;
+      font-size: 8.5px;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding: 2.5px 8px;
+      border-radius: 999px;
+      letter-spacing: 0.04em;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+    }
+
+    .header-print-btn {
+      background: #0f172a;
+      color: #ffffff;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 10.5px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+      transition: all 0.15s ease;
+    }
+
+    .header-print-btn:hover {
+      background: #334155;
+      transform: translateY(-1px);
+    }
+
+    .doc-meta {
+      text-align: right;
+      font-size: 9px;
+      color: #64748b;
+      line-height: 1.35;
+      padding-right: 2px;
+    }
+
+    .doc-meta strong {
+      color: #0f172a;
+    }
+
+    /* Hero Summary Card */
+    .hero-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-left: 4px solid #16a34a;
+      border-radius: 8px;
+      padding: 8px 12px;
+      margin-bottom: 9px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .hero-left h2 {
+      font-size: 12.2px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #0f172a;
+      margin-bottom: 2px;
+    }
+
+    .hero-left p {
+      font-size: 10px;
+      color: #475569;
+      line-height: 1.35;
+      max-width: 530px;
+    }
+
+    .status-pill {
+      background: #dcfce7;
+      border: 1px solid #bbf7d0;
+      color: #15803d;
+      font-size: 9.5px;
+      font-weight: 800;
+      padding: 3px 9px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+
+    /* Section Headers */
+    .section-header {
+      font-size: 8.8px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #64748b;
+      margin-bottom: 5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .section-header::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: #e2e8f0;
+    }
+
+    /* Comparison Grid */
+    .compare-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 9px;
+    }
+
+    .compare-box {
+      border-radius: 8px;
+      padding: 7px 10px;
+      font-size: 9.7px;
+      line-height: 1.34;
+    }
+
+    .compare-danger {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+    }
+
+    .compare-success {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #166534;
+    }
+
+    .compare-box h3 {
+      font-size: 10.2px;
+      font-weight: 800;
+      margin-bottom: 2px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* 4-Pillar Grid */
+    .pillars-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+      margin-bottom: 9px;
+    }
+
+    .pillar-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 7px 9px;
+    }
+
+    .pillar-title {
+      font-size: 10px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 2px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .pillar-desc {
+      font-size: 9.4px;
+      color: #475569;
+      line-height: 1.32;
+    }
+
+    .pillar-desc strong {
+      color: #0f172a;
+    }
+
+    /* Forensic Table */
+    .audit-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 9.3px;
+      margin-bottom: 9px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .audit-table th {
+      background: #f8fafc;
+      color: #0f172a;
+      font-weight: 800;
+      text-align: left;
+      padding: 5px 8px;
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 8.8px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .audit-table td {
+      padding: 5px 8px;
+      border-bottom: 1px solid #f1f5f9;
+      color: #334155;
+      vertical-align: middle;
+    }
+
+    .audit-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .badge-pass {
+      background: #dcfce7;
+      color: #166534;
+      font-weight: 800;
+      font-size: 8.5px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: inline-block;
+      white-space: nowrap;
+    }
+
+    /* Proof Box */
+    .proof-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 7px 10px;
+      margin-bottom: 8px;
+    }
+
+    .proof-grid {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr 1fr;
+      gap: 8px;
+      font-size: 9.2px;
+      color: #475569;
+      margin-top: 3px;
+    }
+
+    .proof-grid strong {
+      color: #0f172a;
+    }
+
+    /* Footer */
+    .footer {
+      border-top: 1px solid #e2e8f0;
+      padding-top: 5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 8.6px;
+      color: #64748b;
+    }
+
+    .footer strong {
+      color: #0f172a;
+    }
+
+    /* Floating Print Button */
+    .floating-print-btn {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #0f172a;
+      color: #ffffff;
+      padding: 10px 18px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 12px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .floating-print-btn:hover {
+      transform: scale(1.03);
+    }
+
+    @media print {
+      body {
+        width: 100% !important;
+        background: #ffffff !important;
+      }
+      .sheet {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 2px !important;
+      }
+      .floating-print-btn, .header-print-btn {
+        display: none !important;
+      }
+      .hero-card, .compare-box, .pillar-card, .proof-card, .audit-table {
+        break-inside: avoid;
+        page-break-inside: avoid;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+    }
+  </style>
+  <script>
+    document.addEventListener('keydown', function(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
+        e.preventDefault();
+        window.print();
+      }
+    });
+  </script>
+</head>
+<body>
+
+  <div class="sheet">
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <div class="brand-title">
+          Campus-Groovelab
+          <span class="apple-badge">Legal Shield</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button type="button" class="header-print-btn" onclick="window.print()">
+          🖨️ PDF drucken / speichern
+        </button>
+        <div class="doc-meta">
+          <div><strong>Juristisches Gutachten:</strong> Herrenberg-Compliance (BSG B 12 R 3/20 R)</div>
+          <div><strong>Klassifizierung:</strong> Schutzschirm für Musikschulen & Trägerkommunen</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hero Summary -->
+    <div class="hero-card">
+      <div class="hero-left">
+        <h2>100 % Herrenberg-Sicherheit by Design</h2>
+        <p>
+          Campus-Groovelab schützt Musikschulen vor Scheinselbstständigkeits-Verfahren der DRV: Die Plattform etabliert kein hierarchisches Weisungs- oder Stechuhren-System, sondern garantiert <strong>maximale didaktische Lehrkraft-Autonomie</strong>.
+        </p>
+      </div>
+      <div class="status-pill">
+        ✓ 100 % DRV-Konform
+      </div>
+    </div>
+
+    <!-- 1. Systemvergleich -->
+    <div class="section-header">1. Der Systemvergleich: Herkömmliche Schulsoftware vs. Campus-Groovelab</div>
+    <div class="compare-grid">
+      <div class="compare-box compare-danger">
+        <h3>⚠️ Das akute Herrenberg-Risiko klassischer Software</h3>
+        Dienstplan-Diktat der Verwaltung, Zwang zur Zeiterfassung (Stechuhren-Prinzip), lückenlose Verhaltenskontrolle und Überwachung. Die Deutsche Rentenversicherung (DRV) wertet solche Kontrollsysteme vor Gericht als <strong>Beweis für eine abhängige Beschäftigung</strong>.
+      </div>
+      <div class="compare-box compare-success">
+        <h3>✓ Der Campus-Groovelab Schutzschirm (By Design)</h3>
+        Das <strong>Didaktische Assistenz-Prinzip</strong>: Die Plattform dient dem Unterricht der Lehrkraft, nicht dem Schulalltag der Verwaltung. Autonome Unterrichtsdisposition, keine Überwachung, keine Stechuhr und voller Feierabendschutz nach § 5 ArbSchG.
+      </div>
+    </div>
+
+    <!-- 2. Die 4 Säulen -->
+    <div class="section-header">2. Die 4 Säulen des technischen Herrenberg-Schutzes im System</div>
+    <div class="pillars-grid">
+      <div class="pillar-card">
+        <div class="pillar-title">🛡️ 1. Zero-Weisungsrecht & Pädagogische Freiheit</div>
+        <div class="pillar-desc">
+          Die Software erteilt zu keinem Zeitpunkt fachliche Weisungen. Song-Auswahl, Unterrichtsmethodik und Didaktik liegen zu <strong>100 % in der Eigenverantwortung der Lehrkraft</strong>. Keine algorithmische Bevormundung.
+        </div>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-title">📅 2. Unverbindliche Dispositionsvorschläge</div>
+        <div class="pillar-desc">
+          Stundenpläne und Raumbelegungen sind systemisch als <strong>rechtlich unverbindliche Dispositionsvorschläge</strong> deklariert. Lehrkräfte können Termine mit Schülern frei und autonom verschieben – ohne Zwangsgenehmigung.
+        </div>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-title">🚫 3. Kein Nutzungszwang & Übermittlungsfreiheit</div>
+        <div class="pillar-desc">
+          Lehrkräfte werden nicht in den städtischen Weisungsapparat eingegliedert: Es steht jeder Lehrkraft frei, Termine digital über die Plattform oder herkömmlich (per Telefon, E-Mail oder Zettel) mitzuteilen. <strong>Keine Zwangseingliederung</strong>.
+        </div>
+      </div>
+
+      <div class="pillar-card">
+        <div class="pillar-title">🔒 4. Post-Work Schutz & Row-Level-Security (RLS)</div>
+        <div class="pillar-desc">
+          Voller Schutz vor Erreichbarkeitsdruck: Mitteilungen sind stummschaltbar. Strikte Kernel-Policies auf Datenbank-Ebene (PostgreSQL RLS) verhindern, dass Administratoren private Notizen der Lehrkräfte einsehen können (§ 26 BDSG).
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Forensische DRV-Prüfmatrix -->
+    <div class="section-header">3. Forensische Statusfeststellungs-Matrix (DRV / BSG Kriterien)</div>
+    <table class="audit-table">
+      <thead>
+        <tr>
+          <th>BSG Kriterium</th>
+          <th>Gefahr klassischer Software</th>
+          <th>Architektur in Campus-Groovelab</th>
+          <th>Audit-Befund</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Eingliederung in Organisation</strong></td>
+          <td>Verwaltung bestimmt Ort, Zeit und Raum</td>
+          <td>Lehrkraft disponiert Unterrichtstermine völlig autonom</td>
+          <td><span class="badge-pass">Keine Eingliederung</span></td>
+        </tr>
+        <tr>
+          <td><strong>Weisungsgebundenheit Didaktik</strong></td>
+          <td>Curriculum und Songauswahl starr vorgegeben</td>
+          <td>Volle methodisch-didaktische Freiheit der Lehrkraft</td>
+          <td><span class="badge-pass">Weisungsfrei</span></td>
+        </tr>
+        <tr>
+          <td><strong>Zeiterfassung & Überwachung</strong></td>
+          <td>Stempeluhr, Login-Tracking, Kontrollberichte</td>
+          <td>Keine Stechuhr, keine Verhaltensüberwachung</td>
+          <td><span class="badge-pass">Überwachungsfrei</span></td>
+        </tr>
+        <tr>
+          <td><strong>Ersatzgestellung & Absage</strong></td>
+          <td>Dienstverpflichtung bei Ausfall</td>
+          <td>Autonome Terminvereinbarung direkt mit Schülern/Eltern</td>
+          <td><span class="badge-pass">Autonome Disposition</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- 4. Institutionelles Attest -->
+    <div class="section-header">4. Institutionelle Sicherheit: Das amtliche Personalrats- & Träger-Attest</div>
+    <div class="proof-card">
+      <div style="font-size: 9.5px; color: #0f172a; font-weight: 800; margin-bottom: 2px;">
+        Vollautomatisches, siegelfähiges Prüf-Dokument für Personalrat, Rechnungsprüfungsamt & Bürgermeister:
+      </div>
+      <div class="proof-grid">
+        <div>
+          <strong>Rechtsverbindliche Garantie:</strong><br>
+          Integrierter Generator für ein offizielles 2-seitiges Konformitätsattest gem. § 87 BetrVG, BPersVG, LPVG und BSG B 12 R 3/20 R.
+        </div>
+        <div>
+          <strong>Kämmerei- & Prüfsicherheit:</strong><br>
+          Schulleiter legen das Attest direkt der Stadtverwaltung vor. Befreit von aufwändigen juristischen Einzelfallprüfungen.
+        </div>
+        <div>
+          <strong>Server-Standort Deutschland:</strong><br>
+          ISO 27001 zertifiziertes Hosting bei Hetzner (Nürnberg/Falkenstein). Volle DSGVO- und BSI-Konformität.
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div>Campus-Groovelab | Executive Legal Shield & Herrenberg Compliance Documentation</div>
+      <div><strong>Rechtsstand: 2026</strong> | Geprüft nach § 7 SGB IV & BSG B 12 R 3/20 R</div>
+    </div>
+  </div>
+
+  <button class="floating-print-btn" onclick="window.print()">
+    🖨️ Als PDF drucken / speichern
+  </button>
+
+</body>
+</html>

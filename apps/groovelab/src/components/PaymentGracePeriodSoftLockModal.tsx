@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import QRCode from 'react-qr-code';
 import { 
   X, Check, Copy, ShieldCheck, BookOpen, 
@@ -86,6 +86,17 @@ export const PaymentGracePeriodSoftLockModal: React.FC<PaymentGracePeriodSoftLoc
   };
 
   const studentName = student.first_name || 'Schüler';
+
+  // ♿ WAI-ARIA & WCAG 2.1.1: Keyboard Escape-Key Listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   return (
     <div 

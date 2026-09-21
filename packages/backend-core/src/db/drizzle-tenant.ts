@@ -1,8 +1,8 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { sql } from 'drizzle-orm';
-import * as schema from './schema';
-import { SecurityContext, SecurityContextSchema } from '../types/security-context';
+import * as schema from './schema.js';
+import { SecurityContext, SecurityContextSchema } from '../types/security-context.js';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,

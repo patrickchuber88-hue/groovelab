@@ -1,6 +1,19 @@
 import React from 'react';
-import { X, AlertTriangle, Calendar, Clock } from 'lucide-react';
+import { 
+  X, 
+  AlertTriangle, 
+  Calendar, 
+  Clock, 
+  Bell, 
+  CheckCircle2, 
+  User, 
+  Building2, 
+  Scale, 
+  Mail, 
+  Check 
+} from 'lucide-react';
 import { maskLastName, formatTeacherFullName } from '../../utils/nameHelper';
+import { getSimulatedNow } from '../../hooks/useSimulatedTime';
 
 export interface AbsenceNotifData {
   notifs: any[];
@@ -33,7 +46,7 @@ export const TeacherAbsenceNotifModal: React.FC<TeacherAbsenceNotifModalProps> =
   const teacherName = formatTeacherFullName(teacher) || 'Lehrkraft';
   const startStr = absenceNotifModal.absenceStartDateStr
     ? new Date(absenceNotifModal.absenceStartDateStr + 'T00:00:00').toLocaleDateString('de-DE')
-    : new Date().toLocaleDateString('de-DE');
+    : getSimulatedNow().toLocaleDateString('de-DE');
   const untilStr = absenceNotifModal.absenceUntilDateStr
     ? new Date(absenceNotifModal.absenceUntilDateStr + 'T00:00:00').toLocaleDateString('de-DE')
     : 'auf Weiteres';
@@ -46,7 +59,7 @@ export const TeacherAbsenceNotifModal: React.FC<TeacherAbsenceNotifModalProps> =
 
   const noteBlock = absenceNotifModal.officialNote && absenceNotifModal.officialNote.trim().length > 0
     ? `\n• Grund / Anmerkung: ${absenceNotifModal.officialNote.trim()}`
-    : '';
+    : '\n• Grund / Anmerkung: [Optional hier Grund oder Notiz für die Schulleitung ergänzen]';
 
   const bodyText = `Sehr geehrte Schulleitung, liebes Musikschul-Team,\n\nich melde mich für den Zeitraum von ${startStr} bis voraussichtlich ${untilStr} abwesend.\n\nOrganisatorischer Status (Campus-Groovelab):\n• Schüler-Information: ${studentHandlingText}${noteBlock}\n• Betroffene Stunden: ${absenceNotifModal.notifs?.length || 0} Termine disponiert.\n\nSobald ich wieder einsatzbereit bin, gebe ich Bescheid.\n\nMit freundlichen Grüßen,\n${teacherName}`;
   const mailtoUrl = `mailto:${encodeURIComponent(targetSchoolEmail)}?subject=${subject}&body=${encodeURIComponent(bodyText)}`;
@@ -115,9 +128,11 @@ export const TeacherAbsenceNotifModal: React.FC<TeacherAbsenceNotifModalProps> =
           borderRadius: '16px', padding: '14px 16px',
           display: 'flex', alignItems: 'center', gap: '12px',
         }}>
-          <span style={{ fontSize: '1.5rem' }}>
-            {(absenceNotifModal.notifs?.length || 0) > 0 ? '🔔' : '🎉'}
-          </span>
+          {(absenceNotifModal.notifs?.length || 0) > 0 ? (
+            <Bell size={24} color="#dc2626" style={{ flexShrink: 0 }} />
+          ) : (
+            <CheckCircle2 size={24} color="#166534" style={{ flexShrink: 0 }} />
+          )}
           <div>
             <strong style={{ fontSize: '0.85rem', color: '#0f172a', display: 'block', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
               {(absenceNotifModal.notifs?.length || 0) > 0
@@ -134,7 +149,17 @@ export const TeacherAbsenceNotifModal: React.FC<TeacherAbsenceNotifModalProps> =
                 color: absenceNotifModal.handlingOwner === 'teacher' ? '#1d4ed8' : '#dc2626',
                 border: `1px solid ${absenceNotifModal.handlingOwner === 'teacher' ? '#bfdbfe' : '#fecaca'}`
               }}>
-                {absenceNotifModal.handlingOwner === 'teacher' ? '👤 Ich informiere selbst' : '🏢 Sekretariat beauftragt'}
+                {absenceNotifModal.handlingOwner === 'teacher' ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <User size={12} color="#1d4ed8" />
+                    <span>Ich informiere selbst</span>
+                  </span>
+                ) : (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <Building2 size={12} color="#dc2626" />
+                    <span>Sekretariat beauftragt</span>
+                  </span>
+                )}
               </span>
               <span style={{ fontSize: '0.74rem', color: '#475569' }}>
                 {absenceNotifModal.handlingOwner === 'teacher'
@@ -220,7 +245,7 @@ export const TeacherAbsenceNotifModal: React.FC<TeacherAbsenceNotifModalProps> =
             fontSize: '0.74rem', color: '#475569', lineHeight: 1.45,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 800, color: '#0f172a', marginBottom: '4px' }}>
-              <span>⚖️</span>
+              <Scale size={15} color="#475569" style={{ flexShrink: 0 }} />
               <span>Organisatorischer Hinweis für Lehrkräfte</span>
             </div>
             Die Erfassung in Campus-Groovelab dient der didaktischen Unterrichtsorganisation und Schülerinformation. Bitte informiere deine Musikschulleitung bei Bedarf auch auf dem offiziellen Dienstweg.
@@ -248,7 +273,7 @@ export const TeacherAbsenceNotifModal: React.FC<TeacherAbsenceNotifModalProps> =
               boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
             }}
           >
-            <span>✉️</span>
+            <Mail size={16} color="#0f172a" style={{ flexShrink: 0 }} />
             <span>Offizielle Dienstmeldung per E-Mail vorbereiten</span>
             <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>({targetSchoolEmail || 'Musikschule'})</span>
           </a>
@@ -262,10 +287,15 @@ export const TeacherAbsenceNotifModal: React.FC<TeacherAbsenceNotifModalProps> =
               padding: '14px', fontWeight: 900, fontSize: '0.85rem',
               cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif",
               boxShadow: '0 4px 16px rgba(15,23,42,0.2)',
-              transition: 'all 0.15s'
+              transition: 'all 0.15s',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px'
             }}
           >
-            ✓ Verstanden — Zurück zum Briefing
+            <Check size={16} strokeWidth={3} />
+            <span>Verstanden — Zurück zum Briefing</span>
           </button>
         </div>
       </div>

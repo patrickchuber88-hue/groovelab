@@ -63,6 +63,34 @@ export interface AssignTeacherHomeworkResult {
   error?: string;
 }
 
+export interface TeacherMediaAssets {
+  lehrwerke: Array<{
+    id: string;
+    title: string;
+    author?: string;
+    instrument?: string;
+    totalPages?: number;
+    bookColor?: { from: string; to: string; text: string };
+  }>;
+  songs: Array<{
+    id: string;
+    title: string;
+    artist?: string;
+    instrument?: string;
+    tempo_bpm?: number;
+    key?: string;
+    audio_url?: string | null;
+  }>;
+  teacherAudios: Array<{
+    id: string;
+    title: string;
+    url: string;
+    duration?: number;
+    created_at?: string;
+    label?: string;
+  }>;
+}
+
 const LOCAL_STORAGE_KEY_PREFIX = 'campus_teacher_sandbox_';
 
 /**
@@ -313,3 +341,118 @@ export async function assignTeacherHomeworkToStudents(
     };
   }
 }
+
+/**
+ * 📚 1% Goldstandard Media Loader:
+ * Lädt Lehrwerke, Repertoire-Songs und EIGENE Lehrer-Audios (100% DSGVO- & RLS-rein, keine Schüleraufnahmen).
+ */
+export async function fetchTeacherMediaAssets(
+  teacherId: string,
+  schoolId: string
+): Promise<TeacherMediaAssets> {
+  const result: TeacherMediaAssets = {
+    lehrwerke: [],
+    songs: [],
+    teacherAudios: []
+  };
+
+  // 1. Lehrwerke (DB + Lokaler Custom-Katalog)
+  try {
+    let lwQuery = supabase.from('lehrwerke').select('*');
+    if (schoolId && isUUID(schoolId)) {
+      lwQuery = lwQuery.or(`school_id.eq.${schoolId},school_id.is.null`);
+    }
+    const { data: lwData } = await lwQuery.order('title');
+    const dbLehrwerke = (lwData || []).map((d: any) => ({
+      id: d.id,
+      title: d.title,
+      author: d.author || d.publisher || '',
+      instrument: d.instrument || '',
+      totalPages: d.total_pages || 50,
+      bookColor: d.bookColor || { from: '#475569', to: '#1e293b', text: '#ffffff' }
+    }));
+
+    let customLw: any[] = [];
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('custom_lehrwerke');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) customLw = parsed;
+        }
+      } catch {}
+    }
+
+    const combinedLw = [...dbLehrwerke];
+    customLw.forEach(c => {
+      if (c && c.id && !combinedLw.some(x => x.id === c.id || (x.title && x.title.toLowerCase() === (c.title || '').toLowerCase()))) {
+        combinedLw.push({
+          id: c.id,
+          title: c.title,
+          author: c.author || '',
+          instrument: c.instrument || '',
+          totalPages: c.total_pages || c.totalPages || 50,
+          bookColor: c.bookColor || { from: '#475569', to: '#1e293b', text: '#ffffff' }
+        });
+      }
+    });
+    result.lehrwerke = combinedLw;
+  } catch (err) {
+    console.warn('[teacherStudioService] Error fetching lehrwerke:', err);
+  }
+
+  // 2. Repertoire Songs
+  try {
+    let songQuery = supabase.from('songs').select('*');
+    if (schoolId && isUUID(schoolId)) {
+      songQuery = songQuery.or(`school_id.eq.${schoolId},school_id.is.null`);
+    }
+    const { data: sData } = await songQuery.order('title');
+    result.songs = (sData || []).map((s: any) => ({
+      id: s.id,
+      title: s.title,
+      artist: s.artist || 'Traditionell',
+      instrument: s.instrument || '',
+      tempo_bpm: s.tempo_bpm || s.bpm || 80,
+      key: s.key || 'C',
+      audio_url: s.audio_url || null
+    }));
+  } catch (err) {
+    console.warn('[teacherStudioService] Error fetching songs:', err);
+  }
+
+  // 3. EIGENE Lehrkraft-Audios & Demos (DSGVO & RLS-Reinheit: Absolut keine Schüleraufnahmen!)
+  try {
+    if (teacherId && isUUID(teacherId)) {
+      const { data: notesData } = await supabase
+        .from('user_notes')
+        .select('id, title, content, audio_url, audio_duration_seconds, created_at, tags')
+        .eq('user_id', teacherId)
+        .not('audio_url', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (notesData && notesData.length > 0) {
+        result.teacherAudios = notesData
+          .filter(n => n.audio_url && String(n.audio_url).trim() !== '')
+          .map(n => {
+            const rawLabel = (n.title || n.content || '').slice(0, 50).replace(/\n/g, ' ').trim();
+            const cleanLabel = rawLabel || 'Lehrer-Übe-Audio';
+            return {
+              id: n.id,
+              title: cleanLabel,
+              url: n.audio_url,
+              duration: n.audio_duration_seconds || 30,
+              created_at: n.created_at,
+              label: cleanLabel
+            };
+          });
+      }
+    }
+  } catch (err) {
+    console.warn('[teacherStudioService] Error fetching teacher audios:', err);
+  }
+
+  return result;
+}
+

@@ -58,6 +58,12 @@ export interface BuildSecretaryModalsMasterHubPropsParams {
   handleReopenRoomIssue: (issueId: string) => Promise<void>;
   showUnassignedWarning: boolean;
   setShowUnassignedWarning: (show: boolean) => void;
+  showAvvModal?: boolean;
+  setShowAvvModal?: React.Dispatch<React.SetStateAction<boolean>> | ((val: boolean) => void);
+  isAvvSigned?: boolean;
+  setIsAvvSigned?: React.Dispatch<React.SetStateAction<boolean>> | ((val: boolean) => void);
+  rooms?: any[];
+  userMap?: Record<string, string>;
   allUniqueTeacherProfiles: any[];
   getEffectiveStorageUsedBytes: (profile: any) => number;
   generateStarterPin: (role: string, isCampus: boolean, isGroovelab: boolean) => string;
@@ -140,7 +146,7 @@ export function buildSecretaryModalsMasterHubProps(
       setEditBookingStartTime: bookings.setEditBookingStartTime,
       editBookingEndTime: bookings.editBookingEndTime,
       setEditBookingEndTime: bookings.setEditBookingEndTime,
-      rooms: dashboardData.rooms,
+      rooms: params.rooms ?? dashboardData?.rooms ?? [],
       handleConfirmLogbookBooking: bookings.handleConfirmLogbookBooking,
       handleUpdateLogbookBooking: bookings.handleUpdateLogbookBooking,
       handleDeleteLogbookBooking: bookings.handleDeleteLogbookBooking,
@@ -148,7 +154,7 @@ export function buildSecretaryModalsMasterHubProps(
       setShowTrialLogModal: licenses.setShowTrialLogModal,
       trialLogsLoading: licenses.trialLogsLoading,
       trialLogs: licenses.trialLogs,
-      userMap: dashboardData.userMap,
+      userMap: params.userMap ?? dashboardData?.userMap ?? {},
       showResetModal: settings.showResetModal,
       setShowResetModal: settings.setShowResetModal,
       resetConfirmText: settings.resetConfirmText,
@@ -174,8 +180,8 @@ export function buildSecretaryModalsMasterHubProps(
     facilityLogProps: showFacilityLogModal ? {
       isOpen: showFacilityLogModal,
       onClose: () => setShowFacilityLogModal(false),
-      roomIssues: dashboardData.roomIssues,
-      rooms: dashboardData.rooms,
+      roomIssues: bookings?.roomIssues ?? dashboardData?.roomIssues ?? [],
+      rooms: params.rooms ?? dashboardData?.rooms ?? [],
       schoolId,
       onResolveIssue: handleResolveRoomIssue,
       onReopenIssue: handleReopenRoomIssue
@@ -249,8 +255,8 @@ export function buildSecretaryModalsMasterHubProps(
       setStudentBillingOption: licenses.setStudentBillingOption,
       isSwitchingPayer: licenses.isSwitchingPayer,
       setIsSwitchingPayer: licenses.setIsSwitchingPayer,
-      showStorageManagerModal: dashboardData.showStorageManagerModal,
-      setShowStorageManagerModal: dashboardData.setShowStorageManagerModal,
+      showStorageManagerModal: licenses?.showStorageManagerModal ?? false,
+      setShowStorageManagerModal: licenses?.setShowStorageManagerModal ?? (() => {}),
       selectedStorageAddonGb: licenses.selectedStorageAddonGb,
       setSelectedStorageAddonGb: licenses.setSelectedStorageAddonGb,
       selectedStorageAddonFee: licenses.selectedStorageAddonFee,
@@ -266,8 +272,8 @@ export function buildSecretaryModalsMasterHubProps(
       setShowStorageTerminationModal: licenses.setShowStorageTerminationModal,
       storageTerminationDays: licenses.storageTerminationDays,
       setStorageTerminationDays: licenses.setStorageTerminationDays,
-      selectedInvoice: dashboardData.selectedInvoice,
-      setSelectedInvoice: dashboardData.setSelectedInvoice,
+      selectedInvoice: licenses?.selectedInvoice ?? null,
+      setSelectedInvoice: licenses?.setSelectedInvoice ?? (() => {}),
       campusActivatedThisMonth: licenses.campusActivatedThisMonth,
       groovelabActivatedThisMonth: licenses.groovelabActivatedThisMonth,
       billableTeachersCount: licenses.billableTeachersCount,
@@ -330,9 +336,9 @@ export function buildSecretaryModalsMasterHubProps(
       setShowOwnQrModal: settings.setShowOwnQrModal,
       qrModalUser: settings.qrModalUser,
       setQrModalUser: settings.setQrModalUser,
-      showAvvModal: dashboardData.showAvvModal,
-      setShowAvvModal: dashboardData.setShowAvvModal,
-      setIsAvvSigned: dashboardData.setIsAvvSigned,
+      showAvvModal: params.showAvvModal ?? settings?.showAvvModal ?? false,
+      setShowAvvModal: params.setShowAvvModal ?? settings?.setShowAvvModal ?? (() => {}),
+      setIsAvvSigned: params.setIsAvvSigned ?? settings?.setIsAvvSigned ?? (() => {}),
       showDpoIdCardModal,
       setShowDpoIdCardModal,
       showDpoPortalModal,

@@ -62,8 +62,8 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
       docTitle = 'Campus-Groovelab – Datenschutz-Musterinformation nach Art. 13 DSGVO';
       tabHeading = 'Muster-Datenschutzinformation (Art. 13 DSGVO) für Erziehungsberechtigte & Schüler';
     } else if (activeTab === 'child_protection') {
-      docTitle = 'Campus-Groovelab – Kinderschutz-Leitfaden & Netiquette (§ 8a SGB VIII)';
-      tabHeading = 'Kinderschutz-Leitfaden, Vier-Augen-Prinzip & Digitale Netiquette (§ 8a SGB VIII)';
+      docTitle = 'Campus-Groovelab – Kinderschutz-Leitfaden & Netiquette';
+      tabHeading = 'Kinderschutz-Leitfaden, Vier-Augen-Prinzip & Digitale Netiquette';
     } else if (activeTab === 'cancellation') {
       docTitle = 'Campus-Groovelab – Widerrufsbelehrung & Muster-Widerrufsformular';
       tabHeading = 'Widerrufsbelehrung & Muster-Widerrufsformular (B2C)';
@@ -463,7 +463,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
                 { id: 'avv' as const, label: 'AVV (Art. 28)', icon: FileCheck },
                 { id: 'sla' as const, label: 'SLA', icon: Server },
                 { id: 'school_parent_info' as const, label: 'Eltern-Info (Art. 13)', icon: Shield },
-                { id: 'child_protection' as const, label: 'Kinderschutz (§ 8a)', icon: HeartHandshake },
+                { id: 'child_protection' as const, label: 'Kinderschutz', icon: HeartHandshake },
                 { id: 'cancellation' as const, label: 'Widerruf (B2C)', icon: Undo2 },
                 { id: 'accessibility' as const, label: 'Barrierefreiheit (BFSG)', icon: Accessibility }
               ].map(tab => {
@@ -530,7 +530,7 @@ export const LegalTextModal: React.FC<LegalTextModalProps> = ({
               {activeTab === 'avv' && 'Vereinbarung zur Auftragsverarbeitung (AVV nach Art. 28 DSGVO & nDSG) inkl. TOM'}
               {activeTab === 'sla' && 'Service Level Agreement (SLA) & Verfügbarkeitsgarantie (B2B)'}
               {activeTab === 'school_parent_info' && 'Muster-Datenschutzinformation (Art. 13 DSGVO) für Erziehungsberechtigte & Schüler'}
-              {activeTab === 'child_protection' && 'Kinderschutz-Leitfaden, Vier-Augen-Prinzip & Digitale Netiquette (§ 8a SGB VIII)'}
+              {activeTab === 'child_protection' && 'Kinderschutz-Leitfaden, Vier-Augen-Prinzip & Digitale Netiquette'}
               {activeTab === 'cancellation' && 'Widerrufsbelehrung & Muster-Widerrufsformular (B2C)'}
               {activeTab === 'accessibility' && 'Erklärung zur Barrierefreiheit (BITV 2.0 / EN 301 549 / BFSG)'}
             </div>
@@ -1180,7 +1180,7 @@ Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig u
                 Service Level Agreement (SLA) &amp; Verfügbarkeitsgarantie
               </h4>
               <p style={{ margin: '-10px 0 0 0', fontSize: '0.80rem', color: '#64748b' }}>
-                Verbindliche Qualitätsstandards, Störungsklassen P1–P4, garantierte Reaktionszeiten und Gutschriftsregelungen (Service Credits) für Musikschulen.
+                Verbindliche Qualitätsstandards, Störungsklassen P1–P4, garantierte Reaktionszeiten und beitragsfreies Gratismonate-Kompensationsmodell für Musikschulen.
               </p>
 
               <div style={{
@@ -1194,45 +1194,61 @@ Hiermit versichere ich in gutem Glauben, dass die vorstehenden Angaben richtig u
                 boxShadow: '0 2px 10px rgba(15, 23, 42, 0.02)'
               }}>
                 <div>
-                  <strong style={{ color: '#0f172a' }}>1. Geltungsbereich &amp; Verfügbarkeitszusage</strong><br />
-                  (1) Dieses Service Level Agreement regelt die Verfügbarkeit und den Support der Cloud-Plattform Campus-Groovelab für vertraglich gebundene Musikschulen und kommunale Träger.<br />
-                  (2) Der Betreiber garantiert eine <strong>Verfügbarkeit der Cloud-Infrastruktur von 99,5 % im Jahresmittel</strong> (Berechnungsgrundlage: 24 Stunden an 365 Tagen abzüglich vereinbarter Wartungsfenster).
+                  <strong style={{ color: '#0f172a' }}>1. Geltungsbereich &amp; Ausschluss von Rechten Dritter (§ 328 BGB)</strong><br />
+                  (1) Dieses Service Level Agreement (nachfolgend „SLA“) regelt die technische Verfügbarkeit und den Support der Cloud-Infrastruktur von <strong>Campus-Groovelab</strong> im B2B-Verhältnis zwischen dem Betreiber und der vertragschließenden Musikschule bzw. dem Träger (nachfolgend „Kunde“).<br />
+                  (2) <strong>Ausschluss der Drittbegünstigung:</strong> Dieses SLA entfaltet rechtliche Schutz- und Erfüllungswirkung ausschließlich zugunsten des vertragsschließenden Kunden. Die Einbeziehung Dritter in den Schutzbereich ist ausdrücklich abbedungen (§ 328 BGB). Endnutzer – insbesondere Lehrkräfte, Schülerinnen und Schüler sowie Erziehungsberechtigte – erwerben aus diesem SLA keine eigenen Primär-, Erfüllungs-, Minderungs- oder Schadensersatzansprüche gegen den Betreiber.
                 </div>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>2. Geplante Wartungsfenster</strong><br />
-                  (1) Geplante Wartungsarbeiten zur Aktualisierung der Server, Sicherheits-Patches und Datenbank-Optimierungen werden vorzugsweise außerhalb der regulären Kernunterrichtszeiten durchgeführt (werktags zwischen 22:00 Uhr und 06:00 Uhr MEZ oder an Sonn- und gesetzlichen Feiertagen).<br />
-                  (2) Wartungsarbeiten werden der Musikschule mit einer Frist von mindestens <strong>48 Stunden</strong> per E-Mail oder System-Banner angekündigt. Während ordnungsgemäß angekündigter Wartungsfenster gilt die Plattform nicht als unverfügbar.
+                  <strong style={{ color: '#0f172a' }}>2. Verfügbarkeitszusage &amp; Messmethode</strong><br />
+                  (1) Der Betreiber gewährleistet eine <strong>Verfügbarkeit der Plattform von mindestens 99,5 % im jeweiligen Kalendermonat</strong> am Übergabepunkt der Server- und Datenbankinfrastruktur an das öffentliche Internet.<br />
+                  (2) Das monatliche Zeitbudget errechnet sich aus 24 Stunden an allen Tagen des jeweiligen Kalendermonats abzüglich ordnungsgemäß durchgeführter Wartungsfenster gemäß Ziffer 3.<br />
+                  (3) Die Plattform gilt als verfügbar, wenn autorisierte Nutzer auf die Kernfunktionen (Authentifizierung, Datenbankzugriff und Hauptnavigation) über das Internet zugreifen können.
                 </div>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>3. Störungsklassen &amp; Reaktionszeiten</strong><br />
-                  Meldungen über technische Störungen werden nach folgendem Klassifizierungsschema bearbeitet (Kern-Supportzeiten an Werktagen: Mo–Fr 08:30–17:00 Uhr MEZ):<br /><br />
-                  • <strong>Priorität 1 (Kritisch – Systemausfall):</strong> Die Plattform oder wesentliche Kernfunktionen (Login, Datenbankzugriff) sind für alle oder eine Vielzahl von Nutzern vollständig nicht erreichbar.<br />
-                  &nbsp;&nbsp;➔ <em>Erste Reaktionszeit:</em> <strong>&lt; 2 Stunden</strong> während der Kernzeit (max. 4 Stunden außerhalb).<br />
-                  &nbsp;&nbsp;➔ <em>Wiederherstellung / Workaround angestrebt:</em> <strong>&lt; 8 Stunden</strong>.<br /><br />
-                  • <strong>Priorität 2 (Hoch – Wesentliche Teilsysteme beeinträchtigt):</strong> Wichtige Funktionen (z. B. Stundenplaner, Audio-Player oder Raumverwaltung) weisen erhebliche Mängel auf, der Basisbetrieb läuft jedoch eingeschränkt weiter.<br />
-                  &nbsp;&nbsp;➔ <em>Erste Reaktionszeit:</em> <strong>&lt; 4 Stunden</strong>.<br />
-                  &nbsp;&nbsp;➔ <em>Lösung oder Fehlerumgehung angestrebt:</em> <strong>&lt; 24 Stunden</strong>.<br /><br />
-                  • <strong>Priorität 3 (Mittel – Einzelfunktion beeinträchtigt):</strong> Einzelne Komfortfunktionen (z. B. Gamification-XP, Profilavatar-Wechsel) sind fehlerhaft, der reguläre Unterrichtsbetrieb ist nicht gefährdet.<br />
-                  &nbsp;&nbsp;➔ <em>Erste Reaktionszeit:</em> <strong>&lt; 8 Stunden</strong>.<br />
-                  &nbsp;&nbsp;➔ <em>Bearbeitung:</em> Im regulären wöchentlichen Releasezyklus.<br /><br />
-                  • <strong>Priorität 4 (Niedrig – Allgemeine Supportanfragen &amp; Bedienhinweise):</strong> Allgemeine Beratungs-, Bedien- oder Einrichtungsfragen.<br />
-                  &nbsp;&nbsp;➔ <em>Erste Reaktionszeit:</em> <strong>&lt; 24 Stunden</strong> an Werktagen.
+                  <strong style={{ color: '#0f172a' }}>3. Wartungsfenster &amp; Notfall-Sicherheits-Patches</strong><br />
+                  (1) <strong>Planmäßige Wartung:</strong> Notwendige Wartungsarbeiten (Infrastruktur-Upgrades, Sicherheits-Patches, Datenbankoptimierungen) finden vorzugsweise außerhalb der Hauptunterrichtszeiten statt (werktags zwischen 22:00 Uhr und 06:00 Uhr MEZ sowie an Sonn- und bundeseinheitlichen Feiertagen). Sie werden mindestens 48 Stunden im Voraus per E-Mail oder System-Banner angekündigt und dürfen ein Gesamtkontingent von 12 Stunden im Kalendermonat nicht überschreiten.<br />
+                  (2) <strong>Dringende Notfall-Wartung:</strong> Unaufschiebbare Notfallmaßnahmen zur Abwehr akuter Cyber-Angriffe, zur Schließung kritischer Sicherheitslücken (Zero-Day-Exploits) oder zur Abwendung schwerer Datenverluste können ohne Einhaltung einer Vorankündigungsfrist durchgeführt werden. Der Betreiber informiert den Kunden hierüber unverzüglich.<br />
+                  (3) Zeiten ordnungsgemäßer planmäßiger oder unaufschiebbarer Notfall-Wartungsfenster gelten nicht als Ausfallzeiten und bleiben bei der Berechnung der Verfügbarkeitsquote unberücksichtigt.
                 </div>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>4. Service Credits &amp; Minderungsgutschriften</strong><br />
-                  Wird die garantierte Verfügbarkeit von 99,5 % in einem Abrechnungsmonat aus vom Betreiber zu vertretenden Gründen unterschritten, erhält die Musikschule auf schriftliche Anforderung innerhalb von 30 Tagen folgende Gutschriften auf die monatliche Hosting-Flatrate:<br /><br />
-                  • <strong>99,00 % bis 99,49 % Verfügbarkeit:</strong> 5 % Gutschrift auf das Monats-Hosting.<br />
-                  • <strong>98,00 % bis 98,99 % Verfügbarkeit:</strong> 10 % Gutschrift auf das Monats-Hosting.<br />
-                  • <strong>Unter 98,00 % Verfügbarkeit:</strong> 20 % Gutschrift auf das Monats-Hosting.<br /><br />
-                  Service Credits werden mit künftigen Abrechnungen verrechnet. Weitergehende Schadensersatzansprüche bleiben von den Regelungen des § 7 der AGB unberührt.
+                  <strong style={{ color: '#0f172a' }}>4. Störungsklassen &amp; Support-Reaktionszeiten</strong><br />
+                  Meldungen über technische Beeinträchtigungen werden während der regulären Supportzeiten (Werktage Mo–Fr 08:30–17:30 Uhr MEZ) nach folgendem Schema priorisiert:<br /><br />
+                  • <strong>Priorität 1 (Kritisch – Gesamtausfall):</strong> Kernsysteme (Login, Datenbank) sind für alle oder die Mehrheit der Nutzer unbenutzbar.<br />
+                  &nbsp;&nbsp;➔ <em>Ziel-Reaktionszeit (Beginn der Entstörung):</em> <strong>&lt; 2 Stunden</strong> (außerhalb der Supportzeit max. 4 Stunden).<br />
+                  &nbsp;&nbsp;➔ <em>Angestrebter Workaround / Wiederherstellung:</em> <strong>&lt; 8 Stunden</strong>.<br /><br />
+                  • <strong>Priorität 2 (Hoch – Wesentliche Teilsysteme beeinträchtigt):</strong> Wichtige Module (z. B. Stundenplaner, Audio-Engine oder Raumverwaltung) weisen erhebliche Störungen auf; Basisbetrieb bleibt möglich.<br />
+                  &nbsp;&nbsp;➔ <em>Ziel-Reaktionszeit:</em> <strong>&lt; 4 Stunden</strong>.<br />
+                  &nbsp;&nbsp;➔ <em>Angestrebte Fehlerbehebung:</em> <strong>&lt; 24 Stunden</strong>.<br /><br />
+                  • <strong>Priorität 3 (Mittel – Isolierte Komfortfunktionen):</strong> Einzelne didaktische Komfortfunktionen (z. B. Gamification-XP, Avatar-Upload) sind gestört; Unterrichts- und Verwaltungsbetrieb gesichert.<br />
+                  &nbsp;&nbsp;➔ <em>Ziel-Reaktionszeit:</em> <strong>&lt; 8 Stunden</strong>.<br />
+                  &nbsp;&nbsp;➔ <em>Behebung:</em> Im regulären Releasezyklus.<br /><br />
+                  • <strong>Priorität 4 (Niedrig – Allgemeine Anfragen):</strong> Allgemeine Support-, Bedien- oder Konfigurationsfragen.<br />
+                  &nbsp;&nbsp;➔ <em>Ziel-Reaktionszeit:</em> <strong>&lt; 24 Stunden</strong>.<br /><br />
+                  <span style={{ fontSize: '0.80rem', color: '#64748b' }}>
+                    <em>Hinweis: Bei den angegebenen Reaktions- und Behebungszeiten handelt es sich um qualifizierte Serviceziele (Best-Effort), nicht um verschuldensunabhängige Fristgarantien.</em>
+                  </span>
                 </div>
 
                 <div>
-                  <strong style={{ color: '#0f172a' }}>5. Ausschlüsse (Höhere Gewalt &amp; Netzinfrastruktur)</strong><br />
-                  Als Ausfallzeit gelten nicht: (a) Ausfälle infolge höherer Gewalt, kriegerischer Ereignisse, Naturkatastrophen oder behördlicher Anordnungen; (b) flächendeckende Störungen überregionaler Internet-Backbone-Betreiber oder Telekommunikationsanbieter; (c) DDoS-Angriffe oder Cyber-Attacken, die trotz angemessener und dem Stand der Technik entsprechender Schutzmaßnahmen nicht abgewehrt werden konnten; (d) Ausfälle, die auf Fehlbedienungen oder fehlerhafter IT-Infrastruktur der Musikschule beruhen.
+                  <strong style={{ color: '#0f172a' }}>5. Kompensation: Das beitragsfreie Gratismonate-Modell</strong><br />
+                  (1) Unterschreitet der Betreiber die garantierte Mindestverfügbarkeit von 99,5 % in einem Kalendermonat aus von ihm zu vertretenden Gründen, erhält der Kunde als pauschalierte Entschädigung und Minderung beitragsfreie Verlängerungsmonate (<strong>„Gratismonate“</strong>) auf die monatliche Hosting-Basispauschale:<br /><br />
+                  • <strong>99,00 % bis 99,49 % Verfügbarkeit</strong> (Ausfall &gt; 3,6 Std.): <strong>1 Gratismonat</strong> (folgender Monat 100 % beitragsfrei)<br />
+                  • <strong>98,00 % bis 98,99 % Verfügbarkeit</strong> (Ausfall &gt; 7,2 Std.): <strong>2 Gratismonate</strong> (die nächsten 2 Monate beitragsfrei)<br />
+                  • <strong>95,00 % bis 97,99 % Verfügbarkeit</strong> (Ausfall &gt; 14,4 Std.): <strong>3 Gratismonate</strong> (Folgequartal beitragsfrei)<br />
+                  • <strong>Unter 95,00 % Verfügbarkeit</strong> (Ausfall &gt; 36,0 Std.): <strong>6 Gratismonate</strong> (Folgehalbjahr beitragsfrei)<br /><br />
+                  (2) <strong>Strikte Bemessungsgrundlage:</strong> Die Gratismonate beziehen sich ausschließlich auf die monatliche Netto-Hosting-Basispauschale der Musikschule (Campus 14,90 €, GrooveLab 9,90 € bzw. Kombi 19,90 €). Schüleraktivierungsgebühren, Pädagogenlizenzen und Entgelte Dritter sind von der Bemessungsgrundlage ausdrücklich ausgeschlossen.<br />
+                  (3) <strong>Erfüllung &amp; Anrechnung:</strong> Bei monatlicher Zahlweise wird die Hosting-Basispauschale für die Folgemonate auf 0,00 € gesetzt. Bei jährlicher Vorauszahlung (mit Rabatt) werden die Gratismonate beitragsfrei an das vereinbarte Ende der bezahlten Schuljahresperiode angehängt, sodass sich der nächste Rechnungsstichtag entsprechend nach hinten verschiebt.<br />
+                  (4) <strong>Barausschluss &amp; Verfall (No Cash Value):</strong> Gratismonate stellen eine reine Sachkompensation dar. Ein Anspruch auf Barauszahlung, Überweisung, Verrechnung mit Drittforderungen oder Konvertierung in Geld ist unwiderruflich ausgeschlossen. Bei Beendigung des Vertragsverhältnisses durch ordentliche Kündigung des Kunden verfallen noch nicht verbrauchte Gratismonate ersatzlos.<br />
+                  (5) <strong>Antrags- und Nachweispflicht (Ausschlussfrist):</strong> Gratismonate werden nicht automatisch gewährt. Der Kunde hat die Unterschreitung innerhalb einer <strong>harten Ausschlussfrist von 30 Kalendertagen</strong> nach Ablauf des betroffenen Monats in Textform (Support-Ticket/E-Mail) unter Angabe der festgestellten Ausfallzeiten geltend zu machen. Nach Fristablauf ist die Geltendmachung endgültig ausgeschlossen.<br />
+                  (6) <strong>Abschließendes Rechtsmittel (Sole and Exclusive Remedy):</strong> Die Gewährung von Gratismonaten nach dieser Ziffer 5 stellt das alleinige und ausschließliche vertragliche Rechtsmittel des Kunden wegen Verfügbarkeitsunterbrechungen dar. Das gesetzliche Minderungsrecht nach § 536 BGB sowie verschuldensunabhängige Schadensersatzansprüche sind insoweit abbedungen. Gesetzliche Ansprüche wegen Vorsatzes oder grober Fahrlässigkeit sowie das Kündigungsrecht aus wichtigem Grund (§ 314 BGB) bleiben unberührt.
+                </div>
+
+                <div>
+                  <strong style={{ color: '#0f172a' }}>6. Ausschlüsse (Haftungsbefreiung)</strong><br />
+                  Als Ausfallzeit gelten nicht Störungen, die zurückzuführen sind auf: (a) Höhere Gewalt, kriegerische Ereignisse, Naturkatastrophen oder behördliche Anordnungen; (b) flächendeckende Störungen überregionaler Internet-Backbones, von Tier-1-Telekommunikationsprovidern oder DNS-Routing außerhalb des Rechenzentrums; (c) DDoS-Angriffe oder Cyber-Attacken, die trotz angemessener und dem Stand der Technik entsprechender Schutzmaßnahmen nicht abgewehrt werden konnten; (d) Ausfälle, die auf Fehlbedienungen, unzureichenden Bandbreiten oder ungeeigneter IT-Infrastruktur auf Seiten des Kunden oder der Endnutzer beruhen.
                 </div>
               </div>
             </div>

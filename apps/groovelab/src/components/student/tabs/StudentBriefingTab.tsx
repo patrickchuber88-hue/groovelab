@@ -962,7 +962,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             const teacherId = hasToday ? briefingData.todayLesson.teacher_id : (nextOcc?.teacher_id || studentUser?.teacher_id);
                             const timeLabel = hasToday ? briefingData.todayLesson.time : (nextOcc?.start_time?.substring(0, 5) || '15:15');
                             const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-                            const todayStr = new Date().toISOString().split('T')[0];
+                            const todayStr = toLocalYYYYMMDD(getSimulatedNow());
                             const targetDateStr = hasToday ? todayStr : (nextOcc?.date || todayStr);
                             const targetDayOfWeek = targetDateStr ? DAYS_DE[new Date(targetDateStr).getDay()] : 'Termin';
                             const formattedDate = targetDateStr ? new Date(targetDateStr).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : '';
@@ -1071,7 +1071,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 )}
 
                                 {/* 3. Absage / Reaktivieren Button (Master-PIN geschützt für Junior) */}
-                                {nextOcc && (isCanceled || isStudentAbsenceAllowed || checkIsParentUnlockedGlobal()) && (
+                                {nextOcc && (
                                   <button
                                     type="button"
                                     onClick={(e) => {
@@ -1102,17 +1102,23 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                     className="hover-scale"
                                     title={isCanceled ? "Absage zurücknehmen / Termin reaktivieren (Eltern-PIN)" : "Unterrichtstermin absagen"}
                                   >
-                                    {isCanceled ? (
-                                      <>
-                                        <Lock size={14} color="#dc2626" />
-                                        <span>Absage zurücknehmen (Eltern-PIN)</span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        {!isStudentAbsenceAllowed ? <Lock size={14} color="#64748b" /> : <CalendarX size={14} color="#64748b" />}
-                                        <span>{!isStudentAbsenceAllowed ? 'Unterricht absagen (Eltern-PIN)' : 'Unterricht absagen'}</span>
-                                      </>
-                                    )}
+                                    {(() => {
+                                      const isUnlocked = isStudentAbsenceAllowed || checkIsParentUnlockedGlobal();
+                                      if (isCanceled) {
+                                        return (
+                                          <>
+                                            {!isUnlocked ? <Lock size={14} color="#dc2626" /> : <CalendarX size={14} color="#dc2626" />}
+                                            <span>{!isUnlocked ? 'Absage zurücknehmen (Eltern-PIN)' : 'Absage zurücknehmen'}</span>
+                                          </>
+                                        );
+                                      }
+                                      return (
+                                        <>
+                                          {!isUnlocked ? <Lock size={14} color="#64748b" /> : <CalendarX size={14} color="#64748b" />}
+                                          <span>{!isUnlocked ? 'Unterricht absagen (Eltern-PIN)' : 'Unterricht absagen'}</span>
+                                        </>
+                                      );
+                                    })()}
                                   </button>
                                 )}
 
@@ -1166,7 +1172,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
 
                     {/* 1. Gather all active homework books & pages from localProgress */}
                     const activeJuniorBooks: { title: string; pages: number[]; formattedPages: string; notes?: string[]; book?: any }[] = [];
-                    (localProgress || []).forEach((assignment: any) => {
+                    (Array.isArray(localProgress) ? localProgress : []).forEach((assignment: any) => {
                       if (String(assignment.studentId) !== String(studentId) || !assignment.pageStates) return;
                       const book = lehrwerke.find(g => String(g.id) === String(assignment.lehrwerkId));
                       const bookTitle = book?.title || assignment.bookTitle || assignment.lehrwerkTitle;
@@ -2041,11 +2047,12 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                       width: '28px',
                                       height: '28px',
                                       borderRadius: '8px',
-                                      background: '#fee2e2',
+                                      background: 'linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%)',
                                       display: 'flex',
                                       alignItems: 'center',
                                       justifyContent: 'center',
-                                      color: '#dc2626',
+                                      color: '#e11d48',
+                                      boxShadow: '0 1px 3px rgba(225, 29, 72, 0.12)',
                                       flexShrink: 0
                                     }}>
                                       <BookOpen size={14} strokeWidth={2.4} />
@@ -2860,11 +2867,12 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                               width: '28px',
                                               height: '28px',
                                               borderRadius: '8px',
-                                              background: '#fee2e2',
+                                              background: 'linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%)',
                                               display: 'flex',
                                               alignItems: 'center',
                                               justifyContent: 'center',
-                                              color: '#dc2626',
+                                              color: '#e11d48',
+                                              boxShadow: '0 1px 3px rgba(225, 29, 72, 0.12)',
                                               flexShrink: 0
                                             }}>
                                               <BookOpen size={14} strokeWidth={2.4} />
@@ -4573,7 +4581,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         const teacherId = hasToday ? briefingData.todayLesson.teacher_id : (nextOcc?.teacher_id || studentUser?.teacher_id);
                         const timeLabel = hasToday ? briefingData.todayLesson.time : (nextOcc?.start_time?.substring(0, 5) || '15:15');
                         const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-                        const todayStr = new Date().toISOString().split('T')[0];
+                        const todayStr = toLocalYYYYMMDD(getSimulatedNow());
                         const targetDateStr = hasToday ? todayStr : (nextOcc?.date || todayStr);
                         const targetDayOfWeek = targetDateStr ? DAYS_DE[new Date(targetDateStr).getDay()] : 'Termin';
                         const formattedDate = targetDateStr ? new Date(targetDateStr).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : '';
@@ -4680,7 +4688,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             )}
 
                             {/* 3. Absage / Reaktivieren Button */}
-                            {nextOcc && (isCanceled || isStudentAbsenceAllowed || checkIsParentUnlockedGlobal()) && (
+                            {nextOcc && (
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -4711,12 +4719,23 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 className="hover-scale"
                                 title={isCanceled ? "Absage zurücknehmen / Termin reaktivieren" : "Unterrichtstermin absagen"}
                               >
-                                {isCanceled ? (
-                                  !isStudentAbsenceAllowed ? <Lock size={14} color="#dc2626" /> : <CalendarX size={14} color="#dc2626" />
-                                ) : (
-                                  !isStudentAbsenceAllowed ? <Lock size={14} color="#64748b" /> : <CalendarX size={14} color="#64748b" />
-                                )}
-                                <span>{isCanceled ? (!isStudentAbsenceAllowed ? 'Absage zurücknehmen (Eltern-PIN)' : 'Absage zurücknehmen') : (!isStudentAbsenceAllowed ? 'Unterricht absagen (Eltern-PIN)' : 'Unterricht absagen')}</span>
+                                {(() => {
+                                  const isUnlocked = isStudentAbsenceAllowed || checkIsParentUnlockedGlobal();
+                                  if (isCanceled) {
+                                    return (
+                                      <>
+                                        {!isUnlocked ? <Lock size={14} color="#dc2626" /> : <CalendarX size={14} color="#dc2626" />}
+                                        <span>{!isUnlocked ? 'Absage zurücknehmen (Eltern-PIN)' : 'Absage zurücknehmen'}</span>
+                                      </>
+                                    );
+                                  }
+                                  return (
+                                    <>
+                                      {!isUnlocked ? <Lock size={14} color="#64748b" /> : <CalendarX size={14} color="#64748b" />}
+                                      <span>{!isUnlocked ? 'Unterricht absagen (Eltern-PIN)' : 'Unterricht absagen'}</span>
+                                    </>
+                                  );
+                                })()}
                               </button>
                             )}
 
@@ -5092,7 +5111,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       // 1. Gather all active homework books & pages directly from localProgress (assigned Lehrwerke)
                       const activeLehrwerkeMap: Record<string, { pages: { num: number; notes: string; status: string }[] }> = {};
 
-                      (localProgress || []).forEach((assignment: any) => {
+                      (Array.isArray(localProgress) ? localProgress : []).forEach((assignment: any) => {
                         const isStudentMatch = !effectiveId || String(assignment.studentId) === String(effectiveId) || String(assignment.student_id) === String(effectiveId);
                         if (!isStudentMatch || !assignment.pageStates) return;
                         const book = lehrwerke.find(g => String(g.id) === String(assignment.lehrwerkId));
@@ -5524,11 +5543,12 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                             width: '28px',
                                             height: '28px',
                                             borderRadius: '8px',
-                                            background: '#fee2e2',
+                                            background: `linear-gradient(135deg, ${bookGradient.from}, ${bookGradient.to})`,
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
-                                            color: '#dc2626',
+                                            color: bookGradient.text,
+                                            boxShadow: '0 1px 3px rgba(225, 29, 72, 0.12)',
                                             flexShrink: 0
                                           }}>
                                             <BookOpen size={14} strokeWidth={2.4} />
@@ -5538,20 +5558,18 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                           </span>
                                         </div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap', flexShrink: 0 }}>
-                                          {item.pageNums.map((pNum: number, pIdx: number) => (
-                                            <span key={`teen-p-${pIdx}`} style={{
-                                              fontSize: '0.78rem',
-                                              fontWeight: 900,
-                                              color: '#15803d',
-                                              background: '#dcfce7',
-                                              padding: '3px 9px',
-                                              borderRadius: '7px',
-                                              border: '1px solid #bbf7d0',
-                                              flexShrink: 0
-                                            }}>
-                                              S. {pNum}
-                                            </span>
-                                          ))}
+                                          <span style={{
+                                            fontSize: '0.80rem',
+                                            fontWeight: 850,
+                                            color: '#15803d',
+                                            background: '#dcfce7',
+                                            padding: '3px 10px',
+                                            borderRadius: '99px',
+                                            border: '1px solid #bbf7d0',
+                                            flexShrink: 0
+                                          }}>
+                                            {item.formattedPages || (item.pageNums?.length === 1 ? `S. ${item.pageNums[0]}` : `S. ${item.pageNums.join(', ')}`)}
+                                          </span>
                                         </div>
                                       </div>
                                     );
@@ -6677,7 +6695,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         const teacherId = hasToday ? briefingData.todayLesson.teacher_id : (nextOcc?.teacher_id || studentUser?.teacher_id);
                         const timeLabel = hasToday ? briefingData.todayLesson.time : (nextOcc?.start_time?.substring(0, 5) || '15:15');
                         const DAYS_DE = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-                        const todayStr = new Date().toISOString().split('T')[0];
+                        const todayStr = toLocalYYYYMMDD(getSimulatedNow());
                         const targetDateStr = hasToday ? todayStr : (nextOcc?.date || todayStr);
                         const targetDayOfWeek = targetDateStr ? DAYS_DE[new Date(targetDateStr).getDay()] : 'Termin';
                         const formattedDate = targetDateStr ? new Date(targetDateStr).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : '';
@@ -6824,7 +6842,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             </button>
 
                             {/* 4. Absage / Reaktivieren Button */}
-                            {nextOcc && (isCanceled || isStudentAbsenceAllowed || checkIsParentUnlockedGlobal()) && (
+                            {nextOcc && (
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -6855,12 +6873,23 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                 className="hover-scale"
                                 title={isCanceled ? "Absage zurücknehmen / Termin reaktivieren" : "Unterrichtstermin absagen"}
                               >
-                                {isCanceled ? (
-                                  !isStudentAbsenceAllowed ? <Lock size={14} color="#dc2626" /> : <CalendarX size={14} color="#dc2626" />
-                                ) : (
-                                  !isStudentAbsenceAllowed ? <Lock size={14} color="#64748b" /> : <CalendarX size={14} color="#64748b" />
-                                )}
-                                <span>{isCanceled ? (!isStudentAbsenceAllowed ? 'Absage zurücknehmen (Eltern-PIN)' : 'Absage zurücknehmen') : (!isStudentAbsenceAllowed ? 'Unterricht absagen (Eltern-PIN)' : 'Unterricht absagen')}</span>
+                                {(() => {
+                                  const isUnlocked = isStudentAbsenceAllowed || checkIsParentUnlockedGlobal();
+                                  if (isCanceled) {
+                                    return (
+                                      <>
+                                        {!isUnlocked ? <Lock size={14} color="#dc2626" /> : <CalendarX size={14} color="#dc2626" />}
+                                        <span>{!isUnlocked ? 'Absage zurücknehmen (Eltern-PIN)' : 'Absage zurücknehmen'}</span>
+                                      </>
+                                    );
+                                  }
+                                  return (
+                                    <>
+                                      {!isUnlocked ? <Lock size={14} color="#64748b" /> : <CalendarX size={14} color="#64748b" />}
+                                      <span>{!isUnlocked ? 'Unterricht absagen (Eltern-PIN)' : 'Unterricht absagen'}</span>
+                                    </>
+                                  );
+                                })()}
                               </button>
                             )}
 
@@ -7252,7 +7281,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       // 1. Gather all active homework books & pages directly from localProgress (assigned Lehrwerke)
                       const activeLehrwerkeMap: Record<string, { pages: { num: number; notes: string; status: string }[] }> = {};
 
-                      (localProgress || []).forEach((assignment: any) => {
+                      (Array.isArray(localProgress) ? localProgress : []).forEach((assignment: any) => {
                         const isStudentMatch = !effectiveId || String(assignment.studentId) === String(effectiveId) || String(assignment.student_id) === String(effectiveId);
                         if (!isStudentMatch || !assignment.pageStates) return;
                         const book = lehrwerke.find(g => String(g.id) === String(assignment.lehrwerkId));
@@ -7688,11 +7717,12 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                             width: '28px',
                                             height: '28px',
                                             borderRadius: '8px',
-                                            background: '#fee2e2',
+                                            background: `linear-gradient(135deg, ${bookGradient.from}, ${bookGradient.to})`,
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
-                                            color: '#dc2626',
+                                            color: bookGradient.text,
+                                            boxShadow: '0 1px 3px rgba(225, 29, 72, 0.12)',
                                             flexShrink: 0
                                           }}>
                                             <BookOpen size={14} strokeWidth={2.4} />
@@ -7702,20 +7732,18 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                           </span>
                                         </div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap', flexShrink: 0 }}>
-                                          {item.pageNums.map((pNum: number, pIdx: number) => (
-                                            <span key={`pro-p-${pIdx}`} style={{
-                                              fontSize: '0.78rem',
-                                              fontWeight: 900,
-                                              color: '#15803d',
-                                              background: '#dcfce7',
-                                              padding: '3px 9px',
-                                              borderRadius: '7px',
-                                              border: '1px solid #bbf7d0',
-                                              flexShrink: 0
-                                            }}>
-                                              S. {pNum}
-                                            </span>
-                                          ))}
+                                          <span style={{
+                                            fontSize: '0.80rem',
+                                            fontWeight: 850,
+                                            color: '#15803d',
+                                            background: '#dcfce7',
+                                            padding: '3px 10px',
+                                            borderRadius: '99px',
+                                            border: '1px solid #bbf7d0',
+                                            flexShrink: 0
+                                          }}>
+                                            {item.formattedPages || (item.pageNums?.length === 1 ? `S. ${item.pageNums[0]}` : `S. ${item.pageNums.join(', ')}`)}
+                                          </span>
                                         </div>
                                       </div>
                                     );
@@ -8645,7 +8673,163 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                         );
                       });
                     } else {
-                      return <div style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', padding: '20px 0' }}>Keine Termine verfügbar.</div>;
+                      const simNow = typeof getSimulatedNow === 'function' ? getSimulatedNow() : new Date();
+                      const dayOfWeek = simNow.getDay();
+                      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+                      if (isWeekend) {
+                        if (effectiveLevel === 'junior') {
+                          return (
+                            <div style={{
+                              background: 'linear-gradient(135deg, #fffbeb 0%, #f0fdf4 50%, #eff6ff 100%)',
+                              border: '1.5px solid #bbf7d0',
+                              borderRadius: '20px',
+                              padding: '20px 16px',
+                              textAlign: 'center',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: '10px',
+                              boxShadow: '0 4px 16px rgba(34, 197, 94, 0.06)',
+                              margin: '6px 0'
+                            }}>
+                              <div style={{
+                                width: '46px',
+                                height: '46px',
+                                borderRadius: '16px',
+                                background: 'linear-gradient(135deg, #facc15 0%, #eab308 50%, #ca8a04 100%)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: '0 4px 12px rgba(234, 179, 8, 0.3)',
+                                fontSize: '1.3rem'
+                              }}>
+                                🎶
+                              </div>
+                              <div>
+                                <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900, color: '#0f172a', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                  Wochenend-Pause!
+                                </h4>
+                                <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#475569', fontWeight: 600, lineHeight: 1.4 }}>
+                                  Heute ist kein Unterricht. Zeit für deine Lieblings-Songs &amp; neue Grooves!
+                                </p>
+                              </div>
+                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '4px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleTabChangeLocal && handleTabChangeLocal('practice_board')}
+                                  style={{
+                                    background: '#16a34a',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: '10px',
+                                    padding: '6px 14px',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)'
+                                  }}
+                                >
+                                  <span>🎧</span>
+                                  <span>Übe-Studio</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleTabChangeLocal && handleTabChangeLocal('homework_book')}
+                                  style={{
+                                    background: '#ffffff',
+                                    color: '#334155',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: '10px',
+                                    padding: '6px 12px',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 750,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '5px'
+                                  }}
+                                >
+                                  <span>📖</span>
+                                  <span>Hausaufgaben</span>
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        // Teen & Pro Level: Clean, high-end, calm
+                        return (
+                          <div style={{
+                            background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '18px',
+                            padding: '18px 16px',
+                            textAlign: 'center',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '8px',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                            margin: '6px 0'
+                          }}>
+                            <div style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              background: '#ede9fe',
+                              color: '#6d28d9',
+                              padding: '3px 10px',
+                              borderRadius: '100px',
+                              fontSize: '0.72rem',
+                              fontWeight: 800,
+                              letterSpacing: '0.04em',
+                              textTransform: 'uppercase'
+                            }}>
+                              <Sparkles size={11} color="#6d28d9" />
+                              <span>Unterrichtsfreies Wochenende</span>
+                            </div>
+                            <div style={{ fontSize: '0.84rem', color: '#334155', fontWeight: 650, marginTop: '2px' }}>
+                              Deine nächsten Stunden starten ab Montag.
+                            </div>
+                            <div style={{ fontSize: '0.76rem', color: '#64748b' }}>
+                              Nutze das freie Wochenende für deine Songs, Improvisation und Jam-Sessions.
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleTabChangeLocal && handleTabChangeLocal('practice_board')}
+                                style={{
+                                  background: '#ffffff',
+                                  color: '#0f172a',
+                                  border: '1px solid #cbd5e1',
+                                  borderRadius: '10px',
+                                  padding: '5px 12px',
+                                  fontSize: '0.76rem',
+                                  fontWeight: 750,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+                                }}
+                              >
+                                <Music size={13} color="#6d28d9" />
+                                <span>Zum Übe-Studio</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div style={{ fontSize: '0.8rem', color: '#64748b', textAlign: 'center', padding: '20px 0' }}>
+                          Heute keine Termine im Stundenplan.
+                        </div>
+                      );
                     }
                   })()}
                 </div>

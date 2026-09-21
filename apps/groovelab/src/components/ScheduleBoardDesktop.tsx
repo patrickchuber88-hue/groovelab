@@ -132,6 +132,29 @@ function InstrumentBadge({ instrument, color }: { instrument: string; color: str
   );
 }
 
+// 🏛️ Tier-1 L1-Cache Hydration: Sofortige 0ms-Sichtbarkeit des Stundenplaner-Entwurfs
+const readInitialTeacherDraftState = (teacherId: string) => {
+  if (typeof window === 'undefined' || !teacherId) return null;
+  try {
+    const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
+    const keys = [
+      `groovelab_teacher_draft_state_${activePlatform}_${teacherId}`,
+      `groovelab_teacher_draft_state_campus_${teacherId}`,
+      `groovelab_teacher_draft_state_groovelab_${teacherId}`
+    ];
+    for (const k of keys) {
+      const raw = localStorage.getItem(k);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.drafts) && parsed.drafts.length > 0) {
+          return parsed;
+        }
+      }
+    }
+  } catch (e) {}
+  return null;
+};
+
 export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
   const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
 
@@ -199,9 +222,17 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
       });
     });
   };
-  const [boards, setBoards] = useState<DayBoard[]>([]);
+  const initialDraftState = useMemo(() => readInitialTeacherDraftState(userId), [userId]);
+  const [boards, setBoards] = useState<DayBoard[]>(() => {
+    if (initialDraftState?.drafts) {
+      const activeId = initialDraftState.activeDraftId || 'default';
+      const target = initialDraftState.drafts.find((d: any) => d.id === activeId) || initialDraftState.drafts[0];
+      if (target?.boards) return target.boards;
+    }
+    return [];
+  });
   const [undoStack, setUndoStack] = useState<{ boards: DayBoard[]; students: Student[] }[]>([]);
-  const [drafts, setDrafts] = useState<{ id: string; name: string; boards: DayBoard[] }[]>([]);
+  const [drafts, setDrafts] = useState<{ id: string; name: string; boards: DayBoard[] }[]>(() => initialDraftState?.drafts || []);
   const draftsRef = useRef<{ id: string; name: string; boards: DayBoard[] }[]>([]);
   draftsRef.current = drafts;
 
@@ -223,15 +254,16 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
     setStudents(lastSnapshot.students);
     setToast({ message: 'Änderung rückgängig gemacht', type: 'success' });
   };
-  const [activeDraftId, setActiveDraftId] = useState<string>('default');
+  const [activeDraftId, setActiveDraftId] = useState<string>(() => initialDraftState?.activeDraftId || 'default');
   const activeDraftIdRef = useRef<string>('default');
   activeDraftIdRef.current = activeDraftId;
-  const [submittedDraftId, setSubmittedDraftId] = useState<string>('');
+  const [submittedDraftId, setSubmittedDraftId] = useState<string>(() => initialDraftState?.submittedDraftId || '');
   const lastSavedStateRef = useRef<string>('');
   const [students, setStudents] = useState<Student[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(() => !initialDraftState);
   const [submitting, setSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [showCelebration, setShowCelebration] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarTab, setSidebarTab] = useState<'all' | 'unassigned' | 'assigned'>('unassigned');
@@ -374,6 +406,19 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
     duration: number;
   }
   const [editingBreak, setEditingBreak] = useState<{ boardId: string; breakId: string; startTime?: string; duration: number } | null>(null);
+
+  // 🍏 Apple HIG Edge-Resize State for Breaks (Direktes Kanten-Ziehen & Stauchen)
+  interface ResizingBreakState {
+    boardId: string;
+    breakId: string;
+    initialDuration: number;
+    startY: number;
+    currentDuration: number;
+  }
+  const [resizingBreak, setResizingBreak] = useState<ResizingBreakState | null>(null);
+  const resizingBreakRef = useRef<ResizingBreakState | null>(null);
+  resizingBreakRef.current = resizingBreak;
+
   const [editingTimeStudent, setEditingTimeStudent] = useState<{ boardId: string; studentId: string; currentTime: string } | null>(null);
   const [selectedSlotsStudent, setSelectedSlotsStudent] = useState<Student | null>(null);
   const [showAutoScheduleReportModal, setShowAutoScheduleReportModal] = useState(false);
@@ -401,6 +446,8 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
   const [hasSubmittedSchedule, setHasSubmittedSchedule] = useState(false);
   const [submittedBoardsSnapshot, setSubmittedBoardsSnapshot] = useState<string | null>(null);
   const [lastSubmittedTime, setLastSubmittedTime] = useState<string | null>(null);
+  const [submittedAtIso, setSubmittedAtIso] = useState<string>('');
+  const submittedAtIsoRef = useRef<string>('');
   const [scheduleStatus, setScheduleStatus] = useState<'none' | 'pending' | 'approved' | 'needs_revision'>('none');
   const [rejectionNote, setRejectionNote] = useState<string | null>(null);
   const [showRejectModal, setShowRejectModal] = useState<boolean>(false);
@@ -444,9 +491,22 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
   // Dynamic Theme calculations
   const activePlatformStored = typeof localStorage !== 'undefined' ? localStorage.getItem('groovelab_active_platform') : 'campus';
   const isGroovelab = activePlatformStored === 'groovelab';
-  const isTeacher = currentUserRole === 'teacher' || (!currentUserRole && typeof localStorage !== 'undefined' && localStorage.getItem('user_role') === 'teacher');
+
+  // 🏛️ Herrenberg-Goldstandard & Dual-Role Guard:
+  // Bestimme den aktiven Arbeitsbereich. Befindet sich der Benutzer im Bereich 'teacher' (Campus Lehrkraft),
+  // agiert er IMMER und AUSNAHMSLOS in der didaktischen Lehrkraft-Rolle (didaktische Termin- & Schülerplanung ohne Raumauswahl).
+  // Raumzuweisung und Genehmigung/Ablehnung sind physikalisch auf den Bereich 'secretary' (Schulverwaltung) beschränkt.
+  const activeWorkspace = typeof window !== 'undefined'
+    ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace') || '')
+    : '';
+  const isSecretaryWorkspace = activeWorkspace === 'secretary' || (
+    (currentUserRole === 'admin' || currentUserRole === 'secretary') &&
+    activeWorkspace !== 'teacher' &&
+    activePlatformStored === 'admin'
+  );
+  const isTeacher = !isSecretaryWorkspace;
   const isCampus = !isGroovelab;
-  const isAdminView = (currentUserRole === 'admin' || currentUserRole === 'secretary') && !isTeacher && activePlatformStored !== 'campus';
+  const isAdminView = isSecretaryWorkspace;
 
   let brandColor = '#34a853'; // Campus Green by default
   let lightBg = 'rgba(52, 168, 83, 0.06)';
@@ -704,18 +764,42 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         }))
       }));
 
+      // Guard against race conditions during an active submission
+      if (isSubmittingRef.current) {
+        return;
+      }
+
       // Update our drafts list for the active draft ID using draftsRef to prevent circular cascades
       const currentDraftsList = draftsRef.current.length > 0 ? draftsRef.current : drafts;
+      const effectiveSubmittedAt = submittedAtIsoRef.current || submittedAtIso || ((currentDraftsList.find(d => d.id === submittedDraftId) as any)?.submittedAt) || null;
+
       const updatedDrafts = currentDraftsList.map(d => {
         if (d.id === activeDraftId) {
-          return { ...d, boards: boardDefinitions };
+          // Invariant: Never downgrade 'ready_for_admin_review' back to 'approved' or unsubmitted during autosave
+          const preservedStatus = (d as any).status === 'ready_for_admin_review' || (d.id === submittedDraftId && scheduleStatus === 'pending')
+            ? 'ready_for_admin_review'
+            : (d as any).status;
+          const preservedSubmittedAt = (d as any).submittedAt || (d.id === submittedDraftId ? effectiveSubmittedAt : null);
+
+          // 🛡️ Fail-Safe: If boardDefinitions has 0 students but d.boards previously had students, DO NOT wipe out!
+          const newStudentCount = boardDefinitions.reduce((acc, b) => acc + (b.students || []).filter(s => !s.isBreak).length, 0);
+          const oldStudentCount = (d.boards || []).reduce((acc, b) => acc + (b.students || []).filter((s: any) => !s.isBreak).length, 0);
+          const effectiveBoards = (newStudentCount === 0 && oldStudentCount > 0) ? d.boards : boardDefinitions;
+
+          return { 
+            ...d, 
+            status: preservedStatus,
+            submittedAt: preservedSubmittedAt,
+            boards: effectiveBoards 
+          };
         }
         return d;
       });
 
       const draftStateToSave = {
         activeDraftId,
-        submittedDraftId,
+        submittedDraftId: submittedDraftId || '',
+        submittedAt: submittedDraftId ? effectiveSubmittedAt : null,
         drafts: updatedDrafts
       };
 
@@ -738,6 +822,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
 
       // Debounce Supabase write (1000ms delay)
       const handler = setTimeout(() => {
+        if (isSubmittingRef.current) return;
         supabase
           .from('users')
           .update({
@@ -1052,7 +1137,9 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
 
   const loadInitialData = async () => {
     try {
-      setLoading(true);
+      if (!draftsRef.current || draftsRef.current.length === 0) {
+        setLoading(true);
+      }
       const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
       const isCampus = activePlatform === 'campus';
       const columnName = isCampus ? 'campus_räume' : 'groovelab_räume';
@@ -1265,6 +1352,33 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
             ? rawPlannedEarly.allTeacherStudentIds
             : (Array.isArray(rawPlannedEarly?.unassignedStudentIds) ? rawPlannedEarly.unassignedStudentIds : [])
         );
+
+        // 🛡️ Enterprise+ Goldstandard: Harvest all student IDs embedded in stored drafts and boards
+        if (rawPlannedEarly?.drafts && Array.isArray(rawPlannedEarly.drafts)) {
+          rawPlannedEarly.drafts.forEach((d: any) => {
+            (d.boards || []).forEach((b: any) => {
+              (b.students || []).forEach((st: any) => {
+                if (st?.id && !st.id.startsWith('break-')) savedTeacherStudentIds.add(st.id);
+                if (Array.isArray(st?.groupStudents)) {
+                  st.groupStudents.forEach((gs: any) => {
+                    if (gs?.id) savedTeacherStudentIds.add(gs.id);
+                  });
+                }
+              });
+            });
+          });
+        } else if (Array.isArray(rawPlannedEarly)) {
+          rawPlannedEarly.forEach((b: any) => {
+            (b.students || []).forEach((st: any) => {
+              if (st?.id && !st.id.startsWith('break-')) savedTeacherStudentIds.add(st.id);
+              if (Array.isArray(st?.groupStudents)) {
+                st.groupStudents.forEach((gs: any) => {
+                  if (gs?.id) savedTeacherStudentIds.add(gs.id);
+                });
+              }
+            });
+          });
+        }
 
         const teacherAssignedStudentIds = new Set([...schedStudentIds, ...occStudentIds, ...groupStudentIds]);
 
@@ -1534,7 +1648,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         } catch (e) {}
       }
 
-      // FAIL-SAFE MERGE: Never drop any locally created drafts
+      // FAIL-SAFE MERGE: Never drop any locally created drafts, but strictly deduplicate by ID and Name
       if (localParsedDrafts.length > 0) {
         if (loadedDrafts.length === 0) {
           loadedDrafts = localParsedDrafts;
@@ -1543,14 +1657,44 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
           if (localSubmittedAt) loadedSubmittedAt = localSubmittedAt;
         } else {
           const dbDraftIdSet = new Set(loadedDrafts.map(d => d.id));
+          const dbDraftNameSet = new Set(loadedDrafts.map(d => (d.name || '').trim().toLowerCase()));
+
           for (const ld of localParsedDrafts) {
-            if (!dbDraftIdSet.has(ld.id)) {
+            const ldName = (ld.name || '').trim().toLowerCase();
+            const existingById = loadedDrafts.find(d => d.id === ld.id);
+            const existingByName = !existingById && (ldName === 'entwurf 1' || ldName === 'standard-entwurf')
+              ? loadedDrafts.find(d => (d.name || '').trim().toLowerCase() === 'entwurf 1' || (d.name || '').trim().toLowerCase() === 'standard-entwurf')
+              : null;
+
+            const existing = existingById || existingByName;
+
+            if (existing) {
+              // Deduplication match: merge boards if existing is empty and local has students
+              const existingStudentCount = (existing.boards || []).reduce((acc: number, b: any) => acc + (b.students || []).filter((s: any) => !s.isBreak).length, 0);
+              const localStudentCount = (ld.boards || []).reduce((acc: number, b: any) => acc + (b.students || []).filter((s: any) => !s.isBreak).length, 0);
+
+              if (existingStudentCount === 0 && localStudentCount > 0) {
+                existing.boards = ld.boards;
+              }
+            } else if (!dbDraftIdSet.has(ld.id) && !dbDraftNameSet.has(ldName)) {
+              // Genuinely distinct local draft
               loadedDrafts.push(ld);
+              dbDraftIdSet.add(ld.id);
+              dbDraftNameSet.add(ldName);
             }
           }
-          if (localActiveDraftId && loadedDrafts.some(d => d.id === localActiveDraftId)) {
+
+          // Active draft precedence: A draft with populated students must ALWAYS take precedence over an empty draft
+          const activeCandidate = loadedDrafts.find(d => d.id === localActiveDraftId);
+          const activeCandidateCount = activeCandidate ? (activeCandidate.boards || []).reduce((acc: number, b: any) => acc + (b.students || []).filter((s: any) => !s.isBreak).length, 0) : 0;
+          const bestPopulatedDraft = loadedDrafts.find(d => (d.boards || []).some((b: any) => (b.students || []).some((s: any) => !s.isBreak)));
+
+          if (activeCandidate && (activeCandidateCount > 0 || !bestPopulatedDraft)) {
             loadedActiveDraftId = localActiveDraftId;
+          } else if (bestPopulatedDraft) {
+            loadedActiveDraftId = bestPopulatedDraft.id;
           }
+
           if (localSubmittedDraftId) {
             loadedSubmittedDraftId = localSubmittedDraftId;
           }
@@ -1593,7 +1737,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         return undefined;
       };
 
-      // Rename legacy 'Standard-Entwurf' to 'Entwurf 1' and filter out any students not explicitly assigned to this teacher (eliminating orphan drafts)
+      // Rename legacy 'Standard-Entwurf' to 'Entwurf 1' and preserve all students with Zero-Drop Fail-Safe
       loadedDrafts = loadedDrafts.map(d => ({
         ...d,
         name: d.name === 'Standard-Entwurf' ? 'Entwurf 1' : d.name,
@@ -1615,9 +1759,17 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                       instrument: resolved.instrument || gs.instrument,
                       duration: resolved.duration || gs.duration
                     });
+                  } else {
+                    validMembers.push({
+                      ...gs,
+                      first_name: gs.first_name || 'Schüler',
+                      last_name: gs.last_name || '',
+                      instrument: gs.instrument || 'Musiker',
+                      duration: gs.duration || 30
+                    });
                   }
                 });
-                if (validMembers.length === 0) return null;
+                if (validMembers.length === 0) return s;
                 if (validMembers.length === 1) {
                   const m = validMembers[0];
                   return {
@@ -1637,7 +1789,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                   groupStudents: validMembers
                 };
               }
-              return null;
+              return s;
             }
             const resolved = resolveStudentFromDraft(s);
             if (resolved) {
@@ -1650,7 +1802,14 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                 duration: resolved.duration || s.duration
               };
             }
-            return null;
+            // 🛡️ Fail-Safe Preservation: NEVER drop a student from a teacher's draft!
+            return {
+              ...s,
+              first_name: s.first_name || 'Schüler',
+              last_name: s.last_name || '',
+              instrument: s.instrument || 'Musiker',
+              duration: s.duration || 30
+            };
           }).filter(Boolean) as Student[]
         }))
       }));
@@ -1721,6 +1880,8 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         let submissionDate: Date | null = null;
         if (loadedSubmittedAt) {
           submissionDate = new Date(loadedSubmittedAt);
+          setSubmittedAtIso(loadedSubmittedAt);
+          submittedAtIsoRef.current = loadedSubmittedAt;
         } else {
           // Find the latest created_at in schedData
           const dates = schedData.map(s => s.created_at ? new Date(s.created_at).getTime() : 0).filter(t => t > 0);
@@ -1755,6 +1916,8 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
             setScheduleStatus('pending');
           }
           if (loadedSubmittedAt) {
+            setSubmittedAtIso(loadedSubmittedAt);
+            submittedAtIsoRef.current = loadedSubmittedAt;
             const submissionDate = new Date(loadedSubmittedAt);
             if (!isNaN(submissionDate.getTime())) {
               const rawDate = submissionDate.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
@@ -2016,7 +2179,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
               dayOfWeek: i,
               startAnchor: dayConfig?.start || '14:00',
               availabilityEnd: dayConfig?.end || '19:00',
-              roomId: defaultRoomId,
+              roomId: isTeacher ? undefined : defaultRoomId,
               students: []
             });
           }
@@ -2030,7 +2193,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
               id: `board-${crypto.randomUUID()}`,
               dayOfWeek: i,
               startAnchor: '14:00',
-              roomId: defaultRoomId,
+              roomId: isTeacher ? undefined : defaultRoomId,
               students: []
             });
           }
@@ -2044,8 +2207,10 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
       reconstructedBoards = reconstructedBoards.map(b => recalculateBoardTimes(b));
 
       // Guarantee that all drafts in loadedDrafts (especially Entwurf 1) have valid day boards assigned
+      const reconstructedStudentCount = reconstructedBoards.reduce((acc, b) => acc + (b.students || []).filter(s => !s.isBreak).length, 0);
       loadedDrafts = loadedDrafts.map(d => {
-        if (!d.boards || d.boards.length === 0 || d.id === loadedActiveDraftId) {
+        const dStudentCount = (d.boards || []).reduce((acc, b) => acc + (b.students || []).filter(s => !s.isBreak).length, 0);
+        if (!d.boards || d.boards.length === 0 || (d.id === loadedActiveDraftId && (reconstructedStudentCount > 0 || dStudentCount === 0))) {
           return { ...d, boards: reconstructedBoards };
         }
         return d;
@@ -2313,6 +2478,59 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
   // Directly assign or reassign a room to a day board (used by secretariat and admin)
   const handleAssignBoardRoom = (boardId: string, newRoomId: string) => {
     setBoards(prev => prev.map(b => b.id === boardId ? { ...b, roomId: newRoomId || undefined } : b));
+  };
+
+  // 🏛️ Herrenberg-Goldstandard: Intelligente Raum-Kollisionsprüfung für das Schulsekretariat
+  const getRoomCollisionInfo = (roomId: string, board: DayBoard): string | null => {
+    if (!roomId) return null;
+    const boardStudents = (board.students || []).filter(s => !s.isBreak && s.assignedTime);
+    let startMin = 24 * 60;
+    let endMin = 0;
+    if (boardStudents.length > 0) {
+      boardStudents.forEach(s => {
+        const [sh, sm] = parseTime(s.assignedTime);
+        const sStart = sh * 60 + sm;
+        const sEnd = sStart + (s.duration || 30);
+        if (sStart < startMin) startMin = sStart;
+        if (sEnd > endMin) endMin = sEnd;
+      });
+    } else if (board.startAnchor) {
+      const [sh, sm] = parseTime(board.startAnchor);
+      startMin = sh * 60 + sm;
+      endMin = startMin + 60;
+    }
+    if (startMin >= endMin) return null;
+
+    // 1. Check against weekly blocked room slots
+    const matchedBlocked = (blockedSlots || []).find((b: any) => {
+      if (b.room_id !== roomId) return false;
+      if (Number(b.day_of_week) !== Number(board.dayOfWeek)) return false;
+      const [bsh, bsm] = parseTime(b.start_time ? b.start_time.substring(0, 5) : '00:00');
+      const bStart = bsh * 60 + bsm;
+      const [beh, bem] = parseTime(b.end_time ? b.end_time.substring(0, 5) : '23:59');
+      const bEnd = beh * 60 + bem;
+      return startMin < bEnd && endMin > bStart;
+    });
+    if (matchedBlocked) {
+      return matchedBlocked.title ? `Gesperrt: ${matchedBlocked.title}` : 'Gesperrt';
+    }
+
+    // 2. Check against other teachers schedules
+    const matchedOther = (otherTeachersSchedules || []).find((s: any) => {
+      if (s.room_id !== roomId) return false;
+      if (s.teacher_id === selectedTeacherId) return false;
+      if (Number(s.day_of_week) !== Number(board.dayOfWeek)) return false;
+      const [tsh, tsm] = parseTime(s.time_slot ? s.time_slot.substring(0, 5) : '00:00');
+      const tStart = tsh * 60 + tsm;
+      const tEnd = tStart + (s.duration || 45);
+      return startMin < tEnd && endMin > tStart;
+    });
+    if (matchedOther) {
+      const tName = formatTeacherFullName(matchedOther.teacher || teachers.find(t => t.id === matchedOther.teacher_id));
+      return `Belegt (${tName !== 'Lehrkraft' ? tName : 'Andere Lehrkraft'})`;
+    }
+
+    return null;
   };
 
   // Add a break/pause to a day board
@@ -2744,11 +2962,13 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
       const draftStateToSave = {
         activeDraftId: currentActiveId,
         submittedDraftId: submittedDraftId || '',
-        submittedAt: submittedDraftId ? (lastSubmittedTime || '') : '',
+        submittedAt: submittedDraftId ? (submittedAtIsoRef.current || submittedAtIso || (lastSubmittedTime ? new Date().toISOString() : '')) : null,
         drafts: updatedDrafts,
         allTeacherStudentIds,
         unassignedStudentIds
       };
+
+      lastSavedStateRef.current = JSON.stringify(draftStateToSave);
 
       // 1. Immediate local storage persistence
       localStorage.setItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, JSON.stringify(draftStateToSave));
@@ -3276,6 +3496,15 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         if (draggedStudentId) handleDragEnd();
         if (quickActionStudentId) setQuickActionStudentId(null);
         if (swapPartnerPendingId) setSwapPartnerPendingId(null);
+        if (resizingBreakRef.current) {
+          const bState = resizingBreakRef.current;
+          setBoards(prev => prev.map(b => {
+            if (b.id !== bState.boardId) return b;
+            const nextStudents = b.students.map(s => s.id === bState.breakId ? { ...s, duration: bState.initialDuration } : s);
+            return recalculateBoardTimes({ ...b, students: nextStudents });
+          }));
+          setResizingBreak(null);
+        }
       }
     };
     const handleClickOutside = (e: MouseEvent) => {
@@ -3283,13 +3512,22 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         setQuickActionStudentId(null);
       }
     };
+    const handlePointerUpOrCancel = () => {
+      if (resizingBreakRef.current) {
+        setResizingBreak(null);
+      }
+    };
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('click', handleClickOutside);
+    window.addEventListener('pointerup', handlePointerUpOrCancel);
+    window.addEventListener('pointercancel', handlePointerUpOrCancel);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('click', handleClickOutside);
+      window.removeEventListener('pointerup', handlePointerUpOrCancel);
+      window.removeEventListener('pointercancel', handlePointerUpOrCancel);
     };
-  }, [draggedStudentId, quickActionStudentId, swapPartnerPendingId]);
+  }, [draggedStudentId, quickActionStudentId, swapPartnerPendingId, resizingBreak]);
 
   // Drag over handler to allow dropping
   const handleDragOver = (e: React.DragEvent) => {
@@ -4802,10 +5040,14 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
 
     try {
       setSubmitting(true);
+      isSubmittingRef.current = true;
       const validBoards = boards.filter(b => b.students.length > 0);
       const currentActiveId = activeDraftIdRef.current || activeDraftId;
       
       const now = new Date();
+      const nowIso = now.toISOString();
+      setSubmittedAtIso(nowIso);
+      submittedAtIsoRef.current = nowIso;
       const formattedDate = now.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
       const formattedTime = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
       const submitTimeString = `am ${formattedDate} um ${formattedTime} Uhr`;
@@ -4873,7 +5115,9 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
       };
 
       const activePlatform = localStorage.getItem('groovelab_active_platform') || 'groovelab';
-      localStorage.setItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, JSON.stringify(draftStateToSave));
+      const payloadToSaveStr = JSON.stringify(draftStateToSave);
+      lastSavedStateRef.current = payloadToSaveStr;
+      localStorage.setItem(`groovelab_teacher_draft_state_${activePlatform}_${selectedTeacherId}`, payloadToSaveStr);
 
       await supabase
         .from('users')
@@ -4916,6 +5160,9 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
       await showAlert('Fehler beim Einreichen: ' + err.message);
     } finally {
       setSubmitting(false);
+      setTimeout(() => {
+        isSubmittingRef.current = false;
+      }, 1500);
     }
   };
 
@@ -4947,37 +5194,37 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
       setSubmitting(true);
       const now = new Date();
       const currentActiveId = activeDraftIdRef.current || activeDraftId;
+      const cleanTeacherId = selectedTeacherId ? selectedTeacherId.replace(/^teacher-/i, '') : '';
 
       // 1. Prepare clean slots to insert/update in schedules table
       const slotsToInsert: any[] = [];
       validBoards.forEach(b => {
+        const cleanRoomId = isUUID(b.roomId) ? b.roomId : null;
         b.students.forEach(s => {
           if (s.isBreak || !s.assignedTime) return;
           if (s.isGroup && s.groupStudents && s.groupStudents.length > 0) {
             s.groupStudents.forEach(gs => {
               slotsToInsert.push({
                 school_id: schoolId,
-                teacher_id: selectedTeacherId,
-                student_id: gs.id,
+                teacher_id: cleanTeacherId,
+                student_id: isUUID(gs.id) ? gs.id : null,
                 day_of_week: b.dayOfWeek,
                 time_slot: s.assignedTime,
-                room_id: b.roomId,
+                room_id: cleanRoomId,
                 duration: s.duration || 30,
-                status: 'approved',
-                instrument: gs.instrument || s.instrument || 'Instrument'
+                status: 'approved'
               });
             });
           } else if (s.id && !s.id.startsWith('group-') && !s.id.startsWith('break-')) {
             slotsToInsert.push({
               school_id: schoolId,
-              teacher_id: selectedTeacherId,
-              student_id: s.id,
+              teacher_id: cleanTeacherId,
+              student_id: isUUID(s.id) ? s.id : null,
               day_of_week: b.dayOfWeek,
               time_slot: s.assignedTime,
-              room_id: b.roomId,
+              room_id: cleanRoomId,
               duration: s.duration || 30,
-              status: 'approved',
-              instrument: s.instrument || 'Instrument'
+              status: 'approved'
             });
           }
         });
@@ -4988,7 +5235,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
         .from('schedules')
         .delete()
         .eq('school_id', schoolId)
-        .eq('teacher_id', selectedTeacherId);
+        .eq('teacher_id', cleanTeacherId);
 
       // Insert new approved schedules
       if (slotsToInsert.length > 0) {
@@ -5023,15 +5270,118 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
           campus_räume: draftStateToSave,
           groovelab_räume: draftStateToSave
         })
-        .eq('id', selectedTeacherId);
+        .eq('id', cleanTeacherId);
+
+      // Resolve pending submission alerts for Teacher
+      await supabase
+        .from('system_alerts')
+        .update({ resolved: true })
+        .eq('school_id', schoolId)
+        .eq('teacher_id', cleanTeacherId)
+        .in('type', ['Stundenplan Freigabe', 'schedule_submission']);
 
       // System Alert / Notification for Teacher
       await supabase.from('system_alerts').insert({
         school_id: schoolId,
-        teacher_id: selectedTeacherId,
+        teacher_id: cleanTeacherId,
         type: 'Stundenplan Genehmigt',
         message: `Stundenplan genehmigt: Das Schulsekretariat hat deinen Stundenplan verbindlich freigegeben und live geschaltet (${totalStudents} Schüler eingeteilt).`
       });
+
+      // Generate schedule_occurrences for this teacher until end of school year
+      const today = new Date();
+      const y = today.getFullYear();
+      const m = String(today.getMonth() + 1).padStart(2, '0');
+      const d = String(today.getDate()).padStart(2, '0');
+      const todayStr = `${y}-${m}-${d}`;
+      const schoolStartYear = today.getMonth() >= 8 ? today.getFullYear() : today.getFullYear() - 1;
+      const schoolYearEnd = new Date(`${schoolStartYear + 1}-08-31T23:59:59`);
+
+      const { data: dbTeacherSchedules } = await supabase
+        .from('schedules')
+        .select('*')
+        .eq('school_id', schoolId)
+        .eq('teacher_id', cleanTeacherId)
+        .eq('status', 'approved');
+
+      if (dbTeacherSchedules && dbTeacherSchedules.length > 0) {
+        const occurrences: any[] = [];
+        dbTeacherSchedules.forEach((sch: any) => {
+          const { id: scheduleId, student_id, day_of_week, time_slot, duration } = sch;
+          if (!student_id || !day_of_week || !time_slot) return;
+          const dayNum = typeof day_of_week === 'number' ? day_of_week : (parseInt(day_of_week, 10) || 1);
+
+          const current = new Date(today);
+          current.setHours(0, 0, 0, 0);
+          const currentDay = current.getDay() || 7;
+          const diff = dayNum - currentDay;
+          const targetDate = new Date(current);
+          targetDate.setDate(current.getDate() + diff);
+
+          const todayZero = new Date(today);
+          todayZero.setHours(0, 0, 0, 0);
+          if (targetDate < todayZero) {
+            targetDate.setDate(targetDate.getDate() + 7);
+          }
+
+          while (targetDate <= schoolYearEnd) {
+            const ty = targetDate.getFullYear();
+            const tm = String(targetDate.getMonth() + 1).padStart(2, '0');
+            const td = String(targetDate.getDate()).padStart(2, '0');
+            const dateStr = `${ty}-${tm}-${td}`;
+            const startTime = time_slot.includes(':') && time_slot.split(':').length === 2 ? time_slot + ':00' : time_slot;
+            occurrences.push({
+              school_id: schoolId,
+              schedule_id: scheduleId,
+              template_room_id: sch.room_id || null,
+              student_id,
+              teacher_id: cleanTeacherId,
+              date: dateStr,
+              start_time: startTime,
+              duration: duration || 45,
+              status: 'scheduled'
+            });
+            targetDate.setDate(targetDate.getDate() + 7);
+          }
+        });
+
+        await supabase
+          .from('schedule_occurrences')
+          .delete()
+          .eq('teacher_id', cleanTeacherId)
+          .gte('date', todayStr);
+
+        if (occurrences.length > 0) {
+          const chunkSize = 250;
+          for (let i = 0; i < occurrences.length; i += chunkSize) {
+            const chunk = occurrences.slice(i, i + chunkSize);
+            await supabase.from('schedule_occurrences').insert(chunk);
+          }
+        }
+      }
+
+      // 🛡️ Enterprise+ Revisionssicheres Audit-Logging (OWASP ASVS / DSGVO Art. 30)
+      try {
+        await supabase.from('audit_logs').insert([{
+          school_id: schoolId,
+          table_name: 'schedules',
+          action: 'SCHEDULES_APPROVED',
+          record_id: isUUID(cleanTeacherId) ? cleanTeacherId : null,
+          actor_id: isUUID(userId) ? userId : null,
+          user_id: isUUID(userId) ? userId : null,
+          changed_by: isUUID(userId) ? userId : null,
+          details: {
+            action_type: 'SCHEDULES_APPROVED',
+            teacher_id: cleanTeacherId,
+            teacher_name: teacherName,
+            slots_count: slotsToInsert.length,
+            approved_at: now.toISOString(),
+            approved_by: userId || 'Schulleitung'
+          }
+        }]);
+      } catch (auditErr) {
+        console.warn('[ScheduleBoardDesktop] Audit logging notice:', auditErr);
+      }
 
       setScheduleStatus('approved');
       setToast({ message: `Stundenplan für ${teacherName} erfolgreich genehmigt & live geschaltet!`, type: 'success' });
@@ -5054,6 +5404,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
       setSubmitting(true);
       const now = new Date();
       const currentActiveId = activeDraftIdRef.current || activeDraftId;
+      const cleanTeacherId = selectedTeacherId ? selectedTeacherId.replace(/^teacher-/i, '') : '';
 
       const updatedDrafts = drafts.map(d => {
         if (d.id === currentActiveId) {
@@ -5085,12 +5436,20 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
           campus_räume: draftStateToSave,
           groovelab_räume: draftStateToSave
         })
-        .eq('id', selectedTeacherId);
+        .eq('id', cleanTeacherId);
+
+      // Resolve pending submission alert
+      await supabase
+        .from('system_alerts')
+        .update({ resolved: true })
+        .eq('school_id', schoolId)
+        .eq('teacher_id', cleanTeacherId)
+        .in('type', ['Stundenplan Freigabe', 'schedule_submission']);
 
       // System Alert for Teacher
       await supabase.from('system_alerts').insert({
         school_id: schoolId,
-        teacher_id: selectedTeacherId,
+        teacher_id: cleanTeacherId,
         type: 'Stundenplan Klärungsbedarf',
         message: `Stundenplan abgelehnt: ${finalNote}`
       });
@@ -5152,7 +5511,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [students, boards, handleAutoAssign, handleResetAllAssignments]);
 
-  if (loading) {
+  if (loading && activeTab === 'designer') {
     return (
       <div className="flex h-[400px] items-center justify-center text-slate-400">
         <div className="flex flex-col items-center gap-3">
@@ -5180,7 +5539,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
   const assignedCount = students.filter(s => !!s.assignedDay).length;
   const allCount = students.length;
 
-  const showOnboardingOverlay = !isOnboardingCompleted && (currentUserRole === 'teacher') && (selectedTeacherId === userId);
+  const showOnboardingOverlay = !isOnboardingCompleted && !isSecretaryWorkspace && (selectedTeacherId === userId);
 
   let onboardingOverlayContent = null;
   if (showOnboardingOverlay) {
@@ -5567,7 +5926,14 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
               drafts.find(d => (d as any).status === 'ready_for_admin_review') ||
               drafts.find(d => d.id === activeDraftId) ||
               drafts[0];
-            return targetDraft?.boards || [];
+            const candidateBoards = targetDraft?.boards;
+            if (candidateBoards && candidateBoards.some(b => (b.students || []).length > 0)) {
+              return candidateBoards;
+            }
+            if (boards && boards.some(b => (b.students || []).length > 0)) {
+              return boards;
+            }
+            return candidateBoards || boards || [];
           })()} 
           activeTab={activeTab} 
           setActiveTab={setActiveTab} 
@@ -5721,7 +6087,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                     <span>Stundenplan-Designer</span>
                   </button>
                 </div>
-                {currentUserRole === 'teacher' && (
+                {!isSecretaryWorkspace && (
                   <TourStartButton onClick={startDesignerTour} platformTheme={localStorage.getItem('groovelab_active_platform') === 'campus' ? 'campus' : 'groovelab'} />
                 )}
               </div>
@@ -5729,7 +6095,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
               {/* Right: Didactic Purpose & Secretariat Approval Disclaimer Badge */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', minWidth: 0 }}>
                 <div 
-                  title="Didaktische Entwurfsplanung • Genehmigungsvorbehalt durch Schulsekretariat"
+                  title="Didaktische Terminplanung • Unverbindlicher Entwurf zur Raumprüfung & Freigabe durch Musikschule"
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -5751,7 +6117,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                 >
                   <Info size={12} color="currentColor" style={{ flexShrink: 0 }} />
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    Didaktische Entwurfsplanung • Genehmigungsvorbehalt durch Schulsekretariat
+                    Didaktische Terminplanung • Unverbindlicher Entwurf zur Raumprüfung & Freigabe durch Musikschule
                   </span>
                 </div>
               </div>
@@ -5767,7 +6133,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(0,0,0,0.03)', padding: '3px 10px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.04)', minHeight: '36px' }}>
                   <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
-                    {currentUserRole === 'teacher' ? 'Dein Designer' : 'Stundenplan-Designer'}
+                    {isSecretaryWorkspace ? 'Stundenplan-Designer (Verwaltung)' : 'Dein Designer'}
                   </span>
                 </div>
 
@@ -5821,7 +6187,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
 
                 <div style={{ width: '1px', height: '16px', background: 'rgba(0,0,0,0.1)', margin: '0 4px' }} />
 
-                {currentUserRole === 'teacher' && selectedTeacherId === userId ? (
+                {!isSecretaryWorkspace && selectedTeacherId === userId ? (
                   <button type="button" onClick={handleEditTeacherAvailability} className="apple-btn" title="Unterrichtszeiten & Wunschtage ändern">
                     <Clock size={13} />
                     <span>Zeiten ändern</span>
@@ -5960,7 +6326,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
 
               {/* Right: Status + Senden (Rollen-spezifisch) */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {(currentUserRole === 'admin' || currentUserRole === 'secretary') ? (
+                {isSecretaryWorkspace ? (
                   <>
                     {/* Status-Pill für Admin/Sekretariat */}
                     <div style={{ 
@@ -6432,6 +6798,53 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
             </div>
           </div>
 
+          {/* Teacher Review Pending Banner (ready_for_admin_review / pending) */}
+          {scheduleStatus === 'pending' && (
+            <div className="animation-slide-down" style={{
+              background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+              border: '1.5px solid #f59e0b',
+              borderRadius: '12px',
+              padding: '12px 16px',
+              fontSize: '0.82rem',
+              color: '#78350f',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              marginBottom: '8px',
+              boxShadow: '0 2px 10px rgba(245, 158, 11, 0.08)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Clock size={18} color="#d97706" style={{ flexShrink: 0 }} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <span style={{ fontWeight: 800, color: '#92400e' }}>
+                    Stundenplan zur Freigabe eingereicht {lastSubmittedTime ? `(${lastSubmittedTime})` : ''} · In Prüfung beim Schulsekretariat
+                  </span>
+                  <span style={{ fontSize: '0.76rem', color: '#b45309', fontWeight: 500 }}>
+                    Das Schulsekretariat prüft aktuell die Raumverteilung. Sobald die Freigabe erteilt ist, wird der Plan automatisch als Live-Plan aktiv.
+                  </span>
+                </div>
+              </div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'rgba(255, 255, 255, 0.8)',
+                border: '1px solid #fde68a',
+                padding: '4px 10px',
+                borderRadius: '8px',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                color: '#92400e',
+                whiteSpace: 'nowrap'
+              }}>
+                <Lock size={12} color="#d97706" />
+                <span>Schreibschutz aktiv</span>
+              </div>
+            </div>
+          )}
+
           {/* Teacher Revision Banner (needs_revision) */}
           {scheduleStatus === 'needs_revision' && (
             <div className="animation-slide-down" style={{
@@ -6494,7 +6907,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <AlertCircle size={15} color="#d97706" style={{ flexShrink: 0 }} />
-                <span>Du hast den Stundenplan angepasst. Klicke auf <strong>"Abstimmen & Freigeben"</strong>, um deinen Terminvorschlag zur Freigabe zu übermitteln.</span>
+                <span>Du hast den Stundenplan angepasst. Klicke auf <strong>"Stundenplan zur Freigabe einreichen"</strong>, um deinen Terminvorschlag an das Schulsekretariat zu übermitteln.</span>
               </div>
             </div>
           )}
@@ -6959,47 +7372,70 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                           <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#86868b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Unterrichtstag</div>
                           <div style={{ fontSize: '1rem', fontWeight: 800, color: '#1d1d1f' }}>{dayLabel} ({board.students.filter(s => !s.isBreak).length})</div>
                           
-                          {/* 🏛️ Raum-Zuweisung: Für Sekretariat/Admin direkt editierbar als Dropdown, für Lehrkraft als informative Anzeige */}
-                          {(currentUserRole === 'admin' || currentUserRole === 'secretary') ? (
+                          {/* 🏛️ Raum-Zuweisung: Für Sekretariat/Admin direkt editierbar als Dropdown mit intelligenter Kollisionserkennung, für Lehrkraft als 3-Stufen-Herrenberg-Anzeige */}
+                          {isSecretaryWorkspace ? (
                             <div 
                               onClick={(e) => e.stopPropagation()} 
-                              style={{ marginTop: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                              style={{ marginTop: '5px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}
                             >
-                              <MapPin size={11} color={board.roomId ? '#16a34a' : '#ea580c'} style={{ flexShrink: 0 }} />
-                              <select
-                                value={board.roomId || ''}
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  handleAssignBoardRoom(board.id, e.target.value);
-                                }}
-                                aria-label={`Raum für ${dayLabel} zuweisen`}
-                                style={{
-                                  fontSize: '0.7rem',
-                                  fontWeight: 700,
-                                  padding: '2px 6px',
-                                  borderRadius: '6px',
-                                  border: board.roomId ? '1px solid #bbf7d0' : '1.5px solid #fdba74',
-                                  background: board.roomId ? '#f0fdf4' : '#fff7ed',
-                                  color: board.roomId ? '#15803d' : '#c2410c',
-                                  cursor: 'pointer',
-                                  outline: 'none',
-                                  maxWidth: '130px',
-                                  textOverflow: 'ellipsis'
-                                }}
-                              >
-                                <option value="">-- Kein Raum --</option>
-                                {rooms.map(r => (
-                                  <option key={r.id} value={r.id}>
-                                    {r.name}
-                                  </option>
-                                ))}
-                              </select>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                                <MapPin size={11} color={board.roomId ? (getRoomCollisionInfo(board.roomId, board) ? '#dc2626' : '#16a34a') : '#ea580c'} style={{ flexShrink: 0 }} />
+                                <select
+                                  value={board.roomId || ''}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    handleAssignBoardRoom(board.id, e.target.value);
+                                  }}
+                                  aria-label={`Raum für ${dayLabel} zuweisen`}
+                                  style={{
+                                    fontSize: '0.7rem',
+                                    fontWeight: 700,
+                                    padding: '2px 6px',
+                                    borderRadius: '6px',
+                                    border: board.roomId 
+                                      ? (getRoomCollisionInfo(board.roomId, board) ? '1.5px solid #fca5a5' : '1px solid #bbf7d0') 
+                                      : '1.5px solid #fdba74',
+                                    background: board.roomId 
+                                      ? (getRoomCollisionInfo(board.roomId, board) ? '#fef2f2' : '#f0fdf4') 
+                                      : '#fff7ed',
+                                    color: board.roomId 
+                                      ? (getRoomCollisionInfo(board.roomId, board) ? '#b91c1c' : '#15803d') 
+                                      : '#c2410c',
+                                    cursor: 'pointer',
+                                    outline: 'none',
+                                    maxWidth: '140px',
+                                    textOverflow: 'ellipsis'
+                                  }}
+                                >
+                                  <option value="">-- Raum zuweisen --</option>
+                                  {rooms.map(r => {
+                                    const colInfo = getRoomCollisionInfo(r.id, board);
+                                    return (
+                                      <option key={r.id} value={r.id}>
+                                        {r.name} {colInfo ? `⚠️ (${colInfo})` : '✓ (Frei)'}
+                                      </option>
+                                    );
+                                  })}
+                                </select>
+                              </div>
+                              {board.roomId && getRoomCollisionInfo(board.roomId, board) && (
+                                <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#b91c1c', textAlign: 'center', maxWidth: '140px', lineHeight: 1.1 }}>
+                                  ⚠️ {getRoomCollisionInfo(board.roomId, board)}
+                                </span>
+                              )}
                             </div>
                           ) : (
-                            <div style={{ marginTop: '4px', fontSize: '0.68rem', fontWeight: 600, color: board.roomId ? '#15803d' : '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                              <MapPin size={10} color={board.roomId ? '#16a34a' : '#94a3b8'} style={{ flexShrink: 0 }} />
-                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '120px' }}>
-                                {rooms.find(r => r.id === board.roomId)?.name || 'Kein Raum festgelegt'}
+                            <div style={{ marginTop: '4px', fontSize: '0.68rem', fontWeight: 600, color: (scheduleStatus === 'approved' && board.roomId) ? '#15803d' : '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                              <MapPin size={10} color={(scheduleStatus === 'approved' && board.roomId) ? '#16a34a' : '#94a3b8'} style={{ flexShrink: 0 }} />
+                              <span 
+                                style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }} 
+                                title={(scheduleStatus === 'approved' && board.roomId) 
+                                  ? `Zugewiesener Raum: ${rooms.find(r => r.id === board.roomId)?.name || 'Raum'}` 
+                                  : 'Die Zuweisung freier Räume erfolgt nach Einreichung durch das Schulsekretariat'}
+                              >
+                                {(scheduleStatus === 'approved' && board.roomId) 
+                                  ? (rooms.find(r => r.id === board.roomId)?.name || 'Raum zugewiesen')
+                                  : 'Raum: Zuteilung durch Musikschule'}
                               </span>
                             </div>
                           )}
@@ -7290,7 +7726,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                                 height: `${dragSnapState.duration * PX_PER_MIN - 4}px`,
                                 background: gBg,
                                 border: gBorder,
-                                borderRadius: '8px',
+                                borderRadius: '10px',
                                 padding: '5px 8px',
                                 boxSizing: 'border-box',
                                 display: 'flex',
@@ -7299,6 +7735,8 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                                 gap: '2px',
                                 zIndex: 98,
                                 pointerEvents: 'none',
+                                backdropFilter: 'blur(8px)',
+                                WebkitBackdropFilter: 'blur(8px)',
                                 boxShadow: gShadow,
                                 transition: 'top 0.08s cubic-bezier(0.16, 1, 0.3, 1)',
                               }}
@@ -7621,11 +8059,34 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                       {board.students.map((bs, cardIndex) => {
                         const [sh, sm] = parseTime(bs.assignedTime || board.startAnchor);
                         const cardTopPx = (sh * 60 + sm - startMinutes) * PX_PER_MIN;
-                        const cardHeightPx = bs.duration * PX_PER_MIN - 4;
+                        const cardHeightPx = (bs.duration || 30) * PX_PER_MIN - 4;
+
+                        // 🍏 Apple HIG Spatial Opening: Wenn eine Karte über diese Spalte gezogen wird,
+                        // weichen alle nachfolgenden Karten flüssig nach unten aus und öffnen die Ziellücke
+                        const isCardShifted = dragOverBoardId === board.id &&
+                          draggedStudentId !== null &&
+                          draggedStudentId !== bs.id &&
+                          dragOverIndex !== null &&
+                          cardIndex >= dragOverIndex &&
+                          dragTargetIntent !== 'swap';
+
+                        let shiftMins = 30;
+                        if (draggedStudentId) {
+                          if (draggedStudentId === 'sidebar-pause' || draggedStudentId.startsWith('break-')) {
+                            shiftMins = 15;
+                          } else {
+                            const draggedObj = board.students.find(s => s.id === draggedStudentId) || students.find(s => s.id === draggedStudentId);
+                            if (draggedObj) shiftMins = draggedObj.duration || 30;
+                          }
+                        }
+                        const shiftPx = isCardShifted ? (shiftMins * PX_PER_MIN) : 0;
 
                         if (bs.isBreak) {
+                          const isCurrentlyResizingThis = resizingBreak?.breakId === bs.id;
+                          const effectiveBreakDuration = isCurrentlyResizingThis ? resizingBreak.currentDuration : (bs.duration || 15);
+                          const cardHeightPx = effectiveBreakDuration * PX_PER_MIN - 4;
                           const [bsh, bsm] = parseTime(bs.assignedTime || board.startAnchor);
-                          const endTotalMin = bsh * 60 + bsm + (bs.duration || 15);
+                          const endTotalMin = bsh * 60 + bsm + effectiveBreakDuration;
                           const endHours = Math.floor(endTotalMin / 60) % 24;
                           const endMins = endTotalMin % 60;
                           const breakEndTime = `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}`;
@@ -7636,14 +8097,14 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                               key={bs.id}
                               role="button"
                               tabIndex={0}
-                              aria-label={`Pause ${breakStartTime} bis ${breakEndTime} Uhr`}
+                              aria-label={`Pause ${breakStartTime} bis ${breakEndTime} Uhr (${effectiveBreakDuration} Minuten)`}
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter' || e.key === ' ') {
                                   e.preventDefault();
                                   (e.currentTarget as HTMLElement).click();
                                 }
                               }}
-                              draggable={true}
+                              draggable={!isCurrentlyResizingThis}
                               onDragStart={(e) => handleDragStart(bs.id, 'board', board.id, e)}
                               onDragEnd={handleDragEnd}
                               onDragOver={(e) => {
@@ -7661,18 +8122,21 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                                 top: `${Math.max(cardTopPx, 0)}px`,
                                 height: `${Math.max(cardHeightPx, 32)}px`,
                                 background: 'linear-gradient(135deg, #ffffff 0%, #fefce8 100%)',
-                                border: '1px solid #fef08a',
-                                borderLeft: '4px solid #f59e0b',
+                                border: isCurrentlyResizingThis ? '1.5px solid #d97706' : '1px solid #fef08a',
+                                borderLeft: isCurrentlyResizingThis ? '5px solid #b45309' : '4px solid #f59e0b',
                                 borderRadius: '10px',
-                                padding: '4px 8px',
+                                padding: '4px 8px 10px 8px',
                                 boxSizing: 'border-box',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'space-between',
-                                cursor: 'grab',
-                                boxShadow: '0 2px 6px rgba(245, 158, 11, 0.08)',
-                                zIndex: 10,
-                                userSelect: 'none'
+                                cursor: isCurrentlyResizingThis ? 'ns-resize' : 'grab',
+                                boxShadow: isCurrentlyResizingThis ? '0 6px 18px rgba(245, 158, 11, 0.28)' : '0 2px 6px rgba(245, 158, 11, 0.08)',
+                                zIndex: isCurrentlyResizingThis ? 30 : 10,
+                                userSelect: 'none',
+                                transform: isCardShifted ? `translateY(${shiftPx}px)` : 'none',
+                                transition: isCurrentlyResizingThis ? 'none' : 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.15s ease',
+                                willChange: 'transform, top'
                               }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
@@ -7702,12 +8166,14 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                                 <span style={{
                                   fontSize: '0.6rem',
                                   fontWeight: 800,
-                                  background: 'rgba(245, 158, 11, 0.16)',
+                                  background: isCurrentlyResizingThis ? 'rgba(245, 158, 11, 0.35)' : 'rgba(245, 158, 11, 0.16)',
                                   color: '#b45309',
                                   padding: '1px 5px',
-                                  borderRadius: '5px'
+                                  borderRadius: '5px',
+                                  border: isCurrentlyResizingThis ? '1px solid #d97706' : 'none',
+                                  transition: 'all 0.15s ease'
                                 }}>
-                                  {bs.duration || 15}m
+                                  {effectiveBreakDuration}m
                                 </span>
                                 <button
                                   type="button"
@@ -7730,6 +8196,119 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                                 >
                                   <X size={12} />
                                 </button>
+                              </div>
+
+                              {/* 🍏 Apple HIG Edge-Resize Handle: Unterer Griff zum magnetischen Ziehen & Stauchen */}
+                              <div
+                                role="separator"
+                                aria-orientation="horizontal"
+                                aria-label={`Pausenlänge anpassen (aktuell ${effectiveBreakDuration} Minuten)`}
+                                tabIndex={0}
+                                onPointerDown={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+                                  setResizingBreak({
+                                    boardId: board.id,
+                                    breakId: bs.id,
+                                    initialDuration: bs.duration || 15,
+                                    startY: e.clientY,
+                                    currentDuration: bs.duration || 15
+                                  });
+                                }}
+                                onPointerMove={(e) => {
+                                  if (!resizingBreak || resizingBreak.breakId !== bs.id) return;
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  const deltaPx = e.clientY - resizingBreak.startY;
+                                  const deltaMin = Math.round((deltaPx / PX_PER_MIN) / 15) * 15;
+                                  const newDuration = Math.min(120, Math.max(15, resizingBreak.initialDuration + deltaMin));
+                                  if (newDuration !== resizingBreak.currentDuration) {
+                                    setResizingBreak(prev => prev ? { ...prev, currentDuration: newDuration } : null);
+                                    setBoards(prev => prev.map(b => {
+                                      if (b.id !== resizingBreak.boardId) return b;
+                                      const nextStudents = b.students.map(s => s.id === bs.id ? { ...s, duration: newDuration } : s);
+                                      return recalculateBoardTimes({ ...b, students: nextStudents });
+                                    }));
+                                  }
+                                }}
+                                onPointerUp={(e) => {
+                                  if (!resizingBreak || resizingBreak.breakId !== bs.id) return;
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  try {
+                                    (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+                                  } catch {}
+                                  pushUndoSnapshot();
+                                  const finalDuration = resizingBreak.currentDuration;
+                                  setResizingBreak(null);
+                                  triggerDebouncedAutoSave(boards);
+                                  setToast({
+                                    message: `Pause auf ${finalDuration} Min angepasst (Folgetermine synchronisiert)`,
+                                    type: 'success'
+                                  });
+                                }}
+                                onPointerCancel={(e) => {
+                                  if (!resizingBreak || resizingBreak.breakId !== bs.id) return;
+                                  try {
+                                    (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+                                  } catch {}
+                                  const initDur = resizingBreak.initialDuration;
+                                  setBoards(prev => prev.map(b => {
+                                    if (b.id !== resizingBreak.boardId) return b;
+                                    const nextStudents = b.students.map(s => s.id === bs.id ? { ...s, duration: initDur } : s);
+                                    return recalculateBoardTimes({ ...b, students: nextStudents });
+                                  }));
+                                  setResizingBreak(null);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+                                    e.preventDefault();
+                                    const newDuration = Math.min(120, (bs.duration || 15) + 15);
+                                    pushUndoSnapshot();
+                                    setBoards(prev => prev.map(b => {
+                                      if (b.id !== board.id) return b;
+                                      const nextStudents = b.students.map(s => s.id === bs.id ? { ...s, duration: newDuration } : s);
+                                      return recalculateBoardTimes({ ...b, students: nextStudents });
+                                    }));
+                                    setToast({ message: `Pause auf ${newDuration} Min verlängert`, type: 'success' });
+                                  } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+                                    e.preventDefault();
+                                    const newDuration = Math.max(15, (bs.duration || 15) - 15);
+                                    pushUndoSnapshot();
+                                    setBoards(prev => prev.map(b => {
+                                      if (b.id !== board.id) return b;
+                                      const nextStudents = b.students.map(s => s.id === bs.id ? { ...s, duration: newDuration } : s);
+                                      return recalculateBoardTimes({ ...b, students: nextStudents });
+                                    }));
+                                    setToast({ message: `Pause auf ${newDuration} Min verkürzt`, type: 'success' });
+                                  }
+                                }}
+                                title="Pausenlänge durch Ziehen nach unten/oben anpassen (15m-Schritte) oder Pfeiltasten"
+                                className="break-resize-handle"
+                                style={{
+                                  position: 'absolute',
+                                  left: 0,
+                                  right: 0,
+                                  bottom: 0,
+                                  height: '10px',
+                                  cursor: 'ns-resize',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  zIndex: 15,
+                                  touchAction: 'none',
+                                  userSelect: 'none'
+                                }}
+                              >
+                                <div style={{
+                                  width: '28px',
+                                  height: '3.5px',
+                                  borderRadius: '2px',
+                                  background: isCurrentlyResizingThis ? '#b45309' : 'rgba(217, 119, 6, 0.45)',
+                                  transition: 'all 0.15s ease',
+                                  boxShadow: isCurrentlyResizingThis ? '0 0 6px rgba(180, 83, 9, 0.4)' : 'none'
+                                }} />
                               </div>
                             </div>
                           );
@@ -7903,7 +8482,7 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
 
                         const isCampusTheme = localStorage.getItem('groovelab_active_platform') === 'campus';
                         const isGroovelabTheme = localStorage.getItem('groovelab_active_platform') === 'groovelab';
-                        const isAdminViewTheme = currentUserRole === 'admin' || currentUserRole === 'secretary';
+                        const isAdminViewTheme = isSecretaryWorkspace;
 
                         const studentInPool = students.find((s: Student) => s.id === bs.id);
                         const isPendingOnboarding = (bs.status === 'ausstehend' || (studentInPool ? (studentInPool.status === 'ausstehend' || studentInPool.isOnboarded === false) : false)) && !studentInPool?.hasPreferences;
@@ -8078,7 +8657,11 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                                 visibility: 'visible',
                                 opacity: draggedStudentId === bs.id ? 0.25 : 1,
                                 boxShadow: hasConflict ? '0 2px 8px rgba(239, 68, 68, 0.15)' : (isInsideWunsch ? '0 2px 8px rgba(52, 168, 83, 0.18)' : (isSelected ? `0 0 10px ${cardPrimaryColor}40` : '0 2px 6px rgba(0,0,0,0.03)')),
-                                transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                                transform: (dragTargetIntent === 'swap' && dragTargetStudentId === bs.id) 
+                                  ? 'scale(0.98)' 
+                                  : (isCardShifted ? `translateY(${shiftPx}px)` : 'none'),
+                                transition: draggedStudentId ? 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)' : 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                                willChange: 'transform, top',
                                 overflow: 'hidden',
                               }}
                             >
@@ -8233,12 +8816,8 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                         let displayAssignedTime = bs.assignedTime || '14:00';
                         let isLiveShiftedPreview = false;
 
-                        if (dragOverBoardId === board.id && draggedStudentId && draggedStudentId !== bs.id && dragOverIndex !== null && cardIndex >= dragOverIndex) {
-                          let shiftMins = 30;
-                          const draggedStudentObj = board.students.find(s => s.id === draggedStudentId) || students.find(s => s.id === draggedStudentId);
-                          if (draggedStudentObj) {
-                            shiftMins = draggedStudentObj.duration || 30;
-                          }
+                        if (isCardShifted) {
+                          isLiveShiftedPreview = true;
                           const [origH, origM] = parseTime(bs.assignedTime || board.startAnchor);
                           const newTotalMins = origH * 60 + origM + shiftMins;
                           displayAssignedTime = `${String(Math.floor(newTotalMins / 60) % 24).padStart(2, '0')}:${String(newTotalMins % 60).padStart(2, '0')}`;
@@ -8337,14 +8916,14 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
                               pointerEvents: 'auto',
                               transform: (dragTargetIntent === 'swap' && dragTargetStudentId === bs.id) 
                                 ? 'scale(0.98)' 
-                                : (isSelected ? 'scale(1.015)' : 'none'),
+                                : (isCardShifted ? `translateY(${shiftPx}px)` : (isSelected ? 'scale(1.015)' : 'none')),
                               overflow: 'visible',
                               boxShadow: (dragTargetIntent === 'swap' && dragTargetStudentId === bs.id)
                                 ? '0 0 16px rgba(52, 168, 83, 0.4)'
                                 : (swapPartnerPendingId === bs.id
                                     ? '0 0 0 3px rgba(52, 168, 83, 0.25), 0 4px 14px rgba(52, 168, 83, 0.2)'
                                     : (isSelected ? '0 4px 16px rgba(22, 163, 74, 0.25)' : (draggedStudentId === bs.id ? '0 8px 24px rgba(22, 163, 74, 0.3)' : finalShadow))),
-                              transition: draggedStudentId ? 'transform 0.12s ease' : 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+                              transition: draggedStudentId ? 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)' : 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
                               willChange: 'transform, top',
                             }}
                             onMouseOver={e => {

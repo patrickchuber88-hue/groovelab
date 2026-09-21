@@ -425,7 +425,7 @@ export const ParentDataVaultSettingsView: React.FC<ParentDataVaultSettingsViewPr
                 className="hover-scale"
               >
                 <FileSpreadsheet size={15} />
-                <span>Art. 15 PDF/JSON</span>
+                <span>Art. 15 Selbstauskunft (JSON)</span>
               </button>
             )}
             {handleExportFullDataArchive && (

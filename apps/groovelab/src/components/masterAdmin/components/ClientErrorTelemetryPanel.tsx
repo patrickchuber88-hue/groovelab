@@ -15,6 +15,7 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [severityFilter, setSeverityFilter] = useState<'ALL' | 'CRITICAL' | 'WARNING' | 'INFO'>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'UNRESOLVED' | 'RESOLVED'>('ALL');
+  const [tagFilter, setTagFilter] = useState<'ALL' | 'AUDIO' | 'RPC' | 'CIRCUIT' | 'UNHANDLED'>('ALL');
   const [selectedLog, setSelectedLog] = useState<ClientErrorLog | null>(null);
   const [copiedStack, setCopiedStack] = useState(false);
 
@@ -76,12 +77,22 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
     if (statusFilter === 'UNRESOLVED' && log.resolved) return false;
     if (statusFilter === 'RESOLVED' && !log.resolved) return false;
 
+    if (tagFilter !== 'ALL') {
+      const t = (log.tag || 'UNHANDLED').toUpperCase();
+      if (tagFilter === 'AUDIO' && !t.includes('AUDIO') && !t.includes('MIC') && !t.includes('DECODE') && !t.includes('MASTERING')) return false;
+      if (tagFilter === 'RPC' && !t.includes('RPC')) return false;
+      if (tagFilter === 'CIRCUIT' && !t.includes('CIRCUIT')) return false;
+      if (tagFilter === 'UNHANDLED' && (t.includes('AUDIO') || t.includes('RPC') || t.includes('CIRCUIT') || t.includes('MIC') || t.includes('DECODE') || t.includes('MASTERING'))) return false;
+    }
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchMsg = log.message.toLowerCase().includes(q);
       const matchRoute = log.route.toLowerCase().includes(q);
       const matchBrowser = (log.browserName + ' ' + log.osName).toLowerCase().includes(q);
-      return matchMsg || matchRoute || matchBrowser;
+      const matchTag = (log.tag || '').toLowerCase().includes(q);
+      const matchUi = (log.uiLevel || '').toLowerCase().includes(q);
+      return matchMsg || matchRoute || matchBrowser || matchTag || matchUi;
     }
     return true;
   });
@@ -293,8 +304,23 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
             />
           </div>
 
-          {/* Severity & Status Filters */}
+          {/* Severity, Status & Category Filters */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#ffffff', padding: '3px 10px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>Kategorie:</span>
+              <select
+                value={tagFilter}
+                onChange={e => setTagFilter(e.target.value as any)}
+                style={{ border: 'none', background: 'transparent', fontSize: '0.78rem', fontWeight: 700, color: '#0f172a', outline: 'none', cursor: 'pointer' }}
+              >
+                <option value="ALL">Alle Kategorien</option>
+                <option value="AUDIO">Audio &amp; DSP</option>
+                <option value="RPC">RPC &amp; Backend</option>
+                <option value="CIRCUIT">Circuit Breaker</option>
+                <option value="UNHANDLED">UI &amp; Uncaught</option>
+              </select>
+            </div>
+
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#ffffff', padding: '3px 10px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
               <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b' }}>Schweregrad:</span>
               <select
@@ -389,10 +415,25 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
                         <div style={{ fontWeight: 800, color: '#0f172a', lineHeight: 1.4, wordBreak: 'break-word' }}>
                           {log.message}
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                           <span style={{ fontFamily: 'monospace', fontSize: '0.70rem', background: '#f1f5f9', padding: '2px 6px', borderRadius: '6px', color: '#475569' }}>
                             {log.route || '/'}
                           </span>
+                          {log.tag && (
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '1px 6px', borderRadius: '6px', background: '#e0f2fe', color: '#0369a1' }}>
+                              #{log.tag}
+                            </span>
+                          )}
+                          {log.uiLevel && (
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '1px 6px', borderRadius: '6px', background: '#fef3c7', color: '#b45309' }}>
+                              UI: {log.uiLevel}
+                            </span>
+                          )}
+                          {log.module && (
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '1px 6px', borderRadius: '6px', background: log.module === 'groovelab' ? '#fef08a' : '#dcfce7', color: log.module === 'groovelab' ? '#854d0e' : '#15803d' }}>
+                              {log.module === 'groovelab' ? 'GrooveLab' : 'Campus'}
+                            </span>
+                          )}
                           {log.userRole && (
                             <span style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600 }}>
                               Rolle: {log.userRole}
@@ -567,6 +608,14 @@ export const ClientErrorTelemetryPanel: React.FC = () => {
                 <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                   <span style={{ color: '#64748b', fontWeight: 600 }}>Route / Screen:</span><br />
                   <strong>{selectedLog.route || '/'}</strong>
+                </div>
+                <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <span style={{ color: '#64748b', fontWeight: 600 }}>Kategorie &amp; Tag:</span><br />
+                  <strong>#{selectedLog.tag || 'UNHANDLED'}</strong>
+                </div>
+                <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <span style={{ color: '#64748b', fontWeight: 600 }}>UI-Level &amp; Modul:</span><br />
+                  <strong>{selectedLog.uiLevel || 'Standard'} • {selectedLog.module === 'groovelab' ? 'GrooveLab' : 'Campus'}</strong>
                 </div>
                 <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                   <span style={{ color: '#64748b', fontWeight: 600 }}>Umgebung:</span><br />

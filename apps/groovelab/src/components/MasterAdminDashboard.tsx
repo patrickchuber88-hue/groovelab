@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, Suspense, lazy } from 'react';
 import { 
-  Shield, Activity, Layers, CreditCard, Receipt, Cpu, Tag, ShieldAlert, 
-  Lightbulb, Wrench, Database, Building2, BookOpen, LogOut, Search, 
-  WifiOff, RotateCcw, CheckCircle, HardDrive, ExternalLink, Eye 
+  WifiOff, RotateCcw, CheckCircle, HardDrive, ExternalLink, Eye, Shield 
 } from 'lucide-react';
 
 import { useMasterPricing } from '../context/MasterPricingContext';
@@ -10,8 +8,11 @@ import { measureDatabasePing, LatencyMetric } from '../utils/latencyMonitor';
 
 // Re-exports for backwards compatibility
 export { LOAD_TIERS } from './masterAdmin/MasterAdminTypes';
-export type { LoadTier, ServerMetric } from './masterAdmin/MasterAdminTypes';
-import type { School } from './masterAdmin/MasterAdminTypes';
+export type { LoadTier, ServerMetric, MasterAdminPortalTab } from './masterAdmin/MasterAdminTypes';
+import type { MasterAdminPortalTab } from './masterAdmin/MasterAdminTypes';
+
+// Sidebar & Layout Components
+import { MasterAdminSidebar } from './masterAdmin/MasterAdminSidebar';
 
 // Domain Hooks
 import { useMasterAdminSchools } from './masterAdmin/hooks/useMasterAdminSchools';
@@ -19,6 +20,9 @@ import { useMasterAdminTelemetry } from './masterAdmin/hooks/useMasterAdminTelem
 import { useMasterAdminPricing } from './masterAdmin/hooks/useMasterAdminPricing';
 import { useMasterAdminOperator } from './masterAdmin/hooks/useMasterAdminOperator';
 import { useMasterAdminIdleLock } from './masterAdmin/hooks/useMasterAdminIdleLock';
+import { useMasterAdminModalStates } from './masterAdmin/hooks/useMasterAdminModalStates';
+import { useMasterAdminStepUp } from './masterAdmin/hooks/useMasterAdminStepUp';
+import { useMasterAdminSecurityShield } from './masterAdmin/hooks/useMasterAdminSecurityShield';
 
 // Tabs
 import { ExecutiveTab } from './masterAdmin/tabs/ExecutiveTab';
@@ -32,31 +36,12 @@ import { MaintenanceTab } from './masterAdmin/tabs/MaintenanceTab';
 import { BackupResetTab } from './masterAdmin/tabs/BackupResetTab';
 import { OperatorTab } from './masterAdmin/tabs/OperatorTab';
 
-// Modals
-import { GhostGateModal } from './masterAdmin/modals/GhostGateModal';
-import { SchoolArchiveModal } from './masterAdmin/modals/SchoolArchiveModal';
-import { MasterCommandPaletteModal } from './masterAdmin/modals/MasterCommandPaletteModal';
-import { ExecutiveMonthlyReportModal } from './masterAdmin/modals/ExecutiveMonthlyReportModal';
-import { PricingLegalNoticeModal } from './masterAdmin/modals/PricingLegalNoticeModal';
-import { MasterIdleLockModal } from './masterAdmin/modals/MasterIdleLockModal';
+// Consolidated Modals Hub
+import { MasterAdminModalsHub } from './masterAdmin/modals/MasterAdminModalsHub';
 
 // Lazy Loaded Components
 const BillingDashboard = lazy(() => import('./BillingDashboard').then(m => ({ default: m.BillingDashboard })));
 const SchoolDetailDrawer = lazy(() => import('./masterAdmin/drawers/SchoolDetailDrawer').then(m => ({ default: m.SchoolDetailDrawer })));
-const HelpCenterModal = lazy(() => import('./help/HelpCenterModal').then(m => ({ default: m.HelpCenterModal })));
-
-export type MasterAdminPortalTab = 
-  | 'executive' 
-  | 'schools' 
-  | 'briefing' 
-  | 'billing' 
-  | 'telemetry' 
-  | 'pricing' 
-  | 'trust_safety' 
-  | 'operator' 
-  | 'maintenance' 
-  | 'backup' 
-  | 'feedback';
 
 interface MasterAdminDashboardProps {
   onLogout: () => void;
@@ -65,39 +50,28 @@ interface MasterAdminDashboardProps {
 
 export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashboardProps) {
   const masterPricing = useMasterPricing();
-  const [saveSuccessToast, setSaveSuccessToast] = useState<string | null>(null);
+  const modalStates = useMasterAdminModalStates();
   const [globalFetchError, setGlobalFetchError] = useState<string | null>(null);
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const [commandSearch, setCommandSearch] = useState('');
-  const [isAkademieOpen, setIsAkademieOpen] = useState(false);
-  const [showMonthlyReportModal, setShowMonthlyReportModal] = useState(false);
-  const [showLegalNoticeModal, setShowLegalNoticeModal] = useState(false);
-  const [selectedReportMonth] = useState(() => new Date().toISOString().substring(0, 7));
   const [dbLatency, setDbLatency] = useState<LatencyMetric>({ rttMs: 18, quality: 'EXCELLENT', timestamp: Date.now() });
-
-  const showToast = useCallback((msg: string) => {
-    setSaveSuccessToast(msg);
-    setTimeout(() => setSaveSuccessToast(null), 3500);
-  }, []);
 
   // 1. Telemetry Domain Hook
   const telemetry = useMasterAdminTelemetry();
 
   // 2. Schools Domain Hook
   const schools = useMasterAdminSchools({
-    onNotify: showToast,
+    onNotify: modalStates.showToast,
     onRefreshMetrics: telemetry.fetchServerMetrics,
   });
 
   // 3. Pricing Domain Hook
   const pricing = useMasterAdminPricing({
-    onNotify: showToast,
+    onNotify: modalStates.showToast,
   });
 
   // 4. Operator Domain Hook
   const operator = useMasterAdminOperator({
     currentUser,
-    onNotify: showToast,
+    onNotify: modalStates.showToast,
   });
 
   // 5. Idle Lock Watchdog Hook (15-min fail-closed lock)
@@ -107,16 +81,26 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
     adminUserId: operator.adminUser?.id,
   });
 
+  // 6. JIT Step-Up Authentication Hook
+  const stepUp = useMasterAdminStepUp();
+
+  // 7. Client-Side Runtime Integrity Guard
+  const securityShield = useMasterAdminSecurityShield();
+
   // Tab State
   const [activePortalTab, setActivePortalTabRaw] = useState<MasterAdminPortalTab>(() => {
     if (typeof window !== 'undefined') {
-      const saved = sessionStorage.getItem('cg_master_active_portal_tab');
-      const validTabs: MasterAdminPortalTab[] = [
-        'executive', 'schools', 'briefing', 'billing', 'telemetry', 
-        'pricing', 'trust_safety', 'operator', 'maintenance', 'backup', 'feedback'
-      ];
-      if (saved && validTabs.includes(saved as MasterAdminPortalTab)) {
-        return saved as MasterAdminPortalTab;
+      try {
+        const saved = sessionStorage.getItem('cg_master_active_portal_tab');
+        const validTabs: MasterAdminPortalTab[] = [
+          'executive', 'schools', 'briefing', 'billing', 'telemetry', 
+          'pricing', 'trust_safety', 'operator', 'maintenance', 'backup', 'feedback'
+        ];
+        if (saved && validTabs.includes(saved as MasterAdminPortalTab)) {
+          return saved as MasterAdminPortalTab;
+        }
+      } catch (e) {
+        console.warn('Storage operation failed in activePortalTab init:', e);
       }
     }
     return 'executive';
@@ -125,7 +109,11 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   const setActivePortalTab = useCallback((newTab: MasterAdminPortalTab) => {
     setActivePortalTabRaw(newTab);
     if (typeof window !== 'undefined') {
-      sessionStorage.setItem('cg_master_active_portal_tab', newTab);
+      try {
+        sessionStorage.setItem('cg_master_active_portal_tab', newTab);
+      } catch (e) {
+        console.warn('Storage operation failed in setActivePortalTab:', e);
+      }
     }
   }, []);
 
@@ -134,15 +122,15 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setCommandPaletteOpen(prev => !prev);
+        modalStates.setCommandPaletteOpen(prev => !prev);
       }
       if (e.key === 'Escape') {
-        setCommandPaletteOpen(false);
+        modalStates.setCommandPaletteOpen(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [modalStates]);
 
   // Periodic Latency Ping
   useEffect(() => {
@@ -156,20 +144,24 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
   // Global Maintenance Detection
   const isGlobalMaintenanceActive = useMemo(() => {
     if (typeof window !== 'undefined') {
-      const localMaint = localStorage.getItem('cg_master_maintenance_state');
-      if (localMaint) {
-        try {
-          if (JSON.parse(localMaint)?.isActive) return true;
-        } catch {}
-      }
-      const localAnnounce = localStorage.getItem('cg_master_broadcast_announcement');
-      if (localAnnounce) {
-        try {
-          const parsed = JSON.parse(localAnnounce);
-          if (parsed?.isActive && (parsed?.type === 'maintenance' || parsed?.severity === 'emergency' || parsed?.title?.toLowerCase().includes('wartung'))) {
-            return true;
-          }
-        } catch {}
+      try {
+        const localMaint = localStorage.getItem('cg_master_maintenance_state');
+        if (localMaint) {
+          try {
+            if (JSON.parse(localMaint)?.isActive) return true;
+          } catch {}
+        }
+        const localAnnounce = localStorage.getItem('cg_master_broadcast_announcement');
+        if (localAnnounce) {
+          try {
+            const parsed = JSON.parse(localAnnounce);
+            if (parsed?.isActive && (parsed?.type === 'maintenance' || parsed?.severity === 'emergency' || parsed?.title?.toLowerCase().includes('wartung'))) {
+              return true;
+            }
+          } catch {}
+        }
+      } catch (e) {
+        console.warn('Storage operation failed in isGlobalMaintenanceActive:', e);
       }
     }
     if (pricing.specialOffers && Array.isArray(pricing.specialOffers)) {
@@ -234,306 +226,17 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
         zIndex: 1
       }}>
         {/* Left Premium Sidebar */}
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.8)',
-          backdropFilter: 'blur(35px)',
-          WebkitBackdropFilter: 'blur(35px)',
-          borderRight: '1px solid rgba(15, 23, 42, 0.06)',
-          padding: '40px 24px 32px 24px',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          height: '100vh',
-          position: 'sticky',
-          top: 0,
-          boxShadow: '4px 0 24px rgba(15, 23, 42, 0.01)'
-        }}>
-          <div>
-            {/* App Logo & Branding */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '44px', padding: '0 8px' }}>
-              <div style={{
-                background: 'linear-gradient(135deg, #10b981 0%, #eab308 100%)',
-                width: '40px',
-                height: '40px',
-                borderRadius: '12px',
-                boxShadow: '0 8px 20px rgba(16, 185, 129, 0.25)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <Shield size={20} color="#ffffff" />
-              </div>
-              <div>
-                <h1 style={{ fontSize: '1.25rem', fontWeight: 900, margin: 0, letterSpacing: '-0.03em', color: '#0f172a', fontFamily: '"Outfit", sans-serif' }}>
-                  Campus-Groovelab
-                </h1>
-                <span style={{ fontSize: '0.68rem', color: '#059669', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                  Admin Leitstand
-                </span>
-              </div>
-            </div>
-
-            {/* Sidebar Navigation */}
-            <nav role="tablist" aria-label="Master-Admin Hauptnavigation" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {/* Cmd+K Trigger */}
-              <button
-                type="button"
-                onClick={() => setCommandPaletteOpen(true)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  width: '100%',
-                  padding: '10px 14px',
-                  borderRadius: '12px',
-                  border: '1px solid rgba(15, 23, 42, 0.08)',
-                  background: '#f8fafc',
-                  color: '#64748b',
-                  fontSize: '0.82rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  marginBottom: '12px',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Search size={14} color="#64748b" />
-                  <span>Suchen / Befehl...</span>
-                </div>
-                <kbd style={{
-                  background: '#ffffff',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '6px',
-                  padding: '2px 6px',
-                  fontSize: '0.7rem',
-                  fontWeight: 800,
-                  color: '#475569',
-                  fontFamily: 'sans-serif'
-                }}>⌘K</kbd>
-              </button>
-
-              {[
-                { id: 'executive', label: 'Master Cockpit', icon: <Activity size={18} /> },
-                { id: 'schools', label: 'Schulen & Tenants', icon: <Layers size={18} /> },
-                { id: 'briefing', label: 'Zahlungsabgleich & Aktivierungen', icon: <CreditCard size={18} /> },
-                { id: 'billing', label: 'Financial Control', icon: <Receipt size={18} /> },
-                { id: 'telemetry', label: 'Telemetrie & Health', icon: <Cpu size={18} /> },
-                { id: 'pricing', label: 'Preise & Kampagnen', icon: <Tag size={18} /> },
-                { id: 'trust_safety', label: 'Trust & Safety (Takedowns)', icon: <ShieldAlert size={18} /> },
-                { id: 'feedback', label: 'Ideen & Feedback', icon: <Lightbulb size={18} /> },
-                { id: 'maintenance', label: 'Wartung & Betrieb', icon: <Wrench size={18} /> },
-                { id: 'backup', label: 'Backup & Reset', icon: <Database size={18} /> },
-                { id: 'operator', label: 'Betreiber & Zugang', icon: <Building2 size={18} /> }
-              ].map((tab) => {
-                const isActive = activePortalTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    id={`master-tab-${tab.id}`}
-                    role="tab"
-                    aria-selected={isActive}
-                    aria-controls={`master-panel-${tab.id}`}
-                    tabIndex={0}
-                    onClick={() => setActivePortalTab(tab.id as MasterAdminPortalTab)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      width: '100%',
-                      padding: '12px 16px',
-                      borderRadius: '12px',
-                      border: 'none',
-                      background: isActive ? 'rgba(234, 67, 53, 0.08)' : 'transparent',
-                      color: isActive ? '#ea4335' : '#475569',
-                      fontSize: '0.88rem',
-                      fontWeight: isActive ? 800 : 600,
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                      boxShadow: isActive ? '0 4px 12px rgba(234, 67, 53, 0.06)' : 'none',
-                      justifyContent: 'space-between'
-                    }}
-                    className="sidebar-nav-btn"
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <span style={{ color: isActive ? '#ea4335' : '#64748b', transition: 'color 0.2s', display: 'flex', alignItems: 'center' }}>
-                        {tab.icon}
-                      </span>
-                      <span>{tab.label}</span>
-                    </div>
-                    {tab.id === 'maintenance' && isGlobalMaintenanceActive && (
-                      <span style={{
-                        background: '#fee2e2',
-                        border: '1px solid #fca5a5',
-                        color: '#dc2626',
-                        fontSize: '0.68rem',
-                        fontWeight: 850,
-                        padding: '2px 6px',
-                        borderRadius: '6px',
-                        boxShadow: '0 0 8px rgba(239, 68, 68, 0.25)',
-                        letterSpacing: '0.02em'
-                      }}>
-                        AKTIV
-                      </span>
-                    )}
-                    {tab.id === 'executive' && pendingStorageSchools.length > 0 && (
-                      <span style={{
-                        background: '#f59e0b',
-                        color: '#ffffff',
-                        fontSize: '0.72rem',
-                        fontWeight: 900,
-                        padding: '2px 7px',
-                        borderRadius: '10px',
-                        minWidth: '16px',
-                        textAlign: 'center',
-                        boxShadow: '0 2px 5px rgba(245, 158, 11, 0.35)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '3px'
-                      }}>
-                        <HardDrive size={10} /> {pendingStorageSchools.length}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-
-          {/* Sidebar Footer */}
-          <div style={{
-            borderTop: '1px solid rgba(15, 23, 42, 0.06)',
-            paddingTop: '24px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '14px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '0 8px' }}>
-              <img
-                src="/campus_login_hero.png"
-                alt="Master Admin"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).src = '/campus_login_hero.png';
-                }}
-                style={{
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: '50%',
-                  objectFit: 'cover',
-                  border: '2px solid rgba(234, 67, 53, 0.3)',
-                  boxShadow: '0 4px 10px rgba(15, 23, 42, 0.15)'
-                }}
-              />
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {operator.adminUsername || 'Master Admin'}
-                </div>
-                <div style={{ fontSize: '0.7rem', color: '#ea4335', fontWeight: 800, letterSpacing: '0.02em', textTransform: 'uppercase' }}>
-                  System Root
-                </div>
-              </div>
-            </div>
-
-            {/* Akademie & Handbuch Button */}
-            <button
-              type="button"
-              onClick={() => setIsAkademieOpen(true)}
-              style={{
-                width: '100%',
-                padding: '11px 14px',
-                borderRadius: '12px',
-                background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.04) 0%, rgba(234, 67, 53, 0.08) 100%)',
-                border: '1px solid rgba(234, 67, 53, 0.25)',
-                color: '#0f172a',
-                fontWeight: 800,
-                fontSize: '0.82rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '8px',
-                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)'
-              }}
-            >
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                <BookOpen size={16} color="#ea4335" />
-                <span>Akademie & Handbuch</span>
-              </span>
-              <span style={{
-                background: '#0f172a',
-                color: '#ffffff',
-                fontSize: '0.66rem',
-                fontWeight: 900,
-                padding: '2px 7px',
-                borderRadius: '6px',
-                letterSpacing: '0.04em'
-              }}>
-                ROOT
-              </span>
-            </button>
-
-            {/* Zur Schulleitung wechseln */}
-            <button
-              type="button"
-              onClick={() => {
-                sessionStorage.removeItem('groovelab_is_master_admin');
-                localStorage.removeItem('groovelab_is_master_admin');
-                sessionStorage.setItem('groovelab_active_workspace', 'secretary');
-                localStorage.setItem('groovelab_active_workspace', 'secretary');
-                sessionStorage.setItem('groovelab_active_platform', 'campus');
-                sessionStorage.setItem('campus_active_tab', 'briefing');
-                window.location.reload();
-              }}
-              style={{
-                width: '100%',
-                padding: '11px',
-                marginBottom: '8px',
-                borderRadius: '12px',
-                background: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                color: '#334155',
-                fontWeight: 800,
-                fontSize: '0.82rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
-                <Building2 size={15} color="#475569" />
-                <span>Zur Schulleitung wechseln</span>
-              </span>
-            </button>
-
-            {/* Logout */}
-            <button
-              type="button"
-              onClick={onLogout}
-              style={{
-                width: '100%',
-                padding: '12px',
-                borderRadius: '12px',
-                background: 'rgba(239, 68, 68, 0.08)',
-                border: '1px solid rgba(239, 68, 68, 0.15)',
-                color: '#dc2626',
-                fontWeight: 800,
-                fontSize: '0.85rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <LogOut size={14} /> Abmelden
-            </button>
-          </div>
-        </div>
+        <MasterAdminSidebar
+          activePortalTab={activePortalTab}
+          setActivePortalTab={setActivePortalTab}
+          onOpenCommandPalette={() => modalStates.setCommandPaletteOpen(true)}
+          onOpenAkademie={() => modalStates.setIsAkademieOpen(true)}
+          onLogout={onLogout}
+          adminUsername={operator.adminUsername}
+          pendingUsersCount={schools.pendingUsers.length}
+          isGlobalMaintenanceActive={isGlobalMaintenanceActive}
+          pendingStorageCount={pendingStorageSchools.length}
+        />
 
         {/* Right Workspace Area */}
         <div style={{
@@ -543,21 +246,76 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           boxSizing: 'border-box',
           position: 'relative'
         }}>
-          {/* Offline / Server Error Banner */}
-          {globalFetchError && (
+          {/* Security Shield Tamper Banner */}
+          {securityShield.integrityCompromised && (
             <div style={{
-              background: '#fffbeb',
-              border: '1.5px solid #fde68a',
-              borderRadius: '20px',
-              padding: '16px 22px',
+              background: '#fef2f2',
+              border: '2px solid #ef4444',
+              borderRadius: '16px',
+              padding: '16px 20px',
+              color: '#b91c1c',
+              marginBottom: '24px',
+              fontWeight: 800,
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '14px',
-              marginBottom: '24px',
-              boxShadow: '0 4px 20px rgba(245, 158, 11, 0.08)'
+              gap: '12px',
+              boxShadow: '0 4px 16px rgba(220, 38, 38, 0.1)'
             }}>
+              <Shield size={24} color="#dc2626" />
+              <div>
+                <div style={{ fontSize: '0.90rem' }}>⚠️ SICHERHEITS-INTEGRITÄTSWARNUNG</div>
+                <div style={{ fontSize: '0.78rem', fontWeight: 600, marginTop: '2px' }}>{securityShield.integrityReason}</div>
+              </div>
+            </div>
+          )}
+
+          {/* DOM Zeroing: Arbeitsspeicher- und DOM-Bereinigung im gesperrten Zustand */}
+          {idleLock.isIdleLocked ? (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '75vh',
+              textAlign: 'center',
+              color: '#94a3b8'
+            }}>
+              <div style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '20px',
+                background: '#f1f5f9',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: '16px'
+              }}>
+                <Shield size={30} color="#64748b" />
+              </div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#475569', margin: '0 0 6px 0' }}>
+                Leitstand geschützt &amp; im Ruhezustand
+              </h3>
+              <p style={{ fontSize: '0.85rem', maxWidth: '360px', margin: 0, lineHeight: 1.5 }}>
+                Vertrauliche Arbeitsdaten wurden aus dem DOM und Arbeitsspeicher entfernt. Entsperren Sie über Touch ID oder Google Authenticator.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Offline / Server Error Banner */}
+              {globalFetchError && (
+                <div style={{
+                  background: '#fffbeb',
+                  border: '1.5px solid #fde68a',
+                  borderRadius: '20px',
+                  padding: '16px 22px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '14px',
+                  marginBottom: '24px',
+                  boxShadow: '0 4px 20px rgba(245, 158, 11, 0.08)'
+                }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <div style={{
                   width: '40px',
@@ -727,7 +485,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           )}
 
           {/* Success Toast */}
-          {saveSuccessToast && (
+          {modalStates.saveSuccessToast && (
             <div style={{
               position: 'fixed',
               top: '24px',
@@ -745,7 +503,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
               fontWeight: 800
             }}>
               <CheckCircle size={20} color="#ffffff" />
-              <span>{saveSuccessToast}</span>
+              <span>{modalStates.saveSuccessToast}</span>
             </div>
           )}
 
@@ -806,10 +564,10 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 schoolStats={schools.schoolStats}
                 loading={schools.loading}
                 serverMetrics={telemetry.serverMetrics}
-                pendingUsers={[]}
+                pendingUsers={schools.pendingUsers}
                 masterPricing={masterPricing}
                 onRefresh={schools.fetchSchoolsAndStats}
-                onOpenCommandPalette={() => setCommandPaletteOpen(true)}
+                onOpenCommandPalette={() => modalStates.setCommandPaletteOpen(true)}
                 onNavigateTab={(tab) => setActivePortalTab(tab as MasterAdminPortalTab)}
                 onSelectSchool={(s) => schools.setSelectedSchool(s)}
               />
@@ -838,13 +596,13 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
           {activePortalTab === 'briefing' && (
             <div role="tabpanel" id="master-panel-briefing" aria-labelledby="master-tab-briefing" tabIndex={0}>
               <ReconciliationTab
-                pendingUsers={[]}
+                pendingUsers={schools.pendingUsers}
                 schools={schools.schools}
                 masterPricing={masterPricing}
-                loadingPending={false}
-                onRefresh={schools.fetchSchoolsAndStats}
-                onBatchActivate={async () => {}}
-                onSingleActivate={async () => {}}
+                loadingPending={schools.loadingPending}
+                onRefresh={schools.fetchPendingUsers}
+                onBatchActivate={schools.handleBatchActivateUsers}
+                onSingleActivate={schools.handleActivateUser}
               />
             </div>
           )}
@@ -902,7 +660,7 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
                 pricingSaving={pricing.pricingSaving}
                 onSavePricing={pricing.handleSavePricing}
                 onSaveCampaigns={pricing.handleSaveCampaigns}
-                onOpenLegalNoticeModal={() => setShowLegalNoticeModal(true)}
+                onOpenLegalNoticeModal={() => modalStates.setShowLegalNoticeModal(true)}
                 schools={schools.schools}
                 schoolStats={schools.schoolStats}
               />
@@ -925,8 +683,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
             <div role="tabpanel" id="master-panel-maintenance" aria-labelledby="master-tab-maintenance" tabIndex={0}>
               <MaintenanceTab
                 schools={schools.schools}
-                saveSuccessToast={saveSuccessToast}
-                setSaveSuccessToast={setSaveSuccessToast}
+                saveSuccessToast={modalStates.saveSuccessToast}
+                setSaveSuccessToast={modalStates.setSaveSuccessToast}
               />
             </div>
           )}
@@ -994,6 +752,8 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
               />
             </div>
           )}
+          </>
+        )}
 
           {/* ═══════════════════════════════════════════════════════════════════ */}
           {/* DRAWERS & MODALS                                                    */}
@@ -1016,98 +776,18 @@ export function MasterAdminDashboard({ onLogout, currentUser }: MasterAdminDashb
             </Suspense>
           )}
 
-          {/* Ghost Support Gate Modal */}
-          <GhostGateModal
-            ghostGateSchool={schools.ghostGateSchool}
-            ghostGateReason={schools.ghostGateReason}
-            setGhostGateReason={schools.setGhostGateReason}
-            ghostGateTicketRef={schools.ghostGateTicketRef}
-            setGhostGateTicketRef={schools.setGhostGateTicketRef}
-            onClose={() => schools.setGhostGateSchool(null)}
-            onConfirm={(school, fullReason) => {
-              schools.handleStartGhostMode(school, fullReason);
-              schools.setGhostGateSchool(null);
-            }}
-          />
-
-          {/* School Archive Modal */}
-          <SchoolArchiveModal
-            archiveModalSchool={schools.archiveModalSchool}
-            onClose={() => schools.setArchiveModalSchool(null)}
-            onPauseSchool={(s) => schools.handleToggleSchoolStatus(s, 'suspended')}
-            onDeleteSchool={(id, name) => schools.handleDeleteSchool(id, name)}
-          />
-
-          {/* Cmd+K Master Command Palette */}
-          <MasterCommandPaletteModal
-            isOpen={commandPaletteOpen}
-            search={commandSearch}
-            setSearch={setCommandSearch}
-            onClose={() => setCommandPaletteOpen(false)}
-            schools={schools.schools}
-            onSelectSchool={(s: School) => {
-              schools.setSelectedSchool(s);
-              setCommandPaletteOpen(false);
-            }}
-            onNavigateTab={(tab) => {
-              setActivePortalTab(tab as MasterAdminPortalTab);
-              setCommandPaletteOpen(false);
-            }}
-          />
-
-          {/* Executive Monthly Report Modal */}
-          <ExecutiveMonthlyReportModal
-            isOpen={showMonthlyReportModal}
-            onClose={() => setShowMonthlyReportModal(false)}
-            selectedReportMonth={selectedReportMonth}
-            schools={schools.schools}
-            pendingUsers={[]}
-            priceCampus={pricing.priceCampus}
-            priceGroovelab={pricing.priceGroovelab}
-            priceKombi={pricing.priceKombi}
-            priceStudent={pricing.priceStudent}
-          />
-
-          {/* Pricing Legal Notice Modal */}
-          <PricingLegalNoticeModal
-            isOpen={showLegalNoticeModal}
-            onClose={() => setShowLegalNoticeModal(false)}
-            priceCampus={Number(pricing.priceCampus)}
-            priceGroovelab={Number(pricing.priceGroovelab)}
-            priceKombi={Number(pricing.priceKombi)}
-            priceTeacher={Number(pricing.priceTeacher)}
-            priceStudent={Number(pricing.priceStudent)}
-            priceEffectiveDate={pricing.priceEffectiveDate}
-          />
-
-          {/* 15-Min Inactivity Idle Lock Screen */}
-          <MasterIdleLockModal
-            isIdleLocked={idleLock.isIdleLocked}
-            idleUnlockLoading={idleLock.idleUnlockLoading}
-            idlePinInput={idleLock.idlePinInput}
-            setIdlePinInput={idleLock.setIdlePinInput}
-            idleError={idleLock.idleError}
-            onIdleUnlock={idleLock.handleIdleUnlock}
-            masterPasskeyActive={operator.masterPasskeyActive}
+          {/* Consolidated Modals Hub with JIT Step-Up Verification */}
+          <MasterAdminModalsHub
+            schools={schools}
+            pricing={pricing}
+            operator={operator}
+            idleLock={idleLock}
+            modalStates={modalStates}
+            stepUp={stepUp}
+            activePortalTab={activePortalTab}
+            setActivePortalTab={setActivePortalTab}
             onLogout={onLogout}
           />
-
-          {/* Campus-Groovelab Fullscreen-Akademie */}
-          {isAkademieOpen && (
-            <Suspense fallback={null}>
-              <HelpCenterModal
-                isOpen={isAkademieOpen}
-                onClose={() => setIsAkademieOpen(false)}
-                userRole="master_admin"
-                activePlatform="campus"
-                initialBoardId={activePortalTab}
-                onNavigateBoard={(target) => {
-                  if (target) setActivePortalTab(target as MasterAdminPortalTab);
-                }}
-                schoolName="Campus-Groovelab Platform Root"
-              />
-            </Suspense>
-          )}
         </div>
       </div>
     </div>

@@ -16,8 +16,13 @@ export function getSimulatedNow(): Date {
     if (!simStr) return new Date();
 
     const startTsStr = localStorage.getItem(STORAGE_KEY_TS);
-    const startTs = startTsStr ? parseInt(startTsStr, 10) : Date.now();
-    const elapsed = Date.now() - (isNaN(startTs) ? Date.now() : startTs);
+    let startTs = startTsStr ? parseInt(startTsStr, 10) : NaN;
+    // ⏰ Garantierter 14:00:00 Uhr Start: Bei fehlendem, veraltetem (>10h) oder negativem Timestamp neu ansetzen
+    if (isNaN(startTs) || (Date.now() - startTs) > 10 * 60 * 60 * 1000 || (Date.now() - startTs) < 0) {
+      startTs = Date.now();
+      localStorage.setItem(STORAGE_KEY_TS, String(startTs));
+    }
+    const elapsed = Date.now() - startTs;
 
     const parts = simStr.split('-').map(Number);
     if (parts.length !== 3 || isNaN(parts[0])) return new Date();

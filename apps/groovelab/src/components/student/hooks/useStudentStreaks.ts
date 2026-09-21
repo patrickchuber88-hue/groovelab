@@ -67,7 +67,10 @@ export function useStudentStreaks({
   // Streak & Target states
   const [hasCompletedTargetToday, setHasCompletedTargetToday] = useState<boolean>(false);
   const streakFlamesCount = avatar?.streak_flame || 0;
-  const flamesActive = streakFlamesCount > 0;
+  const campusSettings = useMemo(() => {
+    return studentUser?.schools?.opening_hours?.campus_settings || {};
+  }, [studentUser]);
+  const flamesActive = campusSettings.flames_active !== false;
 
   const getTargetMinutes = useCallback((streak: number): number => {
     if (streak >= 14) return 20;

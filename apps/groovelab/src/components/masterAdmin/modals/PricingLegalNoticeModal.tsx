@@ -35,7 +35,7 @@ export const PricingLegalNoticeModal: React.FC<PricingLegalNoticeModalProps> = (
       `Kombi-Vorteil Bundle: ${Number(priceKombi).toFixed(2)} € / Mo.\n` +
       `Lehrer- & Verwaltungsprofil: ${Number(priceTeacher).toFixed(2)} € / Mo.\n` +
       `Schüleraktivierung: ${Number(priceStudent).toFixed(2)} € / Mo.\n\n` +
-      `Gesetzliche Belehrung (§ 308 BGB):\n` +
+      `Gesetzliche Belehrung zum Sonderkündigungsrecht:\n` +
       `Sie haben das Recht, dieser Vertragsanpassung innerhalb von vier (4) Wochen ab Zugang dieser Mitteilung in Textform zu widersprechen. Im Falle eines Widerspruchs steht Ihnen das Recht zu, das Abonnement zum Stichtag des Inkrafttretens kostenfrei außerordentlich zu kündigen.`
     );
     alert('Rechtssicherer Mitteilungstext erfolgreich in die Zwischenablage kopiert!');
@@ -152,7 +152,7 @@ export const PricingLegalNoticeModal: React.FC<PricingLegalNoticeModalProps> = (
           </div>
 
           <p style={{ margin: '0 0 12px 0', fontWeight: 700, color: '#0f172a' }}>
-            ⚖️ Gesetzliche Belehrung zum Sonderkündigungsrecht (§ 308 BGB):
+            ⚖️ Gesetzliche Belehrung zum Sonderkündigungsrecht:
           </p>
           <p style={{ margin: '0 0 12px 0', fontSize: '0.80rem', color: '#334155' }}>
             Sie haben das Recht, dieser Vertragsanpassung innerhalb von vier (4) Wochen ab Zugang dieser Mitteilung in Textform zu widersprechen. Im Falle eines form- und fristgerechten Widerspruchs steht Ihnen das Recht zu, das Abonnement zum Stichtag des Inkrafttretens ({effectiveDateFormatted}) kostenfrei außerordentlich zu kündigen. Wenn Sie nicht widersprechen, gilt die Vertragsanpassung als von Ihnen genehmigt.

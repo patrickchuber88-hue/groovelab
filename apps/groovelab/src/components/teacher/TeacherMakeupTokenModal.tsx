@@ -477,7 +477,7 @@ export const TeacherMakeupTokenModal: React.FC<MakeupTokenModalProps> = ({
                 </div>
               </div>
 
-              {/* Juristischer Transparenz-Kasten (§ 275 BGB / Tier-1 Enterprise) */}
+              {/* Revisionssicherer Transparenz-Kasten */}
               <div style={{
                 background: '#eff6ff',
                 border: '1px solid #bfdbfe',

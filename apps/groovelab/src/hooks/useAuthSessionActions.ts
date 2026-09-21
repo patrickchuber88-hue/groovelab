@@ -340,13 +340,25 @@ export function useAuthSessionActions({
     }
     setLoggedInUserIdRaw(userId);
 
-    const { data: userToLogin } = await supabase.from('users').select('*, schools(*)').eq('id', userId).single();
+    let { data: userToLogin } = await supabase.from('users').select('*, schools(*)').eq('id', userId).single();
+
+    if (!userToLogin && typeof window !== 'undefined') {
+      try {
+        const cached = sessionStorage.getItem('groovelab_cached_user');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed?.id === userId) {
+            userToLogin = parsed;
+          }
+        }
+      } catch (e) {}
+    }
 
     const existingWorkspace = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_workspace') : null;
 
     let effectiveUser = userToLogin;
     if (!effectiveUser && isLocalhost) {
-      const targetSchoolId = typeof window !== 'undefined' ? (localStorage.getItem('groovelab_last_school_id') || localStorage.getItem('groovelab_school_id') || '') : '';
+      const targetSchoolId = typeof window !== 'undefined' ? (localStorage.getItem('groovelab_last_school_id') || localStorage.getItem('groovelab_school_id') || (isLocalhost ? '53e83805-1d5a-4ed8-988e-1fb0b8200b9c' : '')) : (isLocalhost ? '53e83805-1d5a-4ed8-988e-1fb0b8200b9c' : '');
       if (!targetSchoolId) {
         console.warn('[useAuthSessionActions] Fail-Closed: Cannot construct session without a resolved school_id.');
         return;
@@ -355,6 +367,10 @@ export function useAuthSessionActions({
       const isTeacher = existingWorkspace === 'teacher' || userId === '98b6a599-7ff7-4f99-b51d-b6a4c348a0a0' || userId === '11079eae-664a-49a4-8692-771d83a3193c';
       const isMaster = existingWorkspace === 'master_admin' || userId === '88888888-8888-8888-8888-888888888888';
       effectiveUser = {
+        id: userId,
+        first_name: isStudent ? 'Linus' : (isTeacher ? 'Peter' : (isMaster ? 'Master' : 'Manuel')),
+        last_name: isStudent ? 'K.' : (isTeacher ? 'Pan' : (isMaster ? 'Admin' : 'Wagner')),
+        name: isStudent ? 'Linus K.' : (isTeacher ? 'Peter Pan' : (isMaster ? 'Master Admin' : 'Manuel Wagner')),
         role: isMaster ? 'admin' : (isStudent ? 'student' : (isTeacher ? 'teacher' : 'admin')),
         roles: isTeacher ? ['teacher', 'admin'] : [isMaster ? 'admin' : (isStudent ? 'student' : 'admin')],
         contract_ends_at: null,
@@ -365,6 +381,7 @@ export function useAuthSessionActions({
         is_master_admin: isMaster,
         schools: {
           id: targetSchoolId,
+          name: 'Musäk Bad Säckingen',
           has_campus_subscription: true,
           has_groovelab_subscription: true,
           is_billing_booked: true,
@@ -462,23 +479,26 @@ export function useAuthSessionActions({
       setActiveStudentTab('qr_landing');
     }
 
-    // Force checkout from active sessions for Campus logins / Admins / Secretaries to prevent automatic check-in visibility
+    // Force checkout from active sessions for Campus logins / Admins / Secretaries to prevent automatic check-in visibility (non-blocking)
     const isCampus = activePlatform === 'campus' || currentRole === 'admin' || currentRole === 'secretary';
     if (isCampus) {
-      await supabase
+      supabase
         .from('sessions')
         .update({ check_out_time: new Date().toISOString() })
         .eq('user_id', userId)
-        .is('check_out_time', null);
+        .is('check_out_time', null)
+        .then(() => {})
+        .catch(() => {});
     }
 
-    const isStaff = userToLogin?.role === 'teacher' || userToLogin?.role === 'admin' || userToLogin?.role === 'secretary';
+    const resolvedRole = (effectiveUser?.role || currentRole || '').toLowerCase();
+    const isStaff = resolvedRole === 'teacher' || resolvedRole === 'admin' || resolvedRole === 'secretary';
     const mode = (isStaff && activePlatform === 'groovelab') ? 'lab' : (isHome ? 'home' : 'lab');
     
-    // If we are switching profiles, mark the OLD one as offline first (excluding teachers)
+    // If we are switching profiles, mark the OLD one as offline first (excluding teachers, non-blocking)
     if (loggedInUserId && loggedInUserId !== userId && user?.role !== 'teacher') {
       const pastDate = new Date(Date.now() - 10 * 60000).toISOString();
-      await supabase.from('users').update({ last_seen: pastDate }).eq('id', loggedInUserId);
+      supabase.from('users').update({ last_seen: pastDate }).eq('id', loggedInUserId).then(() => {}).catch(() => {});
     }
 
     // Store in sessionStorage per-tab so each browser tab is 100% isolated
@@ -486,7 +506,7 @@ export function useAuthSessionActions({
     sessionStorage.setItem('groovelab_location_mode', mode);
     if (effectiveUser) {
       try {
-        const isStudentRole = (effectiveUser.role || '').toLowerCase() === 'student';
+        const isStudentRole = resolvedRole === 'student';
         const userToCache = isStudentRole ? { ...effectiveUser, last_name: undefined } : effectiveUser;
         sessionStorage.setItem('groovelab_cached_user', JSON.stringify(userToCache));
         updateUserRaw(effectiveUser);
@@ -498,7 +518,7 @@ export function useAuthSessionActions({
     
     // Check if the user selected 'groovelab' on the login screen
     let selectedPlat = sessionStorage.getItem('groovelab_active_platform') || 'campus';
-    if (!localIsKioskMode && (userToLogin?.role === 'student' || userToLogin?.role === 'teacher')) {
+    if (!localIsKioskMode && (resolvedRole === 'student' || resolvedRole === 'teacher')) {
       selectedPlat = 'campus';
       sessionStorage.setItem('groovelab_active_platform', 'campus');
     } else if (localIsKioskMode) {
@@ -510,7 +530,7 @@ export function useAuthSessionActions({
       sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
       sessionStorage.setItem('groovelab_is_master_admin', 'true');
       sessionStorage.setItem('campus_active_tab', 'briefing');
-    } else if (userToLogin?.role === 'student') {
+    } else if (resolvedRole === 'student') {
       sessionStorage.setItem('groovelab_active_workspace', 'student');
       if (selectedPlat === 'groovelab') {
         sessionStorage.setItem('groovelab_active_tab', 'live');
@@ -518,7 +538,7 @@ export function useAuthSessionActions({
         sessionStorage.setItem('campus_active_tab', 'briefing');
         sessionStorage.setItem('groovelab_active_tab', 'briefing');
       }
-    } else if (userToLogin?.role === 'teacher') {
+    } else if (resolvedRole === 'teacher') {
       sessionStorage.setItem('groovelab_active_workspace', 'teacher');
       if (selectedPlat === 'groovelab') {
         sessionStorage.setItem('groovelab_active_tab', 'live');
@@ -526,7 +546,7 @@ export function useAuthSessionActions({
         sessionStorage.setItem('campus_active_tab', 'briefing');
         sessionStorage.setItem('groovelab_active_tab', 'briefing');
       }
-    } else if (userToLogin?.role === 'secretary' || userToLogin?.role === 'admin') {
+    } else if (resolvedRole === 'secretary' || resolvedRole === 'admin') {
       sessionStorage.setItem('groovelab_active_workspace', 'secretary');
       sessionStorage.setItem('groovelab_secretary_subtab', 'briefing');
       sessionStorage.setItem('campus_active_tab', 'briefing');
@@ -543,11 +563,13 @@ export function useAuthSessionActions({
     setActiveStudentTab(startTab);
 
     // Immediate Heartbeat on Login (non-blocking for instantaneous login transition! Excludes teachers under TVöD § 26 BDSG)
-    if (userToLogin?.role !== 'teacher') {
+    if (resolvedRole !== 'teacher') {
       supabase
         .from('users')
         .update({ last_seen: new Date().toISOString() })
-        .eq('id', userId);
+        .eq('id', userId)
+        .then(() => {})
+        .catch(() => {});
     }
       
     // 🛡️ Forensische URL-Sanitization: Bereinigt Query-Params und leitet autoritativ auf /dashboard
@@ -557,7 +579,7 @@ export function useAuthSessionActions({
       } else {
         window.location.reload();
       }
-    }, 50);
+    }, 10);
   }, [
     supabase,
     stationIdFromStorage,
