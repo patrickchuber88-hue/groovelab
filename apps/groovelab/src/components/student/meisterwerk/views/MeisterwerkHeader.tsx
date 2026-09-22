@@ -432,6 +432,41 @@ export const MeisterwerkHeader: React.FC<MeisterwerkHeaderProps> = ({
                 <span>An Schüler zuweisen</span>
               </button>
             )}
+            {isMobileOrSim && (activeViewMode !== 'document' || activeModalTab !== 'document' || activeSubView !== 'hub' || hubTab === 'protocol') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveModalTab('document');
+                  setActiveViewMode('document');
+                  setActiveSubView('hub');
+                  setHubTab('modules');
+                }}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.22)',
+                  border: '1px solid rgba(255, 255, 255, 0.35)',
+                  borderRadius: '100px',
+                  minHeight: '34px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px',
+                  color: '#ffffff',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  padding: '4px 10px',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
+                  touchAction: 'manipulation',
+                  flexShrink: 0
+                }}
+                className="hover-scale"
+                aria-label="Zurück zum Aufgabenheft"
+                title="Zurück zum Aufgabenheft"
+              >
+                <ArrowLeft size={14} strokeWidth={2.6} />
+                <span>Zurück</span>
+              </button>
+            )}
             {renderFullscreenButton()}
             {renderCloseButton()}
           </div>

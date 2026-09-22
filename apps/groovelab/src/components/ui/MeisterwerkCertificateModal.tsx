@@ -173,7 +173,7 @@ export const MeisterwerkCertificateModal: React.FC<MeisterwerkCertificateProps> 
         }
       `}</style>
 
-      <div
+      <div role="dialog" aria-modal="true"
         style={{
           background: '#ffffff',
           borderRadius: '24px',

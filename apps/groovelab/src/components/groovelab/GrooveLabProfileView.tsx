@@ -523,13 +523,22 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                               <button 
                                 onClick={async () => {
                                   if (window.confirm('VORSICHT: Möchtest du wirklich ALLE Wochenplan-Einträge für diese Schule löschen?')) {
-                                    const schoolData = Array.isArray((user as any)?.schools) ? (user as any)?.schools[0] : (user as any)?.schools;
-                                    if (!schoolData?.id) return;
-                                    const { error } = await supabase.from('lab_planning').delete().eq('school_id', schoolData.id);
-                                    if (error) alert('Fehler: ' + error.message);
-                                    else {
-                                      alert('Wochenplan wurde auf 0 zurückgesetzt! ✅');
-                                      if (fetchPlanningData) fetchPlanningData(schoolData.id);
+                                    try {
+                                      const targetSchoolId = (user as any)?.school_id || (Array.isArray((user as any)?.schools) ? (user as any)?.schools[0]?.id : (user as any)?.schools?.id);
+                                      if (!targetSchoolId) {
+                                        alert('Fehler: Schul-ID konnte nicht ermittelt werden.');
+                                        return;
+                                      }
+                                      const { error } = await supabase.from('lab_planning').delete().eq('school_id', targetSchoolId);
+                                      if (error) {
+                                        alert('Fehler: ' + error.message);
+                                      } else {
+                                        alert('Wochenplan wurde auf 0 zurückgesetzt! ✅');
+                                        if (fetchPlanningData) fetchPlanningData(targetSchoolId);
+                                      }
+                                    } catch (err: any) {
+                                      console.error('[GrooveLabProfileView] Fehler beim Zurücksetzen des Wochenplans:', err);
+                                      alert('Fehler beim Zurücksetzen: ' + (err?.message || 'Unbekannter Fehler'));
                                     }
                                   }
                                 }}
@@ -1210,13 +1219,22 @@ export const GrooveLabProfileView: React.FC<GrooveLabProfileViewProps> = ({
                               <button 
                                 onClick={async () => {
                                   if (window.confirm('VORSICHT: Möchtest du wirklich ALLE Wochenplan-Einträge für diese Schule löschen?')) {
-                                    const schoolData = Array.isArray((user as any)?.schools) ? (user as any)?.schools[0] : (user as any)?.schools;
-                                    if (!schoolData?.id) return;
-                                    const { error } = await supabase.from('lab_planning').delete().eq('school_id', schoolData.id);
-                                    if (error) alert('Fehler: ' + error.message);
-                                    else {
-                                      alert('Wochenplan wurde auf 0 zurückgesetzt! ✅');
-                                      if (fetchPlanningData) fetchPlanningData(schoolData.id);
+                                    try {
+                                      const targetSchoolId = (user as any)?.school_id || (Array.isArray((user as any)?.schools) ? (user as any)?.schools[0]?.id : (user as any)?.schools?.id);
+                                      if (!targetSchoolId) {
+                                        alert('Fehler: Schul-ID konnte nicht ermittelt werden.');
+                                        return;
+                                      }
+                                      const { error } = await supabase.from('lab_planning').delete().eq('school_id', targetSchoolId);
+                                      if (error) {
+                                        alert('Fehler: ' + error.message);
+                                      } else {
+                                        alert('Wochenplan wurde auf 0 zurückgesetzt! ✅');
+                                        if (fetchPlanningData) fetchPlanningData(targetSchoolId);
+                                      }
+                                    } catch (err: any) {
+                                      console.error('[GrooveLabProfileView] Fehler beim Zurücksetzen des Wochenplans:', err);
+                                      alert('Fehler beim Zurücksetzen: ' + (err?.message || 'Unbekannter Fehler'));
                                     }
                                   }
                                 }}

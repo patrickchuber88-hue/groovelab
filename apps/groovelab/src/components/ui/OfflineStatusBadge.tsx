@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { CloudOff, RefreshCw, Check, ShieldCheck, Wifi } from 'lucide-react';
+import { RefreshCw, Check } from 'lucide-react';
 import { subscribeOfflineState, flushAllOfflineData, OfflineQueueState } from '../../services/offlineSyncService';
 
 interface OfflineStatusBadgeProps {
@@ -7,7 +7,7 @@ interface OfflineStatusBadgeProps {
   variant?: 'floating' | 'header';
 }
 
-export const OfflineStatusBadge: React.FC<OfflineStatusBadgeProps> = ({ floating = true, variant = 'floating' }) => {
+export const OfflineStatusBadge: React.FC<OfflineStatusBadgeProps> = () => {
   const [offlineState, setOfflineState] = useState<OfflineQueueState>({
     pendingActionsCount: 0,
     pendingAudioCount: 0,
@@ -22,10 +22,10 @@ export const OfflineStatusBadge: React.FC<OfflineStatusBadgeProps> = ({ floating
   useEffect(() => {
     const unsubscribe = subscribeOfflineState((newState) => {
       setOfflineState((prev) => {
-        // If we were syncing and now totalPending is 0, show short success confirmation
-        if (prev.isSyncing && !newState.isSyncing && newState.totalPending === 0) {
+        // If we were syncing and now not syncing, show short success confirmation (1.8s)
+        if (prev.isSyncing && !newState.isSyncing) {
           setRecentlySynced(true);
-          setTimeout(() => setRecentlySynced(false), 3500);
+          setTimeout(() => setRecentlySynced(false), 1800);
         }
         return newState;
       });
@@ -36,32 +36,20 @@ export const OfflineStatusBadge: React.FC<OfflineStatusBadgeProps> = ({ floating
     };
   }, []);
 
-  // Only render if offline, has pending items, syncing, or recently synced
-  const shouldShow = !offlineState.isOnline || offlineState.totalPending > 0 || offlineState.isSyncing || recentlySynced;
+  // 1% Goldstandard Visibility Axiom: ONLY render if syncing, offline, or recently completed
+  const shouldShow = !offlineState.isOnline || offlineState.isSyncing || recentlySynced;
 
   if (!shouldShow) {
     return null;
   }
 
-  // On desktop with header, suppress default floating badge so it does not cover the sidebar footer
-  const isHeaderMode = variant === 'header';
-  const isDesktop = typeof window !== 'undefined' ? window.innerWidth > 768 : true;
-  if (!isHeaderMode && floating && isDesktop) {
-    return null;
-  }
-
-  const containerStyle: React.CSSProperties = isHeaderMode ? {
-    display: 'inline-flex',
-    alignItems: 'center',
-    flexShrink: 0
-  } : floating ? {
+  const containerStyle: React.CSSProperties = {
     position: 'fixed',
-    bottom: 'calc(var(--bottom-bar-height, 68px) + env(safe-area-inset-bottom) + 12px)',
-    left: '16px',
+    bottom: 'calc(var(--bottom-bar-height, 0px) + env(safe-area-inset-bottom) + 24px)',
+    right: '24px',
     zIndex: 9999,
+    pointerEvents: offlineState.isSyncing || recentlySynced ? 'none' : 'auto',
     animation: 'slideUpBadge 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
-  } : {
-    display: 'inline-flex'
   };
 
   const handleManualSync = () => {
@@ -70,119 +58,60 @@ export const OfflineStatusBadge: React.FC<OfflineStatusBadgeProps> = ({ floating
     }
   };
 
-  const isInteractive = offlineState.isOnline && offlineState.totalPending > 0 && !offlineState.isSyncing;
-
-  const getAriaLabel = (): string => {
-    if (!offlineState.isOnline) {
-      return `Offline-Tresor aktiv: Stundenpläne und Hausaufgaben lokal verfügbar. ${offlineState.totalPending > 0 ? `${offlineState.totalPending} Aktionen für Synchronisation vorgemerkt.` : ''}`;
-    }
-    if (offlineState.isSyncing) {
-      return 'Synchronisiere lokale Daten mit der Supabase Cloud...';
-    }
-    if (recentlySynced) {
-      return 'Wieder online: Alle Daten wurden erfolgreich synchronisiert.';
-    }
-    return `${offlineState.totalPending} ausstehende Aktionen bereit. Klicken oder Eingabetaste drücken, um jetzt mit der Cloud zu synchronisieren.`;
-  };
-
   return (
     <div style={containerStyle}>
       <style>{`
         @keyframes slideUpBadge {
-          0% { transform: translateY(16px); opacity: 0; }
-          100% { transform: translateY(0); opacity: 1; }
+          0% { transform: translateY(12px) scale(0.96); opacity: 0; }
+          100% { transform: translateY(0) scale(1); opacity: 1; }
         }
         @keyframes badgeSpin {
           100% { transform: rotate(360deg); }
         }
-        .offline-badge-focus:focus-visible {
-          outline: 2px solid #34a853 !important;
-          outline-offset: 2px !important;
-        }
-        .offline-header-pill:hover {
-          background: #dcfce7 !important;
-          border-color: #86efac !important;
-        }
       `}</style>
       <div 
-        role={isInteractive ? 'button' : 'status'}
-        tabIndex={isInteractive ? 0 : -1}
-        aria-label={getAriaLabel()}
+        role="status"
+        aria-live="polite"
         onClick={handleManualSync}
-        onKeyDown={(e) => {
-          if ((e.key === 'Enter' || e.key === ' ') && isInteractive) {
-            e.preventDefault();
-            handleManualSync();
-          }
-        }}
-        className={`offline-badge-focus ${isHeaderMode ? 'offline-header-pill' : ''} ${isInteractive ? 'hover-scale-mini' : ''}`}
-        style={isHeaderMode ? {
-          background: '#f0fdf4',
-          border: '1.2px solid #bbf7d0',
-          color: '#166534',
-          height: '36px',
-          borderRadius: '10px',
-          padding: '0 12px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          fontSize: '0.75rem',
-          fontWeight: 750,
-          cursor: isInteractive ? 'pointer' : 'default',
-          userSelect: 'none',
-          transition: 'all 0.18s ease',
-          outline: 'none',
-          boxSizing: 'border-box',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
-          fontFamily: "'Plus Jakarta Sans', -apple-system, sans-serif"
-        } : {
-          background: 'rgba(255, 255, 255, 0.95)',
+        style={{
+          background: 'rgba(255, 255, 255, 0.94)',
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
-          color: '#166534',
-          borderRadius: '24px',
+          color: recentlySynced ? '#15803d' : offlineState.isSyncing ? '#0369a1' : '#334155',
+          borderRadius: '20px',
           padding: '7px 14px',
-          border: '1.2px solid #bbf7d0',
-          boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(52, 168, 83, 0.08)',
+          border: recentlySynced ? '1px solid #bbf7d0' : offlineState.isSyncing ? '1px solid #bae6fd' : '1px solid #e2e8f0',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.04)',
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
-          fontSize: '0.75rem',
+          fontSize: '0.74rem',
           fontWeight: 750,
-          cursor: isInteractive ? 'pointer' : 'default',
           userSelect: 'none',
-          transition: 'all 0.2s ease',
-          outline: 'none',
-          touchAction: 'manipulation',
+          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
           fontFamily: "'Plus Jakarta Sans', -apple-system, sans-serif"
         }}
-        title={isInteractive ? 'Klicken, um jetzt mit der Cloud zu synchronisieren' : undefined}
       >
         {!offlineState.isOnline ? (
           <>
             <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 8px #10b981', flexShrink: 0 }} />
-            <span>{isHeaderMode ? `Offline-Tresor aktiv ${offlineState.totalPending > 0 ? `(${offlineState.totalPending})` : ''}` : `🟢 Offline-Tresor aktiv · Stundenpläne & Hausaufgaben lokal verfügbar ${offlineState.totalPending > 0 ? `(${offlineState.totalPending} bereit)` : ''}`}</span>
+            <span>Offline-Tresor aktiv</span>
           </>
         ) : offlineState.isSyncing ? (
           <>
             <RefreshCw 
               size={13} 
               color="#0284c7" 
-              style={{ flexShrink: 0, animation: 'badgeSpin 1s linear infinite' }} 
+              style={{ flexShrink: 0, animation: 'badgeSpin 0.9s linear infinite' }} 
             />
-            <span>{isHeaderMode ? 'Synchronisiere...' : 'Synchronisiere mit Cloud...'}</span>
+            <span>Synchronisiere...</span>
           </>
         ) : recentlySynced ? (
           <>
             <Check size={14} color="#16a34a" style={{ flexShrink: 0 }} />
-            <span>{isHeaderMode ? '✨ Synchronisiert' : '✨ Wieder online · Daten synchronisiert'}</span>
+            <span>Synchronisiert</span>
           </>
-        ) : (
-          <>
-            <ShieldCheck size={14} color="#16a34a" style={{ flexShrink: 0 }} />
-            <span>{offlineState.totalPending} ausstehend · Sync bereit</span>
-          </>
-        )}
+        ) : null}
       </div>
     </div>
   );

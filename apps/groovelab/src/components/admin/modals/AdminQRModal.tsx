@@ -392,10 +392,20 @@ export const AdminQRModal: React.FC<AdminQRModalProps> = ({
             type="button"
             onClick={() => {
               const effectiveToken = (selectedQRUser.role === 'teacher' || selectedQRUser.role === 'admin' || selectedQRUser.role === 'secretary')
-                ? (selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || '')
-                : (selectedQRUser.qr_token || selectedQRUser.ausweis_nummer || '');
-              const qrUrl = getCanonicalQrLandingUrl(effectiveToken);
-              window.open(qrUrl, '_blank');
+                ? (selectedQRUser.teacher_qr_token || selectedQRUser.qr_token || selectedQRUser.ausweis_nummer || selectedQRUser.id || '')
+                : (selectedQRUser.qr_token || selectedQRUser.ausweis_nummer || selectedQRUser.id || '');
+              const rawQrUrl = getCanonicalQrLandingUrl(effectiveToken);
+              const qrUrl = rawQrUrl 
+                ? (rawQrUrl.includes('?') ? `${rawQrUrl}&dev_sim=true` : `${rawQrUrl}?dev_sim=true`)
+                : '';
+              if (!qrUrl) {
+                alert('Kein gültiges Token oder Benutzer-ID zur Simulation gefunden.');
+                return;
+              }
+              const win = window.open(qrUrl, '_blank', 'noopener,noreferrer');
+              if (!win || win.closed || typeof win.closed === 'undefined') {
+                window.location.href = qrUrl;
+              }
             }}
             style={{
               width: '100%',

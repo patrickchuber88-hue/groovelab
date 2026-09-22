@@ -69,7 +69,7 @@ export function useTeacherAbsence({
   const [optimisticContacted, setOptimisticContacted] = useState<Record<string, { status: string; at: string }>>({});
 
   const fetchUrgentCancellations = useCallback(async () => {
-    if (!userId) return;
+    if (!userId || teacher?.role?.toLowerCase() === 'student') return;
     try {
       const { data, error } = await supabase.rpc('get_urgent_unacknowledged_cancellations', {
         p_teacher_id: userId
@@ -139,7 +139,7 @@ export function useTeacherAbsence({
   const [selectedMakeupToken, setSelectedMakeupToken] = useState<any>(null);
 
   const fetchActiveMakeupTokens = useCallback(async () => {
-    if (!userId) return;
+    if (!userId || teacher?.role?.toLowerCase() === 'student') return;
     try {
       const { data, error } = await supabase.rpc('get_teacher_active_makeup_tokens', {
         p_teacher_id: userId

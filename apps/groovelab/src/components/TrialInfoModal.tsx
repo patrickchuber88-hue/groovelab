@@ -53,7 +53,7 @@ export const TrialInfoModal: React.FC<TrialInfoModalProps> = ({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div
+      <div role="dialog" aria-modal="true"
         style={{
           background: '#ffffff',
           borderRadius: '24px',

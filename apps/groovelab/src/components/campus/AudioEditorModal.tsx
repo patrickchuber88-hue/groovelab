@@ -15,6 +15,8 @@ import {
   Scissors 
 } from 'lucide-react';
 import { getBlob, storeBlob } from '../../utils/blobStorage';
+import { getOfflineAudioRecord } from '../../utils/offlineAudioVault';
+import { getSecureAudioUrl } from '../../utils/audioStorageHelper';
 import { shiftAudioBufferPitch } from '../../utils/pitchShifter';
 import { safeDecodeAudioData, audioBufferToWavBlob } from '../../utils/audioMasteringEngine';
 import { getAudioNotes } from '../../utils/audioNotesStorage';
@@ -150,13 +152,25 @@ export const AudioEditorModal: React.FC<AudioEditorModalProps> = ({
         if (activeUrl.startsWith('data:') || activeUrl.startsWith('blob:')) {
           const resp = await fetch(activeUrl);
           arrayBuffer = await resp.arrayBuffer();
+        } else if (activeUrl.startsWith('schools/') || activeUrl.includes('/storage/v1/object/')) {
+          const signedUrl = await getSecureAudioUrl(activeUrl, 'campus-assets', 1800);
+          const resp = await fetch(signedUrl, { mode: 'cors' });
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          arrayBuffer = await resp.arrayBuffer();
         } else if (activeUrl.startsWith('http://') || activeUrl.startsWith('https://')) {
           const resp = await fetch(activeUrl, { mode: 'cors' });
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
           arrayBuffer = await resp.arrayBuffer();
         } else {
-          // Local IndexedDB key (e.g. campus_blob_... or campus_audio_...)
-          const raw = await getBlob(activeUrl);
+          // Local IndexedDB key (e.g. campus_blob_..., campus_audio_..., offline://..., or audio_...)
+          let raw: any = await getBlob(activeUrl);
+          if (!raw) {
+            const cleanKey = activeUrl.replace(/^offline:\/\//, '');
+            const offlineRec = await getOfflineAudioRecord(cleanKey);
+            if (offlineRec && offlineRec.blob) {
+              raw = offlineRec.blob;
+            }
+          }
           if (raw instanceof Blob) {
             arrayBuffer = await raw.arrayBuffer();
           } else if (raw instanceof ArrayBuffer) {

@@ -217,7 +217,7 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
   // 🚀 Performance Optimization: Lazy-mount student Live Lab (TeacherDashboard) on first navigation
   // Keeps it mounted afterwards for instantaneous tab switching without initial login query storm
   const isStudent = user?.role?.toLowerCase() === 'student';
-  const isLiveLabActive = activePlatform === 'groovelab' || (activePlatform !== 'ensembles' && activePlatform !== 'campus' && activeStudentTab === 'live');
+  const isLiveLabActive = isStudent && activePlatform === 'groovelab' && activeStudentTab === 'live';
   const [hasVisitedLiveLab, setHasVisitedLiveLab] = React.useState(isLiveLabActive);
 
   React.useEffect(() => {
@@ -225,6 +225,26 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
       setHasVisitedLiveLab(true);
     }
   }, [isLiveLabActive, hasVisitedLiveLab]);
+
+  // 🚀 Performance Optimization: Lazy-mount and preserve Admin/Teacher Suite & Messages
+  const isStaffRole = user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'secretary';
+  const isAdminTeacherSuiteActive = isStaffRole && activePlatform !== 'ensembles' && activeStudentTab !== 'profile' && activeStudentTab !== 'messages';
+  const [hasVisitedAdminTeacherSuite, setHasVisitedAdminTeacherSuite] = React.useState(isAdminTeacherSuiteActive);
+
+  React.useEffect(() => {
+    if (isAdminTeacherSuiteActive && !hasVisitedAdminTeacherSuite) {
+      setHasVisitedAdminTeacherSuite(true);
+    }
+  }, [isAdminTeacherSuiteActive, hasVisitedAdminTeacherSuite]);
+
+  const isMessagesActive = activeStudentTab === 'messages';
+  const [hasVisitedMessages, setHasVisitedMessages] = React.useState(isMessagesActive);
+
+  React.useEffect(() => {
+    if (isMessagesActive && !hasVisitedMessages) {
+      setHasVisitedMessages(true);
+    }
+  }, [isMessagesActive, hasVisitedMessages]);
 
   return (
     <main id="main-content" tabIndex={-1} className="main-content" style={{ 
@@ -422,11 +442,13 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
                   initialTeacher={user}
                   hideHeader={true} 
                   viewMode="student" 
+                  initialTab="live"
                   onTabChange={setActiveStudentTab}
                   isSidebarCollapsed={isSidebarCollapsed}
                   setIsSidebarCollapsed={setIsSidebarCollapsed}
                   onSidebarNotificationsChange={setSidebarNotificationsCount}
                   activePlatform="groovelab"
+                  wallSongs={wallSongs}
                   session={session}
                   onSessionChange={setSession}
                   locationMode={locationMode}
@@ -533,61 +555,74 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
         </ErrorBoundary>
       )}
 
-      {/* Admin/Teacher Section Tabs (Unified) */}
-      {((user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'secretary')) && activePlatform !== 'ensembles' && activeStudentTab !== 'profile' && activeStudentTab !== 'messages' && (
-        <ErrorBoundary key={`admin-teacher-suite-${activePlatform}`}>
-          <AdminDashboard 
-            key={`admin-dashboard-${activePlatform}`}
-            userId={user.id} 
-            onLogout={handleLogout} 
-            forceTab={['schedule', 'students', 'team', 'rooms', 'songs', 'stats', 'gallery', 'setup', 'bands', 'events', 'briefing', 'live', showMissionsFeature ? 'missions' : ''].includes(activeStudentTab) ? activeStudentTab : undefined}
-            activePlatform={activePlatform as any}
-            onTabChange={(tabId: any) => setActiveStudentTab(tabId)}
-            onSwitchPlatform={(platform) => setActivePlatform(platform)}
-            onOpenBandProfile={(band: any) => {
-              setSelectedBandForProfile(band);
-              setShowBandProfile(true);
-            }}
-            session={session}
-            onSessionChange={setSession}
-            locationMode={locationMode}
-            onLocationModeChange={(mode) => {
-              setLocationMode(mode);
-              sessionStorage.setItem('groovelab_location_mode', mode);
-            }}
-          />
-        </ErrorBoundary>
+      {/* Admin/Teacher Section Tabs (Unified & Preserved for 0ms Tab-Switching) */}
+      {((user.role?.toLowerCase() === 'admin' || user.role?.toLowerCase() === 'teacher' || user.role?.toLowerCase() === 'secretary')) && activePlatform !== 'ensembles' && (hasVisitedAdminTeacherSuite || isAdminTeacherSuiteActive) && (
+        <div style={{
+          display: (isAdminTeacherSuiteActive && activeStudentTab !== 'profile' && activeStudentTab !== 'messages') ? 'block' : 'none',
+          width: '100%'
+        }}>
+          <ErrorBoundary key={`admin-teacher-suite-${activePlatform}-${activeWorkspace || user?.role || 'default'}`}>
+            <AdminDashboard 
+              key={`admin-dashboard-${activePlatform}-${activeWorkspace || user?.role || 'default'}`}
+              userId={user.id} 
+              activeWorkspace={activeWorkspace || (user.role === 'teacher' ? 'teacher' : undefined)}
+              userRole={user.role}
+              onLogout={handleLogout} 
+              forceTab={['schedule', 'students', 'team', 'rooms', 'songs', 'stats', 'gallery', 'setup', 'bands', 'events', 'briefing', 'live', showMissionsFeature ? 'missions' : ''].includes(activeStudentTab) ? activeStudentTab : undefined}
+              activePlatform={activePlatform as any}
+              onTabChange={(tabId: any) => setActiveStudentTab(tabId)}
+              onSwitchPlatform={(platform) => setActivePlatform(platform)}
+              onOpenBandProfile={(band: any) => {
+                setSelectedBandForProfile(band);
+                setShowBandProfile(true);
+              }}
+              session={session}
+              onSessionChange={setSession}
+              locationMode={locationMode}
+              onLocationModeChange={(mode) => {
+                setLocationMode(mode);
+                sessionStorage.setItem('groovelab_location_mode', mode);
+              }}
+            />
+          </ErrorBoundary>
+        </div>
       )}
 
-      {/* Messages Tab */}
-      {activeStudentTab === 'messages' && (
-        <MessagesTabContainer
-          user={user}
-          activePlatform={activePlatform}
-          schoolUsers={schoolUsers}
-          campusMessages={campusMessages}
-          announcements={announcements}
-          studentMessages={studentMessages}
-          selectedCampusRecipient={selectedCampusRecipient}
-          setSelectedCampusRecipient={setSelectedCampusRecipient}
-          onSendCampusMessage={handleSendCampusMessage}
-          onMarkCampusMessagesAsRead={handleMarkCampusMessagesAsRead}
-          onMarkCampusGroupAsRead={handleMarkCampusGroupAsRead}
-          onMarkCampusChannelAsRead={handleMarkCampusChannelAsRead}
-          onPostAnnouncement={async (title: any, message: any, targetType: any, targetUserIds: any) => {
-            setAnnouncementTitle(title);
-            setAnnouncementMessage(message);
-            setAnnouncementTarget(targetType as any);
-            setSelectedTargetUserIds(targetUserIds);
-            await handlePostAnnouncement({ preventDefault: () => {} } as any);
-          }}
-          onDeleteAnnouncement={handleDeleteAnnouncement}
-          onAcknowledgeMessage={handleAcknowledgeStudentMessage}
-        />
+      {/* Messages Tab (Preserved for 0ms Tab-Switching) */}
+      {(hasVisitedMessages || isMessagesActive) && (
+        <div style={{
+          display: activeStudentTab === 'messages' ? 'block' : 'none',
+          width: '100%',
+          height: '100%'
+        }}>
+          <MessagesTabContainer
+            user={user}
+            activePlatform={activePlatform}
+            schoolUsers={schoolUsers}
+            campusMessages={campusMessages}
+            announcements={announcements}
+            studentMessages={studentMessages}
+            selectedCampusRecipient={selectedCampusRecipient}
+            setSelectedCampusRecipient={setSelectedCampusRecipient}
+            onSendCampusMessage={handleSendCampusMessage}
+            onMarkCampusMessagesAsRead={handleMarkCampusMessagesAsRead}
+            onMarkCampusGroupAsRead={handleMarkCampusGroupAsRead}
+            onMarkCampusChannelAsRead={handleMarkCampusChannelAsRead}
+            onPostAnnouncement={async (title: any, message: any, targetType: any, targetUserIds: any) => {
+              setAnnouncementTitle(title);
+              setAnnouncementMessage(message);
+              setAnnouncementTarget(targetType as any);
+              setSelectedTargetUserIds(targetUserIds);
+              await handlePostAnnouncement({ preventDefault: () => {} } as any);
+            }}
+            onDeleteAnnouncement={handleDeleteAnnouncement}
+            onAcknowledgeMessage={handleAcknowledgeStudentMessage}
+          />
+        </div>
       )}
 
       {/* Practice & Repertoire Tabs */}
-      {['practice', 'repertoire'].includes(activeStudentTab) && (
+      {user.role?.toLowerCase() === 'student' && ['practice', 'repertoire'].includes(activeStudentTab) && (
         <StudentPracticeRepertoireTabs
           activeStudentTab={activeStudentTab as 'practice' | 'repertoire'}
           user={user}
@@ -617,7 +652,7 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
       )}
 
       {/* Band Matching & Bands Tabs (Students) */}
-      {['matching', 'bands'].includes(activeStudentTab) && user.role === 'student' && (
+      {['matching', 'bands'].includes(activeStudentTab) && user.role?.toLowerCase() === 'student' && (
         <StudentBandMatchingSuite
           activeStudentTab={activeStudentTab as 'matching' | 'bands'}
           user={user}
@@ -660,7 +695,7 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
         />
       )}
 
-      {activeStudentTab === 'library' && (
+      {user.role?.toLowerCase() === 'student' && activeStudentTab === 'library' && (
         <StudentLibraryTab
           globalSongs={globalSongs}
           userSongs={userSongs}
@@ -673,7 +708,10 @@ export const CampusMainContentRouter: React.FC<CampusMainContentRouterProps> = (
       {/* Team Tab */}
       {user.role?.toLowerCase() === 'student' && activeStudentTab === 'team' && (
         <StudentTeamTab
-          teachers={teachers}
+          teachers={activePlatform === 'groovelab'
+            ? teachers.filter((t: any) => Boolean(t.is_groovelab_active || t.isGroovelabActive))
+            : teachers.filter((t: any) => t.is_campus_active !== false && t.isCampusActive !== false)
+          }
           brandColor={brandColor}
           onSelectTeacher={(t: any) => setSelectedTeacher(t)}
           isMobile={isMobile}

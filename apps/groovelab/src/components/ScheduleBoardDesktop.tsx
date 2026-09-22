@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { usePremiumOnboardingTour, TourStartButton, TourStep } from './PremiumOnboardingTour';
 import { supabase, deleteUserStorageAssets, queryCache } from '../lib/supabase';
+import { logApplicationAudit } from '../services/auditLogService';
 import { 
   Calendar, 
   Plus, 
@@ -59,6 +60,7 @@ import {
   resolveLastName,
   formatMinutes
 } from '../domain/schedule/scheduleBoardTypes';
+import { isTeacherInstrumentCompatible } from '../services/studentRosterService';
 export type { Student, DayBoard };
 
 interface ScheduleBoardProps {
@@ -2928,25 +2930,34 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
 
       // ZERO-DATA-LOSS HARDENING: Extract all student IDs belonging to this teacher
       const allPoolStudents = masterStudentsRef.current.length > 0 ? masterStudentsRef.current : students;
+      const currentTeacherObj = teachers.find(t => t.id === selectedTeacherId);
+      const activeTeacherInstrument = currentTeacherObj?.instrument;
+
       const allTeacherStudentIds = Array.from(new Set(
         allPoolStudents
           .flatMap(s => s.isGroup && s.groupStudents ? s.groupStudents.map(gs => gs.id) : [s.id])
           .filter(id => id && !id.startsWith('group-') && !id.startsWith('break-'))
       ));
 
+      // FACH-INTEGRITÄT (1% Goldstandard): Nur fachkompatible Schüler auf teacher_id schreiben
+      const compatibleTeacherStudentIds = allTeacherStudentIds.filter(id => {
+        const studentObj = allPoolStudents.find(s => s.id === id || (s.groupStudents && s.groupStudents.some(gs => gs.id === id)));
+        return isTeacherInstrumentCompatible(activeTeacherInstrument, studentObj?.instrument);
+      });
+
       // Harden student ownership in Supabase: ensure teacher_id is set in users and students
-      if (allTeacherStudentIds.length > 0 && selectedTeacherId) {
+      if (compatibleTeacherStudentIds.length > 0 && selectedTeacherId) {
         try {
           await Promise.all([
             supabase
               .from('users')
               .update({ teacher_id: selectedTeacherId })
-              .in('id', allTeacherStudentIds)
+              .in('id', compatibleTeacherStudentIds)
               .eq('school_id', effectiveSchoolId),
             supabase
               .from('students')
               .update({ teacher_id: selectedTeacherId })
-              .in('id', allTeacherStudentIds)
+              .in('id', compatibleTeacherStudentIds)
               .eq('school_id', effectiveSchoolId)
           ]);
         } catch (ownershipErr) {
@@ -5355,21 +5366,21 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
           const chunkSize = 250;
           for (let i = 0; i < occurrences.length; i += chunkSize) {
             const chunk = occurrences.slice(i, i + chunkSize);
-            await supabase.from('schedule_occurrences').insert(chunk);
+            const { error: chunkErr } = await supabase.from('schedule_occurrences').insert(chunk);
+            if (chunkErr) {
+              console.error('[ScheduleBoardDesktop] Occurrence bulk insert chunk failed:', chunkErr);
+            }
           }
         }
       }
 
       // 🛡️ Enterprise+ Revisionssicheres Audit-Logging (OWASP ASVS / DSGVO Art. 30)
       try {
-        await supabase.from('audit_logs').insert([{
-          school_id: schoolId,
-          table_name: 'schedules',
+        await logApplicationAudit({
+          schoolId: schoolId || null,
+          tableName: 'schedules',
           action: 'SCHEDULES_APPROVED',
-          record_id: isUUID(cleanTeacherId) ? cleanTeacherId : null,
-          actor_id: isUUID(userId) ? userId : null,
-          user_id: isUUID(userId) ? userId : null,
-          changed_by: isUUID(userId) ? userId : null,
+          recordId: isUUID(cleanTeacherId) ? cleanTeacherId : null,
           details: {
             action_type: 'SCHEDULES_APPROVED',
             teacher_id: cleanTeacherId,
@@ -5378,10 +5389,11 @@ export function ScheduleBoardDesktop({ schoolId, userId }: ScheduleBoardProps) {
             approved_at: now.toISOString(),
             approved_by: userId || 'Schulleitung'
           }
-        }]);
+        });
       } catch (auditErr) {
         console.warn('[ScheduleBoardDesktop] Audit logging notice:', auditErr);
       }
+
 
       setScheduleStatus('approved');
       setToast({ message: `Stundenplan für ${teacherName} erfolgreich genehmigt & live geschaltet!`, type: 'success' });

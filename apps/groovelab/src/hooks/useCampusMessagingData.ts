@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useCallback } from 'react';
+import { decryptMessagesBatch } from '../lib/security/messageCrypto';
 
 // 🛡️ Tier-1 Enterprise+ Local Storage Read Receipts Cache (Offline-First / Zero-Bounce)
 export const getLocalChannelReads = (uid: string): Map<string, number> => {
@@ -298,30 +299,13 @@ export function useCampusMessagingData({
         .eq('school_id', schoolId)
         .eq('name', '__SYSTEM_ANNOUNCEMENTS__');
         
-      let bandIds: string[] = [];
       if (!annBands || annBands.length === 0) {
-        const { data: newBand, error: insertErr } = await supabase
-          .from('bands')
-          .insert({
-            name: '__SYSTEM_ANNOUNCEMENTS__',
-            status: 'active',
-            school_id: schoolId,
-            coach_id: null,
-            genre: 'System',
-            photo_url: '/logo.png'
-          })
-          .select();
-        if (insertErr) {
-          console.error('[fetchAnnouncements] Error inserting band:', insertErr);
-        }
-        if (newBand && newBand[0]) {
-          bandIds = [newBand[0].id];
-          setAnnBandId(newBand[0].id);
-        }
-      } else {
-        bandIds = annBands.map((b: any) => b.id);
-        setAnnBandId(annBands[0].id);
+        setAnnBandId(null);
+        return;
       }
+
+      const bandIds = annBands.map((b: any) => b.id);
+      setAnnBandId(annBands[0].id);
       
       if (bandIds.length === 0) return;
       
@@ -443,7 +427,16 @@ export function useCampusMessagingData({
       const channelLastReadMap = getLocalChannelReads(uid);
       const groupDefaultChannelMap = new Map<string, string>();
 
+      const effectiveSchoolId = user?.school_id || (Array.isArray(user?.schools) ? user?.schools[0]?.id : user?.schools?.id);
+
       try {
+        let channelsQuery = supabase
+          .from('campus_chat_channels')
+          .select('id, group_id, is_default');
+        if (effectiveSchoolId) {
+          channelsQuery = channelsQuery.eq('school_id', effectiveSchoolId);
+        }
+
         const [memberGroupsRes, createdGroupsRes, channelReadsRes, channelsRes] = await Promise.all([
           supabase
             .from('campus_chat_group_members')
@@ -458,9 +451,7 @@ export function useCampusMessagingData({
             .from('campus_chat_channel_reads')
             .select('channel_id, last_read_at')
             .eq('user_id', uid),
-          supabase
-            .from('campus_chat_channels')
-            .select('id, group_id, is_default')
+          channelsQuery
         ]);
 
         const allGIds = new Set<string>();
@@ -515,14 +506,18 @@ export function useCampusMessagingData({
         .from('campus_direct_messages')
         .select('*')
         .or(`sender_id.eq.${uid},recipient_id.eq.${uid}${groupFilter}`)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: false })
+        .limit(300);
       if (error) throw error;
       if (data) {
         const directLastReadMap = getLocalDirectReads(uid);
         const readMsgIds = getLocalReadMsgIds(uid);
 
+        // Reverse to maintain chronological order (oldest to newest) for downstream rendering
+        const chronologicalData = data.slice().reverse();
+
         // 🛡️ Sanitize incoming messages with local persistence (Offline-First / Zero-Bounce)
-        const sanitizedData = data.map((m: any) => {
+        const sanitizedData = chronologicalData.map((m: any) => {
           if (m.is_read) return m;
           if (readMsgIds.has(m.id)) {
             return { ...m, is_read: true };
@@ -536,7 +531,11 @@ export function useCampusMessagingData({
           return m;
         });
 
-        setCampusMessages(sanitizedData);
+        // 🛡️ SEC-24: Authoritative 1% Cryptographic Message Vault Decryption (L1 Fast-Path Cache)
+        const resolvedSchoolId = effectiveSchoolId || data[0]?.school_id;
+        const decryptedData = await decryptMessagesBatch(sanitizedData, resolvedSchoolId);
+
+        setCampusMessages(decryptedData);
         
         // 1. Unread direct (1:1) messages
         const directUnread = sanitizedData.filter((m: any) => !m.group_id && m.recipient_id === uid && !m.is_read).length;
@@ -563,7 +562,7 @@ export function useCampusMessagingData({
     } finally {
       setCampusMessagesLoading(false);
     }
-  }, [user?.id, supabase, setCampusMessages, setCampusUnreadCount, setCampusMessagesLoading]);
+  }, [user?.id, user?.school_id, supabase, setCampusMessages, setCampusUnreadCount, setCampusMessagesLoading]);
 
   const fetchCampusMessagesTimeoutRef = useRef<any>(null);
   const debouncedFetchCampusMessages = useCallback(() => {

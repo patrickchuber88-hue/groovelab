@@ -47,7 +47,7 @@ export const CampusWrappedStoryModal: React.FC<CampusWrappedStoryModalProps> = (
           fontFamily: '"Outfit", sans-serif'
         }}>
           {/* 9:16 Aspect Ratio Container */}
-          <div style={{
+          <div role="dialog" aria-modal="true" style={{
             position: 'relative',
             width: '100%',
             maxWidth: '430px',

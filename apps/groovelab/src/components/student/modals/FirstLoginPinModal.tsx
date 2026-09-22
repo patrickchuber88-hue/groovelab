@@ -68,7 +68,7 @@ export const FirstLoginPinModal: React.FC<FirstLoginPinModalProps> = ({
           padding: '20px',
           overflowY: 'auto'
         }}>
-          <div style={{
+          <div role="dialog" aria-modal="true" style={{
             background: '#ffffff',
             borderRadius: '28px',
             padding: '28px 24px',

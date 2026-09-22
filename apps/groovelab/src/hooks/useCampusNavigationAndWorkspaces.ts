@@ -42,21 +42,43 @@ export function useCampusNavigationAndWorkspaces({
   locationMode,
   onResetRecipient
 }: UseCampusNavigationAndWorkspacesParams): UseCampusNavigationAndWorkspacesReturn {
-  // 1. Plattform-Steuerung
+  // 1. Plattform-Steuerung (1% Goldstandard Fail-Closed Guard)
   const [activePlatform, setActivePlatformRaw] = useState<PlatformType>(() => {
+    const isStaff = user?.role === 'admin' || user?.role === 'secretary';
+    const isGrooveActive = isStaff || Boolean(user?.is_groovelab_active);
+
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
       const platParam = urlParams.get('platform');
-      if (platParam === 'campus' || platParam === 'groovelab' || platParam === 'ensembles') {
+      if (platParam === 'groovelab') {
+        return isGrooveActive ? 'groovelab' : 'campus';
+      }
+      if (platParam === 'campus' || (showEnsemblesFeature && platParam === 'ensembles')) {
         return platParam as PlatformType;
       }
     }
     const saved = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_active_platform') : null;
+    if (saved === 'groovelab') {
+      return isGrooveActive ? 'groovelab' : 'campus';
+    }
     if (!showEnsemblesFeature && saved === 'ensembles') {
       return 'campus';
     }
     return (saved as PlatformType) || 'campus';
   });
+
+  // 🛡️ Reaktiver Security Guard: Verwehrt unberechtigten Lehrkräften & Schülern den GrooveLab-Zugang
+  useEffect(() => {
+    if (!user) return;
+    const isStaff = user.role === 'admin' || user.role === 'secretary';
+    if (!isStaff && activePlatform === 'groovelab' && !user.is_groovelab_active) {
+      console.warn('[Security Guard] GrooveLab-Zugriff verweigert (Lehrkraft nicht autorisiert):', user.id);
+      setActivePlatformRaw('campus');
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('groovelab_active_platform', 'campus');
+      }
+    }
+  }, [user, activePlatform]);
 
   // 2. Tab-Steuerung
   const [activeStudentTab, setActiveStudentTabRaw] = useState<string>(() => {
@@ -73,20 +95,32 @@ export function useCampusNavigationAndWorkspaces({
 
   const setActivePlatform = useCallback((val: any, _forceUnlock = false) => {
     const schoolObj = Array.isArray(user?.schools) ? user.schools[0] : user?.schools;
-    const schoolHasCampus = Boolean(
-      user?.is_campus_active || 
+    const isStaff = user?.role === 'admin' || user?.role === 'secretary';
+
+    const schoolHasCampusSub = Boolean(
       (schoolObj ? (schoolObj.has_campus_subscription || !schoolObj.is_billing_booked || schoolObj.subscription_bypass) : true)
     );
-    const schoolHasGroove = Boolean(
-      user?.is_groovelab_active || 
+    const schoolHasGrooveSub = Boolean(
       (schoolObj ? (schoolObj.has_groovelab_subscription || !schoolObj.is_billing_booked || schoolObj.subscription_bypass) : true)
     );
 
+    // 1% Goldstandard: Lehrkräfte und Schüler benötigen ZWINGEND ihre persönliche Modulberechtigung
+    const canAccessCampus = isStaff || (schoolHasCampusSub && (user?.is_campus_active !== false));
+    const canAccessGroove = isStaff || (schoolHasGrooveSub && Boolean(user?.is_groovelab_active));
+
     let targetVal = val;
-    if (targetVal === 'campus' && !schoolHasCampus) {
-      targetVal = 'groovelab';
-    } else if (targetVal === 'groovelab' && !schoolHasGroove) {
-      targetVal = 'campus';
+    if (targetVal === 'campus' && !canAccessCampus) {
+      if (canAccessGroove) {
+        targetVal = 'groovelab';
+      } else {
+        return;
+      }
+    } else if (targetVal === 'groovelab' && !canAccessGroove) {
+      if (canAccessCampus) {
+        targetVal = 'campus';
+      } else {
+        return;
+      }
     }
     // Instantly stop all active camera and microphone streams when switching modules
     if (typeof (window as any).stopAllCameras === 'function') {

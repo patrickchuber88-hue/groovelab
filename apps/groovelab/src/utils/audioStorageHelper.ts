@@ -1,5 +1,166 @@
 import { supabase } from '../lib/supabase';
 import { validateMediaBlob, stripAudioMetadata } from './mediaSecurityValidator';
+import { getOfflineAudioRecord } from './offlineAudioVault';
+import { getBlob } from './blobStorage';
+
+export interface PlayableAudioSourceResult {
+  src: string;
+  isBlobUrl: boolean;
+  cleanup?: () => void;
+}
+
+/**
+ * Universal Goldstandard Audio Source Resolver
+ * Harmonizes IndexedDB Offline Audio Vault, Binary Blob Storage, and Supabase Storage HMAC Signed URLs.
+ * Guarantees zero split-brain between offline takes, classroom recordings, and cloud assets.
+ */
+export async function resolvePlayableAudioSource(
+  urlOrPath: string,
+  bucket: string = 'campus-assets',
+  expiresInSeconds: number = 1800
+): Promise<PlayableAudioSourceResult> {
+  if (!urlOrPath || typeof urlOrPath !== 'string') {
+    return { src: '', isBlobUrl: false };
+  }
+
+  const trimmed = urlOrPath.trim();
+  if (!trimmed) {
+    return { src: '', isBlobUrl: false };
+  }
+
+  // 1. Direct playable blob / data URL
+  if (trimmed.startsWith('blob:') || trimmed.startsWith('data:')) {
+    return { src: trimmed, isBlobUrl: trimmed.startsWith('blob:') };
+  }
+
+  // 2. Offline Vault Protocol ("offline://audio_..." or "offline://<id>")
+  if (trimmed.startsWith('offline://')) {
+    const recordId = trimmed.replace(/^offline:\/\//, '');
+    try {
+      const offlineRec = await getOfflineAudioRecord(recordId);
+      if (offlineRec && offlineRec.blob) {
+        const objectUrl = URL.createObjectURL(offlineRec.blob);
+        return {
+          src: objectUrl,
+          isBlobUrl: true,
+          cleanup: () => {
+            try { URL.revokeObjectURL(objectUrl); } catch {}
+          }
+        };
+      }
+    } catch (vaultErr) {
+      console.warn('[AudioStorageHelper] Offline vault resolution failed for:', recordId, vaultErr);
+    }
+
+    // Secondary check in blobStorage just in case it was stored with the raw key
+    try {
+      const fallbackRaw = await getBlob(trimmed);
+      if (fallbackRaw) {
+        const finalBlob = fallbackRaw instanceof Blob ? fallbackRaw : new Blob([fallbackRaw], { type: 'audio/webm' });
+        const objectUrl = URL.createObjectURL(finalBlob);
+        return {
+          src: objectUrl,
+          isBlobUrl: true,
+          cleanup: () => {
+            try { URL.revokeObjectURL(objectUrl); } catch {}
+          }
+        };
+      }
+    } catch {}
+  }
+
+  // 3. Raw audio record ID without offline:// prefix (e.g. "audio_172703..._abc")
+  if (trimmed.startsWith('audio_') && !trimmed.includes('/') && !trimmed.includes('.')) {
+    try {
+      const offlineRec = await getOfflineAudioRecord(trimmed);
+      if (offlineRec && offlineRec.blob) {
+        const objectUrl = URL.createObjectURL(offlineRec.blob);
+        return {
+          src: objectUrl,
+          isBlobUrl: true,
+          cleanup: () => {
+            try { URL.revokeObjectURL(objectUrl); } catch {}
+          }
+        };
+      }
+    } catch {}
+  }
+
+  // 4. Binary blob storage keys ("campus_blob_...", "campus_audio_...")
+  if (trimmed.startsWith('campus_blob_') || trimmed.startsWith('campus_audio_')) {
+    try {
+      const raw = await getBlob(trimmed);
+      if (raw) {
+        const finalBlob = raw instanceof Blob ? raw : new Blob([raw], { type: 'audio/webm' });
+        const objectUrl = URL.createObjectURL(finalBlob);
+        return {
+          src: objectUrl,
+          isBlobUrl: true,
+          cleanup: () => {
+            try { URL.revokeObjectURL(objectUrl); } catch {}
+          }
+        };
+      }
+    } catch (blobErr) {
+      console.warn('[AudioStorageHelper] Binary blob DB lookup error:', trimmed, blobErr);
+    }
+  }
+
+  // 5. Cloud Storage Paths or Supabase Storage URLs (HMAC signed streaming)
+  if (
+    trimmed.startsWith('schools/') ||
+    trimmed.includes('/storage/v1/object/') ||
+    trimmed.startsWith('recordings/') ||
+    trimmed.startsWith('audio/')
+  ) {
+    try {
+      const signedUrl = await getSecureAudioUrl(trimmed, bucket, expiresInSeconds);
+      if (signedUrl) {
+        return { src: signedUrl, isBlobUrl: false };
+      }
+    } catch (signErr) {
+      console.warn('[AudioStorageHelper] Error creating signed streaming URL:', signErr);
+    }
+  }
+
+  // 6. External HTTP / HTTPS links
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return { src: trimmed, isBlobUrl: false };
+  }
+
+  // 7. Last-resort fallback: Try both IndexedDB stores with original string
+  try {
+    const rec = await getOfflineAudioRecord(trimmed);
+    if (rec && rec.blob) {
+      const objectUrl = URL.createObjectURL(rec.blob);
+      return {
+        src: objectUrl,
+        isBlobUrl: true,
+        cleanup: () => {
+          try { URL.revokeObjectURL(objectUrl); } catch {}
+        }
+      };
+    }
+  } catch {}
+
+  try {
+    const raw = await getBlob(trimmed);
+    if (raw) {
+      const finalBlob = raw instanceof Blob ? raw : new Blob([raw], { type: 'audio/webm' });
+      const objectUrl = URL.createObjectURL(finalBlob);
+      return {
+        src: objectUrl,
+        isBlobUrl: true,
+        cleanup: () => {
+          try { URL.revokeObjectURL(objectUrl); } catch {}
+        }
+      };
+    }
+  } catch {}
+
+  // 8. If all else fails, return trimmed URL as-is
+  return { src: trimmed, isBlobUrl: false };
+}
 
 /**
  * Enterprise+ Audio Storage Helper

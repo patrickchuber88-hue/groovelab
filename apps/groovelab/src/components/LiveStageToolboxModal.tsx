@@ -169,6 +169,9 @@ export const LiveStageToolboxModal: React.FC<LiveStageToolboxModalProps> = ({
       boxSizing: 'border-box'
     }}>
       <div 
+        role="dialog"
+        aria-modal="true"
+        aria-label="Live-Stage Werkzeuge (Stimmgerät & Metronom)"
         className="animation-pop-in"
         style={{
           background: '#ffffff',

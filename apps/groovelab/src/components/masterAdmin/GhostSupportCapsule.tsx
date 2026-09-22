@@ -143,7 +143,7 @@ export const GhostSupportCapsule: React.FC<GhostSupportCapsuleProps> = ({
           operator: 'Patrick Huber (Platform Lead)',
           ticketId,
           ticketReason,
-          breakGlassJustification: '§ 202a StGB Break-Glass Support Consent',
+          breakGlassJustification: 'StGB 202a Break-Glass Support Consent',
           status: 'COMPLETED_CLEANLY'
         };
         localStorage.setItem('campus_ghost_audit_trail', JSON.stringify([newLog, ...existingAudit].slice(0, 50)));

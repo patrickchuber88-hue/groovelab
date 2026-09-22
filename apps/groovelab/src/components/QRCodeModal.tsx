@@ -464,8 +464,8 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
           const isStudentUser = (user.role || '').toLowerCase() === 'student';
           const isCampus = activePlatform === 'campus';
           const effectiveToken = isStudentUser
-            ? (localQrToken || user.qr_token || user.ausweis_nummer || '')
-            : (localTeacherQrToken || user.teacher_qr_token || localQrToken || user.qr_token || '');
+            ? (localQrToken || user.qr_token || user.ausweis_nummer || user.id || '')
+            : (localTeacherQrToken || user.teacher_qr_token || localQrToken || user.qr_token || user.ausweis_nummer || user.id || '');
           const canonicalQrLandingUrl = getCanonicalQrLandingUrl(effectiveToken);
           const loggedInUserId = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null;
           const isSelfView = Boolean(loggedInUserId && user.id && loggedInUserId === user.id);
@@ -723,7 +723,17 @@ export function QRCodeModal({ user, activePlatform, onClose }: QRCodeModalProps)
                   }}>
                     <button
                       onClick={() => {
-                        window.open(canonicalQrLandingUrl, '_blank');
+                        const targetUrl = canonicalQrLandingUrl 
+                          ? (canonicalQrLandingUrl.includes('?') ? `${canonicalQrLandingUrl}&dev_sim=true` : `${canonicalQrLandingUrl}?dev_sim=true`)
+                          : '';
+                        if (!targetUrl) {
+                          alert('Kein gültiges Token oder Benutzer-ID zur Simulation gefunden.');
+                          return;
+                        }
+                        const win = window.open(targetUrl, '_blank', 'noopener,noreferrer');
+                        if (!win || win.closed || typeof win.closed === 'undefined') {
+                          window.location.href = targetUrl;
+                        }
                       }}
                       aria-label="QR-Landingpage im Browser simulieren"
                       style={{

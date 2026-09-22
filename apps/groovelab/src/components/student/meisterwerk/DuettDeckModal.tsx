@@ -32,10 +32,12 @@ import { calculateOptimalAlignmentOffsetMs, extractWaveformPeaks, applyMicroFade
 import { 
   uploadAudioWithIntegrityVerification, 
   computeBlobSha256, 
-  buildCanonicalAudioStoragePath 
+  buildCanonicalAudioStoragePath,
+  resolvePlayableAudioSource
 } from '../../../utils/audioStorageHelper';
 import { isGenericSongTag } from '../../../utils/audioNamingHelper';
 import { supabase } from '../../../lib/supabase';
+import { logApplicationAudit } from '../../../services/auditLogService';
 
 export interface DuettDeckModalProps {
   isOpen: boolean;
@@ -170,16 +172,16 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
   // 1. Resolve and Decode Teacher Audio Buffer via Web Audio API
   useEffect(() => {
     let active = true;
+    let cleanupFn: (() => void) | undefined;
     setIsLoadingTeacher(true);
 
     const loadTeacherAudio = async () => {
       try {
         let rawSource: Blob | string = teacherAudioUrl;
-        if (teacherAudioUrl.startsWith('campus_blob_') || teacherAudioUrl.startsWith('campus_audio_') || teacherAudioUrl.startsWith('offline://')) {
-          const stored = await getBlob(teacherAudioUrl);
-          if (stored) {
-            rawSource = stored instanceof Blob ? stored : new Blob([stored], { type: 'audio/webm' });
-          }
+        const res = await resolvePlayableAudioSource(teacherAudioUrl, 'campus-assets', 1800);
+        if (res.src) {
+          rawSource = res.src;
+          cleanupFn = res.cleanup;
         }
 
         const audioCtx = getSharedAudioContext();
@@ -201,6 +203,7 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
 
     return () => {
       active = false;
+      if (cleanupFn) cleanupFn();
       if (playbackSessionRef.current) {
         playbackSessionRef.current.stop();
         playbackSessionRef.current = null;
@@ -637,11 +640,11 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
 
       // 4. 🛡️ Revisionssicherer Audit-Trail Eintrag in public.audit_logs
       try {
-        await supabase.from('audit_logs').insert({
+        await logApplicationAudit({
           action: 'DUETT_RECORDING_COMMITTED',
-          actor_id: studentId,
-          school_id: effectiveSchool,
-          target_id: takeId,
+          schoolId: effectiveSchool || null,
+          tableName: 'duett_recordings',
+          recordId: takeId,
           details: {
             take_id: takeId,
             title: cleanTitle,
@@ -653,12 +656,12 @@ export const DuettDeckModal: React.FC<DuettDeckModalProps> = ({
             teacher_title: teacherTitle,
             teacher_bpm: teacherBpm,
             duration_seconds: dur
-          },
-          created_at: nowIso
+          }
         });
       } catch (auditErr) {
         console.warn('[DuettDeckModal] Audit logging notice:', auditErr);
       }
+
 
       // 5. SongTag sanitization: Only genuine song/book titles become songTag (never generic lesson fallbacks)
       const validSongTag = (songTag && !isGenericSongTag(songTag) && songTag !== teacherTitle) ? songTag.trim() : undefined;

@@ -22,7 +22,7 @@ export const TariffBookingStornoModal: React.FC<TariffBookingStornoModalProps> =
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(15, 23, 42, 0.55)', backdropFilter: 'blur(4px)' }}>
-      <div style={{ width: '100%', maxWidth: '480px', background: '#ffffff', borderRadius: '20px', padding: '28px', boxShadow: '0 20px 40px rgba(15, 23, 42, 0.25)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div role="dialog" aria-modal="true" style={{ width: '100%', maxWidth: '480px', background: '#ffffff', borderRadius: '20px', padding: '28px', boxShadow: '0 20px 40px rgba(15, 23, 42, 0.25)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626' }}>
             <RotateCcw size={20} />

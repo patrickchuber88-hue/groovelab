@@ -2,18 +2,18 @@ import React, { useState, useRef, useEffect } from 'react';
 import { X } from 'lucide-react';
 
 export interface AppleStyleTokenFieldProps {
-  label: string;
-  selectedString: string;
+  label?: string;
+  selectedString?: string;
   onChange: (newValue: string) => void;
-  suggestions: string[];
+  suggestions?: string[];
   placeholder?: string;
 }
 
 export const AppleStyleTokenField: React.FC<AppleStyleTokenFieldProps> = ({
   label,
-  selectedString,
+  selectedString = '',
   onChange,
-  suggestions,
+  suggestions = [],
   placeholder = 'Fach hinzufügen...'
 }) => {
   const [inputValue, setInputValue] = useState('');
@@ -22,11 +22,12 @@ export const AppleStyleTokenField: React.FC<AppleStyleTokenFieldProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const selectedTokens = selectedString
-    ? selectedString.split(',').map((s) => s.trim()).filter(Boolean)
+  const selectedTokens = (selectedString || '')
+    ? (selectedString || '').split(',').map((s) => s.trim()).filter(Boolean)
     : [];
 
-  const availableSuggestions = suggestions.filter(
+  const safeSuggestions = Array.isArray(suggestions) ? suggestions : [];
+  const availableSuggestions = safeSuggestions.filter(
     (s) => !selectedTokens.includes(s) && s.toLowerCase().includes(inputValue.toLowerCase())
   );
 

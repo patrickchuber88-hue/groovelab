@@ -8,13 +8,20 @@ import {
   fetchActiveSessions, 
   fetchSchoolStaff, 
   fetchUserBandIds, 
-  fetchUnreadShouts 
+  fetchUnreadShouts,
+  getCachedRoomsSync,
+  getCachedStationsSync,
+  getCachedActiveSessionsSync
 } from '../../../repositories';
+import {
+  CANONICAL_GROOVELAB_STUDIO_ROOM,
+  CANONICAL_GROOVELAB_STUDIO_STATIONS
+} from '../../../constants/groovelabLayoutDefaults';
 import { computeSchoolDunningStatus, SchoolDunningStatus } from '../../../domain/schoolDunningEngine';
 import { getSimulatedNow } from '../utils/teacherDashboardUtils';
 
 // 🛡️ OWASP ASVS Level 3: Strict explicit column whitelists for teacher profiles (Zero Wildcards & Zero Secret Leakage)
-export const TEACHER_SELECT_COLUMNS = 'id, school_id, first_name, last_name, nickname, role, roles, email, photo_url, avatar_url, instrument, is_active, ausweis_nummer, teacher_qr_token, qr_token, is_campus_active, is_groovelab_active, is_premium_user, contract_ends_at, lesson_duration, is_pin_activated, ausfall_until, ausfall_start, created_at, preferred_room_ids, planned_boards, student_billing_payment_method, activated_at, student_billing_cash_paid, is_trial, trial_ends_at, exempt_from_direct_billing, quiet_hours';
+export const TEACHER_SELECT_COLUMNS = 'id, school_id, first_name, last_name, nickname, role, roles, email, photo_url, avatar_url, instrument, is_active, ausweis_nummer, teacher_qr_token, qr_token, is_campus_active, is_groovelab_active, is_premium_user, contract_ends_at, lesson_duration, is_pin_activated, ausfall_until, ausfall_start, created_at, preferred_room_ids, planned_boards, student_billing_payment_method, activated_at, student_billing_cash_paid, is_trial, trial_ends_at, exempt_from_direct_billing';
 
 export const TEACHER_WITH_SCHOOL_SELECT = `${TEACHER_SELECT_COLUMNS}, schools(id, name, subdomain, logo_url, primary_color, calendar_url, status, opening_hours, is_trial, trial_ends_at, subscription_bypass, has_campus_subscription, has_groovelab_subscription, allow_messages_global)`;
 
@@ -90,26 +97,55 @@ export function useTeacherData({
   const [schoolData, setSchoolData] = useState<any>(null);
   const [initialSchoolData, setInitialSchoolData] = useState<any>(null);
   const [teacherDunningStatus, setTeacherDunningStatus] = useState<SchoolDunningStatus | null>(null);
-  const [rooms, setRooms] = useState<any[]>([]);
+  const initialSchoolId = teacher?.school_id || 
+    (typeof window !== 'undefined' ? (sessionStorage.getItem('groovelab_ghost_school_id') || '') : '');
+
+  const [rooms, setRooms] = useState<any[]>(() => {
+    if (initialSchoolId) {
+      const cached = getCachedRoomsSync(initialSchoolId, activePlatform);
+      if (cached && cached.length > 0) return cached;
+    }
+    return [CANONICAL_GROOVELAB_STUDIO_ROOM];
+  });
+
   const [selectedRoomId, setSelectedRoomId] = useState<string>(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('groovelab_teacher_selected_room_id') || '';
+      const saved = localStorage.getItem(`groovelab_teacher_selected_room_id_${activePlatform}`) || localStorage.getItem('groovelab_teacher_selected_room_id');
+      if (saved) return saved;
     }
-    return '';
+    if (initialSchoolId) {
+      const cached = getCachedRoomsSync(initialSchoolId, activePlatform);
+      if (cached && cached.length > 0) return cached[0].id;
+    }
+    return CANONICAL_GROOVELAB_STUDIO_ROOM.id;
   });
 
   useEffect(() => {
     if (selectedRoomId) {
       localStorage.setItem('groovelab_teacher_selected_room_id', selectedRoomId);
+      localStorage.setItem(`groovelab_teacher_selected_room_id_${activePlatform}`, selectedRoomId);
     }
-  }, [selectedRoomId]);
+  }, [selectedRoomId, activePlatform]);
 
-  const [stations, setStations] = useState<any[]>([]);
+  const [stations, setStations] = useState<any[]>(() => {
+    if (initialSchoolId) {
+      const cached = getCachedStationsSync(initialSchoolId);
+      if (cached && cached.length > 0) return cached;
+    }
+    return CANONICAL_GROOVELAB_STUDIO_STATIONS;
+  });
   const [coaches, setCoaches] = useState<any[]>([]);
   const [selectedCoachProfile, setSelectedCoachProfile] = useState<any | null>(null);
   const [allBands, setAllBands] = useState<any[]>([]);
   const [openProposals, setOpenProposals] = useState<any[]>([]);
-  const [activeSessions, setActiveSessions] = useState<any[]>([]);
+  const [activeSessions, setActiveSessions] = useState<any[]>(() => {
+    if (initialSchoolId) {
+      const cached = getCachedActiveSessionsSync(initialSchoolId);
+      if (cached && cached.length > 0) return cached;
+    }
+    return [];
+  });
+  const [isSyncing, setIsSyncing] = useState<boolean>(true);
   const [helpRequests, setHelpRequests] = useState<any[]>([]);
   const [unreadShouts, setUnreadShouts] = useState<any[]>([]);
   const [crisisNotifications, setCrisisNotifications] = useState<any[]>([]);
@@ -133,6 +169,7 @@ export function useTeacherData({
 
     const runFetch = async () => {
       setFetchError(null);
+      setIsSyncing(true);
 
       const isGhostMode = userId === 'master-support-id' || (typeof window !== 'undefined' && sessionStorage.getItem('groovelab_support_ghost') === 'true');
       const ghostSchoolId = isGhostMode ? (sessionStorage.getItem('groovelab_ghost_school_id') || '') : '';
@@ -232,19 +269,22 @@ export function useTeacherData({
           localStorage.setItem('campus_teacher_briefing_sidebar_collapsed', String(tData.briefing_sidebar_collapsed));
         }
 
+        const isStudent = viewMode === 'student' || tData?.role?.toLowerCase() === 'student';
         const applySchoolAndDunning = (sd: any) => {
           if (!sd) return;
           setSchoolData(sd);
           setInitialSchoolData(JSON.parse(JSON.stringify(sd)));
 
-          supabase
-            .from('invoices')
-            .select('id, type, amount, status, billing_date, due_date, items')
-            .eq('school_id', tData.school_id)
-            .then(({ data: invData }) => {
-              const status = computeSchoolDunningStatus(sd, invData || [], getSimulatedNow());
-              setTeacherDunningStatus(status);
-            });
+          if (!isStudent) {
+            supabase
+              .from('invoices')
+              .select('id, type, amount, status, billing_date, due_date, items')
+              .eq('school_id', tData.school_id)
+              .then(({ data: invData }) => {
+                const status = computeSchoolDunningStatus(sd, invData || [], getSimulatedNow());
+                setTeacherDunningStatus(status);
+              });
+          }
         };
 
         if (tData?.school_id) {
@@ -259,53 +299,144 @@ export function useTeacherData({
             });
           }
 
+          // 🚀 Stage 1 (Fast Path ~50ms): Core Layout, Stations, Sessions & Staff (Unblocks Live Lab immediately)
           const [
             rRes,
             sessRes,
             coachesRes,
-            crisisRes,
-            stationsRes
+            stationsRes,
+            helpRes
           ] = await Promise.all([
             fetchRoomsBySchool(tData.school_id, false, activePlatform).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e })),
             fetchActiveSessions(tData.school_id).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e })),
             fetchSchoolStaff(tData.school_id).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e })),
-            fetchCrisisNotifications(tData.is_ghost_mode ? tData.school_id : userId, tData.is_ghost_mode).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e })),
-            fetchStationsBySchool(tData.school_id).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e }))
+            fetchStationsBySchool(tData.school_id).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e })),
+            supabase
+              .from('help_requests')
+              .select('*, users(*)')
+              .eq('school_id', tData.school_id)
+              .eq('status', 'pending')
+              .order('created_at', { ascending: false })
+              .then(d => ({ data: d.data || [], error: d.error }), (e: any) => ({ data: [], error: e }))
           ]);
 
-          setCrisisNotifications(prev => areArraysEqualFast(prev, crisisRes.data || []) ? prev : (crisisRes.data || []));
+          // 🚀 Stage 2 (Background Path): Heavy relational band query & crisis notifications (Non-blocking)
+          Promise.all([
+            supabase
+              .from('bands')
+              .select('*, band_members(*, users(*)), coach:users!coach_id(id, first_name, last_name, photo_url), band_songs(*, songs(*), band_song_slots(*, profiles:users!user_id(id, first_name, last_name, photo_url, user_song_skills:user_song_skills!user_song_skills_user_id_fkey(id, song_id, instrument, progress_percent, is_pending_approval, is_stage_ready))))')
+              .eq('school_id', tData.school_id)
+              .neq('name', '__SYSTEM_ANNOUNCEMENTS__')
+              .order('name')
+              .then(d => ({ data: d.data || [], error: d.error }), (e: any) => ({ data: [], error: e })),
+            !isStudent
+              ? fetchCrisisNotifications(tData.is_ghost_mode ? tData.school_id : userId, tData.is_ghost_mode).then(d => ({ data: d, error: null })).catch(e => ({ data: [], error: e }))
+              : Promise.resolve({ data: [], error: null })
+          ]).then(([bandsRes, crisisRes]) => {
+            if (bandsRes?.data) {
+              setAllBands(prev => areArraysEqualFast(prev, bandsRes.data) ? prev : bandsRes.data);
+            }
+            if (crisisRes?.data) {
+              setCrisisNotifications(prev => areArraysEqualFast(prev, crisisRes.data || []) ? prev : (crisisRes.data || []));
+            }
+          }).catch(err => {
+            console.warn('[TeacherData] Background data load warning:', err);
+          });
 
           let effectiveRooms = (rRes.data || []).filter((r: any) => {
             if (activePlatform === 'groovelab') return r.is_groovelab_active !== false;
             if (activePlatform === 'campus') return r.is_campus_active !== false;
             return true;
           });
+
           if (effectiveRooms.length === 0 && (rRes.data || []).length > 0) {
             effectiveRooms = rRes.data || [];
           }
 
           setRooms(prev => areArraysEqualFast(prev, effectiveRooms) ? prev : effectiveRooms);
-          if (effectiveRooms.length > 0 && !selectedRoomId) {
-            setSelectedRoomId(effectiveRooms[0].id);
-          }
 
+          const stationsList: any[] = stationsRes.data || [];
           if (stationsRes.data) {
             setStations(prev => areArraysEqualFast(prev, stationsRes.data) ? prev : stationsRes.data);
           }
 
+          if (effectiveRooms.length > 0) {
+            let chosenRoomId = selectedRoomId;
+            const currentHasStations = chosenRoomId && stationsList.some((s: any) => s.room_id === chosenRoomId);
+
+            if (!chosenRoomId || !effectiveRooms.some((r: any) => r.id === chosenRoomId) || (!currentHasStations && stationsList.length > 0)) {
+              const roomWithStations = effectiveRooms.find((r: any) => stationsList.some((s: any) => s.room_id === r.id));
+              if (roomWithStations) {
+                chosenRoomId = roomWithStations.id;
+              } else {
+                const savedRoomId = typeof window !== 'undefined' ? (localStorage.getItem(`groovelab_teacher_selected_room_id_${activePlatform}`) || localStorage.getItem('groovelab_teacher_selected_room_id')) : null;
+                if (savedRoomId && effectiveRooms.some((r: any) => r.id === savedRoomId)) {
+                  chosenRoomId = savedRoomId;
+                } else {
+                  chosenRoomId = effectiveRooms[0].id;
+                }
+              }
+            }
+            if (chosenRoomId && chosenRoomId !== selectedRoomId) {
+              setSelectedRoomId(chosenRoomId);
+            }
+          }
+
+          const activeSessionsList: any[] = sessRes.data || [];
           if (sessRes.data) {
-            setActiveSessions(prev => areArraysEqualFast(prev, sessRes.data) ? prev : sessRes.data);
+            setActiveSessions(prev => areArraysEqualFast(prev, activeSessionsList) ? prev : activeSessionsList);
           }
 
           if (coachesRes.data) {
-            setCoaches(prev => areArraysEqualFast(prev, coachesRes.data) ? prev : coachesRes.data);
+            const trulyActive = activeSessionsList.filter((s: any) => s && !s.check_out_time);
+            const isSelfCheckedIn = trulyActive.some((s: any) => s && s.user_id === userId);
+            const isCurrentTeacher = tData?.role?.toLowerCase() === 'teacher' ||
+                                     tData?.role?.toLowerCase() === 'admin' ||
+                                     tData?.role?.toLowerCase() === 'secretary';
+
+            const activeCoaches = (coachesRes.data || []).filter((c: any) => {
+              if (!c) return false;
+              if (c.is_observer) return false;
+              if (c.id === userId) {
+                return isCurrentTeacher && isSelfCheckedIn;
+              }
+              return trulyActive.some((s: any) => s && s.user_id === c.id);
+            });
+
+            const mappedCoaches = activeCoaches
+              .filter(Boolean)
+              .map((c: any) => ({
+                id: c.id,
+                users: c,
+                session: trulyActive.find((s: any) => s && s.user_id === c.id)
+              }));
+
+            const seenNames = new Set();
+            const uniqueMapped: any[] = [];
+            for (const coach of mappedCoaches) {
+              if (coach && coach.users) {
+                const fullName = `${coach.users.first_name || ''} ${coach.users.last_name || ''}`.trim().toLowerCase();
+                if (!seenNames.has(fullName)) {
+                  seenNames.add(fullName);
+                  uniqueMapped.push(coach);
+                }
+              }
+            }
+
+            setCoaches(prev => areArraysEqualFast(prev, uniqueMapped) ? prev : uniqueMapped);
           }
+
+          if (helpRes?.data) {
+            setHelpRequests(prev => areArraysEqualFast(prev, helpRes.data) ? prev : helpRes.data);
+          }
+          setIsSyncing(false);
         }
       } catch (err: any) {
         console.error('[TeacherData] Error running fetchData:', err);
         setFetchError(err?.message || 'Fehler beim Laden der Daten');
       } finally {
         isFetchingRef.current = null;
+        setIsSyncing(false);
       }
     };
 
@@ -348,6 +479,7 @@ export function useTeacherData({
     setCrisisNotifications,
     fetchError,
     fetchData,
+    isSyncing,
     isTeacherBriefingSidebarCollapsed,
     setIsTeacherBriefingSidebarCollapsed
   };

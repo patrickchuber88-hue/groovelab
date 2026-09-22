@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense, lazy } from 'react';
 import { createPortal } from 'react-dom';
-import { Lock, Maximize2, Minimize2, X } from 'lucide-react';
+import { Lock, Maximize2, Minimize2, X, ArrowLeft } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import {
   type Student,
@@ -52,6 +52,7 @@ import { MeisterwerkLogbuchTab } from './student/meisterwerk/MeisterwerkLogbuchT
 import { MeisterwerkStickerAlbumTab } from './student/meisterwerk/MeisterwerkStickerAlbumTab';
 import { MeisterwerkSkillRadarTab } from './student/meisterwerk/MeisterwerkSkillRadarTab';
 import { GrooveTrainerStudioView } from './campus/GrooveTrainerStudioView';
+import { WorldTourMapSpread } from './student/meisterwerk/worldtour/WorldTourMapSpread';
 import { GroovePracticeCompanion } from './groovelab/GroovePracticeCompanion';
 import { resolveCampusStudentAvatar } from './student/studentAvatars.constants';
 import { formatTeacherFullName, copyTextToClipboard, capitalizeFirstLetter, formatSongTitleCase } from '../utils/nameHelper';
@@ -213,11 +214,53 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
 
   // Modal Tabs & View Modes
   const [activeModalTab, setActiveModalTab] = useState<'document' | 'logbook' | 'stickeralbum' | 'skillradar' | 'audiobiography'>(initialModalTab || 'document');
-  const [activeViewMode, setActiveViewMode] = useState<'document' | 'recordings' | 'groovetrainer' | 'loopstation' | 'practice' | 'tuner' | 'earlab'>((initialViewMode as any) || 'document');
+  const [activeViewMode, setActiveViewMode] = useState<'document' | 'recordings' | 'groovetrainer' | 'loopstation' | 'practice' | 'tuner' | 'earlab' | 'worldtour'>((initialViewMode as any) || 'document');
   const [activeSubView, setActiveSubView] = useState<'hub' | 'history' | 'repertoire'>('hub');
   const [hubTab, setHubTab] = useState<'modules' | 'protocol'>((student?.is_campus_active === false) ? 'protocol' : 'modules');
-  const [mobileProtokollTab, setMobileProtokollTab] = useState<'repertoire' | 'homework'>('homework');
   const [recordingSearchQuery, setRecordingSearchQuery] = useState('');
+  const [selectedTeacherMonth, setSelectedTeacherMonth] = useState<{ key: string; label: string } | null>(null);
+  const [selectedStudentMonth, setSelectedStudentMonth] = useState<{ key: string; label: string } | null>(null);
+  const [selectedTeacherSongAlbum, setSelectedTeacherSongAlbum] = useState<string | null>(null);
+  const [selectedStudentSongAlbum, setSelectedStudentSongAlbum] = useState<string | null>(null);
+  const [showTeacherFavoritesOnly, setShowTeacherFavoritesOnly] = useState<boolean>(false);
+  const [showStudentFavoritesOnly, setShowStudentFavoritesOnly] = useState<boolean>(false);
+  const [showTeacherHomeworkArchive, setShowTeacherHomeworkArchive] = useState<boolean>(false);
+  const [openHomeworkWeekAccordions, setOpenHomeworkWeekAccordions] = useState<string[]>([]);
+  const [isTeacherHomeworkExpanded, setIsTeacherHomeworkExpanded] = useState<boolean>(false);
+  const [isStudentWeekExpanded, setIsStudentWeekExpanded] = useState<boolean>(false);
+  const [mobileRecordingsTab, setMobileRecordingsTab] = useState<'teacher' | 'student'>('student');
+  const [showRecordingMetronomePopup, setShowRecordingMetronomePopup] = useState<boolean>(false);
+  const [isRecordingPadActive, setIsRecordingPadActive] = useState<boolean>(false);
+  const recordingMetronomeRef = useRef<HTMLDivElement | null>(null);
+
+  const matchesAudioSearch = useCallback((aud: any, searchQuery: string): boolean => {
+    if (!searchQuery || !searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    
+    const label = (aud.harmonizedTitle || aud.label || aud.title || '').toLowerCase();
+    const songTag = (aud.songTag || '').toLowerCase();
+    const baseTopic = (aud.baseTopic || '').toLowerCase();
+    if (label.includes(q) || songTag.includes(q) || baseTopic.includes(q)) return true;
+
+    const d = aud.date ? new Date(aud.date) : null;
+    if (d && !isNaN(d.getTime())) {
+      const weekdayFull = d.toLocaleDateString('de-DE', { weekday: 'long' }).toLowerCase();
+      const weekdayShort = d.toLocaleDateString('de-DE', { weekday: 'short' }).toLowerCase();
+      const monthFull = d.toLocaleDateString('de-DE', { month: 'long' }).toLowerCase();
+      const monthShort = d.toLocaleDateString('de-DE', { month: 'short' }).toLowerCase();
+      const dayNum = String(d.getDate());
+      const monthNum = String(d.getMonth() + 1).padStart(2, '0');
+      if (
+        weekdayFull.includes(q) ||
+        weekdayShort.includes(q) ||
+        monthFull.includes(q) ||
+        monthShort.includes(q) ||
+        dayNum === q ||
+        monthNum === q
+      ) return true;
+    }
+    return false;
+  }, []);
 
   useEffect(() => {
     if (initialViewMode) {
@@ -258,7 +301,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [showMatchConfetti, setShowMatchConfetti] = useState(false);
   const [studentNotesSavedToast, setStudentNotesSavedToast] = useState(false);
-  const [openHomeworkWeekAccordions, setOpenHomeworkWeekAccordions] = useState<string[]>([]);
+  const [mobileProtokollTab, setMobileProtokollTab] = useState<'homework' | 'repertoire'>('homework');
   const [expandedStudentAudioWeeks, setExpandedStudentAudioWeeks] = useState<Record<string, boolean>>({});
   const [expandedTeacherAudioWeeks, setExpandedTeacherAudioWeeks] = useState<Record<string, boolean>>({});
 
@@ -464,6 +507,13 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
   const shareMenuRef = useRef<HTMLDivElement | null>(null);
   const studentNotesSelectionRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
 
+  // 📚 Lehrwerke Selection & Creation State
+  const [showAssignDropdown, setShowAssignDropdown] = useState(false);
+  const [showCreateLehrwerkModal, setShowCreateLehrwerkModal] = useState(false);
+  const [newLehrwerkTitle, setNewLehrwerkTitle] = useState('');
+  const [newLehrwerkPages, setNewLehrwerkPages] = useState('50');
+  const [newLehrwerkLoading, setNewLehrwerkLoading] = useState(false);
+
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (shareMenuRef.current && !shareMenuRef.current.contains(e.target as Node)) {
@@ -505,6 +555,12 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     handleDeleteStudentAudio
   } = useMeisterwerkAudioRecording({
     student,
+    hasTresorStorage: propHasTresor ?? false,
+    isTeacherMode: isTeacherTools,
+    isTeacherSelf,
+    activeSongSkills,
+    setActiveSongSkills,
+    setProgressItems,
     topicName,
     activeSubView,
     activeLehrwerkId,
@@ -514,6 +570,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     setHomeworkNotesList,
     syncHomeworkNotes,
     notifyHomeworkChange,
+    isRecordingPadActive,
+    setIsRecordingPadActive,
     isCountInEnabled,
     setIsCountInEnabled
   });
@@ -873,6 +931,139 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
   }, [globalLehrwerke, student.id, getISOWeek, progressItems, fetchProgress, loadLehrwerke, notifyHomeworkChange]);
 
+  // 📚 Neues Lehrwerk erstellen & dem Schüler zuweisen
+  const handleCreateAndAssignLehrwerk = useCallback(async (titleOrEvent?: any, optionalPages?: number | string) => {
+    if (titleOrEvent && typeof titleOrEvent.preventDefault === 'function') {
+      titleOrEvent.preventDefault();
+    }
+    let title = typeof titleOrEvent === 'string' && titleOrEvent.trim() ? titleOrEvent.trim() : newLehrwerkTitle.trim();
+    let pages = 50;
+    if (typeof titleOrEvent === 'string') {
+      if (optionalPages) {
+        const p = parseInt(String(optionalPages), 10);
+        if (!isNaN(p) && p > 0) pages = p;
+      }
+    } else if (newLehrwerkPages) {
+      const p = parseInt(newLehrwerkPages, 10);
+      if (!isNaN(p) && p > 0) pages = p;
+    }
+    if (!title || !student.id) return;
+    setNewLehrwerkLoading(true);
+
+    try {
+      const sId = student.school_id || propSchoolId || null;
+      const defaultInstrument = (student as any)?.instrument ||
+        (student as any)?.instrument_name ||
+        'Gitarre';
+
+      let createdBook: any = null;
+      try {
+        const { data, error } = await supabase
+          .from('campus_lehrwerke')
+          .insert({
+            title,
+            totalPages: pages,
+            total_pages: pages,
+            instrument: defaultInstrument,
+            school_id: sId
+          })
+          .select()
+          .single();
+        if (!error && data) {
+          createdBook = data;
+        }
+      } catch (dbErr) {
+        console.warn('[Meisterwerk] DB insert campus_lehrwerke fallback:', dbErr);
+      }
+
+      if (!createdBook) {
+        createdBook = {
+          id: `lw-${Date.now()}`,
+          title,
+          totalPages: pages,
+          total_pages: pages,
+          instrument: defaultInstrument,
+          school_id: sId
+        };
+      }
+
+      try {
+        const globalStored = localStorage.getItem('campus_lehrwerke');
+        const existingGlobal = globalStored ? JSON.parse(globalStored) : [];
+        if (!existingGlobal.some((b: any) => b.id === createdBook.id || b.title === createdBook.title)) {
+          localStorage.setItem('campus_lehrwerke', JSON.stringify([...existingGlobal, createdBook]));
+        }
+      } catch {}
+
+      handleAssignLehrwerk(createdBook.id);
+      await loadLehrwerke();
+      notifyHomeworkChange();
+      setNewLehrwerkTitle('');
+      setNewLehrwerkPages('50');
+      setShowCreateLehrwerkModal(false);
+      setShowAssignDropdown(false);
+    } catch (e) {
+      console.error('[Meisterwerk] Error creating and assigning lehrwerk:', e);
+    } finally {
+      setNewLehrwerkLoading(false);
+    }
+  }, [newLehrwerkTitle, newLehrwerkPages, student, propSchoolId, handleAssignLehrwerk, loadLehrwerke, notifyHomeworkChange]);
+
+  // 🗑️ Lehrwerk-Zuweisung entfernen
+  const handleRemoveLehrwerk = useCallback((lehrwerkId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!lehrwerkId || !student.id) return;
+
+    try {
+      const stored = localStorage.getItem('student_lehrwerke_progress');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const updated = parsed.filter((item: any) => !(String(item.studentId) === String(student.id) && String(item.lehrwerkId) === String(lehrwerkId)));
+        localStorage.setItem('student_lehrwerke_progress', JSON.stringify(updated));
+        setAssignedLehrwerke(updated.filter((item: any) => String(item.studentId) === String(student.id)));
+      }
+      if (activeLehrwerkId === lehrwerkId) {
+        setActiveLehrwerkId(null);
+      }
+      loadLehrwerke();
+      notifyHomeworkChange();
+    } catch (err) {
+      console.error('Error removing lehrwerk:', err);
+    }
+  }, [student.id, activeLehrwerkId, setActiveLehrwerkId, setAssignedLehrwerke, loadLehrwerke, notifyHomeworkChange]);
+
+  // 🗑️ Einzelnen Text-Baustein aus den Hausaufgaben entfernen
+  const handleDeleteSingleNoteItem = useCallback((idx: number) => {
+    const current = latestGeneralHomeworkNotesRef.current !== undefined
+      ? latestGeneralHomeworkNotesRef.current
+      : generalHomeworkNotes;
+    const items = getHomeworkNoteItems(current);
+    if (idx < 0 || idx >= items.length) return;
+    const newItems = items.filter((_, i) => i !== idx);
+    const nextText = newItems.join('\n');
+    latestGeneralHomeworkNotesRef.current = nextText;
+    setGeneralHomeworkNotes(nextText);
+    studentNotesSelectionRef.current = { start: nextText.length, end: nextText.length };
+
+    const specialNotes = (homeworkNotesList || []).filter(n => typeof n === 'string' && isInternalMetadataNote(n));
+    const combined = [...specialNotes, ...newItems];
+    setHomeworkNotesList(combined);
+
+    try {
+      localStorage.setItem(`campus_homework_notes_${student.id}`, JSON.stringify(combined));
+      localStorage.setItem(`campus_homework_week_${student.id}`, getISOWeek());
+    } catch {}
+
+    triggerImmediateAutoSave();
+  }, [generalHomeworkNotes, latestGeneralHomeworkNotesRef, homeworkNotesList, setGeneralHomeworkNotes, setHomeworkNotesList, student.id, getISOWeek, triggerImmediateAutoSave]);
+
+  // 📖 Doppelklick auf Lehrwerkseite
+  const handlePageDoubleClick = useCallback((bookId: string, pageNum: number) => {
+    setActiveLehrwerkId(bookId);
+    setActivePageNumber(pageNum);
+    setActiveInputTab('lehrwerk_page');
+  }, [setActiveLehrwerkId, setActivePageNumber, setActiveInputTab]);
+
   // 📸 Strukturierte Momentaufnahme der aktuellen Wochenaufgabe
   const getCurrentHomeworkSnapshot = useCallback(() => {
     let tName = propTeacherName || '';
@@ -1172,6 +1363,241 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
   }, [getHomeworkFormattedSummary]);
 
+  // 🖨️ Air-Gapped Notenständer DIN-A4 Druckansicht (Zero Teacher Notes Leakage)
+  const handlePrintHomeworkSheet = useCallback(() => {
+    try {
+      const snap = getCurrentHomeworkSnapshot();
+      const lehrwerke = snap.items.filter(it => it.type === 'lehrwerk');
+      const songs = snap.items.filter(it => it.type === 'song');
+      const notes = snap.items.filter(it => it.type === 'note');
+
+      const printHtml = `<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>Wochenplan • ${snap.studentFirstName || 'Schüler'}</title>
+  <style>
+    @page { size: A4 portrait; margin: 18mm 16mm 18mm 16mm; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #0f172a;
+      background: #ffffff;
+      margin: 0;
+      padding: 0;
+      line-height: 1.45;
+      font-size: 12pt;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 12px;
+      margin-bottom: 20px;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 19pt;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+    .header .meta {
+      font-size: 10.5pt;
+      color: #475569;
+      font-weight: 600;
+      margin-top: 4px;
+    }
+    .header-right {
+      text-align: right;
+    }
+    .badge {
+      display: inline-block;
+      background: #f1f5f9;
+      border: 1.5px solid #cbd5e1;
+      padding: 3px 12px;
+      border-radius: 20px;
+      font-size: 10pt;
+      font-weight: 800;
+      color: #15803d;
+    }
+    .section-title {
+      font-size: 10pt;
+      font-weight: 800;
+      color: #047857;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin: 18px 0 8px 0;
+    }
+    .task-card {
+      border: 1.5px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      margin-bottom: 8px;
+      background: #fafafa;
+    }
+    .task-title {
+      font-weight: 750;
+      font-size: 11.5pt;
+      color: #0f172a;
+    }
+    .task-notes {
+      font-size: 10.5pt;
+      color: #475569;
+      margin-top: 4px;
+    }
+    .notes-box {
+      border: 1.5px solid #cbd5e1;
+      background: #ffffff;
+      border-radius: 10px;
+      padding: 12px 14px;
+      min-height: 75px;
+      white-space: pre-wrap;
+      font-size: 11pt;
+    }
+    .practice-tracker {
+      margin-top: 24px;
+      border: 2px dashed #047857;
+      border-radius: 12px;
+      padding: 12px 16px;
+      background: #f0fdf4;
+    }
+    .tracker-title {
+      font-size: 10.5pt;
+      font-weight: 800;
+      color: #047857;
+      margin-bottom: 8px;
+    }
+    .tracker-days {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .tracker-day {
+      flex: 1;
+      text-align: center;
+      border: 1px solid #86efac;
+      background: #ffffff;
+      border-radius: 8px;
+      padding: 8px 4px;
+    }
+    .day-name {
+      font-size: 9pt;
+      font-weight: 800;
+      color: #15803d;
+      text-transform: uppercase;
+    }
+    .day-box {
+      width: 20px;
+      height: 20px;
+      border: 2px solid #cbd5e1;
+      border-radius: 5px;
+      margin: 6px auto 0 auto;
+    }
+    .footer {
+      margin-top: 28px;
+      padding-top: 10px;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 8.5pt;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>${snap.studentFirstName ? `Wochenplan: ${snap.studentFirstName}` : 'Wochen-Übeplan'}</h1>
+      <div class="meta">${snap.schoolName || 'Campus-Groovelab'}${snap.instrument ? ` • ${snap.instrument}` : ''}</div>
+    </div>
+    <div class="header-right">
+      <div class="badge">KW ${snap.weekNumber}</div>
+      <div class="meta" style="margin-top: 4px;">Stand: ${snap.date}</div>
+    </div>
+  </div>
+
+  ${lehrwerke.length > 0 ? `
+    <div class="section-title">📖 Lehrwerke & Übungen</div>
+    ${lehrwerke.map(lw => `
+      <div class="task-card">
+        <div class="task-title">${lw.title}</div>
+        ${lw.notes ? `<div class="task-notes">Hinweis: ${lw.notes}</div>` : ''}
+      </div>
+    `).join('')}
+  ` : ''}
+
+  ${songs.length > 0 ? `
+    <div class="section-title">🎵 Repertoire & Songs</div>
+    ${songs.map(s => `
+      <div class="task-card">
+        <div class="task-title">${s.title}</div>
+        ${s.notes ? `<div class="task-notes">Fahrplan: ${s.notes}</div>` : ''}
+      </div>
+    `).join('')}
+  ` : ''}
+
+  <div class="section-title">✏️ Hausaufgaben & Übe-Fahrplan</div>
+  <div class="notes-box">
+    ${notes.length > 0
+      ? notes.map(n => `• ${n.title}`).join('\n')
+      : 'Aktuelle Übungen aus dem Unterricht wie besprochen fortführen.'}
+  </div>
+
+  <div class="practice-tracker">
+    <div class="tracker-title">⭐️ Meine Übe-Woche am Notenständer (Täglich nach dem Üben abhaken)</div>
+    <div class="tracker-days">
+      <div class="tracker-day"><div class="day-name">Mo</div><div class="day-box"></div></div>
+      <div class="tracker-day"><div class="day-name">Di</div><div class="day-box"></div></div>
+      <div class="tracker-day"><div class="day-name">Mi</div><div class="day-box"></div></div>
+      <div class="tracker-day"><div class="day-name">Do</div><div class="day-box"></div></div>
+      <div class="tracker-day"><div class="day-name">Fr</div><div class="day-box"></div></div>
+      <div class="tracker-day"><div class="day-name">Sa</div><div class="day-box"></div></div>
+      <div class="tracker-day"><div class="day-name">So</div><div class="day-box"></div></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div>Persönlicher Übeplan für ${snap.studentFirstName || 'Schüler/in'}${snap.teacherName && snap.teacherName !== 'Lehrkraft' ? ` • Lehrkraft: ${snap.teacherName}` : ''}</div>
+    <div>Campus-Groovelab</div>
+  </div>
+</body>
+</html>`;
+
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow?.document;
+      if (doc) {
+        doc.open();
+        doc.write(printHtml);
+        doc.close();
+        iframe.onload = () => {
+          try {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+          } catch (err) {
+            console.error('[PrintHomework] print error:', err);
+          }
+          setTimeout(() => {
+            if (document.body.contains(iframe)) {
+              document.body.removeChild(iframe);
+            }
+          }, 3000);
+        };
+      }
+    } catch (e) {
+      console.warn('[PrintHomework] failed', e);
+    }
+  }, [getCurrentHomeworkSnapshot]);
+
   const handleRenameTeacherAudio = useCallback(async (url: string, newTitle: string, originalIdx?: number) => {
     const trimmedTitle = newTitle.trim();
     if (!trimmedTitle) return;
@@ -1370,19 +1796,40 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     }
   }, [student.id, selectedActiveSongId, loadActiveSongSkills, notifyHomeworkChange, setSelectedActiveSongId, setActiveInputTab]);
 
-  // F-Key Fullscreen listener
+  // 🛡️ Fail-Safe Modal-Abschluss: Stoppt aktive Audio-/TTS-Prozesse, sichert Notizen sofort & schließt sauber
+  const handleSafeClose = useCallback(() => {
+    try {
+      triggerImmediateAutoSave();
+    } catch {}
+    if (isRecordingAudio) {
+      try {
+        stopRecordingAudio();
+      } catch {}
+    }
+    if (isTtsSpeaking) {
+      try {
+        handleStopSpeaking();
+      } catch {}
+    }
+    onClose?.();
+  }, [triggerImmediateAutoSave, isRecordingAudio, stopRecordingAudio, isTtsSpeaking, handleStopSpeaking, onClose]);
+
+  // F-Key Fullscreen & Escape Key Modal-Close Listener (WAI-ARIA & WCAG 2.2 AA)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const activeEl = document.activeElement;
       if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) return;
-      if (e.key === 'f' || e.key === 'F') {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleSafeClose();
+      } else if (e.key === 'f' || e.key === 'F') {
         e.preventDefault();
         setIsFullscreen(prev => !prev);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFullscreen, isEmbed, onClose]);
+  }, [isFullscreen, isEmbed, handleSafeClose]);
 
   const renderFullscreenButton = () => (
     <button
@@ -1420,7 +1867,7 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
     return (
       <button
         type="button"
-        onClick={onClose}
+        onClick={handleSafeClose}
         aria-label="Aufgabenheft schließen"
         title="Aufgabenheft schließen"
         style={{
@@ -1681,7 +2128,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
           display: 'flex',
           flexDirection: (isMobileOrSim || activeViewMode !== 'document' || activeModalTab !== 'document') ? 'column' : 'row',
           flex: 1,
-          overflowY: (isMobileOrSim || activeViewMode !== 'document' || activeModalTab !== 'document') ? 'auto' : 'hidden',
+          overflowY: (isMobileOrSim || activeViewMode !== 'document' || activeModalTab !== 'document') 
+            ? (activeViewMode === 'groovetrainer' && !isMobileOrSim ? 'hidden' : 'auto') 
+            : 'hidden',
           overflowX: 'hidden',
           WebkitOverflowScrolling: 'touch',
           minHeight: 0,
@@ -1742,20 +2191,31 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
         ) : activeViewMode === 'groovetrainer' ? (
           <div style={{
             width: '100%',
+            height: '100%',
+            maxHeight: '100%',
             flex: 1,
             background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
             borderTop: '1px solid #e2e8f0',
             boxSizing: 'border-box',
-            padding: isMobileOrSim ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '24px 32px 80px 32px',
+            padding: isMobileOrSim ? '12px 12px calc(240px + env(safe-area-inset-bottom, 40px)) 12px' : '10px 20px 10px 20px',
             display: 'flex',
             flexDirection: 'column',
-            justifyContent: 'flex-start',
+            justifyContent: 'center',
             alignItems: 'center',
-            minHeight: isMobileOrSim ? 'auto' : 'calc(70vh - 60px)'
+            overflow: isMobileOrSim ? 'auto' : 'hidden',
+            minHeight: 0
           }}>
             <GrooveTrainerStudioView
               student={student}
               onClose={() => { setActiveViewMode('document'); setHubTab('modules'); }}
+              onExitToBriefing={() => {
+                if (onClose) {
+                  onClose();
+                } else {
+                  setActiveViewMode('document');
+                  setHubTab('modules');
+                }
+              }}
               uiLevel={uiLevel}
               useNotebookLayout={true}
               homeworkNotesList={homeworkNotesList}
@@ -1793,6 +2253,39 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             boxSizing: 'border-box',
             padding: isMobileOrSim ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '16px 20px 20px 20px'
           }}>
+            {/* 🔙 Zurück zum Aufgabenheft */}
+            <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={() => { setActiveViewMode('document'); setHubTab('modules'); }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: '#ffffff',
+                  border: '1.5px solid #cbd5e1',
+                  color: '#334155',
+                  padding: '6px 14px',
+                  borderRadius: '100px',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  userSelect: 'none',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                  touchAction: 'manipulation'
+                }}
+                className="hover-scale"
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveViewMode('document'); setHubTab('modules'); } }}
+                aria-label="Zurück zum Aufgabenheft"
+                title="Zurück zum Aufgabenheft"
+              >
+                <ArrowLeft size={14} strokeWidth={2.5} />
+                <span>Zurück zum Aufgabenheft</span>
+              </button>
+            </div>
             <GroovePracticeCompanion
               useNotebookLayout={useNotebookLayout}
               isCampusModule={true}
@@ -1818,7 +2311,10 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             minHeight: isMobileOrSim ? 'auto' : 'calc(70vh - 60px)'
           }}>
             <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>Lade Stimmgerät...</div>}>
-              <CampusTuner uiLevel={uiLevel} />
+              <CampusTuner
+                uiLevel={uiLevel}
+                onBack={() => { setActiveViewMode('document'); setHubTab('modules'); }}
+              />
             </Suspense>
           </div>
         ) : activeViewMode === 'earlab' ? (
@@ -1847,105 +2343,168 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
               />
             </Suspense>
           </div>
+        ) : activeViewMode === 'worldtour' ? (
+          <div style={{
+            width: '100%',
+            height: '100%',
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: 0,
+            boxSizing: 'border-box',
+            padding: 0,
+            overflow: 'hidden'
+          }}>
+            <WorldTourMapSpread
+              onBackToHub={() => { setActiveViewMode('document'); setHubTab('modules'); }}
+              studentName={displayedStudentName}
+              studentInstrument={(student as any)?.instrument || (student as any)?.resolved_instrument || 'Klavier'}
+              uiLevel={uiLevel}
+              isMobileView={isMobileOrSim}
+            />
+          </div>
         ) : activeViewMode === 'recordings' ? (
-          <MeisterwerkRecordingsTab
-            isTeacherTools={isTeacherTools}
-            readOnly={readOnly}
-            student={student}
-            activeSongSkills={activeSongSkills}
-            audioDuration={audioDuration}
-            audioLabel={audioLabel}
-            audioSongTags={{}}
-            availablePlaylists={[]}
-            availableSongsForTagging={[]}
-            expandedStudentAudioWeeks={expandedStudentAudioWeeks}
-            expandedTeacherAudioWeeks={expandedTeacherAudioWeeks}
-            favoriteAudioUrls={favoriteAudioUrls}
-            formatRecordTime={formatRecordTime}
-            getISOWeek={getISOWeek}
-            getMonthAlbumTheme={() => 'Aufnahmen'}
-            getNormalizedSongTitle={(s: any) => typeof s === 'string' ? s : (s?.topic_name || '')}
-            handleDeleteNote={handleDeleteNote}
-            handleDeleteStudentAudio={handleDeleteStudentAudio}
-            handleRenameStudentAudio={handleRenameStudentAudio}
-            handleRenameTeacherAudio={handleRenameTeacherAudio}
-            handleSaveEditedTeacherAudio={async () => {}}
-            handleRevertTeacherAudioToOriginal={async () => {}}
-            handleSaveShareToPlaylist={async () => {}}
-            handleUpdateAudioSongTag={() => {}}
-            hasTresorStorage={propHasTresor ?? false}
-            homeworkNotes={generalHomeworkNotes}
-            homeworkNotesList={homeworkNotesList}
-            isBookAlbum={() => false}
-            isCurrentHomework={isCurrentHomework}
-            isMobileOrSim={isMobileOrSim}
-            isRecordingAudio={isRecordingAudio}
-            isRecordingMetronomeActive={isRecordingMetronomeActive}
-            isRecordingPadActive={false}
-            setIsRecordingPadActive={() => {}}
-            isSharingToPlaylist={false}
-            isStudentWeekExpanded={true}
-            isTeacherHomeworkExpanded={true}
-            isTeacherMode={isTeacherTools}
-            isUploadingAudio={isUploadingAudio}
-            matchesAudioSearch={() => true}
-            mobileRecordingsTab="student"
-            newPlaylistTitle=""
-            openHomeworkWeekAccordions={openHomeworkWeekAccordions}
-            playMetronomeTick={playMetronomeTick}
-            progressItems={progressItems}
-            recordingBpm={recordingBpm}
-            recordingMetronomeRef={{ current: null } as any}
-            recordingSearchQuery={recordingSearchQuery}
-            selectedStudentMonth={null}
-            selectedStudentSongAlbum={null}
-            selectedTeacherMonth={null}
-            selectedTeacherSongAlbum={null}
-            setAudioLabel={setAudioLabel}
-            setIsRecordingMetronomeActive={setIsRecordingMetronomeActive}
-            setIsStudentWeekExpanded={() => {}}
-            setIsTeacherHomeworkExpanded={() => {}}
-            setLocalJuniorRecordingsTrigger={() => {}}
-            setMobileRecordingsTab={() => {}}
-            setNewPlaylistTitle={() => {}}
-            setOpenHomeworkWeekAccordions={setOpenHomeworkWeekAccordions}
-            setRecordingBpm={setRecordingBpm}
-            setSelectedStudentMonth={() => {}}
-            setSelectedStudentSongAlbum={() => {}}
-            setSelectedTeacherMonth={() => {}}
-            setSelectedTeacherSongAlbum={() => {}}
-            setShareAudioModal={() => {}}
-            setShareCustomTitle={() => {}}
-            setSharePlaylistId={() => {}}
-            setShareProcessing={() => {}}
-            setShowNewPlaylistInput={() => {}}
-            setShowRecordingMetronomePopup={() => {}}
-            setShowStudentFavoritesOnly={() => {}}
-            setShowTeacherFavoritesOnly={() => {}}
-            setShowTeacherHomeworkArchive={() => {}}
-            shareAudioModal={null}
-            shareCustomTitle=""
-            sharePlaylistId=""
-            shareProcessing="raw"
-            showNewPlaylistInput={false}
-            showRecordingMetronomePopup={false}
-            showStudentFavoritesOnly={false}
-            showTeacherFavoritesOnly={false}
-            showTeacherHomeworkArchive={false}
-            songs={songs}
-            startRecordingAudio={startRecordingAudio}
-            stopRecordingAudio={stopRecordingAudio}
-            recordCountInRemaining={recordCountInRemaining}
-            cancelActiveRecordCountIn={cancelActiveRecordCountIn}
-            justRecordedAudioUrl={justRecordedAudioUrl}
-            justRecordedAudioLabel={justRecordedAudioLabel}
-            studentFirstName={studentFirstName}
-            toggleFavoriteAudio={toggleFavoriteAudio}
-            toggleStudentAudioWeek={toggleStudentAudioWeek}
-            toggleTeacherAudioWeek={toggleTeacherAudioWeek}
-            topicName={topicName}
-            useNotebookLayout={useNotebookLayout}
-          />
+          <div style={{
+            width: '100%',
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: 0,
+            boxSizing: 'border-box',
+            padding: isMobileOrSim ? '16px 16px calc(280px + env(safe-area-inset-bottom, 40px)) 16px' : '16px 20px 20px 20px'
+          }}>
+            {/* 🔙 Zurück zum Aufgabenheft */}
+            <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={() => { setActiveViewMode('document'); setHubTab('modules'); }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: '#ffffff',
+                  border: '1.5px solid #cbd5e1',
+                  color: '#334155',
+                  padding: '6px 14px',
+                  borderRadius: '100px',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  userSelect: 'none',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                  touchAction: 'manipulation'
+                }}
+                className="hover-scale"
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveViewMode('document'); setHubTab('modules'); } }}
+                aria-label="Zurück zum Aufgabenheft"
+                title="Zurück zum Aufgabenheft"
+              >
+                <ArrowLeft size={14} strokeWidth={2.5} />
+                <span>Zurück zum Aufgabenheft</span>
+              </button>
+            </div>
+            <MeisterwerkRecordingsTab
+              isTeacherTools={isTeacherTools}
+              readOnly={readOnly}
+              student={student}
+              activeSongSkills={activeSongSkills}
+              audioDuration={audioDuration}
+              audioLabel={audioLabel}
+              audioSongTags={{}}
+              availablePlaylists={[]}
+              availableSongsForTagging={[]}
+              expandedStudentAudioWeeks={expandedStudentAudioWeeks}
+              expandedTeacherAudioWeeks={expandedTeacherAudioWeeks}
+              favoriteAudioUrls={favoriteAudioUrls}
+              formatRecordTime={formatRecordTime}
+              getISOWeek={getISOWeek}
+              getMonthAlbumTheme={() => 'Aufnahmen'}
+              getNormalizedSongTitle={(s: any) => typeof s === 'string' ? s : (s?.topic_name || '')}
+              handleDeleteNote={handleDeleteNote}
+              handleDeleteStudentAudio={handleDeleteStudentAudio}
+              handleRenameStudentAudio={handleRenameStudentAudio}
+              handleRenameTeacherAudio={handleRenameTeacherAudio}
+              handleSaveEditedTeacherAudio={async () => {}}
+              handleRevertTeacherAudioToOriginal={async () => {}}
+              handleSaveShareToPlaylist={async () => {}}
+              handleUpdateAudioSongTag={() => {}}
+              hasTresorStorage={propHasTresor ?? false}
+              homeworkNotes={generalHomeworkNotes}
+              homeworkNotesList={homeworkNotesList}
+              isBookAlbum={() => false}
+              isCurrentHomework={isCurrentHomework}
+              isMobileOrSim={isMobileOrSim}
+              isRecordingAudio={isRecordingAudio}
+              isRecordingMetronomeActive={isRecordingMetronomeActive}
+              isRecordingPadActive={isRecordingPadActive}
+              setIsRecordingPadActive={setIsRecordingPadActive}
+              isSharingToPlaylist={false}
+              isStudentWeekExpanded={isStudentWeekExpanded}
+              isTeacherHomeworkExpanded={isTeacherHomeworkExpanded}
+              isTeacherMode={isTeacherTools}
+              isUploadingAudio={isUploadingAudio}
+              matchesAudioSearch={matchesAudioSearch}
+              mobileRecordingsTab={mobileRecordingsTab}
+              newPlaylistTitle=""
+              openHomeworkWeekAccordions={openHomeworkWeekAccordions}
+              playMetronomeTick={playMetronomeTick}
+              progressItems={progressItems}
+              recordingBpm={recordingBpm}
+              recordingMetronomeRef={recordingMetronomeRef}
+              recordingSearchQuery={recordingSearchQuery}
+              selectedStudentMonth={selectedStudentMonth}
+              setSelectedStudentMonth={setSelectedStudentMonth}
+              selectedStudentSongAlbum={selectedStudentSongAlbum}
+              setSelectedStudentSongAlbum={setSelectedStudentSongAlbum}
+              selectedTeacherMonth={selectedTeacherMonth}
+              setSelectedTeacherMonth={setSelectedTeacherMonth}
+              selectedTeacherSongAlbum={selectedTeacherSongAlbum}
+              setSelectedTeacherSongAlbum={setSelectedTeacherSongAlbum}
+              setAudioLabel={setAudioLabel}
+              setIsRecordingMetronomeActive={setIsRecordingMetronomeActive}
+              setIsStudentWeekExpanded={setIsStudentWeekExpanded}
+              setIsTeacherHomeworkExpanded={setIsTeacherHomeworkExpanded}
+              setLocalJuniorRecordingsTrigger={() => {}}
+              setMobileRecordingsTab={setMobileRecordingsTab}
+              setNewPlaylistTitle={() => {}}
+              setOpenHomeworkWeekAccordions={setOpenHomeworkWeekAccordions}
+              setRecordingBpm={setRecordingBpm}
+              setShareAudioModal={() => {}}
+              setShareCustomTitle={() => {}}
+              setSharePlaylistId={() => {}}
+              setShareProcessing={() => {}}
+              setShowNewPlaylistInput={() => {}}
+              setShowRecordingMetronomePopup={setShowRecordingMetronomePopup}
+              setShowStudentFavoritesOnly={setShowStudentFavoritesOnly}
+              setShowTeacherFavoritesOnly={setShowTeacherFavoritesOnly}
+              setShowTeacherHomeworkArchive={setShowTeacherHomeworkArchive}
+              shareAudioModal={null}
+              shareCustomTitle=""
+              sharePlaylistId=""
+              shareProcessing="raw"
+              showNewPlaylistInput={false}
+              showRecordingMetronomePopup={showRecordingMetronomePopup}
+              showStudentFavoritesOnly={showStudentFavoritesOnly}
+              showTeacherFavoritesOnly={showTeacherFavoritesOnly}
+              showTeacherHomeworkArchive={showTeacherHomeworkArchive}
+              songs={songs}
+              startRecordingAudio={startRecordingAudio}
+              stopRecordingAudio={stopRecordingAudio}
+              recordCountInRemaining={recordCountInRemaining}
+              cancelActiveRecordCountIn={cancelActiveRecordCountIn}
+              justRecordedAudioUrl={justRecordedAudioUrl}
+              justRecordedAudioLabel={justRecordedAudioLabel}
+              studentFirstName={studentFirstName}
+              toggleFavoriteAudio={toggleFavoriteAudio}
+              toggleStudentAudioWeek={toggleStudentAudioWeek}
+              toggleTeacherAudioWeek={toggleTeacherAudioWeek}
+              topicName={topicName}
+              useNotebookLayout={useNotebookLayout}
+            />
+          </div>
         ) : activeModalTab === 'stickeralbum' ? (
           <MeisterwerkStickerAlbumTab
             isMobileOrSim={isMobileOrSim}
@@ -2061,13 +2620,14 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             handleCheckMatch={() => {}}
             handleCommitStudentRating={handleCommitStudentRating}
             handleCopyShareLink={handleCopyShareLink}
-            handleCreateAndAssignLehrwerk={() => {}}
+            handlePrintHomeworkSheet={handlePrintHomeworkSheet}
+            handleCreateAndAssignLehrwerk={handleCreateAndAssignLehrwerk}
             handleCreateAndAssignSong={handleCreateAndAssignSong}
             handleDeleteNote={handleDeleteNote}
             handleDeletePageNote={handleDeletePageNote}
-            handleDeleteSingleNoteItem={() => {}}
-            handlePageDoubleClick={() => {}}
-            handleRemoveLehrwerk={() => {}}
+            handleDeleteSingleNoteItem={handleDeleteSingleNoteItem}
+            handlePageDoubleClick={handlePageDoubleClick}
+            handleRemoveLehrwerk={handleRemoveLehrwerk}
             handleRemoveSong={handleRemoveSong}
             handleResetAllCurrentHomework={handleResetAllCurrentHomework}
             handleResolveStudentQuestion={handleResolveStudentQuestion}
@@ -2121,9 +2681,9 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             matchHistory={matchHistory}
             mobileProtokollTab={mobileProtokollTab}
             newCustomTagInput=""
-            newLehrwerkLoading={false}
-            newLehrwerkPages=""
-            newLehrwerkTitle=""
+            newLehrwerkLoading={newLehrwerkLoading}
+            newLehrwerkPages={newLehrwerkPages}
+            newLehrwerkTitle={newLehrwerkTitle}
             newSongArtist=""
             newSongTitle=""
             onClose={onClose}
@@ -2188,8 +2748,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             setIsTransferModalOpen={setIsTransferModalOpen}
             setMobileProtokollTab={setMobileProtokollTab}
             setNewCustomTagInput={() => {}}
-            setNewLehrwerkPages={() => {}}
-            setNewLehrwerkTitle={() => {}}
+            setNewLehrwerkPages={setNewLehrwerkPages}
+            setNewLehrwerkTitle={setNewLehrwerkTitle}
             setNewSongArtist={() => {}}
             setNewSongTitle={() => {}}
             setPageChunk={() => {}}
@@ -2201,8 +2761,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             setRhythmVal={() => {}}
             setSelectedHistoryWeek={() => {}}
             setShowAllPagesGrid={() => {}}
-            setShowAssignDropdown={() => {}}
-            setShowCreateLehrwerkModal={() => {}}
+            setShowAssignDropdown={setShowAssignDropdown}
+            setShowCreateLehrwerkModal={setShowCreateLehrwerkModal}
             setShowCreateSongModal={() => {}}
             setShowPlayAlongMetronomePopup={() => {}}
             setSongHomeworkNotes={setSongHomeworkNotes}
@@ -2214,8 +2774,8 @@ export const MeisterwerkDocumentationModal: React.FC<MeisterwerkDocumentationMod
             setTeacherNotes={setTeacherNotes}
             setViewingWeekOffset={setViewingWeekOffset}
             shareMenuRef={{ current: null } as any}
-            showAssignDropdown={false}
-            showCreateLehrwerkModal={false}
+            showAssignDropdown={showAssignDropdown}
+            showCreateLehrwerkModal={showCreateLehrwerkModal}
             showCreateSongModal={false}
             showMatchConfetti={showMatchConfetti}
             showPlayAlongMetronomePopup={false}

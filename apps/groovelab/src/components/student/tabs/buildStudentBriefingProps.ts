@@ -35,6 +35,8 @@ export interface BuildStudentBriefingParams {
   setShowStudentToolbox: React.Dispatch<React.SetStateAction<boolean>>;
   setShowPushSoftPrompt: React.Dispatch<React.SetStateAction<boolean>>;
   handleOpenHomeworkBookWithView: (...args: any[]) => void;
+  totalPracticeMinutes?: number;
+  unifiedStickersMap?: Record<string, any>;
 }
 
 export function buildStudentBriefingProps(params: BuildStudentBriefingParams): StudentBriefingTabProps {
@@ -81,7 +83,7 @@ export function buildStudentBriefingProps(params: BuildStudentBriefingParams): S
     downloadJuniorRecording: practice.downloadJuniorRecording,
     draftAllowTts: feed.draftAllowTts,
     effectiveLevel: streaks.currentLevel,
-    effectivePracticeMinutes: Math.floor(practice.secondsElapsed / 60),
+    effectivePracticeMinutes: params.totalPracticeMinutes !== undefined ? params.totalPracticeMinutes : Math.floor(practice.secondsElapsed / 60),
     feedInteractions: feed.feedInteractions,
     finishPracticeSession: practice.finishPracticeSession,
     flamesActive: streaks.flamesActive,
@@ -183,7 +185,7 @@ export function buildStudentBriefingProps(params: BuildStudentBriefingParams): S
     togglePlayJuniorPreview: () => {},
     togglePlayJuniorRecording: () => {},
     totalUnreadDirectMessages: 0,
-    unifiedStickersMap: {},
+    unifiedStickersMap: params.unifiedStickersMap || {},
     unreadClassFeedCount: 0,
     xpActive: true,
     pushEnabled: false,

@@ -25,7 +25,7 @@ import { getBlob } from '../../../utils/blobStorage';
 import { formatHarmonizedAudioTitle } from '../../../utils/audioNamingHelper';
 import { safeDecodeAudioData, ensureWavBlob, ensureCenteredStereoAudioBuffer } from '../../../utils/audioMasteringEngine';
 import { getAudioNotesCount, getAudioNotes, addAudioNote, updateAudioNote, deleteAudioNote, fetchAudioNotesFromServer } from '../../../utils/audioNotesStorage';
-import { getSecureAudioUrl } from '../../../utils/audioStorageHelper';
+import { getSecureAudioUrl, resolvePlayableAudioSource } from '../../../utils/audioStorageHelper';
 import { SharedAudioEngine } from '../../../utils/sharedAudioEngine';
 import { resampleWaveformPeaks, extractWaveformPeaks, detectAudioMimeType } from '../../../utils/waveformHelper';
 import { AudioLoopLocator, getLoopLocator } from '../../../utils/audioLoopLocatorStorage';
@@ -149,43 +149,30 @@ export const MasterworkAudioCapsule: React.FC<MasterworkAudioCapsuleProps> = ({
 
   useEffect(() => {
     let active = true;
-    let createdBlobUrl: string | null = null;
+    let cleanupFn: (() => void) | null = null;
 
-    if (url.startsWith('campus_blob_') || url.startsWith('campus_audio_')) {
-      getBlob(url).then(raw => {
-        if (active && raw) {
-          const finalBlob = raw instanceof Blob ? raw : new Blob([raw], { type: 'audio/webm' });
-          createdBlobUrl = URL.createObjectURL(finalBlob);
-          setResolvedUrl(createdBlobUrl);
-        }
-      }).catch((err: any) => console.warn('[MasterworkAudioCapsule] Blob load note:', err));
-    } else if (url.startsWith('http') || url.includes('/storage/v1/object/') || url.startsWith('schools/')) {
-      getBlob(url).then(cachedBlob => {
-        if (active && cachedBlob) {
-          const finalBlob = cachedBlob instanceof Blob ? cachedBlob : new Blob([cachedBlob], { type: 'audio/webm' });
-          createdBlobUrl = URL.createObjectURL(finalBlob);
-          setResolvedUrl(createdBlobUrl);
+    if (!url) {
+      setResolvedUrl('');
+      return;
+    }
+
+    resolvePlayableAudioSource(url, 'campus-assets', 1800)
+      .then(res => {
+        if (!active) {
+          if (res.cleanup) res.cleanup();
           return;
         }
-        getSecureAudioUrl(url, 'campus-assets', 300).then(secUrl => {
-          if (active && secUrl) setResolvedUrl(secUrl);
-        }).catch(() => {
-          if (active) setResolvedUrl(url);
-        });
-      }).catch(() => {
-        getSecureAudioUrl(url, 'campus-assets', 300).then(secUrl => {
-          if (active && secUrl) setResolvedUrl(secUrl);
-        }).catch(() => {
-          if (active) setResolvedUrl(url);
-        });
+        cleanupFn = res.cleanup ?? null;
+        if (res.src) setResolvedUrl(res.src);
+      })
+      .catch(err => {
+        console.warn('[MasterworkAudioCapsule] Failed to resolve playable audio source:', err);
+        if (active) setResolvedUrl(url);
       });
-    } else {
-      setResolvedUrl(url);
-    }
 
     return () => {
       active = false;
-      if (createdBlobUrl) URL.revokeObjectURL(createdBlobUrl);
+      if (cleanupFn) cleanupFn();
     };
   }, [url]);
 
@@ -194,31 +181,38 @@ export const MasterworkAudioCapsule: React.FC<MasterworkAudioCapsuleProps> = ({
     if (!audio) return;
 
     const handleLoaded = () => {
-      if (audio.duration && isFinite(audio.duration)) {
+      if (audio.duration && isFinite(audio.duration) && audio.duration > 1) {
         setDuration(Math.round(audio.duration));
       }
     };
     const handleTimeUpdate = () => {
       setCurrentTime(audio.currentTime);
+      if (audio.currentTime > duration) {
+        setDuration(Math.ceil(audio.currentTime));
+      }
     };
     const handleEnded = () => {
       setIsPlaying(false);
       setCurrentTime(0);
     };
 
-    if (audio.duration && isFinite(audio.duration)) {
+    if (audio.duration && isFinite(audio.duration) && audio.duration > 1) {
       setDuration(Math.round(audio.duration));
     }
 
     audio.addEventListener('loadedmetadata', handleLoaded);
+    audio.addEventListener('durationchange', handleLoaded);
+    audio.addEventListener('canplay', handleLoaded);
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
     return () => {
       audio.removeEventListener('loadedmetadata', handleLoaded);
+      audio.removeEventListener('durationchange', handleLoaded);
+      audio.removeEventListener('canplay', handleLoaded);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [resolvedUrl]);
+  }, [resolvedUrl, duration]);
 
   const togglePlay = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -275,7 +269,33 @@ export const MasterworkAudioCapsule: React.FC<MasterworkAudioCapsuleProps> = ({
         boxSizing: 'border-box'
       }}
     >
-      <audio ref={audioRef} src={resolvedUrl || undefined} preload="metadata" playsInline />
+      <audio
+        ref={audioRef}
+        src={resolvedUrl || undefined}
+        preload="metadata"
+        playsInline
+        onLoadedMetadata={(e) => {
+          const a = e.currentTarget;
+          if (a.duration && isFinite(a.duration) && a.duration > 1) {
+            setDuration(Math.round(a.duration));
+          }
+        }}
+        onDurationChange={(e) => {
+          const a = e.currentTarget;
+          if (a.duration && isFinite(a.duration) && a.duration > 1) {
+            setDuration(Math.round(a.duration));
+          }
+        }}
+        onError={() => {
+          console.warn('[MasterworkAudioCapsule] Audio stream error for:', resolvedUrl);
+          if (resolvedUrl && resolvedUrl.includes('/storage/v1/object/sign/')) {
+            const pubUrl = resolvedUrl.replace('/storage/v1/object/sign/', '/storage/v1/object/public/').split('?')[0];
+            if (pubUrl && pubUrl !== resolvedUrl) {
+              setResolvedUrl(pubUrl);
+            }
+          }
+        }}
+      />
 
       {/* Play / Pause Circular Button */}
       <button
@@ -492,7 +512,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
   const effectiveUiLevel: 'junior' | 'teen' | 'pro' = uiLevel || (typeof window !== 'undefined' ? (localStorage.getItem('campus_student_ui_level') as any) : null) || 'junior';
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isLooping, setIsLooping] = useState<boolean>(() => Boolean(initialLoopLocator?.enabled));
-  const [countInActive, setCountInActive] = useState<boolean>(() => effectiveUiLevel === 'junior');
+  const [countInActive, setCountInActive] = useState<boolean>(false);
   const [countInStep, setCountInStep] = useState<number | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
@@ -721,48 +741,30 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
 
   useEffect(() => {
     let active = true;
-    let createdBlobUrl: string | null = null;
+    let cleanupFn: (() => void) | undefined;
 
-    const candidateLocalKey = [url, audioId, id].find(k => k && (k.startsWith('campus_blob_') || k.startsWith('campus_audio_') || k.startsWith('offline://')));
-
-    if (candidateLocalKey) {
-      getBlob(candidateLocalKey).then(raw => {
-        if (active && raw) {
-          const mime = detectAudioMimeType(raw instanceof Blob ? raw : null, candidateLocalKey);
-          const finalBlob = raw instanceof Blob ? raw : new Blob([raw], { type: mime });
-          createdBlobUrl = URL.createObjectURL(finalBlob);
-          setResolvedUrl(createdBlobUrl);
-        }
-      }).catch(err => console.warn('[InlineAudioPlayer] Blob load note:', err));
-    } else if (url && (url.startsWith('http') || url.includes('/storage/v1/object/') || url.startsWith('schools/'))) {
-      // ⚡ First check if this file was stored in IndexedDB locally (0ms Fast Local-First)
-      getBlob(url).then(cachedBlob => {
-        if (active && cachedBlob) {
-          const mime = detectAudioMimeType(cachedBlob instanceof Blob ? cachedBlob : null, url);
-          const finalBlob = cachedBlob instanceof Blob ? cachedBlob : new Blob([cachedBlob], { type: mime });
-          createdBlobUrl = URL.createObjectURL(finalBlob);
-          setResolvedUrl(createdBlobUrl);
-          return;
-        }
-        getSecureAudioUrl(url, 'campus-assets', 300).then(secUrl => {
-          if (active && secUrl) setResolvedUrl(secUrl);
-        }).catch(() => {
-          if (active) setResolvedUrl(url);
+    const candidateUrl = url || audioId || id;
+    if (candidateUrl) {
+      resolvePlayableAudioSource(candidateUrl, 'campus-assets', 1800)
+        .then((res) => {
+          if (active && res.src) {
+            setResolvedUrl(res.src);
+            cleanupFn = res.cleanup;
+          }
+        })
+        .catch((err) => {
+          console.warn('[InlineAudioPlayer] Failed to resolve playable audio source:', err);
+          if (active && isPlayableUrl(candidateUrl)) {
+            setResolvedUrl(candidateUrl);
+          }
         });
-      }).catch(() => {
-        getSecureAudioUrl(url, 'campus-assets', 300).then(secUrl => {
-          if (active && secUrl) setResolvedUrl(secUrl);
-        }).catch(() => {
-          if (active) setResolvedUrl(url);
-        });
-      });
     } else {
-      setResolvedUrl(url);
+      setResolvedUrl('');
     }
 
     return () => {
       active = false;
-      if (createdBlobUrl) URL.revokeObjectURL(createdBlobUrl);
+      if (cleanupFn) cleanupFn();
       if (countInTimerRef.current) {
         if (typeof countInTimerRef.current === 'object' && countInTimerRef.current.clear) {
           countInTimerRef.current.clear();
@@ -794,7 +796,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       const candidateKeys = [url, resolvedUrl, audioId, id].filter(Boolean) as string[];
 
       for (const k of candidateKeys) {
-        if (k.startsWith('campus_blob_') || k.startsWith('campus_audio_') || k.startsWith('offline://')) {
+        if (k.startsWith('campus_blob_') || k.startsWith('campus_audio_') || k.startsWith('offline://') || k.startsWith('blob_')) {
           const raw = await getBlob(k);
           if (raw instanceof Blob) {
             arrayBuffer = await raw.arrayBuffer();
@@ -1150,12 +1152,18 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       // 🚀 Preload buffer in background
       loadAudioBuffer().catch(() => {});
 
-      // 🛑 Ensure audio is at startOffset and completely paused during count-in
+      // 🔓 Safari WebKit Autoplay Priming:
+      // Start audio playing silently during user gesture so unmuting on beat 4 is guaranteed
       if (audio && isPlayable) {
         try {
-          if (!audio.paused) audio.pause();
+          audio.muted = true;
+          audio.volume = 0;
           if (audio.readyState > 0) audio.currentTime = startOffset;
           audio.playbackRate = playbackRate || 1;
+          const primePromise = audio.play();
+          if (primePromise !== undefined) {
+            primePromise.catch(() => {});
+          }
         } catch {}
       }
 
@@ -1256,7 +1264,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
     const audio = audioRef.current;
     if (!audio) return;
     const handleLoadedMetadata = () => {
-      if (audio.duration && isFinite(audio.duration)) {
+      if (audio.duration && isFinite(audio.duration) && audio.duration > 1) {
         setDuration(Math.round(audio.duration));
       }
     };
@@ -1268,7 +1276,11 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
             audio.currentTime = loopLocator.startSec;
           }
         }
-        setCurrentTime(audio.currentTime);
+        const cur = audio.currentTime;
+        setCurrentTime(cur);
+        if (cur > duration) {
+          setDuration(Math.ceil(cur));
+        }
       }
     };
     const handleEnded = () => {
@@ -1278,7 +1290,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       }
     };
 
-    if (audio.duration && isFinite(audio.duration)) {
+    if (audio.duration && isFinite(audio.duration) && audio.duration > 1) {
       setDuration(Math.round(audio.duration));
     }
 
@@ -1293,18 +1305,22 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
 
     audio.loop = isLooping;
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('durationchange', handleLoadedMetadata);
+    audio.addEventListener('canplay', handleLoadedMetadata);
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('play', handlePlay);
     audio.addEventListener('pause', handlePause);
     return () => {
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('durationchange', handleLoadedMetadata);
+      audio.removeEventListener('canplay', handleLoadedMetadata);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('play', handlePlay);
       audio.removeEventListener('pause', handlePause);
     };
-  }, [resolvedUrl, isLooping, loopLocator]);
+  }, [resolvedUrl, isLooping, loopLocator, duration]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -1344,7 +1360,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
       let detectedExt = 'webm';
 
       // 1. Resolve Audio Content to a native Blob
-      if (resolvedUrl.startsWith('campus_blob_') || resolvedUrl.startsWith('campus_audio_') || resolvedUrl.startsWith('offline://')) {
+      if (resolvedUrl.startsWith('campus_blob_') || resolvedUrl.startsWith('campus_audio_') || resolvedUrl.startsWith('offline://') || resolvedUrl.startsWith('blob_')) {
         const raw = await getBlob(resolvedUrl);
         if (raw) {
           finalBlob = raw instanceof Blob ? raw : new Blob([raw], { type: 'audio/webm' });
@@ -2277,7 +2293,33 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
         position: "relative"
       }}
     >
-      <audio ref={audioRef} src={resolvedUrl || undefined} preload="metadata" playsInline />
+      <audio
+        ref={audioRef}
+        src={resolvedUrl || undefined}
+        preload="metadata"
+        playsInline
+        onLoadedMetadata={(e) => {
+          const a = e.currentTarget;
+          if (a.duration && isFinite(a.duration) && a.duration > 1) {
+            setDuration(Math.round(a.duration));
+          }
+        }}
+        onDurationChange={(e) => {
+          const a = e.currentTarget;
+          if (a.duration && isFinite(a.duration) && a.duration > 1) {
+            setDuration(Math.round(a.duration));
+          }
+        }}
+        onError={() => {
+          console.warn('[InlineAudioPlayer] Audio stream error for:', resolvedUrl);
+          if (resolvedUrl && resolvedUrl.includes('/storage/v1/object/sign/')) {
+            const pubUrl = resolvedUrl.replace('/storage/v1/object/sign/', '/storage/v1/object/public/').split('?')[0];
+            if (pubUrl && pubUrl !== resolvedUrl) {
+              setResolvedUrl(pubUrl);
+            }
+          }
+        }}
+      />
 
       {/* 🛡️ Instant Deleting Visual Feedback Overlay & Progress Bar */}
       {isDeleting && (
@@ -3039,7 +3081,7 @@ export const InlineAudioPlayer: React.FC<InlineAudioPlayerProps> = ({
 
               // 4. Neu gekürzten WAV-Blob sofort in den Player laden & vor-dekodieren
               if (res.url) {
-                if (res.url.startsWith('campus_blob_') || res.url.startsWith('campus_audio_')) {
+                if (res.url.startsWith('campus_blob_') || res.url.startsWith('campus_audio_') || res.url.startsWith('blob_')) {
                   getBlob(res.url).then(raw => {
                     if (raw) {
                       const finalBlob = raw instanceof Blob ? raw : new Blob([raw], { type: 'audio/wav' });

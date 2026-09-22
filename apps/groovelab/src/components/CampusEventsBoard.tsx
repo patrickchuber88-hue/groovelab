@@ -73,6 +73,7 @@ import { isUUID } from '../utils/uuidValidator';
 import { formatGermanDate, formatGermanWeekday } from '../utils/formatters';
 import { CampusAppointmentShoutboxModal } from './CampusAppointmentShoutboxModal';
 import { CampusCalendarSyncHubModal } from './CampusCalendarSyncHubModal';
+import { decryptMessagesBatch, primeDecryptedCache } from '../lib/security/messageCrypto';
 import { supabase as defaultSupabase } from '../lib/supabase';
 
 export interface CampusEventsBoardProps {
@@ -2439,7 +2440,9 @@ export function CampusEventsBoard({
           return false;
         });
 
-        setChatMessages(filtered);
+        const effectiveSchoolId = schoolId || filtered[0]?.school_id;
+        const decrypted = await decryptMessagesBatch(filtered, effectiveSchoolId);
+        setChatMessages(decrypted);
         setTimeout(() => chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
       }
     } catch (err) {
@@ -2514,8 +2517,11 @@ export function CampusEventsBoard({
         messagePayload.occurrence_id = targetOccId;
       }
 
-      const { error } = await supabase.from('campus_direct_messages').insert(messagePayload);
+      const { data, error } = await supabase.from('campus_direct_messages').insert(messagePayload).select().single();
       if (error) throw error;
+      if (data?.content && typeof data.content === 'string' && data.content.startsWith('enc:')) {
+        primeDecryptedCache(schoolId, data.content, messageContent);
+      }
 
       setActiveChatOccIds(prev => {
         const newSet = new Set(prev);
@@ -6850,42 +6856,6 @@ export function CampusEventsBoard({
 
                           return (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                              {sortedWeekKeys.length > 1 && (
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', padding: '0 2px' }}>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setExpandedWeeks(prev => {
-                                        const next = { ...prev };
-                                        const allAreOpen = sortedWeekKeys.every(k => next[k] === true);
-                                        sortedWeekKeys.forEach(k => {
-                                          next[k] = !allAreOpen;
-                                        });
-                                        return next;
-                                      });
-                                    }}
-                                    style={{
-                                      background: 'transparent',
-                                      border: 'none',
-                                      color: '#64748b',
-                                      fontSize: '0.68rem',
-                                      fontWeight: 700,
-                                      cursor: 'pointer',
-                                      padding: '2px 8px',
-                                      borderRadius: '6px',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                      touchAction: 'manipulation'
-                                    }}
-                                    title="Alle Kalenderwochen dieses Monats auf- oder zuklappen"
-                                  >
-                                    {sortedWeekKeys.every(k => expandedWeeks[k] === true) ? 'Alle Wochen einklappen' : 'Alle Wochen aufklappen'}
-                                  </button>
-                                </div>
-                              )}
-
                               {sortedWeekKeys.map((weekKey, weekIdx) => {
                                 const wGroup = weekGroups[weekKey];
                                 const isCurrentWeek = (monthKey === currentSimMonthKey && wGroup.weekNum === currentSimWeekNum) || wGroup.items.some(item => item.date === todayStr);
@@ -6913,8 +6883,8 @@ export function CampusEventsBoard({
                                         alignItems: 'center',
                                         justifyContent: 'space-between',
                                         padding: '8px 12px',
-                                        background: isCurrentWeek ? '#f0fdf4' : '#ffffff',
-                                        border: isCurrentWeek ? '1.5px solid #bbf7d0' : '1px solid #f1f5f9',
+                                        background: '#ffffff',
+                                        border: '1px solid #f1f5f9',
                                         borderRadius: '10px',
                                         cursor: 'pointer',
                                         userSelect: 'none',
@@ -6923,16 +6893,11 @@ export function CampusEventsBoard({
                                         touchAction: 'manipulation'
                                       }}
                                     >
-                                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: isCurrentWeek ? '#166534' : '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        {isWeekExpanded ? <ChevronDown size={13} color={isCurrentWeek ? '#16a34a' : '#94a3b8'} /> : <ChevronRight size={13} color={isCurrentWeek ? '#16a34a' : '#94a3b8'} />}
+                                      <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        {isWeekExpanded ? <ChevronDown size={13} color="#94a3b8" /> : <ChevronRight size={13} color="#94a3b8" />}
                                         KW {wGroup.weekNum} ({wGroup.rangeStr})
-                                        {isCurrentWeek && (
-                                          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#15803d', background: '#dcfce7', padding: '1px 6px', borderRadius: '5px' }}>
-                                            Diese Woche
-                                          </span>
-                                        )}
                                       </span>
-                                      <span style={{ fontSize: '0.68rem', fontWeight: 900, color: isCurrentWeek ? '#166534' : '#64748b', background: isCurrentWeek ? '#dcfce7' : '#f1f5f9', padding: '1px 6px', borderRadius: '5px' }}>
+                                      <span style={{ fontSize: '0.68rem', fontWeight: 900, color: '#64748b', background: '#f1f5f9', padding: '1px 6px', borderRadius: '5px' }}>
                                         {wGroup.items.length} {wGroup.items.length === 1 ? 'Termin' : 'Termine'}
                                       </span>
                                     </div>

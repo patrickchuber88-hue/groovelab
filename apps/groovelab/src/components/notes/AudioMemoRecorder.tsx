@@ -4,6 +4,7 @@ import { checkIsAudioTresorActive } from '../../domain/stickersAndTresor';
 import { supabase } from '../../lib/supabase';
 import { acquireAudioStream, PURE_RAW_AUDIO_CONSTRAINTS } from '../../services/audioPermissionService';
 import { processPureRawBlob, TARGET_PURE_RAW_LUFS, TARGET_PEAK_DBTP, MAX_PURE_RAW_LIMITER_GR_DB } from '../../utils/audioMasteringEngine';
+import { saveOfflineAudioRecord } from '../../utils/offlineAudioVault';
 
 interface AudioMemoRecorderProps {
   user: any;
@@ -262,14 +263,35 @@ export const AudioMemoRecorder: React.FC<AudioMemoRecorderProps> = ({
           } catch {}
         }
       } else {
-        // Fallback local blob URL representation
-        finalUrl = audioUrl || '';
+        // Fallback: Lossless save to offline vault
+        const offlineRec = await saveOfflineAudioRecord({
+          blob: audioBlob,
+          mimeType: audioBlob.type,
+          durationSeconds: recordSeconds || 1,
+          studentId: user?.id,
+          schoolId: targetSchoolId,
+          context: 'voice_memo',
+          title: 'Sprachnotiz'
+        });
+        finalUrl = `offline://${offlineRec.id}`;
       }
 
       onAudioReady(finalUrl, recordSeconds || 1);
     } catch (err: any) {
-      console.warn('Audio upload fallback to local URL:', err);
-      onAudioReady(audioUrl || '', recordSeconds || 1);
+      console.warn('Audio upload fallback to offline vault:', err);
+      try {
+        const offlineRec = await saveOfflineAudioRecord({
+          blob: audioBlob,
+          mimeType: audioBlob.type,
+          durationSeconds: recordSeconds || 1,
+          studentId: user?.id,
+          context: 'voice_memo',
+          title: 'Sprachnotiz'
+        });
+        onAudioReady(`offline://${offlineRec.id}`, recordSeconds || 1);
+      } catch {
+        onAudioReady(audioUrl || '', recordSeconds || 1);
+      }
     } finally {
       setIsUploading(false);
     }

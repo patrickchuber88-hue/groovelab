@@ -190,7 +190,7 @@ export const BandFoundingModalsHub: React.FC<BandFoundingModalsHubProps> = ({
                             border: 'none',
                             cursor: 'pointer',
                             background: foundingLanguage === 'de' ? '#eab308' : 'transparent',
-                            color: foundingLanguage === 'de' ? 'white' : '#64748b',
+                            color: foundingLanguage === 'de' ? '#0f172a' : '#64748b',
                             transition: 'all 0.15s',
                           }}
                         >
@@ -211,7 +211,7 @@ export const BandFoundingModalsHub: React.FC<BandFoundingModalsHubProps> = ({
                             border: 'none',
                             cursor: 'pointer',
                             background: foundingLanguage === 'en' ? '#eab308' : 'transparent',
-                            color: foundingLanguage === 'en' ? 'white' : '#64748b',
+                            color: foundingLanguage === 'en' ? '#0f172a' : '#64748b',
                             transition: 'all 0.15s',
                           }}
                         >
@@ -385,7 +385,7 @@ export const BandFoundingModalsHub: React.FC<BandFoundingModalsHubProps> = ({
                                       justifyContent: 'center',
                                       fontSize: '1.1rem',
                                       fontWeight: 900,
-                                      color: 'white',
+                                      color: isSelected ? '#0f172a' : 'white',
                                       letterSpacing: '-0.02em',
                                       transition: 'background 0.2s',
                                     }}
@@ -447,7 +447,7 @@ export const BandFoundingModalsHub: React.FC<BandFoundingModalsHubProps> = ({
                     borderRadius: '18px',
                     fontSize: '1.1rem',
                     fontWeight: 900,
-                    color: 'white',
+                    color: '#0f172a',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
@@ -458,7 +458,7 @@ export const BandFoundingModalsHub: React.FC<BandFoundingModalsHubProps> = ({
                     minHeight: '44px',
                   }}
                 >
-                  <Zap size={20} fill="white" /> EIGENE BAND GRÜNDEN 🚀
+                  <Zap size={20} fill="#0f172a" /> EIGENE BAND GRÜNDEN 🚀
                 </button>
               </div>
             ) : (

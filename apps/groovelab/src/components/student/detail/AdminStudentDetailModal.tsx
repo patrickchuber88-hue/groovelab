@@ -5,6 +5,7 @@ import {
   Music, Edit3, ArrowRight, CheckCircle2, UserCheck
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
+import { logApplicationAudit } from '../../../services/auditLogService';
 import { StudentModalHeader } from './shared/StudentModalHeader';
 import { StudentScheduleCard, getFormattedScheduleDayTime } from './shared/StudentScheduleCard';
 import { StudentAccessSection } from './shared/StudentAccessSection';
@@ -511,10 +512,11 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
 
       // 3. Audit Log
       try {
-        await supabase.from('audit_logs').insert({
+        await logApplicationAudit({
           action: 'STUDENT_RECORD_SPLIT_INTO_GROUP',
-          school_id: activeStudent.school_id || activeStudent.schoolId,
-          user_id: activeStudent.id,
+          schoolId: activeStudent.school_id || activeStudent.schoolId,
+          tableName: 'students',
+          recordId: activeStudent.id,
           details: {
             original_id: activeStudent.id,
             child_a: `${childAFirst} ${lastName}`,
@@ -522,10 +524,10 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
             child_b: `${childBFirst} ${lastName}`,
             new_group_id: newGroupId,
             action_by: 'admin',
-            timestamp: new Date().toISOString()
           }
         });
       } catch (e) {}
+
 
       // 4. Update local state
       setFirstName(childAFirst);
@@ -612,18 +614,19 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
       student.is_adult = targetAdult;
 
       try {
-        await supabase.from('audit_logs').insert({
+        await logApplicationAudit({
           action: targetAdult ? 'STUDENT_LEGAL_MAJORITY_CONFIRMED' : 'STUDENT_LEGAL_MAJORITY_REVOKED',
-          school_id: activeStudent.school_id || activeStudent.schoolId,
-          user_id: activeStudent.id,
+          schoolId: activeStudent.school_id || activeStudent.schoolId,
+          tableName: 'students',
+          recordId: activeStudent.id,
           details: {
             student_id: activeStudent.id,
             student_name: `${firstName} ${lastName}`.trim(),
             action_by: 'admin',
-            timestamp: new Date().toISOString()
           }
         });
       } catch (auditErr) {}
+
 
       alert(targetAdult
         ? `Schüler ${firstName} wurde als volljährig (18+) bestätigt. Elterlicher PIN-Zugriff wurde deaktiviert.`
@@ -681,17 +684,18 @@ export const AdminStudentDetailModal: React.FC<AdminStudentDetailModalProps> = (
     try {
       setIsDeletingStudent(true);
       // DSGVO Art. 17 Deletion via audit and soft/hard delete
-      await supabase.from('audit_logs').insert({
+      await logApplicationAudit({
         action: 'STUDENT_PROFILE_DELETED_ART17',
-        school_id: activeStudent.school_id || activeStudent.schoolId,
-        user_id: activeStudent.id,
+        schoolId: activeStudent.school_id || activeStudent.schoolId,
+        tableName: 'students',
+        recordId: activeStudent.id,
         details: {
           student_id: activeStudent.id,
           student_name: `${firstName} ${lastName}`.trim(),
           action_by: 'admin',
-          timestamp: new Date().toISOString()
         }
       });
+
 
       await supabase.from('users').delete().eq('id', activeStudent.id);
       try {

@@ -994,7 +994,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: '#64748b' }}>Rechtsgrundlage:</span>
-              <span style={{ fontWeight: 800, color: '#f8fafc' }}>Art. 6 DSA / § 10 DDG / UrhDaG</span>
+              <span style={{ fontWeight: 800, color: '#f8fafc' }}>Rechtlicher Urheberschutz & Plattform-Sicherheit</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: '#64748b' }}>Status:</span>
@@ -1517,7 +1517,7 @@ export const SharedAudioBiographyPage: React.FC<SharedAudioBiographyPageProps> =
                 </span>
               </div>
               <span style={{ fontSize: '0.68rem', color: isLight ? '#64748b' : '#94a3b8', fontWeight: 600, display: 'block' }}>
-                Geschützte Unterrichts-Dokumentation (§§ 15 Abs. 3, 53 UrhG)
+                Geschützte private Unterrichts-Dokumentation
               </span>
             </div>
           </div>

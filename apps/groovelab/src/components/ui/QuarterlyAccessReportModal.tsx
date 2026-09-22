@@ -51,7 +51,7 @@ export const QuarterlyAccessReportModal: React.FC<QuarterlyAccessReportModalProp
       WebkitBackdropFilter: 'blur(16px)',
       overflowY: 'auto'
     }}>
-      <div style={{
+      <div role="dialog" aria-modal="true" style={{
         background: '#ffffff',
         borderRadius: '24px',
         maxWidth: '820px',

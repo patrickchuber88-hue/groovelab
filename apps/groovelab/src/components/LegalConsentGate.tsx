@@ -41,24 +41,26 @@ export function setLocalhostDevLegalBypassed(bypassed: boolean): void {
   } catch {}
 }
 
-function isSessionCacheCompliant(userId: string, minVersion: string): boolean {
+function isSessionCacheCompliant(userId: string, role: string, minVersion: string): boolean {
   if (typeof window === 'undefined' || !userId) return false;
   try {
-    const key = `${LEGAL_SESSION_CACHE_PREFIX}_${userId}_min_${minVersion}`;
-    return sessionStorage.getItem(key) === 'true';
+    const roleKey = `${LEGAL_SESSION_CACHE_PREFIX}_${userId}_${role}_min_${minVersion}`;
+    if (sessionStorage.getItem(roleKey) === 'true') return true;
+    const legacyKey = `${LEGAL_SESSION_CACHE_PREFIX}_${userId}_min_${minVersion}`;
+    return sessionStorage.getItem(legacyKey) === 'true';
   } catch {
     return false;
   }
 }
 
-function setSessionCacheCompliant(userId: string, minVersion: string, compliant: boolean): void {
+function setSessionCacheCompliant(userId: string, role: string, minVersion: string, compliant: boolean): void {
   if (typeof window === 'undefined' || !userId) return;
   try {
-    const key = `${LEGAL_SESSION_CACHE_PREFIX}_${userId}_min_${minVersion}`;
+    const roleKey = `${LEGAL_SESSION_CACHE_PREFIX}_${userId}_${role}_min_${minVersion}`;
     if (compliant) {
-      sessionStorage.setItem(key, 'true');
+      sessionStorage.setItem(roleKey, 'true');
     } else {
-      sessionStorage.removeItem(key);
+      sessionStorage.removeItem(roleKey);
     }
   } catch {}
 }
@@ -67,6 +69,7 @@ interface LegalConsentGateProps {
   user: {
     id: string;
     role?: string;
+    roles?: string[];
     school_id?: string;
     is_ghost_mode?: boolean;
     first_name?: string;
@@ -85,7 +88,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
 
   const isDevBypassed = isDev && isLocalhostDevLegalBypassed();
   const cachedCompliant = user?.id 
-    ? (isSessionCacheCompliant(user.id, MINIMUM_ENFORCED_VERSION) || isDevBypassed) 
+    ? (isSessionCacheCompliant(user.id, role, MINIMUM_ENFORCED_VERSION) || isDevBypassed) 
     : false;
 
   // Initialize compliant state optimistically if valid session cache or localhost dev bypass is present
@@ -129,13 +132,13 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
         setIsCompliant(true);
         setIsChecking(false);
         setIsNetworkBlocked(false);
-        setSessionCacheCompliant(user.id, MINIMUM_ENFORCED_VERSION, true);
+        setSessionCacheCompliant(user.id, role, MINIMUM_ENFORCED_VERSION, true);
       }
     };
     return () => {
       channel.close();
     };
-  }, [user?.id]);
+  }, [user?.id, role]);
 
   // 2. Authoritative check with adaptive timeout & resilient schema fallback
   useEffect(() => {
@@ -158,7 +161,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
           setIsCompliant(true);
           setIsChecking(false);
           setIsNetworkBlocked(false);
-          setSessionCacheCompliant(user.id, MINIMUM_ENFORCED_VERSION, true);
+          setSessionCacheCompliant(user.id, role, MINIMUM_ENFORCED_VERSION, true);
         }
         return;
       }
@@ -187,11 +190,23 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
           // Fall back gracefully to the canonical 3-parameter call from Migration 375!
           if (rpcRes.error && (rpcRes.error.code === 'PGRST202' || rpcRes.error.message?.includes('schema cache'))) {
             console.info('[LegalConsentGate] 4-parameter check_user_legal_status not in remote schema cache. Falling back to 3-parameter signature...');
+            // First attempt with ACTIVE_LEGAL_VERSION so newly confirmed consents match
             rpcRes = await supabase.rpc('check_user_legal_status', {
               p_user_id: user.id,
               p_role: role,
-              p_required_version: MINIMUM_ENFORCED_VERSION
+              p_required_version: ACTIVE_LEGAL_VERSION
             });
+            // If not compliant with active, check if compliant with minimum enforced
+            if (rpcRes.data && !rpcRes.data.is_compliant && MINIMUM_ENFORCED_VERSION !== ACTIVE_LEGAL_VERSION) {
+              const minRes = await supabase.rpc('check_user_legal_status', {
+                p_user_id: user.id,
+                p_role: role,
+                p_required_version: MINIMUM_ENFORCED_VERSION
+              });
+              if (minRes.data?.is_compliant) {
+                rpcRes = minRes;
+              }
+            }
           }
 
           return rpcRes;
@@ -212,7 +227,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
               console.info('[LegalConsentGate] Dev environment: auto-passing on transient RPC error.');
               setIsCompliant(true);
               setIsNetworkBlocked(false);
-              setSessionCacheCompliant(user.id, MINIMUM_ENFORCED_VERSION, true);
+              setSessionCacheCompliant(user.id, role, MINIMUM_ENFORCED_VERSION, true);
             } else if (!cachedCompliant) {
               setIsCompliant(false);
               setIsNetworkBlocked(true);
@@ -226,14 +241,14 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
           if (data && data.is_compliant === true) {
             setIsCompliant(true);
             setIsNetworkBlocked(false);
-            setSessionCacheCompliant(user.id, MINIMUM_ENFORCED_VERSION, true);
+            setSessionCacheCompliant(user.id, role, MINIMUM_ENFORCED_VERSION, true);
           } else {
             // 🛡️ 1% Goldstandard Localhost Immunität: Im Dev-Modus mit aktivem Bypass niemals zurücksetzen
             if (isDev && isLocalhostDevLegalBypassed()) {
               console.info('[LegalConsentGate] Localhost Dev-Immunity: preserving active bypass state.');
               setIsCompliant(true);
               setIsNetworkBlocked(false);
-              setSessionCacheCompliant(user.id, MINIMUM_ENFORCED_VERSION, true);
+              setSessionCacheCompliant(user.id, role, MINIMUM_ENFORCED_VERSION, true);
             } else {
               setIsCompliant(false);
               setIsNetworkBlocked(false);
@@ -243,7 +258,7 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
               } else {
                 setIsMajorUpdateFlow(false);
               }
-              setSessionCacheCompliant(user.id, MINIMUM_ENFORCED_VERSION, false);
+              setSessionCacheCompliant(user.id, role, MINIMUM_ENFORCED_VERSION, false);
             }
           }
           setIsChecking(false);
@@ -315,7 +330,11 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
         return;
       }
 
-      setSessionCacheCompliant(user.id, MINIMUM_ENFORCED_VERSION, true);
+      setSessionCacheCompliant(user.id, role, MINIMUM_ENFORCED_VERSION, true);
+      if (isAdmin) {
+        setSessionCacheCompliant(user.id, 'admin', MINIMUM_ENFORCED_VERSION, true);
+        setSessionCacheCompliant(user.id, 'secretary', MINIMUM_ENFORCED_VERSION, true);
+      }
 
       // Realtime Cross-Tab Broadcast notification
       try {
@@ -343,29 +362,50 @@ export const LegalConsentGate: React.FC<LegalConsentGateProps> = ({ user, onCons
   const handleDevBypassClick = async () => {
     if (user?.id) {
       setLocalhostDevLegalBypassed(true);
-      setSessionCacheCompliant(user.id, MINIMUM_ENFORCED_VERSION, true);
+      setSessionCacheCompliant(user.id, role, MINIMUM_ENFORCED_VERSION, true);
+      if (Array.isArray(user.roles)) {
+        user.roles.forEach((r: string) => {
+          setSessionCacheCompliant(user.id, r.toLowerCase(), MINIMUM_ENFORCED_VERSION, true);
+        });
+      }
+      if (isAdmin) {
+        setSessionCacheCompliant(user.id, 'admin', MINIMUM_ENFORCED_VERSION, true);
+        setSessionCacheCompliant(user.id, 'secretary', MINIMUM_ENFORCED_VERSION, true);
+      }
 
       // Fire-and-forget: Asynchroner DB-Eintrag, damit auch PostgreSQL autoritativ synchronisiert ist
       try {
-        const consentTypes: string[] = [primaryDocKey];
-        const docHashes: Record<string, string> = {
-          [primaryDocKey]: await computeSha256(primaryDoc.fullTextMarkdown)
-        };
-        if (isStudent) {
-          consentTypes.push('consent_media_audio');
-          docHashes['consent_media_audio'] = await computeSha256(audioDoc.fullTextMarkdown);
+        const isDualRole = Array.isArray(user.roles) && user.roles.includes('teacher') && (user.roles.includes('admin') || user.roles.includes('secretary'));
+        const docsToRecord: Array<{ role: string; docKey: string; doc: any }> = [];
+
+        if (isDualRole) {
+          docsToRecord.push({ role: 'teacher', docKey: 'terms_teacher_conduct', doc: LEGAL_DOCUMENTS.terms_teacher_conduct });
+          docsToRecord.push({ role: 'admin', docKey: 'terms_b2b_avv', doc: LEGAL_DOCUMENTS.terms_b2b_avv });
+        } else {
+          docsToRecord.push({ role, docKey: primaryDocKey, doc: primaryDoc });
         }
-        void supabase.rpc('record_user_legal_consent', {
-          p_user_id: user.id,
-          p_school_id: user.school_id || null,
-          p_role: role,
-          p_consent_types: consentTypes,
-          p_version: ACTIVE_LEGAL_VERSION,
-          p_document_hashes: docHashes,
-          p_user_agent: 'Localhost Dev-Sandbox Bypass (1-Klick)',
-          p_ip_hash: null,
-          p_metadata: { dev_bypass: true, client_timestamp: new Date().toISOString() }
-        });
+
+        for (const item of docsToRecord) {
+          const consentTypes: string[] = [item.docKey];
+          const docHashes: Record<string, string> = {
+            [item.docKey]: await computeSha256(item.doc.fullTextMarkdown)
+          };
+          if (isStudent && item.role === 'student') {
+            consentTypes.push('consent_media_audio');
+            docHashes['consent_media_audio'] = await computeSha256(audioDoc.fullTextMarkdown);
+          }
+          void supabase.rpc('record_user_legal_consent', {
+            p_user_id: user.id,
+            p_school_id: user.school_id || null,
+            p_role: item.role,
+            p_consent_types: consentTypes,
+            p_version: ACTIVE_LEGAL_VERSION,
+            p_document_hashes: docHashes,
+            p_user_agent: 'Localhost Dev-Sandbox Bypass (1-Klick)',
+            p_ip_hash: null,
+            p_metadata: { dev_bypass: true, client_timestamp: new Date().toISOString() }
+          });
+        }
       } catch {}
 
       // Cross-Tab Broadcast

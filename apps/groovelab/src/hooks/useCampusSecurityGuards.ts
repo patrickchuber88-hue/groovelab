@@ -2,10 +2,12 @@ import React, { useEffect, useMemo } from 'react';
 import { verifyMasterSessionLease, createMasterSessionLease } from '../utils/masterAuditLogger';
 import { isLocalDevEnvironment } from '../utils/devEnvironment';
 
+import { PlatformType } from './useCampusNavigationAndWorkspaces';
+
 export interface UseCampusSecurityGuardsParams {
   user: any;
   setUser: React.Dispatch<React.SetStateAction<any>>;
-  activePlatform: 'campus' | 'groovelab' | 'ensembles';
+  activePlatform: PlatformType;
   setActivePlatform: (platform: any) => void;
   setActiveWorkspace: (workspace: string) => void;
   setActiveStudentTab: (tab: string) => void;

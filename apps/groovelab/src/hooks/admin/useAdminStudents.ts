@@ -43,7 +43,7 @@ export function useAdminStudents({
 }: UseAdminStudentsParams) {
   const [studentSearch, setStudentSearch] = useState('');
   const [listType, setListType] = useState<'active' | 'archive' | 'trash'>('active');
-  const [instrumentFilter, setInstrumentFilter] = useState('ALL');
+  const [instrumentFilter, setInstrumentFilter] = useState('all');
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [showBulkAddStudents, setShowBulkAddStudents] = useState(false);
   const [bulkInput, setBulkInput] = useState('');

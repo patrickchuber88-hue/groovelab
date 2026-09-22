@@ -439,6 +439,9 @@ export const FeedbackHubModal: React.FC<FeedbackHubModalProps> = ({
       padding: '16px'
     }}>
       <div 
+        role="dialog"
+        aria-modal="true"
+        aria-label="Feedback & Feature Hub"
         onClick={(e) => e.stopPropagation()}
         style={{
           backgroundColor: '#ffffff',

@@ -341,7 +341,7 @@ export function useCampusDeviceAndParentControls({
   // Reagiert sofort und ohne Reload auf UI-Level-Änderungen aus dem Elternbereich anderer Clients
   useEffect(() => {
     if (!user?.id) return;
-    const channel = supabase.channel(`realtime_student_progress_${user.id}`);
+    const channel = supabase.channel(`realtime_ui_level_${user.id}`);
     channel
       .on('broadcast', { event: 'ui-level-changed' }, (payload: any) => {
         const newLevel = payload?.payload?.uiLevel;

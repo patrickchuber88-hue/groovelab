@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { useVoiceToText } from '../../hooks/useVoiceToText';
 import { getBlob } from '../../utils/blobStorage';
+import { getOfflineAudioRecord } from '../../utils/offlineAudioVault';
 import { getSecureAudioUrl } from '../../utils/audioStorageHelper';
 import { safeDecodeAudioData } from '../../utils/audioMasteringEngine';
 import { SharedAudioEngine } from '../../utils/sharedAudioEngine';
@@ -385,11 +386,18 @@ export const AudioNotesModal: React.FC<AudioNotesModalProps> = ({
             } catch {}
           }
 
-          // 2. Suche in IndexedDB
+          // 2. Suche in IndexedDB (Harmonisierte Vault- & Blob-Prüfung)
           for (const candidateKey of candidateKeys) {
             if (!candidateKey) continue;
             try {
-              const raw = await getBlob(candidateKey);
+              let raw: any = await getBlob(candidateKey);
+              if (!raw) {
+                const cleanKey = candidateKey.replace(/^offline:\/\//, '');
+                const offlineRec = await getOfflineAudioRecord(cleanKey);
+                if (offlineRec && offlineRec.blob) {
+                  raw = offlineRec.blob;
+                }
+              }
               if (raw instanceof Blob) {
                 const detectedMime = detectAudioMimeType(raw, candidateKey);
                 const typedBlob = raw.type === detectedMime ? raw : new Blob([raw], { type: detectedMime });

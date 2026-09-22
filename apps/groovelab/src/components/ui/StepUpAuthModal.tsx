@@ -91,7 +91,7 @@ export const StepUpAuthModal: React.FC<StepUpAuthModalProps> = ({
       }}
       onClick={onClose}
     >
-      <div
+      <div role="dialog" aria-modal="true"
         style={{
           background: '#ffffff',
           borderRadius: '20px',

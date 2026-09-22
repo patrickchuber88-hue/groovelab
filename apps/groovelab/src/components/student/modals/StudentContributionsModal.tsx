@@ -46,7 +46,7 @@ export const StudentContributionsModal: React.FC<StudentContributionsModalProps>
 
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(16px)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: 'white', padding: '32px', borderRadius: '28px', boxShadow: '0 24px 60px rgba(15, 23, 42, 0.16)', width: '460px', maxWidth: '95vw', border: '1px solid rgba(255,255,255,0.5)', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', maxHeight: '90vh', overflowY: 'auto' }}>
+      <div role="dialog" aria-modal="true" style={{ background: 'white', padding: '32px', borderRadius: '28px', boxShadow: '0 24px 60px rgba(15, 23, 42, 0.16)', width: '460px', maxWidth: '95vw', border: '1px solid rgba(255,255,255,0.5)', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', maxHeight: '90vh', overflowY: 'auto' }}>
         
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>

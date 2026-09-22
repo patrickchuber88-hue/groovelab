@@ -37,6 +37,10 @@ export const AdminGroovelabRoomsView: React.FC<AdminGroovelabRoomsViewProps> = (
   handleDeleteStation,
   brandColor = '#eab308'
 }) => {
+  const groovelabRooms = React.useMemo(() => {
+    return (rooms || []).filter(r => Boolean(r.is_groovelab_active));
+  }, [rooms]);
+
   return (
     <div style={{ marginTop: '24px' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -67,21 +71,45 @@ export const AdminGroovelabRoomsView: React.FC<AdminGroovelabRoomsViewProps> = (
 
           <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a' }}>{rooms.length}</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a' }}>{groovelabRooms.length}</div>
               <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Räume</div>
             </div>
             <div style={{ width: '1px', height: '32px', background: '#cbd5e1' }} />
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#0f172a' }}>
-                {stations.filter(s => rooms.some(r => r.id === s.room_id) && s.name.toLowerCase() !== 'lehrer ipad').length}
+                {stations.filter(s => groovelabRooms.some(r => r.id === s.room_id) && s.name.toLowerCase() !== 'lehrer ipad').length}
               </div>
               <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>iPads Gesamt</div>
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 400px), 1fr))', gap: '24px' }}>
-          {rooms.map((room, index) => (
+        {groovelabRooms.length === 0 ? (
+          <div className="glass-panel" style={{ 
+            textAlign: 'center', 
+            padding: '48px 24px', 
+            borderRadius: '24px', 
+            background: '#ffffff', 
+            border: '1px solid #f1f5f9',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '12px'
+          }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: `${brandColor}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Box size={24} color={brandColor} />
+            </div>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>
+              Keine Räume für GrooveLab aktiviert
+            </h3>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', fontWeight: 600, maxWidth: '440px', lineHeight: 1.5 }}>
+              In der Verwaltung unter „Räume“ kannst du festlegen, welche Räume deiner Musikschule für das GrooveLab-Modul freigeschaltet sind.
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 400px), 1fr))', gap: '24px' }}>
+            {groovelabRooms.map((room, index) => (
             <div 
               key={room.id} 
               className="glass-panel" 
@@ -116,7 +144,40 @@ export const AdminGroovelabRoomsView: React.FC<AdminGroovelabRoomsViewProps> = (
                   </h3>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <button onClick={() => setCustomizingRoom(room)} style={{ padding: '8px 12px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569', cursor: 'pointer', fontWeight: 700, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      try {
+                        setCustomizingRoom(room);
+                      } catch (err) {
+                        console.error('[RoomsView] Error opening room layout:', err);
+                      }
+                    }} 
+                    aria-label={`Raum-Layout für ${room.name} gestalten`}
+                    title="Raum-Layout gestalten"
+                    style={{ 
+                      padding: '8px 12px', 
+                      borderRadius: '10px', 
+                      background: '#f8fafc', 
+                      border: '1px solid #e2e8f0', 
+                      color: '#475569', 
+                      cursor: 'pointer', 
+                      fontWeight: 700, 
+                      fontSize: '0.75rem', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '4px',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.borderColor = brandColor;
+                      e.currentTarget.style.color = '#0f172a';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.borderColor = '#e2e8f0';
+                      e.currentTarget.style.color = '#475569';
+                    }}
+                  >
                     <MapPin size={14} color={brandColor} /> Layout
                   </button>
                   <button onClick={() => triggerBatchAddStations(room.id)} style={{ padding: '8px 12px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0', color: brandColor, cursor: 'pointer', fontWeight: 700, fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -194,6 +255,7 @@ export const AdminGroovelabRoomsView: React.FC<AdminGroovelabRoomsViewProps> = (
             </div>
           ))}
         </div>
+        )}
       </div>
     </div>
   );

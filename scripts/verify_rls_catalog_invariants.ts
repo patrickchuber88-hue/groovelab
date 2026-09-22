@@ -1,7 +1,9 @@
 #!/usr/bin/env tsx
 // ==============================================================================
 // 🏛️ Campus-Groovelab Enterprise+ RLS & Schema Catalog Invariant Verifier
-// Standard: OWASP ASVS Level 3 / DSGVO Art. 5, 8, 25 & 32 / BSI IT-Grundschutz
+// Standards: DIN EN ISO/IEC 27001 (Annex A.8.20, A.8.24 Mandantentrennung),
+//            DIN EN ISO/IEC 27002:2022, BSI C5 (Kriterienkatalog Cloud Computing),
+//            BSI IT-Grundschutz APP.3.1, OWASP ASVS Level 3, DSGVO Art. 5, 8, 25 & 32
 // Validates: Findings 1 through 10 of the Enterprise Forensic Security Audit
 // Dual Mode: Static Invariant Verification + Live pg_policies Catalog Verification
 // ==============================================================================
@@ -35,6 +37,7 @@ const results: InvariantCheckResult[] = [];
 
 console.log('════════════════════════════════════════════════════════════════════');
 console.log('🛡️  CAMPUS-GROOVELAB ENTERPRISE+ RLS & SCHEMA CATALOG INVARIANT AUDIT');
+console.log('    Standards: DIN EN ISO/IEC 27001 (A.8.20/A.8.24) & BSI C5 Kriterienkatalog');
 console.log('    Validating 20 Forensic Architecture & Performance Invariants...');
 console.log('════════════════════════════════════════════════════════════════════\n');
 

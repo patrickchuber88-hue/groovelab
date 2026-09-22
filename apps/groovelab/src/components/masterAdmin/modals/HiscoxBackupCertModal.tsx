@@ -116,7 +116,7 @@ export const HiscoxBackupCertModal: React.FC<HiscoxBackupCertModalProps> = ({
         }
       `}</style>
 
-      <div
+      <div role="dialog" aria-modal="true"
         id="hiscox-cert-print-area"
         style={{
           background: '#ffffff',

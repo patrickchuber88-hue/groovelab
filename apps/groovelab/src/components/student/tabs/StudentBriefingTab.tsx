@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, Suspense } from 'react';
 import {
   Award, Lock, HelpCircle, Trophy, Sparkles, Star, Rocket, ChevronLeft, ChevronRight,
   Clock, Timer, Flame, BookOpen, Play, Pause, Square, RotateCcw, Volume2, VolumeX, X,
@@ -17,6 +17,7 @@ import { buildContinuousHomeworkNarrative } from '../../../services/neuralTtsSer
 import { formatTeacherFullName } from '../../../utils/nameHelper';
 import { Avatar, getInstrumentAvatarUrl, resolveCampusStudentAvatar } from '../studentAvatars.constants';
 import { getSimulatedNow, toLocalYYYYMMDD, getISOWeekRaw, getISOWeek, getItemWeek, getLehrwerkColor } from '../studentDateUtils';
+import { playTriumphantXpChime, animateXpCountUp, CAMPUS_XP_EFFECTS_CSS } from '../../../utils/campusXpEffects';
 
 export interface StudentBriefingTabProps {
   studentId: string;
@@ -279,6 +280,98 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
   // 📶 1% Goldstandard Network Awareness for Mobile Audio Recording & Streaming
   const { isCellular, formatBytes, badgeText } = useNetworkProfile();
 
+  // 🌟 1% Goldstandard: Real-Time Live XP Deposit Animation & Triumphant Audio Feedback
+  const [displayXp, setDisplayXp] = useState<number>(() => {
+    if (typeof currentXp === 'number' && currentXp > 0) return currentXp;
+    if (typeof window !== 'undefined') {
+      const effectiveId = props.studentId || studentUser?.id;
+      if (effectiveId) {
+        const cached = localStorage.getItem(`campus_bonus_xp_${effectiveId}`);
+        if (cached !== null) {
+          const parsed = parseInt(cached, 10);
+          if (!isNaN(parsed) && parsed > 0) return parsed;
+        }
+      }
+    }
+    return currentXp || 0;
+  });
+  const [isXpPulsing, setIsXpPulsing] = useState<boolean>(false);
+  const [floatingDepositAmount, setFloatingDepositAmount] = useState<number | null>(null);
+  const pendingDepositRef = useRef<{ amount: number; oldVal: number } | null>(null);
+
+  // Trigger deposit animation helper
+  const triggerDepositAnimation = useCallback((amount: number, fromVal: number, toVal: number) => {
+    setIsXpPulsing(true);
+    setFloatingDepositAmount(amount);
+    playTriumphantXpChime();
+
+    const cancelAnim = animateXpCountUp(fromVal, toVal, 1200, (val) => {
+      setDisplayXp(val);
+    }, () => {
+      setDisplayXp(toVal);
+      setTimeout(() => {
+        setIsXpPulsing(false);
+      }, 600);
+      setTimeout(() => {
+        setFloatingDepositAmount(null);
+      }, 1200);
+    });
+
+    return cancelAnim;
+  }, []);
+
+  // Real-time listener for 'campus-xp-awarded'
+  useEffect(() => {
+    let cleanupAnim: (() => void) | null = null;
+    const handleXpAwarded = (e: Event) => {
+      const customEvent = e as CustomEvent<{ studentId?: string; amount?: number }>;
+      const { studentId: targetId, amount } = customEvent.detail || {};
+      const currentEffectiveId = props.studentId || studentUser?.id;
+      if (!targetId || targetId === currentEffectiveId) {
+        if (typeof amount === 'number' && amount > 0) {
+          const oldVal = displayXp;
+          const newVal = oldVal + amount;
+          if (activeTab === 'briefing') {
+            setTimeout(() => {
+              cleanupAnim = triggerDepositAnimation(amount, oldVal, newVal);
+            }, 250);
+          } else {
+            pendingDepositRef.current = { amount, oldVal };
+          }
+        }
+      }
+    };
+    window.addEventListener('campus-xp-awarded', handleXpAwarded);
+    return () => {
+      window.removeEventListener('campus-xp-awarded', handleXpAwarded);
+      if (cleanupAnim) cleanupAnim();
+    };
+  }, [activeTab, displayXp, props.studentId, studentUser?.id, triggerDepositAnimation]);
+
+  // Tab switch listener / pending deposit trigger
+  useEffect(() => {
+    if (activeTab === 'briefing') {
+      if (pendingDepositRef.current) {
+        const { amount, oldVal } = pendingDepositRef.current;
+        pendingDepositRef.current = null;
+        const target = Math.max(oldVal + amount, currentXp || 0);
+        const timer = setTimeout(() => {
+          triggerDepositAnimation(amount, oldVal, target);
+        }, 300);
+        return () => clearTimeout(timer);
+      } else if (currentXp > displayXp && displayXp > 0 && !isXpPulsing) {
+        const diff = currentXp - displayXp;
+        const oldVal = displayXp;
+        const timer = setTimeout(() => {
+          triggerDepositAnimation(diff, oldVal, currentXp);
+        }, 300);
+        return () => clearTimeout(timer);
+      } else if (currentXp !== displayXp && !isXpPulsing) {
+        setDisplayXp(currentXp || 0);
+      }
+    }
+  }, [activeTab, currentXp, displayXp, isXpPulsing, triggerDepositAnimation]);
+
   const activeWeeklyFocusKey = useMemo(() => {
     let focusKey: string | null = null;
     try {
@@ -521,6 +614,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
 
           return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', position: 'relative' }}>
+          <style>{CAMPUS_XP_EFFECTS_CSS}</style>
           
           {/* Floating Right-Edge Toggle Button when Collapsed (Desktop only, for Teen / Pro) */}
           {isRightSidebarCollapsed && studentUiLevel !== 'junior' && !isMobile && (
@@ -745,18 +839,25 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                     {/* KPI 1: Zauber-XP */}
                     {xpActive && (
                       <div style={{ 
-                        position: 'relative', overflow: 'hidden',
+                        position: 'relative', overflow: 'visible',
                         background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
                         color: 'white',
                         borderRadius: '28px',
-                        boxShadow: '0 14px 30px -6px rgba(99, 102, 241, 0.35)',
+                        boxShadow: isXpPulsing 
+                          ? '0 0 35px 8px rgba(250, 204, 21, 0.85), 0 14px 30px -6px rgba(99, 102, 241, 0.35)'
+                          : '0 14px 30px -6px rgba(99, 102, 241, 0.35)',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                         minHeight: '100px',
                         padding: '20px 24px',
                         boxSizing: 'border-box',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        border: '1.5px solid rgba(255, 255, 255, 0.25)'
-                      }} className="hover-scale">
+                        border: isXpPulsing ? '2px solid #facc15' : '1.5px solid rgba(255, 255, 255, 0.25)'
+                      }} className={`hover-scale ${isXpPulsing ? 'campus-xp-pulsing' : ''}`}>
+                        {floatingDepositAmount !== null && (
+                          <div className="campus-xp-floating-badge">
+                            +{floatingDepositAmount} XP eingezahlt! 🌟
+                          </div>
+                        )}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                           <span style={{ 
                             fontSize: '0.85rem', 
@@ -768,11 +869,12 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             Zauber-XP ⭐
                           </span>
                           <div style={{ 
-                            background: 'rgba(255, 255, 255, 0.25)', 
+                            background: isXpPulsing ? 'rgba(250, 204, 21, 0.4)' : 'rgba(255, 255, 255, 0.25)', 
                             padding: '8px', 
-                            borderRadius: '12px' 
+                            borderRadius: '12px',
+                            transition: 'all 0.3s ease'
                           }}>
-                            <Star size={20} color="white" fill="white" />
+                            <Star size={20} color={isXpPulsing ? '#fef08a' : 'white'} fill={isXpPulsing ? '#fef08a' : 'white'} />
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '6px' }}>
@@ -784,7 +886,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             color: 'white',
                             lineHeight: 1
                           }}>
-                            {currentXp || 0}
+                            {displayXp}
                           </span>
                           <span style={{ fontSize: '0.95rem', fontWeight: 800, opacity: 0.95, color: 'white' }}>
                             Punkte
@@ -1851,7 +1953,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           style={{
                             background: isTtsSpeaking && activeTtsKey === 'junior_box1' ? 'linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%)' : '#ffffff',
                             borderRadius: '32px',
-                            padding: isMusicStandMode ? '32px' : '28px',
+                            padding: isMusicStandMode ? '32px' : '26px 20px',
                             boxShadow: isTtsSpeaking && activeTtsKey === 'junior_box1' ? '0 16px 36px rgba(34, 197, 94, 0.16)' : '0 12px 30px rgba(15, 23, 42, 0.04)',
                             border: isTtsSpeaking && activeTtsKey === 'junior_box1' ? '2px solid #86efac' : '2px solid #e2e8f0',
                             display: 'flex',
@@ -1864,22 +1966,36 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                           className="hover-scale"
                         >
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                            <div style={{ 
+                              display: 'flex', 
+                              justifyContent: 'space-between', 
+                              alignItems: 'center', 
+                              gap: '8px', 
+                              width: '100%',
+                              flexWrap: 'nowrap' 
+                            }}>
                               <div style={{
                                 background: 'linear-gradient(135deg, #e6f4ea 0%, #d1fae5 100%)',
                                 color: '#34a853',
-                                width: isMusicStandMode ? '64px' : '56px',
-                                height: isMusicStandMode ? '64px' : '56px',
-                                borderRadius: '20px',
+                                width: isMusicStandMode ? '52px' : '42px',
+                                height: isMusicStandMode ? '52px' : '42px',
+                                borderRadius: '14px',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                boxShadow: '0 6px 16px rgba(52, 168, 83, 0.18)'
+                                boxShadow: '0 4px 12px rgba(52, 168, 83, 0.16)',
+                                flexShrink: 0
                               }}>
-                                <BookOpen size={isMusicStandMode ? 32 : 28} />
+                                <BookOpen size={isMusicStandMode ? 26 : 22} />
                               </div>
 
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <div style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '6px', 
+                                flexWrap: 'nowrap',
+                                minWidth: 0 
+                              }}>
                                 {/* 3D-TOY-BUTTON FÜR VORLESEN (Hör zu!) */}
                                 {(draftAllowTts ?? (studentUser as any)?.parent_allow_tts ?? (studentUiLevel === 'junior')) && (
                                   <button
@@ -1910,27 +2026,29 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                         : 'linear-gradient(135deg, #34a853 0%, #2e9549 100%)',
                                       border: 'none',
                                       borderRadius: '100px',
-                                      padding: '8px 16px',
-                                      minHeight: '44px',
-                                      display: 'flex',
+                                      padding: isMusicStandMode ? '8px 14px' : '6px 11px',
+                                      minHeight: '38px',
+                                      display: 'inline-flex',
                                       alignItems: 'center',
-                                      gap: '8px',
+                                      gap: '6px',
                                       cursor: 'pointer',
                                       color: '#ffffff',
-                                      fontSize: '0.84rem',
+                                      fontSize: isMusicStandMode ? '0.86rem' : '0.78rem',
                                       fontWeight: 950,
+                                      whiteSpace: 'nowrap',
                                       boxShadow: isTtsSpeaking && activeTtsKey === 'junior_box1' 
                                         ? '0 3px 0 #991b1b, 0 6px 14px rgba(239, 68, 68, 0.35)' 
                                         : '0 3px 0 #1e7037, 0 6px 14px rgba(52, 168, 83, 0.32)',
                                       transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
                                     }}
                                     title={isTtsSpeaking && activeTtsKey === 'junior_box1' ? "Vorlesen stoppen" : "Hausaufgaben vorlesen lassen"}
+                                    aria-label={isTtsSpeaking && activeTtsKey === 'junior_box1' ? "Vorlesen stoppen" : "Hausaufgaben vorlesen lassen"}
                                   >
                                     {isTtsSpeaking && activeTtsKey === 'junior_box1' ? (
                                       <span>Stopp ⏹</span>
                                     ) : (
                                       <>
-                                        <Volume2 size={16} color="#ffffff" strokeWidth={2.8} />
+                                        <Volume2 size={15} color="#ffffff" strokeWidth={2.8} />
                                         <span>Hör zu! ✨</span>
                                       </>
                                     )}
@@ -1949,27 +2067,29 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                         background: '#e6f4ea',
                                         border: '1.5px solid #c7eed2',
                                         borderRadius: '100px',
-                                        padding: '8px 15px',
-                                        minHeight: '44px',
-                                        display: 'flex',
+                                        padding: isMusicStandMode ? '8px 14px' : '6px 10px',
+                                        minHeight: '38px',
+                                        display: 'inline-flex',
                                         alignItems: 'center',
-                                        gap: '7px',
+                                        gap: '6px',
                                         cursor: 'pointer',
                                         color: '#1e7037',
-                                        fontSize: '0.84rem',
+                                        fontSize: isMusicStandMode ? '0.86rem' : '0.78rem',
                                         fontWeight: 900,
+                                        whiteSpace: 'nowrap',
                                         boxShadow: '0 2px 8px rgba(52, 168, 83, 0.12)',
                                         transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
                                       }}
                                       className="hover-scale-mini"
                                       title="Aufnahmen deiner Lehrkraft anhören"
+                                      aria-label="Aufnahmen deiner Lehrkraft anhören"
                                     >
-                                      <Headphones size={16} color="#1e7037" strokeWidth={2.4} />
+                                      <Headphones size={15} color="#1e7037" strokeWidth={2.4} />
                                       <span>{audioTracks.length === 1 ? '1 Aufnahme' : `${audioTracks.length} Aufnahmen`}</span>
                                     </button>
                                   )}
 
-                                  {/* 1-Touch Metronom & Stimmgerät Direktzugriff */}
+                                  {/* 1-Touch Praxis-Tools Direktzugriff (ehemals Metronom) */}
                                   {props.setShowStudentToolbox && (
                                     <button
                                       type="button"
@@ -1981,23 +2101,25 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                                         background: '#ffffff',
                                         border: '1.5px solid #cbd5e1',
                                         borderRadius: '100px',
-                                        padding: '8px 15px',
-                                        minHeight: '44px',
-                                        display: 'flex',
+                                        padding: isMusicStandMode ? '8px 14px' : '6px 10px',
+                                        minHeight: '38px',
+                                        display: 'inline-flex',
                                         alignItems: 'center',
-                                        gap: '7px',
+                                        gap: '6px',
                                         cursor: 'pointer',
                                         color: '#0f172a',
-                                        fontSize: '0.84rem',
+                                        fontSize: isMusicStandMode ? '0.86rem' : '0.78rem',
                                         fontWeight: 900,
+                                        whiteSpace: 'nowrap',
                                         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
                                         transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)'
                                       }}
                                       className="hover-scale-mini"
-                                      title="Praxis-Toolbox: Metronom & Stimmgerät öffnen"
+                                      title="Praxis-Tools: Metronom, Stimmgerät & Toolbox öffnen"
+                                      aria-label="Praxis-Tools öffnen"
                                     >
-                                      <Timer size={16} color="#34a853" strokeWidth={2.4} />
-                                      <span>Metronom</span>
+                                      <Sliders size={15} color="#34a853" strokeWidth={2.4} />
+                                      <span>Tools</span>
                                     </button>
                                   )}
                               </div>
@@ -4226,18 +4348,25 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       <div style={{ 
                         flex: '1 1 0px',
                         minWidth: 0,
-                        position: 'relative', overflow: 'hidden',
+                        position: 'relative', overflow: 'visible',
                         background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
                         color: 'white',
                         borderRadius: '20px',
-                        boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.35)',
+                        boxShadow: isXpPulsing 
+                          ? '0 0 35px 8px rgba(250, 204, 21, 0.85), 0 10px 25px -5px rgba(99, 102, 241, 0.35)'
+                          : '0 10px 25px -5px rgba(99, 102, 241, 0.35)',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                         minHeight: '70px',
                         padding: '16px',
                         boxSizing: 'border-box',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        border: '1px solid rgba(255, 255, 255, 0.15)'
-                      }} className="hover-scale">
+                        border: isXpPulsing ? '2px solid #facc15' : '1px solid rgba(255, 255, 255, 0.15)'
+                      }} className={`hover-scale ${isXpPulsing ? 'campus-xp-pulsing' : ''}`}>
+                        {floatingDepositAmount !== null && (
+                          <div className="campus-xp-floating-badge">
+                            +{floatingDepositAmount} XP eingezahlt! ⚡
+                          </div>
+                        )}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                           <span style={{ 
                             fontSize: '0.68rem', 
@@ -4250,11 +4379,12 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             XP-Punkte ⚡
                           </span>
                           <div style={{ 
-                            background: 'rgba(255, 255, 255, 0.2)', 
+                            background: isXpPulsing ? 'rgba(250, 204, 21, 0.4)' : 'rgba(255, 255, 255, 0.2)', 
                             padding: '6px', 
-                            borderRadius: '10px' 
+                            borderRadius: '10px',
+                            transition: 'all 0.3s ease'
                           }}>
-                            <Star size={14} color="white" fill="white" />
+                            <Star size={14} color={isXpPulsing ? '#fef08a' : 'white'} fill={isXpPulsing ? '#fef08a' : 'white'} />
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
@@ -4265,7 +4395,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             letterSpacing: '-0.02em',
                             color: 'white'
                           }}>
-                            {currentXp || 0}
+                            {displayXp}
                           </span>
                           <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9, color: 'white' }}>
                             XP
@@ -6266,18 +6396,25 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                       <div style={{ 
                         flex: '1 1 0px',
                         minWidth: 0,
-                        position: 'relative', overflow: 'hidden',
+                        position: 'relative', overflow: 'visible',
                         background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
                         color: 'white',
                         borderRadius: '20px',
-                        boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.35)',
+                        boxShadow: isXpPulsing 
+                          ? '0 0 35px 8px rgba(250, 204, 21, 0.85), 0 10px 25px -5px rgba(99, 102, 241, 0.35)'
+                          : '0 10px 25px -5px rgba(99, 102, 241, 0.35)',
                         display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
                         minHeight: '70px',
                         padding: '16px',
                         boxSizing: 'border-box',
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        border: '1px solid rgba(255, 255, 255, 0.15)'
-                      }} className="hover-scale">
+                        border: isXpPulsing ? '2px solid #facc15' : '1px solid rgba(255, 255, 255, 0.15)'
+                      }} className={`hover-scale ${isXpPulsing ? 'campus-xp-pulsing' : ''}`}>
+                        {floatingDepositAmount !== null && (
+                          <div className="campus-xp-floating-badge">
+                            +{floatingDepositAmount} XP eingezahlt! 🏆
+                          </div>
+                        )}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                           <span style={{ 
                             fontSize: '0.68rem', 
@@ -6290,11 +6427,12 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             Level XP
                           </span>
                           <div style={{ 
-                            background: 'rgba(255, 255, 255, 0.2)', 
+                            background: isXpPulsing ? 'rgba(250, 204, 21, 0.4)' : 'rgba(255, 255, 255, 0.2)', 
                             padding: '6px', 
-                            borderRadius: '10px' 
+                            borderRadius: '10px',
+                            transition: 'all 0.3s ease'
                           }}>
-                            <Star size={14} color="white" fill="white" />
+                            <Star size={14} color={isXpPulsing ? '#fef08a' : 'white'} fill={isXpPulsing ? '#fef08a' : 'white'} />
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginTop: '6px' }}>
@@ -6305,7 +6443,7 @@ export function StudentBriefingTab(props: StudentBriefingTabProps) {
                             letterSpacing: '-0.02em',
                             color: 'white'
                           }}>
-                            {currentXp || 0}
+                            {displayXp}
                           </span>
                           <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.9, color: 'white' }}>
                             XP

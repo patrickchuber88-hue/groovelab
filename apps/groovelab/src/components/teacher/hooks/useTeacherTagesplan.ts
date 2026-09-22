@@ -349,6 +349,10 @@ export function useTeacherTagesplan({
 
   // 🏛️ Authoritative Supabase Hydration for Teacher Tagesplan & Briefing Timeline
   const loadBriefingTimeline = useCallback(async () => {
+    if (teacher?.role?.toLowerCase() === 'student') {
+      setBriefingData([]);
+      return;
+    }
     const effectiveTeacherId = userId || teacher?.id;
     if (!effectiveTeacherId) return;
 

@@ -54,7 +54,7 @@ export const StudentJuniorStickerDetailModal: React.FC<StudentJuniorStickerDetai
       padding: '20px',
       animation: 'fadeIn 0.2s ease-out'
     }}>
-      <div style={{
+      <div role="dialog" aria-modal="true" style={{
         background: '#ffffff',
         borderRadius: '38px',
         maxWidth: '480px',

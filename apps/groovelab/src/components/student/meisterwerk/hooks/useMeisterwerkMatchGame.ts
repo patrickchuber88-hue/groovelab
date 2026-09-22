@@ -167,25 +167,38 @@ export function useMeisterwerkMatchGame({
 
     // Realtime Broadcast
     try {
-      const channel = supabase.channel(`realtime_student_progress_${student.id}`);
-      channel.subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          await channel.send({
-            type: 'broadcast',
-            event: 'song-matched',
-            payload: {
-              songTitle,
-              tier,
-              xpAmount: xpWon,
-              teacherPercent,
-              studentPercent: studPercent,
-              matchedAt: nowIso,
-              matchNumber: updatedHistory.length
-            }
-          });
-          supabase.removeChannel(channel);
-        }
-      });
+      const topicName = `realtime_student_progress_${student.id}`;
+      const payload = {
+        songTitle,
+        tier,
+        xpAmount: xpWon,
+        teacherPercent,
+        studentPercent: studPercent,
+        matchedAt: nowIso,
+        matchNumber: updatedHistory.length
+      };
+      const existing = supabase.getChannels().find(
+        (c: any) => c.topic === `realtime:${topicName}` || c.topic === topicName
+      );
+      if (existing && (existing.state === 'joined' || existing.state === 'joining')) {
+        existing.send({
+          type: 'broadcast',
+          event: 'song-matched',
+          payload
+        });
+      } else {
+        const channel = supabase.channel(topicName);
+        channel.subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            await channel.send({
+              type: 'broadcast',
+              event: 'song-matched',
+              payload
+            });
+            setTimeout(() => supabase.removeChannel(channel), 1500);
+          }
+        });
+      }
     } catch (bcErr) {
       console.warn('Realtime broadcast error:', bcErr);
     }

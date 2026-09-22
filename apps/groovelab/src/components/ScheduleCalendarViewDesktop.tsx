@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { supabase, queryCache } from '../lib/supabase';
+import { decryptMessagesBatch, primeDecryptedCache } from '../lib/security/messageCrypto';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -1352,7 +1353,9 @@ export function ScheduleCalendarViewDesktop({
           });
         }
 
-        setChatMessages(filtered);
+        const effectiveSchoolId = schoolId || filtered[0]?.school_id;
+        const decrypted = await decryptMessagesBatch(filtered, effectiveSchoolId);
+        setChatMessages(decrypted);
         setTimeout(() => scrollChatToBottom(true), 60);
 
         // Auto-mark incoming unread messages as read for this user
@@ -1548,10 +1551,10 @@ export function ScheduleCalendarViewDesktop({
           o.start_time === occ.start_time && 
           (o.schedules?.room_id || null) === (occ.schedules?.room_id || null)
         );
-        const insertPromises = groupOccs.map(go => {
-          if (!go.student_id || go.student_id === 'vacant') return Promise.resolve();
+        const insertPromises = groupOccs.map(async go => {
+          if (!go.student_id || go.student_id === 'vacant') return;
           const goRefId = go.id || (go.schedule_id ? `virtual-${go.schedule_id}-${go.date}` : fallbackOccId);
-          return supabase.from('campus_direct_messages').insert({
+          const { data } = await supabase.from('campus_direct_messages').insert({
             sender_id: userId,
             recipient_id: go.student_id,
             content: messageContent,
@@ -1559,11 +1562,14 @@ export function ScheduleCalendarViewDesktop({
             sender_role: 'teacher',
             is_system: false,
             is_read: false
-          });
+          }).select().single();
+          if (data?.content && typeof data.content === 'string' && data.content.startsWith('enc:')) {
+            primeDecryptedCache(schoolId, data.content, messageContent);
+          }
         });
         await Promise.all(insertPromises);
       } else {
-        const { error } = await supabase.from('campus_direct_messages').insert({
+        const { data, error } = await supabase.from('campus_direct_messages').insert({
           sender_id: userId,
           recipient_id: studentId,
           content: messageContent,
@@ -1571,8 +1577,11 @@ export function ScheduleCalendarViewDesktop({
           sender_role: 'teacher',
           is_system: false,
           is_read: false
-        });
+        }).select().single();
         if (error) throw error;
+        if (data?.content && typeof data.content === 'string' && data.content.startsWith('enc:')) {
+          primeDecryptedCache(schoolId, data.content, messageContent);
+        }
       }
       
       await fetchChat(studentId, occ.id);

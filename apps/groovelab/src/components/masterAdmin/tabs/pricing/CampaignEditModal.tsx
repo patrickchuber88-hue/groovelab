@@ -30,7 +30,7 @@ export const CampaignEditModal: React.FC<CampaignEditModalProps> = ({
       zIndex: 999999,
       padding: '20px'
     }}>
-      <div style={{
+      <div role="dialog" aria-modal="true" style={{
         background: '#ffffff',
         borderRadius: '24px',
         width: '100%',

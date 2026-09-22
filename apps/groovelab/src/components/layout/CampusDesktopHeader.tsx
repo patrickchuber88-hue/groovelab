@@ -16,7 +16,6 @@ import {
   Calendar
 } from 'lucide-react';
 import { StudioAvatar } from '../StudioAvatar';
-import { OfflineStatusBadge } from '../ui/OfflineStatusBadge';
 import { formatTeacherFullName } from '../../utils/nameHelper';
 import { isDevEnvironment } from '../../utils/tenantUrlHelper';
 
@@ -181,7 +180,7 @@ export const CampusDesktopHeader: React.FC<CampusDesktopHeaderProps> = ({
             </div>
           )}
 
-          {Boolean((school ? (school.has_groovelab_subscription || !school.is_billing_booked || school.subscription_bypass) : true) && user?.is_groovelab_active) && (
+          {Boolean((school ? (school.has_groovelab_subscription || !school.is_billing_booked || school.subscription_bypass) : true) && (user?.is_groovelab_active || user?.role === 'admin' || user?.role === 'secretary')) && (
             <div 
               role="button"
               tabIndex={0}
@@ -638,9 +637,6 @@ export const CampusDesktopHeader: React.FC<CampusDesktopHeaderProps> = ({
                 </div>
               </div>
             )}
-
-            {/* System Sync & Offline Status Indicator in Header */}
-            <OfflineStatusBadge floating={false} variant="header" />
 
             {/* Elegant Refresh / Reload Button */}
             <button 

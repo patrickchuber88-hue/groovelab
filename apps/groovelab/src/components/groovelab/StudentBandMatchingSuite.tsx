@@ -476,14 +476,16 @@ export function StudentBandMatchingSuite({
                                             </div>
                                             {!form.originBand && (
                                               <button 
-                                                onClick={() => {
+                                                onClick={async () => {
                                                   if (userBands.length > 0) {
                                                     const proceed = window.confirm('Deine Formation ist vollständig! 🎸\n\nDu spielst bereits in einer Band. Möchtest du wirklich eine zusätzliche Band gründen? Falls nicht, gibst du deinen Slot für andere frei.');
                                                     if (!proceed) {
-                                                      (async () => {
-                                                         await supabase.from('user_song_skills').update({ formation_group: null }).eq('id', mySlot.skill_id);
-                                                         onRefreshDashboard(user.id);
-                                                      })();
+                                                      try {
+                                                        await supabase.from('user_song_skills').update({ formation_group: null }).eq('id', mySlot.skill_id);
+                                                        onRefreshDashboard(user.id);
+                                                      } catch (err) {
+                                                        console.error('[StudentBandMatchingSuite] Fehler beim Freigeben des Slots:', err);
+                                                      }
                                                       return;
                                                     }
                                                   }
@@ -498,7 +500,8 @@ export function StudentBandMatchingSuite({
                                                   width: '100%', 
                                                   cursor: 'pointer',
                                                   background: 'linear-gradient(135deg, #ca8a04, #eab308)', 
-                                                  color: 'white',
+                                                  color: '#0f172a',
+                                                  fontWeight: 900,
                                                   border: 'none',
                                                   boxShadow: '0 12px 28px rgba(234, 179, 8, 0.35)',
                                                   minHeight: '44px',
@@ -874,12 +877,17 @@ export function StudentBandMatchingSuite({
                                         <button 
                                           key={ev.id}
                                           onClick={async () => {
-                                            const hasSlot1 = vocalists.some((v: any) => v.part_number === 1);
-                                            const nextPartNumber = hasSlot1 ? 2 : 1;
-                                            await supabase.from('band_members').insert({ band_id: band.id, user_id: ev.id, instrument: 'Vocals' });
-                                            await supabase.from('band_song_slots').insert({ band_song_id: bandSong.id, user_id: ev.id, instrument: 'Vocals', part_number: nextPartNumber, status: 'accepted' });
-                                            setShowTeacherVocalPicker(null);
-                                            onRefreshDashboard(user.id);
+                                            try {
+                                              const hasSlot1 = vocalists.some((v: any) => v.part_number === 1);
+                                              const nextPartNumber = hasSlot1 ? 2 : 1;
+                                              await supabase.from('band_members').insert({ band_id: band.id, user_id: ev.id, instrument: 'Vocals' });
+                                              await supabase.from('band_song_slots').insert({ band_song_id: bandSong.id, user_id: ev.id, instrument: 'Vocals', part_number: nextPartNumber, status: 'accepted' });
+                                              setShowTeacherVocalPicker(null);
+                                              onRefreshDashboard(user.id);
+                                            } catch (err: any) {
+                                              console.error('[StudentBandMatchingSuite] Fehler beim Hinzufügen des externen Sängers:', err);
+                                              alert('Fehler beim Zuweisen: ' + (err?.message || 'Unbekannter Fehler'));
+                                            }
                                           }}
                                           style={{ width: '100%', padding: '8px', borderRadius: '8px', border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', textAlign: 'left', minHeight: '44px', touchAction: 'manipulation' }}
                                           className="hover-bg"

@@ -213,6 +213,8 @@ export function useAdminSongs({
       pdf_keys_url: editingSong.pdf_keys_url || '',
       playalong_url: editingSong.playalong_url || '',
       bypass_wlan_check: !!editingSong.bypass_wlan_check,
+      is_groovelab_active: editingSong.is_groovelab_active !== undefined ? !!editingSong.is_groovelab_active : true,
+      is_campus_active: editingSong.is_campus_active !== undefined ? !!editingSong.is_campus_active : true,
       instrumentation: editingSong.instrumentation
     };
 

@@ -334,7 +334,11 @@ export const InvoicePreviewModal: React.FC<InvoicePreviewModalProps> = ({
           }
         }
       `}</style>
-      <div style={{
+      <div 
+        role="dialog"
+        aria-modal="true"
+        aria-label="Rechnungsvorschau"
+        style={{
         background: '#ffffff',
         borderRadius: '24px',
         width: '100%',

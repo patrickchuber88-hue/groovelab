@@ -100,7 +100,7 @@ export const HiscoxVpnCertModal: React.FC<HiscoxVpnCertModalProps> = ({
         }
       `}</style>
 
-      <div
+      <div role="dialog" aria-modal="true"
         id="hiscox-vpn-cert-print"
         style={{
           background: '#ffffff',

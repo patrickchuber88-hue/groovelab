@@ -619,7 +619,8 @@ export function SecretaryDashboard({
     setShowUnassignedWarning,
     allUniqueTeacherProfiles,
     getEffectiveStorageUsedBytes,
-    generateStarterPin
+    generateStarterPin,
+    activeSubjectsList
   }), [
     schoolId, schoolNumericId, userId, currentSchoolProfile, currentUserProfile, activePlatform,
     showRealNames, masterPricing, operatorCompany, operatorContact, operatorStreet, operatorZip,
@@ -630,7 +631,7 @@ export function SecretaryDashboard({
     handleResolveRoomIssue, handleReopenRoomIssue, showUnassignedWarning, allUniqueTeacherProfiles,
     getEffectiveStorageUsedBytes, setIsFeedbackModalOpen, setShowAgb, setShowAvvModal,
     setShowDpoIdCardModal, setShowDpoPortalModal, setShowFacilityLogModal, setShowGuidanceModal,
-    setShowParentInfoSheetModal, setShowPrivacy, setShowUnassignedWarning
+    setShowParentInfoSheetModal, setShowPrivacy, setShowUnassignedWarning, activeSubjectsList
   ]);
 
   const showBlockedOverlay = Boolean(isTrialExpired && !(activeTab === 'secretary' && secretarySubTab === 'licenses'));

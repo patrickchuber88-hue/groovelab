@@ -1,6 +1,5 @@
 import React from "react";
 import { Plus, QrCode, Shield, Trash2 } from "lucide-react";
-import { ADMIN_INSTRUMENT_ICONS } from "./AdminStatsView";
 import { StudioAvatar } from "../StudioAvatar";
 
 export interface AdminTeachersViewProps {
@@ -18,7 +17,7 @@ export interface AdminTeachersViewProps {
   handleAddTeacher: (e: React.FormEvent) => Promise<void>;
   handleUpdateTeacher: (e: React.FormEvent) => Promise<void>;
   handleDeleteTeacher: (teacherId: string) => Promise<void>;
-  handleToggleObserver: (teacher: any, e: React.MouseEvent) => Promise<void>;
+  handleToggleObserver?: (teacher: any, e: React.MouseEvent) => Promise<void>;
   setSelectedQRUser: (u: any) => void;
   windowWidth: number;
 }
@@ -38,33 +37,67 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
   handleAddTeacher,
   handleUpdateTeacher,
   handleDeleteTeacher,
-  handleToggleObserver,
   setSelectedQRUser,
   windowWidth
 }) => {
   const brandColor = activePlatform === "campus" ? "#34a853" : (activePlatform === "groovelab" ? "#eab308" : "#ea4335");
+
   return (
-      <div style={{ marginTop: '0px' }}>
+    <div style={{ marginTop: '0px' }}>
+      <style>{`
+        .team-member-card {
+          transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .team-member-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 12px 24px -6px rgba(15, 23, 42, 0.07), 0 4px 10px -2px rgba(15, 23, 42, 0.03) !important;
+          border-color: #cbd5e1 !important;
+        }
+        .team-action-btn {
+          transition: all 0.15s ease;
+        }
+        .team-action-btn:hover {
+          transform: scale(1.06);
+        }
+        .team-action-btn:active {
+          transform: scale(0.94);
+        }
+      `}</style>
       <div 
         className="glass-panel" 
         style={{ 
           background: 'white', 
           borderRadius: '20px', 
           border: '1px solid rgba(0, 0, 0, 0.05)', 
-          padding: '16px 20px', 
+          padding: '20px 24px', 
           boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.02), 0 2px 8px -1px rgba(0, 0, 0, 0.01)',
           display: 'flex', 
           flexDirection: 'column', 
-          gap: '16px' 
+          gap: '18px' 
         }}
       >
-        <div style={{ display: 'flex', flexDirection: windowWidth < 768 ? 'column' : 'row', justifyContent: 'space-between', alignItems: windowWidth < 768 ? 'stretch' : 'center', gap: '10px', marginBottom: '4px' }}>
-          <h2 style={{ fontSize: windowWidth < 768 ? '1.4rem' : '1.75rem', fontWeight: 900, color: '#18181b', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-            <div style={{ background: `${brandColor}15`, color: brandColor, padding: '5px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
-              <Shield size={16} />
-            </div>
-            Team
-          </h2>
+        {/* Header Bar with Title, Member Count and Add Button */}
+        <div style={{ display: 'flex', flexDirection: windowWidth < 768 ? 'column' : 'row', justifyContent: 'space-between', alignItems: windowWidth < 768 ? 'stretch' : 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <h2 style={{ fontSize: windowWidth < 768 ? '1.4rem' : '1.65rem', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+              <div style={{ background: `${brandColor}15`, color: brandColor, padding: '6px', borderRadius: '10px', display: 'flex', alignItems: 'center' }}>
+                <Shield size={18} />
+              </div>
+              Team
+            </h2>
+            <span style={{ 
+              fontSize: '0.8rem', 
+              fontWeight: 800, 
+              color: '#64748b', 
+              background: '#f1f5f9', 
+              padding: '3px 10px', 
+              borderRadius: '20px',
+              border: '1px solid #e2e8f0'
+            }}>
+              {teachers.length} {teachers.length === 1 ? 'Lehrkraft' : 'Lehrkräfte'}
+            </span>
+          </div>
+
           {canManageTeachers && !showAddTeacher && (
             <button
               onClick={() => {
@@ -74,7 +107,7 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
               aria-label="Neue Lehrkraft hinzufügen"
               style={{
                 background: brandColor,
-                color: activePlatform === 'groovelab' ? '#1e293b' : 'white',
+                color: activePlatform === 'groovelab' ? '#0f172a' : 'white',
                 border: 'none',
                 padding: '10px 18px',
                 borderRadius: '14px',
@@ -86,7 +119,7 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
                 justifyContent: 'center',
                 gap: '6px',
                 width: windowWidth < 768 ? '100%' : 'auto',
-                boxShadow: `0 4px 12px ${brandColor}20`
+                boxShadow: `0 4px 12px ${brandColor}25`
               }}
               className="hover-scale"
             >
@@ -95,11 +128,12 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
           )}
         </div>
 
+        {/* Add Teacher Form */}
         {showAddTeacher && (
-          <form onSubmit={handleAddTeacher} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: '#f8fafc', border: `1.5px solid ${brandColor}20`, borderRadius: '20px', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
+          <form onSubmit={handleAddTeacher} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: '#f8fafc', border: `1.5px solid ${brandColor}25`, borderRadius: '20px', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
             <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Neue Lehrkraft hinzufügen</h3>
             
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 640 ? '1fr' : '1fr 1fr', gap: '12px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname</label>
                 <input required aria-label="Vorname" placeholder="Vorname" value={newTeacher.firstName} onChange={e => setNewTeacher({...newTeacher, firstName: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
@@ -142,11 +176,10 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
               </div>
             </div>
 
-
             {!newTeacher.isAdmin && (
               <div>
-                <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Instrumente (Icons anklicken):</label>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'nowrap', overflowX: 'auto' }}>
+                <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Instrumente (Klicken zum Auswählen):</label>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   {["Gitarre", "Bass", "Drums", "Vocals", "Piano / Keys"].map(inst => {
                     const currentInstruments = (newTeacher.instrument || '').split(',').map((s: string) => s.trim()).filter(Boolean);
                     const isSelected = currentInstruments.includes(inst);
@@ -159,18 +192,22 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
                           setNewTeacher({...newTeacher, instrument: next.join(', ')});
                         }}
                         style={{
-                          flex: 1,
-                          display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '10px 8px', borderRadius: '12px', 
+                          flex: windowWidth < 640 ? '1 1 calc(50% - 8px)' : '1 1 auto',
+                          padding: '10px 14px',
+                          borderRadius: '12px',
                           border: `1.5px solid ${isSelected ? brandColor : '#e2e8f0'}`,
-                          background: isSelected ? `${brandColor}10` : 'white',
-                          color: isSelected ? '#1e293b' : '#64748b',
-                          fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s',
+                          background: isSelected ? `${brandColor}12` : 'white',
+                          color: isSelected ? '#0f172a' : '#64748b',
+                          fontSize: '0.85rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
                           boxShadow: isSelected ? `0 2px 8px ${brandColor}15` : 'none',
                           whiteSpace: 'nowrap',
-                          flexShrink: 0
+                          textAlign: 'center'
                         }}
                       >
-                        <span style={{ fontSize: '1rem' }}>{ADMIN_INSTRUMENT_ICONS[inst]}</span> {inst === "Piano / Keys" ? "Piano" : inst}
+                        {inst}
                       </button>
                     );
                   })}
@@ -179,29 +216,30 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
             )}
 
             <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-              <button type="submit" style={{ flex: 2, background: brandColor, color: activePlatform === 'groovelab' ? '#1e293b' : 'white', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer', boxShadow: `0 4px 15px ${brandColor}20`, transition: 'all 0.2s' }}>Hinzufügen</button>
+              <button type="submit" style={{ flex: 2, background: brandColor, color: activePlatform === 'groovelab' ? '#0f172a' : 'white', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer', boxShadow: `0 4px 15px ${brandColor}20`, transition: 'all 0.2s' }}>Hinzufügen</button>
               <button type="button" onClick={() => { setShowAddTeacher(false); setNewTeacher({ firstName: '', lastName: '', isAdmin: false, instrument: '', photoUrl: '' }); }} style={{ flex: 1, background: 'white', color: '#64748b', border: '1px solid #e2e8f0', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer' }}>Abbrechen</button>
             </div>
           </form>
         )}
 
+        {/* Edit Teacher Form */}
         {editingTeacher && (
-          <form onSubmit={handleUpdateTeacher} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: '#f8fafc', border: `1.5px solid ${brandColor}20`, borderRadius: '20px', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
+          <form onSubmit={handleUpdateTeacher} className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: '#f8fafc', border: `1.5px solid ${brandColor}25`, borderRadius: '20px', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>Profil bearbeiten</h3>
               <div style={{ padding: '6px 12px', background: 'white', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, color: brandColor, border: '1px solid #e2e8f0' }}>
-                ID: {editingTeacher.id.slice(0,8)}...
+                ID: {editingTeacher.id?.slice(0,8)}...
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 640 ? '1fr' : '1fr 1fr', gap: '12px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Vorname</label>
-                <input required aria-label="Vorname" placeholder="Vorname" value={editingTeacher.first_name} onChange={e => setEditingTeacher({...editingTeacher, first_name: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                <input required aria-label="Vorname" placeholder="Vorname" value={editingTeacher.first_name || ''} onChange={e => setEditingTeacher({...editingTeacher, first_name: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Nachname</label>
-                <input required aria-label="Nachname" placeholder="Nachname" value={editingTeacher.last_name} onChange={e => setEditingTeacher({...editingTeacher, last_name: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
+                <input required aria-label="Nachname" placeholder="Nachname" value={editingTeacher.last_name || ''} onChange={e => setEditingTeacher({...editingTeacher, last_name: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
               </div>
             </div>
             
@@ -237,10 +275,9 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
               </div>
             </div>
 
-
             <div>
-              <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Instrumente (Icons anklicken):</label>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'nowrap', overflowX: 'auto' }}>
+              <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Instrumente (Klicken zum Auswählen):</label>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {["Gitarre", "Bass", "Drums", "Vocals", "Piano / Keys"].map(inst => {
                   const currentInstruments = (editingTeacher.groovelab_instrument || '').split(',').map((s: string) => s.trim()).filter(Boolean);
                   const isSelected = currentInstruments.includes(inst);
@@ -253,18 +290,22 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
                         setEditingTeacher({...editingTeacher, groovelab_instrument: next.join(', ')});
                       }}
                       style={{
-                        flex: 1,
-                        display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '10px 8px', borderRadius: '12px', 
+                        flex: windowWidth < 640 ? '1 1 calc(50% - 8px)' : '1 1 auto',
+                        padding: '10px 14px',
+                        borderRadius: '12px',
                         border: `1.5px solid ${isSelected ? brandColor : '#e2e8f0'}`,
-                        background: isSelected ? `${brandColor}10` : 'white',
-                        color: isSelected ? '#1e293b' : '#64748b',
-                        fontSize: '0.8rem', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s',
+                        background: isSelected ? `${brandColor}12` : 'white',
+                        color: isSelected ? '#0f172a' : '#64748b',
+                        fontSize: '0.85rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
                         boxShadow: isSelected ? `0 2px 8px ${brandColor}15` : 'none',
                         whiteSpace: 'nowrap',
-                        flexShrink: 0
+                        textAlign: 'center'
                       }}
                     >
-                      <span style={{ fontSize: '1rem' }}>{ADMIN_INSTRUMENT_ICONS[inst]}</span> {inst === "Piano / Keys" ? "Piano" : inst}
+                      {inst}
                     </button>
                   );
                 })}
@@ -276,7 +317,7 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
               <textarea aria-label="Musikalischer Werdegang (Bio)" placeholder="Erzähle etwas über deinen Werdegang..." value={editingTeacher.bio || ''} onChange={e => setEditingTeacher({...editingTeacher, bio: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', minHeight: '80px', fontSize: '0.9rem', fontWeight: 500, lineHeight: 1.4 }} />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: windowWidth < 640 ? '1fr' : '1fr 1fr', gap: '12px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>Expertise & Stile</label>
                 <input aria-label="Expertise & Stile" placeholder="z.B. Jazz, Rock, Metal..." value={editingTeacher.expertise || ''} onChange={e => setEditingTeacher({...editingTeacher, expertise: e.target.value})} style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white', fontSize: '0.9rem', fontWeight: 600 }} />
@@ -287,49 +328,53 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
               </div>
             </div>
 
-
             <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-              <button type="submit" style={{ flex: 2, background: brandColor, color: 'white', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer', boxShadow: `0 4px 15px ${brandColor}20`, transition: 'all 0.2s' }}>Änderungen speichern</button>
+              <button type="submit" style={{ flex: 2, background: brandColor, color: activePlatform === 'groovelab' ? '#0f172a' : 'white', border: 'none', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer', boxShadow: `0 4px 15px ${brandColor}20`, transition: 'all 0.2s' }}>Änderungen speichern</button>
               <button type="button" onClick={() => setEditingTeacher(null)} style={{ flex: 1, background: 'white', color: '#64748b', border: '1px solid #e2e8f0', padding: '12px', borderRadius: '12px', fontWeight: 800, fontSize: '0.95rem', cursor: 'pointer' }}>Abbrechen</button>
             </div>
           </form>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
+        {/* Teachers Cards Grid (Apple Squircle Modern Clean Design - Pure Typography) */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 1fr))', gap: '16px' }}>
           {teachers.map(t => {
-            const isObserver = !!t.is_observer;
-            const accentColor = isObserver ? '#94a3b8' : (activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#eab308' : (t.role === 'admin' ? '#ea4335' : brandColor)));
+            const isSelf = t.id === userId;
+            const canEdit = isSelf || canManageTeachers;
+            const instruments = (t.groovelab_instrument || '')
+              .split(',')
+              .map((inst: string) => inst.trim())
+              .filter(Boolean);
+
             return (
               <div 
                 key={t.id} 
                 role="button"
                 tabIndex={0}
                 aria-label={`Lehrkraft ${t.first_name} ${t.last_name || ''} bearbeiten`}
-                className="glass-panel" 
+                className="team-member-card"
                 style={{ 
-                  padding: '16px 20px', 
+                  padding: '18px 20px', 
                   display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '16px', 
-                  background: isObserver ? '#f8fafc' : 'white', 
+                  flexDirection: 'column',
+                  gap: '14px', 
+                  background: '#ffffff', 
                   borderRadius: '20px', 
-                  border: `1px solid ${isObserver ? '#e2e8f0' : '#f1f5f9'}`,
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
+                  border: '1px solid #f1f5f9',
+                  boxShadow: '0 2px 8px -2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.02)',
                   position: 'relative',
                   overflow: 'hidden',
-                  cursor: 'pointer',
-                  outline: 'none',
-                  transition: 'all 0.2s ease'
+                  cursor: canEdit ? 'pointer' : 'default',
+                  outline: 'none'
                 }}
                 onClick={() => {
-                  if (t.id === userId || canManageTeachers) {
+                  if (canEdit) {
                     setEditingTeacher(t);
                     setShowAddTeacher(false);
                   }
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
-                    if (t.id === userId || canManageTeachers) {
+                    if (canEdit) {
                       e.preventDefault();
                       setEditingTeacher(t);
                       setShowAddTeacher(false);
@@ -337,139 +382,176 @@ export const AdminTeachersView: React.FC<AdminTeachersViewProps> = ({
                   }
                 }}
               >
-                {/* Left accent bar */}
-                <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '6px', background: accentColor, transition: 'background 0.3s' }}></div>
-                
-                {/* Avatar */}
-                <div style={{ width: '80px', height: '80px', borderRadius: '20px', overflow: 'hidden', flexShrink: 0, boxShadow: '0 4px 12px rgba(0,0,0,0.08)', opacity: isObserver ? 0.65 : 1, transition: 'opacity 0.3s' }}>
-                  <StudioAvatar src={t.photo_url} user={t} activePlatform={activePlatform} />
-                </div>
-                
-                {/* Info */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                    <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: isObserver ? '#475569' : '#1e293b', margin: 0, transition: 'color 0.3s', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.first_name} {t.last_name}</h3>
-                    {t.role === 'admin' && !isObserver && <Shield size={14} color="#f59e0b" />}
+                {/* Top Section: Avatar + Name & Role + Action Buttons */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', width: '100%' }}>
+                  {/* 58x58 Apple Squircle Avatar */}
+                  <div style={{
+                    width: '58px',
+                    height: '58px',
+                    borderRadius: '16px',
+                    overflow: 'hidden',
+                    flexShrink: 0,
+                    boxShadow: '0 4px 12px rgba(15, 23, 42, 0.06)',
+                    border: '2px solid #ffffff',
+                    background: '#f8fafc'
+                  }}>
+                    <StudioAvatar src={t.photo_url} user={t} activePlatform={activePlatform} />
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '6px' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: accentColor, textTransform: 'uppercase', letterSpacing: '0.05em', transition: 'color 0.3s' }}>
-                      {isObserver ? '👁 Hospitant' : 'Lehrer'}
-                    </div>
-                  </div>
+                  
+                  {/* Teacher Info */}
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                    <h3 style={{
+                      fontSize: '1.08rem',
+                      fontWeight: 800,
+                      color: '#0f172a',
+                      margin: 0,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      letterSpacing: '-0.01em'
+                    }}>
+                      {t.first_name} {t.last_name}
+                    </h3>
 
-                  {/* Lehrer / Hospitant Toggle */}
-                  {(t.id === userId || canManageTeachers) ? (
-                    <div
-                      role="switch"
-                      aria-checked={!isObserver}
-                      tabIndex={0}
-                      aria-label={`Lehrer-Modus für ${t.first_name} ${t.last_name || ''} umschalten (aktuell: ${isObserver ? 'Hospitant' : 'Lehrer aktiv'})`}
-                      onClick={(e) => handleToggleObserver(t, e)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          handleToggleObserver(t, e as any);
-                        }
-                      }}
-                      title={isObserver ? 'Auf Lehrer-Modus umschalten' : 'Auf Hospitant-Modus umschalten'}
-                      style={{
+                    {/* Role Micro Badge */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{
+                        fontSize: '0.68rem',
+                        fontWeight: 800,
+                        letterSpacing: '0.05em',
+                        textTransform: 'uppercase',
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        background: t.role === 'admin' ? '#fef2f2' : (activePlatform === 'groovelab' ? '#fefce8' : '#f0fdf4'),
+                        color: t.role === 'admin' ? '#b91c1c' : (activePlatform === 'groovelab' ? '#854d0e' : '#15803d'),
+                        border: `1px solid ${t.role === 'admin' ? '#fee2e2' : (activePlatform === 'groovelab' ? '#fef08a' : '#dcfce7')}`,
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '8px',
-                        marginBottom: '8px',
+                        gap: '4px'
+                      }}>
+                        {t.role === 'admin' && <Shield size={11} />}
+                        {t.role === 'admin' ? 'Lehrer & Admin' : 'Lehrkraft'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Actions (QR Code and Delete) */}
+                  <div 
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <button 
+                      type="button"
+                      onClick={() => setSelectedQRUser(t)} 
+                      aria-label={`QR-Zugangskarte und Login-Token für ${t.first_name} ${t.last_name || ''} anzeigen`}
+                      title="QR Code & Ausweis"
+                      className="team-action-btn"
+                      style={{
+                        width: '36px',
+                        height: '36px',
+                        minWidth: '36px',
+                        minHeight: '36px',
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '10px',
                         cursor: 'pointer',
-                        userSelect: 'none',
-                        padding: '4px 8px 4px 4px',
-                        borderRadius: '16px',
-                        background: isObserver ? '#f1f5f9' : `${brandColor}10`,
-                        border: `1.5px solid ${isObserver ? '#e2e8f0' : `${brandColor}20`}`,
-                        transition: 'all 0.25s',
+                        color: '#475569',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                         outline: 'none'
                       }}
                     >
-                      {/* Toggle pill */}
-                      <div style={{
-                        width: '36px', height: '20px',
-                        borderRadius: '10px',
-                        background: isObserver ? '#cbd5e1' : brandColor,
-                        position: 'relative',
-                        transition: 'background 0.25s',
-                        flexShrink: 0,
-                        boxShadow: isObserver ? 'none' : `0 2px 6px ${brandColor}30`
-                      }}>
-                        <div style={{
-                          position: 'absolute',
-                          top: '2px',
-                          left: isObserver ? '2px' : '18px',
-                          width: '16px', height: '16px',
-                          background: 'white',
-                          borderRadius: '50%',
-                          boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
-                          transition: 'left 0.25s cubic-bezier(0.34,1.56,0.64,1)'
-                        }}></div>
-                      </div>
-                      {/* Label */}
-                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: isObserver ? '#475569' : brandColor, letterSpacing: '0.02em', transition: 'color 0.25s' }}>
-                        {isObserver ? 'Hospitant' : 'Lehrer aktiv'}
-                      </span>
-                    </div>
-                  ) : (
-                    <div style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      marginBottom: '8px',
-                      padding: '4px 8px',
-                      borderRadius: '16px',
-                      background: isObserver ? '#f1f5f9' : `${brandColor}10`,
-                      border: `1.5px solid ${isObserver ? '#e2e8f0' : `${brandColor}20`}`
-                    }}>
-                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: isObserver ? '#475569' : brandColor, letterSpacing: '0.02em' }}>
-                        {isObserver ? '👁 Hospitant' : 'Lehrer aktiv'}
-                      </span>
-                    </div>
-                  )}
+                      <QrCode size={16} />
+                    </button>
 
-                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                    {t.groovelab_instrument?.split(',')
-                      .map((inst: string) => inst.trim())
-                      .filter(Boolean)
-                      .map((inst: string) => (
-                        <span key={inst} style={{ padding: '4px 8px', background: '#f1f5f9', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 700, color: '#475569', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                          <span>{ADMIN_INSTRUMENT_ICONS[inst] || '🎸'}</span> {inst}
-                        </span>
-                      ))
-                    }
+                    {!isSelf && canManageTeachers && (
+                      <button 
+                        type="button"
+                        onClick={() => handleDeleteTeacher(t.id)} 
+                        aria-label={`Lehrkraft ${t.first_name} ${t.last_name || ''} aus Schule löschen`}
+                        title="Lehrkraft löschen"
+                        className="team-action-btn"
+                        style={{
+                          width: '36px',
+                          height: '36px',
+                          minWidth: '36px',
+                          minHeight: '36px',
+                          background: '#fff1f2',
+                          border: '1px solid #ffe4e6',
+                          borderRadius: '10px',
+                          cursor: 'pointer',
+                          color: '#e11d48',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          outline: 'none'
+                        }}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
                   </div>
                 </div>
-                
-                {/* Action buttons */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); setSelectedQRUser(t); }} 
-                    aria-label={`QR-Zugangskarte und Login-Token für ${t.first_name} ${t.last_name || ''} anzeigen`}
-                    title="QR Code & Ausweis"
-                    style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px', borderRadius: '10px', cursor: 'pointer', color: '#64748b', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                  >
-                    <QrCode size={18} />
-                  </button>
-                  {t.id !== userId && canManageTeachers && (
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); handleDeleteTeacher(t.id); }} 
-                      aria-label={`Lehrkraft ${t.first_name} ${t.last_name || ''} aus Schule löschen`}
-                      title="Lehrkraft löschen"
-                      style={{ background: activePlatform === 'groovelab' ? '#fefce8' : '#fff1f2', border: activePlatform === 'groovelab' ? '1px solid #fef08a' : '1px solid #fecaca', padding: '10px', borderRadius: '10px', cursor: 'pointer', color: activePlatform === 'groovelab' ? '#eab308' : '#ef4444', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  )}
-                </div>
+
+                {/* Bottom Section: Instruments (Pure Typography, beautifully placed across full card width) */}
+                {instruments.length > 0 && (
+                  <div style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '6px',
+                    alignItems: 'center',
+                    paddingTop: '12px',
+                    borderTop: '1px solid #f1f5f9'
+                  }}>
+                    {instruments.map((inst: string) => (
+                      <span
+                        key={inst}
+                        style={{
+                          padding: '3px 10px',
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '0.74rem',
+                          fontWeight: 700,
+                          color: '#334155',
+                          letterSpacing: '0.01em',
+                          lineHeight: 1.3
+                        }}
+                      >
+                        {inst}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
+
+        {/* Empty State */}
+        {teachers.length === 0 && (
+          <div style={{
+            padding: '48px 24px',
+            textAlign: 'center',
+            background: '#f8fafc',
+            borderRadius: '20px',
+            border: '1.5px dashed #e2e8f0',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: `${brandColor}15`, color: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Shield size={24} />
+            </div>
+            <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#1e293b' }}>Noch keine Lehrkräfte im Team</h4>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', maxWidth: '360px' }}>
+              Füge Lehrkräfte hinzu, um ihnen Zugänge zu erstellen, Instrumente zuzuweisen und Bands zu koordinieren.
+            </p>
+          </div>
+        )}
       </div>
     </div>
-    );
+  );
 };

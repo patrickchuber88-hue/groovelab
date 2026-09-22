@@ -70,7 +70,7 @@ return (
             padding: '20px',
             fontFamily: '"Plus Jakarta Sans", sans-serif'
           }}>
-            <div style={{
+            <div role="dialog" aria-modal="true" style={{
               background: '#ffffff',
               borderRadius: '32px',
               width: '100%',
@@ -246,7 +246,7 @@ return (
                     <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <Volume2 size={14} color="#34a853" /> Play-Along Audio:
                     </span>
-                    <audio controls src={song.audio_url} style={{ width: '100%', height: '36px', borderRadius: '8px' }} />
+                    <audio controls src={song.audio_url} preload="metadata" playsInline style={{ width: '100%', height: '36px', borderRadius: '8px' }} />
                   </div>
                 )}
 

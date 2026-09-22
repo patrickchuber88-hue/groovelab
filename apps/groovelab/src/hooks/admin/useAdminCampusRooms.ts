@@ -40,6 +40,9 @@ export function useAdminCampusRooms({
     if (!schoolId) return;
 
     try {
+      const minDate = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const maxDate = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
       const { data, error } = await supabase
         .from('room_bookings')
         .select(`
@@ -57,7 +60,9 @@ export function useAdminCampusRooms({
             name
           )
         `)
-        .eq('school_id', schoolId);
+        .eq('school_id', schoolId)
+        .gte('date', minDate)
+        .lte('date', maxDate);
 
       if (error) throw error;
 
@@ -96,6 +101,9 @@ export function useAdminCampusRooms({
     if (!schoolId) return;
 
     try {
+      const minDate = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const maxDate = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
       const { data, error } = await supabase
         .from('schedule_occurrences')
         .select(`
@@ -109,7 +117,9 @@ export function useAdminCampusRooms({
           notes,
           schedule_id
         `)
-        .eq('school_id', schoolId);
+        .eq('school_id', schoolId)
+        .gte('date', minDate)
+        .lte('date', maxDate);
 
       if (error) throw error;
       setScheduleOccurrences(data || []);

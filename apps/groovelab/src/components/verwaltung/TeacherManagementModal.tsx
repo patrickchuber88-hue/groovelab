@@ -30,17 +30,17 @@ import { getCanonicalQrLandingUrl } from '../../utils/tenantUrlHelper';
 // ─── APPLE STYLE TOKEN FIELD ──────────────────────────────────────────────────
 interface AppleStyleTokenFieldProps {
   label?: string;
-  selectedString: string;
+  selectedString?: string;
   onChange: (newValue: string) => void;
-  suggestions: string[];
+  suggestions?: string[];
   placeholder?: string;
 }
 
 const AppleStyleTokenField: React.FC<AppleStyleTokenFieldProps> = ({
   label,
-  selectedString,
+  selectedString = '',
   onChange,
-  suggestions,
+  suggestions = [],
   placeholder = 'Fach hinzufügen...'
 }) => {
   const [inputValue, setInputValue] = useState('');
@@ -53,7 +53,8 @@ const AppleStyleTokenField: React.FC<AppleStyleTokenFieldProps> = ({
     ? selectedString.split(',').map((s) => s.trim()).filter(Boolean)
     : [];
 
-  const availableSuggestions = suggestions.filter(
+  const safeSuggestions = Array.isArray(suggestions) ? suggestions : [];
+  const availableSuggestions = safeSuggestions.filter(
     (s) => !selectedTokens.includes(s) && s.toLowerCase().includes(inputValue.toLowerCase())
   );
 
@@ -235,7 +236,7 @@ export interface TeacherManagementModalProps {
   activeTab?: 'campus' | 'groovelab' | 'admin' | string;
   students: any[];
   bands: any[];
-  activeSubjectsList: string[];
+  activeSubjectsList?: string[];
   onClose: () => void;
   onSave: (updatedData: any) => Promise<void>;
   onDelete: (teacherId: string) => Promise<void>;
@@ -267,7 +268,7 @@ export const TeacherManagementModal: React.FC<TeacherManagementModalProps> = ({
   activeTab = 'campus',
   students,
   bands,
-  activeSubjectsList,
+  activeSubjectsList = [],
   onClose,
   onSave,
   onDelete,

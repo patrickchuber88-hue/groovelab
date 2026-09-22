@@ -13,6 +13,8 @@
     "build": "tsc && vite build && node ../../scripts/inject_sri_hashes.mjs && node ../../scripts/precompress_assets.mjs && node ../../scripts/check-bundle-budget.js",
     "test:billing": "tsx src/domain/__tests__/runBillingInvariantTests.ts",
     "test:teacher-names": "tsx src/tests/runTeacherNameInvariantTests.ts",
+    "test:roster": "tsx src/tests/runStudentRosterTests.ts",
+    "test:avatars": "tsx src/tests/runAvatarResolutionTests.ts",
     "test:tier3": "tsx src/tests/test_tier3_sovereign_enterprise_forensic.ts",
     "test:forensic-optimizations": "tsx src/tests/test_forensic_optimizations_suite.ts",
     "gate": "node ../../scripts/security_drift_guard.mjs && node ../../scripts/verify_neutral_ausfall_invariants.mjs && bash ../../scripts/pre_commit_secret_scanner.sh --all && tsc --noEmit",

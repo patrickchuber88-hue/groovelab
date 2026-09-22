@@ -8,6 +8,8 @@ export interface UseTeacherLiveLabProps {
   stations: any[];
   setCoaches: React.Dispatch<React.SetStateAction<any[]>>;
   setActiveSessions: React.Dispatch<React.SetStateAction<any[]>>;
+  session?: any;
+  activeSessions?: any[];
   onSessionChange?: (sess: any) => void;
   onLocationModeChange?: (mode: 'lab' | 'home') => void;
   fetchData: () => Promise<void>;
@@ -23,6 +25,8 @@ export function useTeacherLiveLab({
   stations,
   setCoaches,
   setActiveSessions,
+  session,
+  activeSessions = [],
   onSessionChange,
   onLocationModeChange,
   fetchData,
@@ -43,7 +47,9 @@ export function useTeacherLiveLab({
   const [localCheckedIn, setLocalCheckedIn] = useState(false);
 
   const isTeacher = teacher?.role?.toLowerCase() === 'teacher' || teacher?.role?.toLowerCase() === 'admin';
-  const isUserCheckedIn = localCheckedIn;
+  const isUserCheckedIn = localCheckedIn || 
+    (!!session && !session.check_out_time && (session.user_id === userId || !!session.station_id)) || 
+    (activeSessions && activeSessions.some((s: any) => s && s.user_id === userId && !s.check_out_time));
 
   const performDirectTeacherCheckin = useCallback(async () => {
     setCheckInErrorMsg('');
@@ -164,6 +170,8 @@ export function useTeacherLiveLab({
       if (sessErr) {
         if (sessErr.message?.includes('DATABASE_CIRCUIT_OPEN') || sessErr.message?.includes('Failed to fetch') || sessErr.message?.includes('NetworkError')) {
           if (onLocationModeChange) onLocationModeChange('lab');
+          localCheckedInRef.current = true;
+          setLocalCheckedIn(true);
           setShowKioskView(false);
           setCheckingInStatus('idle');
         } else {
@@ -173,6 +181,8 @@ export function useTeacherLiveLab({
         return;
       }
 
+      localCheckedInRef.current = true;
+      setLocalCheckedIn(true);
       if (onSessionChange) onSessionChange(sessData);
       if (onLocationModeChange) onLocationModeChange('lab');
 

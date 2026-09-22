@@ -127,7 +127,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
       'Ã¡': 'á', 'Ã©': 'é', 'Ã­': 'í', 'Ã³': 'ó', 'Ãº': 'ú',
       'Ã ': 'à', 'Ã¨': 'è', 'Ã¬': 'ì', 'Ã²': 'ò', 'Ã¹': 'ù',
       'â€“': '–', 'â€”': '—', 'â€ž': '„', 'â€œ': '“', 'â€™': '’',
-      'Ã±': 'ñ', 'Ã§': 'ç'
+      'Ã±': 'ñ', '\u00C3\u00A7': 'ç'
     };
 
     for (const [bad, good] of Object.entries(mojibakeMap)) {
@@ -491,7 +491,11 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
       justifyContent: 'center',
       padding: '20px'
     }}>
-      <div style={{
+      <div 
+        role="dialog"
+        aria-modal="true"
+        aria-label="Listen-Import"
+        style={{
         background: '#ffffff',
         borderRadius: '28px',
         width: '100%',

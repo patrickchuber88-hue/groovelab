@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // =============================================================================
 // 🏛️  Campus-Groovelab Tier-1 Perimeter & Mozilla Observatory Security Auditor
-// Standard:  Mozilla Observatory (Target: A+ / 100%+), BSI TR-02102-2, OWASP ASVS L3
+// Standards: DIN EN ISO/IEC 27001 (Annex A.8.20, A.8.26), BSI TR-02102-2,
+//            BSI TR-03116-4, Mozilla Observatory (A+), OWASP ASVS Level 3
 // Runtime:   Native Node.js ESM — zero external dependencies
 // Usage:     node scripts/verify_perimeter_headers.mjs [URL]
 // =============================================================================
@@ -27,7 +28,8 @@ const SUB_HR = '─'.repeat(74);
 
 console.log(`\n${HR}`);
 console.log('  🏛️   CAMPUS-GROOVELAB TIER-1 WEB-PERIMETER SECURITY AUDITOR');
-console.log('       Mozilla Observatory Grade A+ & BSI TR-02102-2 Compliance Engine');
+console.log('       Standards: DIN EN ISO/IEC 27001 / BSI TR-02102-2 / BSI TR-03116-4');
+console.log('       Mozilla Observatory Grade A+ & Enterprise Boundary Defense');
 console.log(`       Ziel: ${targetUrl.origin}`);
 console.log(`${HR}\n`);
 

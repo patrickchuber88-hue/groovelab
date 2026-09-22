@@ -52,7 +52,7 @@ BEGIN
         RAISE NOTICE 'Dev Seed: Legal consent seeded for Admin (%)', v_admin_id;
     END IF;
 
-    -- 3. Seed Lehrkraft (Peter Pan) -> terms_teacher_conduct
+    -- 3. Seed Lehrkraft (Peter Pan) -> terms_teacher_conduct & terms_b2b_avv (Dual-Role Teacher + Admin)
     IF NOT EXISTS (
         SELECT 1 FROM public.legal_consents
         WHERE user_id = v_teacher_id AND consent_type = 'terms_teacher_conduct' AND version = v_version AND is_revoked = false
@@ -79,6 +79,64 @@ BEGIN
             jsonb_build_object('seed', true, 'environment', 'development', 'role', 'teacher')
         );
         RAISE NOTICE 'Dev Seed: Legal consent seeded for Teacher (%)', v_teacher_id;
+    END IF;
+
+    -- Dual-Role Seed: Peter Pan is also Admin/Secretary
+    IF NOT EXISTS (
+        SELECT 1 FROM public.legal_consents
+        WHERE user_id = v_teacher_id AND consent_type = 'terms_b2b_avv' AND version = v_version AND is_revoked = false
+    ) THEN
+        INSERT INTO public.legal_consents (
+            user_id,
+            school_id,
+            role,
+            consent_type,
+            version,
+            document_checksum,
+            accepted_at,
+            user_agent,
+            metadata
+        ) VALUES (
+            v_teacher_id,
+            v_school_id,
+            'admin',
+            'terms_b2b_avv',
+            v_version,
+            'sha256_canonical_dev_seed_b2b_avv',
+            now(),
+            'Campus-Groovelab Localhost Dev-Sandbox Seed',
+            jsonb_build_object('seed', true, 'environment', 'development', 'role', 'admin', 'dual_role', true)
+        );
+        RAISE NOTICE 'Dev Seed: Dual-Role B2B AVV consent seeded for Teacher Peter Pan (%)', v_teacher_id;
+    END IF;
+
+    -- Dual-Role Seed: Manuel Wagner can also switch to Teacher
+    IF NOT EXISTS (
+        SELECT 1 FROM public.legal_consents
+        WHERE user_id = v_admin_id AND consent_type = 'terms_teacher_conduct' AND version = v_version AND is_revoked = false
+    ) THEN
+        INSERT INTO public.legal_consents (
+            user_id,
+            school_id,
+            role,
+            consent_type,
+            version,
+            document_checksum,
+            accepted_at,
+            user_agent,
+            metadata
+        ) VALUES (
+            v_admin_id,
+            v_school_id,
+            'teacher',
+            'terms_teacher_conduct',
+            v_version,
+            'sha256_canonical_dev_seed_teacher_conduct',
+            now(),
+            'Campus-Groovelab Localhost Dev-Sandbox Seed',
+            jsonb_build_object('seed', true, 'environment', 'development', 'role', 'teacher', 'dual_role', true)
+        );
+        RAISE NOTICE 'Dev Seed: Dual-Role Teacher Conduct consent seeded for Admin Manuel Wagner (%)', v_admin_id;
     END IF;
 
     -- 4. Seed Schüler (Linus) -> terms_student_platform & consent_media_audio

@@ -35,6 +35,7 @@ export interface BuildSecretaryModalsMasterHubPropsParams {
   bookings: any;
   schedules: any;
   dashboardData: any;
+  activeSubjectsList?: string[];
 
   // Modals & Handlers
   showAgb: boolean;
@@ -205,7 +206,7 @@ export function buildSecretaryModalsMasterHubProps(
       setGroovelabSubTab: navigation.setGroovelabSubTab,
       students: studentsHook.students,
       bands: dashboardData.bands,
-      activeSubjectsList: dashboardData.activeSubjectsList,
+      activeSubjectsList: params.activeSubjectsList ?? dashboardData?.activeSubjectsList ?? [],
       handleUpdateTeacher: extendedSettings.handleUpdateTeacher,
       handleDeleteUser: staff.handleDeleteUser,
       setQrModalUser: settings.setQrModalUser,

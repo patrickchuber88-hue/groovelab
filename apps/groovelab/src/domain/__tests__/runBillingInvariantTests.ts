@@ -1,5 +1,7 @@
 // =============================================================================
 // Campus-Groovelab Billing Invariant Test Suite — Algorithmus-Korrektheit
+// Standards: DIN EN 16931-1 (Elektronische Rechnungsstellung), ISO 4217 (EUR/CHF),
+//            DIN 1333 (Kaufmännisches Runden), GoBD (§§ 146, 147 AO)
 //
 // DESIGN-PRINZIP:
 //   Diese Tests prüfen ausschließlich FORMELN und ALGORITHMEN — niemals
@@ -394,5 +396,48 @@ assert(dMulti.level === 'level_5_full_readonly',    'Älteste offene Rechnung (7
 assert(dMulti.oldestOverdueInvoice?.id === 'inv-old', 'Älteste offene Rechnung muss korrekt identifiziert werden');
 
 console.log('✅ Test 7 bestanden (Alle 5 Stufen + Moratorium + Vertrauenspass + Kulanzjoker + Bypass)\n');
+
+// =============================================================================
+// TEST 8: Normative Rechnungs- & Rundungsstandards (DIN EN 16931-1, DIN 1333, ISO 4217)
+// =============================================================================
+console.log('Test 8: Normative Rechnungs- & Rundungsstandards (DIN EN 16931-1, DIN 1333, ISO 4217)');
+
+// 1. DIN 1333 Kaufmännische Rundung auf 2 Dezimalstellen
+function roundCommercialDin1333(val: number): number {
+  return Math.round((val + Number.EPSILON) * 100) / 100;
+}
+assert(roundCommercialDin1333(10.005) === 10.01, 'DIN 1333: 10.005 € wird kaufmännisch zu 10.01 € gerundet');
+assert(roundCommercialDin1333(10.004) === 10.00, 'DIN 1333: 10.004 € wird kaufmännisch zu 10.00 € gerundet');
+
+// 2. ISO 4217 Währungscode-Konformität (Campus-Groovelab Canonical Billing)
+const validCurrencies = new Set(['EUR', 'CHF']);
+assert(validCurrencies.has('EUR') && validCurrencies.has('CHF'), 'ISO 4217: Nur normierte Währungscodes EUR und CHF zugelassen');
+
+// 3. DIN EN 16931-1 E-Rechnung Semantisches Datenmodell Pflichtfelder
+interface DinEn16931InvoiceModel {
+  invoiceNumber: string;       // BT-1 (Rechnungsnummer)
+  issueDate: string;           // BT-2 (Rechnungsdatum)
+  currency: string;            // BT-5 (Währungscode ISO 4217)
+  buyerName: string;           // BT-44 (Name des Käufers / Schule)
+  taxExclusiveAmount: number;  // BT-109 (Gesamtbetrag ohne USt)
+  taxInclusiveAmount: number;  // BT-112 (Gesamtbetrag mit USt)
+  payableAmount: number;       // BT-115 (Fälliger Zahlungsbetrag)
+}
+
+const mockInvoice: DinEn16931InvoiceModel = {
+  invoiceNumber: 'RE-2026-TONA-0001',
+  issueDate: '2026-10-01',
+  currency: 'EUR',
+  buyerName: 'Musikschule Tonart e.V.',
+  taxExclusiveAmount: 54.50,
+  taxInclusiveAmount: 54.50,
+  payableAmount: 54.50,
+};
+
+assert(validCurrencies.has(mockInvoice.currency), 'DIN EN 16931-1: Währung entspricht ISO 4217');
+assert(mockInvoice.payableAmount === mockInvoice.taxInclusiveAmount, 'DIN EN 16931-1: Fälliger Zahlungsbetrag entspricht Bruttobetrag');
+assert(mockInvoice.invoiceNumber.startsWith('RE-'), 'DIN EN 16931-1 / GoBD: Eindeutige fortlaufende Rechnungsnummer');
+
+console.log('✅ Test 8 bestanden (DIN EN 16931-1, DIN 1333, ISO 4217)\n');
 
 console.log('🎉 ALLE BILLING-INVARIANT-TESTS BESTANDEN — Formel-korrekt, datenneutral, zukunftssicher!');

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
+import { logApplicationAudit } from '../services/auditLogService';
 import { CampusGroovelabText } from './CampusGroovelabBrand';
 import { 
   Send, 
@@ -60,6 +61,7 @@ import { CampusCreateChannelModal } from './CampusCreateChannelModal';
 import { CampusTopicCard, CampusTopicReaction } from './CampusTopicCard';
 import { CampusTopicComposer } from './CampusTopicComposer';
 import { logSecurityEvent } from '../services/auditLogService';
+import { primeDecryptedCache } from '../lib/security/messageCrypto';
 
 export const getGroupIconComponent = (iconId: string) => {
   switch (iconId) {
@@ -656,10 +658,11 @@ export function CampusDirectMessages({
     const lastReportKey = `cgl_last_report_${selectedRecipient?.id || 'general'}`;
     localStorage.setItem(lastReportKey, String(Date.now()));
     try {
-      await supabase.from('audit_logs').insert({
+      await logApplicationAudit({
         action: 'group_message_reported',
-        entity_type: 'chat_message',
-        entity_id: reportingMessage.id,
+        schoolId: user?.school_id || null,
+        tableName: 'campus_direct_messages',
+        recordId: reportingMessage.id,
         details: {
           reason: reasonText,
           reporter_id: user?.id,
@@ -672,6 +675,7 @@ export function CampusDirectMessages({
     }
     setReportingMessage(null);
     setReportToast('Meldung vertraulich an deine Lehrkraft übermittelt. Danke für deine Mithilfe!');
+
     setTimeout(() => setReportToast(null), 4000);
   };
 
@@ -1009,8 +1013,6 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
       };
 
       fetchStudentTeachers();
-      const timer = setTimeout(fetchStudentTeachers, 800);
-      return () => clearTimeout(timer);
     }
 
     const fetchAssignedStudents = async () => {
@@ -1178,8 +1180,6 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     };
 
     fetchAssignedStudents();
-    const timer = setTimeout(fetchAssignedStudents, 800);
-    return () => clearTimeout(timer);
   }, [user?.id, user?.school_id, user?.schools?.id, isStudent, schoolUsers]);
 
   const [channelReads, setChannelReads] = useState<Map<string, number>>(() => getLocalChannelReads(effectiveUid || ''));
@@ -1331,7 +1331,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
         const dbGrpTime = myMembership?.last_read_at ? new Date(myMembership.last_read_at).getTime() : 0;
         const groupLastRead = Math.max(dbGrpTime, localGrpTime);
 
-        const grpMessages = (campusMessages || []).filter((m: any) => m.group_id === g.id);
+        const grpMessages = (campusMessagesRef.current || []).filter((m: any) => m.group_id === g.id);
         const lastMsg = grpMessages.length > 0 ? grpMessages[grpMessages.length - 1] : null;
 
         // Channel-level accurate unread calculation
@@ -1359,11 +1359,48 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     } catch (err) {
       console.error('[CampusDirectMessages] Error in fetchCampusGroups:', err);
     }
-  }, [user?.id, isStudent, campusMessages]);
+  }, [user?.id, isStudent, effectiveUid]);
 
   useEffect(() => {
     fetchCampusGroups();
   }, [fetchCampusGroups]);
+
+  // 1% Goldstandard In-Memory Synchronisation: Update unread counts and last messages without hitting database
+  useEffect(() => {
+    if (!campusMessages || campusMessages.length === 0) return;
+    const uid = effectiveUid;
+    if (!uid) return;
+    setCampusGroups(prev => {
+      if (!prev || prev.length === 0) return prev;
+      let hasChanged = false;
+      const updated = prev.map(g => {
+        const msgs = campusMessages.filter((m: any) => m.group_id === g.id);
+        const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+        const myMembership = g.members?.find((mb: any) => mb.user_id === uid);
+        const groupLastRead = myMembership?.last_read_at ? new Date(myMembership.last_read_at).getTime() : 0;
+        const unreadCount = msgs.filter((m: any) => {
+          if (m.sender_id === uid) return false;
+          const msgTime = new Date(m.created_at).getTime();
+          const chanLastRead = m.channel_id && channelReads.has(m.channel_id) ? (channelReads.get(m.channel_id) || 0) : 0;
+          const effLastRead = Math.max(chanLastRead, groupLastRead);
+          if (effLastRead > 0) return msgTime > effLastRead;
+          return msgTime > groupLastRead;
+        }).length;
+
+        if (g.unreadCount !== unreadCount || g.lastMessage?.id !== lastMsg?.id) {
+          hasChanged = true;
+          return {
+            ...g,
+            lastMessage: lastMsg,
+            unreadCount,
+            lastMessageTime: lastMsg ? new Date(lastMsg.created_at) : new Date(g.created_at)
+          };
+        }
+        return g;
+      });
+      return hasChanged ? updated : prev;
+    });
+  }, [campusMessages, effectiveUid, channelReads]);
 
   const fetchGroupMembersDetails = async (groupId: string) => {
     setGroupMembersLoading(true);
@@ -1526,9 +1563,21 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     let isMounted = true;
     const loadReactions = async () => {
       try {
+        const activeMsgs = (campusMessagesRef.current || []).filter((m: any) => {
+          if (selectedRecipient.is_group) return m.group_id === selectedRecipient.id;
+          return (m.sender_id === selectedRecipient.id || m.recipient_id === selectedRecipient.id) && !m.group_id;
+        });
+        const activeMsgIds = activeMsgs.map((m: any) => m.id).filter(Boolean);
+
+        if (activeMsgIds.length === 0) {
+          if (isMounted) setMessageReactions([]);
+          return;
+        }
+
         const { data, error } = await supabase
           .from('campus_message_reactions')
-          .select('*');
+          .select('*')
+          .in('message_id', activeMsgIds.slice(0, 150));
         if (!error && data && isMounted) {
           setMessageReactions(data);
         }
@@ -1544,8 +1593,17 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'campus_message_reactions' },
-        () => {
-          loadReactions();
+        (payload: any) => {
+          if (payload.eventType === 'INSERT' && payload.new) {
+            setMessageReactions(prev => {
+              if (prev.some(r => r.id === payload.new.id)) return prev;
+              return [...prev, payload.new];
+            });
+          } else if (payload.eventType === 'DELETE' && payload.old) {
+            setMessageReactions(prev => prev.filter(r => r.id !== payload.old.id));
+          } else {
+            loadReactions();
+          }
         }
       )
       .subscribe();
@@ -1554,7 +1612,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
       isMounted = false;
       supabase.removeChannel(channel);
     };
-  }, [selectedRecipient?.id]);
+  }, [selectedRecipient?.id, selectedRecipient?.is_group]);
 
   const handlePublishTopic = async (subject: string, content?: string) => {
     if (!selectedRecipient) return;
@@ -1709,6 +1767,46 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
       return true;
     }
     return false;
+  };
+
+  const renderLastMessagePreview = (lastMsg: any) => {
+    if (!lastMsg || !lastMsg.content) {
+      return <span>Keine Nachrichten.</span>;
+    }
+    const rawContent = cleanChatMessageContent(lastMsg.content);
+    const isSys = isSystemMessage(lastMsg);
+
+    if (isSys) {
+      const isReactivation = lastMsg.message_type === 'cancellation_reset' ||
+        rawContent.includes('🔄') || rawContent.toLowerCase().includes('reaktiviert') || rawContent.toLowerCase().includes('zurückgesetzt') || rawContent.toLowerCase().includes('regulär statt');
+      const isCancellation = lastMsg.message_type === 'reschedule_notification' ||
+        rawContent.includes('❌') || rawContent.toLowerCase().includes('abgesagt') || rawContent.toLowerCase().includes('fällt aus');
+
+      const cleanText = rawContent.replace(/[❌🔄🕒✅🔒⚠️]/gu, '').replace(/\s+/g, ' ').trim();
+
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {isReactivation ? (
+            <RotateCcw size={12} color="#15803d" strokeWidth={2.5} style={{ flexShrink: 0 }} />
+          ) : isCancellation ? (
+            <X size={12} color="#dc2626" strokeWidth={2.5} style={{ flexShrink: 0 }} />
+          ) : (
+            <Info size={12} color="#64748b" strokeWidth={2.5} style={{ flexShrink: 0 }} />
+          )}
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {cleanText}
+          </span>
+        </span>
+      );
+    }
+
+    // Regular human message: strip out any stray emoji markers and display cleanly
+    const cleanedText = rawContent.replace(/[❌🔄]/gu, '').trim();
+    return (
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {cleanedText}
+      </span>
+    );
   };
 
   // Determine source list based on user role: Students see strictly their assigned teachers!
@@ -1935,7 +2033,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
             type: 'group_chat',
             group_name: target.name,
             channels_count: groupChannels.length,
-            legal_basis: '§ 130 BGB / GoBD'
+            legal_basis: 'BGB 130 / GoBD'
           }
         }).catch(e => console.warn('[CampusDirectMessages] Audit log error:', e));
 
@@ -1966,7 +2064,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
           metadata: {
             type: 'direct_chat',
             partner_name: `${target.first_name || ''} ${target.last_name || ''}`.trim(),
-            legal_basis: '§ 130 BGB / GoBD'
+            legal_basis: 'BGB 130 / GoBD'
           }
         }).catch(e => console.warn('[CampusDirectMessages] Audit log error:', e));
 
@@ -2059,7 +2157,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
             channel_id: targetChanId,
             channel_name: activeChan?.name || 'default',
             messages_count: unreadInActiveChannel.length,
-            legal_basis: '§ 130 BGB / GoBD'
+            legal_basis: 'BGB 130 / GoBD'
           }
         }).catch(e => console.warn('[CampusDirectMessages] Channel auto-read audit error:', e));
 
@@ -2113,7 +2211,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
             type: 'direct_chat_auto_read',
             partner_name: `${selectedRecipient.first_name || ''} ${selectedRecipient.last_name || ''}`.trim(),
             messages_count: unreadFromRecipient.length,
-            legal_basis: '§ 130 BGB / GoBD'
+            legal_basis: 'BGB 130 / GoBD'
           }
         }).catch(e => console.warn('[CampusDirectMessages] Direct auto-read audit error:', e));
 
@@ -2522,15 +2620,20 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     }
   }, [activeSubTab, allOccurrenceTabs]);
 
+  // Unified chronological timeline for 1:1 chat (including direct dialogues & system event cards, excluding topics & thread replies)
+  const unifiedTimelineMessages = useMemo(() => {
+    return activeThreadMessages.filter(m => !m.parent_message_id && !m.subject && m.message_type !== 'topic' && !String(m.content || '').startsWith('📌 ['));
+  }, [activeThreadMessages]);
+
   // 5. Messages displayed in the chat area for currently active sub-tab (Unified Timeline)
   const displayedMessages = useMemo(() => {
     if (selectedRecipient?.is_group) {
       return activeThreadMessages;
     }
     // Tab "Alle" (Unified Timeline for 1:1 chat):
-    // strictly human dialogues, excluding replies inside topics and excluding structured topics
-    return humanMessages;
-  }, [activeThreadMessages, selectedRecipient?.is_group, humanMessages]);
+    // Chronological feed of human messages and system notifications (excluding replies inside topics and excluding structured topics)
+    return unifiedTimelineMessages;
+  }, [activeThreadMessages, selectedRecipient?.is_group, unifiedTimelineMessages]);
 
   const activeRootTopics = useMemo(() => {
     if (selectedRecipient?.is_group) {
@@ -2623,6 +2726,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
             .limit(1);
 
           if (!existing || existing.length === 0) {
+            const effSchoolId = user?.school_id || (Array.isArray(user?.schools) ? user?.schools[0]?.id : user?.schools?.id) || null;
             await supabase.from('campus_direct_messages').insert({
               sender_id: syntheticMsg.sender_id,
               recipient_id: syntheticMsg.recipient_id,
@@ -2630,7 +2734,8 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
               message_type: 'cancellation_reset',
               occurrence_id: syntheticMsg.occurrence_id,
               is_read: true,
-              created_at: syntheticMsg.created_at
+              created_at: syntheticMsg.created_at,
+              school_id: effSchoolId
             });
             console.log('[CampusDirectMessages] Audit Self-Healing: Persisted missing cancellation_reset event to DB.');
           }
@@ -2667,13 +2772,18 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
     if (activeSubTab !== 'all' && activeSubTab !== 'general' && activeSubTab !== 'system') {
       const targetOccTab = allOccurrenceTabs.find(tab => tab.id === activeSubTab || (tab.allIds && tab.allIds.includes(activeSubTab)));
       if (targetOccTab) {
-        await supabase.from('campus_direct_messages').insert({
+        const effectiveSchoolId = user?.school_id || (Array.isArray(user?.schools) ? user?.schools[0]?.id : user?.schools?.id) || null;
+        const { data } = await supabase.from('campus_direct_messages').insert({
           sender_id: user.id,
           recipient_id: selectedRecipient.id,
           content: content.trim(),
           occurrence_id: targetOccTab.id,
-          read_by: [user.id]
-        });
+          read_by: [user.id],
+          school_id: effectiveSchoolId
+        }).select().single();
+        if (data?.content && typeof data.content === 'string' && data.content.startsWith('enc:')) {
+          primeDecryptedCache(effectiveSchoolId, data.content, content.trim());
+        }
         setTimeout(() => scrollToBottom(true), 50);
         return;
       }
@@ -3305,7 +3415,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                           overflow: 'hidden',
                           textOverflow: 'ellipsis'
                         }}>
-                          {item.lastMessage?.content ? cleanChatMessageContent(item.lastMessage.content) : 'Keine Nachrichten'}
+                          {renderLastMessagePreview(item.lastMessage)}
                         </p>
                       </div>
                     </button>
@@ -3437,9 +3547,7 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                           <span>Eltern</span>
                         </span>
                       )}
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {partner.lastMessage ? cleanChatMessageContent(partner.lastMessage.content) : 'Keine Nachrichten.'}
-                      </span>
+                      {renderLastMessagePreview(partner.lastMessage)}
                     </p>
                   </div>
                 </button>
@@ -4547,34 +4655,6 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                   const isSelf = msg.sender_id === user.id;
                   const isSys = isSystemMessage(msg);
 
-                  if (isSys) {
-                    // System messages must NEVER be rendered in the 'all' / 'general' human dialogue stream!
-                    if (activeSubTab === 'all' || activeSubTab === 'general') {
-                      return null;
-                    }
-
-                    const currentOccTab = activeOccurrenceTabs.find(t => t.id === activeSubTab || (t.allIds && t.allIds.includes(activeSubTab)) || t.date === activeSubTab);
-                    const laterSysMsg = displayedMessages.slice(idx + 1).find(m => isSystemMessage(m));
-                    const isSuperseded = Boolean(laterSysMsg);
-
-                    // Find matching occurrence even in 'all' view
-                    const matchedOcc = currentOccTab?.occurrence || (studentOccurrences || []).find(o => 
-                      (msg.occurrence_id && String(o.id) === String(msg.occurrence_id)) || 
-                      (extractOccurrenceDateFromMessage(msg) && o.date === extractOccurrenceDateFromMessage(msg))
-                    );
-
-                    return (
-                      <AppleSystemNotificationCard 
-                        key={msg.id || `sys-${idx}`} 
-                        msg={msg} 
-                        selectedRecipient={selectedRecipient}
-                        onSendMessage={onSendMessage}
-                        isSuperseded={isSuperseded}
-                        currentOcc={matchedOcc}
-                      />
-                    );
-                  }
-
                   const msgDate = new Date(msg.created_at);
                   const prevMsg = idx > 0 ? displayedMessages[idx - 1] : null;
                   const prevMsgDate = prevMsg ? new Date(prevMsg.created_at) : null;
@@ -4593,6 +4673,47 @@ const saveLocalReadMsgIds = (uid: string, msgIds: string[]) => {
                     dateLabel = 'Gestern';
                   } else {
                     dateLabel = msgDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+                  }
+
+                  if (isSys) {
+                    const currentOccTab = activeOccurrenceTabs.find(t => t.id === activeSubTab || (t.allIds && t.allIds.includes(activeSubTab)) || t.date === activeSubTab);
+                    const laterSysMsg = displayedMessages.slice(idx + 1).find(m => isSystemMessage(m));
+                    const isSuperseded = Boolean(laterSysMsg);
+
+                    // Find matching occurrence even in 'all' view
+                    const matchedOcc = currentOccTab?.occurrence || (studentOccurrences || []).find(o => 
+                      (msg.occurrence_id && String(o.id) === String(msg.occurrence_id)) || 
+                      (extractOccurrenceDateFromMessage(msg) && o.date === extractOccurrenceDateFromMessage(msg))
+                    );
+
+                    return (
+                      <React.Fragment key={msg.id || `sys-${idx}`}>
+                        {isNewDay && (
+                          <div style={{ display: 'flex', justifyContent: 'center', width: '100%', margin: '14px 0 8px 0' }}>
+                            <span style={{
+                              fontSize: '0.68rem',
+                              fontWeight: 700,
+                              color: '#64748b',
+                              background: '#f1f5f9',
+                              border: '1px solid #e2e8f0',
+                              padding: '3px 12px',
+                              borderRadius: '100px',
+                              letterSpacing: '0.01em',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                            }}>
+                              {dateLabel}
+                            </span>
+                          </div>
+                        )}
+                        <AppleSystemNotificationCard 
+                          msg={msg} 
+                          selectedRecipient={selectedRecipient}
+                          onSendMessage={onSendMessage}
+                          isSuperseded={isSuperseded}
+                          currentOcc={matchedOcc}
+                        />
+                      </React.Fragment>
+                    );
                   }
 
                   const timeStr = msgDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });

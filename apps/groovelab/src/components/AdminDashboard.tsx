@@ -50,6 +50,8 @@ export interface AdminDashboardProps {
   onLocationModeChange?: (mode: 'lab' | 'home') => void;
   hideHeader?: boolean;
   onSwitchPlatform?: (platform: 'campus' | 'groovelab') => void;
+  activeWorkspace?: string | null;
+  userRole?: string;
 }
 
 export function AdminDashboard({ 
@@ -64,7 +66,9 @@ export function AdminDashboard({
   locationMode,
   onLocationModeChange,
   hideHeader = false,
-  onSwitchPlatform
+  onSwitchPlatform,
+  activeWorkspace,
+  userRole
 }: AdminDashboardProps) {
   const brandColor = activePlatform === 'campus' ? '#34a853' : '#facc15';
   const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
@@ -100,7 +104,7 @@ export function AdminDashboard({
     handleToggleGhostMode,
     handleGhostImpersonate,
     fetchData
-  } = useAdminDashboardData({ userId, activePlatform, forceTab });
+  } = useAdminDashboardData({ userId, activePlatform, forceTab, activeWorkspace, userRole });
 
   // 2. Modals state
   const [showAVVModal, setShowAVVModal] = useState(false);
@@ -475,6 +479,7 @@ export function AdminDashboard({
               setRooms={setRooms}
               schoolObj={schoolObj}
               students={students}
+              teachers={teachers}
               schedules={schedules}
               setSchedules={() => {}}
               campusBookings={roomsState.campusBookings}
@@ -551,7 +556,7 @@ export function AdminDashboard({
         ) : (
           <Suspense fallback={<div style={{ padding: "40px", textAlign: "center", color: "#64748b" }}>GrooveLab Raumplaner wird geladen...</div>}>
             <AdminGroovelabRoomsView
-              rooms={rooms}
+              rooms={rooms.filter(r => Boolean(r.is_groovelab_active))}
               stations={stations}
               draggedRoomId={roomsState.draggedRoomId}
               dragOverRoomId={roomsState.dragOverRoomId}
@@ -788,6 +793,13 @@ export function AdminDashboard({
         showBatchiPadModal={roomsState.showBatchiPadModal}
         setShowBatchiPadModal={roomsState.setShowBatchiPadModal}
         onExecuteBatchiPad={roomsState.executeBatchAddStations}
+        customizingRoom={roomsState.customizingRoom}
+        setCustomizingRoom={roomsState.setCustomizingRoom}
+        stations={stations}
+        setStations={setStations}
+        rooms={rooms}
+        setRooms={setRooms}
+        kiosks={kiosks}
         selectedStudent={studentsState.selectedStudent}
         setSelectedStudent={studentsState.setSelectedStudent}
         admin={admin}

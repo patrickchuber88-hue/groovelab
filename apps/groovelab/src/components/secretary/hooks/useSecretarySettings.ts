@@ -607,7 +607,7 @@ export function useSecretarySettings({
         supabase.from('schedules').select('*').eq('school_id', schoolId),
         supabase.from('bands').select('*').eq('school_id', schoolId),
         supabase.from('students').select('*').eq('school_id', schoolId),
-        supabase.from('stations').select('*, rooms!inner(school_id)').eq('rooms.school_id', schoolId)
+        supabase.from('stations').select('*, rooms!stations_room_id_fkey!inner(school_id)').eq('rooms.school_id', schoolId)
       ]);
 
       if (schoolRes.error) throw schoolRes.error;
@@ -729,7 +729,7 @@ export function useSecretarySettings({
             supabase.from('schedules').select('*').eq('school_id', schoolId),
             supabase.from('bands').select('*').eq('school_id', schoolId),
             supabase.from('students').select('*').eq('school_id', schoolId),
-            supabase.from('stations').select('*, rooms!inner(school_id)').eq('rooms.school_id', schoolId)
+            supabase.from('stations').select('*, rooms!stations_room_id_fkey!inner(school_id)').eq('rooms.school_id', schoolId)
           ]);
           const currentData = {
             schoolId,

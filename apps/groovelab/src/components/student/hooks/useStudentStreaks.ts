@@ -47,11 +47,130 @@ export function useStudentStreaks({
       avatar_style: 'standard',
       instrument_type: studentUser?.resolved_instrument || studentUser?.instrument || 'Guitar',
       evolution_level: 1,
-      xp: 0,
+      xp: studentUser?.campus_xp || studentUser?.xp || 0,
       asset_path: resolveCampusStudentAvatar(studentUser),
       streak_flame: 0
     };
   }, [avatarFromDb, studentUser]);
+
+  const effectiveUserId = studentId || studentUser?.id;
+
+  // 🏛️ 1% Goldstandard: Autoritatives Laden des Avatars & XP aus public.avatars und public.student_stats
+  useEffect(() => {
+    if (!effectiveUserId) return;
+    let isMounted = true;
+
+    // ⚡ SWR Fast-Path: Sofortige Synchronisation aus LocalStorage zur Vermeidung jeglichen Flackerns
+    if (typeof localStorage !== 'undefined') {
+      const cachedBonus = localStorage.getItem(`campus_bonus_xp_${effectiveUserId}`);
+      if (cachedBonus) {
+        const parsedBonus = Number(cachedBonus);
+        if (!isNaN(parsedBonus) && parsedBonus > 0) {
+          setAvatar(prev => {
+            const base = prev || {
+              avatar_style: 'standard',
+              instrument_type: studentUser?.resolved_instrument || studentUser?.instrument || 'Guitar',
+              evolution_level: 1,
+              xp: parsedBonus,
+              asset_path: resolveCampusStudentAvatar(studentUser),
+              streak_flame: 0
+            };
+            return {
+              ...base,
+              xp: Math.max(base.xp || 0, parsedBonus)
+            };
+          });
+        }
+      }
+    }
+
+    const loadAvatarFromDb = async () => {
+      try {
+        // 1. Hole Datensatz aus public.avatars (SSOT für XP und Avatar)
+        const { data: avData } = await supabase
+          .from('avatars')
+          .select('id, user_id, avatar_style, instrument_type, evolution_level, asset_path, streak_flame, xp')
+          .eq('user_id', effectiveUserId)
+          .maybeSingle();
+
+        // 2. Hole Datensatz aus public.student_stats
+        const { data: statsData } = await supabase
+          .from('student_stats')
+          .select('current_xp, streak_flame')
+          .eq('student_id', effectiveUserId)
+          .maybeSingle();
+
+        if (isMounted) {
+          const dbXp = Math.max(
+            avData?.xp || 0,
+            statsData?.current_xp || 0,
+            studentUser?.campus_xp || 0,
+            studentUser?.xp || 0
+          );
+          const dbFlame = avData?.streak_flame ?? statsData?.streak_flame ?? studentUser?.streak_flame ?? 0;
+          const dbLevel = avData?.evolution_level || 1;
+          const dbStyle = avData?.avatar_style || 'standard';
+          const dbAsset = avData?.asset_path || resolveCampusStudentAvatar(studentUser);
+          const dbInstrument = avData?.instrument_type || studentUser?.resolved_instrument || studentUser?.instrument || 'Guitar';
+
+          setAvatar(prev => ({
+            ...(prev || {}),
+            avatar_style: dbStyle,
+            instrument_type: dbInstrument,
+            evolution_level: dbLevel,
+            asset_path: dbAsset,
+            streak_flame: dbFlame,
+            xp: Math.max(prev?.xp || 0, dbXp)
+          }));
+
+          if (dbXp > 0 && typeof localStorage !== 'undefined') {
+            localStorage.setItem(`campus_bonus_xp_${effectiveUserId}`, String(dbXp));
+          }
+        }
+      } catch (err) {
+        console.warn('[useStudentStreaks] Note fetching authoritative avatar:', err);
+      }
+    };
+
+    loadAvatarFromDb();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [effectiveUserId, studentUser]);
+
+  // 🌟 Real-time listener for XP awards (e.g. from Groove-Trainer, Missions, Challenges)
+  useEffect(() => {
+    const handleXpAwarded = (e: Event) => {
+      const customEvent = e as CustomEvent<{ studentId?: string; amount?: number }>;
+      const { studentId: targetId, amount } = customEvent.detail || {};
+      const currentEffectiveId = studentId || studentUser?.id;
+      if (!targetId || targetId === currentEffectiveId) {
+        if (typeof amount === 'number' && amount > 0) {
+          setAvatar(prev => {
+            const base = prev || {
+              avatar_style: 'standard',
+              instrument_type: studentUser?.resolved_instrument || studentUser?.instrument || 'Guitar',
+              evolution_level: 1,
+              xp: studentUser?.campus_xp || studentUser?.xp || 0,
+              asset_path: resolveCampusStudentAvatar(studentUser),
+              streak_flame: 0
+            };
+            const nextXp = (base.xp || 0) + amount;
+            if (currentEffectiveId && typeof localStorage !== 'undefined') {
+              localStorage.setItem(`campus_bonus_xp_${currentEffectiveId}`, String(nextXp));
+            }
+            return {
+              ...base,
+              xp: nextXp
+            };
+          });
+        }
+      }
+    };
+    window.addEventListener('campus-xp-awarded', handleXpAwarded);
+    return () => window.removeEventListener('campus-xp-awarded', handleXpAwarded);
+  }, [studentId, studentUser]);
 
   const currentLevel = avatar.evolution_level || 1;
   const currentXp = avatar.xp || 0;

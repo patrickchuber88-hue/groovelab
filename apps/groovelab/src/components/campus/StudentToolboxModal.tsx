@@ -47,7 +47,7 @@ export const StudentToolboxModal: React.FC<StudentToolboxModalProps> = ({
         }
       }}
     >
-      <div 
+      <div role="dialog" aria-modal="true" 
         style={{
           background: '#ffffff',
           borderRadius: '24px',

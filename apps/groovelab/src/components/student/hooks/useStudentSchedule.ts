@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase, checkSupabaseConnection } from '../../../lib/supabase';
 import { formatTeacherFullName } from '../../../utils/nameHelper';
+import { toLocalYYYYMMDD, getSimulatedNow } from '../studentDateUtils';
 
 interface UseStudentScheduleProps {
   studentId: string;
@@ -51,24 +52,107 @@ export function useStudentSchedule({
     if (!studentId) return;
     setScheduleLoading(true);
     try {
-      const { data, error } = await supabase
+      const simNow = getSimulatedNow();
+      const todayStr = toLocalYYYYMMDD(simNow);
+
+      // 1. Fetch upcoming occurrences
+      const { data: occData, error: occError } = await supabase
         .from('schedule_occurrences')
         .select('*, teacher:users!schedule_occurrences_teacher_id_fkey(id, first_name, last_name, nickname, photo_url, avatar_url, instrument, role, email)')
         .eq('student_id', studentId)
-        .order('date', { ascending: true });
+        .gte('date', todayStr)
+        .order('date', { ascending: true })
+        .order('start_time', { ascending: true });
 
-      if (!error && data) {
-        setScheduleOccurrences(data);
+      // 2. Fetch master schedule (schedules) for SSOT fallback & todayLesson calculation
+      const { data: masterSchedules } = await supabase
+        .from('schedules')
+        .select('*, teacher:users!schedules_teacher_id_fkey(id, first_name, last_name, nickname, photo_url, avatar_url, instrument, role, email), rooms(name)')
+        .eq('student_id', studentId)
+        .eq('status', 'approved');
+
+      // 3. Hydrate todayLesson
+      let todayLesson: any = null;
+      const todayOcc = (occData || []).find((o: any) => o.date === todayStr && o.status !== 'cancelled' && o.status !== 'canceled_by_student');
+      if (todayOcc) {
+        todayLesson = {
+          id: todayOcc.id,
+          time: todayOcc.start_time ? todayOcc.start_time.substring(0, 5) : '14:00',
+          room: todayOcc.template_room_id || 'Unterrichtsraum',
+          teacher: todayOcc.teacher ? formatTeacherFullName(todayOcc.teacher) : 'Lehrkraft',
+          teacher_id: todayOcc.teacher_id,
+          status: todayOcc.status
+        };
+      } else if (masterSchedules && masterSchedules.length > 0) {
+        const currentWeekday = simNow.getDay() || 7; // 1 = Mo, 7 = So
+        const matchingMaster = masterSchedules.find((s: any) => Number(s.day_of_week) === currentWeekday);
+        if (matchingMaster) {
+          todayLesson = {
+            id: matchingMaster.id,
+            time: matchingMaster.time_slot ? matchingMaster.time_slot.substring(0, 5) : '14:00',
+            room: (matchingMaster.rooms as any)?.name || 'Unterrichtsraum',
+            teacher: matchingMaster.teacher ? formatTeacherFullName(matchingMaster.teacher) : 'Lehrkraft',
+            teacher_id: matchingMaster.teacher_id,
+            status: matchingMaster.status
+          };
+        }
+      }
+
+      setBriefingData({ todayLesson });
+
+      if (!occError && occData && occData.length > 0) {
+        setScheduleOccurrences(occData);
+        setSchoolYearOccurrences(occData);
         setIsOfflineScheduleActive(false);
         try {
-          localStorage.setItem(`campus_schedule_cache_${studentId}`, JSON.stringify(data));
+          localStorage.setItem(`campus_schedule_cache_${studentId}`, JSON.stringify(occData));
         } catch (e) {}
+      } else if (masterSchedules && masterSchedules.length > 0) {
+        // Monolith Goldstandard SSOT Fallback: Project recurring slots from master schedules
+        const projectedOccurrences: any[] = [];
+        masterSchedules.forEach((sch: any) => {
+          const dayNum = typeof sch.day_of_week === 'number' ? sch.day_of_week : (parseInt(sch.day_of_week, 10) || 1);
+          const current = new Date(simNow);
+          current.setHours(0, 0, 0, 0);
+          const currentDay = current.getDay() || 7;
+          let diff = dayNum - currentDay;
+          if (diff < 0) diff += 7;
+          const targetDate = new Date(current);
+          targetDate.setDate(current.getDate() + diff);
+
+          const timeSlot = sch.time_slot || '14:00';
+          const startTime = timeSlot.includes(':') && timeSlot.split(':').length === 2 ? `${timeSlot}:00` : timeSlot;
+          const teacherObj = sch.teacher || null;
+
+          for (let i = 0; i < 12; i++) {
+            const d = new Date(targetDate);
+            d.setDate(targetDate.getDate() + (i * 7));
+            projectedOccurrences.push({
+              id: `projected-${sch.id}-${toLocalYYYYMMDD(d)}`,
+              schedule_id: sch.id,
+              student_id: studentId,
+              teacher_id: sch.teacher_id,
+              teacher: teacherObj,
+              date: toLocalYYYYMMDD(d),
+              start_time: startTime,
+              duration: sch.duration || 30,
+              status: 'scheduled',
+              room_name: (sch.rooms as any)?.name || 'Unterrichtsraum'
+            });
+          }
+        });
+        projectedOccurrences.sort((a, b) => a.date.localeCompare(b.date) || a.start_time.localeCompare(b.start_time));
+        setScheduleOccurrences(projectedOccurrences);
+        setSchoolYearOccurrences(projectedOccurrences);
+        setIsOfflineScheduleActive(false);
       } else {
         // Fallback to cache
         try {
           const cached = localStorage.getItem(`campus_schedule_cache_${studentId}`);
           if (cached) {
-            setScheduleOccurrences(JSON.parse(cached));
+            const parsed = JSON.parse(cached);
+            setScheduleOccurrences(parsed);
+            setSchoolYearOccurrences(parsed);
             setIsOfflineScheduleActive(true);
           }
         } catch (e) {}
@@ -78,7 +162,9 @@ export function useStudentSchedule({
       try {
         const cached = localStorage.getItem(`campus_schedule_cache_${studentId}`);
         if (cached) {
-          setScheduleOccurrences(JSON.parse(cached));
+          const parsed = JSON.parse(cached);
+          setScheduleOccurrences(parsed);
+          setSchoolYearOccurrences(parsed);
           setIsOfflineScheduleActive(true);
         }
       } catch (e) {}

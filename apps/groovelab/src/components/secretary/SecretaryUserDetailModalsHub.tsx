@@ -33,7 +33,7 @@ export interface SecretaryUserDetailModalsHubProps {
   setGroovelabSubTab: (sub: any) => void;
   students: any[];
   bands: any[];
-  activeSubjectsList: any[];
+  activeSubjectsList?: string[];
   handleUpdateTeacher: (updatedData: any) => Promise<void>;
   handleDeleteUser: (userId: string) => Promise<void>;
   setQrModalUser: (user: any) => void;
@@ -83,7 +83,7 @@ export function SecretaryUserDetailModalsHub({
   setGroovelabSubTab,
   students,
   bands,
-  activeSubjectsList,
+  activeSubjectsList = [],
   handleUpdateTeacher,
   handleDeleteUser,
   setQrModalUser,
@@ -209,7 +209,7 @@ export function SecretaryUserDetailModalsHub({
           activeTab={activeTab}
           students={students}
           bands={bands}
-          activeSubjectsList={activeSubjectsList}
+          activeSubjectsList={activeSubjectsList || []}
           onClose={() => setManageTeacher(null)}
           onSave={async (updatedData) => {
             await handleUpdateTeacher(updatedData);

@@ -68,7 +68,30 @@ export const AdminBandsView: React.FC<AdminBandsViewProps> = ({
     const brandColor = activePlatform === 'campus' ? '#34a853' : (activePlatform === 'groovelab' ? '#eab308' : '#ea4335');
     const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
     
+    const isRealBand = (b: any) => b && b.name && b.name !== '__SYSTEM_ANNOUNCEMENTS__' && !b.name.startsWith('__SYSTEM_');
+
+    const getBandSongDisplay = (band: any): string => {
+      if (band.songs?.title) {
+        return band.songs.artist ? `${band.songs.artist} – ${band.songs.title}` : band.songs.title;
+      }
+      if (band.band_songs && band.band_songs.length > 0) {
+        const activeBs = band.band_songs.find((bs: any) => bs.status === 'active' || bs.status === 'ready' || bs.status === 'proposal') || band.band_songs[0];
+        const s = activeBs?.songs ? (Array.isArray(activeBs.songs) ? activeBs.songs[0] : activeBs.songs) : null;
+        if (s?.title) {
+          return s.artist ? `${s.artist} – ${s.title}` : s.title;
+        }
+      }
+      if (band.song_id && songs && songs.length > 0) {
+        const matched = songs.find((s: any) => s.id === band.song_id);
+        if (matched?.title) {
+          return matched.artist ? `${matched.artist} – ${matched.title}` : matched.title;
+        }
+      }
+      return 'Kein Song zugeordnet';
+    };
+
     const filteredBands = allBands.filter(band => {
+      if (!isRealBand(band)) return false;
       const matchesSearch = band.name.toLowerCase().includes(bandSearch.toLowerCase());
       const matchesLetter = !bandLetter || band.name.toUpperCase().startsWith(bandLetter);
       
@@ -466,8 +489,13 @@ export const AdminBandsView: React.FC<AdminBandsViewProps> = ({
                     onClick={async (e) => {
                       e.stopPropagation();
                       if(window.confirm(`Band "${band.name}" wirklich komplett auflösen?`)) {
-                        await supabase.from('bands').delete().eq('id', band.id);
-                        fetchData();
+                        try {
+                          await supabase.from('bands').delete().eq('id', band.id);
+                          fetchData();
+                        } catch (err: any) {
+                          console.error('[AdminBandsView] Fehler beim Auflösen der Band:', err);
+                          alert('Fehler beim Auflösen: ' + (err?.message || 'Unbekannter Fehler'));
+                        }
                       }
                     }}
                     aria-label={`Band ${band.name} auflösen`}
@@ -493,83 +521,178 @@ export const AdminBandsView: React.FC<AdminBandsViewProps> = ({
         {/* Right Column: Teacher Vocal Finder Widget */}
         <div style={{ width: '350px', background: '#f8fafc', borderRadius: '32px', padding: '24px', alignSelf: 'start', position: 'sticky', top: '24px', border: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center', color: activePlatform === 'groovelab' ? '#0f172a' : 'white' }}>
               <Mic size={20} />
             </div>
             <div>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: '#1e293b', margin: 0 }}>Vocal Finder</h3>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8' }}>Manuelle Sänger-Zuweisung</div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>Manuelle Sänger-Zuweisung</div>
             </div>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {allBands.filter(band => {
-              const members = band.band_members || [];
-              const vocalists = members.filter((m: any) => (m.instrument || '').toLowerCase().includes('vocal') || (m.instrument || '').toLowerCase().includes('gesang'));
-              return vocalists.length < 2;
-            }).slice(0, 5).map(band => (
-              <div key={band.id} style={{ background: 'white', padding: '20px', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
-                <div style={{ marginBottom: '12px' }}>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b' }}>{band.name}</div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>{band.songs?.title || 'No Song'}</div>
-                </div>
+            {(() => {
+              const realBandsList = allBands.filter(isRealBand);
+              const vocalFinderBands = realBandsList.filter(band => {
+                const members = band.band_members || [];
+                const vocalists = members.filter((m: any) => {
+                  const inst = (m.instrument || '').toLowerCase();
+                  return inst.includes('vocal') || inst.includes('gesang');
+                });
+                return vocalists.length < 2;
+              });
 
-                <div style={{ position: 'relative' }}>
-                  <button 
-                    onClick={() => setShowAddMember(showAddMember === band.id ? null : band.id)}
-                    style={{ width: '100%', padding: '10px', borderRadius: '12px', border: `1px solid ${brandColor}30`, background: `${brandColor}05`, color: brandColor, fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                  >
-                    <Plus size={14} /> Sänger hinzufügen
-                  </button>
+              if (realBandsList.length === 0) {
+                return (
+                  <div style={{ textAlign: 'center', padding: '32px 16px', background: 'white', borderRadius: '24px', border: '1px dashed #cbd5e1' }}>
+                    <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🎤</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', marginBottom: '4px' }}>Noch keine Bands gegründet</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.4 }}>Erstelle links eine Band, um hier Sänger und Stimmen zuzuweisen.</div>
+                  </div>
+                );
+              }
 
-                  {showAddMember === band.id && (
-                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'white', borderRadius: '16px', boxShadow: '0 10px 30px rgba(0,0,0,0.1)', border: '1px solid #f1f5f9', padding: '12px', zIndex: 100, marginTop: '8px', maxHeight: '250px', overflowY: 'auto' }}>
-                      <input 
-                        autoFocus
-                        placeholder="Musiker oder Externe suchen..." 
-                        value={memberSearch}
-                        onChange={e => setMemberSearch(e.target.value)}
-                        style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.8rem', marginBottom: '8px' }}
-                      />
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        {students.filter(s => `${s.first_name} ${s.last_name}`.toLowerCase().includes(memberSearch.toLowerCase())).map(s => (
-                          <button 
-                            key={s.id}
-                            onClick={async () => {
-                              await supabase.from('band_members').insert({ band_id: band.id, user_id: s.id, instrument: 'Vocals', role: 'member' });
-                              const activeProject = (band.band_songs || []).find((bs: any) => bs.status === 'ready' || bs.status === 'proposal');
-                              if (activeProject) {
-                                await supabase.from('band_song_slots').insert({ band_song_id: activeProject.id, user_id: s.id, instrument: 'Vocals', status: 'joined' });
-                              }
-                              setShowAddMember(null);
-                              setMemberSearch('');
-                              fetchData();
-                            }}
-                            style={{ width: '100%', padding: '8px', borderRadius: '8px', border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', textAlign: 'left' }}
-                            
-                            
-                          >
-                            <div style={{ width: '28px', height: '28px', borderRadius: '50%', overflow: 'hidden' }}>
-                              <img src={s.photo_url || '/avatar_ghost.jpg'} alt={`${s.first_name} Avatar`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            </div>
-                            <div>
-                              <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e293b' }}>{s.first_name} {maskLastName(s.last_name, showRealNames)}</div>
-                              {s.is_external_vocalist && <div style={{ fontSize: '0.6rem', color: brandColor, fontWeight: 700 }}>Externer Gesang</div>}
-                            </div>
-                          </button>
-                        ))}
+              if (vocalFinderBands.length === 0) {
+                return (
+                  <div style={{ textAlign: 'center', padding: '28px 16px', background: 'white', borderRadius: '24px', border: '1px solid #f1f5f9' }}>
+                    <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🎉</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', marginBottom: '4px' }}>Alle Bands sind besetzt!</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.4 }}>Jede Formation hat mindestens 2 Stimmen.</div>
+                  </div>
+                );
+              }
+
+              return vocalFinderBands.slice(0, 5).map(band => {
+                const members = band.band_members || [];
+                const vocalists = members.filter((m: any) => {
+                  const inst = (m.instrument || '').toLowerCase();
+                  return inst.includes('vocal') || inst.includes('gesang');
+                });
+                const existingVocalistNames = vocalists.map((v: any) => {
+                  const u = v.users ? (Array.isArray(v.users) ? v.users[0] : v.users) : null;
+                  return u?.first_name || v.external_name || '1 Sänger';
+                }).join(', ');
+
+                return (
+                  <div key={band.id} style={{ background: 'white', padding: '20px', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
+                    <div style={{ marginBottom: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '4px' }}>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{band.name}</div>
+                        {vocalists.length === 0 ? (
+                          <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: '8px', border: '1px solid #fde68a', whiteSpace: 'nowrap' }}>
+                            0/2 Gesang
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#0369a1', background: '#e0f2fe', padding: '2px 8px', borderRadius: '8px', border: '1px solid #bae6fd', whiteSpace: 'nowrap' }}>
+                            1/2 Gesang
+                          </span>
+                        )}
                       </div>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b' }}>{getBandSongDisplay(band)}</div>
+                      {vocalists.length === 1 && (
+                        <div style={{ fontSize: '0.7rem', color: '#0369a1', marginTop: '4px', fontWeight: 600 }}>
+                          2. Stimme gesucht (Besetzt: {existingVocalistNames})
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              </div>
-            ))}
-            {allBands.filter(band => {
-              const vocalists = (band.band_members || []).filter((m: any) => (m.instrument || '').toLowerCase().includes('vocal'));
-              return vocalists.length < 2;
-            }).length === 0 && (
-              <div style={{ textAlign: 'center', padding: '20px', color: '#94a3b8', fontSize: '0.8rem' }}>Alle Bands sind stimmlich besetzt! 🎉</div>
-            )}
+
+                    <div style={{ position: 'relative' }}>
+                      <button 
+                        type="button"
+                        onClick={() => setShowAddMember(showAddMember === band.id ? null : band.id)}
+                        aria-label={`Sänger zu Band ${band.name} hinzufügen`}
+                        style={{ 
+                          width: '100%', 
+                          padding: '10px', 
+                          borderRadius: '12px', 
+                          border: `1px solid ${activePlatform === 'groovelab' ? '#ca8a04' : brandColor}`, 
+                          background: activePlatform === 'groovelab' ? '#fefce8' : `${brandColor}08`, 
+                          color: activePlatform === 'groovelab' ? '#854d0e' : brandColor, 
+                          fontSize: '0.75rem', 
+                          fontWeight: 800, 
+                          cursor: 'pointer', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          gap: '6px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <Plus size={14} /> Sänger hinzufügen
+                      </button>
+
+                      {showAddMember === band.id && (
+                        <div 
+                          style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'white', borderRadius: '16px', boxShadow: '0 10px 30px rgba(0,0,0,0.12)', border: '1px solid #e2e8f0', padding: '12px', zIndex: 100, marginTop: '8px', maxHeight: '250px', overflowY: 'auto' }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') {
+                              setShowAddMember(null);
+                            }
+                          }}
+                        >
+                          <input 
+                            autoFocus
+                            aria-label="Musiker oder Externe suchen"
+                            placeholder="Musiker oder Externe suchen..." 
+                            value={memberSearch}
+                            onChange={e => setMemberSearch(e.target.value)}
+                            style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.8rem', marginBottom: '8px' }}
+                          />
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            {students.filter(s => `${s.first_name} ${s.last_name}`.toLowerCase().includes(memberSearch.toLowerCase())).map(s => (
+                              <button 
+                                key={s.id}
+                                type="button"
+                                aria-label={`${s.first_name} ${maskLastName(s.last_name, showRealNames)} als Sänger zuweisen`}
+                                onClick={async () => {
+                                  try {
+                                    await supabase.from('band_members').insert({ band_id: band.id, user_id: s.id, instrument: 'Vocals', role: 'member' });
+                                    const activeProject = (band.band_songs || []).find((bs: any) => bs.status === 'active' || bs.status === 'ready' || bs.status === 'proposal');
+                                    if (activeProject) {
+                                      const { data: existingSlots } = await supabase
+                                        .from('band_song_slots')
+                                        .select('part_number')
+                                        .eq('band_song_id', activeProject.id)
+                                        .eq('instrument', 'Vocals');
+                                      
+                                      const maxPart = (existingSlots || []).reduce((max: number, slot: any) => Math.max(max, slot.part_number || 1), 0);
+                                      const nextPartNumber = maxPart > 0 ? maxPart + 1 : 1;
+
+                                      await supabase.from('band_song_slots').insert({ 
+                                        band_song_id: activeProject.id, 
+                                        user_id: s.id, 
+                                        instrument: 'Vocals', 
+                                        part_number: nextPartNumber,
+                                        status: 'joined' 
+                                      });
+                                    }
+                                    setShowAddMember(null);
+                                    setMemberSearch('');
+                                    await fetchData();
+                                  } catch (err: any) {
+                                    console.error('[AdminBandsView] Fehler beim Hinzufügen des Sängers:', err);
+                                    alert('Fehler beim Hinzufügen: ' + (err?.message || 'Unbekannter Fehler'));
+                                  }
+                                }}
+                                style={{ width: '100%', padding: '8px', borderRadius: '8px', border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', textAlign: 'left' }}
+                              >
+                                <div style={{ width: '28px', height: '28px', borderRadius: '50%', overflow: 'hidden' }}>
+                                  <img src={s.photo_url || '/avatar_ghost.jpg'} alt={`${s.first_name} Avatar`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#1e293b' }}>{s.first_name} {maskLastName(s.last_name, showRealNames)}</div>
+                                  {s.is_external_vocalist && <div style={{ fontSize: '0.6rem', color: activePlatform === 'groovelab' ? '#854d0e' : brandColor, fontWeight: 700 }}>Externer Gesang</div>}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              });
+            })()}
           </div>
         </div>
         </div>

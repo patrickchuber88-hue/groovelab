@@ -1054,7 +1054,7 @@ export function useSecretaryDashboardData(options: UseSecretaryDashboardDataOpti
           supabase.from('rooms').select('*').eq('school_id', schoolId),
           supabase.from('buildings').select('*').eq('school_id', schoolId),
           supabase.from('school_equipment').select('*').eq('school_id', schoolId).order('name'),
-          supabase.from('stations').select('*, rooms!inner(*)').eq('rooms.school_id', schoolId),
+          supabase.from('stations').select('*, rooms!stations_room_id_fkey!inner(*)').eq('rooms.school_id', schoolId),
           Promise.resolve(supabase.from('bands').select('*').eq('school_id', schoolId)).catch(() => ({ data: [], error: null })),
           supabase.from('system_alerts').select('*').eq('school_id', schoolId).order('created_at', { ascending: false }),
           Promise.resolve(supabase.from('sessions').select('*, users!inner(*), stations(*)').is('check_out_time', null).eq('users.school_id', schoolId)).catch(() => ({ data: [], error: null })),

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
+import { logApplicationAudit } from '../../../services/auditLogService';
 import type { School, SchoolStat, PendingUser } from '../MasterAdminTypes';
 
 interface UseMasterAdminSchoolsOptions {
@@ -368,20 +369,21 @@ export function useMasterAdminSchools({ onNotify, onRefreshMetrics }: UseMasterA
 
       // Transparent audit logging for the target school (DSGVO Art. 28)
       try {
-        await supabase.from('audit_logs').insert({
-          school_id: school.id,
+        await logApplicationAudit({
+          schoolId: school.id,
           action: 'SUPPORT_GHOST_SESSION_STARTED',
-          user_id: targetUserId || null,
+          tableName: 'schools',
+          recordId: targetUserId || school.id,
           details: {
             reason: reasonStr,
             initiated_by: 'Platform Master Admin Leitstand',
             auth_method: 'GOOGLE_AUTHENTICATOR_TOTP',
-            timestamp: new Date().toISOString()
           }
         });
       } catch (e) {
         console.warn('[Ghost] School transparency audit log insert error:', e);
       }
+
 
       const userParam = targetUserId ? `&ghost_user_id=${targetUserId}` : '';
       const tokenParam = ghostToken ? `&ghost_lease_token=${ghostToken}` : '';

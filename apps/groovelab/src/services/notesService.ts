@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { isUUID } from '../utils/uuidValidator';
+import { logApplicationAudit } from './auditLogService';
 
 export interface UserNote {
   id: string;
@@ -180,19 +181,19 @@ export const logNoteAudit = async (
   details: Record<string, any>
 ) => {
   try {
-    const sId = isUUID(schoolId) ? schoolId : undefined;
-    const uId = isUUID(userId) ? userId : undefined;
-    if (sId && uId) {
-      await supabase.from('audit_logs').insert({
+    const sId = isUUID(schoolId) ? String(schoolId) : undefined;
+    const nId = isUUID(noteId) ? String(noteId) : undefined;
+    if (sId) {
+      await logApplicationAudit({
         action,
-        school_id: sId,
-        user_id: uId,
-        entity_type: 'user_note',
-        entity_id: noteId,
+        schoolId: sId,
+        tableName: 'user_notes',
+        recordId: nId || null,
         details: {
           ...details,
-          timestamp: new Date().toISOString()
-        }
+          target_user_id: userId,
+          note_id: noteId,
+        },
       });
     }
   } catch (err) {
@@ -200,6 +201,7 @@ export const logNoteAudit = async (
     console.warn('Silent note audit log notice:', err);
   }
 };
+
 
 // 🏛️ Checkliste Parser (Mehrzeilig, Semikolon-getrennt oder Inline mit Bindestrich)
 export const parseChecklistText = (text: string): { isChecklist: boolean; items: Array<{ id: string; text: string; completed: boolean }> } => {

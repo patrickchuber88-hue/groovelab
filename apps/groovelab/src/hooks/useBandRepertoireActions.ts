@@ -1,5 +1,6 @@
 import React, { useCallback, useRef } from 'react';
 import { normalizeInstrument } from '../utils/instruments';
+import type { ToastMessage } from './useCampusPracticeSearchAndPdfSuite';
 
 export interface UseBandRepertoireActionsParams {
   user: any;
@@ -28,6 +29,7 @@ export interface UseBandRepertoireActionsParams {
   dismissSuggestion?: (skillId: string) => void;
   showConfetti?: any;
   setShowConfetti?: React.Dispatch<React.SetStateAction<any>>;
+  setToastMessage?: React.Dispatch<React.SetStateAction<ToastMessage | null>> | ((toast: ToastMessage | null) => void);
 }
 
 export function useBandRepertoireActions({
@@ -56,10 +58,19 @@ export function useBandRepertoireActions({
   exclusiveProposal = true,
   dismissSuggestion,
   showConfetti,
-  setShowConfetti
+  setShowConfetti,
+  setToastMessage
 }: UseBandRepertoireActionsParams) {
   const localIgnoredRef = useRef<string[]>([]);
   const ignoredFoundingIds = externalIgnoredFoundingIds || localIgnoredRef;
+
+  const notify = useCallback((text: string, type: 'success' | 'error' | 'info' = 'info') => {
+    if (setToastMessage) {
+      setToastMessage({ text, type });
+    } else if (typeof window !== 'undefined') {
+      alert(text);
+    }
+  }, [setToastMessage]);
 
   const updateProgress = useCallback(async (
     skillId: string, 
@@ -186,7 +197,7 @@ export function useBandRepertoireActions({
       setFoundingName('');
       fetchDashboardData(user.id);
     } catch (err: any) {
-      alert('Fehler beim Speichern des Bandnamens: ' + err.message);
+      notify('Fehler beim Speichern des Bandnamens: ' + err.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -447,7 +458,7 @@ export function useBandRepertoireActions({
       
     } catch (err: any) {
       console.error('[Founding] Error during band creation:', err);
-      alert('Fehler bei der Gateway-Eröffnung: ' + err.message);
+      notify('Fehler bei der Gateway-Eröffnung: ' + err.message, 'error');
     } finally {
       console.log('[Founding] Finishing process, clearing loading state.');
       setLoading(false);
@@ -501,7 +512,7 @@ export function useBandRepertoireActions({
 
       if (error) throw error;
 
-      alert('Du bist jetzt offizielles Mitglied! 🤘');
+      notify('Du bist jetzt offizielles Mitglied! 🤘', 'success');
       fetchDashboardData(user.id);
       
       // Update local state to reflect acceptance
@@ -524,7 +535,7 @@ export function useBandRepertoireActions({
         });
       }
     } catch (err: any) {
-      alert('Fehler beim Beitreten: ' + err.message);
+      notify('Fehler beim Beitreten: ' + err.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -583,7 +594,7 @@ export function useBandRepertoireActions({
       setPendingFounding(null);
       fetchDashboardData(user.id);
     } catch (err: any) {
-      alert('Fehler beim Ablehnen: ' + err.message);
+      notify('Fehler beim Ablehnen: ' + err.message, 'error');
     }
   }, [pendingFounding, user, ignoredFoundingIds, supabase, setShowFoundingModal, setPendingFounding, fetchDashboardData]);
 
@@ -636,17 +647,17 @@ export function useBandRepertoireActions({
       const { error: bsErr } = await supabase.from('band_songs').update({ band_id: band.id, status: 'active' }).eq('id', pendingFounding.id);
       if (bsErr) throw bsErr;
       
-      alert(`Glückwunsch! Die Band "${finalName}" wurde erfolgreich gegründet! 🚀🎸`);
+      notify(`Glückwunsch! Die Band "${finalName}" wurde erfolgreich gegründet! 🚀🎸`, 'success');
       setShowFoundingModal(false);
       setPendingFounding(null);
       setFoundingName('');
       fetchDashboardData(user.id);
     } catch (err: any) {
-      alert('Fehler bei der Gründung: ' + err.message);
+      notify('Fehler bei der Gründung: ' + err.message, 'error');
     } finally {
       setLoading(false);
     }
-  }, [pendingFounding, user, foundingName, supabase, setShowFoundingModal, setPendingFounding, setFoundingName, fetchDashboardData, setLoading]);
+  }, [pendingFounding, user, foundingName, supabase, setShowFoundingModal, setPendingFounding, setFoundingName, fetchDashboardData, setLoading, notify]);
 
   const handleDeleteSong = useCallback(async (songId: string) => {
     console.log('Attempting to delete song:', songId, 'for user:', loggedInUserId);
@@ -661,7 +672,7 @@ export function useBandRepertoireActions({
       console.log('Delete successful');
       if (loggedInUserId) await fetchDashboardData(loggedInUserId);
     } catch (e: any) {
-      alert('Fehler beim Löschen: ' + e.message);
+      notify('Fehler beim Löschen: ' + e.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -676,7 +687,7 @@ export function useBandRepertoireActions({
       const instrumentsToAdd = Object.keys(req).filter(inst => req[inst] > 0);
       
       if (instrumentsToAdd.length === 0) {
-        alert('Dieser Song hat keine Instrumente hinterlegt.');
+        notify('Dieser Song hat keine Instrumente hinterlegt.', 'error');
         setLoading(false);
         return;
       }
@@ -705,7 +716,7 @@ export function useBandRepertoireActions({
       
       if (error) {
         if (error.code === '23505') {
-          alert('Dieser Song ist bereits in deinem Repertoire!');
+          notify('Dieser Song ist bereits in deinem Repertoire!', 'info');
         } else {
           throw error;
         }
@@ -714,11 +725,11 @@ export function useBandRepertoireActions({
         setActiveStudentTab('practice');
       }
     } catch (err: any) {
-      alert('Fehler: ' + err.message);
+      notify('Fehler: ' + err.message, 'error');
     } finally {
       setLoading(false);
     }
-  }, [loggedInUserId, supabase, fetchDashboardData, setActiveStudentTab, setLoading]);
+  }, [loggedInUserId, supabase, fetchDashboardData, setActiveStudentTab, setLoading, notify]);
 
   const handleSubmitForApproval = useCallback(async (skill: any) => {
     if (!loggedInUserId || !user) return;
@@ -785,14 +796,14 @@ export function useBandRepertoireActions({
       }
 
       if (loggedInUserId) await fetchDashboardData(loggedInUserId);
-      alert('Challenge eingereicht! Dein Lehrer hat eine Benachrichtigung erhalten.');
+      notify('Challenge eingereicht! Dein Lehrer hat eine Benachrichtigung erhalten.', 'success');
 
     } catch (e: any) {
-      alert('Einreichungs-Fehler: ' + e.message);
+      notify('Einreichungs-Fehler: ' + e.message, 'error');
     } finally {
       setLoading(false);
     }
-  }, [loggedInUserId, user, supabase, fetchDashboardData, setLoading]);
+  }, [loggedInUserId, user, supabase, fetchDashboardData, setLoading, notify]);
 
   const handleSuggestToBand = useCallback(async (bandId: string, skill: any) => {
     try {
@@ -812,7 +823,7 @@ export function useBandRepertoireActions({
 
       if (bsErr) {
         if (bsErr.code === '23505') {
-          alert('Dieser Song wurde bereits für diese Band vorgeschlagen oder ist bereits im Repertoire.');
+          notify('Dieser Song wurde bereits für diese Band vorgeschlagen oder ist bereits im Repertoire.', 'info');
         } else {
           throw bsErr;
         }
@@ -855,7 +866,7 @@ export function useBandRepertoireActions({
           content: `Ich habe die Challenge für "${skill.songs?.title || skill.title}" gemeistert und den Song für unsere Band vorgeschlagen! Wer ist dabei? 🎸🚀`
         });
 
-        alert('Song erfolgreich vorgeschlagen! Deine Bandmitglieder wurden benachrichtigt.');
+        notify('Song erfolgreich vorgeschlagen! Deine Bandmitglieder wurden benachrichtigt.', 'success');
       } else {
         await supabase.from('band_songs').update({ status: 'active' }).eq('id', bsData.id);
         await supabase.from('band_shoutbox').insert({
@@ -863,16 +874,16 @@ export function useBandRepertoireActions({
           user_id: user.id,
           content: `🔥 Juhu! Wir haben "${song?.title || skill.songs?.title || skill.title}" vollständig besetzt und gemeistert! Der Song ist ab sofort in unserem Repertoire!`
         });
-        alert('Song wurde zu deinem Repertoire in dieser Band hinzugefügt.');
+        notify('Song wurde zu deinem Repertoire in dieser Band hinzugefügt.', 'success');
       }
       
       if (dismissSuggestion) dismissSuggestion(skill.id);
       fetchDashboardData(user.id);
     } catch (err: any) {
       console.error('[SuggestToBand] Error:', err);
-      alert('Fehler beim Vorschlagen des Songs: ' + (err.message || 'Unbekannter Fehler'));
+      notify('Fehler beim Vorschlagen des Songs: ' + (err.message || 'Unbekannter Fehler'), 'error');
     }
-  }, [user, exclusiveProposal, globalSongs, dismissSuggestion, supabase, fetchDashboardData]);
+  }, [user, exclusiveProposal, globalSongs, dismissSuggestion, supabase, fetchDashboardData, notify]);
 
   const clearConfetti = useCallback(async () => {
     if (!showConfetti) return;

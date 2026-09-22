@@ -26,8 +26,8 @@ import {
 interface MobileBottomNavProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
-  activePlatform: 'campus' | 'groovelab' | 'admin';
-  setActivePlatform: (platform: 'campus' | 'groovelab' | 'admin') => void;
+  activePlatform: 'campus' | 'groovelab' | 'admin' | string;
+  setActivePlatform: (platform: any) => void;
   userRole?: string;
   hasCampusActive?: boolean;
   hasGrooveLabActive?: boolean;
@@ -53,8 +53,8 @@ const isBoardAllowedForStudent = (boardId: string, level: string, isParentUnlock
   }
 
   if (level === 'junior') {
-    // Junior defaults: Briefing, Homework Book, Practice Board (Übe-Pfad), Events (Termine), Settings
-    const juniorAllowed = ['briefing', 'homework_book', 'practice_board', 'events', 'settings'];
+    // Junior defaults: Campus (Briefing, Aufgaben, Übe-Pfad, Termine, Settings) + GrooveLab (Live Lab, Üben, Bibliothek, Repertoire)
+    const juniorAllowed = ['briefing', 'homework_book', 'practice_board', 'events', 'settings', 'live', 'practice', 'library', 'repertoire'];
     return juniorAllowed.includes(boardId);
   }
 
@@ -393,7 +393,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px', textAlign: 'center' }}>
                   Modul wechseln
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
                   <button
                     type="button"
                     onClick={() => {
@@ -401,25 +401,25 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                       setDrawerOpen(false);
                     }}
                     style={{
-                      padding: '10px 8px',
+                      padding: '10px 6px',
                       borderRadius: '14px',
                       border: activePlatform === 'campus' ? '2px solid #34a853' : '1px solid transparent',
                       background: activePlatform === 'campus' ? '#34a853' : '#ffffff',
                       color: activePlatform === 'campus' ? '#ffffff' : '#64748b',
                       fontWeight: 800,
-                      fontSize: '0.82rem',
+                      fontSize: '0.78rem',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '6px',
+                      gap: '4px',
                       transition: 'all 0.2s',
                       touchAction: 'manipulation',
                       boxShadow: activePlatform === 'campus' ? '0 3px 10px rgba(52, 168, 83, 0.25)' : 'none'
                     }}
                     className="hover-scale"
                   >
-                    <GraduationCap size={16} /> Campus
+                    <GraduationCap size={15} /> Campus
                   </button>
 
                   <button
@@ -429,25 +429,25 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                       setDrawerOpen(false);
                     }}
                     style={{
-                      padding: '10px 8px',
+                      padding: '10px 6px',
                       borderRadius: '14px',
                       border: activePlatform === 'groovelab' ? '2px solid #eab308' : '1px solid transparent',
                       background: activePlatform === 'groovelab' ? '#eab308' : '#ffffff',
                       color: activePlatform === 'groovelab' ? '#ffffff' : '#64748b',
                       fontWeight: 800,
-                      fontSize: '0.82rem',
+                      fontSize: '0.78rem',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '6px',
+                      gap: '4px',
                       transition: 'all 0.2s',
                       touchAction: 'manipulation',
                       boxShadow: activePlatform === 'groovelab' ? '0 3px 10px rgba(234, 179, 8, 0.25)' : 'none'
                     }}
                     className="hover-scale"
                   >
-                    <Music size={16} /> GrooveLab
+                    <Music size={15} /> Groove
                   </button>
                 </div>
               </div>

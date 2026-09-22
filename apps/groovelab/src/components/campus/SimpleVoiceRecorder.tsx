@@ -198,7 +198,7 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
 
       // 🛡️ Keller-Resilienz: Wenn offline, sofort im lokalen IndexedDB-Tresor puffern
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
-        await saveOfflineAudioRecord({
+        const offlineRec = await saveOfflineAudioRecord({
           blob: blobToUpload,
           mimeType: contentType,
           durationSeconds: recordingDuration,
@@ -207,11 +207,11 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
           context: 'voice_memo',
           title: topicName || 'Übeaufnahme'
         });
-        const localBlobUrl = URL.createObjectURL(blobToUpload);
+        const canonicalOfflineUrl = `offline://${offlineRec.id}`;
         setIsOfflineSaved(true);
         setUploadSuccess(true);
-        if (onRecordingComplete) onRecordingComplete(localBlobUrl);
-        if (onAudioSaved) onAudioSaved(localBlobUrl);
+        if (onRecordingComplete) onRecordingComplete(canonicalOfflineUrl);
+        if (onAudioSaved) onAudioSaved(canonicalOfflineUrl);
         return;
       }
 
@@ -241,7 +241,7 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
       } catch (uploadErr) {
         // Ausweichpfad bei Netzwerkabbruch während des Uploads: Verlustfreies Sichern im Tresor
         console.warn('[SimpleVoiceRecorder] Cloud-Upload fehlgeschlagen, speichere im lokalen Audio-Tresor:', uploadErr);
-        await saveOfflineAudioRecord({
+        const offlineRec = await saveOfflineAudioRecord({
           blob: blobToUpload,
           mimeType: contentType,
           durationSeconds: recordingDuration,
@@ -250,11 +250,11 @@ export const SimpleVoiceRecorder: React.FC<SimpleVoiceRecorderProps> = ({
           context: 'voice_memo',
           title: topicName || 'Übeaufnahme'
         });
-        const localBlobUrl = URL.createObjectURL(blobToUpload);
+        const canonicalOfflineUrl = `offline://${offlineRec.id}`;
         setIsOfflineSaved(true);
         setUploadSuccess(true);
-        if (onRecordingComplete) onRecordingComplete(localBlobUrl);
-        if (onAudioSaved) onAudioSaved(localBlobUrl);
+        if (onRecordingComplete) onRecordingComplete(canonicalOfflineUrl);
+        if (onAudioSaved) onAudioSaved(canonicalOfflineUrl);
       }
     } catch (e) {
       console.error('Critical audio save error:', e);

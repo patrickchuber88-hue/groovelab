@@ -1974,25 +1974,6 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                         ) : (
                           <div style={{ minWidth: '800px', position: 'relative' }}>
                             
-                            {/* Closed notification overlay */}
-                            {(() => {
-                              const dayKeys = ['', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-                              const liveHours = openingHours?.[dayKeys[liveViewDay]];
-                              const isLiveClosed = liveHours?.active === false;
-                              if (isLiveClosed) {
-                                return (
-                                  <div style={{ background: '#fef2f2', border: '1.5px solid #fee2e2', color: '#ef4444', padding: '16px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-                                    <AlertCircle size={20} />
-                                    <div>
-                                      <strong style={{ fontSize: '0.88rem', display: 'block', fontWeight: 800 }}>Groovelab geschlossen</strong>
-                                      <span style={{ fontSize: '0.78rem', opacity: 0.9, fontWeight: 600 }}>Das Groovelab ist am {['','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'][liveViewDay]} geschlossen. (Die hier gezeigten Timelines gelten für Groovelab-Räume)</span>
-                                    </div>
-                                  </div>
-                                );
-                              }
-                              return null;
-                            })()}
-                            
                             {/* Hour Header Bar */}
                             <div style={{ display: 'flex', marginBottom: '16px', borderBottom: '2px solid #f1f5f9', paddingBottom: '10px' }}>
                               <div style={{ width: '180px', flexShrink: 0, fontSize: '0.72rem', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Raum</div>
@@ -2015,12 +1996,17 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                   roomAllocations.some(p2 => p1.id !== p2.id && p1.startTime < p2.endTime && p2.startTime < p1.endTime)
                                 );
 
+                                const isGroovelabRoom = (room.name || '').toLowerCase().includes('groovelab') || (room.name || '').toLowerCase().includes('band') || room.is_groovelab_active === true;
+                                const dayKeys = ['', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+                                const liveHours = openingHours?.[dayKeys[liveViewDay]];
+                                const isGroovelabActiveToday = isGroovelabRoom && liveHours?.active === true && !!liveHours?.start && !!liveHours?.end;
+
                                 return (
                                   <div key={room.id} style={{ display: 'flex', alignItems: 'center', minHeight: '64px', paddingBottom: '8px', borderBottom: '1px solid #f8fafc' }}>
                                     
-                                    {/* Left info box */}
-                                    <div style={{ width: '180px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    {/* Left info box: 1% Goldstandard Dual-Layer Room Identity */}
+                                    <div style={{ width: '180px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                                         <strong style={{ fontSize: '0.85rem', color: '#1e293b', fontWeight: 800 }}>
                                           {room.name}
                                           {rooms.filter((r: any) => r.name === room.name).length > 1 && (
@@ -2036,11 +2022,75 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                         )}
                                       </div>
 
-                                      
+                                      {/* Smart Dual-Layer Room Badge */}
+                                      {isGroovelabRoom ? (
+                                        isGroovelabActiveToday ? (
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '1px' }}>
+                                            <span style={{
+                                              fontSize: '0.61rem',
+                                              fontWeight: 800,
+                                              background: '#fef9c3',
+                                              color: '#0f172a',
+                                              border: '1px solid #fde047',
+                                              borderRadius: '6px',
+                                              padding: '1px 6px',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '4px'
+                                            }} title={`GrooveLab Bandbetrieb (${liveHours.start}–${liveHours.end}). Außerhalb dieser Zeiten voll für Campus-Unterricht nutzbar.`}>
+                                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#eab308', display: 'inline-block' }} />
+                                              GrooveLab {liveHours.start}–{liveHours.end}
+                                            </span>
+                                          </div>
+                                        ) : (
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', marginTop: '1px' }}>
+                                            <span style={{
+                                              fontSize: '0.61rem',
+                                              fontWeight: 800,
+                                              background: '#e6f4ea',
+                                              color: '#137333',
+                                              border: '1px solid #b7e1cd',
+                                              borderRadius: '6px',
+                                              padding: '1px 6px',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '4px',
+                                              width: 'fit-content'
+                                            }} title="GrooveLab-Betrieb ruht: Der Raum ist zu 100% frei für regulären Campus-Unterricht, Ensembles, Schlagzeug und Spontanbuchungen.">
+                                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34a853', display: 'inline-block' }} />
+                                              Frei für Campus-Unterricht
+                                            </span>
+                                            <span style={{ fontSize: '0.6rem', color: '#64748b', fontWeight: 600, letterSpacing: '-0.01em' }}>
+                                              Akustik- & Bandraum
+                                            </span>
+                                          </div>
+                                        )
+                                      ) : (
+                                        <span style={{ fontSize: '0.62rem', color: '#94a3b8', fontWeight: 600 }}>
+                                          {room.building_name || room.location || 'Unterrichtsraum'}
+                                        </span>
+                                      )}
                                     </div>
 
-                                    {/* Right timeline grid area */}
-                                    <div style={{ flex: 1, height: '52px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #f1f5f9', position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)' }}>
+                                    {/* Right timeline grid area with click-to-book */}
+                                    <div 
+                                      onClick={(e) => {
+                                        if (e.target === e.currentTarget) {
+                                          const rect = e.currentTarget.getBoundingClientRect();
+                                          const clickX = e.clientX - rect.left;
+                                          const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+                                          const clickedMins = 13 * 60 + Math.round(ratio * 480);
+                                          const h = Math.floor(clickedMins / 60);
+                                          const m = Math.floor((clickedMins % 60) / 15) * 15;
+                                          const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                                          setAdHocRoomId(room.id);
+                                          setAdHocStartTime(timeStr);
+                                          setShowAdHocBooking(true);
+                                        }
+                                      }}
+                                      style={{ flex: 1, height: '52px', background: '#f8fafc', borderRadius: '16px', border: '1px solid #f1f5f9', position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)', cursor: 'pointer' }}
+                                      title="Klicke auf eine freie Stelle, um eine Spontanbelegung für diesen Raum zu buchen"
+                                    >
                                       
                                       {/* Visual Hour Grid lines */}
                                       <div style={{ position: 'absolute', inset: 0, display: 'flex', justifyContent: 'space-between', pointerEvents: 'none', paddingLeft: '20px', paddingRight: '20px' }}>
@@ -2049,16 +2099,9 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                         ))}
                                       </div>
 
-                                      {/* Inactive/Closed Zone Overlays */}
+                                      {/* Subtle GrooveLab Operating Window Indicator (Only during active band hours) */}
                                       {(() => {
-                                        // Only show inactive overlays for GrooveLab rooms
-                                        const isGroovelabRoom = room.name.toLowerCase().includes('groovelab');
-                                        if (!isGroovelabRoom) return null;
-
-                                        const dayKeys = ['', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-                                        const liveHours = openingHours?.[dayKeys[liveViewDay]];
-                                        if (!liveHours || liveHours.active === false) return null;
-                                        if (!liveHours.start || !liveHours.end) return null;
+                                        if (!isGroovelabRoom || !isGroovelabActiveToday || !liveHours?.start || !liveHours?.end) return null;
 
                                         const tToM = (t: string) => {
                                           const [h, m] = t.split(':').map(Number);
@@ -2069,55 +2112,35 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                         const endMin = tToM(liveHours.end);
 
                                         // Timeline is 13:00 (780 mins) to 21:00 (1260 mins). Duration 480 mins.
-                                        const leftZoneWidth = Math.max(0, Math.min(100, ((startMin - 780) / 480) * 100));
-                                        const rightZoneLeft = Math.max(0, Math.min(100, ((endMin - 780) / 480) * 100));
-                                        const rightZoneWidth = 100 - rightZoneLeft;
+                                        const glLeft = Math.max(0, Math.min(100, ((startMin - 780) / 480) * 100));
+                                        const glWidth = Math.max(0, Math.min(100 - glLeft, ((endMin - startMin) / 480) * 100));
+
+                                        if (glWidth <= 0) return null;
 
                                         return (
-                                          <>
-                                            {leftZoneWidth > 0 && (
-                                              <div style={{
-                                                position: 'absolute',
-                                                left: 0,
-                                                top: 0,
-                                                bottom: 0,
-                                                width: `${leftZoneWidth}%`,
-                                                background: 'repeating-linear-gradient(45deg, rgba(241,245,249,0.5), rgba(241,245,249,0.5) 5px, rgba(226,232,240,0.5) 5px, rgba(226,232,240,0.5) 10px)',
-                                                borderRight: '1px solid rgba(203,213,225,0.4)',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                color: '#94a3b8',
-                                                fontSize: '0.62rem',
-                                                fontWeight: 800,
-                                                pointerEvents: 'none',
-                                                zIndex: 1
-                                              }}>
-                                                Geschlossen
-                                              </div>
-                                            )}
-                                            {rightZoneWidth > 0 && (
-                                              <div style={{
-                                                position: 'absolute',
-                                                left: `${rightZoneLeft}%`,
-                                                top: 0,
-                                                bottom: 0,
-                                                width: `${rightZoneWidth}%`,
-                                                background: 'repeating-linear-gradient(45deg, rgba(241,245,249,0.5), rgba(241,245,249,0.5) 5px, rgba(226,232,240,0.5) 5px, rgba(226,232,240,0.5) 10px)',
-                                                borderLeft: '1px solid rgba(203,213,225,0.4)',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                color: '#94a3b8',
-                                                fontSize: '0.62rem',
-                                                fontWeight: 800,
-                                                pointerEvents: 'none',
-                                                zIndex: 1
-                                              }}>
-                                                Geschlossen
-                                              </div>
-                                            )}
-                                          </>
+                                          <div
+                                            style={{
+                                              position: 'absolute',
+                                              left: `${glLeft}%`,
+                                              width: `${glWidth}%`,
+                                              top: '2px',
+                                              bottom: '2px',
+                                              background: 'rgba(254, 240, 138, 0.15)',
+                                              border: '1.5px dashed rgba(234, 179, 8, 0.4)',
+                                              borderRadius: '10px',
+                                              pointerEvents: 'none',
+                                              zIndex: 0,
+                                              display: 'flex',
+                                              alignItems: 'flex-start',
+                                              justifyContent: 'flex-end',
+                                              padding: '2px 6px'
+                                            }}
+                                            title={`GrooveLab Bandbetriebsfenster: ${liveHours.start}–${liveHours.end} Uhr`}
+                                          >
+                                            <span style={{ fontSize: '0.55rem', fontWeight: 800, color: '#a16207', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                                              GrooveLab Kernzeit
+                                            </span>
+                                          </div>
                                         );
                                       })()}
 
@@ -2187,10 +2210,51 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                                         );
                                       })}
 
+                                      {/* Interactive 1% Goldstandard Free Slot Trigger */}
                                       {roomAllocations.length === 0 && (
-                                        <div style={{ width: '100%', textAlign: 'center', fontSize: '0.67rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.02em' }}>
-                                          ☕ Frei · Keine Zuweisungen
-                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setAdHocRoomId(room.id);
+                                            setAdHocStartTime('14:00');
+                                            setShowAdHocBooking(true);
+                                          }}
+                                          style={{
+                                            width: '100%',
+                                            height: '100%',
+                                            background: 'transparent',
+                                            border: 'none',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '8px',
+                                            cursor: 'pointer',
+                                            borderRadius: '12px',
+                                            transition: 'all 0.15s ease',
+                                            padding: '0 12px',
+                                            outline: 'none'
+                                          }}
+                                          className="hover-scale-mini"
+                                          title={`${room.name} ist frei. Klicke hier, um eine Spontanbelegung oder Unterrichtsstunde einzubuchen.`}
+                                          aria-label={`${room.name} ist frei. Klicke für Spontanbelegung.`}
+                                        >
+                                          <span style={{
+                                            fontSize: '0.72rem',
+                                            fontWeight: 700,
+                                            color: isGroovelabRoom ? '#15803d' : '#64748b',
+                                            background: isGroovelabRoom ? '#dcfce7' : 'rgba(0,0,0,0.03)',
+                                            border: isGroovelabRoom ? '1px solid #bbf7d0' : '1px solid rgba(0,0,0,0.05)',
+                                            padding: '4px 12px',
+                                            borderRadius: '20px',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '6px'
+                                          }}>
+                                            <span>☕ Frei · {isGroovelabRoom ? 'Für Campus-Unterricht verfügbar' : 'Keine Zuweisungen'}</span>
+                                            <span style={{ fontSize: '0.64rem', fontWeight: 800, color: isGroovelabRoom ? '#166534' : '#34a853', opacity: 0.9 }}>+ Belegung buchen</span>
+                                          </span>
+                                        </button>
                                       )}
                                     </div>
 
@@ -2729,7 +2793,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                         <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
                           <button
                             type="submit"
-                            style={{ flex: 1.5, background: '#ea4335', color: 'white', border: 'none', padding: '14px', borderRadius: '14px', fontSize: '0.85rem', fontWeight: 900, cursor: 'pointer', boxShadow: '0 4px 14px rgba(234,67,53,0.3)' }}
+                            style={{ flex: 1.5, background: 'linear-gradient(135deg, #34a853 0%, #2e944b 100%)', color: 'white', border: 'none', padding: '14px', borderRadius: '14px', fontSize: '0.85rem', fontWeight: 900, cursor: 'pointer', boxShadow: '0 4px 14px rgba(52,168,83,0.25)', transition: 'all 0.15s' }}
                           >
                             Einbuchen ⚡
                           </button>
@@ -2739,7 +2803,7 @@ export const SecretaryCampusTab: React.FC<SecretaryCampusTabProps> = ({
                               setShowAdHocBooking(false);
                               setAdHocStudentName('');
                             }}
-                            style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '14px', borderRadius: '14px', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer' }}
+                            style={{ flex: 1, background: '#f1f5f9', color: '#64748b', border: 'none', padding: '14px', borderRadius: '14px', fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' }}
                           >
                             Abbrechen
                           </button>

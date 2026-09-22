@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase, deleteUserStorageAssets } from '../../lib/supabase';
 import { areArraysEqualFast, areObjectsEqualFast } from '../../utils/fastCompare';
 import { fetchSchoolRoster, getTeacherRoster } from '../../services/studentRosterService';
@@ -14,6 +14,8 @@ export interface UseAdminDashboardDataParams {
   bookingDate?: string;
   missionFilter?: string;
   forceTab?: string;
+  activeWorkspace?: string | null;
+  userRole?: string;
 }
 
 export function useAdminDashboardData({
@@ -22,8 +24,11 @@ export function useAdminDashboardData({
   activeTab: propActiveTab = 'live',
   bookingDate,
   missionFilter = 'all',
-  forceTab
+  forceTab,
+  activeWorkspace,
+  userRole: propUserRole
 }: UseAdminDashboardDataParams) {
+  const hasFetchedCoreRef = useRef<string>('');
   const [activeTab, setActiveTab] = useState<string>(() => {
     if (forceTab) return forceTab;
     if (typeof window !== 'undefined') {
@@ -70,38 +75,36 @@ export function useAdminDashboardData({
     }
   };
 
-  const fetchTeacherStudentsHelper = async (teacherId: string, schoolId: string, platform: string) => {
+  const fetchTeacherStudentsHelper = async (teacherId: string, schoolId: string, platform: string, teacherProfile?: any) => {
     let assignedStudentIds: string[] = [];
     if (!teacherId || !isUUID(teacherId)) return assignedStudentIds;
 
-    if (platform === 'campus') {
-      const [{ data: schedData }, { data: occData }, { data: groupData }] = await Promise.all([
-        supabase.from('schedules').select('student_id').eq('teacher_id', teacherId),
-        supabase.from('schedule_occurrences').select('student_id').eq('teacher_id', teacherId),
-        supabase.from('bands').select('id').eq('coach_id', teacherId)
-      ]);
+    const [{ data: schedData }, { data: occData }, { data: groupData }, stRes] = await Promise.all([
+      supabase.from('schedules').select('student_id').eq('teacher_id', teacherId),
+      supabase.from('schedule_occurrences').select('student_id').eq('teacher_id', teacherId),
+      supabase.from('bands').select('id').eq('coach_id', teacherId),
+      supabase.from('student_teachers').select('student_id').eq('teacher_id', teacherId)
+    ]);
 
-      const schedStudentIds = (schedData || []).map(s => s.student_id).filter(Boolean);
-      const occStudentIds = (occData || []).map(s => s.student_id).filter(Boolean);
+    const schedStudentIds = (schedData || []).map((s: any) => s.student_id).filter(Boolean);
+    const occStudentIds = (occData || []).map((s: any) => s.student_id).filter(Boolean);
+    const stStudentIds = (stRes?.data || []).map((s: any) => s.student_id).filter(Boolean);
 
-      let groupStudentIds: string[] = [];
-      if (groupData && groupData.length > 0) {
-        const groupIds = groupData.map(g => g.id);
-        const { data: gsData } = await supabase.from('band_members').select('user_id').in('band_id', groupIds);
-        groupStudentIds = (gsData || []).map(gs => gs.user_id).filter(Boolean);
-      }
-
-      let stStudentIds: string[] = [];
-      try {
-        const { data: stData } = await supabase.from('student_teachers').select('student_id').eq('teacher_id', teacherId);
-        stStudentIds = (stData || []).map((s: any) => s.student_id).filter(Boolean);
-      } catch (e) {}
-
-      assignedStudentIds = Array.from(new Set([...schedStudentIds, ...occStudentIds, ...groupStudentIds, ...stStudentIds]));
+    let groupStudentIds: string[] = [];
+    if (groupData && groupData.length > 0) {
+      const groupIds = groupData.map((g: any) => g.id);
+      const { data: gsData } = await supabase.from('band_members').select('user_id').in('band_id', groupIds);
+      groupStudentIds = (gsData || []).map((gs: any) => gs.user_id).filter(Boolean);
     }
 
+    assignedStudentIds = Array.from(new Set([...schedStudentIds, ...occStudentIds, ...groupStudentIds, ...stStudentIds]));
+
     const schoolRoster = await fetchSchoolRoster(schoolId, supabase);
-    let teacherStudents = getTeacherRoster(teacherId, schoolRoster, assignedStudentIds);
+    const rawTeacherInst = teacherProfile?.instrument || '';
+    const teacherInstruments = rawTeacherInst
+      ? rawTeacherInst.split(',').map((i: string) => i.trim().toLowerCase()).filter(Boolean)
+      : [];
+    let teacherStudents = getTeacherRoster(teacherId, schoolRoster, assignedStudentIds, teacherInstruments);
 
     if (platform !== 'campus') {
       teacherStudents = teacherStudents.filter(s => s.is_groovelab_active);
@@ -196,8 +199,17 @@ export function useAdminDashboardData({
     });
     currentAdmin = adminData;
 
-    const userRole = adminData.role?.toLowerCase() || 'student';
-    if (userRole !== 'admin' && userRole !== 'teacher' && userRole !== 'secretary') {
+    const storedWorkspace = typeof window !== 'undefined'
+      ? (sessionStorage.getItem('groovelab_active_workspace') || localStorage.getItem('groovelab_active_workspace'))
+      : null;
+    const effectiveWorkspace = activeWorkspace || storedWorkspace;
+    const effectiveRole = (
+      propUserRole?.toLowerCase() === 'teacher' ||
+      effectiveWorkspace === 'teacher' ||
+      adminData.role?.toLowerCase() === 'teacher'
+    ) ? 'teacher' : (adminData.role?.toLowerCase() || 'student');
+
+    if (effectiveRole !== 'admin' && effectiveRole !== 'teacher' && effectiveRole !== 'secretary') {
       return;
     }
 
@@ -210,56 +222,81 @@ export function useAdminDashboardData({
       if (adminData.school_id) {
         const effectiveTab = forceTab || activeTab;
         const isRoomsOnly = effectiveTab === 'rooms';
+        const cacheKey = `${adminData.school_id}_${activePlatform}_${effectiveRole}`;
+        const shouldFetchCore = force || hasFetchedCoreRef.current !== cacheKey;
 
-        // Parallel fetch core data: teachers, rooms, stations, schoolRoster, schedules
-        const [tRes, rRes, stRes, schoolRoster, schedRes] = await Promise.all([
-          supabase
-            .from('users')
-            .select('*')
-            .eq('school_id', adminData.school_id)
-            .in('role', ['teacher', 'admin', 'secretary'])
-            .order('first_name'),
-          supabase.from('rooms').select('*').eq('school_id', adminData.school_id).order('sort_order', { ascending: true }),
-          supabase.from('stations').select('*, rooms(*)').order('name'),
-          fetchSchoolRoster(adminData.school_id, supabase),
-          supabase.from('schedules').select('*, rooms(*)').eq('school_id', adminData.school_id)
-        ]);
+        if (shouldFetchCore) {
+          // Parallel fetch core data: teachers, rooms, stations, schoolRoster, schedules
+          const [tRes, rRes, stRes, schoolRoster, schedRes] = await Promise.all([
+            supabase
+              .from('users')
+              .select('*')
+              .eq('school_id', adminData.school_id)
+              .in('role', ['teacher', 'admin', 'secretary'])
+              .order('first_name'),
+            supabase.from('rooms').select('*').eq('school_id', adminData.school_id).order('sort_order', { ascending: true }),
+            supabase.from('stations').select('*, rooms!stations_room_id_fkey(*)').eq('school_id', adminData.school_id).order('name'),
+            fetchSchoolRoster(adminData.school_id, supabase, force),
+            supabase.from('schedules').select('*, rooms(*)').eq('school_id', adminData.school_id)
+          ]);
 
-        if (tRes.data) setTeachers(tRes.data);
-        if (rRes.data) {
-          setRooms(rRes.data);
-          setSetupRooms(rRes.data);
+          if (tRes.data) {
+            const platformTeachers = activePlatform === 'groovelab'
+              ? tRes.data.filter((t: any) => Boolean(t.is_groovelab_active || t.isGroovelabActive))
+              : tRes.data.filter((t: any) => t.is_campus_active !== false && t.isCampusActive !== false);
+            setTeachers(platformTeachers);
+          }
+          if (rRes.data) {
+            const platformRooms = activePlatform === 'groovelab'
+              ? rRes.data.filter((r: any) => Boolean(r.is_groovelab_active))
+              : rRes.data.filter((r: any) => r.is_campus_active !== false);
+            setRooms(platformRooms);
+            setSetupRooms(platformRooms);
+          }
+          if (stRes.data) {
+            setStations(stRes.data);
+            setSetupStations(stRes.data);
+          }
+          if (schoolRoster) {
+            if (effectiveRole === 'teacher') {
+              const teacherStudents = await fetchTeacherStudentsHelper(adminData.id, adminData.school_id, activePlatform, adminData);
+              setStudents(teacherStudents);
+            } else {
+              const activeStudents = activePlatform === 'groovelab' 
+                ? schoolRoster.filter(s => s.is_groovelab_active) 
+                : schoolRoster;
+              setStudents(activeStudents);
+            }
+          }
+          if (schedRes.data) setSchedules(schedRes.data);
+          hasFetchedCoreRef.current = cacheKey;
         }
-        if (stRes.data) {
-          setStations(stRes.data);
-          setSetupStations(stRes.data);
-        }
-        if (schoolRoster) {
-          const activeStudents = activePlatform === 'groovelab' 
-            ? schoolRoster.filter(s => s.is_groovelab_active) 
-            : schoolRoster;
-          setStudents(activeStudents);
-        }
-        if (schedRes.data) setSchedules(schedRes.data);
 
         // Fetch heavy sub-view data only when needed (skip completely if rooms-only view)
         if (!isRoomsOnly) {
           const [bRes, sngRes, sessRes, subRes] = await Promise.all([
             effectiveTab === 'bands' || effectiveTab === 'live'
-              ? supabase.from('bands').select('*, band_members(*, users(*))').eq('school_id', adminData.school_id)
+              ? supabase
+                  .from('bands')
+                  .select('*, songs(id, title, artist, instrumentation), coach:users!coach_id(id, first_name, last_name, photo_url), band_members(*, users!user_id(id, first_name, last_name, photo_url, role)), band_songs(*, songs(id, title, artist, instrumentation), band_song_slots(*, profiles:users!user_id(id, first_name, photo_url)))')
+                  .eq('school_id', adminData.school_id)
+                  .order('name')
               : Promise.resolve({ data: null }),
             effectiveTab === 'songs' || effectiveTab === 'live'
-              ? supabase.from('songs').select('*').eq('school_id', adminData.school_id).order('title')
+              ? supabase.from('songs').select('*').or(`school_id.eq.${adminData.school_id},school_id.is.null`).order('title')
               : Promise.resolve({ data: null }),
             activePlatform === 'groovelab' && (effectiveTab === 'live' || effectiveTab === 'setup')
               ? supabase.from('sessions').select('*, profiles:users!inner(*), stations(*)').eq('profiles.school_id', adminData.school_id).is('check_out_time', null)
               : Promise.resolve({ data: null }),
             activePlatform === 'groovelab' && (effectiveTab === 'missions' || effectiveTab === 'live')
-              ? supabase.from('user_song_skills').select('*, users!inner(*), songs!inner(*)').eq('is_pending_approval', true)
+              ? supabase.from('user_song_skills').select('*, users!user_song_skills_user_id_fkey!inner(*), songs!inner(*)').eq('is_pending_approval', true)
               : Promise.resolve({ data: null })
           ]);
 
-          if (bRes.data) setAllBands(bRes.data);
+          if (bRes.data) {
+            const realBands = bRes.data.filter((b: any) => b.name && b.name !== '__SYSTEM_ANNOUNCEMENTS__' && !b.name.startsWith('__SYSTEM_'));
+            setAllBands(realBands);
+          }
           if (sngRes.data) setSongs(sngRes.data);
           if (sessRes.data) setActiveSessions(sessRes.data);
           if (subRes.data) {

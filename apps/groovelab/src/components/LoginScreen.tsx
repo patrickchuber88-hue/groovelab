@@ -1985,8 +1985,11 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
           // Enforce strict separation: Campus-Login strictly loads Campus, GrooveLab-Login strictly loads GrooveLab
           if (isGroovelabKiosk) {
             if (!user.is_groovelab_active) {
-              if (user.is_campus_active && user.role === 'student') {
+              if (user.is_campus_active) {
                 sessionStorage.setItem('groovelab_active_platform', 'campus');
+                if (user.role === 'teacher') {
+                  sessionStorage.setItem('campus_active_tab', 'briefing');
+                }
               } else {
                 const tokenToUse = user.qr_token || user.ausweis_nummer || user.id;
                 sessionStorage.setItem('groovelab_user_id', user.id);
@@ -1999,7 +2002,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
             }
           } else {
             if (!user.is_campus_active) {
-              if (user.is_groovelab_active && user.role === 'student') {
+              if (user.is_groovelab_active) {
                 sessionStorage.setItem('groovelab_active_platform', 'groovelab');
               } else {
                 const tokenToUse = user.qr_token || user.ausweis_nummer || user.id;
@@ -7306,6 +7309,8 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 await createMasterSessionLease(targetId, 'bypass_dev').catch(() => {});
                 setLocalhostDevLegalBypassed(true);
                 sessionStorage.setItem(`gl_legal_status_v_${targetId}_min_2026.1`, 'true');
+                sessionStorage.setItem(`gl_legal_status_v_${targetId}_admin_min_2026.1`, 'true');
+                sessionStorage.setItem(`gl_legal_status_v_${targetId}_master_admin_min_2026.1`, 'true');
                 sessionStorage.setItem('groovelab_is_master_admin', 'true');
                 sessionStorage.setItem('groovelab_active_workspace', 'master_admin');
                 sessionStorage.setItem('groovelab_active_platform', 'campus');
@@ -7410,6 +7415,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 }
                 setLocalhostDevLegalBypassed(true);
                 sessionStorage.setItem(`gl_legal_status_v_${targetUser.id}_min_2026.1`, 'true');
+                sessionStorage.setItem(`gl_legal_status_v_${targetUser.id}_admin_min_2026.1`, 'true');
+                sessionStorage.setItem(`gl_legal_status_v_${targetUser.id}_secretary_min_2026.1`, 'true');
+                sessionStorage.setItem(`gl_legal_status_v_${targetUser.id}_teacher_min_2026.1`, 'true');
                 sessionStorage.removeItem('groovelab_is_master_admin');
                 localStorage.removeItem('groovelab_is_master_admin');
                 sessionStorage.removeItem('groovelab_support_ghost');
@@ -7505,6 +7513,9 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 }
                 setLocalhostDevLegalBypassed(true);
                 sessionStorage.setItem(`gl_legal_status_v_${targetUser.id}_min_2026.1`, 'true');
+                sessionStorage.setItem(`gl_legal_status_v_${targetUser.id}_teacher_min_2026.1`, 'true');
+                sessionStorage.setItem(`gl_legal_status_v_${targetUser.id}_admin_min_2026.1`, 'true');
+                sessionStorage.setItem(`gl_legal_status_v_${targetUser.id}_secretary_min_2026.1`, 'true');
                 sessionStorage.removeItem('groovelab_is_master_admin');
                 localStorage.removeItem('groovelab_is_master_admin');
                 sessionStorage.removeItem('groovelab_support_ghost');
@@ -7599,6 +7610,7 @@ export function LoginScreen({ onLogin, kioskStationId }: LoginScreenProps) {
                 }
                 setLocalhostDevLegalBypassed(true);
                 sessionStorage.setItem(`gl_legal_status_v_${targetUser.id}_min_2026.1`, 'true');
+                sessionStorage.setItem(`gl_legal_status_v_${targetUser.id}_student_min_2026.1`, 'true');
                 sessionStorage.removeItem('groovelab_is_master_admin');
                 localStorage.removeItem('groovelab_is_master_admin');
                 sessionStorage.removeItem('groovelab_support_ghost');

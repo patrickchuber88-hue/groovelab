@@ -1003,13 +1003,29 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
 
         // Supabase channel broadcast for multi-device sync
         try {
-          const channel = supabase.channel(`realtime_student_progress_${studentIdToUse}`);
-          await channel.send({
-            type: 'broadcast',
-            event: 'homework-changed',
-            payload: { studentId: studentIdToUse }
-          });
-          setTimeout(() => supabase.removeChannel(channel), 1000);
+          const topicName = `realtime_student_progress_${studentIdToUse}`;
+          const existing = supabase.getChannels().find(
+            (c: any) => c.topic === `realtime:${topicName}` || c.topic === topicName
+          );
+          if (existing && (existing.state === 'joined' || existing.state === 'joining')) {
+            existing.send({
+              type: 'broadcast',
+              event: 'homework-changed',
+              payload: { studentId: studentIdToUse }
+            });
+          } else {
+            const channel = supabase.channel(topicName);
+            channel.subscribe(async (status) => {
+              if (status === 'SUBSCRIBED') {
+                await channel.send({
+                  type: 'broadcast',
+                  event: 'homework-changed',
+                  payload: { studentId: studentIdToUse }
+                });
+                setTimeout(() => supabase.removeChannel(channel), 1500);
+              }
+            });
+          }
         } catch {}
       }
 
@@ -1065,7 +1081,7 @@ export const TagesplanQuickAudioModal: React.FC<TagesplanQuickAudioModalProps> =
       }} 
       onClick={(e) => { if (e.target === e.currentTarget && !isRecording && !isDictating && !isSaving && countInRemaining === null) { stopHardware(); onClose(); } }}
     >
-      <div 
+      <div role="dialog" aria-modal="true" 
         style={{ 
           background: '#ffffff', 
           borderRadius: '24px', 

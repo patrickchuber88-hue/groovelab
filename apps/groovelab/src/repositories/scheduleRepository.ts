@@ -82,24 +82,55 @@ export async function fetchCrisisNotifications(targetId: string, isSchoolLevel =
   });
 }
 
-export async function fetchActiveSessions(schoolId: string): Promise<any[]> {
+// In-memory runtime cache for 0ms same-tick lookups and SWR tab-switching
+const inMemoryActiveSessions = new Map<string, { timestamp: number; data: any[] }>();
+const SESSIONS_CACHE_TTL_MS = 15 * 1000; // 15 seconds SWR TTL
+
+export async function fetchActiveSessions(schoolId: string, force = false): Promise<any[]> {
   if (!schoolId) return [];
+
+  if (!force && inMemoryActiveSessions.has(schoolId)) {
+    const cached = inMemoryActiveSessions.get(schoolId)!;
+    if (Date.now() - cached.timestamp < SESSIONS_CACHE_TTL_MS) {
+      return cached.data;
+    }
+  }
+
   return dedupeQuery(`active_sessions_${schoolId}`, async () => {
     try {
       const { data, error } = await supabase
         .from('sessions')
-        .select('*, users!inner(*), stations(*)')
+        .select(`
+          id, user_id, station_id, check_in_time, check_out_time,
+          users!inner(id, first_name, last_name, instrument, photo_url, role, school_id),
+          stations(id, name, color, instrument, pos_x, pos_y, room_id)
+        `)
         .is('check_out_time', null)
         .eq('users.school_id', schoolId);
 
       if (error) {
         console.warn('[ScheduleRepository] Error fetching active sessions:', error);
-        return [];
+        return inMemoryActiveSessions.get(schoolId)?.data || [];
       }
-      return data || [];
+      const result = data || [];
+      inMemoryActiveSessions.set(schoolId, { timestamp: Date.now(), data: result });
+      return result;
     } catch (err) {
       console.error('[ScheduleRepository] Unexpected error in fetchActiveSessions:', err);
-      return [];
+      return inMemoryActiveSessions.get(schoolId)?.data || [];
     }
   });
+}
+
+/**
+ * Synchronously retrieves cached active sessions from in-memory cache.
+ * Returns null if not cached or expired.
+ */
+export function getCachedActiveSessionsSync(schoolId: string): any[] | null {
+  if (!schoolId) return null;
+  const cached = inMemoryActiveSessions.get(schoolId);
+  if (cached && Date.now() - cached.timestamp < SESSIONS_CACHE_TTL_MS) {
+    return cached.data;
+  }
+  return null;
 }

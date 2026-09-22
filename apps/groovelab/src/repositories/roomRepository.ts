@@ -70,11 +70,9 @@ export async function fetchRoomsBySchool(schoolId: string, force = false, active
       const allRooms = data || [];
       let result = allRooms;
       if (activePlatform === 'groovelab') {
-        const glRooms = allRooms.filter(r => r.is_groovelab_active !== false);
-        result = glRooms.length > 0 ? glRooms : allRooms;
+        result = allRooms.filter(r => Boolean(r.is_groovelab_active));
       } else if (activePlatform === 'campus') {
-        const campusRooms = allRooms.filter(r => r.is_campus_active !== false);
-        result = campusRooms.length > 0 ? campusRooms : allRooms;
+        result = allRooms.filter(r => r.is_campus_active !== false);
       }
 
       inMemoryRooms.set(memoryKey, { timestamp: Date.now(), data: result });
@@ -110,7 +108,7 @@ export async function fetchStationsBySchool(schoolId: string, force = false): Pr
     try {
       const { data, error } = await supabase
         .from('stations')
-        .select('*, rooms!inner(school_id, is_groovelab_active, is_campus_active)')
+        .select('*, rooms!stations_room_id_fkey!inner(school_id, is_groovelab_active, is_campus_active)')
         .eq('rooms.school_id', schoolId)
         .order('name');
 
@@ -128,4 +126,45 @@ export async function fetchStationsBySchool(schoolId: string, force = false): Pr
       return inMemoryStations.get(schoolId)?.data || [];
     }
   });
+}
+
+/**
+ * Synchronously retrieves cached rooms from in-memory cache or localStorage TTL cache.
+ * Returns null if not cached or expired.
+ */
+export function getCachedRoomsSync(schoolId: string, activePlatform?: string): RoomRecord[] | null {
+  if (!schoolId) return null;
+  const memoryKey = `${schoolId}_${activePlatform || 'all'}`;
+  const mem = inMemoryRooms.get(memoryKey);
+  if (mem && Date.now() - mem.timestamp < CACHE_TTL_MS) {
+    return mem.data;
+  }
+  const persistentKey = activePlatform 
+    ? `campus_all_rooms_${schoolId}_${activePlatform}`
+    : `campus_all_rooms_${schoolId}`;
+  const cached = getItemWithTTL<RoomRecord[]>(persistentKey);
+  if (cached && cached.length > 0) {
+    inMemoryRooms.set(memoryKey, { timestamp: Date.now(), data: cached });
+    return cached;
+  }
+  return null;
+}
+
+/**
+ * Synchronously retrieves cached stations from in-memory cache or localStorage TTL cache.
+ * Returns null if not cached or expired.
+ */
+export function getCachedStationsSync(schoolId: string): StationRecord[] | null {
+  if (!schoolId) return null;
+  const mem = inMemoryStations.get(schoolId);
+  if (mem && Date.now() - mem.timestamp < CACHE_TTL_MS) {
+    return mem.data;
+  }
+  const persistentKey = `campus_stations_${schoolId}`;
+  const cached = getItemWithTTL<StationRecord[]>(persistentKey);
+  if (cached && cached.length > 0) {
+    inMemoryStations.set(schoolId, { timestamp: Date.now(), data: cached });
+    return cached;
+  }
+  return null;
 }

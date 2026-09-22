@@ -22,7 +22,7 @@ import {
   Shield, 
   QrCode, 
   LogOut, 
-  ZoomIn 
+  ZoomIn
 } from 'lucide-react';
 import { StudioAvatar } from '../StudioAvatar';
 import { formatTeacherFullName } from '../../utils/nameHelper';

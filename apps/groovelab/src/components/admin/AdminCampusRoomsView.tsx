@@ -78,6 +78,7 @@ export interface AdminCampusRoomsViewProps {
   setRooms?: (r: any) => void;
   schoolObj: any;
   students: any[];
+  teachers?: any[];
   schedules: any[];
   setSchedules: React.Dispatch<React.SetStateAction<any[]>>;
   campusBookings: any[];
@@ -159,6 +160,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
   setRooms,
   schoolObj,
   students,
+  teachers,
   schedules,
   setSchedules,
   campusBookings,
@@ -235,6 +237,20 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
     const isEditing = !!(selectedBooking && (!selectedBooking.isSchedule || selectedBooking.teacherId === userId));
     const isStaff = admin?.role?.toLowerCase() === 'secretary' || admin?.role?.toLowerCase() === 'admin';
     
+    // Fast lookup map for resolving teacher names from teacher_id
+    const teacherLookupMap = useMemo(() => {
+      const map: Record<string, string> = {};
+      (teachers || []).forEach((t: any) => {
+        if (t?.id) {
+          const name = formatTeacherFullName(t);
+          map[t.id] = name;
+          const cleanId = t.id.replace(/^teacher-/i, '');
+          map[cleanId] = name;
+        }
+      });
+      return map;
+    }, [teachers]);
+
     const handleQuickDuration = (mins: number) => {
       const [sh, sm] = bookingStartTime.split(':').map(Number);
       const total = sh * 60 + sm + mins;
@@ -521,26 +537,27 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
           const [ehStr, emStr] = endTimeStr.split(':');
           const duration = (parseInt(ehStr) * 60 + parseInt(emStr)) - (parseInt(shStr) * 60 + parseInt(smStr));
 
-          const targetRoomIds = glRooms.length > 0
-            ? glRooms.map((r: any) => r.id)
-            : (dayHours.roomId ? [dayHours.roomId] : ['groovelab']);
+          // 1% Monolith Goldstandard: Assign strictly to the designated GrooveLab room
+          const designatedRoomId = dayHours.roomId || 
+            glRooms.find((r: any) => r.is_groovelab_active === true)?.id || 
+            glRooms.find((r: any) => (r.name || '').toLowerCase() === 'groovelab')?.id || 
+            glRooms[0]?.id || 
+            (rooms.length > 0 ? rooms[0].id : 'groovelab');
 
-          targetRoomIds.forEach((targetRoomId: string, idx: number) => {
-            virtualGroovelabSchedules.push({
-              id: `virtual_groovelab_schedule_${d}_${idx}`,
-              room_id: targetRoomId,
-              day_of_week: DAYS_MAP[d],
-              teacher_id: 'groovelab',
-              teacher: { first_name: 'GrooveLab', last_name: '' },
-              teacher_name: 'GrooveLab',
-              purpose: 'GrooveLab Plattform',
-              time_slot: startTimeStr,
-              start_time: startTimeStr,
-              end_time: endTimeStr,
-              duration: duration,
-              status: 'approved',
-              is_approved: true
-            });
+          virtualGroovelabSchedules.push({
+            id: `virtual_groovelab_schedule_${d}`,
+            room_id: designatedRoomId,
+            day_of_week: DAYS_MAP[d],
+            teacher_id: 'groovelab',
+            teacher: { first_name: 'GrooveLab', last_name: '' },
+            teacher_name: 'GrooveLab',
+            purpose: 'GrooveLab Plattform',
+            time_slot: startTimeStr,
+            start_time: startTimeStr,
+            end_time: endTimeStr,
+            duration: duration,
+            status: 'approved',
+            is_approved: true
           });
         }
       }
@@ -851,23 +868,21 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
         }
       });
 
-      // 2. Build merged Teaching Blocks ("Regulärer Unterricht") for active lessons on this day in this room
+      // 2. Build merged Teaching Blocks for active lessons on this day in this room
       interface LessonSlot {
         teacherId: string;
         teacherName: string;
+        purpose: string;
         startMin: number;
         endMin: number;
       }
       const activeLessons: LessonSlot[] = [];
 
+      // 1% Monolith Goldstandard: Strict room matching - never leak unassigned schedules into rooms
       const isRoomMatch = (targetRoomId?: string) => {
-        if (!selectedRoom || selectedRoom.id === 'all') return true;
+        if (!selectedRoom) return false;
+        if (selectedRoom.id === 'all') return true;
         if (targetRoomId && targetRoomId === selectedRoom.id) return true;
-        if (!targetRoomId || targetRoomId === 'groovelab') {
-          if (selectedRoom.name.toLowerCase().includes('groovelab')) return true;
-          const fallbackRoom = roomsToRender[0] || rooms[0];
-          if (fallbackRoom && fallbackRoom.id === selectedRoom.id) return true;
-        }
         return false;
       };
 
@@ -904,13 +919,18 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
           }
         }
 
-        const teacherName = s.teacher 
+        const rawTeacherName = s.teacher 
           ? formatTeacherFullName(s.teacher)
-          : (s.teacher_name ? formatTeacherFullName(s.teacher_name) : 'Lehrer');
+          : (s.teacher_name 
+              ? formatTeacherFullName(s.teacher_name) 
+              : (teacherLookupMap[s.teacher_id] || teacherLookupMap[(s.teacher_id || '').replace(/^teacher-/i, '')] || (s.teacher_id === 'groovelab' ? 'GrooveLab' : 'Lehrer')));
+
+        const defaultPurpose = s.teacher_id === 'groovelab' ? 'GrooveLab Plattform' : 'Regulärer Unterricht';
 
         activeLessons.push({
           teacherId: s.teacher_id || 'unknown',
-          teacherName: teacherName || 'Lehrer',
+          teacherName: rawTeacherName || (s.teacher_id === 'groovelab' ? 'GrooveLab' : 'Lehrer'),
+          purpose: s.purpose || defaultPurpose,
           startMin,
           endMin
         });
@@ -930,13 +950,14 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
         const durationMin = occ.duration || 45;
         const endMin = startMin + durationMin;
 
-        const teacherName = occ.teacher 
+        const rawTeacherName = occ.teacher 
           ? formatTeacherFullName(occ.teacher)
-          : 'Lehrer';
+          : (teacherLookupMap[occ.teacher_id] || teacherLookupMap[(occ.teacher_id || '').replace(/^teacher-/i, '')] || 'Lehrer');
 
         activeLessons.push({
           teacherId: occ.teacher_id || 'unknown',
-          teacherName: teacherName || 'Lehrer',
+          teacherName: rawTeacherName || 'Lehrer',
+          purpose: occ.purpose || 'Regulärer Unterricht',
           startMin,
           endMin
         });
@@ -962,6 +983,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
         mergedBlocks.push({
           teacherId: list[0].teacherId,
           teacherName: list[0].teacherName,
+          purpose: list[0].purpose || (list[0].teacherId === 'groovelab' ? 'GrooveLab Plattform' : 'Regulärer Unterricht'),
           startMin: minStart,
           endMin: maxEnd
         });
@@ -990,7 +1012,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
             date: targetDateStr,
             startTime,
             endTime,
-            purpose: 'Regulärer Unterricht',
+            purpose: b.purpose || (b.teacherId === 'groovelab' ? 'GrooveLab Plattform' : 'Regulärer Unterricht'),
             teacherId: b.teacherId,
             teacherName: b.teacherName,
             isSchedule: true,
@@ -2673,7 +2695,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                                 fontWeight: 700,
                                 color: '#475569'
                               }}>
-                                {b.purpose || (isSchedule ? 'Regulärer Unterricht' : 'Raumbuchung')}
+                                {b.purpose || (isSchedule ? (b.teacherId === 'groovelab' ? 'GrooveLab Plattform' : 'Regulärer Unterricht') : 'Raumbuchung')}
                               </span>
 
                               {isOwnBooking && !b.isSchedule && (
@@ -3617,7 +3639,7 @@ export const AdminCampusRoomsView: React.FC<AdminCampusRoomsViewProps> = ({
                                             color: bodyTextColor,
                                             lineHeight: 1.2
                                           }}>
-                                            {b.purpose || (isSchedule ? 'Regulärer Unterricht' : 'Raumbuchung')}
+                                            {b.purpose || (isSchedule ? (isGroovelabBlock ? 'GrooveLab Plattform' : 'Regulärer Unterricht') : 'Raumbuchung')}
                                           </div>
 
                                           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>

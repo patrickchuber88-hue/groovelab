@@ -55,6 +55,31 @@ export function useStudentProfile({
     }
   }, [studentId, studentUser]);
 
+  // 🌟 Reaktivitäts-Brücke: Sofortige Aktualisierung von campus_xp im Profil bei XP-Ausschüttungen
+  useEffect(() => {
+    const handleXp = (e: Event) => {
+      const customEvent = e as CustomEvent<{ studentId?: string; amount?: number }>;
+      const { studentId: targetId, amount } = customEvent.detail || {};
+      const effectiveId = studentId || studentUser?.id;
+      if (!targetId || targetId === effectiveId) {
+        if (typeof amount === 'number' && amount > 0) {
+          setStudentUser((prev: any) => {
+            if (!prev) return prev;
+            const currentXpVal = prev.campus_xp ?? prev.xp ?? 0;
+            const nextXpVal = currentXpVal + amount;
+            return {
+              ...prev,
+              campus_xp: nextXpVal,
+              xp: nextXpVal
+            };
+          });
+        }
+      }
+    };
+    window.addEventListener('campus-xp-awarded', handleXp);
+    return () => window.removeEventListener('campus-xp-awarded', handleXp);
+  }, [studentId, studentUser?.id]);
+
   const currentPlatform: 'campus' | 'groovelab' = parentActiveTab === 'campus' 
     ? 'campus' 
     : (parentActiveTab === 'groovelab' 
@@ -220,6 +245,8 @@ export function useStudentProfile({
       photo_url: studentUser.photo_url || '/avatar_ghost.jpg',
       is_campus_active: studentUser.is_campus_active ?? false,
       campus_ui_level: studentUiLevel || studentUser?.campus_ui_level,
+      campus_xp: studentUser?.campus_xp ?? studentUser?.xp ?? 0,
+      xp: studentUser?.xp ?? studentUser?.campus_xp ?? 0,
       parent_permissions: (studentUser as any)?.parent_permissions,
       school_id: studentUser?.school_id,
       schoolId: studentUser?.school_id,

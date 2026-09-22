@@ -123,7 +123,7 @@ export const ParentInfoSheetModal: React.FC<ParentInfoSheetModalProps> = ({
       }}
       onClick={(e) => { if (e.target === e.currentTarget && !isGenerating) onClose(); }}
     >
-      <div 
+      <div role="dialog" aria-modal="true" 
         style={{
           background: '#ffffff',
           borderRadius: '24px',

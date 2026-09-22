@@ -41,7 +41,7 @@ export const StudentJuniorPreFlightModal: React.FC<StudentJuniorPreFlightModalPr
       justifyContent: 'center',
       padding: '16px'
     }}>
-      <div style={{
+      <div role="dialog" aria-modal="true" style={{
         background: '#ffffff',
         borderRadius: '32px',
         maxWidth: 'min(94vw, 480px)',

@@ -192,6 +192,9 @@ export const AVVModal: React.FC<AVVModalProps> = ({ isOpen, onClose, school, onA
         }}
       >
         <div 
+          role="dialog"
+          aria-modal="true"
+          aria-label="Auftragsverarbeitungsvertrag (AVV)"
           className="avv-modal-box"
           style={{
             background: '#ffffff',

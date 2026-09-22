@@ -7,6 +7,7 @@ import {
 import { supabase } from '../../lib/supabase';
 import { getParentOnboardingUrl } from '../../utils/tenantUrlHelper';
 import { maskLastName } from '../../utils/nameHelper';
+import { isTeacherInstrumentCompatible } from '../../services/studentRosterService';
 
 export const INSTRUMENT_TAGS = ['Schlagzeug', 'Piano', 'Gitarre', 'Gesang', 'Geige', 'Querflöte', 'Saxophon', 'Bass', 'Keyboard', 'Trompete'];
 
@@ -1302,9 +1303,20 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                           }}
                         >
                           <option value="">Ohne Zuweisung</option>
-                          {allUniqueTeachers.map((t: any) => (
-                            <option key={t.id} value={t.id}>{`${t.firstName || t.first_name || ''} ${t.lastName || t.last_name || ''}`.trim()}</option>
-                          ))}
+                          {allUniqueTeachers.map((t: any) => {
+                            const isCompatible = isTeacherInstrumentCompatible(t.instrument, student.instrument);
+                            const tName = `${t.firstName || t.first_name || ''} ${t.lastName || t.last_name || ''}`.trim();
+                            return (
+                              <option 
+                                key={t.id} 
+                                value={t.id}
+                                disabled={!isCompatible && t.id !== student.teacher_id}
+                                style={!isCompatible && t.id !== student.teacher_id ? { color: '#94a3b8' } : undefined}
+                              >
+                                {tName} {!isCompatible && t.id !== student.teacher_id ? '(Fachfremd)' : ''}
+                              </option>
+                            );
+                          })}
                         </select>
                       </div>
 
@@ -1793,9 +1805,20 @@ export const SecretaryStudentsView: React.FC<SecretaryStudentsViewProps> = ({
                       style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', background: 'white' }}
                     >
                       <option value="">Allgemein</option>
-                      {allUniqueTeachers.map((t: any) => (
-                        <option key={t.id} value={t.id}>{t.firstName || t.first_name} {t.lastName || t.last_name}</option>
-                      ))}
+                      {allUniqueTeachers.map((t: any) => {
+                        const isCompatible = isTeacherInstrumentCompatible(t.instrument, newStudentInstrument);
+                        const tName = `${t.firstName || t.first_name || ''} ${t.lastName || t.last_name || ''}`.trim();
+                        return (
+                          <option 
+                            key={t.id} 
+                            value={t.id}
+                            disabled={!isCompatible}
+                            style={!isCompatible ? { color: '#94a3b8' } : undefined}
+                          >
+                            {tName} {!isCompatible ? '(Fachfremd)' : ''}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                 </div>

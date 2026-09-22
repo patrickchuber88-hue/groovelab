@@ -5,6 +5,7 @@
 
 import { supabase } from '../lib/supabase';
 import { extractCanonicalAudioKey } from './audioNotesStorage';
+import { logApplicationAudit } from '../services/auditLogService';
 
 export interface AudioLoopLocator {
   enabled: boolean;
@@ -235,12 +236,15 @@ async function logLocatorAuditTrail(
   };
 
   try {
-    const { error } = await supabase.from('audit_logs').insert(auditPayload);
-    if (error) {
-      console.warn('[LoopLocatorStorage] Audit log write notice:', error.message);
-      if (canEnqueueOnFailure) {
-        enqueueOutbox({ type: action, audioKey: audioUrlOrKey, locator, meta });
-      }
+    const auditId = await logApplicationAudit({
+      action,
+      schoolId: meta?.schoolId || locator?.schoolId || null,
+      tableName: 'audio_recordings',
+      recordId: meta?.recordingId || null,
+      details: auditPayload.details
+    });
+    if (!auditId && canEnqueueOnFailure) {
+      enqueueOutbox({ type: action, audioKey: audioUrlOrKey, locator, meta });
     }
   } catch (err) {
     console.warn('[LoopLocatorStorage] Audit log write exception:', err);
@@ -248,6 +252,7 @@ async function logLocatorAuditTrail(
       enqueueOutbox({ type: action, audioKey: audioUrlOrKey, locator, meta });
     }
   }
+
 
   // Cross-Device Realtime Broadcast anstoßen (Mandanten-isoliert)
   try {

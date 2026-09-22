@@ -714,7 +714,8 @@ export function useCampusAppOrchestrator(): CampusAppOrchestratorResult {
     exclusiveProposal,
     dismissSuggestion,
     showConfetti,
-    setShowConfetti
+    setShowConfetti,
+    setToastMessage
   });
 
   // 25. Security Guards

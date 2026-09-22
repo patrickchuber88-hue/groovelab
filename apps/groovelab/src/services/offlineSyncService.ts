@@ -4,6 +4,7 @@ import { registerHeartbeatJob } from './heartbeatOrchestrator';
 import { 
   getAllPendingAudioRecords, 
   removeOfflineAudioRecord, 
+  saveOfflineAudioRecord,
   getPendingAudioCount,
   saveOfflineMutation,
   getAllOfflineMutations,
@@ -26,7 +27,7 @@ export interface PendingSyncAction {
 
 const STORAGE_KEY = 'groovelab_pending_offline_sync';
 const QUARANTINE_KEY = 'groovelab_quarantined_offline_sync';
-const MAX_RETRY_ATTEMPTS = 5;
+const MAX_RETRY_ATTEMPTS = 10;
 
 // Subscribers for UI reactive updates
 export interface OfflineQueueState {
@@ -120,9 +121,28 @@ export const loadAndMigrateOfflineMutations = async (): Promise<PendingSyncActio
       try { localStorage.removeItem(STORAGE_KEY); } catch {}
     }
 
-    memoryActionsCache = idbMutations;
+    // ⚡ Fast-Quarantine any stale or exhausted mutations on load so they don't block the UI
+    const activeMutations: PendingSyncAction[] = [];
+    const stalledMutations: PendingSyncAction[] = [];
+    for (const item of idbMutations) {
+      if ((item.attempts || 0) >= MAX_RETRY_ATTEMPTS) {
+        stalledMutations.push(item);
+        await removeOfflineMutation(item.id).catch(() => {});
+      } else {
+        activeMutations.push(item);
+      }
+    }
+    if (stalledMutations.length > 0) {
+      try {
+        const rawQuarantine = typeof localStorage !== 'undefined' ? localStorage.getItem(QUARANTINE_KEY) : null;
+        const existingQuarantine = rawQuarantine ? JSON.parse(rawQuarantine) : [];
+        localStorage.setItem(QUARANTINE_KEY, JSON.stringify([...existingQuarantine, ...stalledMutations]));
+      } catch {}
+    }
+
+    memoryActionsCache = activeMutations;
     isCacheLoaded = true;
-    return idbMutations;
+    return activeMutations;
   } catch (err) {
     console.warn('[OfflineSync] Error loading/migrating offline mutations:', err);
     return getPendingSyncActionsFallback();
@@ -313,9 +333,15 @@ export const flushOfflineAudioQueue = async (forceUpload: boolean = false): Prom
         console.error(`[OfflineSync] Error syncing audio record ${record.id}:`, err);
         failedCount++;
         const currentAttempts = (record.syncAttempts || 0) + 1;
+        // 🛡️ Zero-Data-Loss Garantie: Audio-Takes niemals aus IndexedDB tilgen!
+        await saveOfflineAudioRecord({
+          ...record,
+          syncAttempts: currentAttempts,
+          lastError: String(err?.message || err)
+        }).catch(() => {});
+
         if (currentAttempts >= MAX_RETRY_ATTEMPTS) {
-          console.warn(`[OfflineSync] Audio record ${record.id} exceeded max retries (${MAX_RETRY_ATTEMPTS}). Pruning from active queue.`);
-          await removeOfflineAudioRecord(record.id).catch(() => {});
+          console.warn(`[OfflineSync] Audio record ${record.id} reached retry threshold (${MAX_RETRY_ATTEMPTS}). Retained safely in local offline vault.`);
         }
       }
     }
@@ -384,8 +410,10 @@ export const flushOfflineSyncQueue = async (): Promise<{ success: number; failed
       action.attempts = currentAttempts;
       action.lastError = err?.message || String(err);
 
-      if (currentAttempts >= MAX_RETRY_ATTEMPTS) {
-        console.warn(`[OfflineSync] Action ${action.id} exceeded max retries. Moving to quarantine.`);
+      // Fast quarantine on unrecoverable errors (RLS violation, foreign key, 400/403, or max retries reached)
+      const isUnrecoverable = err?.code === '42501' || err?.code === '23503' || err?.status === 400 || err?.status === 403 || String(err?.message || '').toLowerCase().includes('violates');
+      if (currentAttempts >= MAX_RETRY_ATTEMPTS || isUnrecoverable) {
+        console.warn(`[OfflineSync] Action ${action.id} unrecoverable or exceeded retries. Moving to quarantine.`);
         await removeOfflineMutation(action.id);
         quarantinedActions.push(action);
         quarantinedCount++;
@@ -433,12 +461,12 @@ export const flushAllOfflineData = async (forceAudioUpload: boolean = false): Pr
       flushOfflineAudioQueue(forceAudioUpload)
     ]);
     
-    // 1% Goldstandard Timeout Protection: Never lock the UI in syncing state longer than 10s
+    // 1% Goldstandard Timeout Protection: Never lock the UI in syncing state longer than 2.5s
     const timeoutPromise = new Promise<[{ success: number }, { success: number }]>((resolve) =>
       setTimeout(() => {
-        console.warn('[OfflineSync] Sync timeout reached (10s). Releasing lock to avoid UI blocking.');
+        console.warn('[OfflineSync] Sync timeout reached (2.5s). Releasing lock to avoid UI blocking.');
         resolve([{ success: 0 }, { success: 0 }]);
-      }, 10000)
+      }, 2500)
     );
 
     const [mutationsResult, audioResult] = await Promise.race([

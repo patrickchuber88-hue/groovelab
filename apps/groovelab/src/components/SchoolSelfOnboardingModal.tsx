@@ -414,7 +414,7 @@ export const SchoolSelfOnboardingModal: React.FC<SchoolSelfOnboardingModalProps>
       `}</style>
 
       {/* Main Dialog Container */}
-      <div style={{
+      <div role="dialog" aria-modal="true" style={{
         width: '100%',
         maxWidth: step === 1 ? '580px' : '520px',
         maxHeight: '94vh',

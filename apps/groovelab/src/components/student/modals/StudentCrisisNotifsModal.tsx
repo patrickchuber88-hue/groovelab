@@ -51,7 +51,7 @@ export const StudentCrisisNotifsModal: React.FC<StudentCrisisNotifsModalProps> =
     }
 
     try {
-      // 🛡️ Autoritativer Revisionssicherer RPC mit Audit-Log gem. § 130 BGB / GoBD
+      // 🛡️ Autoritativer Revisionssicherer RPC mit Audit-Log (Status & Kenntnisnahmen)
       const { error } = await supabase.rpc('acknowledge_crisis_notifications', {
         p_notification_ids: ids
       });

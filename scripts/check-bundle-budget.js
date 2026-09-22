@@ -1,5 +1,9 @@
-// Enterprise Performance & Bundle Budget Guard
-// Verifies that production chunks remain within defined Core Web Vitals (CWV) budgets.
+// =============================================================================
+// 🏛️  Campus-Groovelab Enterprise Performance & Bundle Budget Guard
+// Standards: DIN EN ISO/IEC 25010 (Performance Efficiency: Resource Utilization),
+//            DIN EN ISO/IEC 25023 (Quality Measure Elements), W3C Core Web Vitals
+// Verifies that production chunks remain within defined Core Web Vitals budgets.
+// =============================================================================
 
 import fs from 'fs';
 import path from 'path';
@@ -18,7 +22,7 @@ const BUDGETS = {
   vendorReact: 250 * 1024 // 250 KB
 };
 
-console.log('🔍 Running Enterprise Bundle-Budget CI Guard...');
+console.log('🔍 Running Enterprise Bundle-Budget Guard (DIN EN ISO/IEC 25010 & CWV)...');
 
 if (!fs.existsSync(DIST_DIR)) {
   console.error('❌ Dist directory not found. Please run build first.');

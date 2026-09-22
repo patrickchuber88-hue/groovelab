@@ -18,11 +18,32 @@
 - **Verifikations-Doktrin (Striktes Verbot automatischer Terminal-Runs mit Ausnahme des Codeworts „commit“)**: Der KI-Agent führt außerhalb expliziter Aufforderungen NIEMALS eigenständig oder ungefragt `npm run ...` oder `npx ...` (wie `security:check`, `security:secrets`, `tsc`, `vite build` oder `gate`) im Terminal aus. Keine automatischen Test- oder Validierungs-Schleifen am Ende von regulären Antworten. **Ausdrückliche Ausnahme**: Beim Codewort „commit“ (oder „commit and deploy“) darf und soll der KI-Agent alle relevanten `npm runs` (`npm run gate`, `npm run build:groovelab`, `npm run verify:invariants` etc.) vollständig und eigenständig ausführen, um vor dem Commit und Deployment 100%ige Integrität sicherzustellen.
 
 ## 🌅 Automatischer Guten-Morgen-Sicherheitscheck (Morning Security Routine)
-- **Automatischer Trigger**: Wenn der Benutzer eine Nachricht mit einer morgendlichen Begrüßung (z. B. „Guten Morgen“, „Morning Check“, „Moin“, „Morgen-Audit“) sendet, MUSS automatisch und ohne gesonderte Aufforderung der vollständige Sicherheits- und Integritätscheck ausgeführt werden:
+- **Automatischer Trigger**: Wenn der Benutzer eine Nachricht mit einer morgendlichen Begrüßung (z. B. „Guten Morgen“, „Morning Check“, „Moin“, „Morgen-Audit“) sendet, MUSS automatisch und ohne gesonderte Aufforderung der vollständige 4-fache Sicherheits-, Compliance- und Integritätscheck ausgeführt werden:
   1. `npm run security:check` (Security Drift Guard & Architektur-Invarianten-Scan)
   2. `npm run security:secrets` (Entropie- & Secret-Leak-Scanner)
-  3. `npx tsc --noEmit` (TypeScript Typprüfung)
-- **Ergebnisbericht**: Die Antwort liefert direkt das strukturierte **Morning Health & Security Briefing**, das den aktuellen Systemstatus, Code-Integrität (0 Verstöße, 0 Leaks) und den Status des Live-Systems transparent zusammenfasst.
+  3. `npm run legal:check` (12-Säulen Legal- & Regulatory-Compliance-as-Code Guard, 18 unbestechliche Checks: DIN EN 301 549, ISO 27001, BGB §§ 312j/k)
+  4. `npm run typecheck` (TypeScript Typprüfung über alle Workspaces)
+  *(Entspricht dem Shortcut: `npm run operator:morning` bzw. `npm run gate`)*
+- **Ergebnisbericht**: Die Antwort liefert direkt das strukturierte **Morning Health & Security Briefing**, das den aktuellen Systemstatus, Code-Integrität (0 Verstöße, 0 Leaks), rechtliche Konformität (12/12 Säulen, 18/18 Checks) und den Status des Live-Systems transparent zusammenfasst.
+
+## 🧭 Autoritative Betreiber-Codewörter & Chat-Trigger (Operator Cockpit)
+- **`Guten Morgen` / `Morning Check`**: Führt den 10-Sekunden Morning Check (`npm run operator:morning` bzw. `npm run gate`) aus und liefert das Morning Health Briefing.
+- **`Freitags-Check` / `Weekly Audit`**: Führt den wöchentlichen Forensik-Tiefenscan (`npm run operator:weekly` bzw. `npm run test:forensics:all`) mit allen 25 Test-Suites (Dashboards, Resilienz, Digitale Souveränität) aus und liefert das Weekly Resilience Dossier.
+- **`Full Audit` / `verify enterprise`**: Führt die maximale Enterprise-Prüfung (`npm run verify:enterprise`) aus (Gate + Pyramide + alle Forensik-Suites).
+- **`commit` / `commit and deploy`**: Führt `npm run gate`, `npm run verify:invariants`, `npm run build:groovelab` aus und setzt nach erfolgreicher Integrität den Git-Commit um.
+- **Verifikations-Doktrin**: Außerhalb dieser expliziten Trigger führt der KI-Agent NIEMALS ungefragt Terminal-Testschleifen aus.
+
+## ⚖️ 360° IT-Forensik & Legal-Compliance Governance (Two-Tier Standard & 5 Interaktions-Vektoren)
+- **Kanonischer 360° Standard (`docs/TEST_SUITE_360_GOLDSTANDARD.md`)**: Keine Prüfung im Monorepo darf auf Stichproben beruhen. Es gilt das Zero-Sampling-Axiom: 100 % aller Quellcode-Dateien im Bounded Context werden dynamisch traversiert.
+- **Two-Tier Architektur**:
+  - *Tier 1 (Täglicher Morning Check / `npm run gate` in < 2s)*: Statische AST- und Regex-Vollprüfung über alle 12 Säulen und 18 unbestechliche Checks (`scripts/legal_compliance_guard.mjs`).
+  - *Tier 2 (Wöchentliches Freitags-Audit / `npm run operator:weekly` in < 45s)*: Tiefgehende 4-Rollen- und 5-Vektoren-Simulation (`test_legal_compliance_360_forensic.ts` in Master-Runner 3).
+- **Die 5 Juristischen Interaktions-Vektoren (Senior Volljurist Standard)**:
+  1. *Schüler ⇄ Lehrkraft*: Kinderschutz (§ 8a SGB VIII / § 832 BGB), Chat-Respekt-Filterung & Fachbegriffs-Whitelist (`chatRespectGuard.ts`), KUG § 22 Zero-Photo Doktrin mit 3D-Avataren, UrhG § 73 Audio-TTL $\le 1800$s, DSGVO Art. 9 Neutralität bei Unterrichtsabsagen, ISO/IEC 27001 Zero-Client-Secrets.
+  2. *Eltern ⇄ Schüler/Schule*: DSGVO Art. 8 Parental Governance (Server-PIN `verify_parent_pin_with_lease`, Bedtime/Daytime Locks), Art. 15/20 Auskunftsdossier mit SHA-256 Siegel (`exportStudentGdprDossier`), Art. 17 Scrubber (`scrubSharedDeviceCache`).
+  3. *Schule ⇄ Eltern/Kunden*: BGB § 312j Button-Lösung bei Buchungen, BGB § 312k Kündigungsbutton & PDF-Eingangsbeleg, PAngV & § 19 UStG Steuertransparenz auf Rechnungsansichten, DSGVO Art. 28 digitaler AVV-Abschluss (`AVVModal.tsx`).
+  4. *Lehrkraft ⇄ Schulleitung*: § 26 BDSG neutrale Ausfallmeldungen (`teacher_ausfall`) ohne medizinische Diagnosedaten, ArbZG Ruhezeiten (Quiet Hours).
+  5. *Master-Admin ⇄ Schulen*: NIS-2 & § 202a StGB Ghost-Support RFC 6238 TOTP 2FA Zwang, rollender 15m Lease (`useMasterAdminIdleLock.ts`), PostgreSQL WORM Manipulationsschutz auf `master_audit_trail`.
 
 ## 🎯 Master Prompt Trigger ("master prompt" / "prompt Agent starten")
 - **Kernprinzip**: Rein neutrales, modulares Architektur- und Struktur-Framework basierend auf `.agents/prompts/MASTER_PROMPT_TEMPLATE.md`.

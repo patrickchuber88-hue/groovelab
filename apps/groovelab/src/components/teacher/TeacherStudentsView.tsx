@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Edit3, Eye, EyeOff, FileText, Headphones,
-  Search, Trash2, UserPlus, CameraOff
+  Search, UserPlus, CameraOff
 } from 'lucide-react';
 import { maskLastName } from '../../utils/nameHelper';
 import { getInstrumentAvatarUrl } from '../StudioAvatar';
@@ -24,7 +24,7 @@ export interface TeacherStudentsViewProps {
   setShowInviteStudent: (show: boolean) => void;
   setEditingStudent: (s: any) => void;
   setSelectedStudentProfile: (s: any) => void;
-  handleDeleteStudent: (id: string) => void;
+  handleDeleteStudent?: (id: string) => void;
   teachersManageStudents: boolean;
   onOpenBandProfile?: (band: any) => void;
   AvatarImage: React.ComponentType<any>;
@@ -216,19 +216,12 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
             {/* Students Grid */}
             {(() => {
               const filtered = allStudents.filter(student => {
-                // Strict Module Activation Filter:
-                // GrooveLab tab MUST ONLY show students who have GrooveLab activated (is_groovelab_active === true)
-                // Campus tab shows all assigned students in lesson roster
-                const isModuleActive = activePlatform === 'campus'
-                  ? true
-                  : (student.is_groovelab_active === true || student.isGroovelabActive === true);
-
-                if (!isModuleActive) return false;
-
                 const matchesSearch = (student.first_name || '').toLowerCase().includes(studentSearch.toLowerCase()) || 
                                       (student.last_name || '').toLowerCase().includes(studentSearch.toLowerCase());
-                const matchesLetter = studentLetter ? (student.first_name || '').toUpperCase().startsWith(studentLetter) : true;
-                const matchesInstrument = studentInstrumentFilter === 'all' || 
+                const matchesLetter = !studentLetter || studentLetter === 'ALL'
+                  ? true
+                  : (student.first_name || '').toUpperCase().startsWith(studentLetter);
+                const matchesInstrument = !studentInstrumentFilter || studentInstrumentFilter.toLowerCase() === 'all' || 
                   (student.instrument && student.instrument.toLowerCase().trim() === studentInstrumentFilter.toLowerCase().trim());
                 return matchesSearch && matchesLetter && matchesInstrument;
               });
@@ -374,7 +367,7 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                         )}
 
                         {teachersManageStudents && (
-                          <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }} onClick={e => e.stopPropagation()}>
+                          <div style={{ display: 'flex', gap: '8px', marginTop: 'auto', width: '100%' }} onClick={e => e.stopPropagation()}>
                             <button
                               onClick={() => setEditingStudent({
                                 id: student.id,
@@ -388,7 +381,7 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                                 is_external_vocalist: student.is_external_vocalist || false
                               })}
                               style={{
-                                flex: 1,
+                                width: '100%',
                                 background: '#f1f5f9',
                                 border: 'none',
                                 padding: '10px 12px',
@@ -401,28 +394,11 @@ export const TeacherStudentsView: React.FC<TeacherStudentsViewProps> = ({
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                gap: '6px'
+                                gap: '6px',
+                                transition: 'background 0.2s'
                               }}
                             >
                               <Edit3 size={14} /> Bearbeiten
-                            </button>
-                            <button
-                              onClick={() => handleDeleteStudent(student.id)}
-                              style={{
-                                background: '#fee2e2',
-                                border: 'none',
-                                width: '44px',
-                                height: '44px',
-                                borderRadius: '12px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: '#ef4444',
-                                cursor: 'pointer',
-                                flexShrink: 0
-                              }}
-                            >
-                              <Trash2 size={14} />
                             </button>
                           </div>
                         )}

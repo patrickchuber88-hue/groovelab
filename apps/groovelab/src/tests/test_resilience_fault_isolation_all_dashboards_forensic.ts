@@ -146,7 +146,7 @@ assertResilience(
   'SECRETARY',
   'SEC-RES-01',
   'Keyed ErrorBoundary Isolation for Admin/Secretary Suite',
-  routerSrc.includes('<ErrorBoundary key={`admin-teacher-suite-${activePlatform}`}>') &&
+  routerSrc.includes('<ErrorBoundary key={`admin-teacher-suite-${activePlatform}') &&
   routerSrc.includes('<AdminDashboard'),
   'AdminDashboard is wrapped in an ErrorBoundary keyed by activePlatform, ensuring complete reset on workspace transitions'
 );

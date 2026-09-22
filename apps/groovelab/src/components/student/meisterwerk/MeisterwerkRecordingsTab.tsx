@@ -955,6 +955,7 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                     const date = parts[2]?.trim() || new Date().toISOString();
                     const label = parts[3]?.trim() || `Aufnahme #${teacherAudios.length + 1}`;
                     const author = parts[4]?.trim() || 'teacher';
+                    if (author === 'student') return;
 
                     const tagInParts = parts[7]?.trim();
                     const rawSongTag = item.songTag || (tagInParts && tagInParts !== '' ? tagInParts : undefined);
@@ -3368,6 +3369,44 @@ export function MeisterwerkRecordingsTab(props: MeisterwerkRecordingsTabProps) {
                             });
                           }
                         } catch {}
+                      }
+                    });
+                  } catch {}
+
+                  // 2. Ingest historical student takes from homeworkNotesList for 100% backward-compatibility
+                  try {
+                    (homeworkNotesList || []).forEach((n, hIdx) => {
+                      if (typeof n !== 'string' || !n.startsWith('AUDIO:')) return;
+                      const parts = n.substring(6).split('|');
+                      const url = parts[0]?.trim() || '';
+                      const duration = parseInt(parts[1] || '0', 10);
+                      const date = parts[2]?.trim() || new Date().toISOString();
+                      const label = parts[3]?.trim() || `Eigene Aufnahme #${studentAudios.length + 1}`;
+                      const author = parts[4]?.trim() || 'teacher';
+                      const visibility = parts[5]?.trim() || 'private';
+                      const uniqueId = parts[6]?.trim() || `hw_note_${hIdx}`;
+                      const tagInParts = parts[7]?.trim();
+
+                      if (author === 'student' && url && !seenStudentUrls.has(url) && !seenStudentUrls.has(uniqueId)) {
+                        seenStudentUrls.add(url);
+                        seenStudentUrls.add(uniqueId);
+                        const bpmPart = parts.find(p => typeof p === 'string' && p.trim().startsWith('BPM:'));
+                        const metronomeBpm = bpmPart ? parseInt(bpmPart.trim().replace('BPM:', ''), 10) : undefined;
+
+                        studentAudios.push({
+                          id: uniqueId,
+                          url,
+                          blobKey: url,
+                          duration,
+                          date,
+                          label,
+                          visibility,
+                          songTag: tagInParts || undefined,
+                          originalIdx: hIdx,
+                          source: 'homework_note',
+                          bpm: metronomeBpm,
+                          metronomeBpm
+                        });
                       }
                     });
                   } catch {}

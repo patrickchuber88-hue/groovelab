@@ -19,6 +19,8 @@ import { setVaultItem } from '../utils/aesStorageVault';
 import { verifyPinPbkdf2 } from '../utils/argonPinEngine';
 import { getInstrumentAvatarUrl as getStudioInstrumentAvatarUrl } from './StudioAvatar';
 import { isSlotCancelledByAbsence } from '../utils/teacherAbsenceHelper';
+import { playTriumphantXpChime, animateXpCountUp, CAMPUS_XP_EFFECTS_CSS } from '../utils/campusXpEffects';
+import { decryptMessagesBatch, primeDecryptedCache } from '../lib/security/messageCrypto';
 
 
 
@@ -397,6 +399,50 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
   const [activeChatOccIds, setActiveChatOccIds] = useState<Set<string>>(new Set());
   const chatMessagesEndRef = useRef<HTMLDivElement | null>(null);
   const [stats, setStats] = useState<any | null>(null);
+  const [displayQrXp, setDisplayQrXp] = useState<number>(0);
+  const [isQRLandingXpPulsing, setIsQRLandingXpPulsing] = useState<boolean>(false);
+  const [qrLandingFloatingXp, setQrLandingFloatingXp] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (stats?.current_xp !== undefined && !isQRLandingXpPulsing) {
+      setDisplayQrXp(stats.current_xp);
+    }
+  }, [stats?.current_xp, isQRLandingXpPulsing]);
+
+  useEffect(() => {
+    let cancelAnim: (() => void) | null = null;
+    const handleXpAwarded = (e: Event) => {
+      const customEvent = e as CustomEvent<{ studentId?: string; amount?: number }>;
+      const { studentId: targetId, amount } = customEvent.detail || {};
+      const currentEffectiveId = profile?.id;
+      if (!targetId || targetId === currentEffectiveId) {
+        if (typeof amount === 'number' && amount > 0) {
+          setIsQRLandingXpPulsing(true);
+          setQrLandingFloatingXp(amount);
+          playTriumphantXpChime();
+          const start = displayQrXp || stats?.current_xp || 0;
+          const target = start + amount;
+          setStats((prev: any) => ({
+            ...prev,
+            current_xp: target
+          }));
+          cancelAnim = animateXpCountUp(start, target, 1200, (val) => {
+            setDisplayQrXp(val);
+          }, () => {
+            setDisplayQrXp(target);
+            setTimeout(() => setIsQRLandingXpPulsing(false), 600);
+            setTimeout(() => setQrLandingFloatingXp(null), 1200);
+          });
+        }
+      }
+    };
+    window.addEventListener('campus-xp-awarded', handleXpAwarded);
+    return () => {
+      window.removeEventListener('campus-xp-awarded', handleXpAwarded);
+      if (cancelAnim) cancelAnim();
+    };
+  }, [displayQrXp, profile?.id, stats?.current_xp]);
+
   const [loadingDashboard, setLoadingDashboard] = useState(false);
   const [practiceLoggedToday, setPracticeLoggedToday] = useState(false);
   const [avatar, setAvatar] = useState<any | null>(null);
@@ -2143,14 +2189,30 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     };
   }, [fetchDashboardData]);
 
+  // Stable ref for fetchDashboardData to decouple realtime channel lifecycle from profile updates
+  const fetchDashboardDataRef = useRef(fetchDashboardData);
+  useEffect(() => {
+    fetchDashboardDataRef.current = fetchDashboardData;
+  }, [fetchDashboardData]);
+
   // Realtime synchronization for teacher homework & schedule edits
   useEffect(() => {
     if ((pageState !== 'profile' && pageState !== 'inactive_landing') || !profile?.id) return;
 
-    const channel = supabase.channel(`realtime_student_progress_${profile.id}`);
+    const channelTopic = `realtime_student_progress_${profile.id}`;
+
+    // Ensure any stale/unclosed channel from previous hot reload or fast navigation is removed
+    const existing = supabase.getChannels().find(
+      (c: any) => c.topic === `realtime:${channelTopic}` || c.topic === channelTopic
+    );
+    if (existing) {
+      supabase.removeChannel(existing);
+    }
+
+    const channel = supabase.channel(channelTopic);
     channel
       .on('broadcast', { event: 'homework-changed' }, () => {
-        fetchDashboardData();
+        fetchDashboardDataRef.current();
       })
       .on(
         'postgres_changes',
@@ -2160,7 +2222,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           table: 'campus_direct_messages'
         },
         () => {
-          fetchDashboardData();
+          fetchDashboardDataRef.current();
         }
       )
       .on(
@@ -2171,7 +2233,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           table: 'schedule_occurrences'
         },
         () => {
-          fetchDashboardData();
+          fetchDashboardDataRef.current();
         }
       )
       .on(
@@ -2182,7 +2244,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           table: 'schedules'
         },
         () => {
-          fetchDashboardData();
+          fetchDashboardDataRef.current();
         }
       )
       .on(
@@ -2193,7 +2255,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           table: 'fokus_logs'
         },
         () => {
-          fetchDashboardData();
+          fetchDashboardDataRef.current();
         }
       )
       .on(
@@ -2204,7 +2266,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           table: 'student_stats'
         },
         () => {
-          fetchDashboardData();
+          fetchDashboardDataRef.current();
         }
       )
       .on(
@@ -2215,7 +2277,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           table: 'avatars'
         },
         () => {
-          fetchDashboardData();
+          fetchDashboardDataRef.current();
         }
       )
       .on(
@@ -2226,7 +2288,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           table: 'progress_matrix'
         },
         () => {
-          fetchDashboardData();
+          fetchDashboardDataRef.current();
         }
       )
       .on(
@@ -2237,7 +2299,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
           table: 'user_song_skills'
         },
         () => {
-          fetchDashboardData();
+          fetchDashboardDataRef.current();
         }
       )
       .subscribe();
@@ -2245,7 +2307,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     const handleHomeworkUpdate = (e: Event) => {
       const customEvent = e as CustomEvent;
       if (!customEvent.detail?.studentId || customEvent.detail?.studentId === profile.id) {
-        fetchDashboardData();
+        fetchDashboardDataRef.current();
       }
     };
     window.addEventListener('homework-updated', handleHomeworkUpdate);
@@ -2253,7 +2315,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     const handlePracticeUpdate = (e: Event) => {
       const customEvent = e as CustomEvent;
       if (!customEvent.detail?.studentId || customEvent.detail?.studentId === profile.id) {
-        fetchDashboardData();
+        fetchDashboardDataRef.current();
       }
     };
     window.addEventListener('cg_practice_updated', handlePracticeUpdate);
@@ -2263,7 +2325,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       if (typeof BroadcastChannel !== 'undefined') {
         bc = new BroadcastChannel(`cg_practice_sync_${profile.id}`);
         bc.onmessage = () => {
-          fetchDashboardData();
+          fetchDashboardDataRef.current();
         };
       }
     } catch (e) {}
@@ -2276,7 +2338,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         try { bc.close(); } catch (e) {}
       }
     };
-  }, [pageState, profile?.id, fetchDashboardData]);
+  }, [pageState, profile?.id]);
 
   // Payment default selection when school data is fetched
   useEffect(() => {
@@ -3438,7 +3500,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       const { data, error } = await query.order('created_at', { ascending: true });
       if (error) throw error;
       if (data) {
-        setChatMessages(data);
+        const effectiveSchoolId = profile?.school_id || activeChatOcc?.school_id || data[0]?.school_id;
+        const decrypted = await decryptMessagesBatch(data, effectiveSchoolId);
+        setChatMessages(decrypted);
         setTimeout(() => chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
       }
     } catch (err) {
@@ -3516,13 +3580,17 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
       setChatMessages(prev => [...prev, optimisticMessage]);
       setTimeout(() => chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
 
-      const { error } = await supabase.from('campus_direct_messages').insert({
+      const { data, error } = await supabase.from('campus_direct_messages').insert({
         sender_id: studentId,
         recipient_id: recipientId,
         content: messageContent,
         occurrence_id: activeChatOcc.id
-      });
+      }).select().single();
       if (error) throw error;
+      if (data?.content && typeof data.content === 'string' && data.content.startsWith('enc:')) {
+        const effectiveSchoolId = profile?.school_id || activeChatOcc?.school_id || data?.school_id;
+        primeDecryptedCache(effectiveSchoolId, data.content, messageContent);
+      }
 
       setActiveChatOccIds(prev => {
         const newSet = new Set(prev);
@@ -3587,7 +3655,9 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
 
       if (error) throw error;
       if (data) {
-        setParentChatMessages(data);
+        const effectiveSchoolId = profile?.school_id || data[0]?.school_id;
+        const decrypted = await decryptMessagesBatch(data, effectiveSchoolId);
+        setParentChatMessages(decrypted);
         setTimeout(() => parentChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
       }
     } catch (err) {
@@ -3640,7 +3710,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
     setTimeout(() => parentChatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 40);
 
     try {
-      const { error } = await supabase.from('campus_direct_messages').insert({
+      const { data, error } = await supabase.from('campus_direct_messages').insert({
         sender_id: studentId,
         recipient_id: teacherId,
         school_id: profile.school_id,
@@ -3648,8 +3718,11 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
         sender_role: 'parent',
         recipient_role: 'teacher',
         is_read: false
-      });
+      }).select().single();
       if (error) throw error;
+      if (data?.content && typeof data.content === 'string' && data.content.startsWith('enc:')) {
+        primeDecryptedCache(profile.school_id, data.content, content);
+      }
       await fetchParentChatMessages();
     } catch (err) {
       console.error('[QRLanding] Error sending parent message:', err);
@@ -11339,6 +11412,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                         </div>
 
                         {/* XP points card (Purple/Indigo Gradient) */}
+                        <style>{CAMPUS_XP_EFFECTS_CSS}</style>
                         <div style={{
                           background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
                           borderRadius: '20px',
@@ -11347,12 +11421,21 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           flexDirection: 'column',
                           justifyContent: 'space-between',
                           position: 'relative',
-                          overflow: 'hidden',
-                          boxShadow: '0 4px 14px rgba(99, 102, 241, 0.25)',
+                          overflow: 'visible',
+                          boxShadow: isQRLandingXpPulsing
+                            ? '0 0 35px 8px rgba(250, 204, 21, 0.85), 0 4px 14px rgba(99, 102, 241, 0.25)'
+                            : '0 4px 14px rgba(99, 102, 241, 0.25)',
                           color: '#ffffff',
                           minHeight: '86px',
-                          boxSizing: 'border-box'
-                        }}>
+                          boxSizing: 'border-box',
+                          border: isQRLandingXpPulsing ? '2px solid #facc15' : 'none',
+                          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                        }} className={isQRLandingXpPulsing ? 'campus-xp-pulsing' : ''}>
+                          {qrLandingFloatingXp !== null && (
+                            <div className="campus-xp-floating-badge">
+                              +{qrLandingFloatingXp} XP eingezahlt! 🌟
+                            </div>
+                          )}
                           <div style={{
                             position: 'absolute',
                             top: '12px',
@@ -11360,14 +11443,15 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                             width: '30px',
                             height: '30px',
                             borderRadius: '10px',
-                            background: 'rgba(255, 255, 255, 0.22)',
+                            background: isQRLandingXpPulsing ? 'rgba(250, 204, 21, 0.4)' : 'rgba(255, 255, 255, 0.22)',
                             backdropFilter: 'blur(4px)',
                             WebkitBackdropFilter: 'blur(4px)',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center'
+                            justifyContent: 'center',
+                            transition: 'all 0.3s ease'
                           }}>
-                            <Sparkles size={16} color="#ffffff" />
+                            <Sparkles size={16} color={isQRLandingXpPulsing ? '#fef08a' : '#ffffff'} />
                           </div>
                           <div>
                             <span style={{ fontSize: '0.64rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.85)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
@@ -11376,7 +11460,7 @@ export function QRLandingPage({ token }: QRLandingPageProps) {
                           </div>
                           <div style={{ marginTop: '10px' }}>
                             <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#ffffff', lineHeight: 1 }}>
-                              {stats?.current_xp || 0} <span style={{ fontSize: '0.78rem', fontWeight: 800 }}>XP</span>
+                              {displayQrXp || stats?.current_xp || 0} <span style={{ fontSize: '0.78rem', fontWeight: 800 }}>XP</span>
                             </span>
                           </div>
                         </div>

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatTeacherFullName, formatSingleStudentAnonymized } from '../utils/nameHelper';
+import { decryptMessagesBatch, primeDecryptedCache } from '../lib/security/messageCrypto';
 
 export interface CampusAppointmentShoutboxModalProps {
   isOpen: boolean;
@@ -208,7 +209,13 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
           return false;
         });
 
-        setChatMessages(filtered);
+        const effectiveSchoolId = currentUserProfile?.school_id || 
+          (Array.isArray(currentUserProfile?.schools) ? currentUserProfile?.schools[0]?.id : currentUserProfile?.schools?.id) || 
+          occurrence?.school_id || 
+          filtered[0]?.school_id;
+        const decrypted = await decryptMessagesBatch(filtered, effectiveSchoolId);
+
+        setChatMessages(decrypted);
         setTimeout(() => chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
 
         // Mark incoming messages as read
@@ -397,7 +404,7 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
     setTimeout(() => chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 40);
 
     try {
-      const { error } = await supabase.from('campus_direct_messages').insert({
+      const { data, error } = await supabase.from('campus_direct_messages').insert({
         sender_id: currentUserId,
         recipient_id: recipientId,
         content: text,
@@ -405,8 +412,14 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
         is_read: false,
         is_system: false,
         sender_role: isParentSender ? 'parent' : (currentUserRole === 'teacher' ? 'teacher' : 'student')
-      });
+      }).select().single();
       if (error) throw error;
+      const effectiveSchoolId = currentUserProfile?.school_id || 
+        (Array.isArray(currentUserProfile?.schools) ? currentUserProfile?.schools[0]?.id : currentUserProfile?.schools?.id) || 
+        occurrence?.school_id;
+      if (data?.content && typeof data.content === 'string' && data.content.startsWith('enc:')) {
+        primeDecryptedCache(effectiveSchoolId, data.content, text);
+      }
       await fetchMessages();
     } catch (err) {
       console.error('[CampusAppointmentShoutboxModal] Error sending message:', err);
@@ -688,6 +701,9 @@ export const CampusAppointmentShoutboxModal: React.FC<CampusAppointmentShoutboxM
       }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Termin-Details & Chat"
         onClick={e => e.stopPropagation()}
         className="pwa-modal-drawer"
         style={{

@@ -21,8 +21,8 @@ export function useTeacherStudents({
 }: UseTeacherStudentsProps) {
   const [allStudents, setAllStudents] = useState<any[]>([]);
   const [studentSearch, setStudentSearch] = useState('');
-  const [studentLetter, setStudentLetter] = useState('ALL');
-  const [studentInstrumentFilter, setStudentInstrumentFilter] = useState('ALL');
+  const [studentLetter, setStudentLetter] = useState<string | null>(null);
+  const [studentInstrumentFilter, setStudentInstrumentFilter] = useState('all');
 
   const { visible: showRealNames, toggleVisibility: toggleRealNames } = useRealNamesVisibility();
 
@@ -38,21 +38,27 @@ export function useTeacherStudents({
 
   // 🏛️ Authoritative Supabase Student Hydration for Teacher Dashboard
   const loadStudents = useCallback(async () => {
+    if (teacher?.role?.toLowerCase() === 'student') {
+      setAllStudents([]);
+      return;
+    }
     const effectiveSchoolId = schoolData?.id || teacher?.school_id || (Array.isArray(teacher?.schools) ? teacher?.schools[0]?.id : teacher?.schools?.id);
     const effectiveTeacherId = userId || teacher?.id;
     if (!effectiveSchoolId || !effectiveTeacherId) return;
 
     try {
-      // 1. Fetch assigned student IDs across schedules, schedule_occurrences, and bands
+      // 1. Fetch assigned student IDs across schedules, schedule_occurrences, bands, and student_teachers in parallel
       let assignedStudentIds: string[] = [];
-      const [{ data: schedData }, { data: occData }, { data: groupData }] = await Promise.all([
+      const [{ data: schedData }, { data: occData }, { data: groupData }, stRes] = await Promise.all([
         supabase.from('schedules').select('student_id').eq('teacher_id', effectiveTeacherId),
         supabase.from('schedule_occurrences').select('student_id').eq('teacher_id', effectiveTeacherId),
-        supabase.from('bands').select('id').eq('coach_id', effectiveTeacherId)
+        supabase.from('bands').select('id').eq('coach_id', effectiveTeacherId),
+        supabase.from('student_teachers').select('student_id').eq('teacher_id', effectiveTeacherId)
       ]);
 
       const schedStudentIds = (schedData || []).map((s: any) => s.student_id).filter(Boolean);
       const occStudentIds = (occData || []).map((s: any) => s.student_id).filter(Boolean);
+      const stStudentIds = (stRes?.data || []).map((s: any) => s.student_id).filter(Boolean);
 
       let groupStudentIds: string[] = [];
       if (groupData && groupData.length > 0) {
@@ -61,26 +67,15 @@ export function useTeacherStudents({
         groupStudentIds = (gsData || []).map((gs: any) => gs.user_id).filter(Boolean);
       }
 
-      let stStudentIds: string[] = [];
-      try {
-        const { data: stData } = await supabase.from('student_teachers').select('student_id').eq('teacher_id', effectiveTeacherId);
-        stStudentIds = (stData || []).map((s: any) => s.student_id).filter(Boolean);
-      } catch (e) {}
-
       assignedStudentIds = Array.from(new Set([...schedStudentIds, ...occStudentIds, ...groupStudentIds, ...stStudentIds]));
 
       // 2. Fetch authoritative school roster and filter for this teacher
       const schoolRoster = await fetchSchoolRoster(effectiveSchoolId, supabase);
-      let teacherStudents = getTeacherRoster(effectiveTeacherId, schoolRoster, assignedStudentIds);
-
-      // In GrooveLab mode, show students who have GrooveLab active
-      if (activePlatform !== 'campus') {
-        const glStudents = teacherStudents.filter((s: any) => s.is_groovelab_active);
-        // Resilient fallback: if filter returns 0 but teacher has students, show them
-        if (glStudents.length > 0) {
-          teacherStudents = glStudents;
-        }
-      }
+      const rawTeacherInst = teacher?.instrument || '';
+      const teacherInstruments = rawTeacherInst
+        ? rawTeacherInst.split(',').map((i: string) => i.trim().toLowerCase()).filter(Boolean)
+        : [];
+      const teacherStudents = getTeacherRoster(effectiveTeacherId, schoolRoster, assignedStudentIds, teacherInstruments);
 
       setAllStudents(teacherStudents);
     } catch (err) {

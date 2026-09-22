@@ -361,7 +361,7 @@ export const AddSiblingModal: React.FC<AddSiblingModalProps> = ({
       zIndex: 100001,
       padding: '20px'
     }}>
-      <div style={{
+      <div role="dialog" aria-modal="true" style={{
         background: '#ffffff',
         borderRadius: '28px',
         maxWidth: '480px',

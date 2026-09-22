@@ -1141,6 +1141,27 @@ export const AdminSongsView: React.FC<AdminSongsViewProps> = ({
                     </div>
                   )}
 
+                  <div style={{ display: 'flex', gap: '16px', alignItems: 'center', padding: '10px 14px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', margin: '4px 0 8px 0' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>
+                      <input 
+                        type="checkbox"
+                        checked={editingSong.is_groovelab_active !== undefined ? !!editingSong.is_groovelab_active : true}
+                        onChange={(e) => setEditingSong({ ...editingSong, is_groovelab_active: e.target.checked })}
+                        style={{ accentColor: '#eab308', width: '16px', height: '16px', cursor: 'pointer' }}
+                      />
+                      <span>In GrooveLab aktiv</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>
+                      <input 
+                        type="checkbox"
+                        checked={editingSong.is_campus_active !== undefined ? !!editingSong.is_campus_active : true}
+                        onChange={(e) => setEditingSong({ ...editingSong, is_campus_active: e.target.checked })}
+                        style={{ accentColor: '#34a853', width: '16px', height: '16px', cursor: 'pointer' }}
+                      />
+                      <span>In Campus aktiv</span>
+                    </label>
+                  </div>
+
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button type="submit" style={{ flex: 2, background: brandColor, color: '#1e293b', border: 'none', padding: '10px', borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer' }}>Speichern</button>
                     <button type="button" onClick={() => setEditingSong(null)} style={{ flex: 1, background: 'white', color: '#64748b', border: '1px solid #e2e8f0', padding: '10px', borderRadius: '10px', fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem' }}>Abbrechen</button>

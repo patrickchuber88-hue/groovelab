@@ -37,7 +37,7 @@ export const TeacherInviteStudentModal: React.FC<TeacherInviteStudentModalProps>
       position: 'fixed', inset: 0, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px)',
       zIndex: 1500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px'
     }}>
-      <div style={{
+      <div role="dialog" aria-modal="true" style={{
         background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '32px',
         width: '100%', maxWidth: '480px', padding: '32px',
         boxShadow: '0 20px 60px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', gap: '24px'

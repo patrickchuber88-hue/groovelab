@@ -284,19 +284,21 @@ export const GrooveLeaderboardWidget: React.FC<GrooveLeaderboardWidgetProps> = (
     <div style={{
       width: '100%',
       height: '100%',
-      minHeight: '520px',
+      minHeight: '0',
+      maxHeight: '100%',
       background: '#ffffff',
-      borderRadius: useNotebookLayout ? '28px' : '24px',
+      borderRadius: useNotebookLayout ? '24px' : '20px',
       border: '1.5px solid #fed7aa',
       boxShadow: useNotebookLayout
         ? '0 12px 36px -8px rgba(217, 119, 6, 0.10), 0 2px 8px rgba(0, 0, 0, 0.03)'
         : '0 10px 30px -6px rgba(0, 0, 0, 0.05)',
-      padding: useNotebookLayout ? '22px 24px' : '18px 20px',
+      padding: useNotebookLayout ? '14px 18px' : '14px 16px',
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'space-between',
       boxSizing: 'border-box',
-      gap: '14px'
+      gap: '10px',
+      overflow: 'hidden'
     }}>
       {/* 1. Header: Titel & Schul-Badge */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>

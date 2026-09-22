@@ -8,6 +8,7 @@
  */
 
 import { getEffectiveInstrument, isGenericInstrument } from '../utils/avatarResolutionEngine';
+export { isGenericInstrument };
 import {
   DbUserRosterRecord,
   DbTeacherRosterRecord,
@@ -332,11 +333,26 @@ export async function fetchSchoolRoster(schoolId: string, supabaseClient: any, f
 export function getTeacherRoster(
   teacherId: string,
   fullRoster: RosterStudent[],
-  additionalAssignedStudentIds: string[] = []
+  additionalAssignedStudentIds: string[] = [],
+  teacherInstruments?: string[]
 ): RosterStudent[] {
   if (!teacherId || !Array.isArray(fullRoster)) return [];
   const assignedSet = new Set(additionalAssignedStudentIds);
-  return fullRoster.filter(s => s.teacher_id === teacherId || assignedSet.has(s.id));
+  let roster = fullRoster.filter(s => s.teacher_id === teacherId || assignedSet.has(s.id));
+  if (teacherInstruments && teacherInstruments.length > 0) {
+    const cleanTeacherInsts = teacherInstruments.map(i => i.trim().toLowerCase()).filter(Boolean);
+    if (cleanTeacherInsts.length > 0) {
+      roster = roster.filter(s => {
+        // Band/schedule assignments preserved
+        if (assignedSet.has(s.id)) return true;
+        // Generic stubs ('Musiker', etc.) inherit teacher instrument
+        if (isGenericInstrument(s.instrument)) return true;
+        const sInst = (s.instrument || s.resolved_instrument || '').toLowerCase().trim();
+        return cleanTeacherInsts.some(tInst => sInst.includes(tInst) || tInst.includes(sInst));
+      });
+    }
+  }
+  return roster;
 }
 
 /**
@@ -356,4 +372,54 @@ export function getTeacherStudentCount(
   }
   const assignedSet = new Set(additionalAssignedStudentIds);
   return fullRoster.filter(s => s.teacher_id === teacherId || assignedSet.has(s.id)).length;
+}
+
+/**
+ * Canonical helper to check if a student's instrument is compatible with a teacher's instruments.
+ * Fail-closed: If student plays a specific instrument (e.g. 'Schlagzeug') and teacher teaches 'Gitarre', returns false.
+ * Generic stubs ('Musiker', etc.) are compatible with any teacher.
+ */
+export function isTeacherInstrumentCompatible(
+  teacherInstrument: string | null | undefined,
+  studentInstrument: string | null | undefined
+): boolean {
+  if (!studentInstrument || isGenericInstrument(studentInstrument)) return true;
+  if (!teacherInstrument || isGenericInstrument(teacherInstrument)) return true;
+
+  const normalize = (val: string) =>
+    val
+      .toLowerCase()
+      .replace(/ä/g, 'ae')
+      .replace(/ö/g, 'oe')
+      .replace(/ü/g, 'ue')
+      .replace(/ß/g, 'ss')
+      .replace(/[^a-z0-9]/g, '');
+
+  const mapAlias = (token: string) => {
+    const c = normalize(token);
+    if (['schlagzeug', 'drums', 'drumset', 'percussion', 'cajon'].includes(c)) return 'schlagzeug';
+    if (['gitarre', 'guitar', 'egitarre', 'akustikgitarre', 'westerngitarre', 'konzertgitarre'].includes(c)) return 'gitarre';
+    if (['bass', 'ebass', 'kontrabass'].includes(c)) return 'bass';
+    if (['klavier', 'piano', 'epiano', 'keyboard', 'fluegel'].includes(c)) return 'klavier';
+    if (['gesang', 'vocals', 'vocal', 'stimme'].includes(c)) return 'gesang';
+    if (['saxophon', 'saxophone', 'sax'].includes(c)) return 'saxophon';
+    if (['trompete', 'trumpet'].includes(c)) return 'trompete';
+    if (['geige', 'violine', 'violin'].includes(c)) return 'geige';
+    if (['floete', 'querfloete', 'blockfloete', 'flute'].includes(c)) return 'floete';
+    return c;
+  };
+
+  const studentTokens = studentInstrument
+    .split(/[,/&+;\s]+/)
+    .map(t => mapAlias(t))
+    .filter(Boolean);
+
+  const teacherTokens = teacherInstrument
+    .split(/[,/&+;\s]+/)
+    .map(t => mapAlias(t))
+    .filter(Boolean);
+
+  if (studentTokens.length === 0 || teacherTokens.length === 0) return true;
+
+  return studentTokens.some(st => teacherTokens.includes(st));
 }

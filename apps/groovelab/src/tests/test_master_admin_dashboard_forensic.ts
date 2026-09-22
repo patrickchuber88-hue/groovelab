@@ -369,11 +369,12 @@ function testHighSecurityHardenings() {
   const schoolsHookContent = fs.readFileSync(schoolsHookPath, 'utf-8');
 
   assert(
-    schoolsHookContent.includes("from('audit_logs').insert") && schoolsHookContent.includes('SUPPORT_GHOST_SESSION_STARTED'),
+    (schoolsHookContent.includes('logApplicationAudit') || schoolsHookContent.includes("from('audit_logs').insert")) && schoolsHookContent.includes('SUPPORT_GHOST_SESSION_STARTED'),
     'Ghost Transparency (DSGVO Art. 28)',
     'handleStartGhostMode writes transparent audit record into target school audit_logs',
     'Transparent school audit log missing in useMasterAdminSchools.ts'
   );
+
 
   // 5. Client-Side Runtime Integrity Guard
   const shieldHookPath = path.resolve(__dirname, '../components/masterAdmin/hooks/useMasterAdminSecurityShield.ts');

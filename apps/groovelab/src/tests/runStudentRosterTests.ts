@@ -1,3 +1,10 @@
+// =============================================================================
+// 🏛️  Campus-Groovelab Student Roster Service Invariant Test Suite
+// Standards: DIN 5008 (Abschnitt 8 - Namensnormalisierung),
+//            DSGVO Art. 5 (Datenminimierung & Richtigkeit), OWASP ASVS Level 3
+// Invariante: Deterministische Deduplizierung und Roster-Integrität
+// =============================================================================
+
 import assert from 'node:assert';
 import { 
   normalizeStudentKey, 
@@ -8,7 +15,7 @@ import {
   RosterStudent 
 } from '../services/studentRosterService';
 
-console.log('=== RUNNING STUDENT ROSTER SERVICE INVARIANT TESTS ===');
+console.log('=== RUNNING STUDENT ROSTER SERVICE INVARIANT TESTS (DIN 5008 & DSGVO Art. 5) ===');
 
 // Test 1: normalizeStudentKey
 assert.strictEqual(normalizeStudentKey('Dominik ', 'H.'), 'dominik_h', 'normalize extra space & dot failed');
@@ -94,5 +101,32 @@ assert.strictEqual(getTeacherStudentCount('t1', mockRoster, 'all_accessible', ['
 const t1Roster = getTeacherRoster('t1', mockRoster);
 assert.strictEqual(t1Roster.length, 2, 't1 roster length should be 2');
 console.log('✔ Test 4: getTeacherRoster & getTeacherStudentCount passed');
+
+// Test 5: 1% Goldstandard Teacher Instrument Invariant Guard
+const mockInstrumentRoster: RosterStudent[] = [
+  { id: 's1', school_id: 'sch1', teacher_id: 't1', role: 'student', first_name: 'Amelia', last_name: 'N.', instrument: 'Gitarre', is_active: true, is_campus_active: true, is_groovelab_active: true, status: 'active', isPendingOnboarding: false, created_at: '' },
+  { id: 's2', school_id: 'sch1', teacher_id: 't1', role: 'student', first_name: 'Jonah', last_name: 'K.', instrument: 'Musiker', is_active: true, is_campus_active: true, is_groovelab_active: true, status: 'active', isPendingOnboarding: false, created_at: '' },
+  { id: 's3', school_id: 'sch1', teacher_id: 't1', role: 'student', first_name: 'Aurora', last_name: 'D.', instrument: 'Schlagzeug', is_active: true, is_campus_active: true, is_groovelab_active: true, status: 'active', isPendingOnboarding: false, created_at: '' }
+];
+
+const t1FilteredRoster = getTeacherRoster('t1', mockInstrumentRoster, [], ['gitarre']);
+assert.strictEqual(t1FilteredRoster.length, 2, 't1 roster must exclude Schlagzeug student s3');
+assert.strictEqual(t1FilteredRoster.some(s => s.id === 's3'), false, 'Aurora (Schlagzeug) must never be in guitar teacher roster');
+assert.strictEqual(t1FilteredRoster.some(s => s.id === 's1'), true, 'Amelia (Gitarre) must be in guitar teacher roster');
+assert.strictEqual(t1FilteredRoster.some(s => s.id === 's2'), true, 'Jonah (generic Musiker) must be in guitar teacher roster');
+console.log('✔ Test 5: 1% Goldstandard Teacher Instrument Invariant Guard passed');
+
+// Test 6: isTeacherInstrumentCompatible
+import { isTeacherInstrumentCompatible } from '../services/studentRosterService';
+
+assert.strictEqual(isTeacherInstrumentCompatible('Gitarre', 'Schlagzeug'), false, 'Gitarre teacher cannot teach Schlagzeug');
+assert.strictEqual(isTeacherInstrumentCompatible('Gitarre', 'Gitarre'), true, 'Gitarre teacher can teach Gitarre');
+assert.strictEqual(isTeacherInstrumentCompatible('Gitarre', 'E-Gitarre'), true, 'Gitarre teacher can teach E-Gitarre');
+assert.strictEqual(isTeacherInstrumentCompatible('Gitarre, E-Bass', 'Bass'), true, 'Multi-instrument teacher matches Bass');
+assert.strictEqual(isTeacherInstrumentCompatible('Gitarre', 'Musiker'), true, 'Generic Musiker is compatible with any teacher');
+assert.strictEqual(isTeacherInstrumentCompatible('Schlagzeug', 'Drums'), true, 'Schlagzeug teacher can teach Drums');
+assert.strictEqual(isTeacherInstrumentCompatible('Schlagzeug', 'Klavier'), false, 'Schlagzeug teacher cannot teach Klavier');
+assert.strictEqual(isTeacherInstrumentCompatible('Klavier / Keyboard', 'Piano'), true, 'Klavier/Keyboard matches Piano');
+console.log('✔ Test 6: isTeacherInstrumentCompatible passed');
 
 console.log('🎉 ALL STUDENT ROSTER SERVICE TESTS PASSED PERFECTLY!');

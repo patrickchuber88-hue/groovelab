@@ -302,8 +302,9 @@ export function renderCampusStartupGates(props: CampusStartupGatesProps): React.
 
     const isStandalone = typeof window !== 'undefined' && ((window.navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches);
     const currentUserId = typeof window !== 'undefined' ? sessionStorage.getItem('groovelab_user_id') : null;
+    const isDevSim = urlParams.get('dev_sim') === 'true';
 
-    if (isStandalone && currentUserId) {
+    if (isStandalone && currentUserId && !isDevSim) {
       const externalUrl = `${window.location.origin}/qr/${resolvedEffectiveQrToken}?auto_pair=true`;
       window.open(externalUrl, '_blank');
       navigate('/dashboard', { replace: true });

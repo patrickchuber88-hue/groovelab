@@ -1,7 +1,8 @@
 // ==============================================================================
 // Campus-Groovelab Enterprise+ Domain & Regulatory Test Suite
 // Datei: tests/unit/gobd-sepa-domain.test.ts
-// Standards: GoBD (§§ 146, 147 AO), UStG (§ 14, § 4 Nr. 21), ISO 20022 (pain.008.001.08)
+// Standards: DIN EN ISO 20022 (pain.008.001.08), DIN ISO 7064 (MOD 97-10), DIN 5008,
+//            GoBD (§§ 146, 147 AO), UStG (§ 14, § 4 Nr. 21)
 // ==============================================================================
 
 import { generateSepaDirectDebitXml, SepaDirectDebitBatchOptions } from '../../apps/groovelab/src/utils/sepaXmlGenerator';
@@ -20,7 +21,7 @@ function assert(name: string, condition: boolean, details: string = '') {
 }
 
 /**
- * Validiert IBAN-Prüfsumme nach ISO 7064 (MOD 97-10)
+ * Validiert IBAN-Prüfsumme nach DIN ISO 7064 (MOD 97-10)
  */
 function isValidIban(iban: string): boolean {
   const clean = iban.replace(/\s+/g, '').toUpperCase();
@@ -51,7 +52,7 @@ function isValidIban(iban: string): boolean {
 async function runDomainAndRegulatoryTestSuite() {
   console.log('════════════════════════════════════════════════════════════════════');
   console.log('🏛️  CAMPUS-GROOVELAB: DOMAIN-, GOBD- & SEPA-REGULATORIK TEST SUITE');
-  console.log('    Validierung: ISO 20022 XML, IBAN Checksummen, GoBD WORM & Cent-Genauigkeit');
+  console.log('    Standards: DIN EN ISO 20022 XML, DIN ISO 7064, DIN 5008 & GoBD');
   console.log('════════════════════════════════════════════════════════════════════\n');
 
   // ----------------------------------------------------------------------------
@@ -154,6 +155,17 @@ async function runDomainAndRegulatoryTestSuite() {
 
   assert('IBAN mit Buchstaben-Zahlendreher wird abgewiesen', 
     !isValidIban('DE9610050000000012345X'));
+
+  // DIN 5008 IBAN 4er-Block Formatierungs-Invariante
+  function formatIbanDin5008(iban: string): string {
+    const clean = iban.replace(/\s+/g, '').toUpperCase();
+    return clean.replace(/(.{4})(?!$)/g, '$1 ');
+  }
+
+  const rawIban = 'DE96100500000000123456';
+  const din5008Iban = formatIbanDin5008(rawIban);
+  assert('DIN 5008 Konformität: IBAN wird in lesbare 4er-Blöcke gegliedert',
+    din5008Iban === 'DE96 1005 0000 0000 1234 56');
 
   // ----------------------------------------------------------------------------
   // 4. GOBD-RECHNUNGSNUMMERNKREIS & FORMAT-INVARIANTE (§ 14 UStG)

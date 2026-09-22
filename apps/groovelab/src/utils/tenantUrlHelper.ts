@@ -6,6 +6,8 @@
  * for zero-mail onboarding, parent invitations, teacher logins, and PDF generation.
  */
 
+import { isLocalDevEnvironment } from './devEnvironment';
+
 /**
  * Converts a school name into a clean, URL-safe subdomain slug.
  */
@@ -117,8 +119,17 @@ export function getTeacherLoginUrl(
  */
 export function isLocalhostEnvironment(): boolean {
   if (typeof window === 'undefined') return false;
-  const host = window.location.hostname;
-  return host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host.endsWith('.local');
+  const host = window.location.hostname.toLowerCase();
+  return isLocalDevEnvironment() ||
+         host === 'localhost' || 
+         host === '127.0.0.1' || 
+         host === '0.0.0.0' || 
+         host === '[::1]' ||
+         host.endsWith('.localhost') ||
+         host.endsWith('.local') ||
+         /^192\.168\./.test(host) ||
+         /^10\./.test(host) ||
+         /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host);
 }
 
 /**
@@ -126,8 +137,7 @@ export function isLocalhostEnvironment(): boolean {
  * Eliminates all URL parameter bypasses in production builds.
  */
 export function isDevEnvironment(): boolean {
-  const isViteDev = typeof import.meta !== 'undefined' && Boolean((import.meta as any)?.env?.DEV);
-  return Boolean(isViteDev && isLocalhostEnvironment());
+  return isLocalDevEnvironment();
 }
 
 /**
@@ -146,12 +156,17 @@ export function getCanonicalQrLandingUrl(qrToken?: string | null): string {
     return `https://campus-groovelab.de/qr/${cleanToken}`;
   }
 
-  const hostname = window.location.hostname;
-  const isLocal = hostname === 'localhost' || 
+  const hostname = window.location.hostname.toLowerCase();
+  const isLocal = isLocalDevEnvironment() ||
+                  hostname === 'localhost' || 
                   hostname === '127.0.0.1' || 
-                  hostname.startsWith('192.168.') || 
-                  hostname.startsWith('10.') || 
-                  hostname.endsWith('.local');
+                  hostname === '0.0.0.0' || 
+                  hostname === '[::1]' ||
+                  hostname.endsWith('.localhost') ||
+                  hostname.endsWith('.local') ||
+                  /^192\.168\./.test(hostname) ||
+                  /^10\./.test(hostname) ||
+                  /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname);
 
   if (isLocal) {
     return `${window.location.origin}/qr/${cleanToken}`;

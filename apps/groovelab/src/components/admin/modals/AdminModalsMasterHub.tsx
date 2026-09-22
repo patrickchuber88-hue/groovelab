@@ -9,6 +9,7 @@ const AVVModal = lazy(() => import('../../AVVModal').then(m => ({ default: m.AVV
 const MeisterwerkDocumentationModal = lazy(() => import('../../MeisterwerkDocumentationModal').then(m => ({ default: m.MeisterwerkDocumentationModal })));
 const AdminSongDetailModal = lazy(() => import('./AdminSongDetailModal').then(m => ({ default: m.AdminSongDetailModal })));
 const AdminTextbausteinModal = lazy(() => import('./AdminTextbausteinModal').then(m => ({ default: m.AdminTextbausteinModal })));
+const AdminRoomLayoutModal = lazy(() => import('./AdminRoomLayoutModal').then(m => ({ default: m.AdminRoomLayoutModal })));
 
 export interface AdminModalsMasterHubProps {
   // Batch iPad
@@ -77,6 +78,15 @@ export interface AdminModalsMasterHubProps {
   onRemoveMember: (memberId: string) => void;
   onAddMember: (bandId: string, userId: string | null, instrument: string, externalName?: string) => void;
 
+  // Room Layout
+  customizingRoom?: any | null;
+  setCustomizingRoom?: (room: any | null) => void;
+  stations?: any[];
+  setStations?: React.Dispatch<React.SetStateAction<any[]>>;
+  rooms?: any[];
+  setRooms?: React.Dispatch<React.SetStateAction<any[]>>;
+  kiosks?: any[] | null;
+
   brandColor?: string;
 }
 
@@ -84,6 +94,13 @@ export const AdminModalsMasterHub: React.FC<AdminModalsMasterHubProps> = ({
   showBatchiPadModal,
   setShowBatchiPadModal,
   onExecuteBatchiPad,
+  customizingRoom,
+  setCustomizingRoom,
+  stations = [],
+  setStations,
+  rooms = [],
+  setRooms,
+  kiosks = [],
   selectedStudent,
   setSelectedStudent,
   admin,
@@ -341,6 +358,24 @@ export const AdminModalsMasterHub: React.FC<AdminModalsMasterHubProps> = ({
         onAddMember={onAddMember}
         brandColor={brandColor}
       />
+
+      {/* 10. Room Layout Modal */}
+      {customizingRoom && setCustomizingRoom && setStations && setRooms && (
+        <Suspense fallback={null}>
+          <AdminRoomLayoutModal
+            room={customizingRoom}
+            onClose={() => setCustomizingRoom(null)}
+            stations={stations}
+            setStations={setStations}
+            rooms={rooms}
+            setRooms={setRooms}
+            kiosks={kiosks}
+            supabase={supabase}
+            activePlatform={activePlatform}
+            brandColor={brandColor}
+          />
+        </Suspense>
+      )}
     </>
   );
 };

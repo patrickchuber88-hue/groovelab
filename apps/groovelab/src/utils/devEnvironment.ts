@@ -20,7 +20,7 @@
  */
 export function isLocalDevEnvironment(): boolean {
   // 🛡️ Axiom 1: Compile-Time Gate (AST Dead-Code Elimination)
-  if (!import.meta.env.DEV) {
+  if (!import.meta?.env?.DEV) {
     return false;
   }
 
@@ -34,7 +34,9 @@ export function isLocalDevEnvironment(): boolean {
   return (
     hostname === 'localhost' ||
     hostname === '127.0.0.1' ||
+    hostname === '0.0.0.0' ||
     hostname === '[::1]' ||
+    hostname.endsWith('.localhost') ||
     hostname.endsWith('.local') ||
     /^192\.168\./.test(hostname) ||
     /^10\./.test(hostname) ||

@@ -99,7 +99,7 @@ export const StudentSessionCelebrationModal: React.FC<StudentSessionCelebrationM
         fontFamily: '"Plus Jakarta Sans", -apple-system, system-ui, sans-serif'
       }}
     >
-      <div style={{
+      <div role="dialog" aria-modal="true" style={{
         width: '100%',
         maxWidth: '380px',
         background: '#ffffff',

@@ -86,7 +86,7 @@ return (
             padding: '20px',
             fontFamily: '"Plus Jakarta Sans", sans-serif'
           }}>
-            <div style={{
+            <div role="dialog" aria-modal="true" style={{
               background: '#ffffff',
               borderRadius: isMobile ? '0' : '28px',
               width: '100%',

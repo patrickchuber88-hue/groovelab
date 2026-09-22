@@ -261,7 +261,7 @@ export const HomeworkTransferModal: React.FC<HomeworkTransferModalProps> = ({
         if (e.target === e.currentTarget && !isSubmitting) onClose();
       }}
     >
-      <div 
+      <div role="dialog" aria-modal="true" 
         style={{
           width: '100%',
           maxWidth: '680px',

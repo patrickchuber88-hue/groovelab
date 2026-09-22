@@ -1,4 +1,5 @@
 import { supabase, deleteUserStorageAssets } from '../lib/supabase';
+import { logApplicationAudit } from '../services/auditLogService';
 
 export interface DeleteStudentOptions {
   activePlatform?: 'campus' | 'groovelab' | 'all';
@@ -272,23 +273,24 @@ export async function deleteStudentFully(
     // 🛡️ Revisionssicheres Audit-Logging (Art. 5 Abs. 2 DSGVO / OWASP ASVS Level 3)
     if (schId) {
       try {
-        await supabase.from('audit_logs').insert({
+        await logApplicationAudit({
           action: 'STUDENT_DELETED_PERMANENTLY',
-          school_id: schId,
-          user_id: studentId,
+          schoolId: schId,
+          tableName: 'students',
+          recordId: studentId,
           details: {
             deleted_student_id: studentId,
             student_first_name_masked: fName ? `${fName.slice(0, 1)}***` : 'Anonym',
             records_purged_count: idsArray.length,
             platform: options.activePlatform || 'all',
             action_by: 'administrator',
-            timestamp: new Date().toISOString()
-          }
+          },
         });
       } catch (auditErr) {
         console.warn('[studentDeletionService] Audit log warning (non-fatal):', auditErr);
       }
     }
+
 
     return { success: true, softDeleted: false };
   } catch (err: any) {

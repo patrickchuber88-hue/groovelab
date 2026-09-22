@@ -43,7 +43,7 @@ export const StudentMatchCelebrationModal: React.FC<StudentMatchCelebrationModal
       <Suspense fallback={null}>
         <Confetti width={typeof window !== 'undefined' ? window.innerWidth : 400} height={typeof window !== 'undefined' ? window.innerHeight : 800} recycle={false} numberOfPieces={280} gravity={0.22} />
       </Suspense>
-      <div
+      <div role="dialog" aria-modal="true"
         style={{
           width: '100%',
           maxWidth: '420px',

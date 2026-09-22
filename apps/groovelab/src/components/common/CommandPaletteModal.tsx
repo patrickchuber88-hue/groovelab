@@ -216,7 +216,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div
+      <div role="dialog" aria-modal="true"
         style={{
           width: '100%',
           maxWidth: '620px',

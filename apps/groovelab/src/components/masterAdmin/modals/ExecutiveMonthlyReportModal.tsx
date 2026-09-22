@@ -56,7 +56,7 @@ export const ExecutiveMonthlyReportModal: React.FC<ExecutiveMonthlyReportModalPr
       alignItems: 'center',
       padding: '24px'
     }}>
-      <div style={{
+      <div role="dialog" aria-modal="true" style={{
         background: '#ffffff',
         borderRadius: '28px',
         maxWidth: '850px',

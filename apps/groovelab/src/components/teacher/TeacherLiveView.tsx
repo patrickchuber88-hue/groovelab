@@ -9,6 +9,7 @@ import { supabase } from "../../lib/supabase";
 import { formatTeacherFullName, maskLastName } from "../../utils/nameHelper";
 import { renderInstrumentIcon } from "../../utils/instruments";
 import { AvatarImage } from "../common/AvatarImage";
+import { normalizeStationsForBlueprint } from "../../constants/groovelabLayoutDefaults";
 
 const TEACHER_INSTRUMENT_ICONS: Record<string, any> = new Proxy({}, {
   get: (_, prop: string) => renderInstrumentIcon(prop)
@@ -348,7 +349,7 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
         </div>
 
         {sess ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, marginTop: '2px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, marginTop: '2px', animation: 'fadeInScale 0.25s ease-out' }}>
             <div style={{ 
               width: '104px', 
               height: '104px', 
@@ -377,7 +378,7 @@ const StationNode = React.memo(({ num, color, inst, sess, isMe, viewMode, onProf
             </div>
           </div>
         ) : (
-          <div style={{ margin: 'auto', color: '#e2e8f0', fontWeight: 900, fontSize: '0.85rem', letterSpacing: '0.15em' }}>BEREIT</div>
+          <div style={{ margin: 'auto', color: '#cbd5e1', fontWeight: 900, fontSize: '0.85rem', letterSpacing: '0.15em', userSelect: 'none' }}>BEREIT</div>
         )}
       </div>
     </div>
@@ -612,6 +613,7 @@ export interface TeacherLiveViewProps {
   setToastMessage: (msg: string | null) => void;
   isMobile?: boolean;
   isDesktop?: boolean;
+  isSyncing?: boolean;
 }
 
 export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
@@ -631,6 +633,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
   selectedRoomId,
   setSelectedRoomId,
   stations,
+  isSyncing = false,
   activeSessions,
   setActiveSessions,
   coaches,
@@ -704,22 +707,56 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
   }, [stations, selectedRoomId]);
 
   return (
-        <div id="tour-teacher-livelab" className={`live-lab-grid ${isSidebarCollapsed ? 'collapsed' : ''}`}>
+        <div id="tour-teacher-livelab" className={`live-lab-grid ${isSidebarCollapsed ? 'collapsed' : ''}`} style={{ position: 'relative' }}>
+          {/* Top-Edge Ambient Sync Progress Bar (1% Goldstandard) */}
+          <div 
+            aria-hidden={!isSyncing}
+            role="progressbar"
+            aria-label="Live Lab Synchronisation"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '3px',
+              background: 'linear-gradient(90deg, #f59e0b 0%, #eab308 50%, #facc15 100%)',
+              boxShadow: isSyncing ? '0 0 12px rgba(234, 179, 8, 0.5)' : 'none',
+              opacity: isSyncing ? 1 : 0,
+              transition: 'opacity 0.35s ease',
+              zIndex: 150,
+              pointerEvents: 'none',
+              borderRadius: '999px',
+              overflow: 'hidden'
+            }}
+          >
+            {isSyncing && (
+              <div 
+                style={{
+                  width: '45%',
+                  height: '100%',
+                  background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.85), transparent)',
+                  animation: 'groovelabSyncSweep 1.2s infinite ease-in-out'
+                }} 
+              />
+            )}
+          </div>
+
           {(() => {
             const isMobileView = windowWidth < 768 || containerWidth < 768 || windowHeight < 500;
             const activeRoom = rooms.find(r => r.id === selectedRoomId) || (rooms.length > 0 ? rooms[0] : null);
             let effectiveSelectedRoomId = selectedRoomId || (rooms.length > 0 ? rooms[0]?.id : null);
 
-            let roomStations = stations.filter(s => s.room_id === effectiveSelectedRoomId);
-            if (roomStations.length === 0 && stations.length > 0) {
+            let rawRoomStations = stations.filter(s => s.room_id === effectiveSelectedRoomId);
+            if (rawRoomStations.length === 0 && stations.length > 0) {
               const roomWithStations = rooms.find(r => stations.some(s => s.room_id === r.id));
               if (roomWithStations) {
                 effectiveSelectedRoomId = roomWithStations.id;
-                roomStations = stations.filter(s => s.room_id === roomWithStations.id);
+                rawRoomStations = stations.filter(s => s.room_id === roomWithStations.id);
               } else {
-                roomStations = stations;
+                rawRoomStations = stations;
               }
             }
+            const roomStations = normalizeStationsForBlueprint(rawRoomStations);
 
             const unassignedStudentSessions = activeSessions.filter(se => {
               if (!se || !se.user_id) return false;
@@ -734,9 +771,38 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                   {/* Mobile Room Switcher Row */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.03em', margin: 0, display: 'flex', alignItems: 'center' }}>
-                        <CampusGroovelabLogo size={24} fontSize="1.5rem" />
-                      </h2>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.03em', margin: 0, display: 'flex', alignItems: 'center' }}>
+                          <CampusGroovelabLogo size={24} fontSize="1.5rem" />
+                        </h2>
+                        {/* Mobile Live Sync Status Pill */}
+                        <div 
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '2px 7px',
+                            borderRadius: '999px',
+                            background: isSyncing ? 'rgba(234, 179, 8, 0.12)' : 'rgba(16, 185, 129, 0.10)',
+                            border: `1px solid ${isSyncing ? 'rgba(234, 179, 8, 0.3)' : 'rgba(16, 185, 129, 0.25)'}`,
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            color: isSyncing ? '#b45309' : '#047857'
+                          }}
+                        >
+                          <span 
+                            style={{
+                              width: '5px',
+                              height: '5px',
+                              borderRadius: '50%',
+                              backgroundColor: isSyncing ? '#eab308' : '#10b981',
+                              boxShadow: isSyncing ? '0 0 4px #eab308' : '0 0 4px #10b981',
+                              animation: isSyncing ? 'pulse 1s infinite' : 'none'
+                            }} 
+                          />
+                          {isSyncing ? 'Sync...' : 'Live'}
+                        </div>
+                      </div>
                       {setIsSidebarCollapsed && (
                         <button
                           onClick={() => setIsSidebarCollapsed?.(!isSidebarCollapsed)}
@@ -1192,10 +1258,9 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
               );
             }
 
-            const hasCustomLayout = activeRoom && 
-              activeRoom.room_width && 
-              activeRoom.room_height && 
-              roomStations.some(s => s.pos_x !== null && s.pos_y !== null);
+            const effectiveRoomWidth = (activeRoom && activeRoom.room_width) || 1000;
+            const effectiveRoomHeight = (activeRoom && activeRoom.room_height) || 700;
+            const hasCustomLayout = roomStations.length > 0 && roomStations.some(s => s.pos_x !== null && s.pos_y !== null);
 
             if (hasCustomLayout) {
               // Account for the parent dashboard header height
@@ -1208,11 +1273,11 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
               // while guaranteeing that even the largest room fits completely within the screen boundaries without overflow.
               let unifiedScale = 1.0;
               const customLayoutScales = rooms.map(r => {
-                const rStations = stations.filter(s => s.room_id === r.id);
-                const rHasLayout = r.room_width && r.room_height && rStations.some(s => s.pos_x !== null && s.pos_y !== null);
-                if (!rHasLayout) return null;
-
-                const aspect = r.room_width / r.room_height;
+                const rRawStations = stations.filter(s => s.room_id === r.id);
+                const rStations = normalizeStationsForBlueprint(rRawStations);
+                const rWidth = r.room_width || 1000;
+                const rHeight = r.room_height || 700;
+                const aspect = rWidth / rHeight;
                 const { minX, maxX, minY, maxY } = getCompressedRoomCoordinates(rStations, aspect);
 
                 const bW = Math.max(100, maxX - minX);
@@ -1224,9 +1289,7 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                 unifiedScale = Math.min(1.0, ...customLayoutScales);
               }
 
-              const rawRoomAspectRatio = (activeRoom && activeRoom.room_width && activeRoom.room_height)
-                ? activeRoom.room_width / activeRoom.room_height
-                : 1.0;
+              const rawRoomAspectRatio = effectiveRoomWidth / effectiveRoomHeight;
 
               // Calculate bounding box and compressed coordinates of all nodes for active room
               const compressedActiveLayout = getCompressedRoomCoordinates(roomStations, rawRoomAspectRatio);
@@ -1258,9 +1321,41 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                       flexWrap: 'wrap'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
-                        <h1 style={{ fontSize: '28px', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.04em', margin: 0 }}>
-                          Live Lab
-                        </h1>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <h1 style={{ fontSize: '28px', fontWeight: 900, color: '#1e293b', letterSpacing: '-0.04em', margin: 0 }}>
+                            Live Lab
+                          </h1>
+                          
+                          {/* Live Sync Status Pill */}
+                          <div 
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '4px 10px',
+                              borderRadius: '999px',
+                              background: isSyncing ? 'rgba(234, 179, 8, 0.12)' : 'rgba(16, 185, 129, 0.10)',
+                              border: `1px solid ${isSyncing ? 'rgba(234, 179, 8, 0.3)' : 'rgba(16, 185, 129, 0.25)'}`,
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              color: isSyncing ? '#b45309' : '#047857',
+                              transition: 'all 0.3s ease'
+                            }}
+                            title={isSyncing ? 'Synchronisiere Live-Sessions...' : 'Live-Sessions aktuell'}
+                          >
+                            <span 
+                              style={{
+                                width: '6px',
+                                height: '6px',
+                                borderRadius: '50%',
+                                backgroundColor: isSyncing ? '#eab308' : '#10b981',
+                                boxShadow: isSyncing ? '0 0 6px #eab308' : '0 0 6px #10b981',
+                                animation: isSyncing ? 'pulse 1s infinite' : 'none'
+                              }} 
+                            />
+                            {isSyncing ? 'Synchronisiere...' : 'Live verbunden'}
+                          </div>
+                        </div>
                         
                         {/* Room Switcher inline next to title */}
                         {rooms.length > 1 && (
@@ -1410,42 +1505,72 @@ export const TeacherLiveView: React.FC<TeacherLiveViewProps> = ({
                     </div>
                   ) : (
                     <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '16px', flexWrap: 'wrap' }}>
-                      {rooms.length > 1 ? (
-                        <div id="tour-teacher-livelab-rooms" style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '6px', borderRadius: '16px' }}>
-                          {rooms.map((room, idx) => {
-                            const isSelected = room.id === selectedRoomId;
-                            return (
-                              <button
-                                key={room.id}
-                                onClick={() => {
-                                  setSelectedRoomId(room.id);
-                                  localStorage.setItem('groovelab_teacher_selected_room_id', room.id);
-                                }}
-                                style={{
-                                  border: 'none',
-                                  background: isSelected ? 'white' : 'transparent',
-                                  color: isSelected ? '#1e293b' : '#64748b',
-                                  padding: '8px 16px',
-                                  borderRadius: '12px',
-                                  fontSize: '0.85rem',
-                                  fontWeight: 800,
-                                  cursor: 'pointer',
-                                  boxShadow: isSelected ? '0 4px 10px rgba(0,0,0,0.05)' : 'none',
-                                  transition: 'all 0.2s'
-                                }}
-                                className="hover-scale-mini"
-                              >
-                                  {(() => {
-                                    const cleanName = cleanRoomName(room.name);
-                                    return `${idx + 1} - ${cleanName}`;
-                                  })()}
-                              </button>
-                            );
-                          })}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                        {rooms.length > 1 && (
+                          <div id="tour-teacher-livelab-rooms" style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '6px', borderRadius: '16px' }}>
+                            {rooms.map((room, idx) => {
+                              const isSelected = room.id === selectedRoomId;
+                              return (
+                                <button
+                                  key={room.id}
+                                  onClick={() => {
+                                    setSelectedRoomId(room.id);
+                                    localStorage.setItem('groovelab_teacher_selected_room_id', room.id);
+                                  }}
+                                  style={{
+                                    border: 'none',
+                                    background: isSelected ? 'white' : 'transparent',
+                                    color: isSelected ? '#1e293b' : '#64748b',
+                                    padding: '8px 16px',
+                                    borderRadius: '12px',
+                                    fontSize: '0.85rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    boxShadow: isSelected ? '0 4px 10px rgba(0,0,0,0.05)' : 'none',
+                                    transition: 'all 0.2s'
+                                  }}
+                                  className="hover-scale-mini"
+                                >
+                                    {(() => {
+                                      const cleanName = cleanRoomName(room.name);
+                                      return `${idx + 1} - ${cleanName}`;
+                                    })()}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Live Sync Status Pill */}
+                        <div 
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '4px 10px',
+                            borderRadius: '999px',
+                            background: isSyncing ? 'rgba(234, 179, 8, 0.12)' : 'rgba(16, 185, 129, 0.10)',
+                            border: `1px solid ${isSyncing ? 'rgba(234, 179, 8, 0.3)' : 'rgba(16, 185, 129, 0.25)'}`,
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            color: isSyncing ? '#b45309' : '#047857',
+                            transition: 'all 0.3s ease'
+                          }}
+                          title={isSyncing ? 'Synchronisiere Live-Sessions...' : 'Live-Sessions aktuell'}
+                        >
+                          <span 
+                            style={{
+                              width: '6px',
+                              height: '6px',
+                              borderRadius: '50%',
+                              backgroundColor: isSyncing ? '#eab308' : '#10b981',
+                              boxShadow: isSyncing ? '0 0 6px #eab308' : '0 0 6px #10b981',
+                              animation: isSyncing ? 'pulse 1s infinite' : 'none'
+                            }} 
+                          />
+                          {isSyncing ? 'Synchronisiere...' : 'Live verbunden'}
                         </div>
-                      ) : (
-                        <div />
-                      )}
+                      </div>
 
                       {/* Magnifier Zoom Panel */}
                       <div style={{

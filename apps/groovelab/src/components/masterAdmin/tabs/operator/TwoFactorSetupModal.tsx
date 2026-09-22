@@ -38,7 +38,7 @@ export const TwoFactorSetupModal: React.FC<TwoFactorSetupModalProps> = ({
       zIndex: 999999,
       padding: '20px'
     }} className="animate-fade-in">
-      <div style={{
+      <div role="dialog" aria-modal="true" style={{
         background: '#ffffff',
         borderRadius: '24px',
         width: '100%',

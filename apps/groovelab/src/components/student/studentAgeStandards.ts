@@ -120,7 +120,7 @@ export interface ParentPermissionsConfig {
   instant_lock_until?: number;
 }
 
-export type StudioModuleKey = 'practice' | 'recordings' | 'groovetrainer' | 'tuner' | 'loopstation' | 'earlab' | 'skillradar' | 'protocol' | 'archive';
+export type StudioModuleKey = 'practice' | 'recordings' | 'groovetrainer' | 'tuner' | 'loopstation' | 'earlab' | 'skillradar' | 'protocol' | 'archive' | 'worldtour';
 
 export const ALL_STUDIO_MODULE_KEYS: StudioModuleKey[] = [
   'practice',
@@ -131,7 +131,8 @@ export const ALL_STUDIO_MODULE_KEYS: StudioModuleKey[] = [
   'earlab',
   'skillradar',
   'protocol',
-  'archive'
+  'archive',
+  'worldtour'
 ];
 
 export function isStudioModuleActive(

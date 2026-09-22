@@ -118,7 +118,7 @@ export const HiscoxAltsystemeCertModal: React.FC<HiscoxAltsystemeCertModalProps>
         }
       `}</style>
 
-      <div
+      <div role="dialog" aria-modal="true"
         id="hiscox-altsysteme-cert-print"
         style={{
           background: '#ffffff',

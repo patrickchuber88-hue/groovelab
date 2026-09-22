@@ -49,7 +49,13 @@ export const AdminRoomLayoutModal: React.FC<AdminRoomLayoutModalProps> = ({
     setCustomizingRoom(room);
   }, [room]);
 
-  if (!customizingRoom) return null;
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   useEffect(() => {
     if (customizingRoom) {
@@ -203,6 +209,7 @@ export const AdminRoomLayoutModal: React.FC<AdminRoomLayoutModalProps> = ({
     setTimeout(() => setGridAppliedFeedback(false), 2500);
   };
 
+    if (!customizingRoom) return null;
 
     const roomStations = stations.filter(s => s.room_id === customizingRoom.id);
     const activeStation = stations.find(s => s.id === activeEditStationId);
@@ -216,14 +223,6 @@ export const AdminRoomLayoutModal: React.FC<AdminRoomLayoutModalProps> = ({
       const kiosk = (kiosks || []).find(k => k.room_id === id && !k.station_id);
       return kiosk ? `${window.location.origin}/?kiosk_token=${kiosk.secret_token}` : `${window.location.origin}/?kiosk_room_id=${id}`;
     };
-
-    useEffect(() => {
-      const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') onClose();
-      };
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [onClose]);
 
     return (
       <div 

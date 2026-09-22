@@ -1,3 +1,10 @@
+// =============================================================================
+// 🏛️  Campus-Groovelab Avatar Resolution Engine Invariant Test Suite
+// Standards: KUG § 22 (Zero-Photo Doktrin / Bildnisschutz für Minderjährige),
+//            DSGVO Art. 8 (Kinder-Datenschutz), OWASP ASVS Level 3
+// Invariante: Deterministische 3D-Instrumenten-Avatare & Neutral-Raumavatar Fallbacks
+// =============================================================================
+
 import assert from 'node:assert';
 import {
   isGenericInstrument,
@@ -8,7 +15,7 @@ import {
   resolveCampusStudentAvatar
 } from '../utils/avatarResolutionEngine';
 
-console.log('=== RUNNING AVATAR RESOLUTION ENGINE INVARIANT TESTS ===\n');
+console.log('=== RUNNING AVATAR RESOLUTION ENGINE INVARIANT TESTS (KUG § 22 & DSGVO Art. 8) ===\n');
 
 // Test 1: Generic instrument detection
 assert.strictEqual(isGenericInstrument('Nicht festgelegt'), true);

@@ -248,7 +248,7 @@ export function StudentPracticeRepertoireTabs({
             >
               <button
                 onClick={() => setPracticeAlphaFilter(null)}
-                style={{ padding: '8px 16px', borderRadius: '10px', border: 'none', background: !practiceAlphaFilter ? activeBrandColor : '#f8fafc', color: !practiceAlphaFilter ? 'white' : '#64748b', fontWeight: 800, cursor: 'pointer', fontSize: '0.75rem', minWidth: '50px', flexShrink: 0, minHeight: '44px', touchAction: 'manipulation' }}
+                style={{ padding: '8px 16px', borderRadius: '10px', border: 'none', background: !practiceAlphaFilter ? activeBrandColor : '#f8fafc', color: !practiceAlphaFilter ? '#0f172a' : '#64748b', fontWeight: 800, cursor: 'pointer', fontSize: '0.75rem', minWidth: '50px', flexShrink: 0, minHeight: '44px', touchAction: 'manipulation' }}
               >
                 ALLE
               </button>
@@ -259,7 +259,7 @@ export function StudentPracticeRepertoireTabs({
                   style={{ 
                     width: '36px', height: '44px', borderRadius: '8px', border: 'none', 
                     background: practiceAlphaFilter === letter ? activeBrandColor : 'transparent', 
-                    color: practiceAlphaFilter === letter ? 'white' : '#94a3b8', 
+                    color: practiceAlphaFilter === letter ? '#0f172a' : '#94a3b8', 
                     fontWeight: 800, cursor: 'pointer', fontSize: '0.75rem', 
                     transition: 'all 0.2s', 
                     flexShrink: 0,

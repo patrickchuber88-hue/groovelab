@@ -9,7 +9,7 @@ export interface UseAdminBandsParams {
 
 export function useAdminBands({ admin, userId, fetchData }: UseAdminBandsParams) {
   const [bandSearch, setBandSearch] = useState('');
-  const [bandLetter, setBandLetter] = useState<string | null>('ALL');
+  const [bandLetter, setBandLetter] = useState<string | null>(null);
   const [selectedCoachId, setSelectedCoachId] = useState<string>('all');
   const [showAddBand, setShowAddBand] = useState(false);
   const [newBand, setNewBand] = useState({ name: '', song_id: '', coach_id: '', photo_url: '' });

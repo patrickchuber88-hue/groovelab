@@ -119,10 +119,35 @@ export const VolumeKnob: React.FC<VolumeKnobProps> = ({ value, onChange, disable
     document.addEventListener('touchend', handleTouchEnd);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (disabled) return;
+    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      onChange(Math.min(100, Math.round(value + 5)));
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      onChange(Math.max(0, Math.round(value - 5)));
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      onChange(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      onChange(100);
+    }
+  };
+
   const rotation = -135 + (value / 100) * 270;
 
   return (
     <div
+      role="slider"
+      tabIndex={disabled ? -1 : 0}
+      aria-label="Lautstärkeregler"
+      aria-valuenow={Math.round(value)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuetext={`${Math.round(value)} Prozent`}
+      onKeyDown={handleKeyDown}
       onMouseDown={handleMouseDown}
       onTouchStart={handleTouchStart}
       style={{
@@ -137,9 +162,10 @@ export const VolumeKnob: React.FC<VolumeKnobProps> = ({ value, onChange, disable
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        touchAction: 'none'
+        touchAction: 'none',
+        outline: 'none'
       }}
-      title="Ziehen zum Einstellen der Lautstärke"
+      title="Lautstärkeregler (Pfeiltasten oder Ziehen)"
     >
       <div style={{
         position: 'absolute',

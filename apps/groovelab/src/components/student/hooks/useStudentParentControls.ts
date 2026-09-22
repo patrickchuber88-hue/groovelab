@@ -681,6 +681,31 @@ export function useStudentParentControls({
           if (updates.uiLevel !== undefined) {
             const labels: Record<string, string> = { junior: 'Junior (6–10 J.)', teen: 'Teen (11–15 J.)', pro: '+16 / Pro' };
             console.log(`[ParentControls] Alters-UI erfolgreich auf „${labels[updates.uiLevel] || updates.uiLevel}“ gespeichert 🛡️`);
+            try {
+              const topicName = `realtime_ui_level_${targetStudentId}`;
+              const existingCh = supabase.getChannels().find((c: any) => c.topic === `realtime:${topicName}` || c.topic === topicName);
+              if (existingCh && (existingCh.state === 'joined' || existingCh.state === 'joining')) {
+                existingCh.send({
+                  type: 'broadcast',
+                  event: 'ui-level-changed',
+                  payload: { uiLevel: updates.uiLevel }
+                });
+              } else {
+                const tempCh = supabase.channel(topicName);
+                tempCh.subscribe((status) => {
+                  if (status === 'SUBSCRIBED') {
+                    tempCh.send({
+                      type: 'broadcast',
+                      event: 'ui-level-changed',
+                      payload: { uiLevel: updates.uiLevel }
+                    });
+                    setTimeout(() => supabase.removeChannel(tempCh), 1500);
+                  }
+                });
+              }
+            } catch (bcErr) {
+              console.warn('[ParentControls] Error broadcasting ui-level-changed:', bcErr);
+            }
           }
         }
       }

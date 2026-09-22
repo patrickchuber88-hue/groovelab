@@ -68,7 +68,7 @@ export const GuidanceCenterModal: React.FC<GuidanceCenterModalProps> = ({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div 
+      <div role="dialog" aria-modal="true" 
         style={{
           width: '100%',
           maxWidth: '840px',

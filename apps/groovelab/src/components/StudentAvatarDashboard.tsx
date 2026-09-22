@@ -6,7 +6,6 @@ import { CampusUiLevel } from './campus/CampusLevelSwitcher';
 import { StudentBriefingTab } from './student/tabs/StudentBriefingTab';
 import { StudentHeroTab } from './student/tabs/StudentHeroTab';
 import { StudentModalsHub } from './student/modals/StudentModalsHub';
-import { JuniorStickerCategory } from './student/modals/StudentJuniorStickerModal';
 import { useStudentProfile } from './student/hooks/useStudentProfile';
 import { useStudentPracticeSession } from './student/hooks/useStudentPracticeSession';
 import { useStudentStreaks } from './student/hooks/useStudentStreaks';
@@ -14,16 +13,13 @@ import { useStudentParentControls } from './student/hooks/useStudentParentContro
 import { useStudentSchedule } from './student/hooks/useStudentSchedule';
 import { useStudentFeed } from './student/hooks/useStudentFeed';
 import { useStudentSongsData } from './student/hooks/useStudentSongsData';
+import { useStudentJuniorMission } from './student/hooks/useStudentJuniorMission';
 import { buildStudentBriefingProps } from './student/tabs/buildStudentBriefingProps';
 import { buildStudentSettingsProps } from './student/tabs/buildStudentSettingsProps';
-import { resolveJuniorMissionDetails, calculateJuniorMissionResult } from './student/utils/juniorMissionDetailsResolver';
 import { 
-  playRocketSputterSound, 
   playOrbitLaunchSound, 
-  playCelestialVictoryChime, 
-  playHyperspaceWarpSound 
+  playCelestialVictoryChime 
 } from './student/utils/juniorRocketAudio';
-import { toLocalYYYYMMDD, getSimulatedNow } from './student/studentDateUtils';
 import { 
   HomeworkBookErrorBoundary, 
   HomeworkBookLoadingFallback 
@@ -139,156 +135,58 @@ export function StudentAvatarDashboard({
   const [songSearch, setSongSearch] = useState('');
   const [juniorMediathekFilter, setJuniorMediathekFilter] = useState<'all' | 'songs' | 'lehrwerke' | 'homework'>('all');
 
-  // Junior sticker states
-  const [showJuniorStickerModal, setShowJuniorStickerModal] = useState(false);
-  const [juniorStickerCategory, setJuniorStickerCategory] = useState<JuniorStickerCategory>('all');
-  const [juniorSelectedPreviewSticker, setJuniorSelectedPreviewSticker] = useState<any | null>(null);
-  const [juniorAwardedStickerToCelebrate, setJuniorAwardedStickerToCelebrate] = useState<any | null>(null);
-  const [showJuniorPreFlightModal, setShowJuniorPreFlightModal] = useState(false);
-  const [juniorSelectedTrackIndex, setJuniorSelectedTrackIndex] = useState(0);
-
-  // 🚀 Junior Space Mission States (Kindgerechte Treibstoff-Physik & Raketen-Starts)
-  const [juniorMissionPhase, setJuniorMissionPhase] = useState<'idle' | 'zen' | 'celebrating'>('idle');
-  const [juniorLaunchStage, setJuniorLaunchStage] = useState<'launching' | 'summary'>('launching');
-  const [juniorMissionTier, setJuniorMissionTier] = useState<1 | 2 | 3>(2);
-  const [juniorCelebrationSummary, setJuniorCelebrationSummary] = useState<{
-    elapsedSecs: number;
-    targetMins: number;
-    bonusMins: number;
-    xpGained: number;
-    flightDurationMs?: number;
-    message: string;
-  } | null>(null);
-  const [isJuniorTabPaused, setIsJuniorTabPaused] = useState(false);
-  const [isJuniorMissionPaused, setIsJuniorMissionPaused] = useState(false);
-  const isJuniorMissionPausedRef = useRef(false);
-  const [showJuniorCheatSheet, setShowJuniorCheatSheet] = useState(false);
-  const [juniorMissionCountdown, setJuniorMissionCountdown] = useState<number | null>(null);
-  const [expandedMonths, setExpandedMonths] = useState<Record<string, boolean>>({});
-
-  // 🚀 Junior Space Mission: Auto-sync juniorMissionPhase mit practice.sessionActive
-  useEffect(() => {
-    if (profile.studentUiLevel === 'junior') {
-      if (practice.sessionActive && juniorMissionPhase === 'idle') {
-        setJuniorMissionPhase('zen');
-      } else if (!practice.sessionActive && juniorMissionPhase === 'zen') {
-        setJuniorMissionPhase('idle');
-      }
-    }
-  }, [profile.studentUiLevel, practice.sessionActive, juniorMissionPhase]);
-
-  const getJuniorMissionDetails = useCallback(() => {
-    return resolveJuniorMissionDetails({
-      localProgress,
-      lehrwerke,
-      progressItems,
-      activeSongSkills,
-      assignedCampusSongs,
-      studentId,
-      studentUser: profile.studentUser
-    });
-  }, [localProgress, lehrwerke, progressItems, activeSongSkills, assignedCampusSongs, studentId, profile.studentUser]);
-
-  const startJuniorMissionImmediately = useCallback(() => {
-    setIsJuniorMissionPaused(false);
-    isJuniorMissionPausedRef.current = false;
-    setShowJuniorCheatSheet(false);
-    practice.setSessionActive(true);
-    setJuniorMissionPhase('zen');
-  }, [practice]);
-
-  const handleFinishJuniorMission = useCallback(() => {
-    setIsJuniorMissionPaused(false);
-    isJuniorMissionPausedRef.current = false;
-    setShowJuniorCheatSheet(false);
-
-    const elapsedSecs = practice.secondsElapsed;
-    const streak = streaks.avatar?.streak_flame || 0;
-    const targetMins = streaks.getTargetMinutes(streak);
-    const missionInfo = getJuniorMissionDetails();
-
-    const simNow = getSimulatedNow();
-    const todayStr = toLocalYYYYMMDD(simNow);
-    const abortBonusKey = `cg_abort_bonus_claimed_${studentId}_${todayStr}`;
-    let alreadyClaimedAbortBonusToday = false;
-    try {
-      alreadyClaimedAbortBonusToday = localStorage.getItem(abortBonusKey) === 'true';
-    } catch (e) {}
-
-    const result = calculateJuniorMissionResult(
-      elapsedSecs,
-      targetMins,
-      missionInfo.shortTitle,
-      alreadyClaimedAbortBonusToday
-    );
-
-    if (result.shouldMarkAbortBonus) {
-      try {
-        localStorage.setItem(abortBonusKey, 'true');
-      } catch (e) {}
-    }
-
-    if (result.tier === 1) {
-      playRocketSputterSound();
-    } else if (result.tier === 2) {
-      playOrbitLaunchSound();
-      playCelestialVictoryChime();
-    } else {
-      playHyperspaceWarpSound();
-    }
-
-    setJuniorMissionTier(result.tier);
-    setJuniorMissionPhase('celebrating');
-    setJuniorLaunchStage('launching');
-    setJuniorCelebrationSummary({
-      elapsedSecs,
-      targetMins,
-      bonusMins: result.bonusMins,
-      xpGained: result.xpBonus,
-      flightDurationMs: result.flightDurationMs,
-      message: result.msg
-    });
-
-    setTimeout(() => {
-      setJuniorLaunchStage('summary');
-      if (result.tier >= 2) {
-        playCelestialVictoryChime();
-      }
-    }, result.flightDurationMs);
-
-    setTimeout(async () => {
-      await practice.finishPracticeSession(result.xpBonus);
-    }, result.flightDurationMs + 1200);
-  }, [streaks, practice, studentId, getJuniorMissionDetails]);
-
-  const handleEmergencyExitJuniorMission = useCallback(() => {
-    setIsJuniorMissionPaused(false);
-    isJuniorMissionPausedRef.current = false;
-    setShowJuniorCheatSheet(false);
-    setJuniorMissionPhase('idle');
-    setJuniorLaunchStage('launching');
-    setJuniorCelebrationSummary(null);
-    practice.setSessionActive(false);
-    practice.setSecondsElapsed(0);
-    try {
-      localStorage.removeItem('groovelab_active_practice_session');
-    } catch (e) {}
-  }, [practice]);
-
-  const handleCloseJuniorCelebration = useCallback(() => {
-    setJuniorMissionPhase('idle');
-    setJuniorLaunchStage('launching');
-    setJuniorCelebrationSummary(null);
-    practice.setSessionActive(false);
-    practice.setSecondsElapsed(0);
-    practice.setShowCelebration(false);
-    setIsJuniorMissionPaused(false);
-    isJuniorMissionPausedRef.current = false;
-    setShowJuniorCheatSheet(false);
-    try {
-      localStorage.removeItem('groovelab_active_practice_session');
-    } catch (e) {}
-  }, [practice]);
+  // 🚀 Junior Space Mission & Sticker Engine Hook (Isomorphic Extraction)
+  const {
+    showJuniorStickerModal,
+    setShowJuniorStickerModal,
+    juniorStickerCategory,
+    setJuniorStickerCategory,
+    juniorSelectedPreviewSticker,
+    setJuniorSelectedPreviewSticker,
+    juniorAwardedStickerToCelebrate,
+    setJuniorAwardedStickerToCelebrate,
+    showJuniorPreFlightModal,
+    setShowJuniorPreFlightModal,
+    juniorSelectedTrackIndex,
+    setJuniorSelectedTrackIndex,
+    juniorMissionPhase,
+    setJuniorMissionPhase,
+    juniorLaunchStage,
+    setJuniorLaunchStage,
+    juniorMissionTier,
+    setJuniorMissionTier,
+    juniorCelebrationSummary,
+    setJuniorCelebrationSummary,
+    isJuniorTabPaused,
+    setIsJuniorTabPaused,
+    isJuniorMissionPaused,
+    setIsJuniorMissionPaused,
+    isJuniorMissionPausedRef,
+    showJuniorCheatSheet,
+    setShowJuniorCheatSheet,
+    juniorMissionCountdown,
+    setJuniorMissionCountdown,
+    expandedMonths,
+    setExpandedMonths,
+    totalPracticeMinutes,
+    unifiedStickersMap,
+    getJuniorMissionDetails,
+    startJuniorMissionImmediately,
+    handleFinishJuniorMission,
+    handleEmergencyExitJuniorMission,
+    handleCloseJuniorCelebration
+  } = useStudentJuniorMission({
+    studentId,
+    studentUser: profile.studentUser,
+    studentUiLevel: profile.studentUiLevel,
+    practice,
+    streaks,
+    localProgress,
+    lehrwerke,
+    progressItems,
+    activeSongSkills,
+    assignedCampusSongs
+  });
 
   // Miscellaneous modal states
   const [showRulesModal, setShowRulesModal] = useState(false);
@@ -362,7 +260,9 @@ export function StudentAvatarDashboard({
     setShowRulesModal,
     setShowStudentToolbox,
     setShowPushSoftPrompt,
-    handleOpenHomeworkBookWithView
+    handleOpenHomeworkBookWithView,
+    totalPracticeMinutes,
+    unifiedStickersMap
   }), [
     studentId,
     profile,
@@ -381,7 +281,9 @@ export function StudentAvatarDashboard({
     selectedLehrwerkForDetail,
     selectedSongForDetail,
     selectedTopic,
-    handleOpenHomeworkBookWithView
+    handleOpenHomeworkBookWithView,
+    totalPracticeMinutes,
+    unifiedStickersMap
   ]);
 
   const settingsTabProps = useMemo(() => buildStudentSettingsProps({
@@ -430,7 +332,7 @@ export function StudentAvatarDashboard({
             studentId={studentId}
             studentUser={profile.studentUser}
             avatar={streaks.avatar}
-            effectivePracticeMinutes={Math.floor(practice.secondsElapsed / 60)}
+            effectivePracticeMinutes={totalPracticeMinutes}
             secondsElapsedRef={{ current: practice.secondsElapsed }}
             isJuniorMissionPausedRef={isJuniorMissionPausedRef}
             startJuniorMissionImmediately={startJuniorMissionImmediately}
@@ -683,24 +585,24 @@ export function StudentAvatarDashboard({
         executeSwitchFamilyStudent={parent.executeSwitchFamilyStudent}
         showJuniorPreFlightModal={showJuniorPreFlightModal}
         setShowJuniorPreFlightModal={setShowJuniorPreFlightModal}
-        juniorMissionDetails={{}}
+        juniorMissionDetails={getJuniorMissionDetails()}
         targetMins={streaks.getTargetMinutes(streaks.streakFlamesCount)}
         juniorSelectedTrackIndex={juniorSelectedTrackIndex}
         setJuniorSelectedTrackIndex={setJuniorSelectedTrackIndex}
         onStartJuniorMission={() => {
           profile.handleTabChangeLocal('practice_board');
-          practice.setSessionActive(true);
+          startJuniorMissionImmediately();
         }}
         showJuniorStickerModal={showJuniorStickerModal}
         setShowJuniorStickerModal={setShowJuniorStickerModal}
-        unifiedStickersMap={{}}
+        unifiedStickersMap={unifiedStickersMap}
         juniorStickerCategory={juniorStickerCategory}
         setJuniorStickerCategory={setJuniorStickerCategory}
         juniorSelectedPreviewSticker={juniorSelectedPreviewSticker}
         setJuniorSelectedPreviewSticker={setJuniorSelectedPreviewSticker}
         onStartJuniorInstrument={() => {
           profile.handleTabChangeLocal('practice_board');
-          practice.setSessionActive(true);
+          startJuniorMissionImmediately();
         }}
         assignedCampusSongs={assignedCampusSongs}
         progressItems={progressItems}

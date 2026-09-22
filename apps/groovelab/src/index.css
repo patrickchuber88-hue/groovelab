@@ -1145,6 +1145,12 @@ body {
   to { opacity: 1; }
 }
 
+@keyframes groovelabSyncSweep {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(100%); }
+  100% { transform: translateX(250%); }
+}
+
 @media (min-width: 1201px) {
   .sidebar-backdrop {
     display: none !important;

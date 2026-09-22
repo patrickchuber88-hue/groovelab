@@ -1,7 +1,8 @@
 #!/usr/bin/env tsx
 // =============================================================================
 // 🏛️  Campus-Groovelab Teacher Name Communication Invariant Test Suite
-// Standard:  OWASP ASVS Level 3 / DSGVO Art. 25 / Platform Policy
+// Standards: DIN 5008 (Abschnitt 8 - Namensschreibweise "Vorname Nachname"),
+//            DSGVO Art. 5 (Datenminimierung & Schülerschutz), OWASP ASVS Level 3
 // Invariante: Lehrkräfte-Namen müssen IMMER als "Vorname Nachname" kommuniziert werden.
 // =============================================================================
 

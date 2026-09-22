@@ -132,7 +132,7 @@ export function DpoIdCardModal({ isOpen, onClose, schoolName = 'Stadtmusikschule
         }}
         onClick={onClose}
       >
-        <div
+        <div role="dialog" aria-modal="true"
           className="dsb-modal-box"
           style={{
             background: '#ffffff',

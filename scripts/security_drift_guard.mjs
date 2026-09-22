@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // =============================================================================
-// 🏛️  Campus-Groovelab Security Drift Guard [OWASP ASVS L3]
-// Standard:  OWASP ASVS Level 3 / BSI TR-02102-1 / DSGVO Art. 25 & 32
+// 🏛️  Campus-Groovelab Security Drift Guard [OWASP ASVS L3 / ISO 27001]
+// Standards: DIN EN ISO/IEC 27001 (Annex A.8.28 Secure Coding, A.8.20 Network Security),
+//            NIST SP 800-161 (Supply Chain Risk), BSI TR-02102-1, OWASP ASVS Level 3
 // Runtime:   Native Node.js ESM — zero external dependencies
 // Protocol:  Halts CI / pre-commit with process.exit(1) on ANY violation.
 // =============================================================================
@@ -26,7 +27,7 @@ let migrationsScanned = 0;
 
 const HR = '═'.repeat(72);
 process.stdout.write(`\n${HR}\n`);
-process.stdout.write('  🏛️   Campus-Groovelab Security Drift Guard [OWASP ASVS L3]\n');
+process.stdout.write('  🏛️   Campus-Groovelab Security Drift Guard [ISO 27001 / OWASP ASVS L3]\n');
 process.stdout.write('       Scanning for architectural regressions & invariant violations...\n');
 process.stdout.write(`${HR}\n\n`);
 

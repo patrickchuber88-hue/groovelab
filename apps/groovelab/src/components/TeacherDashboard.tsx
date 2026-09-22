@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 
-import { AvatarImage } from './common/AvatarImage';
+import { AvatarImage, resolveCampusStudentAvatar, resolveGrooveLabTeacherAvatar } from './common/AvatarImage';
 import { usePremiumOnboardingTour, TourStep } from './PremiumOnboardingTour';
 import { formatTeacherFullName } from '../utils/nameHelper';
-import { resolveCampusStudentAvatar, resolveGrooveLabTeacherAvatar } from './common/AvatarImage';
 
 // Header
 import { TeacherDashboardHeader } from './teacher/TeacherDashboardHeader';
@@ -19,11 +18,9 @@ import { useTeacherBookings } from './teacher/hooks/useTeacherBookings';
 import { useTeacherStudentPrep } from './teacher/hooks/useTeacherStudentPrep';
 import { useTeacherModalStates } from './teacher/hooks/useTeacherModalStates';
 
-// Tabs
+// Tabs & Modals
 import { TeacherBriefingTab } from './teacher/tabs/TeacherBriefingTab';
 import { TeacherCoachesTab } from './teacher/tabs/TeacherCoachesTab';
-
-// Modals Hub
 import { TeacherModalsHub } from './teacher/modals/TeacherModalsHub';
 
 // Lazy Loaded Tabs
@@ -33,12 +30,10 @@ const TeacherStudioBoardView = lazy(() => import('./teacher/TeacherStudioBoardVi
 const TeacherStudentsView = lazy(() => import('./teacher/TeacherStudentsView').then(m => ({ default: m.TeacherStudentsView })));
 const TeacherSettingsView = lazy(() => import('./teacher/TeacherSettingsView').then(m => ({ default: m.TeacherSettingsView })));
 const AdminDashboard = lazy(() => import('./AdminDashboard').then(m => ({ default: m.AdminDashboard })));
-
 // Pure utilities re-export for backwards compatibility
 export * from './teacher/utils/teacherDashboardUtils';
 import { cleanRoomName } from './teacher/utils/teacherDashboardUtils';
 import { useSimulatedTime } from '../hooks/useSimulatedTime';
-
 export interface TeacherDashboardProps {
   userId: string;
   initialTeacher?: any;
@@ -59,6 +54,8 @@ export interface TeacherDashboardProps {
   onSidebarNotificationsChange?: (count: number) => void;
   activePlatform?: 'campus' | 'groovelab';
   onSwitchPlatform?: (newPlatform: 'campus' | 'groovelab') => void;
+  wallSongs?: any[];
+  rehearsalSuggestions?: any[];
 }
 
 export function TeacherDashboard({ 
@@ -80,19 +77,64 @@ export function TeacherDashboard({
   setIsSidebarCollapsed: propsSetIsSidebarCollapsed,
   onSidebarNotificationsChange,
   activePlatform: propsActivePlatform,
-  onSwitchPlatform
+  onSwitchPlatform,
+  wallSongs: propsWallSongs,
+  rehearsalSuggestions: propsRehearsalSuggestions
 }: TeacherDashboardProps) {
   const activePlatform: 'campus' | 'groovelab' = (propsActivePlatform === 'groovelab' || (typeof window !== 'undefined' && localStorage.getItem('groovelab_active_platform') === 'groovelab')) ? 'groovelab' : 'campus';
   
   // Layout & Viewport state
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+  const [windowHeight, setWindowHeight] = useState(typeof window !== 'undefined' ? window.innerHeight : 800);
+  const [containerWidth, setContainerWidth] = useState(1000);
   const isMobileDevice = windowWidth <= 768;
 
   useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+      setWindowHeight(window.innerHeight);
+      const containerElem = document.querySelector('.live-lab-grid') || document.querySelector('.blueprint-viewport');
+      if (containerElem) {
+        setContainerWidth((containerElem as HTMLDivElement).offsetWidth || 1000);
+      }
+    };
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    handleResize();
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
   }, []);
+
+  const observerRef = useRef<ResizeObserver | null>(null);
+  const containerRef = useCallback((node: HTMLDivElement | null) => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
+    if (node) {
+      const observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          setContainerWidth(entry.contentRect.width || 1000);
+        }
+      });
+      observer.observe(node);
+      observerRef.current = observer;
+    }
+  }, []);
+
+  const [localLastSeenCounts, setLocalLastSeenCounts] = useState<{ help: number; rehearsal: number; matching: number }>(() => {
+    try {
+      const saved = typeof window !== 'undefined' ? localStorage.getItem('groovelab_last_seen_sidebar') : null;
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return { help: 0, rehearsal: 0, matching: 0 };
+  });
+
+  const [localIsSidebarCollapsed, setLocalIsSidebarCollapsed] = useState(true);
+  const isSidebarCollapsed = propsIsSidebarCollapsed !== undefined ? propsIsSidebarCollapsed : localIsSidebarCollapsed;
+  const setIsSidebarCollapsed = propsSetIsSidebarCollapsed !== undefined ? propsSetIsSidebarCollapsed : setLocalIsSidebarCollapsed;
 
   const [activeTab, setActiveTabRaw] = useState<string>(() => {
     if (initialTab) return initialTab;
@@ -205,6 +247,8 @@ export function TeacherDashboard({
     stations: data.stations,
     setCoaches: data.setCoaches,
     setActiveSessions: data.setActiveSessions,
+    session,
+    activeSessions: data.activeSessions,
     onSessionChange,
     onLocationModeChange,
     fetchData: data.fetchData,
@@ -230,6 +274,33 @@ export function TeacherDashboard({
     isTeacherBriefingSidebarCollapsed: data.isTeacherBriefingSidebarCollapsed,
     onTabChange
   });
+
+  const unreadHelpCount = Math.max(0, (data.helpRequests || []).length - localLastSeenCounts.help);
+  const effectiveRehearsal = propsRehearsalSuggestions !== undefined ? propsRehearsalSuggestions : (livelab.rehearsalSuggestions || []);
+  const effectiveWallSongs = propsWallSongs !== undefined ? propsWallSongs : (livelab.wallSongs || []);
+  const unreadRehearsalCount = Math.max(0, effectiveRehearsal.length - localLastSeenCounts.rehearsal);
+  const unreadMatchingCount = Math.max(0, effectiveWallSongs.length - localLastSeenCounts.matching);
+  const sidebarNotificationsCount = unreadHelpCount + unreadRehearsalCount + unreadMatchingCount;
+
+  useEffect(() => {
+    if (!isSidebarCollapsed) {
+      const currentCounts = {
+        help: (data.helpRequests || []).length,
+        rehearsal: effectiveRehearsal.length,
+        matching: effectiveWallSongs.length
+      };
+      setLocalLastSeenCounts(currentCounts);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('groovelab_last_seen_sidebar', JSON.stringify(currentCounts));
+      }
+    }
+  }, [isSidebarCollapsed, (data.helpRequests || []).length, effectiveRehearsal.length, effectiveWallSongs.length]);
+
+  useEffect(() => {
+    if (onSidebarNotificationsChange) {
+      onSidebarNotificationsChange(sidebarNotificationsCount);
+    }
+  }, [sidebarNotificationsCount, onSidebarNotificationsChange]);
 
   // Guided Tour
   const tourSteps = useMemo<TourStep[]>(() => {
@@ -488,14 +559,14 @@ export function TeacherDashboard({
               activePlatform={activePlatform}
               hideHeader={hideHeader}
               windowWidth={windowWidth}
-              windowHeight={800}
-              containerWidth={1200}
-              containerRef={() => {}}
+              windowHeight={windowHeight}
+              containerWidth={containerWidth}
+              containerRef={containerRef}
               showRealNames={students.showRealNames}
               rooms={data.rooms}
               selectedRoomId={data.selectedRoomId}
               setSelectedRoomId={data.setSelectedRoomId}
-              stations={data.stations}
+              stations={data.stations} isSyncing={data.isSyncing}
               activeSessions={data.activeSessions}
               setActiveSessions={data.setActiveSessions}
               coaches={data.coaches}
@@ -506,14 +577,14 @@ export function TeacherDashboard({
               submissions={feed.submissions}
               allSubmissions={feed.allSubmissions}
               setShowAllSubmissions={feed.setShowAllSubmissions}
-              wallSongs={livelab.wallSongs}
-              rehearsalSuggestions={livelab.rehearsalSuggestions}
+              wallSongs={propsWallSongs !== undefined ? propsWallSongs : livelab.wallSongs}
+              rehearsalSuggestions={propsRehearsalSuggestions !== undefined ? propsRehearsalSuggestions : livelab.rehearsalSuggestions}
               openProposals={data.openProposals}
               zoomFactor={tagesplan.zoomFactor}
               handleZoomChange={tagesplan.handleZoomChange}
-              isSidebarCollapsed={false}
-              setIsSidebarCollapsed={() => {}}
-              sidebarNotificationsCount={0}
+              isSidebarCollapsed={isSidebarCollapsed}
+              setIsSidebarCollapsed={setIsSidebarCollapsed}
+              sidebarNotificationsCount={sidebarNotificationsCount}
               setActiveTab={setActiveTab}
               onTabChange={onTabChange}
               onFoundBand={onFoundBand}
@@ -606,7 +677,7 @@ export function TeacherDashboard({
               userId={userId}
               onLogout={onLogout || (() => {})}
               forceTab="rooms"
-              activePlatform="campus"
+              activePlatform={activePlatform}
               hideHeader={true}
               onSwitchPlatform={onSwitchPlatform}
             />

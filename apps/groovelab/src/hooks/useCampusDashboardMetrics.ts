@@ -127,7 +127,7 @@ export function useCampusDashboardMetrics({
     return acc;
   }, {})), [wallSongs, userBands]);
 
-  const filteredPractice = useMemo(() => (userSongs || []).filter((s: any) => {
+  const filteredPractice = useMemo(() => (practiceSongs || []).filter((s: any) => {
     const term = (practiceSearchQuery || '').toLowerCase();
     const matchesSearch = practiceSearchType === 'title' 
       ? (s.title || '').toLowerCase().includes(term)
@@ -139,7 +139,7 @@ export function useCampusDashboardMetrics({
       : valForAlpha.trim().toUpperCase().startsWith(practiceAlphaFilter);
       
     return matchesSearch && matchesAlpha;
-  }), [userSongs, practiceSearchQuery, practiceSearchType, practiceAlphaFilter]);
+  }), [practiceSongs, practiceSearchQuery, practiceSearchType, practiceAlphaFilter]);
 
   const groupedPracticeSongs = useMemo(() => groupSongs(filteredPractice), [groupSongs, filteredPractice]);
   const groupedRepertoireSongs = useMemo(() => groupSongs(repertoireSongs), [groupSongs, repertoireSongs]);

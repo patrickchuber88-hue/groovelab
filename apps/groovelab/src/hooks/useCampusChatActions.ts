@@ -1,4 +1,5 @@
 import React, { useCallback } from 'react';
+import { primeDecryptedCache } from '../lib/security/messageCrypto';
 
 // Local storage helpers for optimistic and zero-bounce read state
 export const saveLocalDirectRead = (uid: string, partnerId: string, timestamp: number) => {
@@ -165,10 +166,13 @@ export function useCampusChatActions({
 
     setCampusMessages(prev => [...prev, optimisticMessage]);
 
+    const effectiveSchoolId = user?.school_id || (Array.isArray(user?.schools) ? user?.schools[0]?.id : user?.schools?.id) || null;
+
     try {
       const payload: any = {
         sender_id: uid,
-        content
+        content,
+        school_id: effectiveSchoolId
       };
       if (groupId) {
         payload.group_id = groupId;
@@ -204,7 +208,8 @@ export function useCampusChatActions({
           console.warn('[handleSendCampusMessage] DB schema column pending in cache, applying resilient insert fallback:', error);
           const fallbackPayload: any = {
             sender_id: uid,
-            content: subject && errorStr.includes('subject') ? `📌 [${subject}]\n\n${content}` : content
+            content: subject && errorStr.includes('subject') ? `📌 [${subject}]\n\n${content}` : content,
+            school_id: effectiveSchoolId
           };
           if (groupId) {
             fallbackPayload.group_id = groupId;
@@ -230,7 +235,8 @@ export function useCampusChatActions({
             const minimalPayload: any = {
               sender_id: uid,
               content: subject ? `📌 [${subject}]\n\n${content}` : content,
-              recipient_id: groupId ? uid : recipientId
+              recipient_id: groupId ? uid : recipientId,
+              school_id: effectiveSchoolId
             };
             if (groupId) minimalPayload.group_id = groupId;
             const minimalRes = await supabase.from('campus_direct_messages').insert(minimalPayload).select().single();
@@ -253,7 +259,11 @@ export function useCampusChatActions({
 
       // Replace optimistic message with actual persisted message, preserving subject for thread view
       if (insertedMsg) {
-        setCampusMessages(prev => prev.map(m => m.id === tempId ? { ...insertedMsg, subject: insertedMsg.subject || subject } : m));
+        const resolvedSchoolId = effectiveSchoolId || insertedMsg.school_id;
+        if (insertedMsg.content && typeof insertedMsg.content === 'string' && insertedMsg.content.startsWith('enc:')) {
+          primeDecryptedCache(resolvedSchoolId, insertedMsg.content, content);
+        }
+        setCampusMessages(prev => prev.map(m => m.id === tempId ? { ...insertedMsg, content, subject: insertedMsg.subject || subject } : m));
       }
 
       // Group lesson message replication: Check if recipient has a group_id (only for 1:1 direct messages)
@@ -279,7 +289,8 @@ export function useCampusChatActions({
               await supabase.from('campus_direct_messages').insert({
                 sender_id: uid,
                 recipient_id: partnerId,
-                content
+                content,
+                school_id: effectiveSchoolId
               });
             }
           }

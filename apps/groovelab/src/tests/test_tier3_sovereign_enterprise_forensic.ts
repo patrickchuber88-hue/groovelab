@@ -73,17 +73,28 @@ async function testSideChannelTimingInvariance() {
     { label: 'Exact Match (849201)', val: '849201' },
   ];
 
-  const iterations = 5000;
+  const iterations = 10000;
   const timingStats: Record<string, number> = {};
 
+  // JIT Warm-Up pass to eliminate V8 compilation noise
+  for (let i = 0; i < 5000; i++) {
+    constantTimeCompare('123456', targetSecret);
+  }
+
   for (const input of testInputs) {
-    const start = process.hrtime.bigint();
-    for (let i = 0; i < iterations; i++) {
-      constantTimeCompare(input.val, targetSecret);
+    let minDurationNs = Infinity;
+    for (let trial = 0; trial < 3; trial++) {
+      const start = process.hrtime.bigint();
+      for (let i = 0; i < iterations; i++) {
+        constantTimeCompare(input.val, targetSecret);
+      }
+      const end = process.hrtime.bigint();
+      const trialDuration = Number(end - start) / iterations;
+      if (trialDuration < minDurationNs) {
+        minDurationNs = trialDuration;
+      }
     }
-    const end = process.hrtime.bigint();
-    const durationNs = Number(end - start) / iterations;
-    timingStats[input.label] = durationNs;
+    timingStats[input.label] = minDurationNs;
   }
 
   const times = Object.values(timingStats);
@@ -91,7 +102,7 @@ async function testSideChannelTimingInvariance() {
   const variance = times.reduce((acc, t) => acc + Math.pow(t - mean, 2), 0) / times.length;
   const standardDeviationNs = Math.sqrt(variance);
 
-  // In constant-time comparison, standard deviation between inputs is tiny (under 50ns)
+  // In constant-time comparison, standard deviation between inputs is tiny (under 150ns)
   assert(
     standardDeviationNs < 150,
     'Timing Invariance',

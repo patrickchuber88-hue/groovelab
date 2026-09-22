@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // =============================================================================
 // 🏛️  Campus-Groovelab Offline Static Security Headers Auditor
-// Standard:  Mozilla Observatory (A+), SecurityHeaders.com (A+), SSL Labs (A+)
+// Standards: BSI TR-02102-2 (TLS), BSI TR-03116-4, DIN EN ISO/IEC 27001 (A.8.20/A.8.26),
+//            W3C CSP Level 3, RFC 6797 (HSTS), Mozilla Observatory (A+)
 // Protocol:  Zero-Dependency ESM — Validates static header configs offline.
 // =============================================================================
 
@@ -41,6 +42,7 @@ const SUB_HR = '─'.repeat(74);
 
 console.log(`\n${HR}`);
 console.log('  🏛️   CAMPUS-GROOVELAB STATIC SECURITY HEADERS AUDITOR');
+console.log('       Standards: BSI TR-02102-2 / BSI TR-03116-4 / DIN EN ISO/IEC 27001');
 console.log('       Offline Invariant Guard for Mozilla Observatory A+ & SecurityHeaders.com');
 console.log(`${HR}\n`);
 

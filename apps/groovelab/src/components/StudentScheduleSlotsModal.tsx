@@ -554,7 +554,7 @@ export const StudentScheduleSlotsModal: React.FC<StudentScheduleSlotsModalProps>
       justifyContent: 'center',
       padding: '16px'
     }}>
-      <div 
+      <div role="dialog" aria-modal="true" 
         className="glass-panel animate-scale-up"
         style={{
           width: '100%',

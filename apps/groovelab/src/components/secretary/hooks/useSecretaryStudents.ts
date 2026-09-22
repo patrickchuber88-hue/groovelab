@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { sanitizeBirthDateToDayOnly, formatTeacherFullName } from '../../../utils/nameHelper';
 import { StudentToDelete } from '../../ConfirmDeleteStudentModal';
+import { isTeacherInstrumentCompatible, isGenericInstrument } from '../../../services/studentRosterService';
 
 export interface UseSecretaryStudentsOptions {
   schoolId: string;
@@ -679,20 +680,40 @@ export function useSecretaryStudents({
   const handleUpdateStudentTeacher = async (studentId: string, teacherId: string | null) => {
     try {
       let teacherInstrument: string | null = null;
+      let teacherName = 'Lehrkraft';
       if (teacherId) {
         const { data: teacherUser } = await supabase
           .from('users')
-          .select('instrument')
+          .select('instrument, first_name, last_name')
           .eq('id', teacherId)
           .maybeSingle();
-        if (teacherUser?.instrument) {
-          teacherInstrument = teacherUser.instrument;
+        if (teacherUser) {
+          teacherInstrument = teacherUser.instrument || null;
+          teacherName = `${teacherUser.first_name || ''} ${teacherUser.last_name || ''}`.trim() || 'Lehrkraft';
         }
       }
 
+      // 1. Identify target student and verify instrument compatibility
+      const targetStudent = students.find((s: any) => s.id === studentId);
+      const studentCurrentInst = targetStudent?.instrument;
+
+      if (teacherId && !isTeacherInstrumentCompatible(teacherInstrument, studentCurrentInst)) {
+        alert(
+          `⚠️ Fachfremde Zuweisung unzulässig!\n\n` +
+          `Die Lehrkraft ${teacherName} unterrichtet [${teacherInstrument || 'Nicht definiert'}], ` +
+          `der Schüler spielt jedoch [${studentCurrentInst || 'Nicht definiert'}].\n\n` +
+          `Eine fachfremde Zuweisung ist durch die 1% Goldstandard System-Invarianten streng untersagt.`
+        );
+        return;
+      }
+
+      const resolvedInstrument = (studentCurrentInst && !isGenericInstrument(studentCurrentInst))
+        ? studentCurrentInst
+        : (teacherId ? (teacherInstrument || 'Musiker') : 'Musiker');
+
       const updatePayload: any = { 
         teacher_id: teacherId, 
-        instrument: teacherId ? (teacherInstrument || 'Musiker') : 'Musiker' 
+        instrument: resolvedInstrument 
       };
 
       let sFirstName = '';
@@ -725,7 +746,7 @@ export function useSecretaryStudents({
             return {
               ...s,
               teacher_id: teacherId,
-              instrument: teacherId ? (teacherInstrument || s.instrument || 'Musiker') : 'Musiker'
+              instrument: resolvedInstrument
             };
           }
           return s;

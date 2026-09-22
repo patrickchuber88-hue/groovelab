@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../../lib/supabase';
+import { logApplicationAudit } from '../../../services/auditLogService';
 
 export interface PendingSchedule {
   id: string;
@@ -131,26 +132,25 @@ export function useSecretarySchedules({
         // 🛡️ Enterprise+ Revisionssicheres Audit-Logging (OWASP ASVS / DSGVO Art. 30)
         try {
           const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-          const auditEntries = affectedTeacherIds.map(tId => ({
-            school_id: schoolId,
-            table_name: 'schedules',
-            action: 'SCHEDULES_APPROVED',
-            record_id: uuidRegex.test(tId) ? tId : null,
-            actor_id: (userId && uuidRegex.test(userId)) ? userId : null,
-            user_id: (userId && uuidRegex.test(userId)) ? userId : null,
-            changed_by: (userId && uuidRegex.test(userId)) ? userId : null,
-            details: {
-              action_type: 'SCHEDULES_APPROVED_BULK',
-              teacher_id: tId,
-              pending_slots_approved: pendingIds.length,
-              approved_at: new Date().toISOString(),
-              approved_by: userId || 'Schulsekretariat'
-            }
-          }));
-          await supabase.from('audit_logs').insert(auditEntries);
+          for (const tId of affectedTeacherIds) {
+            await logApplicationAudit({
+              schoolId,
+              tableName: 'schedules',
+              action: 'SCHEDULES_APPROVED',
+              recordId: uuidRegex.test(tId) ? tId : null,
+              details: {
+                action_type: 'SCHEDULES_APPROVED_BULK',
+                teacher_id: tId,
+                pending_slots_approved: pendingIds.length,
+                approved_at: new Date().toISOString(),
+                approved_by: userId || 'Schulsekretariat'
+              }
+            });
+          }
         } catch (auditErr) {
           console.warn('[useSecretarySchedules] Bulk audit logging notice:', auditErr);
         }
+
       }
 
       setPendingSchedules([]);
@@ -807,7 +807,10 @@ export function useSecretarySchedules({
           const chunkSize = 250;
           for (let i = 0; i < occurrences.length; i += chunkSize) {
             const chunk = occurrences.slice(i, i + chunkSize);
-            await supabase.from('schedule_occurrences').insert(chunk);
+            const { error: chunkErr } = await supabase.from('schedule_occurrences').insert(chunk);
+            if (chunkErr) {
+              console.error('[useSecretarySchedules] Occurrence bulk insert chunk failed:', chunkErr);
+            }
           }
         }
       }
@@ -833,27 +836,25 @@ export function useSecretarySchedules({
 
         // 🛡️ Enterprise+ Revisionssicheres Audit-Logging (OWASP ASVS / DSGVO Art. 30)
         try {
-          const auditEntries = approvedTeacherIds.map(tId => ({
-            school_id: schoolId,
-            table_name: 'schedules',
-            action: 'SCHEDULES_APPROVED',
-            record_id: isValidUuid(tId) ? tId : null,
-            actor_id: isValidUuid(userId) ? userId : null,
-            user_id: isValidUuid(userId) ? userId : null,
-            changed_by: isValidUuid(userId) ? userId : null,
-            details: {
-              action_type: 'SCHEDULES_APPROVED',
-              teacher_id: tId,
-              slots_count: slotsToInsert.filter(s => s.teacher_id === tId).length,
-              approved_at: new Date().toISOString(),
-              approved_by: userId || 'Schulsekretariat'
-            }
-          }));
-
-          await supabase.from('audit_logs').insert(auditEntries);
+          for (const tId of approvedTeacherIds) {
+            await logApplicationAudit({
+              schoolId,
+              tableName: 'schedules',
+              action: 'SCHEDULES_APPROVED',
+              recordId: isValidUuid(tId) ? tId : null,
+              details: {
+                action_type: 'SCHEDULES_APPROVED',
+                teacher_id: tId,
+                slots_count: slotsToInsert.filter(s => s.teacher_id === tId).length,
+                approved_at: new Date().toISOString(),
+                approved_by: userId || 'Schulsekretariat'
+              }
+            });
+          }
         } catch (auditErr) {
           console.warn('[useSecretarySchedules] Audit log notice:', auditErr);
         }
+
       }
 
       localStorage.setItem(`groovelab_matrix_allocations_draft_${schoolId}`, JSON.stringify(approvedDraftMap));
@@ -1148,24 +1149,22 @@ export function useSecretarySchedules({
       // 🛡️ Enterprise+ Revisionssicheres Audit-Logging
       try {
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        await supabase.from('audit_logs').insert([{
-          school_id: schoolId,
-          table_name: 'schedules',
+        await logApplicationAudit({
+          schoolId,
+          tableName: 'schedules',
           action: 'SCHEDULE_SLOT_APPROVED',
-          record_id: uuidRegex.test(scheduleId) ? scheduleId : null,
-          actor_id: (userId && uuidRegex.test(userId)) ? userId : null,
-          user_id: (userId && uuidRegex.test(userId)) ? userId : null,
-          changed_by: (userId && uuidRegex.test(userId)) ? userId : null,
+          recordId: uuidRegex.test(scheduleId) ? scheduleId : null,
           details: {
             action_type: 'SCHEDULE_SLOT_APPROVED',
             schedule_id: scheduleId,
             approved_at: new Date().toISOString(),
             approved_by: userId || 'Schulsekretariat'
           }
-        }]);
+        });
       } catch (auditErr) {
         console.warn('[useSecretarySchedules] Single slot audit log notice:', auditErr);
       }
+
 
       alert('Stundenplan-Eintrag erfolgreich genehmigt.');
       fetchDashboardData();

@@ -3,7 +3,7 @@ import { Play, Pause, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Trash2,
 import { getBlob, storeBlob } from '../utils/blobStorage';
 import { harmonizeAudioList, formatHarmonizedAudioTitle } from '../utils/audioNamingHelper';
 import { getAudioNotesCount, fetchAudioNotesFromServer } from '../utils/audioNotesStorage';
-import { getSecureAudioUrl } from '../utils/audioStorageHelper';
+import { getSecureAudioUrl, resolvePlayableAudioSource } from '../utils/audioStorageHelper';
 import { SharedAudioEngine } from '../utils/sharedAudioEngine';
 import { getLoopLocator, saveLoopLocator, toggleLoopLocator, removeLoopLocator, AudioLoopLocator } from '../utils/audioLoopLocatorStorage';
 
@@ -434,7 +434,7 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
   }, [initialDuration]);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isLooping, setIsLooping] = useState(false);
-  const [countInActive, setCountInActive] = useState<boolean>(() => uiLevel === 'junior');
+  const [countInActive, setCountInActive] = useState<boolean>(false);
   const [countInStep, setCountInStep] = useState<number | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
@@ -503,30 +503,30 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
 
   useEffect(() => {
     let active = true;
-    let createdBlobUrl: string | null = null;
+    let cleanupFn: (() => void) | undefined;
 
-    if (url.startsWith('campus_blob_') || url.startsWith('campus_audio_') || url.startsWith('offline://')) {
-      getBlob(url).then((raw: any) => {
-        if (active && raw) {
-          const finalBlob = raw instanceof Blob ? raw : new Blob([raw], { type: 'audio/webm' });
-          createdBlobUrl = URL.createObjectURL(finalBlob);
-          setResolvedUrl(createdBlobUrl);
-        }
-      }).catch((err: any) => console.warn('[CompactAudioStrip] Blob load note:', err));
-    } else if (url.startsWith('http') || url.includes('/storage/v1/object/') || url.startsWith('schools/')) {
-      getSecureAudioUrl(url, 'campus-assets', 300).then((secUrl: string) => {
-        if (active && secUrl) setResolvedUrl(secUrl);
-      }).catch(() => {
-        if (active && isPlayableUrl(url)) setResolvedUrl(url);
-      });
-    } else {
-      if (isPlayableUrl(url)) setResolvedUrl(url);
-    }
+    resolvePlayableAudioSource(url, 'campus-assets', 1800).then((res) => {
+      if (active && res.src) {
+        setResolvedUrl(res.src);
+        cleanupFn = res.cleanup;
+      }
+    }).catch((err) => {
+      console.warn('[CompactAudioStrip] Failed to resolve playable audio source:', err);
+      if (active && isPlayableUrl(url)) {
+        setResolvedUrl(url);
+      }
+    });
 
     return () => {
       active = false;
-      if (createdBlobUrl) URL.revokeObjectURL(createdBlobUrl);
-      if (countInTimerRef.current) clearTimeout(countInTimerRef.current);
+      if (cleanupFn) cleanupFn();
+      if (countInTimerRef.current) {
+        if (typeof countInTimerRef.current === 'object' && countInTimerRef.current.clear) {
+          countInTimerRef.current.clear();
+        } else {
+          clearTimeout(countInTimerRef.current);
+        }
+      }
     };
   }, [url]);
 
@@ -553,6 +553,15 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
       }
       countInTimerRef.current = null;
       setCountInStep(null);
+      if (audioRef.current) {
+        try {
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+          audioRef.current.muted = false;
+          audioRef.current.volume = 1;
+        } catch {}
+      }
+      setIsPlaying(false);
       return;
     }
     if (!audioRef.current) return;
@@ -575,6 +584,8 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
           audioRef.current.load();
         }
         audioRef.current.loop = isLooping && (!loopLocator || !loopLocator.enabled);
+        audioRef.current.muted = false;
+        audioRef.current.volume = 1;
         audioRef.current.play().then(() => setIsPlaying(true)).catch(err => {
           console.warn('[CompactAudioStrip] Play error:', err);
           setIsPlaying(false);
@@ -582,6 +593,23 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
       };
 
       if (countInActive) {
+        // 🔓 Safari WebKit Autoplay Priming:
+        // Keep the audio element playing silently throughout count-in so WebKit permits unmuting on beat 4!
+        try {
+          audioRef.current.muted = true;
+          audioRef.current.volume = 0;
+          if (audioRef.current.ended || (duration > 0 && audioRef.current.currentTime >= duration)) {
+            audioRef.current.currentTime = 0;
+          }
+          if (audioRef.current.readyState === 0) {
+            audioRef.current.load();
+          }
+          const primePromise = audioRef.current.play();
+          if (primePromise !== undefined) {
+            primePromise.catch(() => {});
+          }
+        } catch {}
+
         const bpmMatch = label ? label.match(/(?:BPM:|\b)(\d{2,3})\s*(?:BPM|\b)/i) : null;
         const effectiveBpm = bpmMatch ? parseInt(bpmMatch[1], 10) : 100;
         const beatDurationSec = (60 / effectiveBpm) / (playbackRate || 1);
@@ -609,7 +637,24 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
         timers.push(setTimeout(() => {
           setCountInStep(null);
           countInTimerRef.current = null;
-          playNative();
+          if (audioRef.current) {
+            let startPos = 0;
+            if (isLooping && loopLocator && loopLocator.enabled) {
+              startPos = loopLocator.startSec;
+            }
+            try {
+              audioRef.current.currentTime = startPos;
+              audioRef.current.muted = false;
+              audioRef.current.volume = 1;
+              if (audioRef.current.paused) {
+                audioRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+              } else {
+                setIsPlaying(true);
+              }
+            } catch {
+              playNative();
+            }
+          }
         }, leadTimeMs + 4 * beatDurationMs));
       } else {
         playNative();
@@ -621,13 +666,16 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
     const audio = audioRef.current;
     if (!audio) return;
     const handleLoadedMetadata = () => {
-      if (audio.duration && isFinite(audio.duration)) {
+      if (audio.duration && isFinite(audio.duration) && audio.duration > 1) {
         setDuration(Math.round(audio.duration));
       }
     };
     const handleTimeUpdate = () => {
       const cur = audio.currentTime;
       setCurrentTime(cur);
+      if (cur > duration) {
+        setDuration(Math.ceil(cur));
+      }
       if (isLooping && loopLocator && loopLocator.enabled) {
         if (cur >= loopLocator.endSec) {
           audio.currentTime = loopLocator.startSec;
@@ -643,20 +691,24 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
       }
     };
 
-    if (audio.duration && isFinite(audio.duration)) {
+    if (audio.duration && isFinite(audio.duration) && audio.duration > 1) {
       setDuration(Math.round(audio.duration));
     }
 
     audio.loop = isLooping && (!loopLocator || !loopLocator.enabled);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('durationchange', handleLoadedMetadata);
+    audio.addEventListener('canplay', handleLoadedMetadata);
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
     return () => {
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('durationchange', handleLoadedMetadata);
+      audio.removeEventListener('canplay', handleLoadedMetadata);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [resolvedUrl, isLooping, loopLocator]);
+  }, [resolvedUrl, isLooping, loopLocator, duration]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -953,7 +1005,33 @@ const CompactAudioStrip: React.FC<CompactAudioStripProps> = ({
         position: 'relative'
       }}
     >
-      <audio ref={audioRef} src={resolvedUrl || undefined} preload="metadata" playsInline />
+      <audio
+        ref={audioRef}
+        src={resolvedUrl || undefined}
+        preload="metadata"
+        playsInline
+        onLoadedMetadata={(e) => {
+          const a = e.currentTarget;
+          if (a.duration && isFinite(a.duration) && a.duration > 1) {
+            setDuration(Math.round(a.duration));
+          }
+        }}
+        onDurationChange={(e) => {
+          const a = e.currentTarget;
+          if (a.duration && isFinite(a.duration) && a.duration > 1) {
+            setDuration(Math.round(a.duration));
+          }
+        }}
+        onError={() => {
+          console.warn('[CompactAudioStrip] Audio stream error for:', resolvedUrl);
+          if (resolvedUrl && resolvedUrl.includes('/storage/v1/object/sign/')) {
+            const pubUrl = resolvedUrl.replace('/storage/v1/object/sign/', '/storage/v1/object/public/').split('?')[0];
+            if (pubUrl && pubUrl !== resolvedUrl) {
+              setResolvedUrl(pubUrl);
+            }
+          }
+        }}
+      />
 
       {/* Media Playback & Primary Row Controls */}
       <div style={{
@@ -1318,7 +1396,7 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isLooping, setIsLooping] = useState(false);
-  const [countInActive, setCountInActive] = useState<boolean>(() => uiLevel === 'junior');
+  const [countInActive, setCountInActive] = useState<boolean>(false);
   const [countInStep, setCountInStep] = useState<number | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
@@ -1388,30 +1466,30 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
 
   useEffect(() => {
     let active = true;
-    let createdBlobUrl: string | null = null;
+    let cleanupFn: (() => void) | undefined;
 
-    if (url.startsWith('campus_blob_') || url.startsWith('campus_audio_')) {
-      getBlob(url).then((raw: any) => {
-        if (active && raw) {
-          const finalBlob = raw instanceof Blob ? raw : new Blob([raw], { type: 'audio/webm' });
-          createdBlobUrl = URL.createObjectURL(finalBlob);
-          setResolvedUrl(createdBlobUrl);
-        }
-      }).catch((err: any) => console.warn('[SplitCapsulePlayer] Blob load note:', err));
-    } else if (url.startsWith('http') || url.includes('/storage/v1/object/') || url.startsWith('schools/')) {
-      getSecureAudioUrl(url, 'campus-assets', 300).then((secUrl: string) => {
-        if (active && secUrl) setResolvedUrl(secUrl);
-      }).catch(() => {
-        if (active && isPlayableUrl(url)) setResolvedUrl(url);
-      });
-    } else {
-      if (isPlayableUrl(url)) setResolvedUrl(url);
-    }
+    resolvePlayableAudioSource(url, 'campus-assets', 1800).then((res) => {
+      if (active && res.src) {
+        setResolvedUrl(res.src);
+        cleanupFn = res.cleanup;
+      }
+    }).catch((err) => {
+      console.warn('[SplitCapsulePlayer] Failed to resolve playable audio source:', err);
+      if (active && isPlayableUrl(url)) {
+        setResolvedUrl(url);
+      }
+    });
 
     return () => {
       active = false;
-      if (createdBlobUrl) URL.revokeObjectURL(createdBlobUrl);
-      if (countInTimerRef.current) clearTimeout(countInTimerRef.current);
+      if (cleanupFn) cleanupFn();
+      if (countInTimerRef.current) {
+        if (typeof countInTimerRef.current === 'object' && countInTimerRef.current.clear) {
+          countInTimerRef.current.clear();
+        } else {
+          clearTimeout(countInTimerRef.current);
+        }
+      }
     };
   }, [url]);
 
@@ -1438,6 +1516,15 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
       }
       countInTimerRef.current = null;
       setCountInStep(null);
+      if (audioRef.current) {
+        try {
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+          audioRef.current.muted = false;
+          audioRef.current.volume = 1;
+        } catch {}
+      }
+      setIsPlaying(false);
       return;
     }
     if (!audioRef.current) return;
@@ -1460,6 +1547,8 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
           audioRef.current.load();
         }
         audioRef.current.loop = isLooping && (!loopLocator || !loopLocator.enabled);
+        audioRef.current.muted = false;
+        audioRef.current.volume = 1;
         audioRef.current.play().then(() => setIsPlaying(true)).catch(err => {
           console.warn('[Audio] Play error:', err);
           setIsPlaying(false);
@@ -1467,6 +1556,23 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
       };
 
       if (countInActive) {
+        // 🔓 Safari WebKit Autoplay Priming:
+        // Keep the audio element playing silently throughout count-in so WebKit permits unmuting on beat 4!
+        try {
+          audioRef.current.muted = true;
+          audioRef.current.volume = 0;
+          if (audioRef.current.ended || (duration > 0 && audioRef.current.currentTime >= duration)) {
+            audioRef.current.currentTime = 0;
+          }
+          if (audioRef.current.readyState === 0) {
+            audioRef.current.load();
+          }
+          const primePromise = audioRef.current.play();
+          if (primePromise !== undefined) {
+            primePromise.catch(() => {});
+          }
+        } catch {}
+
         const bpmMatch = label ? label.match(/(?:BPM:|\b)(\d{2,3})\s*(?:BPM|\b)/i) : null;
         const effectiveBpm = bpmMatch ? parseInt(bpmMatch[1], 10) : 100;
         const beatDurationSec = (60 / effectiveBpm) / (playbackRate || 1);
@@ -1494,7 +1600,24 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
         timers.push(setTimeout(() => {
           setCountInStep(null);
           countInTimerRef.current = null;
-          playNative();
+          if (audioRef.current) {
+            let startPos = 0;
+            if (isLooping && loopLocator && loopLocator.enabled) {
+              startPos = loopLocator.startSec;
+            }
+            try {
+              audioRef.current.currentTime = startPos;
+              audioRef.current.muted = false;
+              audioRef.current.volume = 1;
+              if (audioRef.current.paused) {
+                audioRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+              } else {
+                setIsPlaying(true);
+              }
+            } catch {
+              playNative();
+            }
+          }
         }, leadTimeMs + 4 * beatDurationMs));
       } else {
         playNative();
@@ -1506,13 +1629,16 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
     const audio = audioRef.current;
     if (!audio) return;
     const handleLoadedMetadata = () => {
-      if (audio.duration && isFinite(audio.duration)) {
+      if (audio.duration && isFinite(audio.duration) && audio.duration > 1) {
         setDuration(Math.round(audio.duration));
       }
     };
     const handleTimeUpdate = () => {
       const cur = audio.currentTime;
       setCurrentTime(cur);
+      if (cur > duration) {
+        setDuration(Math.ceil(cur));
+      }
       if (isLooping && loopLocator && loopLocator.enabled) {
         if (cur >= loopLocator.endSec) {
           audio.currentTime = loopLocator.startSec;
@@ -1528,20 +1654,24 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
       }
     };
 
-    if (audio.duration && isFinite(audio.duration)) {
+    if (audio.duration && isFinite(audio.duration) && audio.duration > 1) {
       setDuration(Math.round(audio.duration));
     }
 
     audio.loop = isLooping && (!loopLocator || !loopLocator.enabled);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('durationchange', handleLoadedMetadata);
+    audio.addEventListener('canplay', handleLoadedMetadata);
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
     return () => {
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('durationchange', handleLoadedMetadata);
+      audio.removeEventListener('canplay', handleLoadedMetadata);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [resolvedUrl, isLooping, loopLocator]);
+  }, [resolvedUrl, isLooping, loopLocator, duration]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -1838,7 +1968,33 @@ const AppleSplitCapsulePlayer: React.FC<AppleSplitCapsulePlayerProps> = ({
         transform: isTransitioning ? 'scale(0.992)' : 'scale(1)'
       }}
     >
-      <audio ref={audioRef} src={resolvedUrl || undefined} preload="metadata" playsInline />
+      <audio
+        ref={audioRef}
+        src={resolvedUrl || undefined}
+        preload="metadata"
+        playsInline
+        onLoadedMetadata={(e) => {
+          const a = e.currentTarget;
+          if (a.duration && isFinite(a.duration) && a.duration > 1) {
+            setDuration(Math.round(a.duration));
+          }
+        }}
+        onDurationChange={(e) => {
+          const a = e.currentTarget;
+          if (a.duration && isFinite(a.duration) && a.duration > 1) {
+            setDuration(Math.round(a.duration));
+          }
+        }}
+        onError={() => {
+          console.warn('[AppleSplitCapsulePlayer] Audio stream error for:', resolvedUrl);
+          if (resolvedUrl && resolvedUrl.includes('/storage/v1/object/sign/')) {
+            const pubUrl = resolvedUrl.replace('/storage/v1/object/sign/', '/storage/v1/object/public/').split('?')[0];
+            if (pubUrl && pubUrl !== resolvedUrl) {
+              setResolvedUrl(pubUrl);
+            }
+          }
+        }}
+      />
 
       <div style={{
         display: 'flex',

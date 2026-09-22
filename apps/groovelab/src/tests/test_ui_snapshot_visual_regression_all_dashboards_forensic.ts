@@ -8,8 +8,8 @@
  * 3. Teacher Dashboard (Campus Green vs GrooveLab Yellow, Schedule Grid, Badges)
  * 4. Student Dashboard & Parent Portal (Didactic Levels, Sticky Safety Banner, PWA Clearance)
  * 5. Universal Visual Design Tokens (Typography, Button Contracts, Zero Paragraphs)
- *
- * Standards: OWASP ASVS Level 3 / WCAG 2.2 AA / BFSG 2025 / Apple HIG Design Tokens
+ * Standards: DIN EN ISO 9241-110:2020 (Software-Ergonomie & Dialoggestaltung),
+ *            DIN EN 301 549 V3.2.1 / WCAG 2.2 AA (BFSG 2025), Apple HIG, OWASP ASVS L3
  * ==============================================================================
  */
 

@@ -77,3 +77,55 @@ export async function logSecurityEvent({
     console.warn('[AUDIT LOG] Non-blocking log error:', err);
   }
 }
+
+export interface ApplicationAuditPayload {
+  action: string;
+  schoolId?: string | null;
+  tableName?: string;
+  recordId?: string | null;
+  details?: Record<string, any>;
+}
+
+/**
+ * 🏛️ Authoritative Application Audit Logging (Enterprise+ Tier-1 / OWASP ASVS Level 3)
+ * Calls public.log_application_audit_event SECURITY DEFINER RPC.
+ * Enforces changed_by = auth.uid() on the PostgreSQL database server.
+ * Beseitigt Client-Audit-Injektionen (CWE-117).
+ */
+export async function logApplicationAudit({
+  action,
+  schoolId,
+  tableName = 'application',
+  recordId,
+  details = {},
+}: ApplicationAuditPayload): Promise<string | null> {
+  try {
+    const cleanDetails = sanitizeMetadata(details);
+    const activeTrace = getOrCreateActiveTrace();
+
+    const enrichedDetails = {
+      ...cleanDetails,
+      trace_id: activeTrace.traceId,
+      traceparent: activeTrace.traceparent,
+      client_timestamp: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabase.rpc('log_application_audit_event', {
+      p_school_id: schoolId || null,
+      p_action: action,
+      p_table_name: tableName,
+      p_record_id: recordId || null,
+      p_details: enrichedDetails,
+    });
+
+    if (error) {
+      console.warn('[APPLICATION AUDIT] RPC notice:', error.message || error);
+      return null;
+    }
+    return data as string;
+  } catch (err) {
+    console.warn('[APPLICATION AUDIT] Non-blocking audit error:', err);
+    return null;
+  }
+}
+
